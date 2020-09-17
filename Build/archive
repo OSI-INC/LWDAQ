@@ -1,0 +1,201 @@
+#!/bin/bash
+
+# This shell script creates the LWDAQ.zip archive in which we distribute 
+# the LWDAQ software.
+
+# Check options
+MAKE="ERROR"
+case "$1" in
+	"") MAKE="YES";;
+	"--no-make") MAKE="NO";;
+	"--make") MAKE="YES";;
+	"--help") 
+		echo "archive ?--make? ?--no-make?"
+		exit;;
+esac
+if [ "$MAKE" == "ERROR" ]
+then
+	echo "ERROR: illegal option \"$1\"."
+	exit
+fi
+
+# Determine operating system. Default is Unix. 
+OS=UNIX
+if [ "`uname -a | grep -i Darwin`" != "" ]
+then 
+	OS=MacOS
+fi
+if [ "`uname -a | grep -i Windows`" != "" ]
+then 
+	OS=Windows
+fi
+if [ "`uname -a | grep -i Linux`" != "" ]
+then 
+	OS=Linux
+fi
+
+# Get rid of platform-specific meta-data files.
+if [ "$OS" == "MacOS" ] 
+then
+	find .. -name ".DS_Store" -print | xargs -n1 rm
+fi
+
+# We assume this archive script is in the LWDAQ/Build directory. We start
+# by obtaining a relative path to the Build directory, then we obtain a 
+# global path.
+BUILD_DIR=`dirname $0`
+cd $BUILD_DIR
+BUILD_DIR=`pwd`
+echo "BUILD_DIR: $BUILD_DIR"
+
+# Look for the LWDAQ directory structure. If we don't find it, we exit.
+if [ -d "../LWDAQ.app" ]
+then
+	echo "FOUND: LWDAQ directory structure."
+else
+	echo "ERROR: No LWDAQ directory structure around script file."
+	exit
+fi
+
+# Define directories.
+cd ..
+LWDAQ_DIR=`pwd`
+echo "LWDAQ_DIR: $LWDAQ_DIR"
+cd ..
+MASTER_DIR=`pwd`
+echo "MASTER_DIR: $MASTER_DIR"
+LIB_DIR="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ"
+echo "LIB_DIR: $LIB_DIR"
+VBT_DIR="$LWDAQ_DIR/Videoarchiver"
+echo "VBT_DIR: $VBT_DIR"
+GIT_DIR="$LWDAQ_DIR/.git"
+echo "GIT_DIR: $GIT_DIR"
+
+# Determine software version number.
+VERSION=`grep -o "\"[0-9]\+\.[0-9]\+\.[0-9]\+\"" $LIB_DIR/Init.tcl | grep -o "[^\"]\+" `
+if [ -z "$VERSION" ] 
+then
+	echo "ERROR: could not find version number in Init.tcl."
+	exit
+fi
+echo "Software Version: $VERSION"
+
+# Return to build directory and clean.
+cd $BUILD_DIR
+make clean
+
+# Build the lwdaq.so shared library for the local platform.
+# On MacOS, we compile two versions of lwdaq.so, one for
+# ppc and one for i386. We combine these into a universal
+# binary that will run on both ppc and i386 MacOS machines.
+# On all other platforms, we compile lwdaq.so directly.
+if [ $MAKE == "YES" ]
+then
+	make remove
+	make
+	make clean
+fi
+
+# Prepare to make archive.
+echo "Preparing LWDAQ files for archive..."
+rm $LWDAQ_DIR/Tools/Data/Acquisifier_Results.txt
+rm $LWDAQ_DIR/Tools/Data/*_Settings.tcl
+mv $LIB_DIR/Toolmaker.tcl $MASTER_DIR/Toolmaker.tcl
+mv $LIB_DIR/Toolmaker_Distribute.tcl $LIB_DIR/Toolmaker.tcl
+
+# We move the Videoarchiver and .git libraries out of the LWDAQ 
+# package because they are large. The user must download
+# these separately.
+mv $VBT_DIR $MASTER_DIR/VBT
+mv $GIT_DIR $MASTER_DIR/GIT
+
+# Move to master directory and define archive name.
+cd $MASTER_DIR
+ARCHIVE=LWDAQ_$VERSION.zip
+
+# Make the zip archive. The archive will appear beside the 
+# LWDAQ directory.
+if [ $OS == "MacOS" ]
+then
+# On MacOS we use the ditto command on MacOS because it 
+# preserve MacOS resource information, so that the LWDAQ
+# program icon will be intact when we unzip on another MacOS
+# machine.
+	echo "Creating $ARCHIVE with MacOS compression utility..."
+	ditto -c -k --sequesterRsrc --keepParent \
+		`basename $LWDAQ_DIR` $ARCHIVE
+else
+# We use the zip command on other platforms. It does not 
+# preserve the MacOS icon. We try to remove resource information
+# to make a more generic archive with the X option.
+	echo "Creating $ARCHIVE with zip compression utility..."
+	zip -rqX $ARCHIVE `basename $LWDAQ_DIR`
+fi
+
+# Restore LWDAQ files to former places.
+echo "Restoring LWDAQ files."
+mv $LIB_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker_Distribute.tcl
+mv Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
+mv VBT $VBT_DIR
+mv GIT $GIT_DIR
+
+# Copy files to website if it's mounted on the desktop.
+SITE="/Volumes/website/Sites/Software/Download"
+if [ -d "$SITE" ]
+then
+	echo "FOUND: Software website mounted upon desktop."
+	echo "Deleting archive on website..."
+	rm $SITE/LWDAQ_$VERSION.zip
+	echo "Uploading LWDAQ_$VERSION.zip..."
+	cp LWDAQ_$VERSION.zip $SITE/LWDAQ_$VERSION.zip
+	echo "Deleting local copy of archive..."
+	rm LWDAQ_$VERSION.zip
+fi
+
+# Copy files to website if it's mounted on the desktop.
+SITE="/Volumes/website/Sites/Electronics/LWDAQ"
+if [ -d "$SITE" ]
+then
+	echo "FOUND: Documentation website."
+	if [ -d "Electronics/LWDAQ" ]
+	then 
+		echo "FOUND: Local documents."
+		echo "Deleting documents on website..."
+		rm $SITE/Manual.html
+		rm $SITE/Commands.html
+		rm $SITE/Acquisifier.html
+		echo "Uploading Manual.html..."
+		cp Electronics/LWDAQ/Manual.html $SITE/Manual.html
+		echo "Generating new Commands.html"
+		GENERATOR_SCRIPT="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Startup/Gen.tcl"
+		echo "LWDAQ_command_reference; exit" | cat > $GENERATOR_SCRIPT
+		$LWDAQ_DIR/lwdaq --no-gui
+		rm $GENERATOR_SCRIPT
+		echo "Uploading Commands.html..."
+		cp $LWDAQ_DIR/Commands.html $SITE/Commands.html
+		rm $LWDAQ_DIR/Commands.html
+		echo "Uploading Acquisifier.html..."
+		cp Electronics/LWDAQ/Acquisifier.html $SITE/Acquisifier.html
+	else
+		echo "NOT FOUND: Local documents."
+	fi
+	if [ -d "LWDAQ/Sources" ]
+	then
+		echo "FOUND: Source code."
+		echo "Deleting source code on website..."
+		rm -R /Volumes/website/Sites/Software/Sources
+		echo "Uploading source code to website..."
+		cp -R LWDAQ/Sources /Volumes/website/Sites/Software
+		cp LWDAQ/LWDAQ.app/Contents/LWDAQ/*.tcl /Volumes/website/Sites/Software/Sources
+		rm /Volumes/website/Sites/Software/Sources/Toolmaker.tcl
+		mv /Volumes/website/Sites/Software/Sources/Toolmaker_Distribute.tcl \
+			/Volumes/website/Sites/Software/Sources/Toolmaker.tcl
+		cp LWDAQ/LWDAQ.app/Contents/LWDAQ/Instruments/*.tcl /Volumes/website/Sites/Software/Sources
+	else
+		echo "NOT FOUND: Source code."
+	fi
+fi
+
+# Finish.
+echo "Done."
+exit
