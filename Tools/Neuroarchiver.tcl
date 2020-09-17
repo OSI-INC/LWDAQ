@@ -518,7 +518,7 @@ proc Neuroarchiver_init {} {
 #
 	set info(title_color) "purple"
 	set info(label_color) "purple"
-	set info(variable_bg) "yellow"
+	set info(variable_bg) "tan"
 #
 # We apply a window function to the signal before we take the fourier 
 # transform. This function smooths the signal to its average value 
