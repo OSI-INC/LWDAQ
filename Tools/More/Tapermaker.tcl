@@ -23,7 +23,7 @@ proc Tapermaker_init {} {
 	upvar #0 Tapermaker_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tapermaker" "2.5"
+	LWDAQ_tool_init "Tapermaker" "2.6"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	# Conversion constants.
@@ -34,7 +34,7 @@ proc Tapermaker_init {} {
 	set config(top_distance) "0"
 	
 	# The reset and go-home speeds.
-	set config(reset_speed_mmps) "2.1"
+	set config(reset_speed_mmps) "2.0"
 	set config(acceleration_mmpss) "10.0"
 	
 	# The distance moved on approach from home to the heating coil. The bottom
@@ -49,10 +49,10 @@ proc Tapermaker_init {} {
 	# A bottom portion delay between the start of the top stretch movement
 	# and the bottom stretch movement.
 	set config(top_stretch_distance_mm) "10.0"
-	set config(top_stretch_speed_mmps) "2.1"
+	set config(top_stretch_speed_mmps) "2.0"
 	set config(bottom_stretch_delay_s) "2.0"
 	set config(bottom_stretch_distance_mm) "10.0"
-	set config(bottom_stretch_speed_mmps) "2.1"
+	set config(bottom_stretch_speed_mmps) "2.0"
 	
 	# The Terminal Instrument settings that allow communication with the
 	# motor controller. We have a transmit string header consisting of 
@@ -66,6 +66,7 @@ proc Tapermaker_init {} {
 	set config(rx_last) "0"
 	set config(rx_timeout_ms) "0"
 	set config(rx_size) "0"
+	set config(xmit_cmd) "<00 *"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -74,15 +75,19 @@ proc Tapermaker_init {} {
 }
 
 #
-# Tapermaker_xmit transmits a string of commands followed by a carriage return and line 
-# feed to the motor controller via the Terminal Instrument and an RS-232 Interface (A2060C).
+# Tapermaker_xmit transmits a string of commands followed by a carriage return
+# and line feed to the motor controller via the Terminal Instrument and an
+# RS-232 Interface (A2060C). If the command string we pass is blank, we use the
+# xmitc_cmd string in the configuration array.
 #
-proc Tapermaker_xmit {cmd} {
+proc Tapermaker_xmit {{cmd ""}} {
 	upvar #0 Tapermaker_info info
 	upvar #0 Tapermaker_config config
 	upvar #0 LWDAQ_config_Terminal tconfig
 	upvar #0 LWDAQ_info_Terminal tinfo
 
+	if {$cmd == ""} {set cmd $config(xmit_cmd)}
+	
 	foreach a {daq_ip_addr daq_driver_socket daq_mux_socket \
 		rx_size rx_last tx_footer tx_ascii rx_timeout_ms} {
 		set tconfig($a) $config($a)
@@ -143,31 +148,65 @@ proc Tapermaker_reset {} {
 	set reset_speed [expr round($config(reset_speed_mmps) * $info(steps_per_mm))]
 	set acceleration [expr round($config(acceleration_mmpss) * $info(steps_per_mm))]
 
-	
-	# Turn on the motor windings with "H35". The windings will be powered at all times
-	# until we use the OFF command.
-	Tapermaker_xmit "<00 H35"
+	# "<00" Select all controllers for universal configuration.
+	Tapermaker_xmit "<00"
 
-	# "<00" Select all controllers. "L06 2" Upon H01 command, program will be
-	# executed entirely. "L07 0" turns off the strobe outputs. "L70 10" Set
-	# resolution to 10 pulses per step, which gives 2000 pulses per revolution,
-	# or 4000 pulses per millimeter. "L09 8000" Set jog speed to 8000 p/s or 2
-	# mm/s. "L11 40000" Set acceleration and deceleration to 40000 p/s/s, or 10
-	# mm/s/s. "L12 4000" Set low speed to 4000 p/s or 1 mm/s. "L13 10" In step
-	# mode, one step is ten pulses. "L14 5000" Set the home speed tpo 5000. "L16
-	# 0" Disable maximum index limit. "L18 -0" Disable CW softare travel limit.
-	# "L19 +0" Disable CCW software travel limit. "L26 3" Transmit EOT at end of
-	# each transmission, and "=" when ready for new commands. "L41 1" Program
-	# reset line number. "L44 10" Insert 10-ms delay between each line
-	# execution. "L47 0" Program repeat counter zero. "L66 +0" Disable backlash
-	# compensation. "L67 0" Disable autoreverse. "L71 115000" Max speed. "L72 0"
-	# trapezoidal ramp (the more fancy shapes cause resonance in the motors at
-	# some speeds. "L98 10" Delay between H-codes is 10 ms.
-	Tapermaker_xmit "<00 L70 10 L06 2 L07 0 L09 $reset_speed"
+	# "L45 0" Activate limit switches.
+	#
+	# "H35" Turn on the motor windings. The windings will be powered until the 
+	# user sends an H36 command, which is windings off.
+	Tapermaker_xmit "L45 0 H35"
+
+	# "<00" Select all controllers.
+	# 
+	# "L06 2" Upon H01 command, program will be executed entirely. 
+	#
+	# "L70 10" Set resolution to 10 pulses per step, which gives 2000 pulses per
+	# revolution, or 4000 pulses per millimeter.
+	# 
+	# "L07 0" turns off the strobe outputs.
+	# 
+	# "L09 8000" Set jog speed to 8000 p/s or 2 mm/s. 
+	Tapermaker_xmit "L70 10 L06 2 L07 0 L09 $reset_speed"
+
+	# "L11 40000" Set acceleration and deceleration to 40000 p/s/s, or 10
+	# mm/s/s. 
+	# 
+	# "L12 4000" Set low speed to 4000 p/s or 1 mm/s.
+	# 
+	# "L13 10" In step mode, one step is ten pulses. 
 	Tapermaker_xmit "L11 $acceleration L12 4000 L13 10"
+
+	# "L14 5000" Set the home speed tpo 5000. 
+	# 
+	# "L16 0" Disable maximum index limit.
+	#
+	# "L18 -0" Disable CW softare travel limit.
+	# 
+	# "L19 +0" Disable CCW software travel limit. 
 	Tapermaker_xmit "L14 5000 L16 0 L18 -0 L19 +0"
+
+	# "L26 3" Transmit EOT at end of each transmission, and "=" when ready for
+	# new commands.
+	# 
+	# "L41 1" Program reset line number.
+	# 
+	# "L44 10" Insert 10-ms delay between each line execution.
+	# 
+	# "L47 0" Program repeat counter zero.
 	Tapermaker_xmit "L26 3 L41 1 L44 0 L45 10 L47 0"
+
+	# "L66 +0" Disable backlash compensation. 
+	# 
+	# "L67 0" Disable autoreverse.
 	Tapermaker_xmit "L66 +0 L67 0"
+
+	# "L71 115000" Max speed.
+	# 
+	# "L72 0" trapezoidal ramp (the more fancy shapes cause resonance in the
+	# motors at some speeds. 
+	# 
+	# "L98 10" Delay between H-codes is 10 ms.
 	Tapermaker_xmit "L71 115000 L72 0 L98 10"
 
 	LWDAQ_print $info(text) "Done.\n"
@@ -385,8 +424,14 @@ proc Tapermaker_open {} {
 		label $f.l$a -text $a -justify left
 		entry $f.e$a -textvariable Tapermaker_config($a) -width 15 -justify right
 		grid $f.l$a $f.e$a - -sticky w
-		 
 	}	
+	
+	# Create a general-purpose G-code command interface.
+	set f [frame $w.xmit]
+	pack $f -side top -fill x
+	button $f.xmit -text "Transmit" -command "Tapermaker_xmit"
+	entry $f.cmd -textvariable Tapermaker_config(xmit_cmd) -width 80 -justify right
+	pack $f.xmit $f.cmd -side left
 	
 	# Creates text widget and prints tool name
 	set info(text) [LWDAQ_text_widget $w 85 10]

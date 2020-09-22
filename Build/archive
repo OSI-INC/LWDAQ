@@ -140,23 +140,25 @@ mv VBT $VBT_DIR
 mv GIT $GIT_DIR
 
 # Copy files to website if it's mounted on the desktop.
-SITE="/Volumes/website/Sites/Software/Download"
+SITE="~/Volumes/BNDHEP/Software/Download"
 if [ -d "$SITE" ]
 then
-	echo "FOUND: Software website mounted upon desktop."
+	echo "FOUND: Remote software download directory."
 	echo "Deleting archive on website..."
 	rm $SITE/LWDAQ_$VERSION.zip
 	echo "Uploading LWDAQ_$VERSION.zip..."
 	cp LWDAQ_$VERSION.zip $SITE/LWDAQ_$VERSION.zip
 	echo "Deleting local copy of archive..."
 	rm LWDAQ_$VERSION.zip
+else
+	echo "NOT FOUND: Remote software download directory."
 fi
 
 # Copy files to website if it's mounted on the desktop.
-SITE="/Volumes/website/Sites/Electronics/LWDAQ"
+SITE="~/Volumes/BNDHEP/Electronics/LWDAQ"
 if [ -d "$SITE" ]
 then
-	echo "FOUND: Documentation website."
+	echo "FOUND: Remote BNDHEP documentation directory."
 	if [ -d "Electronics/LWDAQ" ]
 	then 
 		echo "FOUND: Local documents."
@@ -194,6 +196,8 @@ then
 	else
 		echo "NOT FOUND: Source code."
 	fi
+else 
+	echo "NOT FOUND: Remote BNDHEP documentation directory."
 fi
 
 # Finish.
