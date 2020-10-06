@@ -28,7 +28,7 @@ set num_errors 0
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.1"
-set LWDAQ_Info(program_patchlevel) "10.1.15"
+set LWDAQ_Info(program_patchlevel) "10.1.16"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 	
 # Determine operating system.
@@ -320,6 +320,12 @@ if {$LWDAQ_Info(configuration_file) != ""} {
 		puts "ERROR: $error_message in configuration file \"$LWDAQ_Info(configuration_file)\"."
 		incr num_errors
 	}
+}
+
+# Check to see if there are spaces in the LWDAQ program directory.
+if {[regexp { } $LWDAQ_Info(program_dir)]} {
+	puts "WARNING: Installation directory \"$LWDAQ_Info(program_dir)\" contains spaces."
+	incr num_errors
 }
 
 # Report number of errors if greater than zero.

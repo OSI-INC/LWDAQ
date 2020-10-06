@@ -3,6 +3,9 @@
 # This shell script creates the LWDAQ.zip archive in which we distribute 
 # the LWDAQ software.
 
+# Mount point for remote disk.
+RMT="/Users/kevan/Library/Group Containers/G69SCX94XU.duck/Library/Application Support/duck/Volumes/BNDSFTP"
+
 # Check options
 MAKE="ERROR"
 case "$1" in
@@ -139,8 +142,8 @@ mv Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
 mv VBT $VBT_DIR
 mv GIT $GIT_DIR
 
-# Copy files to website if it's mounted on the desktop.
-SITE="~/Volumes/BNDHEP/Software/Download"
+# Copy files to remote software repository if it's mounted.
+SITE="$RMT/Software/Download"
 if [ -d "$SITE" ]
 then
 	echo "FOUND: Remote software download directory."
@@ -155,7 +158,7 @@ else
 fi
 
 # Copy files to website if it's mounted on the desktop.
-SITE="~/Volumes/BNDHEP/Electronics/LWDAQ"
+SITE="$RMT/Electronics/LWDAQ"
 if [ -d "$SITE" ]
 then
 	echo "FOUND: Remote BNDHEP documentation directory."
