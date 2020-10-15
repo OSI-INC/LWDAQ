@@ -29,7 +29,7 @@ FPC_FLAGS = -Px86_64 -O3
 
 ifeq ($(OS),MacOS)
 	TCL_FLAGS = -Ff../LWDAQ.app/Contents/Frameworks
-	FPC_FLAGS = -Px86_64 -O3 -WM10.8
+	FPC_FLAGS = -Px86_64 -O3 -WM10.9
 endif
 
 ifeq ($(OS),Windows)

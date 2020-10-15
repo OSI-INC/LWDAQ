@@ -4,7 +4,7 @@
 # the LWDAQ software.
 
 # Mount point for remote disk.
-RMT="/Users/kevan/Library/Group Containers/G69SCX94XU.duck/Library/Application Support/duck/Volumes/BNDSFTP"
+RMT="/Users/kevan/BNDSFTP"
 
 # Check options
 MAKE="ERROR"
@@ -158,49 +158,44 @@ else
 fi
 
 # Copy files to website if it's mounted on the desktop.
-SITE="$RMT/Electronics/LWDAQ"
-if [ -d "$SITE" ]
+if [ -d "Electronics/LWDAQ" ]
+then 
+	DOCS="$RMT/Electronics/LWDAQ"
+	echo "FOUND: Local document folder."
+	echo "Deleting documents on website..."
+	rm $DOCS/Manual.html
+	rm $DOCS/Commands.html
+	rm $DOCS/Acquisifier.html
+	echo "Uploading Manual.html..."
+	cp Electronics/LWDAQ/Manual.html $DOCS/Manual.html
+	echo "Generating new Commands.html"
+	GENERATOR_SCRIPT="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Startup/Gen.tcl"
+	echo "LWDAQ_command_reference; exit" | cat > $GENERATOR_SCRIPT
+	$LWDAQ_DIR/lwdaq --no-gui
+	rm $GENERATOR_SCRIPT
+	echo "Uploading Commands.html..."
+	cp $LWDAQ_DIR/Commands.html $DOCS/Commands.html
+	rm $LWDAQ_DIR/Commands.html
+	echo "Uploading Acquisifier.html..."
+	cp Electronics/LWDAQ/Acquisifier.html $DOCS/Acquisifier.html
+else
+	echo "NOT FOUND: Local document folder."
+fi
+	
+if [ -d "LWDAQ/Sources" ]
 then
-	echo "FOUND: Remote BNDHEP documentation directory."
-	if [ -d "Electronics/LWDAQ" ]
-	then 
-		echo "FOUND: Local documents."
-		echo "Deleting documents on website..."
-		rm $SITE/Manual.html
-		rm $SITE/Commands.html
-		rm $SITE/Acquisifier.html
-		echo "Uploading Manual.html..."
-		cp Electronics/LWDAQ/Manual.html $SITE/Manual.html
-		echo "Generating new Commands.html"
-		GENERATOR_SCRIPT="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Startup/Gen.tcl"
-		echo "LWDAQ_command_reference; exit" | cat > $GENERATOR_SCRIPT
-		$LWDAQ_DIR/lwdaq --no-gui
-		rm $GENERATOR_SCRIPT
-		echo "Uploading Commands.html..."
-		cp $LWDAQ_DIR/Commands.html $SITE/Commands.html
-		rm $LWDAQ_DIR/Commands.html
-		echo "Uploading Acquisifier.html..."
-		cp Electronics/LWDAQ/Acquisifier.html $SITE/Acquisifier.html
-	else
-		echo "NOT FOUND: Local documents."
-	fi
-	if [ -d "LWDAQ/Sources" ]
-	then
-		echo "FOUND: Source code."
-		echo "Deleting source code on website..."
-		rm -R /Volumes/website/Sites/Software/Sources
-		echo "Uploading source code to website..."
-		cp -R LWDAQ/Sources /Volumes/website/Sites/Software
-		cp LWDAQ/LWDAQ.app/Contents/LWDAQ/*.tcl /Volumes/website/Sites/Software/Sources
-		rm /Volumes/website/Sites/Software/Sources/Toolmaker.tcl
-		mv /Volumes/website/Sites/Software/Sources/Toolmaker_Distribute.tcl \
-			/Volumes/website/Sites/Software/Sources/Toolmaker.tcl
-		cp LWDAQ/LWDAQ.app/Contents/LWDAQ/Instruments/*.tcl /Volumes/website/Sites/Software/Sources
-	else
-		echo "NOT FOUND: Source code."
-	fi
-else 
-	echo "NOT FOUND: Remote BNDHEP documentation directory."
+	SFTW="$RMT/Software"
+	echo "FOUND: Local source code directory."
+	echo "Deleting remote source code directory..."
+	rm -R $SFTW/Sources
+	echo "Uploading source code to remote directory..."
+	cp -R LWDAQ/Sources $SFTW/Sources
+	cp LWDAQ/LWDAQ.app/Contents/LWDAQ/*.tcl $SFTW/Sources
+	rm $SFTW/Sources/Toolmaker.tcl
+	mv $SFTW/Sources/Toolmaker_Distribute.tcl $RMT/Toolmaker.tcl
+	cp LWDAQ/LWDAQ.app/Contents/LWDAQ/Instruments/*.tcl $SFTW/Sources
+else
+	echo "NOT FOUND: Local source code directory."
 fi
 
 # Finish.

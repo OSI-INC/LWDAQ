@@ -29,13 +29,14 @@
 # V24: Add support for Black and Blue D-BCAMs and IC424Q calibration.
 # V25: Add support for reference camera and source block to plug into same mux.
 # V26: The apparatus name now comes with a description.
+# V27: Add support for more apparatus versions.
 
 proc BCAM_Calibrator_init {} {
 	upvar #0 BCAM_Calibrator_info info
 	upvar #0 BCAM_Calibrator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "BCAM_Calibrator" "26"
+	LWDAQ_tool_init "BCAM_Calibrator" "27"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set config(daq_timeout_ms) 5000
@@ -61,7 +62,9 @@ proc BCAM_Calibrator_init {} {
 	set config(source_database) "\
 		{Default 2 0.000005 0.000020 0.000002} \
 		{BND15 9 0.000400 0.000700 0.000100} \
-		{BND20 9 0.000400 0.000700 0.000100}"
+		{BND20 9 0.000400 0.000700 0.000100} \
+		{BND25 2 0.000005 0.000020 0.000002} \
+		{BND30 9 0.000400 0.000700 0.000100}"
 
 	set info(camera_sources) "4 3 2 1"
 	set info(camera_front_element) "2"

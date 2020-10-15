@@ -22,7 +22,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "1.3"
+	LWDAQ_tool_init "Stimulator" "1.4"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -32,6 +32,7 @@ proc Stimulator_init {} {
 	set config(initiate_delay) "0.010"
 	set config(spacing_delay_A2037E) "0.0000"
 	set config(spacing_delay_A2071E) "0.0014"
+	set config(spacing_delay_cmd) "0.0"
 	set config(byte_processing_time) "0.0002"
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
@@ -462,8 +463,9 @@ proc Stimulator_battery {n} {
 #
 # Stimulator_all takes a parameter "action" that it uses to define a procedure
 # it will call on every stimulator in the current list, provided that its ID is
-# not "*".
-# #
+# not "*". We introduce a delay after each action to give stimulators a chance 
+# to get ready for the next command.
+# 
 proc Stimulator_all {action} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
@@ -472,6 +474,7 @@ proc Stimulator_all {action} {
 		if {[set info(device$n\_id)] != "*"} {
 			Stimulator_$action $n
 		}
+		LWDAQ_wait_seconds $config(spacing_delay_cmd)
 	}
 
 	return "SUCCESS"
