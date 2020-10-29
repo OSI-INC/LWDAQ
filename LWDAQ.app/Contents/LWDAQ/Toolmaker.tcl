@@ -318,3 +318,302 @@ foreach ft $copyfiles {
 }
 </script>
 
+<script>
+for {set i 0} {$i <= 255} {incr i} {
+	set x [expr sin($i*pi()*2/256)]
+	set ADC [expr round($x*20000)+30000]
+	set hex [format %04x $ADC]
+	LWDAQ_print $t [string range $hex 0 1]
+	LWDAQ_print $t [string range $hex 2 3]
+}
+</script>
+
+<script>
+for {set i 0} {$i <= 255} {incr i} {
+	set x [expr sin($i*$pi*2/256)]
+	set ADC [expr round($x*20000)+30000]
+	set hex [format %04x $ADC]
+	LWDAQ_print $t [string range $hex 0 1]
+	LWDAQ_print $t [string range $hex 2 3]
+}
+</script>
+
+<script>
+for {set i 0} {$i <= 255} {incr i} {
+	set x [expr sin($i*3.14159*2/256)]
+	set ADC [expr round($x*20000)+30000]
+	set hex [format %04x $ADC]
+	LWDAQ_print $t [string range $hex 0 1]
+	LWDAQ_print $t [string range $hex 2 3]
+}
+</script>
+
+<script>
+for {set i 0} {$i < 128} {incr i} {
+	set x [expr sin($i*3.14159*2/128)]
+	set ADC [expr round($x*20000)+30000]
+	set hex [format %04x $ADC]
+	LWDAQ_print $t [string range $hex 0 1]
+	LWDAQ_print $t [string range $hex 2 3]
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+LWDAQ_print $t $contents
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+LWDAQ_print $t $match
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+LWDAQ_print $t $nets
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+LWDAQ_print $t $nets
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [string trim $nets]
+LWDAQ_print $t $nets
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	LWDAQ_print $t $line
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexpr {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print $t $name
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print $t $name
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print $t $name
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print $t "\n$name "
+	} elseif {[regexp {[ ]+\(node.*?\(ref (.*?)\)} $line match part]} {
+		LWDAQ_print -nonewline $t "$part "
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print $t "\n$name "
+	} elseif {[regexp {[ ]+\(node.*?\(ref (.+?)\)} $line match part]} {
+		LWDAQ_print -nonewline $t "$part "
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print $t "\n$name "
+	} elseif {[regexp {[ ]+\(node.*?\(ref ([^\)]*\)} $line match part]} {
+		LWDAQ_print -nonewline $t "$part "
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print $t "\n$name "
+	} elseif {[regexp {[ ]+\(node.*?\(ref ([^\)]*)\)} $line match part]} {
+		LWDAQ_print -nonewline $t "$part "
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print $t "\n$name "
+	} elseif {[regexp {[ ]+\(node.*?\(ref ([^\)]*)\).+?\(pin ([^\)]*)\)} $line match part pin]} {
+		LWDAQ_print -nonewline $t "$part-$pin"
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print -nonewline $t "\n$name "
+	} elseif {[regexp {[ ]+\(node.*?\(ref ([^\)]*)\).+?\(pin ([^\)]*)\)} $line match part pin]} {
+		LWDAQ_print -nonewline $t "$part-$pin "
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]+\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print -nonewline $t "\n$name "
+	} elseif {[regexp {[ ]+\(node.*?\(ref ([^\)]*)\).+?\(pin ([^\)]*)\)} $line match part pin]} {
+		LWDAQ_print -nonewline $t "$part-$pin "
+	}
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [read $f]
+close $f
+
+set found [regexp {nets(.*)} $contents match nets]
+if {!$found} {LWDAQ_print $t "ERROR: No netlist found."}
+set nets [split [string trim $nets] \n]
+foreach line $nets {
+	if {[regexp {[ ]*\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		LWDAQ_print -nonewline $t "\n$name "
+	} elseif {[regexp {[ ]+\(node.*?\(ref ([^\)]*)\).+?\(pin ([^\)]*)\)} $line match part pin]} {
+		LWDAQ_print -nonewline $t "$part-$pin "
+	}
+}
+</script>
+
