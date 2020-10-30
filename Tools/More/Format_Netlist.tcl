@@ -1,4 +1,4 @@
-# Format Traxmaker or Kicad Netlist and Create Updated Drill File. [29-OCT-20]
+# Format Traxmaker or Kicad Netlist and Create Updated Drill File. [30-OCT-20]
 
 # Get the file name of the netlist created by Traxmaker. Read its contents.
 set fn [LWDAQ_get_file_name]
@@ -21,14 +21,20 @@ if {[regexp {\(export} $contents]} {
 	}
 	set nets [split [string trim $nets] \n]
 	set contents ""
+	set net ""
+	set nodes "0"
 	foreach line $nets {
 		if {[regexp {[ ]*\(net.*?\(name "([^"]*)"\)} $line match name]} {
-			append contents "\n$name "
+			if {$nodes > 1} {append contents "$net \n"}
+			set net "$name "
+			set nodes "0"
 		} elseif {[regexp {[ ]+\(node.*?\(ref ([^\)]*)\).+?\(pin ([^\)]*)\)} \
 				$line match part pin]} {
-			append contents "$part-$pin "
+			append net "$part-$pin "
+			incr nodes
 		}
 	}
+	if {$nodes > 1} {append contents $net}
 	set f [open $nfn w]
 	puts $f $contents
 	close $f
