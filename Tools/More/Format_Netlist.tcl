@@ -24,9 +24,10 @@ if {[regexp {\(export} $contents]} {
 	set net ""
 	set nodes "0"
 	foreach line $nets {
-		if {[regexp {[ ]*\(net.*?\(name "([^"]*)"\)} $line match name]} {
+		if {[regexp {[ ]*\(net.*?\(name ([^\n]*)} $line match name]} {
 			if {$nodes > 1} {append contents "$net \n"}
-			set net "$name "
+			set name [regsub -all {\)|/|.+?\(|"} $name ""]
+			set net "NET: \"$name\" "
 			set nodes "0"
 		} elseif {[regexp {[ ]+\(node.*?\(ref ([^\)]*)\).+?\(pin ([^\)]*)\)} \
 				$line match part pin]} {
