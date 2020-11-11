@@ -67,6 +67,7 @@ type
 	{$linkframework Tk}
 	{$define _TCLLIB_:=}
 	{$define _TKLIB_:=}
+	{$define _EXT_:=external}
 {$ENDIF}
 
 
@@ -91,6 +92,7 @@ type
 	const tcl_ld_prefix='_';
 	{$define _TCLLIB_:='tcl86'}
 	{$define _TKLIB_:='tk86'}
+	{$define _EXT_:=external}
 {$ENDIF}
 
 
@@ -109,6 +111,7 @@ type
 	}
 	{$define _TCLLIB_:=}
 	{$define _TKLIB_:=}
+	{$define _EXT_:=weakexternal}
 	const tcl_ld_prefix='';
 {$ENDIF}{$ENDIF}
 
@@ -120,48 +123,48 @@ type
 }
 function Tcl_CreateObjCommand (interp:pointer;s:PChar;cmd:Tcl_CmdProc;
 	data:integer;delete_proc:Tcl_CmdDeleteProc):pointer; 
-	cdecl; external _TCLLIB_ name 'Tcl_CreateObjCommand';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_CreateObjCommand';
 function Tcl_Eval (interp:pointer;s:PChar):integer;
-	cdecl; external _TCLLIB_ name 'Tcl_Eval';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_Eval';
 function Tcl_EvalFile (interp:pointer;s:PChar):integer;
-	cdecl; external _TCLLIB_ name 'Tcl_EvalFile';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_EvalFile';
 function Tcl_GetByteArrayFromObj(obj_ptr:pointer;var size:integer):pointer;
-	cdecl; external _TCLLIB_ name 'Tcl_GetByteArrayFromObj';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_GetByteArrayFromObj';
 function Tcl_GetObjResult (interp:pointer):pointer; 
-	cdecl; external _TCLLIB_ name 'Tcl_GetObjResult';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_GetObjResult';
 function Tcl_GetStringFromObj (obj_ptr:pointer;var size:integer):PChar;
-	cdecl; external _TCLLIB_ name 'Tcl_GetStringFromObj';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_GetStringFromObj';
 function Tcl_GetVar(interp:pointer;name:PChar;flags:integer):PChar;
-	cdecl; external _TCLLIB_ name 'Tcl_GetVar';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_GetVar';
 function Tcl_InitStubs (interp:pointer;s:PChar;e:integer):pointer;
-	cdecl; external _TCLLIB_ name 'Tcl_InitStubs';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_InitStubs';
 function Tcl_NewByteArrayObj(bp:pointer;size:integer):pointer;
-	cdecl; external _TCLLIB_ name 'Tcl_NewByteArrayObj';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_NewByteArrayObj';
 function Tcl_PkgProvide (interp:pointer;name,version:PChar):integer; 
-	cdecl; external _TCLLIB_ name 'Tcl_PkgProvide';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_PkgProvide';
 procedure Tcl_SetByteArrayObj(obj_ptr,bp:pointer;size:integer);
-	cdecl; external _TCLLIB_ name 'Tcl_SetByteArrayObj';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_SetByteArrayObj';
 procedure Tcl_SetObjResult (interp,obj_ptr:pointer);
-	cdecl; external _TCLLIB_ name 'Tcl_SetObjResult';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_SetObjResult';
 procedure Tcl_SetStringObj (obj_ptr:pointer;s:PChar;l:integer);
-	cdecl; external _TCLLIB_ name 'Tcl_SetStringObj';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_SetStringObj';
 function Tcl_SetVar(interp:pointer;name:PChar;value:PChar;flags:integer):PChar;
-	cdecl; external _TCLLIB_ name 'Tcl_SetVar';
+	cdecl; _EXT_ _TCLLIB_ name 'Tcl_SetVar';
 function Tk_FindPhoto(interp:pointer;imageName:PChar):pointer;
-	cdecl; external _TKLIB_ name 'Tk_FindPhoto';
+	cdecl; _EXT_ _TKLIB_ name 'Tk_FindPhoto';
 function Tk_InitStubs (interp:pointer;s:PChar;e:integer):pointer;
-	cdecl; external _TKLIB_ name 'Tk_InitStubs';
+	cdecl; _EXT_ _TKLIB_ name 'Tk_InitStubs';
 procedure Tk_PhotoBlank(handle:pointer);
-	cdecl; external _TKLIB_ name 'Tk_PhotoBlank';
+	cdecl; _EXT_ _TKLIB_ name 'Tk_PhotoBlank';
 procedure Tk_PhotoSetSize(inerp:pointer;handle:pointer;width,height:integer);
-	cdecl; external _TKLIB_ name 'Tk_PhotoSetSize';
+	cdecl; _EXT_ _TKLIB_ name 'Tk_PhotoSetSize';
 function Tk_PhotoGetImage(handle,blockptr:pointer):integer;
-	cdecl; external _TKLIB_ name 'Tk_PhotoGetImage';
+	cdecl; _EXT_ _TKLIB_ name 'Tk_PhotoGetImage';
 procedure Tk_PhotoPutBlock(interp,handle,blockptr:pointer;x,y,width,height,comprule:integer);
-	cdecl; external _TKLIB_ name 'Tk_PhotoPutBlock';
+	cdecl; _EXT_ _TKLIB_ name 'Tk_PhotoPutBlock';
 procedure Tk_PhotoPutZoomedBlock(interp,handle,blockptr:pointer;x,y,width,height,
 	zoomX,zoomY,subsampleX,subsampleY,comprule:integer);
-	cdecl; external _TKLIB_ name 'Tk_PhotoPutZoomedBlock';
+	cdecl; _EXT_ _TKLIB_ name 'Tk_PhotoPutZoomedBlock';
 
 {
 	Tcl routines implemented as macros in the C header file, here re-constructed
