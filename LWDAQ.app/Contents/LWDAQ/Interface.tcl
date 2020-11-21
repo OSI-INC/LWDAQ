@@ -507,23 +507,24 @@ proc LWDAQ_print {args} {
 }
 
 #
-# LWDAQ_edit_script creates and controls a text editor window. The window provides
-# New, Open, Save, and SaveAs buttons, as well as a file name entry box. The
-# routine takes a command "cmd" and a text source "src" as input parameters. The
-# "Open" command creates a new, empty, editing window. It treats the source
-# parameter as a file name. If the named file is an empty string, edit_script
-# opens a file browser so the user can select a file, and it reads that file into
-# the editing window. Otherwise, if the named file exists, edit_script reads the
-# contents of the named file into the editing window. It sets the window title
-# equal to the file name. Note that the Open command does not create a new file.
-# The "Save" command takes an editor window name as its source, and saves the
-# contents of that editor window to the file named in the editor window's title.
-# The "SaveAs" command also takes a window as its source but opens a browser for
-# the user to choose a destination file. The "New" command opens a new editor
-# window with a default file name. it ignores the source parameter. In the text 
-# editor window, we use command-z to undo, command-s to save the text to the 
-# title file. The New button in the text editor opens a file called Untitled.txt, 
-# which we assume does not exist.
+# LWDAQ_edit_script creates and controls a text editor window. It returns the
+# name of the window. The window provides New, Open, Save, and SaveAs buttons,
+# as well as a file name entry box. The routine takes a command "cmd" and a text
+# source "src" as input parameters. The "Open" command creates a new, empty,
+# editing window. It treats the source parameter as a file name. If the named
+# file is an empty string, edit_script opens a file browser so the user can
+# select a file, and it reads that file into the editing window. Otherwise, if
+# the named file exists, edit_script reads the contents of the named file into
+# the editing window. It sets the window title equal to the file name. Note that
+# the Open command does not create a new file. The "Save" command takes an
+# editor window name as its source, and saves the contents of that editor window
+# to the file named in the editor window's title. The "SaveAs" command also
+# takes a window as its source but opens a browser for the user to choose a
+# destination file. The "New" command opens a new editor window with a default
+# file name. it ignores the source parameter. In the text editor window, we use
+# command-z to undo, command-s to save the text to the title file. The New
+# button in the text editor opens a file called Untitled.txt, which we assume
+# does not exist.
 # 
 proc LWDAQ_edit_script {{cmd "Open"} {src ""}} {
 	global LWDAQ_Info

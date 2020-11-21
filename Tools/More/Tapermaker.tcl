@@ -1,7 +1,7 @@
 # Tapermaker, a tool for producing tapers for the ISL.
 
 # Copyright (C) 2011-2014 Michael Collins, Open Source Instruments
-# Copyright (C) 2014-2019 Kevan Hashemi, Open Source Instruments
+# Copyright (C) 2014-2020 Kevan Hashemi, Open Source Instruments
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,19 +23,23 @@ proc Tapermaker_init {} {
 	upvar #0 Tapermaker_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tapermaker" "2.6"
+	LWDAQ_tool_init "Tapermaker" "2.7"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	# Conversion constants.
 	set info(steps_per_mm) "4000"
 	
 	# Variables.
-	set config(bottom_distance) "0"
-	set config(top_distance) "0"
+	set config(bottom_distance) "-1"
+	set config(top_distance) "-1"
 	
 	# The reset and go-home speeds.
 	set config(reset_speed_mmps) "2.0"
 	set config(acceleration_mmpss) "10.0"
+	
+	# Set the home positions of the two motors.
+	set config(bottom_home_position_mm) "20.0"
+	set config(top_home_position_mm) "42.0"
 	
 	# The distance moved on approach from home to the heating coil. The bottom
 	# of the coil will be just above the lower fiber mounting plate. The differential
@@ -48,6 +52,7 @@ proc Tapermaker_init {} {
 	# of the fiber that we are separating into two tapered portions. Also
 	# A bottom portion delay between the start of the top stretch movement
 	# and the bottom stretch movement.
+	set config(top_stretch_delay_s) "0.0"
 	set config(top_stretch_distance_mm) "10.0"
 	set config(top_stretch_speed_mmps) "2.0"
 	set config(bottom_stretch_delay_s) "2.0"
@@ -203,8 +208,7 @@ proc Tapermaker_reset {} {
 
 	# "L71 115000" Max speed.
 	# 
-	# "L72 0" trapezoidal ramp (the more fancy shapes cause resonance in the
-	# motors at some speeds. 
+	# "L72 0" trapezoidal ramp
 	# 
 	# "L98 10" Delay between H-codes is 10 ms.
 	Tapermaker_xmit "L71 115000 L72 0 L98 10"
@@ -223,14 +227,16 @@ proc Tapermaker_reset {} {
 	# controller into step mode, in which it moves a specific number of pulses.
 	# "L13 122000" specifies a movement of 122k pulses, or 30.5 mm, and "H6" orders 
 	# the movement in the CW direction.
-	Tapermaker_xmit "H2 L13 122000 H6"
+	set num_pulses [expr round($config(bottom_home_position_mm) * $info(steps_per_mm))]
+	Tapermaker_xmit "H2 L13 $num_pulses H6"
 
 	# Select No2 and set it to turning clockwise (CW). The motor will
 	# keep turning until it hits its CW limit switch.
 	Tapermaker_xmit "<02 H4 H3 H6"
 
 	# Move No2 off CW limit switch by 190k steps, or 47.5 mm.
-	Tapermaker_xmit "H2 L13 190000 H7"
+	set num_pulses [expr round($config(top_home_position_mm) * $info(steps_per_mm))]
+	Tapermaker_xmit "H2 L13 $num_pulses H7"
 
 	LWDAQ_print $info(text) "Establishing home position.\n"
 }
@@ -282,8 +288,8 @@ proc Tapermaker_taper {} {
 	# first pauses and then moves the bottom portion of the fiber down and away. 
 	# Tapers are created at the break made by the heating coil as the two fiber 
 	# ends pull apart. The taper we want to keep is the one on the bottom portion.
-	
-	# The bottom motor pauses, while the top motor begins stretching.
+
+	# The bottom motor pauses before it moves down.
 	set delay [expr round($config(bottom_stretch_delay_s)*1000)]
 	Tapermaker_xmit "<01 N2 G04 X$delay"
 	
@@ -294,10 +300,14 @@ proc Tapermaker_taper {} {
 	Tapermaker_xmit "<01 N3 X-$stretch_distance F$stretch_speed"
 	set config(bottom_distance) [expr $config(bottom_distance) - $stretch_distance]
 	
+	# The top motor pauses before it moves up.
+	set delay [expr round($config(top_stretch_delay_s)*1000)]
+	Tapermaker_xmit "<02 N2 G04 X$delay"
+		
 	# The top motor moves up by the top stretch distance at the top stretch speed.
 	set stretch_distance [expr round($config(top_stretch_distance_mm) * $info(steps_per_mm))]
 	set stretch_speed [expr round($config(top_stretch_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "<02 N2 X+$stretch_distance F$stretch_speed"
+	Tapermaker_xmit "<02 N3 X+$stretch_distance F$stretch_speed"
 	set config(top_distance) [expr $config(top_distance) + $stretch_distance]
 
 	LWDAQ_print $info(text) "Program loaded.\n"
@@ -373,9 +383,14 @@ proc Tapermaker_open {} {
 	set f [frame $ff.left]
 	pack $f -side left -fill y
 
-	foreach a {approach_distance_mm approach_speed_mmps approach_differential_mmpmm\
+	foreach a {bottom_home_position_mm \
+		top_home_position_mm \
+		approach_distance_mm \
+		approach_speed_mmps \
+		approach_differential_mmpmm \
 		bottom_stretch_delay_s \
-		bottom_stretch_distance_mm bottom_stretch_speed_mmps} {
+		bottom_stretch_distance_mm \
+		bottom_stretch_speed_mmps} {
 		
 		set word_list [split $a _] 
 		set name ""
@@ -398,8 +413,11 @@ proc Tapermaker_open {} {
 	set f [frame $ff.right]
 	pack $f -side right -fill y
 
-	foreach a {top_stretch_distance_mm top_stretch_speed_mmps \
-		reset_speed_mmps acceleration_mmpss} {
+	foreach a {top_stretch_delay_s \
+		top_stretch_distance_mm \
+		top_stretch_speed_mmps \
+		reset_speed_mmps \
+		acceleration_mmpss} {
 		
 		set word_list [split $a _] 
 		set name ""

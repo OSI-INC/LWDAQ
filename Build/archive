@@ -6,22 +6,6 @@
 # Mount point for remote disk.
 RMT="/Users/kevan/BNDSFTP"
 
-# Check options
-MAKE="ERROR"
-case "$1" in
-	"") MAKE="YES";;
-	"--no-make") MAKE="NO";;
-	"--make") MAKE="YES";;
-	"--help") 
-		echo "archive ?--make? ?--no-make?"
-		exit;;
-esac
-if [ "$MAKE" == "ERROR" ]
-then
-	echo "ERROR: illegal option \"$1\"."
-	exit
-fi
-
 # Determine operating system. Default is Unix. 
 OS=UNIX
 if [ "`uname -a | grep -i Darwin`" != "" ]
@@ -74,6 +58,14 @@ echo "VBT_DIR: $VBT_DIR"
 GIT_DIR="$LWDAQ_DIR/.git"
 echo "GIT_DIR: $GIT_DIR"
 
+# Check that the remote directory exists.
+if [ -d $RMT ] 
+then
+	echo "FOUND: Remote directory $RMT"
+else
+	echo "WARNING: Cannot find remote directory $RMT"
+fi
+
 # Determine software version number.
 VERSION=`grep -o "\"[0-9]\+\.[0-9]\+\.[0-9]\+\"" $LIB_DIR/Init.tcl | grep -o "[^\"]\+" `
 if [ -z "$VERSION" ] 
@@ -86,18 +78,6 @@ echo "Software Version: $VERSION"
 # Return to build directory and clean.
 cd $BUILD_DIR
 make clean
-
-# Build the lwdaq.so shared library for the local platform.
-# On MacOS, we compile two versions of lwdaq.so, one for
-# ppc and one for i386. We combine these into a universal
-# binary that will run on both ppc and i386 MacOS machines.
-# On all other platforms, we compile lwdaq.so directly.
-if [ $MAKE == "YES" ]
-then
-	make remove
-	make
-	make clean
-fi
 
 # Prepare to make archive.
 echo "Preparing LWDAQ files for archive..."
@@ -125,8 +105,7 @@ then
 # program icon will be intact when we unzip on another MacOS
 # machine.
 	echo "Creating $ARCHIVE with MacOS compression utility..."
-	ditto -c -k --sequesterRsrc --keepParent \
-		`basename $LWDAQ_DIR` $ARCHIVE
+#	ditto -c -k --sequesterRsrc --keepParent `basename $LWDAQ_DIR` $ARCHIVE
 else
 # We use the zip command on other platforms. It does not 
 # preserve the MacOS icon. We try to remove resource information
@@ -138,62 +117,80 @@ fi
 # Restore LWDAQ files to former places.
 echo "Restoring LWDAQ files."
 mv $LIB_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker_Distribute.tcl
-mv Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
-mv VBT $VBT_DIR
-mv GIT $GIT_DIR
+mv $MASTER_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
+mv $MASTER_DIR/VBT $VBT_DIR
+mv $MASTER_DIR/GIT $GIT_DIR
 
 # Copy files to remote software repository if it's mounted.
 SITE="$RMT/Software/Download"
 if [ -d "$SITE" ]
 then
 	echo "FOUND: Remote software download directory."
-	echo "Deleting archive on website..."
-	rm $SITE/LWDAQ_$VERSION.zip
-	echo "Uploading LWDAQ_$VERSION.zip..."
-	cp LWDAQ_$VERSION.zip $SITE/LWDAQ_$VERSION.zip
+	if [ -d "$SITE/$ARCHIVE" ] 
+	then
+		echo "Deleting pre-existing $SITE/$ARCHIVE..."
+		rm $SITE/$ARCHIVE
+	fi
+	echo "Uploading new $ARCHIVE..."
+	cp $ARCHIVE $SITE/$ARCHIVE
 	echo "Deleting local copy of archive..."
-	rm LWDAQ_$VERSION.zip
+	rm $ARCHIVE
 else
-	echo "NOT FOUND: Remote software download directory."
+	echo "WARNING: Cannot find remote download directory."
+	echo "Keeping local copy of $ARCHIVE."
 fi
 
 # Copy files to website if it's mounted on the desktop.
-if [ -d "Electronics/LWDAQ" ]
+DOCS="Electronics/LWDAQ"
+if [ -d "$DOCS" ]
 then 
-	DOCS="$RMT/Electronics/LWDAQ"
 	echo "FOUND: Local document folder."
-	echo "Deleting documents on website..."
-	rm $DOCS/Manual.html
-	rm $DOCS/Commands.html
-	rm $DOCS/Acquisifier.html
-	echo "Uploading Manual.html..."
-	cp Electronics/LWDAQ/Manual.html $DOCS/Manual.html
-	echo "Generating new Commands.html"
-	GENERATOR_SCRIPT="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Startup/Gen.tcl"
-	echo "LWDAQ_command_reference; exit" | cat > $GENERATOR_SCRIPT
-	$LWDAQ_DIR/lwdaq --no-gui
-	rm $GENERATOR_SCRIPT
-	echo "Uploading Commands.html..."
-	cp $LWDAQ_DIR/Commands.html $DOCS/Commands.html
-	rm $LWDAQ_DIR/Commands.html
-	echo "Uploading Acquisifier.html..."
-	cp Electronics/LWDAQ/Acquisifier.html $DOCS/Acquisifier.html
+	RMTDOCS="$RMT/Electronics/LWDAQ"
+	if [ -d "$RMTDOCS" ] 
+	then
+		echo "FOUND: Remote document folder."
+		echo "Deleting documents in remote folder..."
+		rm $RMTDOCS/Manual.html
+		rm $RMTDOCS/Commands.html
+		rm $RMTDOCS/Acquisifier.html
+		echo "Uploading Manual.html..."
+		cp $DOCS/Manual.html $RMTDOCS/Manual.html
+		echo "Generating new Commands.html"
+		GENERATOR_SCRIPT="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Startup/Gen.tcl"
+		echo "LWDAQ_command_reference; exit" | cat > $GENERATOR_SCRIPT
+		$LWDAQ_DIR/lwdaq --no-gui
+		rm $GENERATOR_SCRIPT
+		echo "Uploading Commands.html..."
+		cp $LWDAQ_DIR/Commands.html $RMTDOCS/Commands.html
+		rm $LWDAQ_DIR/Commands.html
+		echo "Uploading Acquisifier.html..."
+		cp Electronics/LWDAQ/Acquisifier.html $RMTDOCS/Acquisifier.html
+	else
+		echo "NOT FOUND: Remote document folder."
+	fi
 else
 	echo "NOT FOUND: Local document folder."
 fi
-	
+
 if [ -d "LWDAQ/Sources" ]
 then
-	SFTW="$RMT/Software"
+	echo "WORKING DIRECTORY: `pwd`"
 	echo "FOUND: Local source code directory."
-	echo "Deleting remote source code directory..."
-	rm -R $SFTW/Sources
-	echo "Uploading source code to remote directory..."
-	cp -R LWDAQ/Sources $SFTW/Sources
-	cp LWDAQ/LWDAQ.app/Contents/LWDAQ/*.tcl $SFTW/Sources
-	rm $SFTW/Sources/Toolmaker.tcl
-	mv $SFTW/Sources/Toolmaker_Distribute.tcl $RMT/Toolmaker.tcl
-	cp LWDAQ/LWDAQ.app/Contents/LWDAQ/Instruments/*.tcl $SFTW/Sources
+	RMTSRCS="$RMT/Software/Sources"
+	if [ -d "$RMTSRCS" ]
+	then
+		echo "FOUND: Remote source code directory."
+		echo "Deleting remote source files..."
+		rm $RMTSRCS/*.*
+		echo "Uploading Pascal sources..."
+		cp -R "LWDAQ/Sources/*.pas" $RMTSRCS
+		echo "Uploading core TclTk scripts..."
+		cp -R "LWDAQ/LWDAQ.app/Contents/LWDAQ/*.tcl" $RMTSRCS
+		echo "Uploading instrument TclTk scripts..."
+		cp -R "LWDAQ/LWDAQ.app/Contents/LWDAQ/Instruments/*.tcl" $RMTSRCS
+	else
+		echo "NOT FOUND: Remote source code directory."
+	fi
 else
 	echo "NOT FOUND: Local source code directory."
 fi
