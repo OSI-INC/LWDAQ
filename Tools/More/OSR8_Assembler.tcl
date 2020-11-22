@@ -23,12 +23,12 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
-proc OSR8Asm_init {} {
-	upvar #0 OSR8Asm_info info
-	upvar #0 OSR8Asm_config config
+proc OSR8_Assembler_init {} {
+	upvar #0 OSR8_Assembler_info info
+	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8Asm" "1.1"
+	LWDAQ_tool_init "OSR8_Assembler" "1.1"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return "SUCCESS"
@@ -65,9 +65,9 @@ proc OSR8Asm_init {} {
 	return "SUCCESS"
 }
 
-proc OSR8Asm_pick {a} {
-	upvar #0 OSR8Asm_config config
-	upvar #0 OSR8Asm_info info
+proc OSR8_Assembler_pick {a} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
 
 	set fn ""
 	switch $a {
@@ -83,9 +83,9 @@ proc OSR8Asm_pick {a} {
 	return "SUCCESS"
 }
 
-proc OSR8Asm_edit {a} {
-	upvar #0 OSR8Asm_config config
-	upvar #0 OSR8Asm_info info
+proc OSR8_Assembler_edit {a} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
 
 	if {[winfo exists $info($a\_ew)]} {
 		raise $info($a\_ew)
@@ -95,9 +95,9 @@ proc OSR8Asm_edit {a} {
 	}
 }
 
-proc OSR8Asm_instructions {} {
-	upvar #0 OSR8Asm_config config
-	upvar #0 OSR8Asm_info info
+proc OSR8_Assembler_instructions {} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
 
 	LWDAQ_print $info(text) "OSR8 Operation Codes and Instruction Syntax" purple
 	LWDAQ_print $info(text) "n = eight-bit number, nn = sixteen-bit number" purple
@@ -120,9 +120,9 @@ proc OSR8Asm_instructions {} {
 		= [llength $info(instructions)].\n" purple
 }
 
-proc OSR8Asm_find_symbol {line} {
-	upvar #0 OSR8Asm_config config
-	upvar #0 OSR8Asm_info info
+proc OSR8_Assembler_find_symbol {line} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
 
 	if {[regexp -nocase {^\s*const\s*([\w]*)\s*([\w]*)} $line dummy symbol value]} {
 		if {[regexp -nocase {^0x[0-9A-F]+$} $value]} {
@@ -138,32 +138,33 @@ proc OSR8Asm_find_symbol {line} {
 	}
 }
 
-proc OSR8Asm_assemble {{asm  ""}} {
-	upvar #0 OSR8Asm_config config
-	upvar #0 OSR8Asm_info info
+proc OSR8_Assembler_assemble {{asm  ""}} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
 
-	LWDAQ_print $info(text) "Open-Source Reconfigurable\
-		Eight-Bit CPU Assembler-Dissembler" purple
-	LWDAQ_print $info(text) "(C) 2020 Kevan Hashemi,\
-		Open Source Instruments Inc." purple	
+	LWDAQ_print $info(text) "Starting OSR8 Assembler." purple
 	if {$asm == ""} {
 		if {[file exists $config(ifn)]} {
+			LWDAQ_print $info(text) "Reading assembler code from $config(ifn)." purple
 			set f [open $config(ifn) r]
 			set asm [split [read $f] \n]
 			close $f
-			LWDAQ_print $info(text) "Read assembler code from $config(ifn)."
+			LWDAQ_print $info(text) "Read [llength $asm] lines of assembler code." purple
 		} else {
 			LWDAQ_print $info(text) "ERROR: Cannot find $config(ifn)."
 			return "FAIL"
 		}
 	} else {
-		LWDAQ_print $info(text) "Received assembler code in string."
+		LWDAQ_print $info(text) "Received assembler code from input string." purple
+		set asm [split [string trim $asm] \n]
+		LWDAQ_print $info(text) "Received [llength $asm] instruction bytes." purple
 	}
 	
+	# Refresh error, warning, symbol, and label lists.
 	set info(error_list) [list]
 	set info(warning_list) [list]
 	set info(symbol_list) [list]
-	LWDAQ_print $info(text) "Found [llength $asm] lines of code in source file."
+	set info(label_list) [list]
 
 	# Eliminate comments and make list of lines.
 	set basm [list]
@@ -413,7 +414,7 @@ proc OSR8Asm_assemble {{asm  ""}} {
 		}
 		
 		# See if this is a symbol definition line.
-		set sym_val [OSR8Asm_find_symbol $line] 
+		set sym_val [OSR8_Assembler_find_symbol $line] 
 		if {[LWDAQ_is_error_result $sym_val]} {
 			incr num_errors
 			LWDAQ_print $info(text) "$sym_val in line $line_index\."
@@ -455,7 +456,6 @@ proc OSR8Asm_assemble {{asm  ""}} {
 	# nothing because it's just a marker. But when we come to the marker, we add
 	# it to the symbol list.
 	set addr $config(base_address)
-	set info(label_list) [list]
 	set new_mem ""
 	foreach m $mem {
 		if {[regexp -nocase {^[0-9A-F]+$} $m]} {
@@ -485,10 +485,10 @@ proc OSR8Asm_assemble {{asm  ""}} {
 		set mem [regsub -all $symbol $mem $value]
 	}
 	
-	# Go through the object code and write bytes to output file.
+	# Go through the object code and write bytes to object file.
 	if {$num_errors == 0} {
-		LWDAQ_print $info(text) "Openikng output file $config(ofn)." purple
-		LWDAQ_print $info(text) "Machine code bytes as written to output:" purple
+		LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
+		LWDAQ_print $info(text) "Machine code bytes as written to object file:" purple
 		set f [open $config(ofn) w]
 		set index 0
 		foreach m $mem {
@@ -499,7 +499,7 @@ proc OSR8Asm_assemble {{asm  ""}} {
 		}
 		close $f
 		if {$index % 30 != 0} {LWDAQ_print $info(text)}
-		LWDAQ_print $info(text) "Wrote [llength $mem] hex bytes to output file." purple
+		LWDAQ_print $info(text) "Wrote [llength $mem] hex bytes to object file." purple
 	} else {
 		LWDAQ_print $info(text) "Aborted assembly due to $num_errors errors."
 	}
@@ -508,38 +508,120 @@ proc OSR8Asm_assemble {{asm  ""}} {
 	return $mem
 }
 
-proc OSR8Asm_disassemble {{mem  ""}} {
-	upvar #0 OSR8Asm_config config
-	upvar #0 OSR8Asm_info info
+proc OSR8_Assembler_disassemble {{mem  ""}} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
 
-	LWDAQ_print $info(text) "Open-Source Reconfigurable Eight-Bit\
-		CPU Dis-Assembler" purple
-	LWDAQ_print $info(text) "(c) 2020 Kevan Hashemi, Open Source\
-		Instruments Inc." purple	
+	LWDAQ_print $info(text) "Starting OSR8 Dis-Assembler" purple
 	if {$mem == ""} {
 		if {[file exists $config(ofn)]} {
+			LWDAQ_print $info(text) "Reading object code from $config(ofn)." purple
 			set f [open $config(ofn) r]
-			set mem [string trim [read $f]]
+			set mem [split [string trim [read $f]] \n]
 			close $f
-			LWDAQ_print $info(text) "Read object code from $config(ofn)."
+			LWDAQ_print $info(text) "Read [llength $mem] instruction bytes." purple
 		} else {
 			LWDAQ_print $info(text) "ERROR: Cannot find file $config(ofn)."
 			return "FAIL"
 		}
+	} else {
+		LWDAQ_print $info(text) "Received object code from input string." purple
+		set mem [split [string trim $mem] \n]
+		LWDAQ_print $info(text) "Received [llength $mem] instruction bytes." purple
 	}
+	LWDAQ_print $info(text) "Output will be written to text window." purple
 	
-	set mem [split $mem \n]
+	# Go through object file finding instructions and printing out prototype
+	# instructions with operands filled in by values found in object file.
+	set index 0
 	set asm ""
-	LWDAQ_print $info(text) "Output will be written to text window." 
-	LWDAQ_print $info(text) "Dis-assembling [llength $mem] bytes of object code."
-	LWDAQ_print $info(text) "$asm"
+	while {$index < [llength $mem]} {
+		set bytes [string trim [lindex $mem $index]]
+		set match 0
+		foreach inst $info(instructions) {
+			set prototype [regsub {,} [lindex $inst 0] " "]
+			set code "[lindex $inst 1] "
+			if {[expr 0x$code] == [expr 0x$bytes]} {
+				set match 1
+				
+				if {[llength $prototype] == 1} {
+					break
+				}
+				
+				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 1]]} {
+					if {$index >= [llength $mem] - 2} {
+						LWDAQ_print $info(text) "ERROR: Missing operand bytes for\
+							final instruction $prototype\."
+						break
+					}
+					set n1 [lindex $mem [expr $index + 1]]
+					set n2 [lindex $mem [expr $index + 2]]
+					lset prototype 1 [regsub {nn} [lindex $prototype 1] \
+						"0x[set n1][set n2]"]
+					append bytes " $n1 $n2"
+				} elseif {[regexp -nocase {^n$} [lindex $prototype 1]]} {
+					if {$index >= [llength $mem] - 1} {
+						LWDAQ_print $info(text) "ERROR: Missing operand bytes for\
+							final instruction $prototype\."
+						break
+					}
+					set n1 [lindex $mem [expr $index + 1]]
+					lset prototype 1 [regsub {n} [lindex $prototype 1] \
+						"0x[set n1]"]
+					append bytes " $n1"
+				}
+				
+				if {[llength $prototype] == 2} {
+					break
+				}
+				
+				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 2]]} {
+					if {$index >= [llength $mem] - 2} {
+						LWDAQ_print $info(text) "ERROR: Missing operand bytes for\
+							final instruction $prototype\."
+						break
+					}
+					set n1 [lindex $mem [expr $index + 1]]
+					set n2 [lindex $mem [expr $index + 2]]
+					lset prototype 2 [regsub {nn} [lindex $prototype 2] \
+						"0x[set n1][set n2]"]
+					append bytes " $n1 $n2"
+				} elseif {[regexp -nocase {^n$} [lindex $prototype 2]]} {
+					if {$index >= [llength $mem] - 1} {
+						LWDAQ_print $info(text) "ERROR: Missing operand bytes for\
+							final instruction $prototype\."
+						break
+					}
+					set n1 [lindex $mem [expr $index + 1]]
+					lset prototype 2 [regsub {n} [lindex $prototype 2] \
+						"0x[set n1]"]
+					append bytes " $n1"
+				}
+				
+				break
+			}
+		}
+
+		if {!$match} {
+			LWDAQ_print $info(text) "ERROR: Unrecognized opcode \"$byte\"."
+			break
+		} else {
+			LWDAQ_print -nonewline $info(text) "0x[format %04X $index]: "
+			LWDAQ_print -nonewline $info(text) \
+				"[format %-10s $bytes] " $config(opcode_color)
+			LWDAQ_print $info(text) $prototype $config(syntax_color)	
+			append asm $prototype	
+		}
+		
+		set index [expr $index + [llength $bytes]]
+	}	
+	
 	LWDAQ_print $info(text) "Done.\n" purple
-	return $asm
 }
 
-proc OSR8Asm_open {} {
-	upvar #0 OSR8Asm_config config
-	upvar #0 OSR8Asm_info info
+proc OSR8_Assembler_open {} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
 
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return 0}
@@ -550,7 +632,7 @@ proc OSR8Asm_open {} {
 	
 	foreach a {Assemble Disassemble Instructions} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post OSR8Asm_$b"
+		button $f.$b -text $a -command "LWDAQ_post OSR8_Assembler_$b"
 		pack $f.$b -side left -expand 1
 		
 	} 
@@ -567,21 +649,23 @@ proc OSR8Asm_open {} {
 		pack $f -side top -fill x
 	
 		label $f.[set a]l -text "$b File:" 
-		entry $f.[set a]e -textvariable OSR8Asm_config([set a]) -width 50
-		button $f.[set a]p -text "Pick" -command "OSR8Asm_pick $a"
-		button $f.[set a]ed -text "Edit" -command "OSR8Asm_edit $a"
+		entry $f.[set a]e -textvariable OSR8_Assembler_config([set a]) -width 50
+		button $f.[set a]p -text "Pick" -command "OSR8_Assembler_pick $a"
+		button $f.[set a]ed -text "Edit" -command "OSR8_Assembler_edit $a"
 		pack $f.[set a]l $f.[set a]e $f.[set a]p $f.[set a]ed -side left -expand 1
 	}
 	
 	set info(text) [LWDAQ_text_widget $w 100 15]
 
-	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"	
+	LWDAQ_print $info(text) "$info(name) Version $info(version)" purple
+	LWDAQ_print $info(text) "(c) 2020 Kevan Hashemi, Open Source\
+		Instruments Inc.\n" purple	
 	
 	return "SUCCESS"
 }
 
-OSR8Asm_init
-OSR8Asm_open
+OSR8_Assembler_init
+OSR8_Assembler_open
 	
 return 1
 
