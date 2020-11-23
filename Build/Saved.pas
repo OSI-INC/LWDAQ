@@ -1,4 +1,42 @@
 {
+	A library that exports a simple routine. Compile with:
+	fpc d.pas -Px86_64
+}
+{$MODESWITCH CLASSICPROCVARS+}
+{$LONGSTRINGS ON}
+{$MACRO ON}
+
+library d;
+
+function answer:longint; cdecl;
+begin
+	writeln('Hello from answer');
+	answer:=42;
+end;
+
+exports
+	answer name '_answer';
+end.
+
+{
+	A program that calls the above dynamic library. Goes with the dynamic
+	library defined by d.pas. Compile with:
+	fpc m.pas -Px86_64 -k-ld
+}
+
+{$MODESWITCH CLASSICPROCVARS+}
+{$LONGSTRINGS ON}
+{$MACRO ON}
+
+program m;
+ 
+function answer:integer; cdecl; external 'd' name '_answer';
+ 
+begin
+	writeln('Answer: ',answer);
+end.
+
+{
 	A program that uses all our analysis units.
 }
 program p;
@@ -95,19 +133,6 @@ begin
 	writeln('And then we created a simulated rasnik image');
 	a:=image_amplitude(ip);
 	writeln('Image amplitude is: ',a:1:2);
-end.{
-	A library that exports a simple routine.
-}
-library d;
-
-function answer:longint; cdecl;
-begin
-	writeln('Hello from answer');
-	answer:=42;
-end;
-
-exports
-	answer name 'answer';
 end.
 
 {

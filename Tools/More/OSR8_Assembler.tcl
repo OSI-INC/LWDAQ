@@ -142,7 +142,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	upvar #0 OSR8_Assembler_config config
 	upvar #0 OSR8_Assembler_info info
 
-	LWDAQ_print $info(text) "Starting OSR8 Assembler." purple
+	LWDAQ_print $info(text) "Starting OSR8 Object Code Assembler." purple
 	if {$asm == ""} {
 		if {[file exists $config(ifn)]} {
 			LWDAQ_print $info(text) "Reading assembler code from $config(ifn)." purple
@@ -512,7 +512,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 	upvar #0 OSR8_Assembler_config config
 	upvar #0 OSR8_Assembler_info info
 
-	LWDAQ_print $info(text) "Starting OSR8 Dis-Assembler" purple
+	LWDAQ_print $info(text) "Starting OSR8 Object Code Dis-Assembler." purple
 	if {$mem == ""} {
 		if {[file exists $config(ofn)]} {
 			LWDAQ_print $info(text) "Reading object code from $config(ofn)." purple
