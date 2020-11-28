@@ -28,7 +28,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.1"
+	LWDAQ_tool_init "OSR8_Assembler" "1.2"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return "SUCCESS"
@@ -43,7 +43,7 @@ proc OSR8_Assembler_init {} {
 	set config(syntax_color) "green"
 	
 	set config(base_address) "0"
-	
+	set config(bytes_per_line) "30"
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
@@ -211,6 +211,8 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			set lo1 [lindex $line 1]
 			if {[string match -nocase $po1 $lo1]} {
 				set fo_match 1
+			} elseif {[regexp -nocase {^\(*(IX|IY|SP)\)*$} $lo1]} {
+				set fo_match 0
 			} elseif {$po1 == "(nn)"} {
 				if {[regexp {^\(([\w]+)\)$} $lo1 dummy v]} {
 					if {[regexp -nocase {^0x[0-9A-F]+$} $v]} {
@@ -310,6 +312,8 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			set lo2 [lindex $line 2]
 			if {[string match -nocase $po2 $lo2]} {
 				set so_match 1
+			} elseif {[regexp -nocase {^\(*(IX|IY)\)*$} $lo2]} {
+				set so_match 0
 			} elseif {$po2 == "(nn)"} {
 				if {[regexp {^\(([\w]+)\)$} $lo2 dummy v]} {
 					if {[regexp -nocase {^0x[0-9A-F]+$} $v]} {
@@ -488,17 +492,17 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	# Go through the object code and write bytes to object file.
 	if {$num_errors == 0} {
 		LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
-		LWDAQ_print $info(text) "Machine code bytes as written to object file:" purple
+		LWDAQ_print $info(text) "Machine code bytes written to object file:" purple
 		set f [open $config(ofn) w]
 		set index 0
 		foreach m $mem {
 			puts $f $m
 			incr index
 			LWDAQ_print -nonewline $info(text) "$m "
-			if {$index % 30 == 0} {LWDAQ_print $info(text)}
+			if {$index % $config(bytes_per_line) == 0} {LWDAQ_print $info(text)}
 		}
 		close $f
-		if {$index % 30 != 0} {LWDAQ_print $info(text)}
+		if {$index % $config(bytes_per_line) != 0} {LWDAQ_print $info(text)}
 		LWDAQ_print $info(text) "Wrote [llength $mem] hex bytes to object file." purple
 	} else {
 		LWDAQ_print $info(text) "Aborted assembly due to $num_errors errors."
@@ -716,13 +720,20 @@ Kevan Hashemi hashemi@opensourcesintruments.com
 
 ----------Begin Data----------
 
-	constant nop : integer := 16#00#;      -- nop
-		
-	constant ld_HL_SP : integer := 16#01#; -- ld hl,sp
-	constant ld_SP_HL : integer := 16#02#; -- ld sp,hl
-	constant ld_HL_PC : integer := 16#03#; -- ld hl,pc
-	constant ld_PC_HL : integer := 16#04#; -- ld pc,hl
-			
+	constant nop      : integer := 16#00#; -- nop
+	constant jp_nn    : integer := 16#01#; -- jp nn
+	constant jp_nz_nn : integer := 16#02#; -- jp nz,nn
+	constant jp_z_nn  : integer := 16#03#; -- jp z,nn
+	constant jp_nc_nn : integer := 16#04#; -- jp nc,nn
+	constant jp_c_nn  : integer := 16#05#; -- jp c,nn
+	constant jp_p_nn  : integer := 16#06#; -- jp p,nn
+	constant jp_m_nn  : integer := 16#07#; -- jp m,nn
+	constant call_nn  : integer := 16#08#; -- call nn
+	constant nm_int   : integer := 16#09#; -- int
+	constant ret_cll  : integer := 16#0A#; -- ret
+	constant ret_int  : integer := 16#0B#; -- rti
+	constant cpu_wt   : integer := 16#0C#; -- wait
+	
 	constant ld_A_n   : integer := 16#10#; -- ld A,n
 	constant ld_IX_nn : integer := 16#11#; -- ld IX,nn
 	constant ld_IY_nn : integer := 16#12#; -- ld IY,nn
@@ -732,88 +743,79 @@ Kevan Hashemi hashemi@opensourcesintruments.com
 	constant ld_A_iy  : integer := 16#16#; -- ld A,(IY)
 	constant ld_ix_A  : integer := 16#17#; -- ld (IX),A
 	constant ld_iy_A  : integer := 16#18#; -- ld (IY),A
+	constant ld_HL_SP : integer := 16#19#; -- ld hl,sp
+	constant ld_SP_HL : integer := 16#1A#; -- ld sp,hl
+	constant ld_HL_PC : integer := 16#1B#; -- ld hl,pc
+	constant ld_PC_HL : integer := 16#1C#; -- ld pc,hl
+			
+	constant push_A   : integer := 16#20#; -- push A
+	constant push_B   : integer := 16#21#; -- push B
+	constant push_C   : integer := 16#22#; -- push C
+	constant push_D   : integer := 16#23#; -- push D
+	constant push_E   : integer := 16#24#; -- push E
+	constant push_H   : integer := 16#25#; -- push H
+	constant push_L   : integer := 16#26#; -- push L
+	constant push_F   : integer := 16#27#; -- push F
+	constant push_IX  : integer := 16#28#; -- push IX
+	constant push_IY  : integer := 16#29#; -- push IY
 	
-	constant push_A  : integer := 16#20#;  -- push A
-	constant push_B  : integer := 16#21#;  -- push B
-	constant push_C  : integer := 16#22#;  -- push C
-	constant push_D  : integer := 16#23#;  -- push D
-	constant push_E  : integer := 16#24#;  -- push E
-	constant push_H  : integer := 16#25#;  -- push H
-	constant push_L  : integer := 16#26#;  -- push L
-	constant push_F  : integer := 16#27#;  -- push F
-	constant push_IX : integer := 16#28#;  -- push IX
-	constant push_IY : integer := 16#29#;  -- push IY
-	
-	constant pop_A  : integer := 16#30#;   -- pop A
-	constant pop_B  : integer := 16#31#;   -- pop B
-	constant pop_C  : integer := 16#32#;   -- pop C
-	constant pop_D  : integer := 16#33#;   -- pop D
-	constant pop_E  : integer := 16#34#;   -- pop E
-	constant pop_H  : integer := 16#35#;   -- pop H
-	constant pop_L  : integer := 16#36#;   -- pop L
-	constant pop_F  : integer := 16#37#;   -- pop F
-	constant pop_IX : integer := 16#38#;   -- pop IX
-	constant pop_IY : integer := 16#39#;   -- pop IY
+	constant pop_A    : integer := 16#30#; -- pop A
+	constant pop_B    : integer := 16#31#; -- pop B
+	constant pop_C    : integer := 16#32#; -- pop C
+	constant pop_D    : integer := 16#33#; -- pop D
+	constant pop_E    : integer := 16#34#; -- pop E
+	constant pop_H    : integer := 16#35#; -- pop H
+	constant pop_L    : integer := 16#36#; -- pop L
+	constant pop_F    : integer := 16#37#; -- pop F
+	constant pop_IX   : integer := 16#38#; -- pop IX
+	constant pop_IY   : integer := 16#39#; -- pop IY
 
-	constant add_A_B : integer := 16#40#;  -- add A,B
-	constant add_A_n : integer := 16#41#;  -- add A,n
-	constant adc_A_B : integer := 16#42#;  -- adc A,B
-	constant adc_A_n : integer := 16#43#;  -- adc A,n
-	constant sub_A_B : integer := 16#44#;  -- sub A,B
-	constant sub_A_n : integer := 16#45#;  -- sub A,n
-	constant sbc_A_B : integer := 16#46#;  -- sbc A,B
-	constant sbc_A_n : integer := 16#47#;  -- sbc A,n
+	constant add_A_B  : integer := 16#40#; -- add A,B
+	constant add_A_n  : integer := 16#41#; -- add A,n
+	constant adc_A_B  : integer := 16#42#; -- adc A,B
+	constant adc_A_n  : integer := 16#43#; -- adc A,n
+	constant sub_A_B  : integer := 16#44#; -- sub A,B
+	constant sub_A_n  : integer := 16#45#; -- sub A,n
+	constant sbc_A_B  : integer := 16#46#; -- sbc A,B
+	constant sbc_A_n  : integer := 16#47#; -- sbc A,n
 	
-	constant inc_A : integer := 16#50#;    -- inc A
-	constant inc_B : integer := 16#51#;    -- inc B
-	constant inc_C : integer := 16#52#;    -- inc C
-	constant inc_D : integer := 16#53#;    -- inc D
-	constant inc_E : integer := 16#54#;    -- inc E
-	constant inc_H : integer := 16#55#;    -- inc H
-	constant inc_L : integer := 16#56#;    -- inc L
-	
-	constant inc_SP : integer := 16#57#;   -- inc SP
-	constant inc_IX : integer := 16#59#;   -- inc IX
-	constant inc_IY : integer := 16#5A#;   -- inc IY
+	constant inc_A    : integer := 16#50#; -- inc A
+	constant inc_B    : integer := 16#51#; -- inc B
+	constant inc_C    : integer := 16#52#; -- inc C
+	constant inc_D    : integer := 16#53#; -- inc D
+	constant inc_E    : integer := 16#54#; -- inc E
+	constant inc_H    : integer := 16#55#; -- inc H
+	constant inc_L    : integer := 16#56#; -- inc L
+	constant inc_SP   : integer := 16#57#; -- inc SP
+	constant inc_IX   : integer := 16#59#; -- inc IX
+	constant inc_IY   : integer := 16#5A#; -- inc IY
 
-	constant dec_A : integer := 16#60#;    -- dec A
-	constant dec_B : integer := 16#61#;    -- dec B
-	constant dec_C : integer := 16#62#;    -- dec C
-	constant dec_D : integer := 16#63#;    -- dec D
-	constant dec_E : integer := 16#64#;    -- dec E
-	constant dec_H : integer := 16#65#;    -- dec H
-	constant dec_L : integer := 16#66#;    -- dec L
+	constant dec_A    : integer := 16#60#; -- dec A
+	constant dec_B    : integer := 16#61#; -- dec B
+	constant dec_C    : integer := 16#62#; -- dec C
+	constant dec_D    : integer := 16#63#; -- dec D
+	constant dec_E    : integer := 16#64#; -- dec E
+	constant dec_H    : integer := 16#65#; -- dec H
+	constant dec_L    : integer := 16#66#; -- dec L
+	constant dly_A    : integer := 16#67#; -- dly A
+	constant dec_SP   : integer := 16#68#; -- dec SP
+	constant dec_IX   : integer := 16#69#; -- dec IX
+	constant dec_IY   : integer := 16#6A#; -- dec IY
 	
-	constant dec_SP : integer := 16#68#;   -- dec SP
-	constant dec_IX : integer := 16#69#;   -- dec IX
-	constant dec_IY : integer := 16#6A#;   -- dec IY
+	constant and_A_B  : integer := 16#70#; -- and A,B
+	constant and_A_n  : integer := 16#71#; -- and A,n
+	constant or_A_B   : integer := 16#72#; -- or A,B
+	constant or_A_n   : integer := 16#73#; -- or A,n
+	constant xor_A_B  : integer := 16#74#; -- xor A,B
+	constant xor_A_n  : integer := 16#75#; -- xor A,n
 	
-	constant and_A_B : integer := 16#70#;  -- and A,B
-	constant and_A_n : integer := 16#71#;  -- and A,n
-	constant or_A_B : integer := 16#72#;   -- or A,B
-	constant or_A_n : integer := 16#73#;   -- or A,n
-	constant xor_A_B : integer := 16#74#;  -- xor A,B
-	constant xor_A_n : integer := 16#75#;  -- xor A,n
-	
-	constant rla_A  : integer := 16#80#;   -- rla A
-	constant rlca_A : integer := 16#81#;   -- rlca A
-	constant rra_A  : integer := 16#82#;   -- rra A
-	constant rrca_A : integer := 16#83#;  	-- rrca A
-	constant sra_A  : integer := 16#84#;   -- sra A
-	constant srl_A  : integer := 16#85#;   -- srl A
-	constant sla_A  : integer := 16#86#;   -- sla A
-	constant rr_A   : integer := 16#87#;   -- rr A
-	constant rl_A   : integer := 16#88#;   -- rl A
-	
-	constant jp_nn    : integer := 16#F1#; -- jp nn
-	constant jp_nz_nn : integer := 16#F2#; -- jp nz,nn
-	constant jp_z_nn  : integer := 16#F3#; -- jp z,nn
-	constant jp_nc_nn : integer := 16#F4#; -- jp nc,nn
-	constant jp_c_nn  : integer := 16#F5#; -- jp c,nn
-	constant jp_p_nn  : integer := 16#F6#; -- jp p,nn
-	constant jp_m_nn  : integer := 16#F7#; -- jp m,nn
-	constant call_nn  : integer := 16#F8#; -- call nn
-	constant nm_int   : integer := 16#F9#; -- int
-	constant ret_cll  : integer := 16#FA#; -- ret
+	constant rl_A     : integer := 16#78#; -- rl A
+	constant rlc_A    : integer := 16#79#; -- rlc A
+	constant rr_A     : integer := 16#7A#; -- rr A
+	constant rrc_A    : integer := 16#7B#; -- rrc A
+	constant sla_A    : integer := 16#7C#; -- sla A
+	constant sra_A    : integer := 16#7D#; -- sra A
+	constant srl_A    : integer := 16#7E#; -- srl A
+
 	
 ----------End Data----------

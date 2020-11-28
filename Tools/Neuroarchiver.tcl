@@ -54,7 +54,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out
 # more about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "139"
+	LWDAQ_tool_init "Neuroarchiver" "140"
 	if {[winfo exists $info(window)]} {return 0}
 #
 # We start setting intial values for the private display and control variables.
@@ -490,6 +490,11 @@ proc Neuroarchiver_init {} {
 	set config(log_file) [file join \
 		[file dirname $info(settings_file_name)] \
 		Neuroarchiver_log.txt ]
+# 
+# Some errors we don't want to write more than once to the text window, so
+# we keep a copy of the most recent error to compare to.
+#
+	set info(previous_line) ""
 #
 # The num_errors parameter contains the number of errors detected in the
 # clock message sequence of the current interval's data.
@@ -702,11 +707,21 @@ proc Neuroarchiver_configure {} {
 # specified is "verbose", the message prints only when the verbose flag
 # is set, and in black. Warnings and errors are always printed in the warning
 # and error colors. In addition, if the log_warnings is set, the routine
-# writes all warnings and errors to the Neuroarchiver log file.
+# writes all warnings and errors to the Neuroarchiver log file. The print
+# routine will refrainn from writing the same error message to the text 
+# window repeatedly when we set the color to the key word "norepeat". The 
+# routine always stores the previous line it writes, so as to compare in 
+# the case of a norepeat requirement.
 #
 proc Neuroarchiver_print {line {color "black"}} {
 	upvar #0 Neuroarchiver_config config
 	upvar #0 Neuroarchiver_info info
+	
+	if {$color == "norepeat"} {
+		if {$info(previous_line) == $line} {return ""}
+		set color black
+	}
+	set info(previous_line) $line
 	
 	if {[regexp "^WARNING: " $line] || [regexp "^ERROR: " $line]} {
 		append line " ([Neuroarchiver_datetime_convert [clock seconds]]\)"
@@ -724,6 +739,7 @@ proc Neuroarchiver_print {line {color "black"}} {
 		if {$color == "verbose"} {set color black}
 		LWDAQ_print $info(text) $line $color
 	}
+	return $line
 }
 
 #
@@ -856,7 +872,7 @@ proc Neuroarchiver_list {{fl ""}} {
 			[list Neuroarchiver_overview $fn]]
 		$w.text insert end "  Overview  " "o_$i textbutton"
 		$w.text insert end "\n"
-		if {![catch {LWDAQ_ndf_data_check $fn} message]} {
+		if {![catch {LWDAQ_ndf_data_check $fn} error_message]} {
 			set metadata [LWDAQ_ndf_string_read $fn]
 			set comments [LWDAQ_xml_get_list $metadata "c"]
 			foreach c $comments {
@@ -864,7 +880,7 @@ proc Neuroarchiver_list {{fl ""}} {
 			}
 			$w.text insert end "\n"
 		} {
-			LWDAQ_print $w.text "ERROR: $message.\n"
+			LWDAQ_print $w.text "ERROR: $error_message.\n"
 		}
 		incr i
 		LWDAQ_support
@@ -896,16 +912,16 @@ proc Neuroarchiver_metadata_view {fn} {
 		"record" {set fn $config(record_file)}
 		default {
 			if {![file exists $fn]} {
-				Neuroarchiver_print "ERROR: file \"$fn\" does not exist."
-				return ""
+				Neuroarchiver_print "ERROR: File \"$fn\" does not exist."
+				return 0
 			}
 		}
 	}
 	
 	# Check the file.
-	if {[catch {LWDAQ_ndf_data_check $fn} message]} {
-		Neuroarchiver_print "ERROR: $message."
-		return ""
+	if {[catch {LWDAQ_ndf_data_check $fn} error_message]} {
+		Neuroarchiver_print "ERROR: Checking archive, $error_message."
+		return 0
 	}
 	
 	# Create a new top-level text window that is a child of the 
@@ -2194,8 +2210,8 @@ proc Neuroarchiver_overview_plot {i {export 0}} {
 	# data start address and data length.
 	if {[catch {
 		scan [LWDAQ_ndf_data_check $ov_config(fn)] %u%u data_start data_length
-	} message]} {
-		Neuroarchiver_print "ERROR: $message."
+	} error_message]} {
+		Neuroarchiver_print "ERROR: Checking archive, $error_message."
 		return 0
 	}
 	
@@ -5363,10 +5379,12 @@ proc Neuroarchiver_record {{command ""}} {
 			return 1
 		}
 
-		# Check the archive file name and type.
-		if {[catch {LWDAQ_ndf_data_check $config(record_file)} message]} {
-			Neuroarchiver_print "ERROR: $message\."
-			set info(record_control) "Idle"
+		# Check the archive file name and type. If we encounter an error, don't repeat
+		# it to the text window, write it only once, and keep trying to write to the
+		# file.
+		if {[catch {LWDAQ_ndf_data_check $config(record_file)} error_message]} {
+			Neuroarchiver_print "ERROR: Checking archive, $error_message\." norepeat
+			LWDAQ_post Neuroarchiver_record end
 			return 0
 		}
 
@@ -5395,25 +5413,38 @@ proc Neuroarchiver_record {{command ""}} {
 		# We restore the global max_daq_attempts variable.
 		set LWDAQ_Info(max_daq_attempts) $saved_max_daq_attempts
 
-		# If the attempt to download encountered an error, report it to the Neuroarchvier
-		# text window with the current date and time. When it encounters an error, the 
-		# Recorder Instrument will try to reset the data receiver, which will clear its
-		# data memory. The Recorder Instrument will set its acquire_end_ms parameter 
-		# accordingly. We post the Neuroarchiver_record command again, so we can make 
-		# another attempt. We will never give up until the user presses the Stop button.
-		# In this case, we post the recording process to the end of the event queue because
-		# our recovery is not urgent.
+		# If the attempt to download encountered an error, report it to the
+		# Neuroarchvier text window with the current date and time. When it
+		# encounters an error, the Recorder Instrument will try to reset the
+		# data receiver, which will clear its data memory. The Recorder
+		# Instrument will set its acquire_end_ms parameter accordingly. We post
+		# the Neuroarchiver_record command again, so we can make another
+		# attempt. The Neuroarchiver will never give up trying to download data
+		# until the user presses the Stop button. In this case, we post the
+		# recording process to the end of the event queue because our recovery
+		# is not urgent.
 		if {[LWDAQ_is_error_result $daq_result]} {
 			Neuroarchiver_print "$daq_result"
 			LWDAQ_post Neuroarchiver_record end
 			return 0
 		}
 		
-		# Append the new data to our NDF file.		
+		# Append the new data to our NDF file. If the data write fails, we print
+		# an error message warning of the loss of data. An error writing to the
+		# file will occur on Windows if another process is reading the file. If
+		# we encounter such an error, we drop this interval of data, post the
+		# recording process to the end of the event queue, and hope that the
+		# file system conflict will soon be resolved.
 		set message_length [expr $info(core_message_length) + $iconfig(payload_length)]
-		LWDAQ_ndf_data_append $config(record_file) \
-			[lwdaq_image_contents $iconfig(memory_name) -truncate 1 \
-				-data_only 1 -record_size $message_length]
+		if {[catch {
+			LWDAQ_ndf_data_append $config(record_file) \
+				[lwdaq_image_contents $iconfig(memory_name) -truncate 1 \
+					-data_only 1 -record_size $message_length]
+		} error_message]} {
+			Neuroarchiver_print "ERROR: Writing data to disk, $error_message\." norepeat
+			LWDAQ_post Neuroarchiver_record end
+			return 0
+		}
 
 		# Increment the record time. If there has been interruption in the
 		# data acquisition, in which we lost data, this end time will be too
@@ -5568,8 +5599,8 @@ proc Neuroarchiver_play {{command ""}} {
 
 	# If we have changed files, check the new file is NDF.
 	if {$config(play_file) != $info(saved_play_file)} {
-		if {[catch {LWDAQ_ndf_data_check $config(play_file)} message]} {
-			Neuroarchiver_print "ERROR: $message."
+		if {[catch {LWDAQ_ndf_data_check $config(play_file)} error_message]} {
+			Neuroarchiver_print "ERROR: Checking archive, $error_message."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
 			return 0
@@ -5616,7 +5647,14 @@ proc Neuroarchiver_play {{command ""}} {
 		# self-consistent combination. Our tracker extraction routine, however,
 		# checks to see if the coordinates and payload are consistent, and
 		# only if they are does it proceed with location calculation.
-		set metadata [LWDAQ_ndf_string_read $config(play_file)]
+		if {[catch {
+			set metadata [LWDAQ_ndf_string_read $config(play_file)]
+		} error_message]} {
+			Neuroarchiver_print "ERROR: $error_message."
+			LWDAQ_set_bg $info(play_control_label) white
+			set info(play_control) "Idle"
+			return 0			
+		}
 		set payload [LWDAQ_xml_get_list $metadata "payload"]
 		if {[string is integer -strict $payload]} {
 			set config(player_payload_length) $payload
@@ -5783,10 +5821,16 @@ proc Neuroarchiver_play {{command ""}} {
 	set end_of_file 0
 	set message_length [expr $info(core_message_length) + $config(player_payload_length)]
 	while {($num_clocks < $play_num_clocks) && !$end_of_file} {
-		set data [LWDAQ_ndf_data_read \
-			$config(play_file) \
-			[expr $message_length * ($config(play_index) + $info(buffer_size))] \
-			$info(block_size)]
+		if {[catch {
+			set data [LWDAQ_ndf_data_read \
+				$config(play_file) \
+				[expr $message_length * ($config(play_index) + $info(buffer_size))] \
+				$info(block_size)]} error_message]} {
+			Neuroarchiver_print "ERROR: $error_message."
+			LWDAQ_set_bg $info(play_control_label) white
+			set info(play_control) "Idle"
+			return 0			
+		}
 		set num_messages_read [expr [string length $data] / $message_length ]
 		if {$num_messages_read > 0} {
 			Neuroarchiver_print "Read $num_messages_read messages from\
@@ -6373,8 +6417,8 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 			return ""
 		}
 		set pf [lindex $fl $index]
-		if {[catch {LWDAQ_ndf_data_check $pf} message]} {
-			Neuroarchiver_print "ERROR: $message."
+		if {[catch {LWDAQ_ndf_data_check $pf} error_message]} {
+			Neuroarchiver_print "ERROR: Checking archive, $error_message."
 			LWDAQ_set_bg $info(play_control_label) white		
 			return ""
 		}
@@ -6421,8 +6465,8 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 			LWDAQ_set_bg $info(play_control_label) white	
 			return ""
 		}
-		if {[catch {LWDAQ_ndf_data_check $pf} message]} {
-			Neuroarchiver_print "ERROR: $message."
+		if {[catch {LWDAQ_ndf_data_check $pf} error_message]} {
+			Neuroarchiver_print "ERROR: Checking archive, $error_message."
 			LWDAQ_set_bg $info(play_control_label) white		
 			return ""
 		}

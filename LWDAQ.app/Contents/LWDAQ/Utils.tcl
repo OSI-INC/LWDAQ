@@ -678,10 +678,12 @@ proc LWDAQ_ndf_data_check {file_name} {
 	set e [tell $f]
 	close $f
 	binary scan $header a4III p m d l
+	if {![info exists p]} {
+		error "file \"[file tail $file_name]\" contains no header"
+	}	
 	if {$p != $LWDAQ_Info(ndf_prefix)} {
-		error "file \"[file tail $file_name]\" is not ndf"
+		error "file \"[file tail $file_name]\" is not ndf."
 	}
-	
 	return "$d [expr $e - $d]"
 }
 
@@ -699,8 +701,11 @@ proc LWDAQ_ndf_string_check {file_name} {
 	set header [read $f $LWDAQ_Info(ndf_header_size)]
 	close $f
 	binary scan $header a4III p m d l
+	if {![info exists p]} {
+		error "file \"[file tail $file_name]\" contains no header"
+	}	
 	if {$p != $LWDAQ_Info(ndf_prefix)} {
-		error "file \"[file tail $file_name]\" is not ndf"
+		error "file \"[file tail $file_name]\" is not ndf."
 	}
 	if {$l == 0} {
 		set f [open $file_name r]
