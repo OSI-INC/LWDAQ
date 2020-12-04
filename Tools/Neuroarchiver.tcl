@@ -5383,7 +5383,8 @@ proc Neuroarchiver_record {{command ""}} {
 		# it to the text window, write it only once, and keep trying to write to the
 		# file.
 		if {[catch {LWDAQ_ndf_data_check $config(record_file)} error_message]} {
-			Neuroarchiver_print "ERROR: Checking archive, $error_message\." norepeat
+			Neuroarchiver_print "WARNING: Could not open recording archive,\
+				$error_message\." norepeat
 			LWDAQ_post Neuroarchiver_record end
 			return 0
 		}
@@ -5441,7 +5442,8 @@ proc Neuroarchiver_record {{command ""}} {
 				[lwdaq_image_contents $iconfig(memory_name) -truncate 1 \
 					-data_only 1 -record_size $message_length]
 		} error_message]} {
-			Neuroarchiver_print "ERROR: Writing data to disk, $error_message\." norepeat
+			Neuroarchiver_print "WARNING: Could not write to recording archive,\
+				$error_message\." norepeat
 			LWDAQ_post Neuroarchiver_record end
 			return 0
 		}

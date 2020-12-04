@@ -559,7 +559,8 @@ proc LWDAQ_edit_script {{cmd "Open"} {src ""}} {
 		# Make the text window.
 		set t [LWDAQ_text_widget $w 100 30 1 1]
 		LWDAQ_enable_text_undo $t
-		LWDAQ_bind_command_key $w s [list LWDAQ_edit_script Save $w]
+		LWDAQ_bind_command_key $t s [list LWDAQ_edit_script Save $w]
+		LWDAQ_bind_command_key $t S [list LWDAQ_edit_script SaveAs $w]
 
 		# If the file exists, but is not equal to the default file name, read 
 		# the file contents one line at a time. During this read, we have
@@ -685,8 +686,9 @@ proc LWDAQ_clock_widget {{wf ""}} {
 }
 
 #
-# LWDAQ_bind_command_key binds the specified command letter
-# to the specified command on all platforms.
+# LWDAQ_bind_command_key binds the specified command letter to the specified
+# command on all platforms. We use the "command" key on MacOS and the "control"
+# key on Windows and Linux.
 #
 proc LWDAQ_bind_command_key {window letter command} {
 	upvar #0 LWDAQ_Info info
@@ -697,7 +699,7 @@ proc LWDAQ_bind_command_key {window letter command} {
 		bind $window <Control-KeyPress-$letter> $command
 	}
 	if {$info(os) == "Windows"} {
-		bind $window <Alt-KeyPress-$letter> $command
+		bind $window <Control-KeyPress-$letter> $command
 	}
 }
 

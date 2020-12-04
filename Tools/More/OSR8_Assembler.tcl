@@ -28,7 +28,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.2"
+	LWDAQ_tool_init "OSR8_Assembler" "1.3"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return "SUCCESS"
@@ -180,7 +180,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	set mem ""
 	set symbols [list]
 	set line_index 0
-	set num_errors 0
+	set unresolved_labels [list]
 	foreach line $basm {
 		incr line_index
 		set match 0
@@ -238,6 +238,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						}
 						if {!$fo_match} {
 							append code "$v "
+							lappend unresolved_labels "$v $line_index"
 							set fo_match 1
 						}
 					}
@@ -267,6 +268,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						}
 						if {!$fo_match} {
 							append code "$v "
+							lappend unresolved_labels "$v $line_index"
 							set fo_match 1
 						}
 					}
@@ -339,6 +341,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						}
 						if {!$so_match} {
 							append code "$v "
+							lappend unresolved_labels "$v $line_index"
 							set so_match 1
 						}
 					}
@@ -368,6 +371,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						}
 						if {!$so_match} {
 							append code "$v "
+							lappend unresolved_labels "$v $line_index"
 							set so_match 1
 						}
 					}
@@ -420,14 +424,18 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		# See if this is a symbol definition line.
 		set sym_val [OSR8_Assembler_find_symbol $line] 
 		if {[LWDAQ_is_error_result $sym_val]} {
-			incr num_errors
-			LWDAQ_print $info(text) "$sym_val in line $line_index\."
-			continue
+			LWDAQ_print $info(text) "$sym_val at line $line_index\:\n$line"
+			return "ERROR"
 		} elseif {$sym_val != ""} {
-			set match 1
-			lappend info(symbol_list) $sym_val
 			set sym [lindex $sym_val 0]
 			set val [lindex $sym_val 1]
+			if {[lsearch -index 0 $info(symbol_list) $sym] >= 0} {
+				LWDAQ_print $info(text) "ERROR: Symbol \"$sym\" already defined\
+					at line $line_index\:\n$line"
+				return "ERROR"
+			}
+			set match 1
+			lappend info(symbol_list) $sym_val
 			LWDAQ_print -nonewline $info(text) "[format %3d $line_index]: " 
 			LWDAQ_print -nonewline $info(text) \
 				"[format %-16s $sym] " $config(syntax_color)
@@ -446,10 +454,9 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		
 		# Any other characters are an error.
 		if {[regexp {\w+} $line dummy]} {
-			incr num_errors
-			LWDAQ_print $info(text) "ERROR: Unrecognised \"$line\" at line $line_index\."
-			set match 0
-			continue
+			LWDAQ_print $info(text) "ERROR: Unrecognised pneumoic\
+				at line $line_index\:\n$line"
+			return "ERROR"
 		}
 	}
 	
@@ -470,14 +477,16 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			incr addr
 			lappend new_mem $m
 		} elseif {[regexp {^(\w+):$} $m dummy lbl]} {
-				set val "[format %02X [expr $addr / 256]]\
-					[format %02X [expr $addr % 256]] "
-				lappend info(label_list) [list $lbl $val]	
-				LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
+			if {[lsearch -index 0 $info(label_list) $lbl] >= 0} {
+				LWDAQ_print $info(text) "ERROR: Label \"$lbl\"\ defined more than once."
+				return "ERROR"
+			}
+			set val "[format %02X [expr $addr / 256]] [format %02X [expr $addr % 256]] "
+			lappend info(label_list) [list $lbl $val]	
+			LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
 		} else {
 			LWDAQ_print $info(text) "ERROR: Bad symbol \"$m\" in object code."
-			incr num_errors
-			lappend new_mem $m
+			return "ERROR"
 		}
 	}
 	set mem $new_mem
@@ -487,26 +496,35 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		set symbol [lindex $lbl 0]
 		set value [lindex $lbl 1]
 		set mem [regsub -all $symbol $mem $value]
+		set index [lsearch -index 0 $unresolved_labels $symbol]
+		if {$index >= 0} {
+			set unresolved_labels [lreplace $unresolved_labels $index $index]
+		}
 	}
 	
-	# Go through the object code and write bytes to object file.
-	if {$num_errors == 0} {
-		LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
-		LWDAQ_print $info(text) "Machine code bytes written to object file:" purple
-		set f [open $config(ofn) w]
-		set index 0
-		foreach m $mem {
-			puts $f $m
-			incr index
-			LWDAQ_print -nonewline $info(text) "$m "
-			if {$index % $config(bytes_per_line) == 0} {LWDAQ_print $info(text)}
+	# Check for unresolved labels.
+	if {[llength $unresolved_labels] > 0} {
+		foreach lbl $unresolved_labels {
+			LWDAQ_print $info(text) "ERROR: Unresolved label \"[lindex $lbl 0]\"\
+				at line [lindex $lbl 1]."
 		}
-		close $f
-		if {$index % $config(bytes_per_line) != 0} {LWDAQ_print $info(text)}
-		LWDAQ_print $info(text) "Wrote [llength $mem] hex bytes to object file." purple
-	} else {
-		LWDAQ_print $info(text) "Aborted assembly due to $num_errors errors."
+		return "ERROR"
+	}	
+		
+	# Go through the object code and write bytes to object file.
+	LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
+	LWDAQ_print $info(text) "Machine code bytes written to object file:" purple
+	set f [open $config(ofn) w]
+	set index 0
+	foreach m $mem {
+		puts $f $m
+		incr index
+		LWDAQ_print -nonewline $info(text) "$m "
+		if {$index % $config(bytes_per_line) == 0} {LWDAQ_print $info(text)}
 	}
+	close $f
+	if {$index % $config(bytes_per_line) != 0} {LWDAQ_print $info(text)}
+	LWDAQ_print $info(text) "Wrote [llength $mem] hex bytes to object file." purple
 	
 	LWDAQ_print $info(text) "Done.\n" purple
 	return $mem
