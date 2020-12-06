@@ -28,7 +28,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.3"
+	LWDAQ_tool_init "OSR8_Assembler" "1.4"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return "SUCCESS"
@@ -56,12 +56,7 @@ proc OSR8_Assembler_init {} {
 			lappend info(instructions) [list $syntax $opcode]
 		}
 	}	
-	
-	set info(error_list) [list]
-	set info(warning_list) [list]
-	set info(symbol_list) [list]
-	set info(label_list) [list]
-	
+		
 	return "SUCCESS"
 }
 
@@ -161,10 +156,8 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	}
 	
 	# Refresh error, warning, symbol, and label lists.
-	set info(error_list) [list]
-	set info(warning_list) [list]
-	set info(symbol_list) [list]
-	set info(label_list) [list]
+	set symbol_list [list]
+	set label_list [list]
 
 	# Eliminate comments and make list of lines.
 	set basm [list]
@@ -180,7 +173,6 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	set mem ""
 	set symbols [list]
 	set line_index 0
-	set unresolved_labels [list]
 	foreach line $basm {
 		incr line_index
 		set match 0
@@ -226,10 +218,10 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						append code "[string range $value 2 3] "
 						set fo_match 1
 					} else {
-						foreach c $info(symbol_list) {
+						foreach c $symbol_list {
 							set s [lindex $c 0]
 							set sv [lindex $c 1]
-							if {[regexp -nocase $v $s]} {
+							if {$v == $s} {
 								set value [format %04X $sv]
 								append code "[string range $value 0 1] "
 								append code "[string range $value 2 3] "
@@ -238,7 +230,6 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						}
 						if {!$fo_match} {
 							append code "$v "
-							lappend unresolved_labels "$v $line_index"
 							set fo_match 1
 						}
 					}
@@ -256,10 +247,10 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						append code "[string range $value 2 3] "
 						set fo_match 1
 					} else {
-						foreach c $info(symbol_list) {
+						foreach c $symbol_list {
 							set s [lindex $c 0]
 							set sv [lindex $c 1]
-							if {[regexp -nocase $v $s]} {
+							if {$v == $s} {
 								set value [format %04X $sv]
 								append code "[string range $value 0 1] "
 								append code "[string range $value 2 3] "
@@ -268,7 +259,6 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						}
 						if {!$fo_match} {
 							append code "$v "
-							lappend unresolved_labels "$v $line_index"
 							set fo_match 1
 						}
 					}
@@ -284,10 +274,10 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						append code "$value "
 						set fo_match 1
 					} else {
-						foreach c $info(symbol_list) {
+						foreach c $symbol_list {
 							set s [lindex $c 0]
 							set sv [lindex $c 1]
-							if {[regexp -nocase $v $s]} {
+							if {$v == $s} {
 								set value [format %02X $sv]
 								append code "$value "
 								set fo_match 1
@@ -329,10 +319,10 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						append code "[string range $value 2 3] "
 						set so_match 1
 					} else {
-						foreach c $info(symbol_list) {
+						foreach c $symbol_list {
 							set s [lindex $c 0]
 							set sv [lindex $c 1]
-							if {[regexp -nocase $v $s]} {
+							if {$v == $s} {
 								set value [format %04X $sv]
 								append code "[string range $value 0 1] "
 								append code "[string range $value 2 3] "
@@ -341,7 +331,6 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						}
 						if {!$so_match} {
 							append code "$v "
-							lappend unresolved_labels "$v $line_index"
 							set so_match 1
 						}
 					}
@@ -359,10 +348,10 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						append code "[string range $value 2 3] "
 						set so_match 1
 					} else {
-						foreach c $info(symbol_list) {
+						foreach c $symbol_list {
 							set s [lindex $c 0]
 							set sv [lindex $c 1]
-							if {[regexp -nocase $v $s]} {
+							if {$v == $s} {
 								set value [format %04X $sv]
 								append code "[string range $value 0 1] "
 								append code "[string range $value 2 3] "
@@ -371,7 +360,6 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						}
 						if {!$so_match} {
 							append code "$v "
-							lappend unresolved_labels "$v $line_index"
 							set so_match 1
 						}
 					}
@@ -387,10 +375,10 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 						append code "$value "
 						set so_match 1
 					} else {
-						foreach c $info(symbol_list) {
+						foreach c $symbol_list {
 							set s [lindex $c 0]
 							set sv [lindex $c 1]
-							if {[regexp -nocase $v $s]} {
+							if {$v == $s} {
 								set value [format %02X $sv]
 								append code "$value "
 								set so_match 1
@@ -429,13 +417,13 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		} elseif {$sym_val != ""} {
 			set sym [lindex $sym_val 0]
 			set val [lindex $sym_val 1]
-			if {[lsearch -index 0 $info(symbol_list) $sym] >= 0} {
+			if {[lsearch -index 0 $symbol_list $sym] >= 0} {
 				LWDAQ_print $info(text) "ERROR: Symbol \"$sym\" already defined\
 					at line $line_index\:\n$line"
 				return "ERROR"
 			}
 			set match 1
-			lappend info(symbol_list) $sym_val
+			lappend symbol_list $sym_val
 			LWDAQ_print -nonewline $info(text) "[format %3d $line_index]: " 
 			LWDAQ_print -nonewline $info(text) \
 				"[format %-16s $sym] " $config(syntax_color)
@@ -477,12 +465,12 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			incr addr
 			lappend new_mem $m
 		} elseif {[regexp {^(\w+):$} $m dummy lbl]} {
-			if {[lsearch -index 0 $info(label_list) $lbl] >= 0} {
+			if {[lsearch -index 0 $label_list $lbl] >= 0} {
 				LWDAQ_print $info(text) "ERROR: Label \"$lbl\"\ defined more than once."
 				return "ERROR"
 			}
 			set val "[format %02X [expr $addr / 256]] [format %02X [expr $addr % 256]] "
-			lappend info(label_list) [list $lbl $val]	
+			lappend label_list [list $lbl $val]	
 			LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
 		} else {
 			LWDAQ_print $info(text) "ERROR: Bad symbol \"$m\" in object code."
@@ -492,25 +480,28 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	set mem $new_mem
 	
 	# Replace labels with their address values.
-	foreach lbl $info(label_list) {
-		set symbol [lindex $lbl 0]
-		set value [lindex $lbl 1]
-		set mem [regsub -all $symbol $mem $value]
-		set index [lsearch -index 0 $unresolved_labels $symbol]
-		if {$index >= 0} {
-			set unresolved_labels [lreplace $unresolved_labels $index $index]
+	set new_mem ""
+	foreach m $mem {
+		if {[regexp -nocase {^[0-9A-F]+$} $m]} {
+			append new_mem "$m "
+			continue
+		}
+		set found_symbol 0
+		foreach lbl $label_list {
+			set symbol [lindex $lbl 0]
+			set value [lindex $lbl 1]
+			if {$m == $symbol} {
+				append new_mem "$value "
+				set found_symbol 1
+				break
+			}
+		}
+		if {!$found_symbol} {
+			LWDAQ_print $info(text) "ERROR: Undefined label \"$m\"."
 		}
 	}
+	set mem $new_mem
 	
-	# Check for unresolved labels.
-	if {[llength $unresolved_labels] > 0} {
-		foreach lbl $unresolved_labels {
-			LWDAQ_print $info(text) "ERROR: Unresolved label \"[lindex $lbl 0]\"\
-				at line [lindex $lbl 1]."
-		}
-		return "ERROR"
-	}	
-		
 	# Go through the object code and write bytes to object file.
 	LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
 	LWDAQ_print $info(text) "Machine code bytes written to object file:" purple
