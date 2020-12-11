@@ -28,7 +28,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.4"
+	LWDAQ_tool_init "OSR8_Assembler" "1.6"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return "SUCCESS"
@@ -304,7 +304,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			set lo2 [lindex $line 2]
 			if {[string match -nocase $po2 $lo2]} {
 				set so_match 1
-			} elseif {[regexp -nocase {^\(*(IX|IY)\)*$} $lo2]} {
+			} elseif {[regexp -nocase {^\(*(IX|IY|SP)\)*$} $lo2]} {
 				set so_match 0
 			} elseif {$po2 == "(nn)"} {
 				if {[regexp {^\(([\w]+)\)$} $lo2 dummy v]} {
@@ -454,6 +454,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	# wherever it appears in the code, or a label with a colon, which counts as
 	# nothing because it's just a marker. But when we come to the marker, we add
 	# it to the symbol list.
+	LWDAQ_print $info(text) "\nAssigning addresses to instruction labels:" purple
 	set addr $config(base_address)
 	set new_mem ""
 	foreach m $mem {
@@ -473,34 +474,41 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			lappend label_list [list $lbl $val]	
 			LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
 		} else {
-			LWDAQ_print $info(text) "ERROR: Bad symbol \"$m\" in object code."
+			LWDAQ_print $info(text) "ERROR: Bad label \"$m\" in object code."
 			return "ERROR"
 		}
 	}
 	set mem $new_mem
+	LWDAQ_print $info(text) "Assigned addresses to [llength $label_list] labels." purple
 	
 	# Replace labels with their address values.
+	LWDAQ_print $info(text) "Resolving address labels in object code." purple
 	set new_mem ""
+	set counter 0
 	foreach m $mem {
 		if {[regexp -nocase {^[0-9A-F]+$} $m]} {
 			append new_mem "$m "
 			continue
 		}
-		set found_symbol 0
+		set found_label 0
 		foreach lbl $label_list {
-			set symbol [lindex $lbl 0]
+			set label [lindex $lbl 0]
 			set value [lindex $lbl 1]
-			if {$m == $symbol} {
+			if {$m == $label} {
 				append new_mem "$value "
-				set found_symbol 1
+				set found_label 1
 				break
 			}
 		}
-		if {!$found_symbol} {
+		if {!$found_label} {
 			LWDAQ_print $info(text) "ERROR: Undefined label \"$m\"."
+			return "ERROR"
+		} else {
+			incr counter
 		}
 	}
 	set mem $new_mem
+	LWDAQ_print $info(text) "Resolved $counter address labels." purple
 	
 	# Go through the object code and write bytes to object file.
 	LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
@@ -735,10 +743,10 @@ Kevan Hashemi hashemi@opensourcesintruments.com
 	constant jp_z_nn  : integer := 16#03#; -- jp z,nn
 	constant jp_nc_nn : integer := 16#04#; -- jp nc,nn
 	constant jp_c_nn  : integer := 16#05#; -- jp c,nn
-	constant jp_p_nn  : integer := 16#06#; -- jp p,nn
-	constant jp_m_nn  : integer := 16#07#; -- jp m,nn
+	constant jp_np_nn : integer := 16#06#; -- jp np,nn
+	constant jp_p_nn  : integer := 16#07#; -- jp p,nn
 	constant call_nn  : integer := 16#08#; -- call nn
-	constant nm_int   : integer := 16#09#; -- int
+	constant sw_int   : integer := 16#09#; -- int
 	constant ret_cll  : integer := 16#0A#; -- ret
 	constant ret_int  : integer := 16#0B#; -- rti
 	constant cpu_wt   : integer := 16#0C#; -- wait
@@ -746,16 +754,17 @@ Kevan Hashemi hashemi@opensourcesintruments.com
 	constant ld_A_n   : integer := 16#10#; -- ld A,n
 	constant ld_IX_nn : integer := 16#11#; -- ld IX,nn
 	constant ld_IY_nn : integer := 16#12#; -- ld IY,nn
-	constant ld_A_mm  : integer := 16#13#; -- ld A,(nn)
-	constant ld_mm_A  : integer := 16#14#; -- ld (nn),A
-	constant ld_A_ix  : integer := 16#15#; -- ld A,(IX)
-	constant ld_A_iy  : integer := 16#16#; -- ld A,(IY)
-	constant ld_ix_A  : integer := 16#17#; -- ld (IX),A
-	constant ld_iy_A  : integer := 16#18#; -- ld (IY),A
-	constant ld_HL_SP : integer := 16#19#; -- ld hl,sp
-	constant ld_SP_HL : integer := 16#1A#; -- ld sp,hl
-	constant ld_HL_PC : integer := 16#1B#; -- ld hl,pc
-	constant ld_PC_HL : integer := 16#1C#; -- ld pc,hl
+	constant ld_HL_nn : integer := 16#13#; -- ld HL,nn
+	constant ld_A_mm  : integer := 16#14#; -- ld A,(nn)
+	constant ld_mm_A  : integer := 16#15#; -- ld (nn),A
+	constant ld_A_ix  : integer := 16#16#; -- ld A,(IX)
+	constant ld_A_iy  : integer := 16#17#; -- ld A,(IY)
+	constant ld_ix_A  : integer := 16#18#; -- ld (IX),A
+	constant ld_iy_A  : integer := 16#19#; -- ld (IY),A
+	constant ld_HL_SP : integer := 16#1A#; -- ld HL,SP
+	constant ld_SP_HL : integer := 16#1B#; -- ld SP,HL
+	constant ld_HL_PC : integer := 16#1C#; -- ld HL,PC
+	constant ld_PC_HL : integer := 16#1D#; -- ld PC,HL
 			
 	constant push_A   : integer := 16#20#; -- push A
 	constant push_B   : integer := 16#21#; -- push B
@@ -787,6 +796,7 @@ Kevan Hashemi hashemi@opensourcesintruments.com
 	constant sub_A_n  : integer := 16#45#; -- sub A,n
 	constant sbc_A_B  : integer := 16#46#; -- sbc A,B
 	constant sbc_A_n  : integer := 16#47#; -- sbc A,n
+	constant clr_flg  : integer := 16#4F#; -- clf
 	
 	constant inc_A    : integer := 16#50#; -- inc A
 	constant inc_B    : integer := 16#51#; -- inc B
@@ -825,6 +835,5 @@ Kevan Hashemi hashemi@opensourcesintruments.com
 	constant sla_A    : integer := 16#7C#; -- sla A
 	constant sra_A    : integer := 16#7D#; -- sra A
 	constant srl_A    : integer := 16#7E#; -- srl A
-
 	
 ----------End Data----------

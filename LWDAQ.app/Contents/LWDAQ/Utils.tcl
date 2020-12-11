@@ -628,20 +628,19 @@ proc LWDAQ_queue_error {event error_result} {
 }
 
 #
-# LWDAQ_ndf_create creates a new Neuroscience Data Format file,
-# which is the format used by LWDAQ to store archives of continuous
-# time-series data. The NDF format begins with a four-byte format
-# identifier, which is the string " ndf" (note the space at the
-# beginning of the identifier string. Next come three four-byte
-# numbers in big-endian format (most significant byte first). These
-# are the byte offset to meta-data space, byte offset to data space, 
-# and the length of meta-data string when last written. If the length
-# is zero, routines that read the meta-data string should check the length
-# for themselves. The header may contain additional binary information
-# particular to the application. The meta-data space follows the header 
-# and contains only a null-terminated character string. The data space
-# comes next, and occupies the remainder of the file. This routine creates 
-# a new file with an empty string and no data.
+# LWDAQ_ndf_create creates a new Neuroscience Data Format file, which is the
+# format used by LWDAQ to store archives of continuous time-series data. The NDF
+# format begins with a four-byte format identifier, which is the string " ndf"
+# (note the space at the beginning of the identifier string. Next come three
+# four-byte numbers in big-endian format (most significant byte first). These
+# are the byte offset to meta-data space, byte offset to data space, and the
+# length of meta-data string when last written. If the length is zero, routines
+# that read the meta-data string should check the length for themselves. The
+# header may contain additional binary information particular to the
+# application. The meta-data space follows the header and contains only a
+# null-terminated character string. The data space comes next, and occupies the
+# remainder of the file. This routine creates a new file with an empty string
+# and no data.
 #
 proc LWDAQ_ndf_create {file_name meta_data_size} {
 	global LWDAQ_Info
@@ -664,42 +663,55 @@ proc LWDAQ_ndf_create {file_name meta_data_size} {
 }
 
 #
-# LWDAQ_ndf_data_check returns the byte location of the
-# file's data block and the length of the data block. If the 
-# file is not NDF, the routine returns an error.
+# LWDAQ_ndf_data_check returns the byte location of the file's data block and
+# the length of the data block. If the file is not NDF, the routine returns an
+# error.
 #
 proc LWDAQ_ndf_data_check {file_name} {
 	global LWDAQ_Info
 
-	set f [open $file_name r]
-	fconfigure $f -translation binary
-	set header [read $f $LWDAQ_Info(ndf_header_size)]
-	seek $f 0 end
-	set e [tell $f]
-	close $f
+	if {![file exists $file_name]} {
+		error "file $file_name does not exist"
+	}
+	if {[catch {
+		set f [open $file_name r]
+		fconfigure $f -translation binary
+		set header [read $f $LWDAQ_Info(ndf_header_size)]
+		seek $f 0 end
+		set e [tell $f]
+		close $f
+	} error_message]} {
+		error "file locked, $error_message"
+	}
 	binary scan $header a4III p m d l
 	if {![info exists p]} {
 		error "file \"[file tail $file_name]\" contains no header"
 	}	
 	if {$p != $LWDAQ_Info(ndf_prefix)} {
-		error "file \"[file tail $file_name]\" is not ndf."
+		error "file \"[file tail $file_name]\" is not ndf"
 	}
 	return "$d [expr $e - $d]"
 }
 
 #
-# LWDAQ_ndf_string_check returns the byte location of the
-# file's meta-data string, the maximum length of the string
-# and the actual length of the string. If the file is not NDF, 
-# the routine returns an error.
+# LWDAQ_ndf_string_check returns the byte location of the file's meta-data
+# string, the maximum length of the string and the actual length of the string.
+# If the file is not NDF, the routine returns an error.
 #
 proc LWDAQ_ndf_string_check {file_name} {
 	global LWDAQ_Info
 
-	set f [open $file_name r]
-	fconfigure $f -translation binary
-	set header [read $f $LWDAQ_Info(ndf_header_size)]
-	close $f
+	if {![file exists $file_name]} {
+		error "file $file_name does not exist"
+	}
+	if {[catch {
+		set f [open $file_name r]
+		fconfigure $f -translation binary
+		set header [read $f $LWDAQ_Info(ndf_header_size)]
+		close $f
+	} error_message]} {
+		error "file locked, $error_message"
+	}
 	binary scan $header a4III p m d l
 	if {![info exists p]} {
 		error "file \"[file tail $file_name]\" contains no header"
@@ -722,10 +734,9 @@ proc LWDAQ_ndf_string_check {file_name} {
 }
 
 #
-# LWDAQ_ndf_string_write re-writes the meta-data string in an
-# NDF-file on disk but leaves the data intact. The routine takes
-# roughly 100 us to write a one-byte string and 1 ms to write
-# a 10-kbyte string (on a 1.3 GHz G3 iBook).
+# LWDAQ_ndf_string_write re-writes the meta-data string in an NDF-file on disk
+# but leaves the data intact. The routine takes roughly 100 us to write a
+# one-byte string and 1 ms to write a 10-kbyte string (on a 1.3 GHz G3 iBook).
 #
 proc LWDAQ_ndf_string_write {file_name meta_data} {
 	global LWDAQ_Info
@@ -753,6 +764,7 @@ proc LWDAQ_ndf_string_write {file_name meta_data} {
 # LWDAQ_ndf_string_read returns the meta-data string in an NDF file.
 #
 proc LWDAQ_ndf_string_read {file_name} {
+
 	scan [LWDAQ_ndf_string_check $file_name] %d%d%d location max_len actual_len
 	
 	set f [open $file_name r]
@@ -765,12 +777,12 @@ proc LWDAQ_ndf_string_read {file_name} {
 }
 
 #
-# LWDAQ_ndf_string_append appends a meta-data string to the one that already 
-# exists in an NDF file. It speeds itself up by using the actual length 
-# value stored in the file header. It does not read the existing string
-# from the file.  The routine takes roughly 100 us to append a one-byte 
-# string regardless of the length of the existing string, and 1 ms to append
-# a 10-kbyte string (on a 1.3 GHz G3 iBook).
+# LWDAQ_ndf_string_append appends a meta-data string to the one that already
+# exists in an NDF file. It speeds itself up by using the actual length value
+# stored in the file header. It does not read the existing string from the file.
+#  The routine takes roughly 100 us to append a one-byte string regardless of
+# the length of the existing string, and 1 ms to append a 10-kbyte string (on a
+# 1.3 GHz G3 iBook).
 #
 proc LWDAQ_ndf_string_append {file_name meta_data} {
 	global LWDAQ_Info
@@ -797,19 +809,26 @@ proc LWDAQ_ndf_string_append {file_name meta_data} {
 # LWDAQ_ndf_data_append appends new data to an NDF file.
 #
 proc LWDAQ_ndf_data_append {file_name data} {
-	set f [open $file_name a]
-	fconfigure $f -translation binary
-	puts -nonewline $f $data
-	close $f
+	if {![file exists $file_name]} {
+		error "file $file_name does not exist"
+	}
+	if {[catch {
+		set f [open $file_name a]
+		fconfigure $f -translation binary
+		puts -nonewline $f $data
+		close $f
+	} error_message]} {
+		error "file locked, $error_message"
+	}
+	
 	return 1
 }
 
 #
-# LWDAQ_ndf_data_read reads num_bytes of data out of an
-# NDF file data block, starting at byte start_addr. The
-# first byte in the data block is byte zero. If you specify
-# * for num_bytes, the routine reads all available data 
-# bytes from the file.
+# LWDAQ_ndf_data_read reads num_bytes of data out of an NDF file data block,
+# starting at byte start_addr. The first byte in the data block is byte zero. If
+# you specify * for num_bytes, the routine reads all available data bytes from
+# the file.
 #
 proc LWDAQ_ndf_data_read {file_name start_addr num_bytes} {
 	scan [LWDAQ_ndf_data_check $file_name] %d%d d l
@@ -823,16 +842,16 @@ proc LWDAQ_ndf_data_read {file_name start_addr num_bytes} {
 }
 
 #
-# LWDAQ_xml_get_list takes an xml string and extracts the list of records from 
-# the database that matches a specified tag you specify. If an xml string contains 
-# one thousand entries delimited by <donor>...</donor>, the routine
-# returns a TCL list of the contents of all the <donor> entries when you
-# pass it the xml string and the tag "donor". You don't pass it the brackets
-# on either side of the tag, even though these brackets always appear in the
-# xml string. Each element in the list the routine returns will be the contents
-# of a single record, with its start and end tags removed. You can now apply
-# this same routine to each element in this list sequentially, to extract fields from
-# each record, and you can apply LWDAQ_xml_get to these fields to look at sub-fields
+# LWDAQ_xml_get_list takes an xml string and extracts the list of records from
+# the database that matches a specified tag you specify. If an xml string
+# contains one thousand entries delimited by <donor>...</donor>, the routine
+# returns a TCL list of the contents of all the <donor> entries when you pass it
+# the xml string and the tag "donor". You don't pass it the brackets on either
+# side of the tag, even though these brackets always appear in the xml string.
+# Each element in the list the routine returns will be the contents of a single
+# record, with its start and end tags removed. You can now apply this same
+# routine to each element in this list sequentially, to extract fields from each
+# record, and you can apply LWDAQ_xml_get to these fields to look at sub-fields
 # and so on.
 #
 proc LWDAQ_xml_get_list {xml tag} {
@@ -855,7 +874,7 @@ proc LWDAQ_xml_get_list {xml tag} {
 
 #
 # LWDAQ_xml_get calls LWDAQ_xml_get_list and returns the contents of the first
-# list entry in the result. We use this routine to extract the value of a field 
+# list entry in the result. We use this routine to extract the value of a field
 # in an xml record.
 #
 proc LWDAQ_xml_get {xml tag} {
@@ -863,16 +882,15 @@ proc LWDAQ_xml_get {xml tag} {
 }
 
 #
-# LWDAQ_write_image_file writes an image to disk in the LWDAQ
-# image format. If the file name has tail ".gif" (case insensitive),
-# the routine saves the file in GIF format. If the file name ends
-# with ".ndf", the routine writes the image file as an NDF file.
-# Otherwise, the routine saves the image in the DAQ format. In a GIF
-# or DAQ file, the LWDAQ image header, with dimensions, analysis bounds, 
-# and results string, will be embedded in the first line of the image.
-# In an NDF file, this header information is lost. The results string is 
-# saved in the meta-data string and the image contents, starting with
-# the first pixel of the first row, are stored in the NDF data block.
+# LWDAQ_write_image_file writes an image to disk in the LWDAQ image format. If
+# the file name has tail ".gif" (case insensitive), the routine saves the file
+# in GIF format. If the file name ends with ".ndf", the routine writes the image
+# file as an NDF file. Otherwise, the routine saves the image in the DAQ format.
+# In a GIF or DAQ file, the LWDAQ image header, with dimensions, analysis
+# bounds, and results string, will be embedded in the first line of the image.
+# In an NDF file, this header information is lost. The results string is saved
+# in the meta-data string and the image contents, starting with the first pixel
+# of the first row, are stored in the NDF data block.
 #
 proc LWDAQ_write_image_file {image_name outfile_name} {
 	global LWDAQ_Info
@@ -903,24 +921,20 @@ proc LWDAQ_write_image_file {image_name outfile_name} {
 }
 
 #
-# LWDAQ_read_image_file reads an image file from disk into
-# the lwdaq image list and returns its list name. If the file
-# name ends with ".gif" (case insensitive), the routine reads
-# the file as a GIF image. The gray-scale values in the
-# first line of the image should, for best results, contain
-# a DAQ image header. The DAQ header contains the image 
-# dimensions, the analysis bounds, and a result string. Two-
-# dimensional image data begins only on the second line of the
-# image. If the file name ends with ".ndf", the routine reads
-# the file as an NDF (Neuroscience Data Format) file. It creates
-# a new image that is approximately square, and large enough to
-# contain the NDF data. It sets the image result string equal
-# to the NDF meta-data string. It copies the NDF data into the
-# image data area, which begins with the first pixel of the second
-# row in the new image. If the file name ends with any other 
-# extension, the routine reads the image in as a DAQ file.
-# You can specify a name for the image if you like, otherwise 
-# the routine will assign its own name.
+# LWDAQ_read_image_file reads an image file from disk into the lwdaq image list
+# and returns its list name. If the file name ends with ".gif" (case
+# insensitive), the routine reads the file as a GIF image. The gray-scale values
+# in the first line of the image should, for best results, contain a DAQ image
+# header. The DAQ header contains the image dimensions, the analysis bounds, and
+# a result string. Two- dimensional image data begins only on the second line of
+# the image. If the file name ends with ".ndf", the routine reads the file as an
+# NDF (Neuroscience Data Format) file. It creates a new image that is
+# approximately square, and large enough to contain the NDF data. It sets the
+# image result string equal to the NDF meta-data string. It copies the NDF data
+# into the image data area, which begins with the first pixel of the second row
+# in the new image. If the file name ends with any other extension, the routine
+# reads the image in as a DAQ file. You can specify a name for the image if you
+# like, otherwise the routine will assign its own name.
 #
 proc LWDAQ_read_image_file {infile_name {image_name ""}} {
 	global LWDAQ_Info
