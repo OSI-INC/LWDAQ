@@ -28,7 +28,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.6"
+	LWDAQ_tool_init "OSR8_Assembler" "1.7"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return "SUCCESS"
@@ -137,7 +137,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	upvar #0 OSR8_Assembler_config config
 	upvar #0 OSR8_Assembler_info info
 
-	LWDAQ_print $info(text) "Starting OSR8 Object Code Assembler." purple
+	LWDAQ_print $info(text) "Starting OSR8 Assembler." purple
 	if {$asm == ""} {
 		if {[file exists $config(ifn)]} {
 			LWDAQ_print $info(text) "Reading assembler code from $config(ifn)." purple
@@ -533,7 +533,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 	upvar #0 OSR8_Assembler_config config
 	upvar #0 OSR8_Assembler_info info
 
-	LWDAQ_print $info(text) "Starting OSR8 Object Code Dis-Assembler." purple
+	LWDAQ_print $info(text) "Starting OSR8 Dis-Assembler." purple
 	if {$mem == ""} {
 		if {[file exists $config(ofn)]} {
 			LWDAQ_print $info(text) "Reading object code from $config(ofn)." purple
@@ -670,7 +670,7 @@ proc OSR8_Assembler_open {} {
 		pack $f -side top -fill x
 	
 		label $f.[set a]l -text "$b File:" 
-		entry $f.[set a]e -textvariable OSR8_Assembler_config([set a]) -width 50
+		entry $f.[set a]e -textvariable OSR8_Assembler_config([set a]) -width 60
 		button $f.[set a]p -text "Pick" -command "OSR8_Assembler_pick $a"
 		button $f.[set a]ed -text "Edit" -command "OSR8_Assembler_edit $a"
 		pack $f.[set a]l $f.[set a]e $f.[set a]p $f.[set a]ed -side left -expand 1
@@ -692,45 +692,7 @@ return 1
 
 ----------Begin Help----------
 
-Each instruction is presented on a single line of assembly code. The first word
-in an instruction line is the operation code, or "opcode". After that come one
-or more operands separated by commas, with parenthesis used to indicate that an
-operand should be used as an address. On any line, every character after a
-semicolon is a comment and will be ignored by the assembler. The language is
-insensitive to case, so you may use lower-case or upper-case letters as you
-like. The following line specifies the eight-bit indirect load of the
-accumulator from address 0x1702.
-	
-ld A,(0x1702) ; Load A with HI sensor byte.
 
-To specify a jump point, or "labeel", use any string containing letter and
-underscores followed immediately by a colon, and place this named marker just
-before the location you wish to label. The jump point must be alone on its
-declaration line. When we later mention the jump location variable, we do not
-include the colon.
-
-loop:        ; We can put a comment here too
-dec A        ; Decrement the accumulator
-jp nz,loop   ; Jump to loop if accumulator is not zero
-
-Jump points are global constants that can be declared anywhere and 
-referred top anywhere. So we can refer to a jump point in an instruction before
-we declare it.
-
-dec l       ; Decrement register L
-jp nz,notz  ; If L is not zero, jump over the decrement of H
-dec h       ; Decrement register H
-notz:       ; This is where we declare the label "notz"
-adc A,56    ; Add 56 decimal to the accumulator, with carry.
-
-Empty lines, or lines with only comments, are ignored by the assembler, although
-they are counted, so that warning and error messages will be able to refer to
-the correct line number. To declare a constant use the following notation.
-
-const sensor_hi 0x1702 ; Define sensor_hi to be value 1702 hexadecimal.
-const step_size 34     ; Replace "step_size" with 34 decimal.
-ld A,step_size         ; Load step-size constant into the accumulator
-ld (sensor_hi),A       ; Load byte location sensor_hi with accumulator.
 
 Kevan Hashemi hashemi@opensourcesintruments.com
 ----------End Help----------
@@ -750,6 +712,8 @@ Kevan Hashemi hashemi@opensourcesintruments.com
 	constant ret_cll  : integer := 16#0A#; -- ret
 	constant ret_int  : integer := 16#0B#; -- rti
 	constant cpu_wt   : integer := 16#0C#; -- wait
+	constant clr_iflg : integer := 16#0D#; -- clri
+	constant set_iflg : integer := 16#0E#; -- seti
 	
 	constant ld_A_n   : integer := 16#10#; -- ld A,n
 	constant ld_IX_nn : integer := 16#11#; -- ld IX,nn
@@ -796,7 +760,7 @@ Kevan Hashemi hashemi@opensourcesintruments.com
 	constant sub_A_n  : integer := 16#45#; -- sub A,n
 	constant sbc_A_B  : integer := 16#46#; -- sbc A,B
 	constant sbc_A_n  : integer := 16#47#; -- sbc A,n
-	constant clr_flg  : integer := 16#4F#; -- clf
+	constant clr_aflg : integer := 16#4F#; -- clrf
 	
 	constant inc_A    : integer := 16#50#; -- inc A
 	constant inc_B    : integer := 16#51#; -- inc B
