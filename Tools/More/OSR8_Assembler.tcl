@@ -664,7 +664,7 @@ proc OSR8_Assembler_open {} {
 		pack $f.$b -side left -expand 1
 	}
 
-	foreach {a b} {ifn Infile ofn Outfile} {
+	foreach {a b} {ifn Input ofn Output} {
 		set f $w.[set a]
 		frame $f
 		pack $f -side top -fill x

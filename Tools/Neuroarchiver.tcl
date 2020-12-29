@@ -53,7 +53,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out
 # more about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "140"
+	LWDAQ_tool_init "Neuroarchiver" "141"
 	if {[winfo exists $info(window)]} {return 0}
 #
 # We start setting intial values for the private display and control variables.
@@ -77,7 +77,7 @@ proc Neuroarchiver_init {} {
 # af_image are those behind the display of the signal trace and the signal
 # spectrum respectively. The buffer_image and data_image are used by the
 # play-back process to buffer data from disk and pass data to the recorder
-# analysis routines respectively.
+# instrument analysis routines respectively.
 #
 	set info(vt_image) "_neuroarchiver_vt_image_"
 	set info(af_image) "_neuroarchiver_af_image_"
@@ -87,6 +87,12 @@ proc Neuroarchiver_init {} {
 	lwdaq_image_destroy $info(af_image)
 	lwdaq_image_destroy $info(data_image)
 	lwdaq_image_destroy $info(buffer_image)
+#
+# The recorder buffer variable holds data that we download from the 
+# receiver but are unable to write to disk because the recording file
+# is locked.
+#
+	set info(recorder_buffer) ""
 #
 # The plot window width and height get set here.
 #
@@ -321,13 +327,18 @@ proc Neuroarchiver_init {} {
 	set config(show_messages) 0
 	set info(min_show_messages) 20
 # 
-# The archive indices give the current position and size of archives. These
-# indices are in units of messages.
-#
+# Timing constants for the recorder, in seconds.
 	set config(record_end_time) 0
 	set config(record_lag) 0.2
 	set config(record_start_clock) 0
+#
+# The play index is the message number in the archive that is the start
+# of the next interval.
+#
 	set config(play_index) 0
+#
+# Timing constants for the player, in seconds.
+#
 	set config(play_time) 0.0
 	set info(t_min) $config(play_time)
 	set info(play_end_time) 0.0
@@ -5227,6 +5238,7 @@ proc Neuroarchiver_record {{command ""}} {
 	# If a global reset is going on, go to idle state.
 	if {$LWDAQ_Info(reset)} {
 		set info(record_control) "Idle"
+		set info(recorder_buffer) ""
 		return 1
 	}
 	
@@ -5247,6 +5259,7 @@ proc Neuroarchiver_record {{command ""}} {
 	# If Stop, we move to Idle and return.
 	if {$info(record_control) == "Stop"} {
 		set info(record_control) "Idle"
+		set info(recorder_buffer) ""
 		return 1
 	}
 	
@@ -5276,6 +5289,9 @@ proc Neuroarchiver_record {{command ""}} {
 
 		# Turn the recording label red,
 		LWDAQ_set_bg $info(record_control_label) red
+		
+		# Clear the buffer.
+		set info(recorder_buffer) ""
 
 		# Wait until a new second begins, but only on a Reset command or if the
 		# synchronization flag set.
@@ -5375,18 +5391,28 @@ proc Neuroarchiver_record {{command ""}} {
 			return 1
 		}
 
-		# Check the archive file name and type. If we encounter an error, check to
-		# see if it is a "file locked" error, in which case we are going to wait
-		# and hope that the file will unlock before too long.
-		if {[catch {LWDAQ_ndf_data_check $config(record_file)} error_message]} {
-			if {[regexp "file locked" $error_message]} {
-				Neuroarchiver_print "WARNING: Recording $error_message\." norepeat
-				LWDAQ_post Neuroarchiver_record end
-			} {
-				Neuroarchiver_print "ERROR: $error_message\."
-				set info(record_control) "Idle"
+		# If our recording buffer is not empty, try to write the data to disk
+		# now. If we get a file locked error, we will try again later to write
+		# the data to disk, but avoid trying to download any more data. If we
+		# get any other error we abandon recording.
+		if {$info(recorder_buffer) != ""} {
+			if {[catch {
+				LWDAQ_ndf_data_append $config(record_file) $info(recorder_buffer)
+				set info(recorder_buffer) ""	
+				Neuroarchiver_print "WARNING: Wrote buffered data to\
+					[file tail $config(record_file)]\
+					after previous write failure."		
+			} error_message]} {
+				if {[regexp "file locked" $error_message]} {				
+					LWDAQ_post Neuroarchiver_record end
+				} {
+					Neuroarchiver_print "ERROR: $error_message\."
+					set info(recorder_buffer) ""
+					set info(record_control) "Idle"
+				}
+				LWDAQ_set_bg $info(record_control_label) white
+				return 0
 			}
-			return 0
 		}
 		
 		# Set the record label to the download color.
@@ -5439,16 +5465,20 @@ proc Neuroarchiver_record {{command ""}} {
 		# file system conflict will soon be resolved.
 		set message_length [expr $info(core_message_length) + $iconfig(payload_length)]
 		if {[catch {
-			LWDAQ_ndf_data_append $config(record_file) \
-				[lwdaq_image_contents $iconfig(memory_name) -truncate 1 \
+			set info(recorder_buffer) [lwdaq_image_contents $iconfig(memory_name) -truncate 1 \
 					-data_only 1 -record_size $message_length]
+			LWDAQ_ndf_data_append $config(record_file) $info(recorder_buffer)
+			set info(recorder_buffer) ""				
 		} error_message]} {
 			if {[regexp "file locked" $error_message]} {				
-				Neuroarchiver_print "WARNING: Recording $error_message\." norepeat
+				Neuroarchiver_print "WARNING: Could not write to\
+					[file tail $config(record_file)],\
+					permission denied."
 				LWDAQ_post Neuroarchiver_record end
 			} {
 				Neuroarchiver_print "ERROR: $error_message\."
 				set info(record_control) "Idle"
+				set info(recorder_buffer) ""				
 			}
 			LWDAQ_set_bg $info(record_control_label) white
 			return 0

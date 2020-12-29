@@ -105,7 +105,7 @@ then
 # program icon will be intact when we unzip on another MacOS
 # machine.
 	echo "Creating $ARCHIVE with MacOS compression utility..."
-#	ditto -c -k --sequesterRsrc --keepParent `basename $LWDAQ_DIR` $ARCHIVE
+	ditto -c -k --sequesterRsrc --keepParent `basename $LWDAQ_DIR` $ARCHIVE
 else
 # We use the zip command on other platforms. It does not 
 # preserve the MacOS icon. We try to remove resource information
@@ -183,11 +183,11 @@ then
 		echo "Deleting remote source files..."
 		rm $RMTSRCS/*.*
 		echo "Uploading Pascal sources..."
-		cp -R "LWDAQ/Sources/*.pas" $RMTSRCS
+		cp  LWDAQ/Sources/*.pas $RMTSRCS
 		echo "Uploading core TclTk scripts..."
-		cp -R "LWDAQ/LWDAQ.app/Contents/LWDAQ/*.tcl" $RMTSRCS
+		cp  LWDAQ/LWDAQ.app/Contents/LWDAQ/*.tcl $RMTSRCS
 		echo "Uploading instrument TclTk scripts..."
-		cp -R "LWDAQ/LWDAQ.app/Contents/LWDAQ/Instruments/*.tcl" $RMTSRCS
+		cp  LWDAQ/LWDAQ.app/Contents/LWDAQ/Instruments/*.tcl $RMTSRCS
 	else
 		echo "NOT FOUND: Remote source code directory."
 	fi
