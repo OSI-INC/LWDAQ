@@ -21,7 +21,18 @@ end.
 {
 	A program that calls the above dynamic library. Goes with the dynamic
 	library defined by d.pas. Compile with:
+	
 	fpc m.pas -Px86_64 -k-ld
+	
+	Before running, on Linux you must declare the location of the dynamic
+	library:
+	
+	LD_LIBRARY_PATH="./"
+	export LD_LIBRARY_PATH
+	
+	Now run with:
+	
+	./m
 }
 
 {$MODESWITCH CLASSICPROCVARS+}
@@ -30,7 +41,7 @@ end.
 
 program m;
  
-function answer:integer; cdecl; external 'd' name '_answer';
+function answer:longint; cdecl; external 'd' name '_answer';
  
 begin
 	writeln('Answer: ',answer);
