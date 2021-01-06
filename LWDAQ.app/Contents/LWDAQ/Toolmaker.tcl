@@ -329,3 +329,167 @@ foreach {i} $OSR8_Assembler_info(instructions) {
 }
 </script>
 
+<script>
+set count 0
+foreach {i} $OSR8_Assembler_info(instructions) {
+	if {$count % 4 = 0} {LWDAQ_print -nonewline $t "<tr>"}
+	set syntax [lindex $i 0]
+	set opcode [lindex $i 1]
+	LWDAQ_print -nonewline $t "<td><a href=\"#$syntax\">$syntax</a></td><td>0x$opcode</td>"
+	if {$count % 4 = 3} {LWDAQ_print $t "</tr>"}
+  incr count
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [split [read $f] \n]
+close $f
+
+foreach {sa sn} {MA "Massachusetts" FL "Florida" GA "Georgia" \
+	MN "Minnesota" NY "New York" CA "California" TX "Texas"} {
+	set $sa [list]
+	foreach line $contents {
+		set line [split $line ","]
+		if {[lindex $line 0] == $s} {
+			lappend $sa [lindex $line 4]
+		}
+	}
+}
+
+for {set i 0} {$i <  [llength MA]} {incr i} {
+	foreach sa {MA FL GA MN NY CA TX} {
+		LWDAQ_print -nonewline $t [lindex $sa $i]
+	}
+	LWDAQ_print $t
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [split [read $f] \n]
+close $f
+
+foreach {sa sn} {MA "Massachusetts" FL "Florida" GA "Georgia" \
+	MN "Minnesota" NY "New York" CA "California" TX "Texas"} {
+	set $sa [list]
+	foreach line $contents {
+		set line [split $line ","]
+		if {[lindex $line 0] == $sn} {
+			lappend $sa [lindex $line 4]
+		}
+	}
+}
+
+for {set i 0} {$i <  [llength MA]} {incr i} {
+	foreach sa {MA FL GA MN NY CA TX} {
+		LWDAQ_print -nonewline $t [lindex $sa $i]
+	}
+	LWDAQ_print $t
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [split [read $f] \n]
+close $f
+
+foreach {sa sn} {MA "Massachusetts" FL "Florida" GA "Georgia" \
+	MN "Minnesota" NY "New York" CA "California" TX "Texas"} {
+	set $sa [list]
+	foreach line $contents {
+		set line [split $line ","]
+		if {[lindex $line 0] == $sn} {
+			lappend $sa [lindex $line 4]
+		}
+	}
+}
+
+for {set i 0} {$i <  [llength MA]} {incr i} {
+	foreach sa {MA FL GA MN NY CA TX} {
+		LWDAQ_print -nonewline $t [lindex [set $sa] $i]
+	}
+	LWDAQ_print $t
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [split [read $f] \n]
+close $f
+
+foreach {sa sn} {MA "Massachusetts" FL "Florida" GA "Georgia" \
+	MN "Minnesota" NY "New York" CA "California" TX "Texas"} {
+	set $sa [list]
+	foreach line $contents {
+		set line [split $line ","]
+		if {[lindex $line 0] == $sn} {
+			lappend $sa [lindex $line 4]
+		}
+	}
+}
+
+for {set i 0} {$i <  [llength [set MA]]} {incr i} {
+	foreach sa {MA FL GA MN NY CA TX} {
+		LWDAQ_print -nonewline $t "[lindex [set $sa] $i] "
+	}
+	LWDAQ_print $t
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [split [read $f] \n]
+close $f
+
+foreach {sa sn} {MA "Massachusetts" FL "Florida" GA "Georgia" \
+	MN "Minnesota" NY "New York" CA "California" \
+	SD "South Dakota" TX "Texas"} {
+	set $sa [list]
+	foreach line $contents {
+		set line [split $line ","]
+		if {[lindex $line 0] == $sn} {
+			lappend $sa [lindex $line 4]
+		}
+	}
+}
+
+for {set i 0} {$i <  [llength [set MA]]} {incr i} {
+	foreach sa {MA FL GA MN NY CA TX} {
+		LWDAQ_print -nonewline $t "[lindex [set $sa] $i] "
+	}
+	LWDAQ_print $t
+}
+</script>
+
+<script>
+set fn [LWDAQ_get_file_name]
+set f [open $fn r]
+set contents [split [read $f] \n]
+close $f
+
+foreach {sa sn} {MA "Massachusetts" FL "Florida" GA "Georgia" \
+	MN "Minnesota" NY "New York" CA "California" \
+	SD "South Dakota" TX "Texas"} {
+	set $sa [list]
+	foreach line $contents {
+		set line [split $line ","]
+		if {[lindex $line 0] == $sn} {
+			lappend $sa [lindex $line 4]
+		}
+	}
+}
+
+for {set i 0} {$i <  [llength [set MA]]} {incr i} {
+	foreach sa {MA FL GA MN NY SD CA TX} {
+		LWDAQ_print -nonewline $t "[lindex [set $sa] $i] "
+	}
+	LWDAQ_print $t
+}
+</script>
+
