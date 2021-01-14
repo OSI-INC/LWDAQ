@@ -493,3 +493,13 @@ for {set i 0} {$i <  [llength [set MA]]} {incr i} {
 }
 </script>
 
+<script>
+# Get the number of frames in a video.
+set fnl [lsort -increasing [LWDAQ_get_file_name 1]]
+foreach fn $fnl {
+	catch {exec /usr/local/bin/ffmpeg -i $fn -c copy -f null -} result
+	regexp {frame= *([0-9]+)} $result match numf
+	LWDAQ_print $t "$fn $numf"
+}
+</script>
+
