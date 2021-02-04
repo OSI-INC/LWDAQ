@@ -46,21 +46,37 @@ type
 		offset:array [Tk_PhotoPixelElement] of integer;
 	end;
 
-	
 {$IFDEF DARWIN}
 	{
-		On MacOS, fpc won't make a dynamic library unless it gets to look at
-		the Tcl library, in its framework. So we declare the Tcl framework here
-		and on the fpc command line we and option like:
-		
+		On MacOS, we cannot compile a dynamic library unless we provide paths to
+		all libraries that the dynamic library requires. The compile-time linker
+		will check that all routines external to the dynamic library are
+		available in the libraries on disk, and embed a path to these libraries
+		in the dynamic library. At run-time, the dynamic linker goes through all
+		the undefined symbols in the dynamic library and checks to see if the
+		symbol is already defined by the process. If the symbol is not defined,
+		the linker loads the library on disk that defines the symbol, as given
+		by the path encoded in the dynamic library itself.
+
+		In our case, we want the compiler to find the TclTk libraries in the
+		MacOS-style framework directory structure, which is a structure that FPC
+		understands. In our Pascal code we include two "linkframework" compiler
+		directives for our Tcl and Tk frameworks. These directives satisfy the
+		compiler, but we must in addition pass the location of the frameworks to
+		the linker with a separate linker directive on the command line. We
+		specify the framework directory with a relative path, so that the
+		dynamic linker will know where to find the libraries in the file system
+		with respect to the location of the dynamic library.
+
 		fpc lwdaq -olwdaq.so_MacOS -k-F../LWDAQ.app/Contents/Frameworks
 		
-		This command forces the output to be lwdaq.dylib instead of liblwdaq.dylib
-		and points the linker to the framework. When we load the library into
-		Tcl, we can specify a relative path.
+		The above command forces the output to be lwdaq.dylib instead of
+		liblwdaq.dylib and points the linker to the framework. When we load the
+		library into Tcl, we can specify a relative path.
 
-		We must add an underscrore to exported routine names on MacOS because Tcl will
-		add an underscore.
+		We must add an underscrore to routine names we export because on
+		MacOS, the Tcl load command will add the underscore to the name we
+		specify before looking for a routine.
 	}
 	const tcl_ld_prefix='_';
 	{$linkframework Tcl}
@@ -73,21 +89,28 @@ type
 
 {$IFDEF WINDOWS}
 	{
-		On Windows we have to have tcl86.dll present. But the cdecl calling
-		convention, as implemented by FPC on Windows, wants to add an underscore
-		to external routine names. We defeat this FPC policy by declaring the
-		name of the library that contains the routine, and FPC ends up adding
-		the underscore in front of the library name, then discarding the
-		underscore. This may be a bug in FPC, and if so it may be fixed later,
-		which will require us to find another work-around. We specify only the
-		name of the library, and specify the path to the library at compile time
-		with.
+		On Windows, we cannot compile a dynamic library unless we provide paths
+		to all libraries that the dynamic library requires. The compile-time
+		linker will check that all routines external to the dynamic library are
+		available in the libraries on disk, and embed a path to these libraries
+		in the dynamic library. At run-time, the dynamic linker goes through all
+		the undefined symbols in the dynamic library and checks to see if the
+		symbol is already defined by the process. If the symbol is not defined,
+		the linker loads the library on disk that defines the symbol, as given
+		by the path encoded in the dynamic library itself.
 
+		In our case, we want the compile-time linker to look in a particular
+		folder for our TclTk dynamic libraries. We can specify the folder with a
+		relative path, so that the dynamic linker will know where to find the
+		libraries in the file system with respect to the location of the dynamic
+		library. The libraries must be named X.dll on disk, where X is the name
+		we give to FPC as the "external name" of the library.
+		
 		fpc lwdaq -olwdaq.so_Windows -Px86_64 -k-L../LWDAQ.app/Contents/Windows/bin
 		
-		When we load the library into Tcl we can specify a relative path. We
-		must add an underscrore to exported routine names on Windows because Tcl
-		will add an underscore.
+		We must add an underscrore to routine names we export because on
+		Windows, the Tcl load command will add the underscore to the name we
+		specify before looking for a routine.
 	}
 	const tcl_ld_prefix='_';
 	{$define _TCLLIB_:='tcl86'}
@@ -98,16 +121,40 @@ type
 
 {$IFNDEF WINDOWS}{$IFNDEF DARWIN}
 	{ 
-		On Linux, we don't need to link to the TclTk libraries to make our dynamic
-		library. The linker trusts that the required routines will be made available
-		at the time of the dynamic link. We have no underscore to add to the exported
-		names on Linux.
+		On Linux, we don't need to link to the TclTk libraries to make our
+		dynamic library. The linker trusts that the required routines will
+		available at run-time. At compile time all we need is:
 		
 		fpc lwdaq -olwdaq.so_Linux
+		
+		In our case, all the TclTk routines declared in this unit as external
+		routines are indeed available at run-time, because the LWDAQ process has
+		launched either the Tcl or the TclTk interpreter, and this interpreter
+		has loaded all its dynamic libraries to install all TclTk routines in
+		process memory. In our Pascal code, we don't even need to specify a
+		library from which our Tcl and Tk external routines should be loaded, so
+		we leave the library name, which goes immediately after each "external"
+		directive, as an empty string.
 
-		When we load the library into Tcl we must specify an absolute path to
-		the library file. On Linux, we don't add underscores in front of our
-		routine names because the Tcl load routine will not add an underscore.
+		When we run the Tcl or TclTk interpreter, however, we do have to tell
+		the dynami linker where to find the Tcl and Tk dynamic libraries,
+		because the interpreter executable is not a self-contained program, but
+		rather relies upon the existence of the Tcl and Tk libraries either in
+		memory or on disk. When we launch LWDAQ, we must provide an absolute
+		path to the location of the Tcl and Tk libraries. In our "lwdaq" launch
+		script, we have these lines before running the Tcl interpreter.
+		
+		LD_LIBRARY_PATH="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/lib"
+		export LD_LIBRARY_PATH
+		
+		Here, the LWDAQ_DIR variable contains an absolute path to the LWDAQ main
+		directory. Given that the "lwdaq" launch script resides in this same
+		directory, we can obtain the absolute path to the libraries from the
+		absolute path to the launch script itself.
+
+		We do not add an underscrore to routine names we export because on MacOS,
+		the Tcl load command does not add an underscore to the name we specify when
+		looking for a routine.
 	}
 	{$define _TCLLIB_:=}
 	{$define _TKLIB_:=}
@@ -118,8 +165,8 @@ type
 
 {
 	External declarations of Tcl/TK library commands provided by the Tcl and Tk
-	libraries. We use the _TCLLIB_ and _TKLIB_ macros to substitute the library
-	names on Windows, but to leave no library name on MacOS and Linux.
+	libraries. We use the _TCLLIB_ and _TKLIB_ macros for platform-dependent 
+	library names.
 }
 function Tcl_CreateObjCommand (interp:pointer;s:PChar;cmd:Tcl_CmdProc;
 	data:integer;delete_proc:Tcl_CmdDeleteProc):pointer; 

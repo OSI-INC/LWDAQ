@@ -22,13 +22,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
+# Version 1.7: Fully functional assembler for OSR8, not major bugs.
 
 proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_info info
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.7"
+	LWDAQ_tool_init "OSR8_Assembler" "1.8"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return "SUCCESS"
@@ -266,7 +267,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			} elseif {$po1 == "n"} {
 				if {[regexp {^([\w]+)$} $lo1 dummy v]} {
 					if {[regexp -nocase {^0x[0-9A-F]+$} $v]} {
-						set value [format %02X [expr $v]]
+						set value [format %02X $v]
 						append code "$value "
 						set fo_match 1
 					} elseif {[regexp {^[0-9]+$} $v]} {

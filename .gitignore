@@ -1,3 +1,8 @@
 /**/.DS_Store
 /Tools/Data/*_Settings.tcl
 /Videoarchiver
+/LWDAQ.app/Contents/LWDAQ/Toolmaker.tcl
+/Build/*.o
+/Build/*.so
+/Build/*.dylib
+/Build/*.dll

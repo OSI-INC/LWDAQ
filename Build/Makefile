@@ -20,23 +20,41 @@ endif
 # Determine the local architecture. We support only 64-bit Intel.
 ARCH = x86_64
 
-# Determine the location of the TCL/TK libraries and the
-# GCC libraries. On Unix, we assume the libraries are in one 
-# of the default library paths. On MacOS, Linux, and Windows,
-# we use the libraries bundled in LWDAQ.app.
+# Determine the location of the TCL/TK libraries and the GCC libraries. On Unix,
+# we assume the libraries are in one of the default library paths.
 TCL_FLAGS = 
 FPC_FLAGS = -Px86_64 -O3
 
+# On Windows, we tell FPC compiler where it can find the TclTk libraries, so
+# that it can embed a path to these libraries in the compiled object. At
+# run-time, the dynamic linker will check to see if the libraries with the
+# specified path are loaded, and if so, link to them. If the libraries are not
+# loaded, the dynamic linker will load them from disk. The TclTk libraries are
+# in a Framework directory structure that FPC understands. We specify the
+# framework directory with the -Ff flag.
 ifeq ($(OS),MacOS)
 	TCL_FLAGS = -Ff../LWDAQ.app/Contents/Frameworks
 	FPC_FLAGS = -Px86_64 -O3 -WM10.9
 endif
 
+# On Windows, we tell FPC where it can find the TclTk libraries, so that it can
+# embed a path to these libraries in the compiled object. At run-time, the
+# dynamic linker will check to see if the libraries with the specified path are
+# loaded, and if so, link to them. If the libraries are not loaded, the dynamic
+# linker will load them from disk. The TclTk libraries are in a particular place
+# in our LWDAQ bundle, and must be named X.dll, where X is the library root name
+# we specify in our Pascal code. 
 ifeq ($(OS),Windows)
 	TCL_FLAGS = -k-L../LWDAQ.app/Contents/Windows/bin
 	FPC_FLAGS = -Px86_64 -O3 
 endif
 
+# On Linux, weak linking is the default, so we don't have to tell the Pascal
+# compiler the location of the TclTk libraries at compile time. At run-time, 
+# the dynamic linker will try to resolve undefined symbols by looking at those
+# libraries already loaded by the process and the operating syste. The Pascal
+# routines that call TclTk routines will be linked to the TclTk libraries loaded
+# by the LWDAQ process, which is itself a TclTk interpreter.
 ifeq ($(OS),Linux)
 	TCL_FLAGS = 
 	FPC_FLAGS = -Px86_64 -O3 -Cg
@@ -59,22 +77,21 @@ OBJB = tcltk.o
 # Our default product is the LWDAQ shared library.
 products: $(LWDAQ)
 
-# The p target is an executable that uses all the analysis units,
-# but does not need the wrapper provided by analysis.a. When we
-# call fpc, we don't list all the objects it needs to link the
-# executable, because it looks for those automatically, by consulting
-# the main program source code.
+# The p target is an executable that uses all the analysis units, but does not
+# need the wrapper provided by analysis.a. When we call fpc, we don't list all
+# the objects it needs to link the executable, because it looks for those
+# automatically, by consulting the main program source code.
 p: p.pas $(OBJA)
 	fpc $< -op.exe $(FPC_FLAGS) 
 
-# The test target is an executable that runs a suit of tests of our
-# analysis library routines.
+# The test target is an executable that runs a suit of tests of our analysis
+# library routines.
 test: test.pas $(OBJA)
 	fpc $< -otest.exe $(FPC_FLAGS) 
 
-# Compile the LWDAQ shared library. We don't list all the required
-# objects in the fpc command line because fpc will look for them
-# as it compiles the dynamic library.
+# Compile the LWDAQ shared library. We don't list all the required objects in
+# the fpc command line because fpc will look for them as it compiles the dynamic
+# library.
 $(LWDAQ): $(SRC_DIR)/lwdaq.pas $(OBJA) $(OBJB)
 	fpc $< -o./$@ $(FPC_FLAGS) $(TCL_FLAGS)
 	cp -f $@ $(LWDAQ_DIR)/$@
