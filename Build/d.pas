@@ -3,6 +3,9 @@
 	with:
 	
 	fpc d.pas -Px86_64
+	
+	The result will be a shared library called  d.dll (Windows), libd.dylib (MacOS), 
+	or libd.so (Linux).
 }
 
 library d;
@@ -41,10 +44,10 @@ begin
 	increment:=a+1;
 end;
 
-function print(s:PChar):longint; cdecl;
+function printstring(s:PChar):longint; cdecl;
 begin
 	writeln('String passed into Pascal library is: "'+s+'"');
-	print:=length(s);
+	printstring:=length(s);
 end;
 
 function sqroot(x:real):real; cdecl;
@@ -65,7 +68,7 @@ end;
 
 exports
 	increment name exp_prefix+'increment',
-	print name exp_prefix+'print',
+	printstring name exp_prefix+'printstring',
 	sqroot name exp_prefix+'sqroot',
 	reportsizes name exp_prefix+'reportsizes';
 end.

@@ -1,54 +1,194 @@
 {
-	A library that exports a simple routine. Compile with:
+	A dynamic library that exports routines. Compile on all platforms with:
+	
 	fpc d.pas -Px86_64
+	
+	The result will be a shared library called  d.dll (Windows), libd.dylib (MacOS), 
+	or libd.so (Linux). We load the library into Python with a commands like this:
+	
+import ctypes
+_libd = ctypes.CDLL( './libd.dylib' )
+	def inc( a ):
+return _libd.increment( ctypes.c_int( a ) )
+
 }
-{$MODESWITCH CLASSICPROCVARS+}
-{$LONGSTRINGS ON}
-{$MACRO ON}
 
 library d;
 
-function answer:longint; cdecl;
+{$MODESWITCH CLASSICPROCVARS+}
+{$LONGSTRINGS ON}
+{$MACRO ON}
+
+{$IFDEF DARWIN}
+	{
+		We must add an underscrore to the names of routines we export, consistent
+		with the GCC linker on MacOS.
+	}
+	const exp_prefix='_';
+{$ENDIF}
+
+{$IFDEF WINDOWS}
+	{
+		We must add an underscrore to the names of routines we export, consistent
+		with the GCC linker on Windows.
+	}
+	const exp_prefix='_';
+{$ENDIF}
+
+{$IFNDEF WINDOWS}{$IFNDEF DARWIN}
+	{ 
+		We do not add an underscore to the start of any exported routine names,
+		for consistency with the GCC linker on Linux.
+	}
+	const exp_prefix='';
+{$ENDIF}{$ENDIF}
+
+function increment(a:longint):longint; cdecl;
 begin
-	writeln('Hello from answer');
-	answer:=42;
+	increment:=a+1;
+end;
+
+function printstring(s:PChar):longint; cdecl;
+begin
+	writeln('String passed into Pascal library is: "'+s+'"');
+	printstring:=length(s);
+end;
+
+function sqroot(x:real):real; cdecl;
+begin
+	sqroot:=sqrt(x);
+end;
+
+function reportsizes:longint; cdecl;
+begin
+	writeln('Reporting sizes of variable types in Pascal:');
+	writeln('Size of integer is ',sizeof(integer),' bytes.');
+	writeln('Size of longint is ',sizeof(longint),' bytes.');
+	writeln('Size of real is ',sizeof(real),' bytes.');
+	writeln('Size of extended is ',sizeof(extended),' bytes.');
+	writeln('Size of char is ',sizeof(char),' bytes.');
+	reportsizes:=0;
 end;
 
 exports
-	answer name '_answer';
+	increment name exp_prefix+'increment',
+	printstring name exp_prefix+'printstring',
+	sqroot name exp_prefix+'sqroot',
+	reportsizes name exp_prefix+'reportsizes';
 end.
 
 {
-	A program that calls the above dynamic library. Goes with the dynamic
-	library defined by d.pas. Compile with:
-	
-	fpc m.pas -Px86_64 -k-ld
-	
-	Before running, on Linux you must declare the location of the dynamic
-	library:
-	
-	LD_LIBRARY_PATH="./"
-	export LD_LIBRARY_PATH
-	
-	Now run with:
-	
-	./m
+	A program that calls routines in an external dynamic library. This library
+	must be stored in the same directory as the program executable, and must be
+	named X.dll (Windows), libX.dylib (MacOS), or libX.so (Linux), where X is the
+	library name given in the compiler directive below.
 }
+
+program m;
 
 {$MODESWITCH CLASSICPROCVARS+}
 {$LONGSTRINGS ON}
 {$MACRO ON}
 
-program m;
- 
-function answer:longint; cdecl; external 'd' name '_answer';
- 
+{$define _LIB_:='d'}
+
+{$IFDEF DARWIN}
+	{
+		On MacOS, we cannot compile an executable unless we provide paths to
+		all the libraries that it requires. The compile-time linker
+		will check that all routines external to the executable code are
+		available in the libraries on disk, and embed a path to these libraries
+		in the executable object. At run-time, the dynamic linker goes through all
+		the undefined symbols in executable and loads libraries from disk to resolve
+		them. Our compile command looks like:
+
+		fpc m.pas -om.exe -k-lX -kLY -Px86_64
+		
+		The compile-time linker looks for a library libX.dylib, where X is the
+		name given in our Pascal code, and it looks in directory Y, which may be
+		a relative path. The command also instructs the compiler to name the
+		executable m.exe. Now run with:
+		
+		./m.exe
+	}
+	{$define _EXT_:=external}
+{$ENDIF}
+
+
+{$IFDEF WINDOWS}
+	{
+		On Windows, we cannot compile an executable unless we provide paths to
+		all the libraries that it requires. The compile-time linker
+		will check that all routines external to the executable code are
+		available in the libraries on disk, and embed a path to these libraries
+		in the executable object. At run-time, the dynamic linker goes through all
+		the undefined symbols in executable and loads libraries from disk to resolve
+		them. Our compile command looks like:
+
+		fpc m.pas -om.exe -k-lX -kLY -Px86_64
+		
+		The compile-time linker looks for a library X.dll, where X is the name
+		given in our Pascal code, and it looks in directory Y, which may be a
+		relative path. The command also instructs the compiler to name the
+		executable m.exe. Now run with:
+		
+		./m.exe
+	}
+	{$define _EXT_:=external}
+{$ENDIF}
+
+
+{$IFNDEF WINDOWS}{$IFNDEF DARWIN}
+	{ 
+		On Linux, we don't need to link to external libraries at compile time.
+		The linker trusts that the required routines will be available at
+		run-time. At compile time all we need is:
+		
+		fpc m.pas -om.exe -Px86_64
+		
+		At run-time, all symbols undefined in the executable must be resolved.
+		If the symbols are defined in memory already by the operating system,
+		they are resolved immediately. Otherwise, the dynamic linker must load a
+		library from disk. Our external routines will not be defined by the
+		operating system, nor loaded as part of any other library, so we must
+		specify in our Pascal code, after each "external" directive, the name of
+		the library in which the routine is defined. If we say "d" for the
+		library name, FPC embeds the name "libd.so" in the executable file as
+		the name of the library that must be loaded. The dynamic linker looks
+		for libd.so in the Linux library paths. In our case, libd.so is a local
+		library we have compiled ourselves, so we must use the LD_LIBRARY_PATH
+		environment variable to tell the dynamic linker where to find it.
+		
+		LD_LIBRARY_PATH="./"
+		export LD_LIBRARY_PATH
+		
+		Now run with:
+		
+		./m.exe
+	}
+	{$define _EXT_:=weakexternal}
+{$ENDIF}{$ENDIF}
+
+
+function increment(a:longint):longint; cdecl; _EXT_ _LIB_ name 'increment';
+function printstring(s:PChar):longint; cdecl; _EXT_ _LIB_ name 'printstring';
+function sqroot(x:real):real; cdecl; _EXT_ _LIB_ name 'sqroot';
+function reportsizes:longint; cdecl; _EXT_ _LIB_ name 'reportsizes';
+
+var 
+	i:longint=42;
+	x:real=21.0;
+
 begin
-	writeln('Answer: ',answer);
+	writeln('Hello world from m.pas.');
+	reportsizes;
+	writeln('Passed string of length ',printstring('hello sailor'),' to library.');
+	writeln('Increment of ',i:1,' is ',increment(i):1);
+	writeln('The square root of ',x:1:3,' is ',sqroot(x):1:3);
 end.
 
 {
-	A program that uses all our analysis units.
+	A program that loads our analysis units.
 }
 program p;
 
@@ -72,7 +212,7 @@ var
 begin
 	gui_writeln:=console_write;
 	gui_readln:=console_read;
-	gui_writeln('Hello from program p, which uses all analysis units.');
+	gui_writeln('Hello from program p, which loads all analysis units.');
 	
 	for i:=0 to 15 do begin
 		x:=i*2.0*pi/16;
@@ -191,6 +331,7 @@ begin
 		writeln('Failed to find library routine.');
 	end;
 end.
+
 {
 	bcam_pair_calib_simplex is like bcam_pair_calib except it uses a simplex fitter
 	rather than a direct calculation to find the calibration constants. The fit 

@@ -4572,29 +4572,28 @@ begin
 end;
 
 {
-	calculate_ft_term calculates the amplitude and offset of the
-	discrete fourier transform component with sinusoidal period
-	"period". We express period as a real-valued multiple of the
-	sample period, T. The special case of period=0 we use to determine
-	the DC component of the waveform. We pass data to the routine in
-	an array of real numbers, each of which represents a sample.
+	calculate_ft_term calculates the amplitude and offset of the discrete
+	fourier transform component with sinusoidal period "period". We express
+	period as a real-valued multiple of the sample period, T. The special case
+	of period=0 we use to determine the DC component of the waveform. We pass
+	data to the routine in an array of real numbers, each of which represents a
+	sample.
 
-	If your waveform has a significant DC component, we recommend you
-	subtract the DC component from its elements before you calculate
-	other components, because the DC component has a second-order
-	effect upon the phase of other components.
+	If your waveform has a significant DC component, we recommend you subtract
+	the DC component from its elements before you calculate other components,
+	because the DC component has a second-order effect upon the phase of other
+	components.
 
-	This routine returns a single component as an amplitude and an
-	offset. The offset is related to the phase by phase =
-	-2*pi*offset/period. You obtain the sinusoidal component value at
-	point x with amplitude*sin(2*pi*(x-offset)/period).
-	
-	If you want to calculate the entire discrete fourier transform,
-	and you have data with N a power of 2, then you can try our fft
-	routine, but note that it returns complex-valued terms, which you
-	have to convert into amplitude and offset. This routine returns
-	amplitude and offset if a format that is convenient for image
-	analysis. 
+	This routine returns a single component as an amplitude and an offset. The
+	offset is related to the phase by phase = -2*pi*offset/period. You obtain
+	the sinusoidal component value at point x with
+	amplitude*sin(2*pi*(x-offset)/period).
+
+	If you want to calculate the entire discrete fourier transform, and you have
+	data with N a power of 2, then you can try our fft routine, but note that it
+	returns complex-valued terms, which you have to convert into amplitude and
+	offset. This routine returns amplitude and offset if a format that is
+	convenient for image analysis. 
 }
 procedure calculate_ft_term(period:real;
 	dp:x_graph_ptr;
@@ -4631,13 +4630,12 @@ begin
 end;
 
 {
-	frequency_component is like calculate_ft_term, but accepts a
-	frequency as a multiple of the fundamental signal frequency, or
-	1/<i>NT</i>, where <i>T</i> is the sample period and <i>N</i> is
-	the number of samples. It returns the amplitude and offset of 
-	a sine wave amplitude*sin(2*pi*(x-offset)*f/N). If you want to
-	obtain a true complex-valued discrete fourier transform, try 
-	our fft routine.
+	frequency_component is like calculate_ft_term, but accepts a frequency as a
+	multiple of the fundamental signal frequency, or 1/<i>NT</i>, where <i>T</i>
+	is the sample period and <i>N</i> is the number of samples. It returns the
+	amplitude and offset of a sine wave amplitude*sin(2*pi*(x-offset)*f/N). If
+	you want to obtain a true complex-valued discrete fourier transform, try our
+	fft routine.
 }
 procedure frequency_component(frequency:real;
 	dp:x_graph_ptr;
@@ -4671,42 +4669,40 @@ begin
 end;
 
 {
-	fft is a Fast Fourier Transform routine for determining the 
-	discrete fourier transform in Nlog(N) time by a divide-and-conquer
-	algorithm due to Colley and Tokey. The routine operates in the 
-	complex plane, taking complex input data and producting complex
-	transform components.
-	
-	fft takes a complex-valued sequence of N data points and returns
-	the N complex-valued components that make up its complete discrete
-	fourier transform. The routine takes its data in an xy_graph and
-	returns the transform in another xy_graph. The routine is
-	reversible also: if you pass the transform back to fft, you will
-	re-construct the original data. Each term dp^[k] in the data is a
-	complex number. The k'th term represents the k'th sample, with the
-	samples being numbered 0 to N-1. The real part of the term is
-	dp^[k].x and the imaginary part is dp^[k].y. When the data is a
-	real-valued sequence of samples, the imaginary components are all
-	zero. Each term in the output is likewise a complex number. The
-	k'th term represents a sinusoidal function with frequency k/NT.
-	The magnitude of the complex number is the amplitude of the
-	sinusoid. The phase is the argument. The sinusoidal amplitude is
-	therefore a = sqrt(sqr(tp^[k].x)+sqr(tp^[k].y)) and the sinusoidal
-	phase is p = full_arctan(tp^[k].y/tp^[k].x)). So the sinusoidal
-	component is a*sin(2*pi*k/NT - p).
+	fft is a Fast Fourier Transform routine for determining the discrete fourier
+	transform in Nlog(N) time by a divide-and-conquer algorithm due to Colley
+	and Tokey. The routine operates in the complex plane, taking complex input
+	data and producting complex transform components.
 
-	The fft_step implements the Cooley-Tukey FFT algorithm. The fft
-	routine calls fft_step, and fft_step calls itself recursively. The
-	recursion does not involve the allocation of new arrays because
-	they all share the same memory. The routine sets up a transform
-	array and a scratch array, each of N complex elements. It
-	stores the evolving transform in the transform array, but performs
-	the merging of odd and even components in the scratch array.
+	fft takes a complex-valued sequence of N data points and returns the N
+	complex-valued components that make up its complete discrete fourier
+	transform. The routine takes its data in an xy_graph and returns the
+	transform in another xy_graph. The routine is reversible also: if you pass
+	the transform back to fft, you will re-construct the original data. Each
+	term dp^[k] in the data is a complex number. The k'th term represents the
+	k'th sample, with the samples being numbered 0 to N-1. The real part of the
+	term is dp^[k].x and the imaginary part is dp^[k].y. When the data is a
+	real-valued sequence of samples, the imaginary components are all zero. Each
+	term in the output is likewise a complex number. The k'th term represents a
+	sinusoidal function with frequency k/NT, where T is the sample period. The
+	magnitude of the complex number is the amplitude of the sinusoidal component
+	and argument of the complex number is the phase of the sinusoidal component.
+	Using x and y for the real and imaginary parts of the complex component, the
+	sinusoidal amplitude is a = sqrt(sqr(x))+sqr(y)) and the sinusoidal phase is
+	p = full_arctan(y/x)). The component itself has value a*cos(2*pi*k*n/N -
+	p), at time nT. The component is a cosine delayed by the phase.
 
-	We applied fft to sets of real-valued samples and measured
-	execution time on an iBook G4 1.33 GHz by calculating the fft a
-	hundred times and dividing the total execution time by 100. We
-	obtained the following results for ascending values of N.
+	The fft_step implements the Cooley-Tukey FFT algorithm. The fft routine
+	calls fft_step, and fft_step calls itself recursively. The recursion does
+	not involve the allocation of new arrays because they all share the same
+	memory. The routine sets up a transform array and a scratch array, each of N
+	complex elements. It stores the evolving transform in the transform array,
+	but performs the merging of odd and even components in the scratch array.
+
+	We applied fft to sets of real-valued samples and measured execution time on
+	an iBook G4 1.33 GHz by calculating the fft a hundred times and dividing the
+	total execution time by 100. We obtained the following results for ascending
+	values of N.
 	
 	N		Time (ms)
 	64		0.28
@@ -4717,10 +4713,10 @@ end;
 	2048	15
 	4096	33
 
-	We can use the fft routine to perform an inverse-transform also.
-	Take the discrete fourier transform the routine produces and
-	reverse the order of its terms, so that X(k) -> X(N-k), but note
-	that X(N) = X(0) so the first term remains in place.
+	We can use the fft routine to perform an inverse-transform also. Take the
+	discrete fourier transform the routine produces and reverse the order of its
+	terms, so that X(k) -> X(N-k), but note that X(N) = X(0) so the first term
+	remains in place.
 }
 function fft(dp:xy_graph_ptr):xy_graph_ptr;
 
@@ -4728,20 +4724,18 @@ var
 	tp,sp:xy_graph_ptr;
 
 {
-	The fft_step routine is the heart of the fft procedure. It
-	implements the Cooley-Tukey algorithm, calling itself recursively.
-	In each call, fft_step divides the transform job into two parts,
-	each of half the size, and therefore one quarter the execution
-	time. The first half consists of the transform of the odd-numbered
-	samples. The second half is the transform of the even-numbered
-	samples. The routine is complicated by the shared use of an
-	existing scratch and transform array, but this sharing is
-	neccessary to avoid allocating new arrays on every recursive call.
-	After determining the sub-transforms, fft_step merges them
-	together. When fft_step is called on data of length 1, it returns
-	as its answer the single data point. We say "returns", but what
-	actuall happens is the data point is copied over into the
-	transform array.
+	The fft_step routine is the heart of the fft procedure. It implements the
+	Cooley-Tukey algorithm, calling itself recursively. In each call, fft_step
+	divides the transform job into two parts, each of half the size, and
+	therefore one quarter the execution time. The first half consists of the
+	transform of the odd-numbered samples. The second half is the transform of
+	the even-numbered samples. The routine is complicated by the shared use of
+	an existing scratch and transform array, but this sharing is neccessary to
+	avoid allocating new arrays on every recursive call. After determining the
+	sub-transforms, fft_step merges them together. When fft_step is called on
+	data of length 1, it returns as its answer the single data point. We say
+	"returns", but what actuall happens is the data point is copied over into
+	the transform array.
 }
 	procedure fft_step(step,start:integer);
 	
@@ -4886,7 +4880,7 @@ end;
 	N/2 frequency components in an xy-graph. The frequency components are
 	expressed as magnitude and phase, with phase in radians. The full discrete
 	fourier transform (DFT), as implemented by our fft routine, produces N
-	complex-valued components from N coplex-valued data points. But when the
+	complex-valued components from N complex-valued data points. But when the
 	data points are real-valued (their imaginary parts are all zero), we find
 	that the k'th component is the complex conjugate of the (N-k)'th component.
 	Meanwhile, the (N-k)'th component is equivalent to the -k'th component, and
@@ -4894,11 +4888,15 @@ end;
 	find that, for real-valued inputs, the sum of the k'th and (N-k)'th
 	components is twice the k'th component. Thus we don't bother returning the
 	top N/2 components for real-valued inputs. We just return twice the first
-	N/2 components. The 0'th component is an exception. In this case we return
-	the magnitude of the 0'th component and the magnitude of the N/2'th
-	component. The phase of these components is always 0 or pi, never anything
-	in between, and we can represent phase 0 with a positive magnitude and phase
-	pi with a negative.
+	N/2 components.
+
+	Each component has an amplitude, a, and a phase, p in radians. It represents
+	a sinusoid given by a*cos(2*pi*k*n/N - p), at time nT. Each component is a
+	cosine of amplitude a delayed by p radians. The 0'th component is an
+	exception. In this case we return the magnitude of the 0'th component and
+	the magnitude of the N/2'th component. The phase of these components is
+	always 0 or pi, never anything in between, and we can represent phase 0 with
+	a positive magnitude and phase pi with a negative. 
 }
 function fft_real(dp:x_graph_ptr):xy_graph_ptr;
 
@@ -4951,7 +4949,10 @@ end;
 	The one complication in our compact format is that we specify the 0 and N/2
 	components in the first element of the transform. The x-component of the
 	first element is the 0-frequency magnitude, and the y-component is the
-	N/2-frequency magnitude.
+	N/2-frequency magnitude. The other components we specify with the amplitude
+	and phase of a sinusoid. The phase, p, is such that we obtain the correct
+	sinusoid with a*cos(2*pi*k*n/N - p). That is: we are passing into the
+	inverse routine the amplitudes and phases of a set of cosine waves.
 }
 function fft_real_inverse(ft:xy_graph_ptr):x_graph_ptr;
 

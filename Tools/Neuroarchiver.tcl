@@ -1982,19 +1982,26 @@ proc Neuroarchiver_values {{signal ""}} {
 }
 
 #
-# Neuroarchiver_spectrum calculates the discrete frourier transform of the signal. It
-# returns the spectrum as a sequence of real numbers separated by spaces. Each pair
-# of numbers is the amplitude and phase of a component in the transform. The k'th
-# pair represent the cosinusoidal component of frequency k/t, where t is the play
-# interval, and k=0 to N/2-1, where N is the sample rate of the signal. Thus for
-# a 512 SPS recording, we have 256 pairs of numbers. The final pair is the amplitude
-# and phase of the 255 Hz component. The k=0 pair is the first pair, and is an exception.
-# The first number in the k=0 pair is the average value of the signal and the second 
-# number is the amplitude of the the amplitude of the N/2'th component. This final 
-# component has phase +pi or -pi, and we represent this phase with the sign of the
-# amplitude. If we pass an empty string to the routine, it uses info(values). The 
-# procedure calls the lwdaq_fft. You can read more about the fourier transform 
-# routine in the LWDAQ Command Reference.
+# Neuroarchiver_spectrum calculates the discrete Fourier transform of the
+# signal. It returns the spectrum as a sequence of real numbers separated by
+# spaces. Each pair of numbers is the amplitude and phase of a component in the
+# transform. The k'th pair represent a sinusoidal component of frequency k/NT,
+# where T is the sample period and N is the number of samples. We have k = 0 to
+# (N/2)-1. We note that the playback interval has length NT. If the sample
+# frequency is f_s, we have f_s = 1/T. For a f_s = 512 SPS and NT = 1 s, we have
+# 256 pairs of numbers, k = 0 to 255, the k'th component having frequency k/1 =
+# k Hz. Each pair consists of a amplitude, a, and a phase, p, and represents a
+# single sinusoidal component of frequency k/NT whose value at sample n is equal
+# to a*cos(2*pi*k*n/N - p). Here we have sample n occurring at time nT. The
+# final pair is the amplitude and phase of the 255-Hz component. We have not yet
+# accounted for the 256-Hz component, which is the highest frequency we can
+# represent with 512 SPS. The k=0 pair is the first pair, and is an exception.
+# The first number in the k=0 pair is the average value of the signal and the
+# second number is the amplitude of the N/2'th component. This final component
+# has phase 0 or pi, and we represent this phase with the sign of the amplitude,
+# positive for phase 0 and negative for phase pi. If we pass an empty string to
+# the routine, it uses info(values). The procedure calls the lwdaq_fft. You can
+# read more about the Fourier transform routine in the LWDAQ Command Reference.
 #
 proc Neuroarchiver_spectrum {{values ""}} {
 	upvar #0 Neuroarchiver_info info

@@ -27,6 +27,7 @@
 # Version 2.9 Automatically set minimum number of clocks.
 # Version 2.10 Restore "*" for analysis channels after acquire.
 # Version 3.1 The function generator sweep uses the LWDAQ event queue.
+# Version 3.2 Allow specification of multiple channels.
 
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
@@ -41,7 +42,7 @@ proc Function_Generator_init {} {
 	global LWDAQ_Driver
 
 	
-	LWDAQ_tool_init "Function_Generator" "3.1"
+	LWDAQ_tool_init "Function_Generator" "3.2"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -49,7 +50,7 @@ proc Function_Generator_init {} {
 	
 	set config(daq_driver_port) 90
 	set config(version) "A"
-	set config(channel) "1"
+	set config(channels) "1"
 	set config(batch) "1"
 	set data(output) ""
 
@@ -566,30 +567,36 @@ proc Function_Generator_frequency_sweep {{index "-1"}} {
 		LWDAQ_wait_ms [expr round(1.0*$config(setup_delay_ms)/$config(input_frequency))]
 
 		LWDAQ_reset_Recorder
-		set iconfig(analysis_channels) $config(channel)
+		set iconfig(analysis_channels) $config(channels)
 		set result [LWDAQ_acquire Recorder]
 		set iconfig(analysis_channels) "*"
 		if {[LWDAQ_is_error_result $result]} {
 			LWDAQ_print $info(text) $result
 			return "0"
 		}
-		set ave [lindex $result 3]
-		set stdev [lindex $result 4]		
-		if {$info(record_yn) == 1} {
-			set f [open $config(database_file_name) a]
-			puts $f "$frequency $stdev"
-			close $f
+		set result [lrange $result 1 end]
+		set output_line "$frequency "
+		foreach c [lsort -increasing $config(channels)] {
+			set amplitude [format %.1f [expr sqrt(2)*[lindex $result 3]]]
+			set result [lrange $result 4 end]
+			append output_line "$c $amplitude "
 		}
-		LWDAQ_print $info(text) "$config(version)$config(batch)\.$config(channel)\
-			$frequency $stdev"
-		append data(output) "$stdev "
+		LWDAQ_print $info(text) "$output_line"
+		lappend data(output) "$output_line"
 		
-		# Call the sweep routine with the next frequency.
+		# Call the sweep routine with the next frequency, or if we are done,
+		# write data to output file.
 		incr index
 		if {$index < [llength $config(frequencies)]} {
 			LWDAQ_post [list Function_Generator_frequency_sweep $index]
 			return "1"
 		} {
+			if {$info(record_yn) == 1} {
+				set f [open $config(database_file_name) a]
+				foreach line $data(output) {puts $f $line}
+				puts $f $data(output)
+				close $f
+			}
 			LWDAQ_print $info(text) "Sweep Complete."
 			set info(control) "Idle"
 			return "1"
@@ -602,8 +609,18 @@ proc Function_Generator_print_response {} {
 	upvar #0 Function_Generator_data data
 	upvar #0 Function_Generator_config config
 
-	LWDAQ_print $info(text) "$config(version)$config(batch)\.$config(channel)"
-	foreach a $data(output) {LWDAQ_print $info(text) $a}
+	foreach c [lsort -increasing $config(channels)] {
+		LWDAQ_print -nonewline $info(text) \
+			"$config(version)$config(batch)\.$c\t"
+	}
+	LWDAQ_print $info(text)
+	foreach output_line $data(output) {
+		set output_line [lrange $output_line 1 end]
+		foreach {c a} $output_line {
+			LWDAQ_print -nonewline $info(text) "$a\t"
+		}
+		LWDAQ_print $info(text)
+	}
 }
 
 proc Function_Generator_convert_voltage_to_memory_amplitude {voltage} {
@@ -618,7 +635,7 @@ proc Function_Generator_convert_voltage_to_memory_amplitude {voltage} {
 		#set memory_amplitude [expr round(13.11 * $voltage + 2.14)]
 	}
 		
-return $memory_amplitude
+	return $memory_amplitude
 }
 
 proc Function_Generator_set_frequency {} {
@@ -659,7 +676,8 @@ proc Function_Generator_adjust_sample_period {} {
 	upvar #0 Function_Generator_info info
 	upvar #0 Function_Generator_config config
 
-	set config(clock_divider) [expr round(40000000.0 / $config(samples) / $config(input_frequency)) - 1]
+	set config(clock_divider) [expr round(40000000.0 / $config(samples) \
+		/ $config(input_frequency)) - 1]
 	set binary_period [dec2bin $config(clock_divider)]
 	set period_upper_bits [string range $binary_period 0 7]
 	set period_lower_bits [string range $binary_period 8 15]	
@@ -842,7 +860,14 @@ proc Function_Generator_upload_ram {} {
 	image create photo $info(photo_name) -width 400 -height 400
 	lwdaq_image_create -name $info(image_name) -width 400 -height 400
 	
-	lwdaq_graph $data(output) $info(image_name) -y_only 1 -color 0 -entire 1 -fill 1 
+	foreach c [lsort -increasing $config(channels)] {
+		set amplitudes ""
+		foreach output_line $data(output) {
+			set index [lsearch $output_line $c]
+			lappend amplitudes [lindex $output_line [expr $index + 1]]
+		}
+		lwdaq_graph $amplitudes $info(image_name) -y_only 1 -color $c -entire 1 -fill 1 
+	}
 	
 	lwdaq_draw $info(image_name) $info(photo_name)
 	
@@ -851,7 +876,6 @@ proc Function_Generator_upload_ram {} {
 	pack $f -side top -fill x
 	label $f.image -image $info(photo_name)
 	pack $f.image
-	
 }
 
  
@@ -864,8 +888,7 @@ proc Function_Generator_view_waveform {} {
 	toplevel $w
 	wm title $w "$info(name) Waveform Viewer"
 	
-	set data \
-		[Function_Generator_create_waveform $config(waveform_type)]
+	set data [Function_Generator_create_waveform $config(waveform_type)]
 	
 	
 	image create photo $info(photo_name) -width 400 -height 400
@@ -1068,7 +1091,7 @@ proc Function_Generator_open {} {
 		-relief sunken -bd 1 -width 15 -justify right					
 	grid $c2.l_Rmuxsocket $c2.e_Rmuxsocket -sticky news
 	
-	foreach a {Version Batch Channel} {
+	foreach a {Version Batch Channels} {
 		set b [string tolower $a]
 		label $c2.l_$b -text "Transmitter $a" -anchor w
 		entry $c2.e_$b -textvariable Function_Generator_config($b) -justify right

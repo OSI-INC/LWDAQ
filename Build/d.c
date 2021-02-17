@@ -1,5 +1,8 @@
 // A library defined in C
+// On MacOS compile with:
 // gcc -shared d.c -o libd.dylib
+// On Linux compile with:
+// gcc -shared d.c -o libd.so -fPIC
 
 #include <stdio.h>
 #include <string.h>
@@ -10,7 +13,7 @@ int increment(int a) {
 	return a+1;
 }
 
-int print(char* s ) {
+int printstring(char* s ) {
 	printf("String passed library is: \"%s\"\n",s);
 	return strlen(s);
 }
