@@ -53,7 +53,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out
 # more about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "141"
+	LWDAQ_tool_init "Neuroarchiver" "142"
 	if {[winfo exists $info(window)]} {return 0}
 #
 # We start setting intial values for the private display and control variables.
@@ -616,7 +616,7 @@ proc Neuroarchiver_init {} {
 	set info(datetime_panel) $info(window)\.clock
 	set info(export_panel) $info(window)\.export
 	set info(export_help_url) \
-		"http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html#Import-Export"
+		"http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html#Exporting%20Data"
 #
 # Export boundaries.
 #
@@ -628,6 +628,9 @@ proc Neuroarchiver_init {} {
 	set info(export_state) "Idle"
 	set info(export_vfl) ""
 	set info(export_epl) ""
+	set config(export_video) 0
+	set config(export_format) "TXT"
+	set info(export_run_start) [clock seconds]
 #
 # Video playback parameters. We define executable names for ffmpeg and mplayer.
 #
@@ -4271,7 +4274,7 @@ proc Neuroarchiver_exporter_open {} {
 				"Set export directory to $Neuroarchiver_config(export_dir)."
 		}
 	}
-	checkbutton $f.ve -variable Neuroarchiver_config(video_enable) -text "Export Video"
+	checkbutton $f.ve -variable Neuroarchiver_config(export_video) -text "Export Video"
 	pack $f.lchannels $f.echannels $f.dir $f.ve -side left -expand yes
 	
 	set f [frame $w.control]
@@ -4279,8 +4282,17 @@ proc Neuroarchiver_exporter_open {} {
 	label $f.state -textvariable Neuroarchiver_info(export_state) -fg blue -width 10
 	button $f.export -text "Start Export" -command "LWDAQ_post Neuroarchiver_export"
 	button $f.stop -text "Stop Export" -command {Neuroarchiver_export "Stop"}
+	pack $f.state $f.export $f.stop -side left -expand yes
+	label $f.fl -text "Format"
+	pack $f.fl -side left -expand yes
+	foreach a "TXT BIN" {
+		set b [string tolower $a]
+		radiobutton $f.$b -variable Neuroarchiver_config(export_format) \
+			-text $a -value $a
+		pack $f.$b -side left -expand yes
+	}
 	button $f.help -text "Help" -command "LWDAQ_url_open $info(export_help_url)"
-	pack $f.state $f.export $f.stop $f.help -side left -expand yes
+	pack $f.help -side left -expand yes
 	
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
 }
@@ -4315,6 +4327,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			return "ERROR"
 		}
 		set info(export_state) "Start"
+		set info(export_run_start) [clock seconds]
 		
 		# Calculate Unix start and end times.
 		set info(export_start_s) [Neuroarchiver_datetime_convert $config(export_start)]
@@ -4375,7 +4388,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		# to get the start and end segments aligned with the start and end
 		# export times. Make a list of the segments we want to concatinate
 		# together later.
-		if {$config(video_enable)} {
+		if {$config(export_video)} {
 			LWDAQ_print $info(export_text) "Looking for video files in\
 				$config(video_dir)."
 			set vt $info(export_start_s)
@@ -4439,13 +4452,13 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		LWDAQ_print $info(export_text) "Starting export of $config(export_duration) s\
 			of recorded signal from NDF archives."
 		if {$config(video_enable)} {
-			LWDAQ_print $info(export_text) "Disabling video playback temporarily to\
-				accelerate playback of recorded signal."
+			LWDAQ_print $info(export_text) "WARNING: Disabling video playback to\
+				accelerate export of recorded signal."
 			set config(video_enable) 0
 		}
 		if {$config(enable_vt) || $config(enable_af)} {
-			LWDAQ_print $info(export_text) "Value and amplitude plotting is\
-				currently enabled, and may slow down signal export."
+			LWDAQ_print $info(export_text) "WARNING: Value and amplitude\
+				plots enabled, will slow down signal export."
 		}
 		set info(export_state) "Play"	
 		Neuroarchiver_jump "$info(export_start_s) 0 ? \"Export start time.\""
@@ -4472,7 +4485,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 
 			# If there are no video files to deal with, stop.
 			if {[llength $info(export_vfl)] == 0} {
-				LWDAQ_print $info(export_text) "All export processes complete." purple
+				LWDAQ_print $info(export_text) "All export processes complete in\
+					[expr [clock seconds] - $info(export_run_start)] s." purple
 				set info(export_state) "Idle"
 			} {
 				set info(export_state) "Wait"
@@ -4484,14 +4498,26 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		}
 	
 		# Write the signal to disk.
-		set fn [file join $config(export_dir) "E$info(export_start_s)\_$info(channel_num)\.txt"]
-		set export_string ""
-		foreach {timestamp value} $info(signal) {
-		  append export_string "$value\n"
+		if {$config(export_format) == "TXT"} {
+			set fn [file join $config(export_dir) "E$info(export_start_s)\_$info(channel_num)\.txt"]
+			set export_string ""
+			foreach {timestamp value} $info(signal) {
+			  append export_string "$value\n"
+			}
+			set f [open $fn a]
+			puts -nonewline $f $export_string
+			close $f
+		} elseif {$config(export_format) == "BIN"} {
+			set fn [file join $config(export_dir) "E$info(export_start_s)\_$info(channel_num)\.bin"]
+			set export_bytes ""
+			foreach {timestamp value} $info(signal) {
+			  append export_bytes [binary format S $value]
+			}
+			set f [open $fn a]
+			fconfigure $f -translation binary
+			puts -nonewline $f $export_bytes
+			close $f
 		}
-		set f [open $fn a]
-		puts -nonewline $f $export_string
-		close $f
 		
 		return "SUCCESS"
 	}
@@ -4507,9 +4533,6 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				}
 			}
 			
-			# We would not be here if video playback were not enabled, so re-anable it
-			# now that export of the telemetry signal is complete.
-			set config(video_enable) 1
 			LWDAQ_print $info(export_text) "Video extractions complete,\
 				video playback re-enabled."
 
@@ -4566,7 +4589,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				}
 			}
 
-			LWDAQ_print $info(export_text) "All export processes complete." purple
+			LWDAQ_print $info(export_text) "All export processes complete in\
+				[expr [clock seconds] - $info(export_run_start)] s." purple
 			set info(export_state) "Idle"
 			return "SUCCESS"
 		}
