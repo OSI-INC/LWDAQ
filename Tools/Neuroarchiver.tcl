@@ -620,7 +620,7 @@ proc Neuroarchiver_init {} {
 #
 # Export boundaries.
 #
-	set info(export_start_s) [clock seconds]
+	set info(export_start_s) "0000000000"
 	set info(export_end_s) $info(export_start_s)
 	set config(export_start) [Neuroarchiver_datetime_convert $info(export_start_s)]
 	set config(export_duration) 60
@@ -628,9 +628,10 @@ proc Neuroarchiver_init {} {
 	set info(export_state) "Idle"
 	set info(export_vfl) ""
 	set info(export_epl) ""
-	set config(export_video) 0
+	set config(export_video) "0"
 	set config(export_format) "TXT"
 	set info(export_run_start) [clock seconds]
+	set config(export_reps) "1"
 #
 # Video playback parameters. We define executable names for ffmpeg and mplayer.
 #
@@ -4240,6 +4241,8 @@ proc Neuroarchiver_exporter_open {} {
 	
 	label $f.sl -text "Export Start Time:" -anchor w -fg green 
 	label $f.slv -textvariable Neuroarchiver_config(export_start) -anchor w
+	set config(export_start) [Neuroarchiver_datetime_convert [clock seconds]]
+	label $f.stl -text "Set To:" -anchor w -fg green
 	button $f.ssi -text "Interval Start" -command {
 		set Neuroarchiver_config(export_start) [Neuroarchiver_datetime_convert \
 			[expr [Neuroarchiver_datetime_convert \
@@ -4258,14 +4261,27 @@ proc Neuroarchiver_exporter_open {} {
 				[file tail $Neuroarchiver_config(play_file)],\
 				duration $Neuroarchiver_config(export_duration) s."
 	}
-	label $f.dl -text "Export Duration (s):" -anchor w -fg green 
-	entry $f.dlv -textvariable Neuroarchiver_config(export_duration) -width 10
-	pack $f.sl $f.slv $f.ssi $f.ssa $f.dl $f.dlv -side left -expand yes 
+	label $f.dl -text "Duration (s):" -anchor w -fg green 
+	entry $f.dlv -textvariable Neuroarchiver_config(export_duration) -width 6
+	label $f.ql -text "Repetitions:" -anchor w -fg green
+	entry $f.qlv -textvariable Neuroarchiver_config(export_reps) -width 3
+	pack $f.sl $f.slv $f.stl $f.ssi $f.ssa $f.dl $f.dlv $f.ql $f.qlv -side left -expand yes 
 	
 	set f [frame $w.select]
 	pack $f -side top -fill x
 	label $f.lchannels -text "Select (ID:SPS):" -anchor w -fg green
-	entry $f.echannels -textvariable Neuroarchiver_config(channel_select) -width 50
+	entry $f.echannels -textvariable Neuroarchiver_config(channel_select) -width 70
+	pack $f.lchannels $f.echannels -side left -expand yes
+	button $f.auto -text "Autofill" -command "Neuroarchiver_exporter_autofill"
+	checkbutton $f.ve -variable Neuroarchiver_config(export_video) \
+		-text "Export Video" -fg green
+	pack $f.auto $f.ve -side left -expand yes
+	
+	set f [frame $w.control]
+	pack $f -side top -fill x
+	label $f.state -textvariable Neuroarchiver_info(export_state) -fg blue -width 10
+	button $f.export -text "Start Export" -command "LWDAQ_post Neuroarchiver_export"
+	button $f.stop -text "Stop Export" -command {Neuroarchiver_export "Stop"}
 	button $f.dir -text "Pick Export Dir" -command {
 		set ndir [LWDAQ_get_dir_name]
 		if {($ndir != "") && ([file exists $ndir])} {
@@ -4274,16 +4290,8 @@ proc Neuroarchiver_exporter_open {} {
 				"Set export directory to $Neuroarchiver_config(export_dir)."
 		}
 	}
-	checkbutton $f.ve -variable Neuroarchiver_config(export_video) -text "Export Video"
-	pack $f.lchannels $f.echannels $f.dir $f.ve -side left -expand yes
-	
-	set f [frame $w.control]
-	pack $f -side top -fill x
-	label $f.state -textvariable Neuroarchiver_info(export_state) -fg blue -width 10
-	button $f.export -text "Start Export" -command "LWDAQ_post Neuroarchiver_export"
-	button $f.stop -text "Stop Export" -command {Neuroarchiver_export "Stop"}
-	pack $f.state $f.export $f.stop -side left -expand yes
-	label $f.fl -text "Format"
+	pack $f.state $f.export $f.stop $f.dir -side left -expand yes
+	label $f.fl -text "Format:" -fg green
 	pack $f.fl -side left -expand yes
 	foreach a "TXT BIN" {
 		set b [string tolower $a]
@@ -4295,6 +4303,31 @@ proc Neuroarchiver_exporter_open {} {
 	pack $f.help -side left -expand yes
 	
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
+}
+
+#
+# Neuroarchiver_exporter_autofill fills the channel select field with the Neuroarchiver's
+# best guess as to all the channels that are active in the most recently-played 
+# interval.
+#
+proc Neuroarchiver_exporter_autofill {} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+
+	set autofill ""
+	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
+		if {$info(f_alert_$id) == "Okay"} {
+			append autofill "$id\:[set info(f_$id)] "
+		}		
+	}
+	if {$autofill == ""} {
+		LWDAQ_print $info(export_text) "Autofill found no active channels.\
+			Setting channel select to \"*\". Play one interval and try again."
+		set config(channel_select) "*"
+		return "FAIL"
+	}
+	set config(channel_select) [string trim $autofill]
+	return "SUCCESS"
 }
 
 #
@@ -4327,14 +4360,18 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			return "ERROR"
 		}
 		set info(export_state) "Start"
-		set info(export_run_start) [clock seconds]
+		set info(export_run_start) [clock seconds]			
 		
 		# Calculate Unix start and end times.
 		set info(export_start_s) [Neuroarchiver_datetime_convert $config(export_start)]
 		set info(export_end_s) [expr $info(export_start_s) + $config(export_duration)]
-		LWDAQ_print $info(export_text) "\nStarting export of $info(export_start_s)\
-			to $info(export_end_s) s, duration $config(export_duration) s" purple
-		LWDAQ_print $info(export_text) "Export directory is $config(export_dir)."
+		LWDAQ_print $info(export_text) "\nStarting export of $config(export_duration) s\
+			from time $config(export_start)." purple
+		LWDAQ_print $info(export_text) "Start absolute time $info(export_start_s) s,\
+			end absolute time $info(export_end_s) s."
+		LWDAQ_print $info(export_text) \
+			"Start archive time $info(t_min) s in archive [file tail $config(play_file)]."
+		LWDAQ_print $info(export_text) "Export directory $config(export_dir)."
 	
 		# Check the channel select string and clean up existing export files.
 		set config(channel_select) [string trim $config(channel_select)]
@@ -4367,8 +4404,19 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				LWDAQ_post "Neuroarchiver_export Stop"
 				return "FAIL"
 			}
-			set efn [file join $config(export_dir) "E$info(export_start_s)\_$id\.txt"]
-			LWDAQ_print $info(export_text) "Will export channel $id at $sps SPS to $efn."
+			if {$config(export_format) == "TXT"} {
+				set ext "txt"
+			} elseif {$config(export_format) == "BIN"} {
+				set ext "bin"
+			} else {
+				LWDAQ_print $info(export_text) \
+					"ERROR: Invalid output format \"config(export_format)\",\
+						aborting export."
+				LWDAQ_post "Neuroarchiver_export Stop"
+				return "FAIL"
+			}
+			set efn [file join $config(export_dir) "E$info(export_start_s)\_$id\.$ext"]
+			LWDAQ_print $info(export_text) "Exporting channel $id at $sps SPS to $efn."
 			if {[file exists $efn]} {
 				LWDAQ_print $info(export_text) "Deleting existing file\
 					[file tail $efn] in export directory."
@@ -4457,11 +4505,17 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			set config(video_enable) 0
 		}
 		if {$config(enable_vt) || $config(enable_af)} {
-			LWDAQ_print $info(export_text) "WARNING: Value and amplitude\
-				plots enabled, will slow down signal export."
+			LWDAQ_print $info(export_text) "WARNING: One or more of value\
+				and amplitude plots enabled in Player, which slows down export."
 		}
 		set info(export_state) "Play"	
-		Neuroarchiver_jump "$info(export_start_s) 0 ? \"Export start time.\""
+		set jump_outcome [Neuroarchiver_jump \
+			"$info(export_start_s) 0 ? \"Starting export of $config(export_duration) s.\""]
+		if {[LWDAQ_is_error_result $jump_outcome]} {
+			LWDAQ_print $info(export_text) $jump_outcome
+			LWDAQ_post "Neuroarchiver_export Stop"
+			return "FAIL"
+		}
 		Neuroarchiver_command play "Play"
 
 		return "SUCCESS"
@@ -4485,14 +4539,14 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 
 			# If there are no video files to deal with, stop.
 			if {[llength $info(export_vfl)] == 0} {
-				LWDAQ_print $info(export_text) "All export processes complete in\
+				LWDAQ_print $info(export_text) "Export complete in\
 					[expr [clock seconds] - $info(export_run_start)] s." purple
-				set info(export_state) "Idle"
+				set info(export_state) "Wait"
+				LWDAQ_post "Neuroarchiver_export Repeat" 
 			} {
 				set info(export_state) "Wait"
 				LWDAQ_post "Neuroarchiver_export Video"
-				LWDAQ_print $info(export_text) "Waiting for background video extractions\
-					to complete."
+				LWDAQ_print $info(export_text) "Waiting for video extractions to complete."
 			}
 			return "SUCCESS"
 		}
@@ -4533,8 +4587,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				}
 			}
 			
-			LWDAQ_print $info(export_text) "Video extractions complete,\
-				video playback re-enabled."
+			LWDAQ_print $info(export_text) "Video extractions complete."
 
 			set info(export_state) "Concat"
 			cd $config(export_dir)
@@ -4589,11 +4642,45 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				}
 			}
 
-			LWDAQ_print $info(export_text) "All export processes complete in\
+			LWDAQ_print $info(export_text) "Export complete in\
 				[expr [clock seconds] - $info(export_run_start)] s." purple
-			set info(export_state) "Idle"
+			set info(export_state) "Wait"
+			LWDAQ_post "Neuroarchiver_export Repeat" 
 			return "SUCCESS"
 		}
+	}
+
+	# At the end of an export, we check to see if we should repeat the export strating
+	# from the point immediately after the end of the previous export.
+	if {$cmd == "Repeat"} {
+		if {$info(export_state) != "Wait"} {
+			return "SUCCESS"
+		}
+		
+		if {$config(export_reps) == "*"} {
+			set repeat 1
+		} elseif {[string is integer $config(export_reps)] \
+			&& ($config(export_reps) > 1)} {
+			set repeat 1
+			set config(export_reps) [expr $config(export_reps) - 1]	
+		} else {
+			set repeat 0
+			set config(export_reps) 1
+		}
+		
+		if {$repeat} {
+			LWDAQ_print $info(export_text) "\nPreparing another export..." purple
+			set config(export_start) \
+				[Neuroarchiver_datetime_convert \
+				[expr [Neuroarchiver_datetime_convert $info(datetime_start_time)] \
+				+ round($info(t_min)) ]]
+			set info(export_state) "Idle"
+			LWDAQ_post Neuroarchiver_export	"Start" 
+			return "SUCCESS"	
+		} {
+			set info(export_state) "Idle"
+			return "SUCCESS"
+		}		
 	}
 
 	return "FAIL"
@@ -4804,7 +4891,6 @@ proc Neuroarchiver_calibration {{name ""}} {
 			grid $f.l$id $f.e$id $f.f$id $f.a$id -sticky news
 			incr count
 		}
-		
 	}
 }
 
@@ -6330,42 +6416,44 @@ proc Neuroarchiver_play {{command ""}} {
 
 #
 # Neuroarchiver_jump displays an event. We can pass the event directly to the
-# routine, or we can a keyword that directs the routine to select an event
-# from an event list, or to move to the archive preceeding or following the
-# current playback archive. The event list is a file on disk. Each line in
-# such a file must itself be an event. And event is a list of values. The first
-# two elements in the list give the location of the event. The location can be
-# specified with a file name and an file time in seconds from the file start, or as
-# an absolute date-time string and an offset in seconds from that time. The third
-# element in the list is a selection string, which lists the channel numbers
-# involved in the event. If the selection string is a list of numbers, the jump
-# routine sets the Player's select string to the event selection string. If the
-# selection string is "*", the Player's channel select string will be set to "*"
-# and all channels will be selected after the jump. If the string is "?", the
-# Player's channel select string will be left unchanged. We can suppress the
-# alteration of the Player's select string by setting isolate_events to 0. If,
-# instead of an event string composed of event elements, we pass one of the
-# keywords "Back", "Go", "Step", "Hop", "Play", or "Stop" the routine will read
-# the current event list from disk and select one of its events for display, just
-# as if this event were passed to the jump routine. The Back, Go, and Step
-# keywords instruct the jump routine to decrement, leave unaltered, or increment
-# the Neuroarchiver's event_index. The Hop keyword instructs the jump routine to
-# select an event at random from the list, by setting the event_index to a random
-# number between one and the event list length. We use the Hop instruction to move
-# at random in large event lists to perform random sampling for confirmation of
-# effective event classification. The Play instruction causes the Neuroarchiver to
-# move through the event list, displaying each event as fast as it can. The Stop
-# instruction stops the Play instruction but does nothing else. The jump routine
-# will set the baseline powers in preparation for display and processing,
-# according to the jump_strategy parameter. If this is "local" we use the current
-# baseline powers, if "read" we read them from the archive metadata using the
-# baseline power name in the Baselines Panel. If it is "event" we assume the
-# fourth element in the event list is a keyword describing the event and the fifth
-# element is the baseline power we should apply to the selected channels. Another
-# option is "verbose", which if set to zero, suppresses the event description
-# printout in the Neuroarchiver text window. The "Next_NDF", "Current_NDF",
-# "Previous_NDF" keywords jump to the start of the next, current, or previous
-# NDF files in the alphabetical list of archives in the playback directory tree.
+# routine, or we can a keyword that directs the routine to select an event from
+# an event list, or to move to the archive preceeding or following the current
+# playback archive. An event list is a file on disk. Each line in such a file
+# must itself be an event. And event is a list of values. The first two elements
+# in the list give the location of the event. The location can be specified with
+# a file name and an file time in seconds from the file start, or as an absolute
+# date-time string and an offset in seconds from that time. The third element in
+# the list is a selection string, which lists the channel numbers involved in
+# the event. If the selection string is a list of numbers, the jump routine sets
+# the Player's select string to the event selection string. If the selection
+# string is "*", the Player's channel select string will be set to "*" and all
+# channels will be selected after the jump. If the string is "?", the Player's
+# channel select string will be left unchanged. We can suppress the alteration
+# of the Player's select string by setting the Neuroarchiver configuration
+# parameter "isolate_events" to 0. If, instead of an event string composed of
+# event elements, we pass one of the keywords "Back", "Go", "Step", "Hop",
+# "Play", or "Stop" the routine will read the current event list from disk and
+# select one of its events for display, just as if this event were passed to the
+# jump routine. The Back, Go, and Step keywords instruct the jump routine to
+# decrement, leave unaltered, or increment the Neuroarchiver's event_index. The
+# Hop keyword instructs the jump routine to select an event at random from the
+# list, by setting the event_index to a random number between one and the event
+# list length. We use the Hop instruction to move at random in large event lists
+# to perform random sampling for confirmation of effective event classification.
+# The Play instruction causes the Neuroarchiver to move through the event list,
+# displaying each event as fast as it can. The Stop instruction stops the Play
+# instruction but does nothing else. The jump routine will set the baseline
+# powers in preparation for display and processing, according to the
+# jump_strategy parameter. If this is "local" we use the current baseline
+# powers, if "read" we read them from the archive metadata using the baseline
+# power name in the Baselines Panel. If it is "event" we assume the fourth
+# element in the event list is a keyword describing the event and the fifth
+# element is the baseline power we should apply to the selected channels.
+# Another option is "verbose", which if set to zero, suppresses the event
+# description printout in the Neuroarchiver text window. The "Next_NDF",
+# "Current_NDF", "Previous_NDF" keywords jump to the start of the next, current,
+# or previous NDF files in the alphabetical list of archives in the playback
+# directory tree.
 #
 proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 	upvar #0 Neuroarchiver_info info
@@ -6400,10 +6488,11 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 		set fl [LWDAQ_sort_files $fl]
 		set index [lsearch $fl $config(play_file)]
 		if {$index < 0} {
-			Neuroarchiver_print "ERROR: Cannot find current play file\
+			set error_message "ERROR: Cannot find current play file\
 				in playback directory tree."
+			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white
-			return ""
+			return $error_message
 		}
 		
 		# We see if there is a next or previous file in the directory tree. 
@@ -6411,9 +6500,10 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 		if {$event == "Previous_NDF"} {set file_name [lindex $fl [expr $index - 1]]}
 		if {$event == "Current_NDF"} {set file_name [lindex $fl [expr $index]]}
 		if {$file_name == ""} {
-			Neuroarchiver_print "ERROR: No matching file in playback directory tree."
+			set error_message "ERROR: No matching file in playback directory tree."
+			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white		
-			return ""
+			return $error_message
 		}
 
 		# We compose an event out of the new NDF file name and time zero.
@@ -6431,9 +6521,10 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 	# event in the file, with event one being the first.
 	if {[lsearch "Back Go Step Hop Play Stop" $event] >= 0} {
 		if {![file exists $config(event_file)]} {
-			Neuroarchiver_print "ERROR: Cannot find \"[file tail $config(event_file)]\"."
+			set error_message "ERROR: Cannot find \"[file tail $config(event_file)]\"."
+			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white	
-			return ""
+			return $error_message
 		}
 	
 		set f [open $config(event_file) r]
@@ -6441,9 +6532,10 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 		close $f
 		
 		if {[llength $event_list] < 1} {
-			Neuroarchiver_print "ERROR: Empty event list."
+			set error_message "ERROR: Empty event list."
+			Neuroarchiver_print error_message
 			LWDAQ_set_bg $info(play_control_label) white		
-			return ""
+			return $error_message
 		}
 	
 		set info(num_events) [llength $event_list]
@@ -6481,15 +6573,17 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 		set pft [lindex $event 0]
 		set index [lsearch $fl "*[lindex $event 0]"]
 		if {$index < 0} {
-			Neuroarchiver_print "ERROR: Cannot find $pft in $config(play_dir)."
+			set error_message "ERROR: Cannot find $pft in $config(play_dir)."
+			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white
-			return ""
+			return $error_message
 		}
 		set pf [lindex $fl $index]
 		if {[catch {LWDAQ_ndf_data_check $pf} error_message]} {
-			Neuroarchiver_print "ERROR: Checking archive, $error_message."
+			set error_message "ERROR: Checking archive, $error_message."
+			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white		
-			return ""
+			return $error_message
 		}
 		
 		# Set the play file and play time to match this event.
@@ -6529,25 +6623,30 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 			}
 		}
 		if {$pf == ""} {
-			Neuroarchiver_print "ERROR: Cannot find\
-				\"[Neuroarchiver_datetime_convert $datetime]\" in $config(play_dir)."
+			set error_message "ERROR: Cannot find\
+				\"[Neuroarchiver_datetime_convert $datetime]\"\
+				in $config(play_dir)."
+			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white	
-			return ""
+			return $error_message
 		}
 		if {[catch {LWDAQ_ndf_data_check $pf} error_message]} {
-			Neuroarchiver_print "ERROR: Checking archive, $error_message."
+			set error_message "ERROR: Checking archive, $error_message."
+			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white		
-			return ""
+			return $error_message
 		}
 
 		# We have an archive starting before our target time. Now we check
 		# to see if the archive extends as far as our target time.
 		set alen [Neuroarchiver_end_time $pf]
 		if {$alen + $atime < $datetime + $offset + $info(play_interval_copy)} {
-			Neuroarchiver_print "ERROR: Cannot find\
-				\"[Neuroarchiver_datetime_convert $datetime]\" in $config(play_dir)."
+			set error_message "ERROR: Cannot find\
+				\"[Neuroarchiver_datetime_convert $datetime]\"\
+				in $config(play_dir)."
+			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white		
-			return ""
+			return $error_message
 		}
 		
 		# Set the play file and play time to match this event.
@@ -6556,9 +6655,10 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 		set config(play_time) [Neuroarchiver_play_time_format \
 			[expr $datetime + $offset - $atime] ]
 	} else {
-		Neuroarchiver_print "ERROR: Invalid event \"[string range $event 0 60]\"."
+		set error_message "ERROR: Invalid event \"[string range $event 0 60]\"."
+		Neuroarchiver_print $error_message
 		LWDAQ_set_bg $info(play_control_label) white		
-		return ""
+		return $error_message
 	}
 	
 	# If event isolation is turned on, we adjust the Player's channel 
