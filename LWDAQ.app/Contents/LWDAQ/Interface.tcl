@@ -39,6 +39,7 @@ proc LWDAQ_interface_init {} {
 	set LWDAQ_Info(default_to_stdout) 0
 	set LWDAQ_Info(error_color) red
 	set LWDAQ_Info(warning_color) blue
+	set LWDAQ_Info(suggestion_color) orange
 	set LWDAQ_Info(numbered_colors) "red green blue orange yellow\
 		magenta brown salmon LightSlateBlue black gray40 gray60 maroon\
 		green4 blue4 brown4"
@@ -413,27 +414,26 @@ proc LWDAQ_enable_text_undo {t} {
 }
 
 #
-# LWDAQ_print prints a string to the end of a text device. The text
-# device can be a text window or a file. When the routine writes to
-# a text window, it does so in a specified color, unless the string
-# begins with "ERROR: " or "WARNING: ", in which case the routine 
-# picks the color itself. If you pass "-nonewline" as an option after 
-# LWDAQ_print, the routine does not add a carriage return to the end of
-# the print string. The routine also recognises "-newline", which is 
-# the default. The routine assumes the text device is a text window
-# if its name starts with a period and this period is not followed by 
-# a forward slash or a backslash. If the text window exists, the routine 
-# writes the print string to the end of the window. If the text device is 
-# either "stdout" or "stderr", the routine writes directly to these channels.
-# If the text device is a file name and the directory of the file exists, 
-# the routine appends the string to the file, or creates the file if the 
-# file does not exist. The routine will not accept any file name that
-# contains a space, is an empty string, or is a real number. If the routine
-# cannot find any valid device that matches the device name, it will write 
-# the print string to stdout when the global default_to_stdout flag is set.
-# Another service provided by the routine is to replace any double
-# occurrances of ERROR: or WARNING: that might arise as we pass error
-# and warning strings through various routines before they are printed.
+# LWDAQ_print prints a string to the end of a text device. The text device can
+# be a text window or a file. When the routine writes to a text window, it does
+# so in a specified color, unless the string begins with "ERROR: ", "WARNING: ",
+# or "SUGGESTION: ", in which case the routine forces the color itself. If you
+# pass "-nonewline" as an option after LWDAQ_print, the routine does not add a
+# carriage return to the end of the print string. The routine also recognises
+# "-newline", which is the default. The routine assumes the text device is a
+# text window if its name starts with a period and this period is not followed
+# by a forward slash or a backslash. If the text window exists, the routine
+# writes the print string to the end of the window. If the text device is either
+# "stdout" or "stderr", the routine writes directly to these channels. If the
+# text device is a file name and the directory of the file exists, the routine
+# appends the string to the file, or creates the file if the file does not
+# exist. The routine will not accept any file name that contains a space, is an
+# empty string, or is a real number. If the routine cannot find any valid device
+# that matches the device name, it will write the print string to stdout when
+# the global default_to_stdout flag is set. Another service provided by the
+# routine is to replace any double occurrances of ERROR: or WARNING: that might
+# arise as we pass error and warning strings through various routines before
+# they are printed.
 #
 proc LWDAQ_print {args} {
 	global LWDAQ_Info
@@ -454,6 +454,10 @@ proc LWDAQ_print {args} {
 
 	set color [lindex $args 2]
 	if {$color == ""} {set color black}
+	if {[regexp {^SUGGESTION: } $print_str]} {
+		set color $LWDAQ_Info(suggestion_color)
+		set print_str [regsub -all {^SUGGESTION: SUGGESTION: } $print_str {SUGGESTION: }]
+	}
 	if {[regexp {^WARNING: } $print_str]} {
 		set color $LWDAQ_Info(warning_color)
 		set print_str [regsub -all {^WARNING: WARNING: } $print_str {WARNING: }]

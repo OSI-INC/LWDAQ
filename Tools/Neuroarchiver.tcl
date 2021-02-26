@@ -1,7 +1,7 @@
 # Neruoarchiver.tcl, Interprets, Analyzes, and Archives Data from 
 # the LWDAQ Recorder Instrument. It is a Polite LWDAQ Tool.
 #
-# Copyright (C) 2007-2020 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2021 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -624,7 +624,7 @@ proc Neuroarchiver_init {} {
 	set info(export_end_s) $info(export_start_s)
 	set config(export_start) [Neuroarchiver_datetime_convert $info(export_start_s)]
 	set config(export_duration) 60
-	set config(export_dir) $LWDAQ_Info(working_dir)
+	set config(export_dir) "~/Desktop"
 	set info(export_state) "Idle"
 	set info(export_vfl) ""
 	set info(export_epl) ""
@@ -632,6 +632,7 @@ proc Neuroarchiver_init {} {
 	set config(export_format) "TXT"
 	set info(export_run_start) [clock seconds]
 	set config(export_reps) "1"
+	set info(optimal_export_interval) "8"
 #
 # Video playback parameters. We define executable names for ffmpeg and mplayer.
 #
@@ -4241,7 +4242,6 @@ proc Neuroarchiver_exporter_open {} {
 	
 	label $f.sl -text "Export Start Time:" -anchor w -fg green 
 	label $f.slv -textvariable Neuroarchiver_config(export_start) -anchor w
-	set config(export_start) [Neuroarchiver_datetime_convert [clock seconds]]
 	label $f.stl -text "Set To:" -anchor w -fg green
 	button $f.ssi -text "Interval Start" -command {
 		set Neuroarchiver_config(export_start) [Neuroarchiver_datetime_convert \
@@ -4272,7 +4272,11 @@ proc Neuroarchiver_exporter_open {} {
 	label $f.lchannels -text "Select (ID:SPS):" -anchor w -fg green
 	entry $f.echannels -textvariable Neuroarchiver_config(channel_select) -width 70
 	pack $f.lchannels $f.echannels -side left -expand yes
-	button $f.auto -text "Autofill" -command "Neuroarchiver_exporter_autofill"
+	button $f.auto -text "Autofill" -command {
+		set Neuroarchiver_config(channel_select) "*"
+		LWDAQ_post Neuroarchiver_play "Step"
+		LWDAQ_post Neuroarchiver_exporter_autofill
+	}
 	checkbutton $f.ve -variable Neuroarchiver_config(export_video) \
 		-text "Export Video" -fg green
 	pack $f.auto $f.ve -side left -expand yes
@@ -4303,6 +4307,10 @@ proc Neuroarchiver_exporter_open {} {
 	pack $f.help -side left -expand yes
 	
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
+	
+	# Initialize the export start time to the start of the current
+	# playback archive.
+	set config(export_start) $info(datetime_start_time)	
 }
 
 #
@@ -4504,9 +4512,17 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				accelerate export of recorded signal."
 			set config(video_enable) 0
 		}
-		if {$config(enable_vt) || $config(enable_af)} {
-			LWDAQ_print $info(export_text) "WARNING: One or more of value\
-				and amplitude plots enabled in Player, which slows down export."
+		if {$config(enable_vt)} {
+			LWDAQ_print $info(export_text) "SUGGESTION: Exporting is faster\
+				if you disable the Value vs. Time plot in the Player."
+		}
+		if {$config(enable_af)} {
+			LWDAQ_print $info(export_text) "SUGGESTION: Exporting is faster\
+				if you disable the Amplitude vs. Frequency plot in the Player."
+		}
+		if {$config(play_interval) != $info(optimal_export_interval)} {
+			LWDAQ_print $info(export_text) "SUGGESTION: Exporting is faster\
+				with an 8-s interval in the Player."
 		}
 		set info(export_state) "Play"	
 		set jump_outcome [Neuroarchiver_jump \
