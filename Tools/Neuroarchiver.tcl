@@ -53,7 +53,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out
 # more about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "142"
+	LWDAQ_tool_init "Neuroarchiver" "143"
 	if {[winfo exists $info(window)]} {return 0}
 #
 # We start setting intial values for the private display and control variables.
@@ -3423,7 +3423,7 @@ proc Neuroclassifier_stop {} {
 
 	catch {unset info(reprocessing_event_list)}
 	set info(classifier_display_control) "Stop"
-	Neuroarchiver_command play "Stop"
+	Neuroarchiver_command "play" "Stop"
 }
 
 proc Neuroclassifier_step {} {
@@ -5865,9 +5865,9 @@ proc Neuroarchiver_play {{command ""}} {
 		set config(play_time) [Neuroarchiver_play_time_format \
 			[expr $config(play_time) - 2.0 * $info(play_interval_copy)]]
 
-		# If we are going back before the start of this archive, we try
-		# to find an previous archive to play its final interval. We get
-		# a list of all NDF files in the play_dir directory tree.
+		# If we are going back before the start of this archive, we try to find
+		# an previous archive. We get a list of all NDF files in the play_dir
+		# directory tree.
 		if {$config(play_time) < 0.0} {
 			set fl [LWDAQ_find_files $config(play_dir) *.ndf]
 			set fl [LWDAQ_sort_files $fl]

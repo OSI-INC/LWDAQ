@@ -1,11 +1,10 @@
 {
-	A dynamic library that exports some routines. Compile on all platforms
-	with:
-	
+	A dynamic library that exports some routines. Compile on all platforms with:
+
 	fpc d.pas -Px86_64
-	
-	The result will be a shared library called  d.dll (Windows), libd.dylib (MacOS), 
-	or libd.so (Linux).
+
+	The result will be a shared library called  d.dll (Windows), libd.dylib
+	(MacOS), or libd.so (Linux).
 }
 
 library d;
@@ -27,7 +26,7 @@ library d;
 		We must add an underscrore to the names of routines we export, consistent
 		with the GCC linker on Windows.
 	}
-	const exp_prefix='_';
+	const exp_prefix='';
 {$ENDIF}
 
 {$IFNDEF WINDOWS}{$IFNDEF DARWIN}
@@ -39,23 +38,23 @@ library d;
 {$ENDIF}{$ENDIF}
 
 
-function increment(a:longint):longint; cdecl;
+function dll_inc(a:longint):longint; cdecl;
 begin
-	increment:=a+1;
+	dll_inc:=a+1;
 end;
 
-function printstring(s:PChar):longint; cdecl;
+function dll_print(s:PChar):longint; cdecl;
 begin
 	writeln('String passed into Pascal library is: "'+s+'"');
-	printstring:=length(s);
+	dll_print:=length(s);
 end;
 
-function sqroot(x:real):real; cdecl;
+function dll_sqrt(x:real):real; cdecl;
 begin
-	sqroot:=sqrt(x);
+	dll_sqrt:=sqrt(x);
 end;
 
-function reportsizes:longint; cdecl;
+function dll_sizes:longint; cdecl;
 begin
 	writeln('Reporting sizes of variable types in Pascal:');
 	writeln('Size of integer is ',sizeof(integer),' bytes.');
@@ -63,13 +62,13 @@ begin
 	writeln('Size of real is ',sizeof(real),' bytes.');
 	writeln('Size of extended is ',sizeof(extended),' bytes.');
 	writeln('Size of char is ',sizeof(char),' bytes.');
-	reportsizes:=0;
+	dll_sizes:=0;
 end;
 
 exports
-	increment name exp_prefix+'increment',
-	printstring name exp_prefix+'printstring',
-	sqroot name exp_prefix+'sqroot',
-	reportsizes name exp_prefix+'reportsizes';
+	dll_inc name exp_prefix+'dll_inc',
+	dll_print name exp_prefix+'dll_print',
+	dll_sqrt name exp_prefix+'dll_sqrt',
+	dll_sizes name exp_prefix+'dll_sizes';
 end.
 

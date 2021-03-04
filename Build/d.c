@@ -9,20 +9,20 @@
 #include <stddef.h>
 #include <math.h>
 
-int increment(int a) {
+int dll_inc(int a) {
 	return a+1;
 }
 
-int printstring(char* s ) {
+int dll_print(char* s ) {
 	printf("String passed library is: \"%s\"\n",s);
 	return strlen(s);
 }
 
-double sqroot(double x) {
+double dll_sqrt(double x) {
 	return sqrt(x);
 }
 
-int reportsizes() {
+int dll_sizes() {
     int intType;
     float floatType;
     double doubleType;

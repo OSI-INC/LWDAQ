@@ -106,5 +106,5 @@ analysis: $(SRC_DIR)/analysis.pas $(OBJA)
 	
 # Clean up all intermediate and product files.
 clean: 
-	rm -f *.o *.ppu *.res *.so* *.a *.exe *.dylib
+	rm -f *.o *.ppu *.res *.so* *.a *.exe *.dylib *.dll
 	

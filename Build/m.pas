@@ -15,21 +15,21 @@ program m;
 
 {$IFDEF DARWIN}
 	{
-		On MacOS, we cannot compile an executable unless we provide paths to
-		all the libraries that it requires. The compile-time linker
-		will check that all routines external to the executable code are
-		available in the libraries on disk, and embed a path to these libraries
-		in the executable object. At run-time, the dynamic linker goes through all
-		the undefined symbols in executable and loads libraries from disk to resolve
-		them. Our compile command looks like:
+		On MacOS, we cannot compile an executable unless we provide paths to all
+		the libraries that it requires. The compile-time linker will check that
+		all routines external to the executable code are available in the
+		libraries on disk, and embed a path to these libraries in the executable
+		object. At run-time, the dynamic linker goes through all the undefined
+		symbols in executable and loads libraries from disk to resolve them. Our
+		compile command looks like:
 
-		fpc m.pas -om.exe -k-lX -kLY -Px86_64
-		
+		fpc m.pas -om.exe -k-lX -k-LY -Px86_64
+
 		The compile-time linker looks for a library libX.dylib, where X is the
 		name given in our Pascal code, and it looks in directory Y, which may be
 		a relative path. The command also instructs the compiler to name the
 		executable m.exe. Now run with:
-		
+
 		./m.exe
 	}
 	{$define _EXT_:=external}
@@ -38,21 +38,16 @@ program m;
 
 {$IFDEF WINDOWS}
 	{
-		On Windows, we cannot compile an executable unless we provide paths to
-		all the libraries that it requires. The compile-time linker
-		will check that all routines external to the executable code are
-		available in the libraries on disk, and embed a path to these libraries
-		in the executable object. At run-time, the dynamic linker goes through all
-		the undefined symbols in executable and loads libraries from disk to resolve
-		them. Our compile command looks like:
+		On Windows, we don't need to link to external libraries at compile time.
+		The linker trusts that the required routines will be available at run-time.
 
-		fpc m.pas -om.exe -k-lX -kLY -Px86_64
-		
+		fpc m.pas -om.exe -k-lX -k-LY -Px86_64
+
 		The compile-time linker looks for a library X.dll, where X is the name
 		given in our Pascal code, and it looks in directory Y, which may be a
 		relative path. The command also instructs the compiler to name the
 		executable m.exe. Now run with:
-		
+
 		./m.exe
 	}
 	{$define _EXT_:=external}
@@ -91,10 +86,10 @@ program m;
 {$ENDIF}{$ENDIF}
 
 
-function increment(a:longint):longint; cdecl; _EXT_ _LIB_ name 'increment';
-function print(s:PChar):longint; cdecl; _EXT_ _LIB_ name 'print';
-function sqroot(x:real):real; cdecl; _EXT_ _LIB_ name 'sqroot';
-function reportsizes:longint; cdecl; _EXT_ _LIB_ name 'reportsizes';
+function dll_inc(a:longint):longint; cdecl; _EXT_ _LIB_ name 'dll_inc';
+function dll_print(s:PChar):longint; cdecl; _EXT_ _LIB_ name 'dll_print';
+function dll_sqrt(x:real):real; cdecl; _EXT_ _LIB_ name 'dll_sqrt';
+function dll_sizes:longint; cdecl; _EXT_ _LIB_ name 'dll_sizes';
 
 var 
 	i:longint=42;
@@ -102,8 +97,8 @@ var
 
 begin
 	writeln('Hello world from m.pas.');
-	reportsizes;
-	writeln('Passed string of length ',print('hello sailor'),' to library.');
-	writeln('Increment of ',i:1,' is ',increment(i):1);
-	writeln('The square root of ',x:1:3,' is ',sqroot(x):1:3);
+	dll_sizes;
+	writeln('Passed string of length ',dll_print('hello sailor'),' to library.');
+	writeln('Increment of ',i:1,' is ',dll_inc(i):1);
+	writeln('The square root of ',x:1:3,' is ',dll_sqrt(x):1:3);
 end.

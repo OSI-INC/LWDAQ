@@ -86,7 +86,6 @@ type
 	{$define _EXT_:=external}
 {$ENDIF}
 
-
 {$IFDEF WINDOWS}
 	{
 		On Windows, we cannot compile a dynamic library unless we provide paths
@@ -117,7 +116,6 @@ type
 	{$define _TKLIB_:='tk86'}
 	{$define _EXT_:=external}
 {$ENDIF}
-
 
 {$IFNDEF WINDOWS}{$IFNDEF DARWIN}
 	{ 
