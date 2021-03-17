@@ -30,13 +30,14 @@
 # V25: Add support for reference camera and source block to plug into same mux.
 # V26: The apparatus name now comes with a description.
 # V27: Add support for more apparatus versions.
+# V28: Add support for source block with elements 4-8 flashing.
 
 proc BCAM_Calibrator_init {} {
 	upvar #0 BCAM_Calibrator_info info
 	upvar #0 BCAM_Calibrator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "BCAM_Calibrator" "27"
+	LWDAQ_tool_init "BCAM_Calibrator" "28"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set config(daq_timeout_ms) 5000
@@ -60,13 +61,10 @@ proc BCAM_Calibrator_init {} {
 	set config(check_for_duplicates) 0
 	set config(use_q_readout) 0
 	set config(source_database) "\
-		{Default 2 0.000005 0.000020 0.000002} \
-		{BND15 9 0.000400 0.000700 0.000100} \
-		{BND20 9 0.000400 0.000700 0.000100} \
-		{BND25 2 0.000005 0.000020 0.000002} \
-		{BND30 9 0.000400 0.000700 0.000100}"
+		{Default 9 0.000400 0.000700 0.000100 \"1 2 3 4\"} \
+		{BND25 2 0.000005 0.000020 0.000002 \"1 2 3 4\"} \
+		{BND27 9 0.000400 0.000700 0.000100 \"5 6 7 8\"}"
 
-	set info(camera_sources) "4 3 2 1"
 	set info(camera_front_element) "2"
 	set info(camera_rear_element) "1"
 	set info(sources_front_elements) "3 4"
@@ -195,11 +193,12 @@ proc BCAM_Calibrator_check {} {
 		set iconfig(daq_driver_socket) $config(bcam_driver_socket)
 		set iconfig(daq_source_driver_socket) $config(apparatus_driver_socket)
 		set iconfig(daq_source_mux_socket) $config(source_block_branch)
+		
 		set i [lsearch -index 0 $config(source_database) [lindex $info(apparatus_version) 0]]
 		if {$i < 0} {set i 0}
 		set iinfo(daq_source_device_type) [lindex $config(source_database) $i 1]
 		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 2]
-		set iconfig(daq_source_device_element) $info(camera_sources)
+		set iconfig(daq_source_device_element) [lindex $config(source_database) $i 5]
 		if {$info(calibration_end) == "front"} {
 			set iconfig(daq_device_element) $info(camera_front_element)
 		} {
@@ -281,11 +280,11 @@ proc BCAM_Calibrator_camera_acquire {range orientation} {
 	}		
 	set iconfig(daq_adjust_flash) $config(daq_adjust_flash)
 	set icongif(daq_subtract_background) $config(daq_subtract_background)
-	set iconfig(daq_source_device_element) $info(camera_sources)
 
 	set i [lsearch -index 0 $config(source_database) [lindex $info(apparatus_version) 0]]
 	if {$i < 0} {set i 0}
 	set iinfo(daq_source_device_type) [lindex $config(source_database) $i 1]
+	set iconfig(daq_source_device_element) [lindex $config(source_database) $i 5]
 	if {$range == "near"} {
 		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 2]
 	} {

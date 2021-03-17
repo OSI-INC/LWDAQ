@@ -659,9 +659,16 @@ proc LWDAQ_set_device_element {sock value} {
 }
 
 #
-# LWDAQ_set_multisource_element composes the command that
-# will select multisource element number "value" and turn
-# it on to power level "power".
+# LWDAQ_set_multisource_element composes the command that will select
+# multisource element number "value" and turn it on to power level "power". If
+# the value is a simple integer, the routine uses this integer as the byte to
+# select the source element. If the value is an alpha-numeric code of the form
+# Xn, where X is a single letter of any case and n is a decimal number 0-15, the
+# routine uses the letter to select a set of sixteen sources and the number to
+# select the source within this set. Thus A1 is source number 1 in the 1st set
+# of sixteen, and is equivalent to selecting source number 1, while P15 is
+# source number 15 in the 16th set of sixteen, and is equivalent to selecting
+# source number 255.
 #
 proc LWDAQ_set_multisource_element {sock value power} {
 	global LWDAQ_Driver
