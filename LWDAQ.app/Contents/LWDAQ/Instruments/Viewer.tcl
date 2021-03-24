@@ -94,6 +94,9 @@ proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
 	if {[lsearch $LWDAQ_Info(instruments) $instrument] < 0} {
 		return "ERROR: No such instrument \"$instrument\"."
 	}
+	if {$instrument == "Viewer"} {
+		return "ERROR: The Viewer does not have its own analysis procedure."
+	}
 	upvar #0 LWDAQ_config_$instrument iconfig
 	upvar #0 LWDAQ_info_$instrument iinfo
 
@@ -124,6 +127,7 @@ proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
 		LWDAQ_print -nonewline $info(text) "$instrument: " darkgreen
 		LWDAQ_print $info(text) $result	
 	}	
+	set info(image_results) [lwdaq_image_results $config(memory_name)]
 
 	set info(verbose_description) $iinfo(verbose_description)
 
@@ -289,7 +293,6 @@ proc LWDAQ_zoom_Viewer {} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
-
 }
 
 #

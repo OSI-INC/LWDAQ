@@ -115,7 +115,7 @@ var {for global use}
 	master_image_list:array [0..master_image_list_length-1] of image_type;
 
 {
-	Image creation, drawing, and simple examination.
+	Image creation, drawing, and examination.
 }
 function get_px(ip:image_ptr_type;j,i:integer):intensity_pixel_type;
 procedure set_px(ip:image_ptr_type;j,i:integer;value:intensity_pixel_type);
@@ -161,16 +161,6 @@ function valid_image_name(name:string):boolean;
 function valid_image_point(ip:image_ptr_type;p:ij_point_type):boolean;
 function valid_image_ptr(ip:image_ptr_type):boolean;
 procedure write_image_list(var f:string;key:string;verbose:boolean);
-
-{
-	Interface for C programs. The routines declared with the "attribute" key word
-	above are also for use with C programs.
-}
-function image_from_contents(intensity_ptr:pointer;
-	width,height,left,top,right,bottom:integer;
-	results,name:PChar):image_ptr_type;
-procedure contents_from_image(ip:image_ptr_type;intensity_ptr:pointer;
-	var width,height,left,top,right,bottom:integer;var results,name:PChar);
 
 implementation
 	
@@ -475,11 +465,10 @@ begin
 end;
 
 {
-	overlay_color_from_integer returns a unique color depending
-	upon the integer input. We can use it to provide colors for
-	indexed arrays of lines, graphs, or shapes on a white background.
-	The color returned will not be white, nor will it be the clear
-	color, but it can be black.
+	overlay_color_from_integer returns a unique color depending upon the integer
+	input. We can use it to provide colors for indexed arrays of lines, graphs,
+	or shapes on a white background. The color returned will not be white, nor
+	will it be the clear color, but it can be black.
 }
 function overlay_color_from_integer(i:integer):overlay_pixel_type;
 
@@ -501,55 +490,6 @@ begin
 	if (i>=0) and (i<num_predefined_colors) then c:=colors[i]
 	else c:= (i*k) mod clear_color;
 	overlay_color_from_integer:=c;
-end;
-
-{
-	image_from_contents creates a new image with dimensions width 
-	and height, fills the intensity array with the block of data
-	pointed to by intensity_ptr, and sets the analysis bounds with
-	left, top, right, and bottom. The routine returns an image pointer.
-}
-function image_from_contents(intensity_ptr:pointer;
-	width,height,left,top,right,bottom:integer;
-	results,name:PChar):image_ptr_type;
-
-var 
-	ip:image_ptr_type;
-
-begin
-	ip:=new_image(height,width);
-	block_move(intensity_ptr,
-		@ip^.intensity[0],
-		ip^.j_size*ip^.i_size*sizeof(intensity_pixel_type));
-	ip^.analysis_bounds.left:=left;
-	ip^.analysis_bounds.top:=top;
-	ip^.analysis_bounds.right:=right;
-	ip^.analysis_bounds.bottom:=bottom;
-	ip^.results:=results;
-	ip^.name:=name;
-	image_from_contents:=ip;
-end;
-
-{
-	contents_from_image does the opposite of image_from_contents.
-	If you pass a nil pointer in intensity_prt, the routine will 
-	not copy the image contents, but simply return the remaining 
-	parameters.
-}
-procedure contents_from_image(ip:image_ptr_type;intensity_ptr:pointer;
-	var width,height,left,top,right,bottom:integer;var results,name:PChar);
-
-begin
-	if intensity_ptr<>nil then
-		block_move(@ip^.intensity[0],
-			intensity_ptr,
-			ip^.j_size*ip^.i_size*sizeof(intensity_pixel_type));
-	left:=ip^.analysis_bounds.left;
-	top:=ip^.analysis_bounds.top;
-	right:=ip^.analysis_bounds.right;
-	bottom:=ip^.analysis_bounds.bottom;
-	results:=PChar(ip^.results);
-	name:=PChar(ip^.name);
 end;
 
 {

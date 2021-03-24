@@ -60,10 +60,10 @@ proc BCAM_Calibrator_init {} {
 	set config(fibers_device_type) 1
 	set config(check_for_duplicates) 0
 	set config(use_q_readout) 0
-	set config(source_database) "\
-		{Default 9 0.000400 0.000700 0.000100 \"1 2 3 4\"} \
-		{BND25 2 0.000005 0.000020 0.000002 \"1 2 3 4\"} \
-		{BND27 9 0.000400 0.000700 0.000100 \"5 6 7 8\"}"
+	set config(source_database) [list \
+		[list Default 9 0.000400 0.000700 0.000100 "1 2 3 4"] \
+		[list BND25 2 0.000005 0.000020 0.000002 "1 2 3 4"] \
+		[list BND27 9 0.000400 0.000700 0.000100 "5 6 7 8"]]
 
 	set info(camera_front_element) "2"
 	set info(camera_rear_element) "1"

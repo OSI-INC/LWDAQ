@@ -13,6 +13,8 @@ begin writeln(s); end;
 function console_read(s:string):string;
 begin write(s);readln(s);console_read:=s; end;
 
+
+
 var
 	x:real;
 	i:integer;

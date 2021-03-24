@@ -1,6 +1,6 @@
 {
-	Main Program for use with Analysis Shared Library 
-	Copyright (C) 2007-2020 Kevan Hashemi, Brandeis University
+	Analysis Library.
+	Copyright (C) 2007-2021 Kevan Hashemi, Brandeis University
 	
 	This program is free software; you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
@@ -43,7 +43,194 @@ uses
 	const ld_prefix='';
 {$ENDIF}{$ENDIF}
 
+{
+	image_from_contents creates a new image with dimensions width and height,
+	fills the intensity array with the block of data pointed to by
+	intensity_ptr, and sets the analysis bounds with left, top, right, and
+	bottom. The routine returns an image pointer.
+}
+function image_from_contents(intensity_ptr:pointer;
+	width,height,left,top,right,bottom:integer;
+	results,name:PChar):image_ptr_type; cdecl;
+
+var 
+	ip:image_ptr_type;
+
+begin
+	ip:=new_image(height,width);
+	block_move(intensity_ptr,
+		@ip^.intensity[0],
+		ip^.j_size*ip^.i_size*sizeof(intensity_pixel_type));
+	ip^.analysis_bounds.left:=left;
+	ip^.analysis_bounds.top:=top;
+	ip^.analysis_bounds.right:=right;
+	ip^.analysis_bounds.bottom:=bottom;
+	ip^.results:=results;
+	ip^.name:=name;
+	image_from_contents:=ip;
+end;
+
+{
+	contents_from_image does the opposite of image_from_contents. If you pass a
+	nil pointer in intensity_prt, the routine will not copy the image contents,
+	but simply return the remaining parameters.
+}
+procedure contents_from_image(ip:image_ptr_type;
+	intensity_ptr:pointer;
+	var width,height,left,top,right,bottom:integer;
+	var results,name:PChar); cdecl;
+
+begin
+	if intensity_ptr<>nil then
+		block_move(@ip^.intensity[0],
+			intensity_ptr,
+			ip^.j_size*ip^.i_size*sizeof(intensity_pixel_type));
+	left:=ip^.analysis_bounds.left;
+	top:=ip^.analysis_bounds.top;
+	right:=ip^.analysis_bounds.right;
+	bottom:=ip^.analysis_bounds.bottom;
+	results:=PChar(ip^.results);
+	name:=PChar(ip^.name);
+end;
+
+{
+	image_from_daq takes a block of data in the DAQ file format and creates a
+	new image by reading the width, height and analysis bounds from the
+	beginning of the file block. The image size, bounds, and name parameters
+	return either as they were passed, if their values were uses, or changes to
+	the values that image_from_daq decided upon. You must pass the size of the
+	data block to image_from_daq so that, in case it deducesd large and invalid
+	values for the image width and height, it constrains itself to copy only
+	from the available image data.
+}
+function image_from_daq(data_ptr:pointer;
+	data_size:integer;
+	var width,height,left,top,right,bottom,try_header:integer;
+	var results,name:PChar):image_ptr_type; cdecl;
+
+var 
+	ip:image_ptr_type=nil;
+	ihp:image_header_ptr_type=nil;
+	char_index,copy_size:integer;
+	q:integer;
+	s:string;
+
+begin
+	image_from_daq:=nil;
+	if data_ptr=nil then exit;
+	if data_size<=0 then exit;
+	
+	ihp:=pointer(data_ptr);
+
+	if (try_header<>0) then begin
+		q:=local_from_big_endian_smallint(ihp^.j_max)+1;
+		if (q>0) then height:=q;
+		q:=local_from_big_endian_smallint(ihp^.i_max)+1;
+		if (q>0) then width:=q;
+	end;
+	if (width<=0) or (height<=0) then begin
+		width:=trunc(sqrt(data_size));
+		if (sqr(width)<data_size) then width:=width+1;
+		height:=width;
+	end;
+
+	if (width*height>data_size) then copy_size:=data_size
+	else copy_size:=(width*height);
+
+	ip:=new_image(height,width);
+	if ip=nil then begin
+		report_error('Failed to allocate memory in image_from_daq.');
+		exit;
+	end;
+
+	block_move(data_ptr,@ip^.intensity,copy_size);
+
+	if (try_header<>0) then begin
+		q:=local_from_big_endian_smallint(ihp^.left);
+		if (q>=0) then left:=q;
+	end;
+	if (left<0) or (left>=width) then left:=0;
+	ip^.analysis_bounds.left:=left;
+	
+	if (try_header<>0) then begin
+		q:=local_from_big_endian_smallint(ihp^.right);
+		if (q>left) then right:=q;
+	end;
+	if (right<=left) or (right>=width) then right:=width-1;
+	ip^.analysis_bounds.right:=right;
+
+	if (try_header<>0) then begin
+		q:=local_from_big_endian_smallint(ihp^.top);
+		if (q>=0) then top:=q;
+	end;
+	if (top<1) or (top>=height) then top:=1;
+	ip^.analysis_bounds.top:=top;
+	
+	if (try_header<>0) then begin
+		q:=local_from_big_endian_smallint(ihp^.bottom);
+		if (q>top) then bottom:=q;
+	end;
+	if (bottom<=top) or (bottom>=height) then bottom:=height-1;
+	ip^.analysis_bounds.bottom:=bottom;
+	
+	if (try_header<>0) then begin
+		ip^.results:='';
+		char_index:=0;
+		while (char_index<short_string_length) 
+				and (ihp^.results[char_index]<>chr(0)) do begin
+			ip^.results:=ip^.results+ihp^.results[char_index];
+			inc(char_index);
+		end;
+		results:=PChar(ip^.results);
+	end 
+	else ip^.results:=results;
+	
+	s:=name;
+	if s<>'' then begin
+		if valid_image_name(s) then
+			dispose_image(image_ptr_from_name(s));
+		ip^.name:=s;
+	end;
+
+	image_from_daq:=ip;
+end;
+
+{
+	daq_from_image does the opposite of image_from_daq. You must pass
+	daq_from_image a pointer to a block of memory that is at least as large as
+	ip^.width*ip^.height. 
+}
+procedure daq_from_image(ip:image_ptr_type;
+	data_ptr:pointer); cdecl;
+
+var
+	ihp:image_header_ptr_type;
+	char_index:integer;
+	
+begin
+	if data_ptr=nil then exit;
+	with ip^ do begin
+		ihp:=pointer(@intensity);
+		ihp^.i_max:=big_endian_from_local_smallint(i_size-1);
+		ihp^.j_max:=big_endian_from_local_smallint(j_size-1);
+		ihp^.left:=big_endian_from_local_smallint(analysis_bounds.left);
+		ihp^.right:=big_endian_from_local_smallint(analysis_bounds.right);
+		ihp^.top:=big_endian_from_local_smallint(analysis_bounds.top);
+		ihp^.bottom:=big_endian_from_local_smallint(analysis_bounds.bottom);
+		for char_index:=1 to length(results) do 
+			ihp^.results[char_index-1]:=results[char_index];
+		ihp^.results[length(results)]:=chr(0);
+	end;
+	block_move(data_ptr,@ip^.intensity,ip^.j_size*ip^.i_size);
+end;
+
 exports
+
+{analysis interface routines for universal use}
+	image_from_contents name ld_prefix+'image_from_contents',
+	contents_from_image name ld_prefix+'contents_from_image',
+	image_from_daq name ld_prefix+'image_from_daq',
+	daq_from_image name ld_prefix+'daq_from_image',
 
 {utils}
 	check_for_math_error name ld_prefix+'check_for_math_error',
