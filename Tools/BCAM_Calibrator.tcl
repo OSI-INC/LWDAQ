@@ -31,18 +31,19 @@
 # V26: The apparatus name now comes with a description.
 # V27: Add support for more apparatus versions.
 # V28: Add support for source block with elements 4-8 flashing.
+# V29: Expand source database to provide for source calibration as well as camera.
 
 proc BCAM_Calibrator_init {} {
 	upvar #0 BCAM_Calibrator_info info
 	upvar #0 BCAM_Calibrator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "BCAM_Calibrator" "28"
+	LWDAQ_tool_init "BCAM_Calibrator" "29"
 	if {[winfo exists $info(window)]} {return 0}
 
-	set config(daq_timeout_ms) 5000
 	set config(apparatus_file) "apparatus_database.txt"
-	set config(calibration_file) [clock format [clock seconds] -format BCAM_calib_%d_%b_%y.txt]
+	set config(calibration_file) [clock format [clock seconds] \
+		-format BCAM_calib_%d_%b_%y.txt]
 	set config(daq_ip_addr) 129.64.37.87
 	set config(bcam_driver_socket) 7
 	set config(apparatus_driver_socket) 3
@@ -55,15 +56,20 @@ proc BCAM_Calibrator_init {} {
 	set config(ambient_exposure_seconds) 0.1
 	set config(auto_store) 0
 	set config(calculation_status) "NONE"
-	set config(jk_plate_device_type) 2
-	set config(sources_device_type) 2
-	set config(fibers_device_type) 1
 	set config(check_for_duplicates) 0
 	set config(use_q_readout) 0
+	
+	# The source database consists of entries that each give the LWDAQ device type,
+	# exposure time for calibration at close range, exposure time for calibration
+	# at long range, exposure time for test image, and source element numbers for the
+	# check image.
 	set config(source_database) [list \
 		[list Default 9 0.000400 0.000700 0.000100 "1 2 3 4"] \
 		[list BND25 2 0.000005 0.000020 0.000002 "1 2 3 4"] \
-		[list BND27 9 0.000400 0.000700 0.000100 "5 6 7 8"]]
+		[list BND27 9 0.000040 0.000700 0.000100 "5 6 7 8"] \
+		[list sources 2 0.000001 0.000001 0.000001 "1 2 3 4 5"]\
+		[list jk_plate 2 0.000001 0.000001 0.000001 "1 2 3 4 5"]\
+		[list fibers 1 0.000010 0.000001 0.000001 "1 2 3 4 5"] ]
 
 	set info(camera_front_element) "2"
 	set info(camera_rear_element) "1"
@@ -194,11 +200,13 @@ proc BCAM_Calibrator_check {} {
 		set iconfig(daq_source_driver_socket) $config(apparatus_driver_socket)
 		set iconfig(daq_source_mux_socket) $config(source_block_branch)
 		
-		set i [lsearch -index 0 $config(source_database) [lindex $info(apparatus_version) 0]]
+		set i [lsearch -index 0 $config(source_database) \
+			[lindex $info(apparatus_version) 0]]
 		if {$i < 0} {set i 0}
 		set iinfo(daq_source_device_type) [lindex $config(source_database) $i 1]
 		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 2]
 		set iconfig(daq_source_device_element) [lindex $config(source_database) $i 5]
+		
 		if {$info(calibration_end) == "front"} {
 			set iconfig(daq_device_element) $info(camera_front_element)
 		} {
@@ -209,8 +217,12 @@ proc BCAM_Calibrator_check {} {
 		set iconfig(daq_driver_socket) $config(apparatus_driver_socket)
 		set iconfig(daq_mux_socket) $config(ref_camera_branch)
 		set iconfig(daq_source_driver_socket) $config(bcam_driver_socket)
-		set iinfo(daq_source_device_type) $config(sources_device_type)
-		set iconfig(daq_flash_seconds) [lindex $config(source_database) 0 4]
+
+		set i [lsearch -index 0 $config(source_database) $info(calibration_class)]
+		if {$i < 0} {set i 0}
+		set iinfo(daq_source_device_type) [lindex $config(source_database) $i 1]
+		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 4]
+		
 		if {$info(calibration_end) == "front"} {
 			set iconfig(daq_source_device_element) $info(sources_front_elements)
 		} {
@@ -222,8 +234,12 @@ proc BCAM_Calibrator_check {} {
 		set iconfig(daq_driver_socket) $config(bcam_driver_socket)
 		set iconfig(daq_source_driver_socket) $config(apparatus_driver_socket)
 		set iconfig(daq_source_mux_socket) $config(source_block_branch)
-		set iinfo(daq_source_device_type) $config(jk_plate_device_type)
-		set iconfig(daq_flash_seconds) [lindex $config(source_database) 0 4]
+
+		set i [lsearch -index 0 $config(source_database) $info(calibration_class)]
+		if {$i < 0} {set i 0}
+		set iinfo(daq_source_device_type) [lindex $config(source_database) $i 1]
+		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 4]
+
 		set iconfig(daq_source_device_element) $info(sources_front_elements)
 		set iconfig(daq_device_element) $info(camera_front_element)
 	}
@@ -231,8 +247,12 @@ proc BCAM_Calibrator_check {} {
 		set iconfig(daq_driver_socket) $config(apparatus_driver_socket)
 		set iconfig(daq_mux_socket) $config(ref_camera_branch)
 		set iconfig(daq_source_driver_socket) $config(bcam_driver_socket)
-		set iinfo(daq_source_device_type) $config(fibers_device_type)
-		set iconfig(daq_flash_seconds) [lindex $config(source_database) 0 4]
+
+		set i [lsearch -index 0 $config(source_database) $info(calibration_class)]
+		if {$i < 0} {set i 0}
+		set iinfo(daq_source_device_type) [lindex $config(source_database) $i 1]
+		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 4]
+
 		if {$info(calibration_end) == "front"} {
 			set iconfig(daq_source_device_element) $info(sources_front_elements)
 		} {
@@ -285,10 +305,13 @@ proc BCAM_Calibrator_camera_acquire {range orientation} {
 	if {$i < 0} {set i 0}
 	set iinfo(daq_source_device_type) [lindex $config(source_database) $i 1]
 	set iconfig(daq_source_device_element) [lindex $config(source_database) $i 5]
-	if {$range == "near"} {
-		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 2]
-	} {
-		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 3]
+
+	if {$orientation == "0"} {
+		if {$range == "near"} {
+			set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 2]
+		} {
+			set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 3]
+		}
 	}
 
 	set iconfig(analysis_enable) 1
@@ -352,27 +375,32 @@ proc BCAM_Calibrator_sources_acquire {orientation} {
 	
 	LWDAQ_set_image_sensor $info(calibration_ccd_type) BCAM	
 	set iconfig(daq_ip_addr) $config(daq_ip_addr)
-	set iconfig(daq_flash_seconds) [lindex $config(source_database) 0 4]
+
 	if {$info(calibration_class) == "sources"} {
 		set iconfig(daq_source_driver_socket) $config(bcam_driver_socket)
 		set iconfig(daq_driver_socket) $config(apparatus_driver_socket)
-		set iinfo(daq_source_device_type) $config(sources_device_type)
 	} 
 	if {$info(calibration_class) == "fibers"} {
 		set iconfig(daq_source_driver_socket) $config(bcam_driver_socket)
 		set iconfig(daq_driver_socket) $config(apparatus_driver_socket)
-		set iinfo(daq_source_device_type) $config(fibers_device_type)
 	} 
 	if {$info(calibration_class) == "jk_plate"} {
 		set iconfig(daq_driver_socket) $config(bcam_driver_socket)
 		set iconfig(daq_source_driver_socket) $config(apparatus_driver_socket)
-		set iinfo(daq_source_device_type) $config(jk_plate_device_type)
 	}
 	if {$info(calibration_end) == "front"} {
 		set iconfig(daq_source_device_element) $info(sources_front_elements)
 	} {
 		set iconfig(daq_source_device_element) $info(sources_rear_elements)
 	}
+
+	set i [lsearch -index 0 $config(source_database) $info(calibration_class)]
+	if {$i < 0} {set i 0}
+	set iinfo(daq_source_device_type) [lindex $config(source_database) $i 1]
+	if {$orientation == "0"} {
+		set iconfig(daq_flash_seconds) [lindex $config(source_database) $i 2]
+	}
+
 	set iconfig(daq_device_element) $info(camera_front_element)	
 	set iconfig(daq_adjust_flash) $config(daq_adjust_flash)
 	set icongif(daq_subtract_background) $config(daq_subtract_background)
@@ -868,8 +896,10 @@ proc BCAM_Calibrator_do {step} {
 				append pattern "calibration_type:\[ \]+$info(calibration_type)"
 				while {[regexp -indices -start $index $pattern $calibrations match]} {
 					set index [expr [lindex $match 1] + 1]
-					regexp -start $index {calibration_time:[ ]+([^\n]*)} $calibrations match timestamp
-					regexp -start $index {operator_name:[ ]+([^\n]*)} $calibrations match operator
+					regexp -start $index {calibration_time:[ ]+([^\n]*)} \
+						$calibrations match timestamp
+					regexp -start $index {operator_name:[ ]+([^\n]*)} \
+						$calibrations match operator
 					lappend pre_existing "$info(device_id) $info(calibration_type)\
 						$timestamp $operator"
 				}

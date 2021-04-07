@@ -529,3 +529,387 @@ for {set i 0} {$i <  [llength [set MA]]} {incr i} {
 }
 </script>
 
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+Nignog and Rikard lower a ladder made of conjured wood into the shaft. The conjured wood is transparent, but there are pieces of rock and grass embedded within it so that the sides and steps are visible, assuming you know what you are looking at. The ladder rests upon the bottom of the shaft and sticks two meters up in the air at the top. Nignog checks that the ladder is sitting well. He tightens his sword belt and ties his shield to his back. Upon his helmet is a luminous stone, held in place by invisible conjured matter.
+
+Ping stands with a conjuring wand in her hand. She made the ladder. Zar placed the grass and stones in the conjured wood. He is an expert at this sort of thing. The grass and stones need to be placed on the surface of the wood, or else they weaken the structure. All four of the adventurers have their luminous stones, those made by the great Alfonso Bongo, fastened to their helmets.
+}
+
+set len [string length $passage]
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n > 0} { 
+		LWDAQ_print -nonewline [lindex $encoded $n]	
+  } else {
+		LWDAQ_print -nonewline [lindex $passage $index]
+  }
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+Nignog and Rikard lower a ladder made of conjured wood into the shaft. The conjured wood is transparent, but there are pieces of rock and grass embedded within it so that the sides and steps are visible, assuming you know what you are looking at. The ladder rests upon the bottom of the shaft and sticks two meters up in the air at the top. Nignog checks that the ladder is sitting well. He tightens his sword belt and ties his shield to his back. Upon his helmet is a luminous stone, held in place by invisible conjured matter.
+
+Ping stands with a conjuring wand in her hand. She made the ladder. Zar placed the grass and stones in the conjured wood. He is an expert at this sort of thing. The grass and stones need to be placed on the surface of the wood, or else they weaken the structure. All four of the adventurers have their luminous stones, those made by the great Alfonso Bongo, fastened to their helmets.
+}
+
+set len [string length $passage]
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n > 0} { 
+		LWDAQ_print -nonewline $t [lindex $encoded $n]	
+  } else {
+		LWDAQ_print -nonewline $t [lindex $passage $index]
+  }
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+Nignog and Rikard lower a ladder made of conjured wood into the shaft. The conjured wood is transparent, but there are pieces of rock and grass embedded within it so that the sides and steps are visible, assuming you know what you are looking at. The ladder rests upon the bottom of the shaft and sticks two meters up in the air at the top. Nignog checks that the ladder is sitting well. He tightens his sword belt and ties his shield to his back. Upon his helmet is a luminous stone, held in place by invisible conjured matter.
+
+Ping stands with a conjuring wand in her hand. She made the ladder. Zar placed the grass and stones in the conjured wood. He is an expert at this sort of thing. The grass and stones need to be placed on the surface of the wood, or else they weaken the structure. All four of the adventurers have their luminous stones, those made by the great Alfonso Bongo, fastened to their helmets.
+}
+
+set len [string length $passage]
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n > 0} { 
+		LWDAQ_print -nonewline $t [lindex $encoded $n]	
+  } else {
+		LWDAQ_print -nonewline $t [lindex $passage $index]
+  }
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+Nignog and Rikard lower a ladder made of conjured wood into the shaft. The conjured wood is transparent, but there are pieces of rock and grass embedded within it so that the sides and steps are visible, assuming you know what you are looking at. The ladder rests upon the bottom of the shaft and sticks two meters up in the air at the top. Nignog checks that the ladder is sitting well. He tightens his sword belt and ties his shield to his back. Upon his helmet is a luminous stone, held in place by invisible conjured matter.
+
+Ping stands with a conjuring wand in her hand. She made the ladder. Zar placed the grass and stones in the conjured wood. He is an expert at this sort of thing. The grass and stones need to be placed on the surface of the wood, or else they weaken the structure. All four of the adventurers have their luminous stones, those made by the great Alfonso Bongo, fastened to their helmets.
+}
+
+set len [string length $passage]
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n >= 0} { 
+		LWDAQ_print -nonewline $t [lindex $encoded $n]	
+  } else {
+		LWDAQ_print -nonewline $t [lindex $passage $index] purple
+  }
+	LWDAQ_update
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+On the very same day that Ping is sitting and talking with Throm Beausex in Machay, indeed: at almost exactly the same time, Zar sees a kobold poking around his camp. We call it a camp, but he calls it his house and garden. He lives in the forest in the Borderlands south of Caravel, five minutes walk from the center of Voisson Village. He did not buy the land. He just found a clearing, killed the bushes in it by burning them, and made a conjured shelter. You may be curious to know what he does for toilets and baths, but you'll have to ask him yourself, because we want to get on with the exciting part of the story, which is the kobold poking around in his camp.
+}
+
+set len [string length $passage]
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n >= 0} { 
+		LWDAQ_print -nonewline $t [lindex $encoded $n]	
+  } else {
+		LWDAQ_print -nonewline $t [lindex $passage $index] purple
+  }
+	LWDAQ_update
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+On the very same day that Ping is sitting and talking with Throm Beausex in Machay, indeed: at almost exactly the same time, Zar sees a kobold poking around his camp. We call it a camp, but he calls it his house and garden. He lives in the forest in the Borderlands south of Caravel, five minutes walk from the center of Voisson Village. He did not buy the land. He just found a clearing, killed the bushes in it by burning them, and made a conjured shelter. You may be curious to know what he does for toilets and baths, but you'll have to ask him yourself, because we want to get on with the exciting part of the story, which is the kobold poking around in his camp.
+}
+
+set len [string length $passage]
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n >= 0} { 
+		LWDAQ_print -nonewline $t [lindex $encoded $n]	
+  } else {
+		LWDAQ_print $t ""
+  }
+	LWDAQ_update
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+On the very same day that Ping is sitting and talking with Throm Beausex in Machay, indeed: at almost exactly the same time, Zar sees a kobold poking around his camp. We call it a camp, but he calls it his house and garden. He lives in the forest in the Borderlands south of Caravel, five minutes walk from the center of Voisson Village. He did not buy the land. He just found a clearing, killed the bushes in it by burning them, and made a conjured shelter. You may be curious to know what he does for toilets and baths, but you'll have to ask him yourself, because we want to get on with the exciting part of the story, which is the kobold poking around in his camp.
+}
+
+set len [string length $passage]
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n >= 0} { 
+		LWDAQ_print -nonewline $t [lindex $encoded $n]	
+  } else {
+		LWDAQ_print -nonewline $t " "
+  }
+	LWDAQ_update
+}
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+On the very same day that Ping is sitting and talking with Throm Beausex in Machay, indeed: at almost exactly the same time, Zar sees a kobold poking around his camp. We call it a camp, but he calls it his house and garden. He lives in the forest in the Borderlands south of Caravel, five minutes walk from the center of Voisson Village. He did not buy the land. He just found a clearing, killed the bushes in it by burning them, and made a conjured shelter. You may be curious to know what he does for toilets and baths, but you'll have to ask him yourself, because we want to get on with the exciting part of the story, which is the kobold poking around in his camp.
+}
+
+set len [string length $passage]
+set translated ""
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n >= 0} { 
+		 append translated [lindex $encoded $n]	
+  } else {
+		 append translated [string index $passage $index]
+ 	}
+}
+LWDAQ_print $t $translated
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+On the very same day that Ping is sitting and talking with Throm Beausex in Machay, indeed: at almost exactly the same time, Zar sees a kobold poking around his camp. We call it a camp, but he calls it his house and garden. He lives in the forest in the Borderlands south of Caravel, five minutes walk from the center of Voisson Village. He did not buy the land. He just found a clearing, killed the bushes in it by burning them, and made a conjured shelter. You may be curious to know what he does for toilets and baths, but you'll have to ask him yourself, because we want to get on with the exciting part of the story, which is the kobold poking around in his camp.
+}
+
+set len [string length $passage]
+set translated ""
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n >= 0} { 
+		 append translated [lindex $encoded $n]	
+  } else {
+		 append translated [string index $passage $index]
+ 	}
+}
+LWDAQ_print $t $translated
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+On the very same day that Ping is sitting and talking with Throm Beausex in Machay, indeed: at almost exactly the same time, Zar sees a kobold poking around his camp. We call it a camp, but he calls it his house and garden. He lives in the forest in the Borderlands south of Caravel, five minutes walk from the center of Voisson Village. He did not buy the land. He just found a clearing, killed the bushes in it by burning them, and made a conjured shelter. You may be curious to know what he does for toilets and baths, but you'll have to ask him yourself, because we want to get on with the exciting part of the story, which is the kobold poking around in his camp.
+}
+
+set len [string length $passage]
+set translated ""
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n >= 0} { 
+		 append translated [lindex $encoded $n]	
+  } else {
+		 append translated [string index $passage $index]
+ 	}
+}
+LWDAQ_print $t $translated
+</script>
+
+<script>
+set alphabet "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+set remaining $alphabet
+set encoded ""
+foreach letter $alphabet {
+	set N [llength $remaining]
+	set index [expr round(rand()*($N-0.5))]
+	if {$index < 0} {set index 0}
+	if {$index > $N - 1} {set index [expr $N - 1]}
+	lappend encoded [lindex $remaining $index]
+	set remaining [lreplace $remaining $index $index]
+}
+for {set index 0} {$index < [llength $alphabet]} {incr index} {
+	LWDAQ_print $t "[lindex $alphabet $index] [lindex $encoded $index]"
+}
+set passage {
+On the very same day that Ping is sitting and talking with Throm Beausex in Machay, indeed: at almost exactly the same time, Zar sees a kobold poking around his camp. We call it a camp, but he calls it his house and garden. He lives in the forest in the Borderlands south of Caravel, five minutes walk from the center of Voisson Village. He did not buy the land. He just found a clearing, killed the bushes in it by burning them, and made a conjured shelter. You may be curious to know what he does for toilets and baths, but you'll have to ask him yourself, because we want to get on with the exciting part of the story, which is the kobold poking around in his camp.
+}
+
+set len [string length $passage]
+set translated ""
+for {set index 0} {$index < $len} {incr index} {
+	set n [lsearch $alphabet [string tolower [string index $passage $index]]]
+	if { $n >= 0} { 
+		 append translated [lindex $encoded $n]	
+  } else {
+		 append translated [string index $passage $index]
+ 	}
+}
+LWDAQ_print $t $translated
+</script>
+

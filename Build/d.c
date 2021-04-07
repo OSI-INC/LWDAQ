@@ -22,7 +22,7 @@ int dll_inc(int a) {
 }
 
 int dll_print(char* s ) {
-	printf("String passed library is: \"%s\"\n",s);
+	printf("String passed in to C library is: \"%s\"\n",s);
 	return strlen(s);
 }
 

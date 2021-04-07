@@ -3,7 +3,7 @@
 
 	fpc d.pas -Px86_64
 
-	The result will be a shared library called  d.dll (Windows), libd.dylib
+	The result will be a shared library called d.dll (Windows), libd.dylib
 	(MacOS), or libd.so (Linux).
 }
 

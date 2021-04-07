@@ -13,7 +13,10 @@ begin writeln(s); end;
 function console_read(s:string):string;
 begin write(s);readln(s);console_read:=s; end;
 
-
+procedure A (procedure B (procedure C));
+begin
+	B(C);
+end;
 
 var
 	x:real;

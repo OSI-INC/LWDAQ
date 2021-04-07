@@ -22,7 +22,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "1.4"
+	LWDAQ_tool_init "Stimulator" "1.5"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -960,13 +960,15 @@ proc Stimulator_refresh_list {{fn ""}} {
 	set m 1000
 	foreach n $info(device_list) {
 		Stimulator_rename_device $n $m
-		lappend new_list $m
+		lappend new_list "$m $info(device$m\_id)"
 		incr m
 	}
+	set new_list [lsort -increasing -index 1 $new_list]
 	
 	set info(device_list) [list]
 	set m 1
-	foreach n $new_list {
+	foreach device $new_list {
+		set n [lindex $device 0]
 		Stimulator_rename_device $n $m
 		set info(device$m\_battery) "?"
 		lappend info(device_list) $m

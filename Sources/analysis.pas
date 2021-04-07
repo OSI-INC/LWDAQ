@@ -32,16 +32,48 @@ uses
 	spot,bcam,shadow,wps,electronics,metrics;
 
 {$IFDEF DARWIN}
-	const ld_prefix='_';
+	const exp_prefix='_';
 {$ENDIF}
 
 {$IFDEF WINDOWS}
-	const ld_prefix='_';
+	const exp_prefix='';
 {$ENDIF}
 
 {$IFNDEF WINDOWS}{$IFNDEF DARWIN}
-	const ld_prefix='';
+	const exp_prefix='';
 {$ENDIF}{$ENDIF}
+
+{
+	The following functions with prefix "dll" are designed to help us set up a connection
+	between this dynamic library and a main program. 
+}
+
+function dll_inc(a:longint):longint; cdecl;
+begin
+	dll_inc:=a+1;
+end;
+
+function dll_print(s:PChar):longint; cdecl;
+begin
+	writeln('String passed to library is: "'+s+'"');
+	dll_print:=length(s);
+end;
+
+function dll_sqrt(x:real):real; cdecl;
+begin
+	dll_sqrt:=sqrt(x);
+end;
+
+function dll_sizes:longint; cdecl;
+begin
+	writeln('Reporting sizes of variable types in Pascal:');
+	writeln('Size of integer is ',sizeof(integer),' bytes.');
+	writeln('Size of longint is ',sizeof(longint),' bytes.');
+	writeln('Size of real is ',sizeof(real),' bytes.');
+	writeln('Size of extended is ',sizeof(extended),' bytes.');
+	writeln('Size of char is ',sizeof(char),' bytes.');
+	dll_sizes:=0;
+end;
 
 {
 	image_from_contents creates a new image with dimensions width and height,
@@ -103,18 +135,16 @@ end;
 	values for the image width and height, it constrains itself to copy only
 	from the available image data.
 }
-function image_from_daq(data_ptr:pointer;
-	data_size:integer;
-	var width,height,left,top,right,bottom,try_header:integer;
-	var results,name:PChar):image_ptr_type; cdecl;
+function image_from_daq(data_ptr:pointer;data_size:integer;
+	width,height,left,top,right,bottom,try_header:integer;
+	results,name:PChar):PChar; cdecl;
 
 var 
 	ip:image_ptr_type=nil;
 	ihp:image_header_ptr_type=nil;
 	char_index,copy_size:integer;
 	q:integer;
-	s:string;
-
+	
 begin
 	image_from_daq:=nil;
 	if data_ptr=nil then exit;
@@ -185,14 +215,15 @@ begin
 	end 
 	else ip^.results:=results;
 	
-	s:=name;
-	if s<>'' then begin
-		if valid_image_name(s) then
-			dispose_image(image_ptr_from_name(s));
-		ip^.name:=s;
+	if name<>'' then begin
+		if valid_image_name(name) then
+			dispose_image(image_ptr_from_name(name));
+		ip^.name:=name;
+	end else begin
+		name:=PChar(ip^.name);
 	end;
 
-	image_from_daq:=ip;
+	image_from_daq:=name;
 end;
 
 {
@@ -226,156 +257,162 @@ end;
 
 exports
 
+{diagnostic routines}
+	dll_inc name exp_prefix+'dll_inc',
+	dll_print name exp_prefix+'dll_print',
+	dll_sqrt name exp_prefix+'dll_sqrt',
+	dll_sizes name exp_prefix+'dll_sizes',
+
 {analysis interface routines for universal use}
-	image_from_contents name ld_prefix+'image_from_contents',
-	contents_from_image name ld_prefix+'contents_from_image',
-	image_from_daq name ld_prefix+'image_from_daq',
-	daq_from_image name ld_prefix+'daq_from_image',
+	image_from_contents name exp_prefix+'image_from_contents',
+	contents_from_image name exp_prefix+'contents_from_image',
+	image_from_daq name exp_prefix+'image_from_daq',
+	daq_from_image name exp_prefix+'daq_from_image',
 
 {utils}
-	check_for_math_error name ld_prefix+'check_for_math_error',
-	math_error name ld_prefix+'math_error',
-	math_overflow name ld_prefix+'math_overflow',
-	error_function name ld_prefix+'error_function',
-	complimentary_error_function name ld_prefix+'complimentary_error_function',
-	gamma_function name ld_prefix+'gamma_function',
-	chi_squares_distribution name ld_prefix+'chi_squares_distribution',
-	chi_squares_probability name ld_prefix+'chi_squares_probability',
-	factorial name ld_prefix+'factorial',
-	full_arctan name ld_prefix+'full_arctan',
-	sum_sinusoids name ld_prefix+'sum_sinusoids',
-	xpy name ld_prefix+'xpy',
-	xpyi name ld_prefix+'xpyi',
-	random_0_to_1 name ld_prefix+'random_0_to_1',
-	new_matrix name ld_prefix+'new_matrix',
-	matrix_rows name ld_prefix+'matrix_rows',
-	matrix_columns name ld_prefix+'matrix_columns',
-	matrix_copy name ld_prefix+'matrix_copy',
-	unit_matrix name ld_prefix+'unit_matrix',
-	matrix_product name ld_prefix+'matrix_product',
-	matrix_determinant name ld_prefix+'matrix_determinant',
-	matrix_difference name ld_prefix+'matrix_difference',
-	matrix_inverse name ld_prefix+'matrix_inverse',
-	swap_matrix_rows name ld_prefix+'swap_matrix_rows',
-	new_simplex name ld_prefix+'new_simplex',
-	simplex_step name ld_prefix+'simplex_step',
-	simplex_volume name ld_prefix+'simplex_volume',
-	simplex_size name ld_prefix+'simplex_size',
-	simplex_construct name ld_prefix+'simplex_construct',
-	simplex_vertex_copy name ld_prefix+'simplex_vertex_copy',
+	check_for_math_error name exp_prefix+'check_for_math_error',
+	math_error name exp_prefix+'math_error',
+	math_overflow name exp_prefix+'math_overflow',
+	error_function name exp_prefix+'error_function',
+	complimentary_error_function name exp_prefix+'complimentary_error_function',
+	gamma_function name exp_prefix+'gamma_function',
+	chi_squares_distribution name exp_prefix+'chi_squares_distribution',
+	chi_squares_probability name exp_prefix+'chi_squares_probability',
+	factorial name exp_prefix+'factorial',
+	full_arctan name exp_prefix+'full_arctan',
+	sum_sinusoids name exp_prefix+'sum_sinusoids',
+	xpy name exp_prefix+'xpy',
+	xpyi name exp_prefix+'xpyi',
+	random_0_to_1 name exp_prefix+'random_0_to_1',
+	new_matrix name exp_prefix+'new_matrix',
+	matrix_rows name exp_prefix+'matrix_rows',
+	matrix_columns name exp_prefix+'matrix_columns',
+	matrix_copy name exp_prefix+'matrix_copy',
+	unit_matrix name exp_prefix+'unit_matrix',
+	matrix_product name exp_prefix+'matrix_product',
+	matrix_determinant name exp_prefix+'matrix_determinant',
+	matrix_difference name exp_prefix+'matrix_difference',
+	matrix_inverse name exp_prefix+'matrix_inverse',
+	swap_matrix_rows name exp_prefix+'swap_matrix_rows',
+	new_simplex name exp_prefix+'new_simplex',
+	simplex_step name exp_prefix+'simplex_step',
+	simplex_volume name exp_prefix+'simplex_volume',
+	simplex_size name exp_prefix+'simplex_size',
+	simplex_construct name exp_prefix+'simplex_construct',
+	simplex_vertex_copy name exp_prefix+'simplex_vertex_copy',
 
 {images}
-	get_px name ld_prefix+'get_px',
-	set_px name ld_prefix+'set_px',
-	get_ov name ld_prefix+'get_ov',
-	set_ov name ld_prefix+'set_ov',
-	paint_image name ld_prefix+'paint_image',
-	clear_image name ld_prefix+'clear_image',
-	paint_overlay name ld_prefix+'paint_overlay',
-	fill_overlay name ld_prefix+'fill_overlay',
-	clear_overlay name ld_prefix+'clear_overlay',
-	dispose_image name ld_prefix+'dispose_image',
-	dispose_named_images name ld_prefix+'dispose_named_images',
-	draw_image name ld_prefix+'draw_image',
-	draw_rggb_image name ld_prefix+'draw_rggb_image',
-	draw_gbrg_image name ld_prefix+'draw_gbrg_image',
-	draw_image_line name ld_prefix+'draw_image_line',
-	draw_overlay_line name ld_prefix+'draw_overlay_line',
-	draw_overlay_pixel name ld_prefix+'draw_overlay_pixel',
-	draw_overlay_rectangle name ld_prefix+'draw_overlay_rectangle',
-	draw_overlay_rectangle_ellipse name ld_prefix+'draw_overlay_rectangle_ellipse',
-	draw_overlay_ellipse name ld_prefix+'draw_overlay_ellipse',
-	embed_image_header name ld_prefix+'embed_image_header',
-	image_ptr_from_name name ld_prefix+'image_ptr_from_name',
-	image_amplitude name ld_prefix+'image_amplitude',
-	image_average name ld_prefix+'image_average',
-	image_median name ld_prefix+'image_median',
-	image_maximum name ld_prefix+'image_maximum',
-	image_minimum name ld_prefix+'image_minimum',
-	image_sum name ld_prefix+'image_sum',
-	overlay_color_from_integer name ld_prefix+'overlay_color_from_integer',
-	spread_overlay name ld_prefix+'spread_overlay',
-	paint_overlay_bounds name ld_prefix+'paint_overlay_bounds',
-	new_image name ld_prefix+'new_image',
-	valid_analysis_bounds name ld_prefix+'valid_analysis_bounds',
-	valid_image_analysis_point name ld_prefix+'valid_image_analysis_point',	
-	valid_image_name name ld_prefix+'valid_image_name',
-	valid_image_point name ld_prefix+'valid_image_point',
-	valid_image_ptr name ld_prefix+'valid_image_ptr',
-	write_image_list name ld_prefix+'write_image_list',
+	get_px name exp_prefix+'get_px',
+	set_px name exp_prefix+'set_px',
+	get_ov name exp_prefix+'get_ov',
+	set_ov name exp_prefix+'set_ov',
+	paint_image name exp_prefix+'paint_image',
+	clear_image name exp_prefix+'clear_image',
+	paint_overlay name exp_prefix+'paint_overlay',
+	fill_overlay name exp_prefix+'fill_overlay',
+	clear_overlay name exp_prefix+'clear_overlay',
+	dispose_image name exp_prefix+'dispose_image',
+	dispose_named_images name exp_prefix+'dispose_named_images',
+	draw_image name exp_prefix+'draw_image',
+	draw_rggb_image name exp_prefix+'draw_rggb_image',
+	draw_gbrg_image name exp_prefix+'draw_gbrg_image',
+	draw_image_line name exp_prefix+'draw_image_line',
+	draw_overlay_line name exp_prefix+'draw_overlay_line',
+	draw_overlay_pixel name exp_prefix+'draw_overlay_pixel',
+	draw_overlay_rectangle name exp_prefix+'draw_overlay_rectangle',
+	draw_overlay_rectangle_ellipse name exp_prefix+'draw_overlay_rectangle_ellipse',
+	draw_overlay_ellipse name exp_prefix+'draw_overlay_ellipse',
+	embed_image_header name exp_prefix+'embed_image_header',
+	image_ptr_from_name name exp_prefix+'image_ptr_from_name',
+	image_amplitude name exp_prefix+'image_amplitude',
+	image_average name exp_prefix+'image_average',
+	image_median name exp_prefix+'image_median',
+	image_maximum name exp_prefix+'image_maximum',
+	image_minimum name exp_prefix+'image_minimum',
+	image_sum name exp_prefix+'image_sum',
+	overlay_color_from_integer name exp_prefix+'overlay_color_from_integer',
+	spread_overlay name exp_prefix+'spread_overlay',
+	paint_overlay_bounds name exp_prefix+'paint_overlay_bounds',
+	new_image name exp_prefix+'new_image',
+	valid_analysis_bounds name exp_prefix+'valid_analysis_bounds',
+	valid_image_analysis_point name exp_prefix+'valid_image_analysis_point',	
+	valid_image_name name exp_prefix+'valid_image_name',
+	valid_image_point name exp_prefix+'valid_image_point',
+	valid_image_ptr name exp_prefix+'valid_image_ptr',
+	write_image_list name exp_prefix+'write_image_list',
 
 {transforms}
-	i_from_c name ld_prefix+'i_from_c',
-	c_from_i name ld_prefix+'c_from_i',
-	p_from_i name ld_prefix+'p_from_i',
-	i_from_p name ld_prefix+'i_from_p',
-	c_from_i_line name ld_prefix+'c_from_i_line',
-	i_from_p_line name ld_prefix+'i_from_p_line',
-	i_from_c_line name ld_prefix+'i_from_c_line',
-	p_from_i_line name ld_prefix+'p_from_i_line',
-	i_from_c_rectangle name ld_prefix+'i_from_c_rectangle',
-	c_from_i_rectangle name ld_prefix+'c_from_i_rectangle',
-	i_from_c_ellipse name ld_prefix+'i_from_c_ellipse',
-	c_from_i_ellipse name ld_prefix+'c_from_i_ellipse',
-	display_ccd_cross name ld_prefix+'display_ccd_cross',
-	display_ccd_line name ld_prefix+'display_ccd_line',
-	draw_ccd_line name ld_prefix+'draw_ccd_line',
-	display_ccd_pixel name ld_prefix+'display_ccd_pixel',
-	display_ccd_rectangle name ld_prefix+'display_ccd_rectangle',
-	display_ccd_rectangle_cross name ld_prefix+'display_ccd_rectangle_cross',
-	display_ccd_rectangle_ellipse name ld_prefix+'display_ccd_rectangle_ellipse',
-	display_ccd_ellipse name ld_prefix+'display_ccd_ellipse',
-	display_profile_row name ld_prefix+'display_profile_row',
-	display_profile_column name ld_prefix+'display_profile_column',
-	display_real_graph name ld_prefix+'display_real_graph',
-	draw_real_graph name ld_prefix+'draw_real_graph',
+	i_from_c name exp_prefix+'i_from_c',
+	c_from_i name exp_prefix+'c_from_i',
+	p_from_i name exp_prefix+'p_from_i',
+	i_from_p name exp_prefix+'i_from_p',
+	c_from_i_line name exp_prefix+'c_from_i_line',
+	i_from_p_line name exp_prefix+'i_from_p_line',
+	i_from_c_line name exp_prefix+'i_from_c_line',
+	p_from_i_line name exp_prefix+'p_from_i_line',
+	i_from_c_rectangle name exp_prefix+'i_from_c_rectangle',
+	c_from_i_rectangle name exp_prefix+'c_from_i_rectangle',
+	i_from_c_ellipse name exp_prefix+'i_from_c_ellipse',
+	c_from_i_ellipse name exp_prefix+'c_from_i_ellipse',
+	display_ccd_cross name exp_prefix+'display_ccd_cross',
+	display_ccd_line name exp_prefix+'display_ccd_line',
+	draw_ccd_line name exp_prefix+'draw_ccd_line',
+	display_ccd_pixel name exp_prefix+'display_ccd_pixel',
+	display_ccd_rectangle name exp_prefix+'display_ccd_rectangle',
+	display_ccd_rectangle_cross name exp_prefix+'display_ccd_rectangle_cross',
+	display_ccd_rectangle_ellipse name exp_prefix+'display_ccd_rectangle_ellipse',
+	display_ccd_ellipse name exp_prefix+'display_ccd_ellipse',
+	display_profile_row name exp_prefix+'display_profile_row',
+	display_profile_column name exp_prefix+'display_profile_column',
+	display_real_graph name exp_prefix+'display_real_graph',
+	draw_real_graph name exp_prefix+'draw_real_graph',
 
 {image_manip}
-	image_copy name ld_prefix+'image_copy',
-	image_filter name ld_prefix+'image_filter',
-	image_grad_i name ld_prefix+'image_grad_i',
-	image_grad_j name ld_prefix+'image_grad_j',
-	image_grad name ld_prefix+'image_grad',
-	image_shrink name ld_prefix+'image_shrink',
-	image_enlarge name ld_prefix+'image_enlarge',
-	image_rotate name ld_prefix+'image_rotate',
-	image_profile_column name ld_prefix+'image_profile_column',
-	image_profile_row name ld_prefix+'image_profile_row',
-	image_quadratic_sum name ld_prefix+'image_quadratic_sum',
-	image_accumulate name ld_prefix+'image_accumulate',
-	image_subtract name ld_prefix+'image_subtract',
-	image_subtract_row_average name ld_prefix+'image_subtract_row_average',
-	image_subtract_gradient name ld_prefix+'image_subtract_gradient',
-	image_transfer_overlay name ld_prefix+'image_transfer_overlay',
-	image_bounds_subtract name ld_prefix+'image_bounds_subtract',
-	image_negate name ld_prefix+'image_negate',
-	image_histogram name ld_prefix+'image_histogram',
-	image_invert name ld_prefix+'image_invert',
-	image_reverse_rows name ld_prefix+'image_reverse_rows',
-	image_soec name ld_prefix+'image_soec',
-	image_soer name ld_prefix+'image_soer',
-	image_crop name ld_prefix+'image_crop',
+	image_copy name exp_prefix+'image_copy',
+	image_filter name exp_prefix+'image_filter',
+	image_grad_i name exp_prefix+'image_grad_i',
+	image_grad_j name exp_prefix+'image_grad_j',
+	image_grad name exp_prefix+'image_grad',
+	image_shrink name exp_prefix+'image_shrink',
+	image_enlarge name exp_prefix+'image_enlarge',
+	image_rotate name exp_prefix+'image_rotate',
+	image_profile_column name exp_prefix+'image_profile_column',
+	image_profile_row name exp_prefix+'image_profile_row',
+	image_quadratic_sum name exp_prefix+'image_quadratic_sum',
+	image_accumulate name exp_prefix+'image_accumulate',
+	image_subtract name exp_prefix+'image_subtract',
+	image_subtract_row_average name exp_prefix+'image_subtract_row_average',
+	image_subtract_gradient name exp_prefix+'image_subtract_gradient',
+	image_transfer_overlay name exp_prefix+'image_transfer_overlay',
+	image_bounds_subtract name exp_prefix+'image_bounds_subtract',
+	image_negate name exp_prefix+'image_negate',
+	image_histogram name exp_prefix+'image_histogram',
+	image_invert name exp_prefix+'image_invert',
+	image_reverse_rows name exp_prefix+'image_reverse_rows',
+	image_soec name exp_prefix+'image_soec',
+	image_soer name exp_prefix+'image_soer',
+	image_crop name exp_prefix+'image_crop',
 
 {rasnik}
-	new_rasnik name ld_prefix+'new_rasnik',
-	dispose_rasnik name ld_prefix+'dispose_rasnik',
-	rasnik_analyze_image name ld_prefix+'rasnik_analyze_image',
-	new_rasnik_pattern name ld_prefix+'new_rasnik_pattern',
-	dispose_rasnik_pattern name ld_prefix+'dispose_rasnik_pattern',
-	rasnik_adjust_pattern_parity name ld_prefix+'rasnik_adjust_pattern_parity',
-	rasnik_analyze_code name ld_prefix+'rasnik_analyze_code',
-	rasnik_display_pattern name ld_prefix+'rasnik_display_pattern',
-	rasnik_find_pattern name ld_prefix+'rasnik_find_pattern',
-	rasnik_refine_pattern name ld_prefix+'rasnik_refine_pattern',
-	rasnik_from_pattern name ld_prefix+'rasnik_from_pattern',
-	rasnik_identify_code_squares name ld_prefix+'rasnik_identify_code_squares',
-	rasnik_identify_pattern_squares name ld_prefix+'rasnik_identify_pattern_squares',
-	rasnik_mask_position name ld_prefix+'rasnik_mask_position',
-	rasnik_pattern_from_string name ld_prefix+'rasnik_pattern_from_string',
-	rasnik_from_string name ld_prefix+'rasnik_from_string',
-	rasnik_shift_reference_point name ld_prefix+'rasnik_shift_reference_point',
-	rasnik_simulated_image name ld_prefix+'rasnik_simulated_image',
-	string_from_rasnik_pattern name ld_prefix+'string_from_rasnik_pattern',
-	string_from_rasnik name ld_prefix+'string_from_rasnik';
+	new_rasnik name exp_prefix+'new_rasnik',
+	dispose_rasnik name exp_prefix+'dispose_rasnik',
+	rasnik_analyze_image name exp_prefix+'rasnik_analyze_image',
+	new_rasnik_pattern name exp_prefix+'new_rasnik_pattern',
+	dispose_rasnik_pattern name exp_prefix+'dispose_rasnik_pattern',
+	rasnik_adjust_pattern_parity name exp_prefix+'rasnik_adjust_pattern_parity',
+	rasnik_analyze_code name exp_prefix+'rasnik_analyze_code',
+	rasnik_display_pattern name exp_prefix+'rasnik_display_pattern',
+	rasnik_find_pattern name exp_prefix+'rasnik_find_pattern',
+	rasnik_refine_pattern name exp_prefix+'rasnik_refine_pattern',
+	rasnik_from_pattern name exp_prefix+'rasnik_from_pattern',
+	rasnik_identify_code_squares name exp_prefix+'rasnik_identify_code_squares',
+	rasnik_identify_pattern_squares name exp_prefix+'rasnik_identify_pattern_squares',
+	rasnik_mask_position name exp_prefix+'rasnik_mask_position',
+	rasnik_pattern_from_string name exp_prefix+'rasnik_pattern_from_string',
+	rasnik_from_string name exp_prefix+'rasnik_from_string',
+	rasnik_shift_reference_point name exp_prefix+'rasnik_shift_reference_point',
+	rasnik_simulated_image name exp_prefix+'rasnik_simulated_image',
+	string_from_rasnik_pattern name exp_prefix+'string_from_rasnik_pattern',
+	string_from_rasnik name exp_prefix+'string_from_rasnik';
 
 end.
