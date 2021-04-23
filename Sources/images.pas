@@ -1108,7 +1108,7 @@ begin
 				im:=image_maximum(ip);
 				if (im-image_offset)<>0 then
 					shade_scale:=(white_intensity-black_intensity)/
-						(image_maximum(ip)-image_offset)
+						(im-image_offset)
 				else shade_scale:=1;
 			end;
 		end;

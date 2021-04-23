@@ -121,26 +121,7 @@ mv $MASTER_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
 mv $MASTER_DIR/VBT $VBT_DIR
 mv $MASTER_DIR/GIT $GIT_DIR
 
-# Copy files to remote software repository if it's mounted.
-SITE="$RMT/Software/Download"
-if [ -d "$SITE" ]
-then
-	echo "FOUND: Remote software download directory."
-	if [ -d "$SITE/$ARCHIVE" ] 
-	then
-		echo "Deleting pre-existing $SITE/$ARCHIVE..."
-		rm $SITE/$ARCHIVE
-	fi
-	echo "Uploading new $ARCHIVE..."
-	cp $ARCHIVE $SITE/$ARCHIVE
-	echo "Deleting local copy of archive..."
-	rm $ARCHIVE
-else
-	echo "WARNING: Cannot find remote download directory."
-	echo "Keeping local copy of $ARCHIVE."
-fi
-
-# Copy files to website if it's mounted on the desktop.
+# Copy documents to website.
 DOCS="Electronics/LWDAQ"
 if [ -d "$DOCS" ]
 then 
@@ -172,6 +153,7 @@ else
 	echo "NOT FOUND: Local document folder."
 fi
 
+# Copy source code to website.
 if [ -d "LWDAQ/Sources" ]
 then
 	echo "WORKING DIRECTORY: `pwd`"
@@ -193,6 +175,25 @@ then
 	fi
 else
 	echo "NOT FOUND: Local source code directory."
+fi
+
+# Copy new distribution archive to the remote repository.
+SITE="$RMT/Software/Download"
+if [ -d "$SITE" ]
+then
+	echo "FOUND: Remote software download directory."
+	if [ -d "$SITE/$ARCHIVE" ] 
+	then
+		echo "Deleting pre-existing $SITE/$ARCHIVE..."
+		rm $SITE/$ARCHIVE
+	fi
+	echo "Uploading new $ARCHIVE..."
+	cp $ARCHIVE $SITE/$ARCHIVE
+	echo "Deleting local copy of archive..."
+	rm $ARCHIVE
+else
+	echo "WARNING: Cannot find remote download directory."
+	echo "Keeping local copy of $ARCHIVE."
 fi
 
 # Finish.

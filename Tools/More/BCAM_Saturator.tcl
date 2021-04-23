@@ -16,13 +16,15 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 # Version 8: Brought up to date with LWDAQ 7.2. 
+#
+# Version 9: Expand plot.
 
 proc BCAM_Saturator_init {} {
 	upvar #0 BCAM_Saturator_info info
 	upvar #0 BCAM_Saturator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "BCAM_Saturator" "8"
+	LWDAQ_tool_init "BCAM_Saturator" "9"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set config(flash_factors) "0.0 0.1 0.3 0.5 0.6 \
@@ -32,6 +34,10 @@ proc BCAM_Saturator_init {} {
 	set config(num_flash_divisions) 10
 	set config(size_intensity_divisions) 25
 	set config(color) 1
+	set config(image_width) 344
+	set config(image_height) 244
+	set config(plot_width) 688
+	set config(plot_height) 588
 	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -147,19 +153,23 @@ proc BCAM_Saturator_open {} {
 	set f1 $f.image_frame
 	frame $f1 
 	pack $f1 -side left -fill y
-	set info(photo) [image create photo -width 344 -height 244]
+	set info(photo) [image create photo \
+		-width $config(image_width) -height $config(image_height)]
 	label $f1.image -image $info(photo) 
 	pack $f1.image -side left
 
 	set f2 $f.graph_frame
 	frame $f2 
 	pack $f2 -side left -fill y
-	set info(graph) [image create photo -width 344 -height 244]
+	set info(graph) [image create photo \
+		-width $config(plot_width) -height $config(plot_height)]
 	label $f2.image -image $info(graph) 
 	pack $f2.image -side left
 
-	set info(graph_image_name) [lwdaq_image_create -width 344 -height 244 \
-		-left 0 -right 343 -top 2 -bottom 243]
+	set info(graph_image_name) [lwdaq_image_create \
+		-width $config(plot_width) -height $config(plot_height) \
+		-left 2 -right [expr $config(plot_width) - 2] \
+		-top 2 -bottom [expr $config(plot_height) - 2]]
 	BCAM_Saturator_clear
 	
 	set f $w.more
