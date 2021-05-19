@@ -1,7 +1,7 @@
 unit shadow;
 {
 Routines for for Detecting One-Dimensional Shadows in Images.
-Copyright (C) 2002-2020 Kevan Hashemi, Brandeis University
+Copyright (C) 2002-2021 Kevan Hashemi, Brandeis University
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software

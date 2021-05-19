@@ -1,5 +1,5 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
-# Copyright (C) 2004-2019 Kevan Hashemi, Brandeis University
+# Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 # Copyright (C) 2006, Raphaël Tieulent, Institut de Physique Nucléaire de Lyon 
 #
 # This program is free software; you can redistribute it and/or

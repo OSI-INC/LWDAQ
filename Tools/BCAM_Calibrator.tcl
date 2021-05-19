@@ -1,5 +1,5 @@
 # BCAM Calibrator, a Standard and Polite LWDAQ Tool
-# Copyright (C) 2004-2018 Kevan Hashemi
+# Copyright (C) 2004-2021 Kevan Hashemi
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

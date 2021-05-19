@@ -1,5 +1,5 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
-# Copyright (C) 2004-2019 Kevan Hashemi, Brandeis University
+# Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -137,8 +137,6 @@ proc LWDAQ_driver_init {} {
 	set LWDAQ_Driver(mrb_addr) 2 ;# most recent byte written to ram (byte)
 	set LWDAQ_Driver(djr_addr) 3 ;# device job register location (byte)
 	set LWDAQ_Driver(dar_addr) 5 ;# device address register location (byte)
-	set LWDAQ_Driver(do_addr) 7 ;# digital outputs location (byte)
-	set LWDAQ_Driver(di_addr) 9 ;# digital inputs location (byte)
 	set LWDAQ_Driver(daclr_addr) 11 ;# data address clear location (byte)
 	set LWDAQ_Driver(dtr_addr) 13 ;# device type register location (byte)
 	set LWDAQ_Driver(der_addr) 15 ;# device element register location (byte)
@@ -151,9 +149,10 @@ proc LWDAQ_driver_init {} {
 	set LWDAQ_Driver(clen_addr) 31 ;# clamp enable location (byte)
 	set LWDAQ_Driver(cr_addr) 32 ;# command register location (two-byte)
 	set LWDAQ_Driver(rc_addr) 34 ;# repeat counter location (four-byte)
-	set LWDAQ_Driver(ctcr_addr) 39 ;# c-t config reg location (byte)
+	set LWDAQ_Driver(cfsw_addr) 40 ;# configuration switch location (byte)
 	set LWDAQ_Driver(srst_addr) 41 ;# software reset location (byte)
 	set LWDAQ_Driver(ba_addr) 42 ;# base address location (four-byte)
+	set LWDAQ_Driver(amod_addr) 42 ;# address modifier location (byte)
 	set LWDAQ_Driver(ram_portal_addr) 63 ;# RAM Portal location (byte)
 #
 # Timing Parameters

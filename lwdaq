@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # LWDAQ Launch Program for Unix, Linux, and Darwin.
-# Copyright (C) 2004-2018 Kevan Hashemi, Brandeis University
+# Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 #
 # This shell program launches LWDAQ from a terminal on Linux, Unix, or
 # MacOS. On Windows, you can run the shell from Cygwin directly. On

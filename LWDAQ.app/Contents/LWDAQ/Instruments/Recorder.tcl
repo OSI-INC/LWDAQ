@@ -1,5 +1,5 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
-# Copyright (C) 2006-2017 Kevan Hashemi, Brandeis University
+# Copyright (C) 2006-2021 Kevan Hashemi, Brandeis University
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -222,6 +222,9 @@ proc LWDAQ_analysis_Recorder {{image_name ""}} {
 					}
 					2 {
 						set info(receiver_version) "A3032"
+					}
+					3 {
+						set info(receiver_version) "A3038"
 					}
 					default {set info(receiver_version) "?"}					
 				}

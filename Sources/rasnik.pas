@@ -1,6 +1,6 @@
 {
 	Routines for Rasnik Image Analysis 
-	Copyright (C) 2004-2019 Kevan Hashemi, Brandeis University
+	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 	
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
