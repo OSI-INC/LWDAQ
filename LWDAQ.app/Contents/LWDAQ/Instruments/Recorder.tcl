@@ -96,6 +96,7 @@ proc LWDAQ_init_Recorder {} {
 	set info(clock_id) 0
 	set info(aux_num_keep) 1000
 	set info(show_errors) 0
+	set info(show_error_extent) 20
 	
 	set info(buffer_image) "_recorder_buffer_image_"
 	catch {lwdaq_image_destroy $info(buffer_image)}
@@ -608,12 +609,16 @@ proc LWDAQ_daq_Recorder {} {
 				"-payload $config(payload_length) clocks"] %d%d%d \
 				num_errors num_new_clocks num_new_messages
 
-			# Enable to see error details.
+			# We use the show_errors and show_error_extent parameters to control
+			# the display of raw message blocks that contain errors.
 			if {($num_errors > 0) && $info(show_errors)} {
-				set result [lwdaq_recorder $info(scratch_image) "print 0 1"]
+				set result [lwdaq_recorder $info(scratch_image) \
+					"-payload $config(payload_length) print 0 1"]
 				if {[regexp {index=([0-9]+)} $result match index]} {
 					set result [lwdaq_recorder $info(scratch_image) \
-						"print [expr $index-10] [expr $index+10]"]
+						"-payload $config(payload_length) print \
+						[expr $index-$info(show_error_extent)] \
+						[expr $index+$info(show_error_extent)]"]
 					LWDAQ_print $info(text) $result purple
 				} {
 					LWDAQ_print $info(text) $result purple
@@ -627,7 +632,7 @@ proc LWDAQ_daq_Recorder {} {
 			# We throw away the data and reset the receiver because all algorithms for trying 
 			# to recover from data errors without resetting the receiver are vulnerable to rare 
 			# error sources that cause disastrous loss of data. By resetting the data receiver, 
-			# we make sure that it is in a known state for our next download. We we lose the
+			# we make sure that it is in a known state for our next download. But we lose
 			# continuity of clock messages within the data buffer.
 			if {$num_errors > 0} {
 				foreach pl $info(payload_options) {
@@ -645,6 +650,7 @@ proc LWDAQ_daq_Recorder {} {
 						"WARNING: Received corrupted data.\
 							Resetting data receiver and trying again."
 				}
+
 				LWDAQ_transmit_command_hex $sock $info(reset_command)
 				LWDAQ_wait_for_driver $sock
 				LWDAQ_socket_close $sock

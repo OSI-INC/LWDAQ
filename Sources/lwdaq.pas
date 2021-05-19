@@ -3029,9 +3029,9 @@ end;
 {
 <p>lwdaq_recorder steps through the data bytes of an image, looking for valid four-byte
 messages, such as those transmitted by a Subcutaneous Transmitter (<a
-href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</ a>) and
+href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>) and
 received by an Octal Data Receiver (<a
-href="http://www.opensourceinstruments.com/Electronics/A3018/M3027.html">A3027</ a>). The
+href="http://www.opensourceinstruments.com/Electronics/A3018/M3027.html">A3027</a>). The
 lwdaq_recorder command takes two arguments. The first is the name of the image that
 contains the message data. The second is a command string. The command string in turn
 contains an instruction and some parameters. The function of lwdaq_recorder we describe in

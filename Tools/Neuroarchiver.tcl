@@ -90,9 +90,11 @@ proc Neuroarchiver_init {} {
 #
 # The recorder buffer variable holds data that we download from the 
 # receiver but are unable to write to disk because the recording file
-# is locked.
+# is locked. The player buffer contains the results of processing for
+# times when the characteristics file is locked.
 #
 	set info(recorder_buffer) ""
+	set info(player_buffer) ""
 #
 # The plot window width and height get set here.
 #
@@ -595,6 +597,8 @@ proc Neuroarchiver_init {} {
 		24 0 24 8 24 16 \
 		32 0 32 8 32 16"
 	set info(A3032_payload) "16"
+	set info(A3038A_coordinates) $info(A3032_coordinates)
+	set info(A3038A_payload) $info(A3032_payload)
 	set config(tracker_coordinates) ""
 		
 	set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
@@ -5464,6 +5468,10 @@ proc Neuroarchiver_record {{command ""}} {
 				set iconfig(payload_length) $info(A3032_payload)
 				set config(tracker_coordinates) $info(A3032_coordinates)
 			}
+			"A3038A" {
+				set iconfig(payload_length) $info(A3038A_payload)
+				set config(tracker_coordinates) $info(A3038A_coordinates)
+			}
 			default {
 				set iconfig(payload_length) 0
 				set config(tracker_coordinates) ""
@@ -5606,7 +5614,7 @@ proc Neuroarchiver_record {{command ""}} {
 			if {[regexp "file locked" $error_message]} {				
 				Neuroarchiver_print "WARNING: Could not write to\
 					[file tail $config(record_file)],\
-					permission denied."
+					permission denied, buffering data."
 				LWDAQ_post Neuroarchiver_record end
 			} {
 				Neuroarchiver_print "ERROR: $error_message\."
@@ -6370,9 +6378,28 @@ proc Neuroarchiver_play {{command ""}} {
 			Neuroarchiver_print $result
 		}
 		if {$config(save_processing)} {
-			set afn [file root [file tail $config(play_file)]]_[\
+			set cfn [file root [file tail $config(play_file)]]_[\
 				regsub {\.tcl} [file tail $config(processor_file)] .txt]
-			LWDAQ_print [file join [file dirname $config(processor_file)] $afn] $result
+			set cfn [file join [file dirname $config(processor_file)] $cfn]
+			if {[catch {
+				if {$info(player_buffer) != ""} {
+					set data_backlog 1
+				} {
+					set data_backlog 0
+				}
+				append info(player_buffer) "$result\n"
+				LWDAQ_print -nonewline $cfn $info(player_buffer)
+				set info(player_buffer) ""
+				if {$data_backlog} {
+					Neuroarchiver_print "WARNING: Wrote buffered characteristics to\
+						[file tail $cfn] after previous write failure."		
+				}
+			} error_result]} {
+				if {!$data_backlog} {
+					Neuroarchiver_print "WARNING: Could not write to [file tail $cfn],\
+						permission denied, buffering characteristics."
+				}
+			}
 		}
 		if {![LWDAQ_is_error_result $result] \
 				&& [winfo exists $info(classifier_window)]} {
@@ -7091,7 +7118,8 @@ proc Neuroarchiver_open {} {
 	label $f.sl -text "Socket:" -fg $info(label_color)
 	entry $f.se -textvariable Neuroarchiver_config(daq_driver_socket) -width 2
 	pack $f.sl $f.se -side left -expand yes
-	tk_optionMenu $f.mr Neuroarchiver_config(daq_receiver) "A3018" "A3027" "A3032"
+	tk_optionMenu $f.mr Neuroarchiver_config(daq_receiver) \
+		"A3018" "A3027" "A3032" "A3038A"
 	pack $f.mr -side left -expand yes
 	label $f.fvl -text "FV:" -fg $info(label_color)
 	label $f.fvd -textvariable LWDAQ_info_Recorder(firmware_version) -width 2
