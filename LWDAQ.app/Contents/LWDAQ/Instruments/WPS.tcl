@@ -78,7 +78,7 @@ proc LWDAQ_init_WPS {} {
 	# instrument window. No config array variables can be set in the
 	# LWDAQ_open_Instrument procedure
 	set config(image_source) "daq"
-	set config(file_name) ./images/$info(name)\*
+	set config(file_name) ./Images/$info(name)\*
 	set config(memory_name) $info(name)\_0
 	set config(daq_ip_addr) 10.0.0.37
 	set config(daq_source_device_element) 1

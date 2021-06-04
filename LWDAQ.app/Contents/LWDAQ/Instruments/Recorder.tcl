@@ -65,12 +65,11 @@ proc LWDAQ_init_Recorder {} {
 	set info(display_offset) $info(min_sample)
 	set info(display_mode) "SP"
 	set info(core_message_length) 4
-	set info(upload_command) "00D0"
-	set info(reset_command) "0081"
-	set info(set_num_command) "1084"
-	set info(set_num_max) 14
-	set info(set_num_min) 0
-	set info(set_num_all) 15
+	set info(upload_cmd) "00D0"
+	set info(reset_cmd) "0081"
+	set info(sel_ch_cmd) "84"
+	set info(sel_all_cmd) "FF84"
+	set info(sel_none_cmd) "0084"
 	set info(channel_activity) ""
 	set info(activity_threshold) "10"
 	set info(errors_for_stop) 10
@@ -112,7 +111,7 @@ proc LWDAQ_init_Recorder {} {
 	set config(daq_ip_addr) 10.0.0.37
 	set config(daq_driver_socket) 1
 	set config(daq_mux_socket) 2
-	set config(set_num) "*"
+	set config(daq_channels) "*"
 	set config(analysis_enable) 1
 	set config(analysis_channels) "*"
 	set config(intensify) none
@@ -306,12 +305,14 @@ proc LWDAQ_refresh_Recorder {} {
 }
 
 #
-# LWDAQ_reset_Recorder configures a data receiver to operate with a particular set
-# or with all sets, as specified by the set_num parameter. It resets the data receiver 
+# LWDAQ_reset_Recorder resets and configures a data receiver. It resets the data receiver 
 # address and timestamp registers, thus emptying its message buffer and resetting its clock. 
-# It destroys the recorder instrument's data buffer and working image as well, and clears
-# the auxiliary message list. We reset the acquired data time as well, which we use to stop
-# the Recorder Instrument from over-drawing from the data receiver.
+# It destroys the recorder instrument's data buffer and working image, and clears the 
+# auxiliary message list. It resets the acquired data time, a parameter we use to stop the
+# Recorder Instrument attempting download too many messages from the data receiver. If the
+# receiver is capable of saving a list of enabled channels that it should select for
+# recording, the reset routine sends the daq_channels list to the receiver so as to select
+# them.
 #
 proc LWDAQ_reset_Recorder {} {
 	upvar #0 LWDAQ_config_Recorder config
@@ -323,29 +324,8 @@ proc LWDAQ_reset_Recorder {} {
 		set info(firmware_version) "?"
 		set info(receiver_version) "?"
 		
-		# Determine the set number for configuration and write to the data receiver
-		# with the help of the set_num_cmd string.
-		set sn $config(set_num)
-		if {[string is integer -strict $sn]} {
-			if {($sn < $info(set_num_min)) || ($sn > $info(set_num_max))} {
-				LWDAQ_print $info(text) "WARNING: Set number $sn out of range,\
-					using $info(set_num_min)."
-				set sn $info(set_num_min)
-			}
-		} {
-			if {$config(set_num) == "*"} {
-				set sn $info(set_num_all)
-			} {
-				LWDAQ_print $info(text) "WARNING: Set number \"$sn\" invalid,\
-					must be $info(set_num_min)-$info(set_num_max) or *,\
-					will use $info(set_num_min) instead."
-				set sn $info(set_num_min)
-			}
-		}
-		set set_num_cmd [string replace $info(set_num_command) 1 1 [format %1X $sn]]
-
 		# Start the reset and configure.
-		LWDAQ_print -nonewline $info(text) "Reset and configure... "
+		LWDAQ_print -nonewline $info(text) "Reset and configure. "
 		LWDAQ_update
 
 		# Open a socket and log in to the driver.
@@ -355,14 +335,43 @@ proc LWDAQ_reset_Recorder {} {
 		# Select the data receiver.
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 		
-		# Configure the recorder with a set number.
-		LWDAQ_transmit_command_hex $sock $set_num_cmd
+		# Reset the receiver message buffer and message detectors.
+		LWDAQ_transmit_command_hex $sock $info(reset_cmd)
 		
-		# Reset the data buffer.
-		LWDAQ_transmit_command_hex $sock $info(reset_command)
+		# Wait for command to complete.
+		LWDAQ_wait_for_driver $sock
 		
-		# Wait for command to execute and close socket.
-		LWDAQ_wake $sock
+		# Send a list of channels to select for recording. If the list is simply a
+		# wildcard, we configure the receiver to record all channels. If the list
+		# contains only integers, we first instruct the receiver to accept no
+		# channels, then to accept the channels listed. 
+		if {[string trim $config(daq_channels)] == "*"} {
+			LWDAQ_print -nonewline $info(text) "Selecting all channels. "
+			LWDAQ_transmit_command_hex $sock $info(sel_all_cmd)
+		} {
+			set cmd_list [list $info(sel_none_cmd)]
+			set ch_list [list]
+			foreach ch $config(daq_channels) {
+				if {[string is integer -strict $ch] && ($ch > 0) && ($ch < 255)} {
+					lappend cmd_list "[format %02X $ch]$info(sel_ch_cmd)"
+					lappend ch_list $ch
+				} {
+					LWDAQ_print -nonewline $info(text) "ERROR:\
+						Invalid channel number \"$ch\". "
+					set ch_list [list]
+					break
+				}
+			}
+			if {[llength $ch_list] > 0} {
+				LWDAQ_print -nonewline $info(text) "Selecting channels $ch_list\. "
+				LWDAQ_transmit_command_hex $sock $info(sel_none_cmd)
+				foreach cmd $cmd_list {
+					LWDAQ_transmit_command_hex $sock $cmd
+				}
+			}
+		}
+		
+		# Wait for completion and close socket.
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 
@@ -384,7 +393,7 @@ proc LWDAQ_reset_Recorder {} {
 		set info(messages_per_clock) $info(min_messages_per_clock)
 
 		# Notification to user.		
-		LWDAQ_print $info(text) "Done. Acquire to get receiver and firmware version. "
+		LWDAQ_print $info(text) "Done."
 	} error_result]} { 
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		incr LWDAQ_Info(num_daq_errors)
@@ -522,7 +531,7 @@ proc LWDAQ_daq_Recorder {} {
 			LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 			
 			# Configure the data receiver for data download.
-			LWDAQ_transmit_command_hex $sock $info(upload_command)
+			LWDAQ_transmit_command_hex $sock $info(upload_cmd)
 
 			# Estimate the number of seconds of data available in the data receiver.
 			# If we think there are few or no seconds of data, we download a minimum
@@ -579,7 +588,7 @@ proc LWDAQ_daq_Recorder {} {
 				set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 				LWDAQ_login $sock $info(daq_password)
 				LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
-				LWDAQ_transmit_command_hex $sock $info(reset_command)
+				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
 				LWDAQ_wait_for_driver $sock
 				LWDAQ_socket_close $sock
 				set start_index 0
@@ -651,7 +660,7 @@ proc LWDAQ_daq_Recorder {} {
 							Resetting data receiver and trying again."
 				}
 
-				LWDAQ_transmit_command_hex $sock $info(reset_command)
+				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
 				LWDAQ_wait_for_driver $sock
 				LWDAQ_socket_close $sock
 				continue
@@ -751,7 +760,7 @@ proc LWDAQ_daq_Recorder {} {
 					"ERROR: Severely corrupted data.\
 						resetting data receiver and\
 						abandoning this acquisition."
-				LWDAQ_transmit_command_hex $sock $info(reset_command)
+				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
 				LWDAQ_wake $sock
 				LWDAQ_wait_for_driver $sock
 				LWDAQ_socket_close $sock
@@ -769,7 +778,7 @@ proc LWDAQ_daq_Recorder {} {
 					"ERROR: Failed to accumulate clock messages,\
 						resetting data receiver and\
 						abandoning this acquisition."
-				LWDAQ_transmit_command_hex $sock $info(reset_command)
+				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
 				LWDAQ_wake $sock
 				LWDAQ_wait_for_driver $sock
 				LWDAQ_socket_close $sock

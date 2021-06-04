@@ -591,14 +591,18 @@ proc Neuroarchiver_init {} {
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
+	set info(A3038A_coordinates) "0 0 0 12 0 24 \
+		12 0 12 12 12 24 \
+		24 0 24 12 24 24 \
+		36 0 36 12 36 24 \
+		48 0 48 12 48 24"
 	set info(A3032_coordinates) "0 0 0 8 0 16 \
 		8 0 8 8 8 16 \
 		16 0 16 8 16 16 \
 		24 0 24 8 24 16 \
 		32 0 32 8 32 16"
 	set info(A3032_payload) "16"
-	set info(A3038A_coordinates) $info(A3032_coordinates)
-	set info(A3038A_payload) $info(A3032_payload)
+	set info(A3038A_payload) "16"
 	set config(tracker_coordinates) ""
 		
 	set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
@@ -983,7 +987,6 @@ proc Neuroarchiver_metadata_header {} {
 	set header "<c>\
 			\nDate Created: [clock format [clock seconds] -format $config(datetime_format)].\
 			\nCreator: Neuroarchiver $info(version), LWDAQ_$LWDAQ_Info(program_patchlevel).\
-			\nHost: [info hostname]\
 			\n</c>\
 			\n<payload>$iconfig(payload_length)</payload>\
 			\n<coordinates>$config(tracker_coordinates)</coordinates>"
@@ -992,6 +995,7 @@ proc Neuroarchiver_metadata_header {} {
 			\n[string trim $info(metadata_header)]\
 			\n</c>"
 	}
+
 	return $header
 }
 
@@ -5364,7 +5368,7 @@ proc Neuroarchiver_record {{command ""}} {
 	upvar #0 LWDAQ_config_Recorder iconfig
 	upvar #0 LWDAQ_info_Recorder iinfo
 	global LWDAQ_Info
-	
+
 	# Make sure we have the info array.
 	if {![array exists info]} {return 0}
 
@@ -5817,15 +5821,8 @@ proc Neuroarchiver_play {{command ""}} {
 		
 		# Read the metadata out of the archive to obtain the payload and
 		# tracker coordinates that accompany the recording. By default,
-		# the payload is zero. But if we find a payload field int he metadata,
-		# we use the value given in the field. By default, the tracker
-		# coordinates will be those of the original location tracker, the 
-		# ALT (A3032), because some early ALT recordings did not contain the
-		# tracker coordinates in their metadata. Thus we can end up with 
-		# payload zero and coordinates for fifteen coils, which is not a
-		# self-consistent combination. Our tracker extraction routine, however,
-		# checks to see if the coordinates and payload are consistent, and
-		# only if they are does it proceed with location calculation.
+		# the payload is zero. But if we find a payload field in the metadata,
+		# we use the value given in the field. 
 		if {[catch {
 			set metadata [LWDAQ_ndf_string_read $config(play_file)]
 		} error_message]} {

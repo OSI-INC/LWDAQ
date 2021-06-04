@@ -72,7 +72,7 @@ proc LWDAQ_init_Dosimeter {} {
 	# instrument window. No config array variables can be set in the
 	# LWDAQ_open_Instrument procedure
 	set config(image_source) "daq"
-	set config(file_name) ./images/$info(name)\*
+	set config(file_name) ./Images/$info(name)\*
 	set config(memory_name) $info(name)\_0
 	set config(daq_ip_addr) "129.64.37.90"
 	set config(daq_driver_socket) 5

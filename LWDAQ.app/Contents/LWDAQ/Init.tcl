@@ -28,7 +28,7 @@ set num_errors 0
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.2"
-set LWDAQ_Info(program_patchlevel) "10.2.2"
+set LWDAQ_Info(program_patchlevel) "10.2.3"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 	
 # Determine operating system.
@@ -166,6 +166,9 @@ proc LWDAQ_stdin_console_execute {} {
 	LWDAQ_stdin_console_prompt
 }
 
+#
+# Run the scripts that set up the LWDAQ program within the TclTk interpreter.
+#
 if {[catch {
 	# Set the console title, if there is a console.
 	if {$LWDAQ_Info(slave_console)} {
@@ -292,6 +295,12 @@ proc ls {args} {
 	}
 }
 
+# When launching LWDAQ with the icon, the default Tcl directory can end up being
+# the root directory, which is not much good, so change it.
+if {[pwd] == "/"} {
+	cd $LWDAQ_Info(program_dir)
+}
+
 # Load start-up settings script, if it exists.
 if {[file exists $LWDAQ_Info(settings)]} {
 	if {[catch {LWDAQ_load_settings $LWDAQ_Info(settings)} error_message]} {
@@ -300,9 +309,9 @@ if {[file exists $LWDAQ_Info(settings)]} {
 	}
 }
 
-# Run startup scripts. Let them know that they are operating as startup
-# scripts, and which one they are in the order of execution, too. They will
-# execute in alphabetical order.
+# Run startup scripts. Let them know that they are operating as startup scripts,
+# and which one they are in the order of execution, too. They will execute in
+# alphabetical order.
 set LWDAQ_Info(num_startup_scripts_loaded) 0
 set LWDAQ_Info(loading_startup_scripts) 1
 foreach s $LWDAQ_Info(startup_scripts) {
@@ -334,8 +343,8 @@ if {$num_errors > 0} {
 }
 
 # If we have a slave console and we have errors, open it so that the errors will
-# be visible. If we don't have a slave console, and our console interface is enabled,
-# start our standard input console.
+# be visible. If we don't have a slave console, and our console interface is
+# enabled, start our standard input console.
 if {$LWDAQ_Info(slave_console)} {
 	if {$num_errors > 0} {
 		console show
@@ -346,7 +355,7 @@ if {$LWDAQ_Info(slave_console)} {
 	}
 }
 
-# If you ran LWDAQ from tclsh, or any other TCL-only shell, the shell
+# If we ran LWDAQ from tclsh, or any other TCL-only shell, the shell
 # will be inclined to terminate now that it has run Init.tcl. We keep
 # the shell alive by telling it to wait until LWDAQ_Info(quit) is set. 
 # You can force the shell to quit with the "exit" command.
