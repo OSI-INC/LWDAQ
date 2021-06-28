@@ -31,9 +31,7 @@ proc DFPS_init {} {
 	set config(image_height) 300
 	set config(plot_width) 300
 	set config(plot_height) 300
-	
-	set config(
-	
+		
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
