@@ -28,10 +28,30 @@
 # plotting and processing.
 #
 
-package require SCT
-Neuroarchiver_init "N"
-Neuroarchiver_open
-Neuroarchiver_fresh_graphs 1
+cd $LWDAQ_Info(program_dir)
+set ch [open "| [info nameofexecutable]" w+]
+fconfigure $ch -translation auto -buffering line -blocking 0
+puts $ch "source LWDAQ.app/Contents/LWDAQ/Init.tcl"
+puts $ch "package require SCT"
+puts $ch "Neuroarchiver_init R"
+puts $ch "Neuroarchiver_open"
+puts $ch "puts Done"
+set waiting 1
+set start_time [clock milliseconds]
+while {$waiting} {
+	while {[gets $ch line] < 0} {
+		LWDAQ_support
+		if {[clock milliseconds] > $start_time + 20000} {
+			error "Failed to launch Neurorecorder."
+		}	
+	}
+	if {[regexp "Done" $line match]} {
+		puts "The Neurorecorder has been launched."
+		set waiting 0
+	}
+	puts $line
+}
+close $ch
 	
 return 1
 

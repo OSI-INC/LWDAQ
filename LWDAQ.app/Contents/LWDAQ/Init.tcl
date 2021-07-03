@@ -149,8 +149,10 @@ proc LWDAQ_stdin_console_start {} {
 # LWDAQ_stdin_console_prompt writes the LWDAQ prompt to the stdin console.
 #
 proc LWDAQ_stdin_console_prompt {} {
-	puts -nonewline stdout "LWDAQ% "
-	flush stdout
+	catch {
+		puts -nonewline stdout "LWDAQ% "
+		flush stdout
+	}
 }
 
 #
@@ -158,10 +160,12 @@ proc LWDAQ_stdin_console_prompt {} {
 # if it exists, and writes the result to the stdout console.
 #
 proc LWDAQ_stdin_console_execute {} {
-	gets stdin line
-	catch {uplevel $line} result
-	if {$result != ""} {
-		puts stdout $result
+	catch {
+		gets stdin line
+		catch {uplevel $line} result
+		if {$result != ""} {
+			puts stdout $result
+		}
 	}
 	LWDAQ_stdin_console_prompt
 }

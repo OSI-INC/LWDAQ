@@ -232,15 +232,13 @@ proc LWDAQ_tool_init {name version} {
 }
 
 #
-# LWDAQ_tool_open opens a tool window if none exists. It 
-# checks to see if the window is already open, and if so 
-# it raises the window to the front and returns an empty
-# string. The calling routine should check to see if this
-# routine returns an empty string, and if so it should 
-# not attempt to perform any graphics operations in the
-# existing window without checking for itself the mode
-# in which LWDAQ is running: in no graphics mode, all
-# graphics routines will fail.
+# LWDAQ_tool_open opens a tool window if none exists. It checks to see if the
+# window is already open, and if so it raises the window to the front and
+# returns an empty string. The calling routine should check to see if this
+# routine returns an empty string, and if so it should not attempt to perform
+# any graphics operations in the existing window without checking for itself the
+# mode in which LWDAQ is running: in no graphics mode, all graphics routines
+# will fail.
 #
 proc LWDAQ_tool_open {name} {
 	upvar #0 $name\_info info
@@ -248,12 +246,23 @@ proc LWDAQ_tool_open {name} {
 
 	if {!$LWDAQ_Info(gui_enabled)} {return ""}
 	set w $info(window)
-	if {[winfo exists $w]} {
-		raise $w
-		return ""
-	}
-	toplevel $w
-	wm title $w "$info(name) $info(version)"		
+	if {$w == ""} {
+		catch {destroy .frame}
+		catch {destroy .menubar.instruments}
+		catch {destroy .menubar.tools}
+		catch {destroy .menubar.file}
+		wm title . "$info(name) $info(version)"	
+		raise .	
+		set w .
+	} {
+		if {[LWDAQ_widget_exists $w]} {
+			raise $w
+			return ""
+		} {
+			toplevel $w
+			wm title $w "$info(name) $info(version)"				
+		}
+	}	
 	
 	return $w
 }

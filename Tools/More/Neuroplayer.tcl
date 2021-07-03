@@ -29,7 +29,7 @@
 #
 
 package require SCT
-Neuroarchiver_init "N"
+Neuroarchiver_init "P"
 Neuroarchiver_open
 Neuroarchiver_fresh_graphs 1
 	

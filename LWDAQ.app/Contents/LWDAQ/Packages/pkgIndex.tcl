@@ -10,3 +10,4 @@
 
 package ifneeded EDF 1.1 [list source [file join $dir EDF.tcl]]
 package ifneeded NIKHEF 1.0 [list source [file join $dir NIKHEF.tcl]]
+package ifneeded SCT 1.1 [list source [file join $dir SCT.tcl]]

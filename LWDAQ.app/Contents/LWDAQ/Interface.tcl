@@ -370,6 +370,16 @@ proc LWDAQ_widget_list {w} {
 }
 
 #
+# LWDAQ_widget_exists returns 1 if a widget or window exists
+# and 0 otherwise.
+#
+proc LWDAQ_widget_exists {w} {
+	if {[winfo exists $w]} {return 1}
+	if {($w == "") && [winfo exists "."]} {return 1}
+	return 0
+}
+
+#
 # LWDAQ_text_widget opens a text window within the specified 
 # window frame. The text window has its "undo" stack turned off.
 # The text widget is a child of an existing window frame "wf", 
