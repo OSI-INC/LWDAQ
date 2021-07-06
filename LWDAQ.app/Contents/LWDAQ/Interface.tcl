@@ -86,7 +86,7 @@ proc LWDAQ_interface_init {} {
 	}
 	
 	LWDAQ_init_main_window
-
+	
 	LWDAQ_bind_command_key all q [list exit]
 	LWDAQ_bind_command_key all w "destroy \[winfo toplevel %W\]"
 	LWDAQ_bind_command_key all r "LWDAQ_reset"
@@ -176,7 +176,7 @@ proc LWDAQ_init_main_window {} {
 	frame .frame
 	pack .frame -side top -fill x
 	button .frame.quit -text "Quit" -command "LWDAQ_quit" -padx 20 -pady 5
-	pack .frame.quit -side left -expand 1 -padx 120 -pady 20
+	pack .frame.quit -side left -expand 1 -padx 140 -pady 20
 }
 
 #

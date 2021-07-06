@@ -7466,7 +7466,6 @@ switch $Neuroarchiver_info(mode) {
 		Neuroarchiver_open
 		Neuroarchiver_fresh_graphs 1
 	}
-	}
 	"Recorder" {
 		Neuroarchiver_open
 	}
