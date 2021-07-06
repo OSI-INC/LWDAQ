@@ -248,9 +248,6 @@ proc LWDAQ_tool_open {name} {
 	set w $info(window)
 	if {$w == ""} {
 		catch {destroy .frame}
-		catch {destroy .menubar.instruments}
-		catch {destroy .menubar.tools}
-		catch {destroy .menubar.file}
 		wm title . "$info(name) $info(version)"	
 		raise .	
 		set w .

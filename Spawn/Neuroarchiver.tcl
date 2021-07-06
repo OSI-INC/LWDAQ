@@ -1,5 +1,5 @@
-# Neruoarchiver.tcl, Interprets, Analyzes, and Archives Data from 
-# the LWDAQ Recorder Instrument. It is a Polite LWDAQ Tool.
+# Neruoarchiver.tcl spawns a child process containing both the recorder and
+# player sections of the Neuroarchiver Tool.
 #
 # Copyright (C) 2007-2021 Kevan Hashemi, Open Source Instruments Inc.
 #
@@ -31,32 +31,13 @@
 cd $LWDAQ_Info(program_dir)
 set ch [open "| [info nameofexecutable]" w+]
 fconfigure $ch -translation auto -buffering line -blocking 0
-puts $ch "source LWDAQ.app/Contents/LWDAQ/Init.tcl"
-puts $ch "package require SCT"
-puts $ch "Neuroarchiver_init R"
-puts $ch "Neuroarchiver_open"
-puts $ch "puts Done"
-set waiting 1
-set start_time [clock milliseconds]
-while {$waiting} {
-	while {[gets $ch line] < 0} {
-		LWDAQ_support
-		if {[clock milliseconds] > $start_time + 20000} {
-			error "Failed to launch Neurorecorder."
-		}	
-	}
-	if {[regexp "Done" $line match]} {
-		puts "The Neurorecorder has been launched."
-		set waiting 0
-	}
-	puts $line
-}
-close $ch
-	
-return 1
-
-----------Begin Help----------
-
-http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html
-
-----------End Help----------
+lappend LWDAQ_Info(children) "$ch Neuro-Archiver"
+puts "Child process initialized, using channel $ch\."
+puts $ch {if {![info exists LWDAQ_Info]} {source LWDAQ.app/Contents/LWDAQ/Init.tcl}}
+puts $ch {destroy .menubar.instruments}
+puts $ch {destroy .menubar.tools}
+puts $ch {destroy .menubar.spawn}
+puts $ch {set Neuroarchiver_mode Combined}
+puts $ch {LWDAQ_run_tool Neuroarchiver.tcl}
+puts $ch {puts "Child Neuro-Archiver running."}
+return "SUCCESS"

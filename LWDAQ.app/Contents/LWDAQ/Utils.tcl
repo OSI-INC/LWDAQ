@@ -32,6 +32,8 @@ proc LWDAQ_utils_init {} {
 	set info(queue_ms) 10
 	set info(queue_events) [list]
 	set info(current_event) "Stopped"
+	
+	set info(children) [list]
 
 	set info(reset) 0
 
@@ -39,11 +41,11 @@ proc LWDAQ_utils_init {} {
 	set info(max_vwait_names) 100
 	set info(update_ms) 10
 	set info(support_ms) 500
-
+	
 	set info(tcp_timeout_ms) 5000
 	set info(close_delay_ms) 5
 	set info(lazy_flush) 1
-	set info(open_sockets) ""
+	set info(open_sockets) [list]
 	set info(blocking_sockets) 0
 	set info(daq_wait_ms) 1000
 	
@@ -65,6 +67,20 @@ proc LWDAQ_utils_init {} {
 	set info(lwdaq_long_string_capacity) 300000
 	
 	set info(debug_log) "debug_log.txt"
+}
+
+#
+# LWDAQ_quit sends quit commands to all child processes, then exits.
+#
+proc LWDAQ_quit {} {
+	upvar #0 LWDAQ_Info info
+	foreach child $info(children) {
+		scan $child %s%s ch desc
+		puts "Terminating child process $child\."
+		catch {puts $ch "LWDAQ_quit"}
+		close $ch
+	}
+	exit
 }
 
 #
@@ -262,9 +278,9 @@ proc LWDAQ_socket_close {sock} {
 #
 proc LWDAQ_close_all_sockets {} {
 	global LWDAQ_Info
-	set LWDAQ_Info(open_sockets) [list]
-	for {set i 1} {$i<100} {incr i} {LWDAQ_socket_close sock$i}	
-	set LWDAQ_Info(open_sockets) [list]
+	foreach sockinfo $LWDAQ_Info(open_sockets) {
+		LWDAQ_socket_close [lindex $sockinfo 0]
+	}
 }
 
 #
@@ -527,7 +543,23 @@ proc LWDAQ_queue_step {} {
 	} {
 		set LWDAQ_Info(current_event) "Idle"
 	}
-
+	
+	set new_children [list]
+	foreach child $LWDAQ_Info(children) {
+		scan $child %s%s ch desc
+		if {[catch {
+			if {[gets $ch line] > 0} {
+				set line [regsub $LWDAQ_Info(console_prompt)	 $line ""]
+				if {$line != ""} {puts "$ch\% $line"}
+			} 
+		} error_result]} {
+			puts "Child $child no longer running."
+		} {
+			lappend new_children $child
+		}
+	}
+	set LWDAQ_Info(children) $new_children
+	
 	if {$LWDAQ_Info(queue_run)} {
 		after $LWDAQ_Info(queue_ms) LWDAQ_queue_step
 	} {

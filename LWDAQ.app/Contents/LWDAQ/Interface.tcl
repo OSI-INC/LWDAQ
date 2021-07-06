@@ -64,6 +64,7 @@ proc LWDAQ_interface_init {} {
 			LWDAQ_url_open \
 				http://alignment.hep.brandeis.edu/Electronics/LWDAQ/Manual.html		
 		}
+		proc ::tk::mac::Quit {} {LWDAQ_quit}
 		proc tkAboutDialog {} {LWDAQ_about}
 	}
 	if {($LWDAQ_Info(os) == "Linux") && $LWDAQ_Info(gui_enabled)} {
@@ -125,7 +126,7 @@ proc LWDAQ_init_main_window {} {
 			-command LWDAQ_about	
 		$info(program_menu) add command -label "Preferences" \
 			-command LWDAQ_preferences	
-		$info(program_menu) add command -label "Quit" -command exit
+		$info(program_menu) add command -label "Quit" -command LWDAQ_quit
 	}
 
 # Create the File menu
@@ -150,6 +151,9 @@ proc LWDAQ_init_main_window {} {
 
 # Create the Tool menu
 	LWDAQ_make_tool_menu
+	
+# Create the Spawn menu
+	LWDAQ_make_spawn_menu
 
 # Create the Help menu.
 	set info(help_menu) $m.help 
@@ -157,13 +161,13 @@ proc LWDAQ_init_main_window {} {
 	menu $info(help_menu) -tearoff 0
 	$m add cascade -menu $info(help_menu) -label "Help"
 	$info(help_menu) add command -label "User Manual" -command \
-		{LWDAQ_url_open http://alignment.hep.brandeis.edu/Electronics/LWDAQ/Manual.html}
+		{LWDAQ_url_open http://bndhep.net/Electronics/LWDAQ/Manual.html}
 	$info(help_menu) add command -label "Command Reference" -command \
-		{LWDAQ_url_open http://alignment.hep.brandeis.edu/Electronics/LWDAQ/Commands.html}
+		{LWDAQ_url_open http://bndhep.net/Electronics/LWDAQ/Commands.html}
 	$info(help_menu) add command -label "Software Download" -command \
-		{LWDAQ_url_open http://alignment.hep.brandeis.edu/Software/Download}
-	$info(help_menu) add command -label "Brandeis University" -command \
-		{LWDAQ_url_open http://alignment.hep.brandeis.edu/}
+		{LWDAQ_url_open http://bndhep.net/Software/Download}
+	$info(help_menu) add command -label "BNDHEP" -command \
+		{LWDAQ_url_open http://bndhep.net/}
 	$info(help_menu) add command -label "Open Source Instruments" -command \
 		{LWDAQ_url_open http://www.opensourceinstruments.com}
 
@@ -171,7 +175,7 @@ proc LWDAQ_init_main_window {} {
 	catch {destroy .frame}
 	frame .frame
 	pack .frame -side top -fill x
-	button .frame.quit -text "Quit" -command "exit" -padx 20 -pady 5
+	button .frame.quit -text "Quit" -command "LWDAQ_quit" -padx 20 -pady 5
 	pack .frame.quit -side left -expand 1 -padx 120 -pady 20
 }
 
@@ -329,6 +333,33 @@ proc LWDAQ_make_tool_menu {} {
 		}
 	}
 # Done.
+	return 1
+}
+
+#
+# LWDAQ_make_spawn_menu destroys the current spawn menu and
+# makes a new one that matches the current selection of
+# tools in the Spawn folder.
+#
+proc LWDAQ_make_spawn_menu {} {
+	upvar #0 LWDAQ_Info info
+	set info(spawn_menu) $info(menubar).spawn
+	set m $info(spawn_menu)
+	catch {destroy $m}
+	menu $m -tearoff 0
+	$info(menubar) add cascade -menu $m -label "Spawn"
+	set files [glob -nocomplain [file join $info(spawn_dir) *.tcl]]
+	if {[llength $files] != 0} {
+		set spawn ""
+		foreach s $files {lappend spawn [file tail $s]}
+		set spawn [lsort -dictionary $spawn]
+		foreach s $spawn {
+			set menu_name [lindex [split $s .] 0]
+			set file_name [file join $info(spawn_dir) $s]
+			$m add command -label $menu_name -command \
+				[list LWDAQ_post [list LWDAQ_run_tool $file_name] front]
+		}
+	}
 	return 1
 }
 
@@ -702,10 +733,12 @@ proc LWDAQ_clock_widget {{wf ""}} {
 #
 # LWDAQ_bind_command_key binds the specified command letter to the specified
 # command on all platforms. We use the "command" key on MacOS and the "control"
-# key on Windows and Linux.
+# key on Windows and Linux. If the window is an empty string, we bing the key
+# to the root window.
 #
 proc LWDAQ_bind_command_key {window letter command} {
 	upvar #0 LWDAQ_Info info
+	if {$window == ""} {set window "."}
 	if {$info(os) == "MacOS"} {
 		bind $window <Command-KeyPress-$letter> $command
 	}

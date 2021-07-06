@@ -21,7 +21,6 @@
 # in the LWDAQ_Info array.
 #
 
-
 # Clear our initialization error flag.
 set num_errors 0
 
@@ -30,6 +29,7 @@ set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.2"
 set LWDAQ_Info(program_patchlevel) "10.2.4"
 set LWDAQ_Info(tcl_version) [info patchlevel]
+set LWDAQ_Info(console_prompt) "LWDAQ% "
 	
 # Determine operating system.
 set LWDAQ_Info(os) "Unix"
@@ -149,8 +149,9 @@ proc LWDAQ_stdin_console_start {} {
 # LWDAQ_stdin_console_prompt writes the LWDAQ prompt to the stdin console.
 #
 proc LWDAQ_stdin_console_prompt {} {
+	global LWDAQ_Info
 	catch {
-		puts -nonewline stdout "LWDAQ% "
+		puts -nonewline stdout $LWDAQ_Info(console_prompt)
 		flush stdout
 	}
 }
@@ -163,9 +164,7 @@ proc LWDAQ_stdin_console_execute {} {
 	catch {
 		gets stdin line
 		catch {uplevel $line} result
-		if {$result != ""} {
-			puts stdout $result
-		}
+		puts stdout $result
 	}
 	LWDAQ_stdin_console_prompt
 }
@@ -210,6 +209,7 @@ if {[catch {
 	set LWDAQ_Info(package_dir) [file join $LWDAQ_Info(lib_dir) Packages]
 	set LWDAQ_Info(scripts_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
 	set LWDAQ_Info(tools_dir) [file join $LWDAQ_Info(program_dir) Tools]
+	set LWDAQ_Info(spawn_dir) [file join $LWDAQ_Info(program_dir) Spawn]
 	set LWDAQ_Info(sources_dir)  [file join $LWDAQ_Info(program_dir) Sources]
 	set LWDAQ_Info(instruments_dir) [file join $LWDAQ_Info(scripts_dir) Instruments]
 	set LWDAQ_Info(startup_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Startup]
@@ -368,4 +368,4 @@ if {!$LWDAQ_Info(gui_enabled)} {
 }
 
 # Return a value of 1 to show success.
-return 1
+return "SUCCESS"
