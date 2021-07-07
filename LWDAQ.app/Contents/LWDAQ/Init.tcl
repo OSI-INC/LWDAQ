@@ -164,7 +164,7 @@ proc LWDAQ_stdin_console_execute {} {
 	catch {
 		gets stdin line
 		catch {uplevel $line} result
-		puts stdout $result
+		if {$result != ""} {puts stdout $result}
 	}
 	LWDAQ_stdin_console_prompt
 }

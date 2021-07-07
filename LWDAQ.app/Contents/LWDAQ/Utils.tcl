@@ -80,6 +80,7 @@ proc LWDAQ_quit {} {
 		catch {puts $ch "LWDAQ_quit"}
 		close $ch
 	}
+	LWDAQ_close_all_sockets
 	exit
 }
 
@@ -549,7 +550,7 @@ proc LWDAQ_queue_step {} {
 		scan $child %s%s ch desc
 		if {[catch {
 			if {[gets $ch line] > 0} {
-				set line [regsub $LWDAQ_Info(console_prompt)	 $line ""]
+				set line [regsub $LWDAQ_Info(console_prompt) $line ""]
 				if {$line != ""} {puts "$ch\% $line"}
 			} 
 		} error_result]} {

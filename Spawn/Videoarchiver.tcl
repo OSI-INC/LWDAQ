@@ -1,19 +1,18 @@
-# Neruoplayer.tcl spawns a child process containing the player section
-# of the Neuroarchiver Tool.
+# Videoarchiver.tcl spawns a child process containing the entire 
+# Videoarchiver tool functionality.
 #
 # Copyright (C) 2021 Kevan Hashemi, Open Source Instruments Inc.
-#
 
 cd $LWDAQ_Info(program_dir)
 puts "Spawning child process..."
 set ch [open "| [info nameofexecutable]" w+]
 fconfigure $ch -translation auto -buffering line -blocking 0
-lappend LWDAQ_Info(children) "$ch Neuroplayer"
+lappend LWDAQ_Info(children) "$ch Videoarchiver"
 puts "Child process initialized, using channel $ch\."
 puts $ch {if {![info exists LWDAQ_Info]} {source LWDAQ.app/Contents/LWDAQ/Init.tcl}}
-puts "Configuring child process as stand-alone Neuroplayer..."
-puts $ch {set Neuroarchiver_mode Player}
-puts $ch {LWDAQ_run_tool Neuroarchiver.tcl}
+puts "Configuring child process as stand-alone Videoarchiver..."
+puts $ch {set Videoarchiver_mode Main}
+puts $ch {LWDAQ_run_tool Videoarchiver.tcl}
 switch $LWDAQ_Info(os) {
 	"MacOS" {
 		puts $ch "destroy .menubar.instruments"

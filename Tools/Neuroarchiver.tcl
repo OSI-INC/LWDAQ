@@ -31,11 +31,15 @@
 #
 # Neuroarchiver_init creates the info and config arrays and the images the
 # Neuroarchiver uses to hold data in memory. The config array is available
-# through the Config button but the info array is private. By default, the
-# Neuroarchiver mode is "Archiver" for full Neuroarchiver functionality. But if
-# we specify "Recorder" we get the Recorder only, which we call a NeuroRecorder,
-# and if we specify "Playewr" we get the Player only, which we call a
-# NeuroPlayer.
+# through the Config button but the info array is private. We select the mode in
+# which the Neuroarchiver should operate by means of the global
+# Neuroarchiver_mode variable. If this is not set, or if it is set to
+# "Archiver", we create a new toplevel window and construct the combined
+# Neuroplayer and Neurorecorder interface in this new window. If the mode is set
+# to "Recorder" we take over the LWDAQ main window and construct in it only the
+# Neurorecorder interface. If the mode is "Player", we construct the Neuroplayer
+# in the main window. If the mode is "Combined", we construct both interfaces in
+# the LWDAQ main window. 
 #
 proc Neuroarchiver_init {} {
 #
@@ -54,21 +58,33 @@ proc Neuroarchiver_init {} {
 #
 # We initialise the Neuroarchiver with LWDAQ_tool_init. Because this command
 # begins with "LWDAQ" we know that it's one of those in the LWDAQ command
-# library. We can look it up in the LWDAQ Command Reference to find out
-# more about what it does.
+# library. We can look it up in the LWDAQ Command Reference to find out more
+# about what it does.
 #
 	LWDAQ_tool_init "Neuroarchiver" "144"
+#
+# We check the global Neuroarchiver_mode variable, which is the means by which
+# we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
+# main window, and to implement the Recorder only, the Player only, or both.
+#
 	if {![info exists Neuroarchiver_mode]} {
 		set info(mode) "Archiver"
 	} {
 		set info(mode) $Neuroarchiver_mode
 	}
+#
+# If we are to take over the LWDAQ main window with the Neuroarchiver, we set
+# the tool window name to the empty string. Otherwise we leave it as it has
+# been set by the tool initialization routine, and we check to see if that
+# window already exists. If it does exist, we abort. When we are taking over
+# the main window, we proceed anyway.
+#
 	switch $info(mode) {
 		"Player" {set info(window) ""}
 		"Recorder" {set info(window) ""}
 		"Combined" {set info(window) ""}
 		default {
-			if {[LWDAQ_widget_exists $info(window)]} {return 0}
+			if {[LWDAQ_widget_exists $info(window)]} {return "ABORT"}
 		}
 	}
 #

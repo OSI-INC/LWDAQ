@@ -23,12 +23,32 @@
 proc Videoarchiver_init {} {
 	upvar #0 Videoarchiver_info info
 	upvar #0 Videoarchiver_config config
-	global LWDAQ_Info LWDAQ_Driver
+	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "18"
-	if {[winfo exists $info(window)]} {return 0}
+	LWDAQ_tool_init "Videoarchiver" "19"
 
+	# We check the global Videoarchiver_mode variable, which is the means by
+	# which we can direct the Videoarchiver to use the LWDAQ main window or
+	# its own toplevel window.
+	if {![info exists Videoarchiver_mode]} {
+		set info(mode) "Main"
+	} {
+		set info(mode) $Videoarchiver_mode
+	}
+
+	# If we are to take over the LWDAQ main window with the Neuroarchiver, we
+	# set the tool window name to the empty string. Otherwise we leave it as it
+	# has been set by the tool initialization routine, and we check to see if
+	# that window already exists. If it does exist, we abort. When we are taking
+	# over the main window, we proceed anyway.
+	switch $info(mode) {
+		"Main" {set info(window) ""}
+		default {
+			if {[LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+		}
+	}
+	
 	# Set up directory names.
 	set info(main_dir) [file join $LWDAQ_Info(program_dir) Videoarchiver]
 	set info(scratch_dir) [file join $info(main_dir) Scratch]
@@ -195,7 +215,7 @@ echo "SUCCESS"
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 	
-	return 1	 
+	return "SUCCESS"	 
 }
 
 #
@@ -2323,6 +2343,7 @@ proc Videoarchiver_open {} {
 
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return 0}
+	if {$w == "."} {set w ""}
 	
 	set padx 0
 	set f $w.f1
@@ -2382,8 +2403,7 @@ proc Videoarchiver_open {} {
 Videoarchiver_init
 Videoarchiver_open
 
-	
-return 1
+return "SUCCESS"
 
 ----------Begin Help----------
 
@@ -2425,7 +2445,6 @@ foreach {option value} $argv {
 # Announce the start of interface in stdout.
 puts "Starting interface process at [clock seconds] with:"
 puts "verbose = $verbose, port = $port, maxshow = $maxshow."
-
 
 # The socket acceptor receives a connection, sets up a socket channel, and configures
 # it so that every time it is readable, the incoming data is passed to the interpreter

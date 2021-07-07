@@ -85,8 +85,7 @@ proc LWDAQ_interface_init {} {
 		proc tkAboutDialog {} {LWDAQ_about}
 	}
 	
-	LWDAQ_init_main_window
-	
+	LWDAQ_init_main_window	
 	LWDAQ_bind_command_key all q [list exit]
 	LWDAQ_bind_command_key all w "destroy \[winfo toplevel %W\]"
 	LWDAQ_bind_command_key all r "LWDAQ_reset"
@@ -100,12 +99,12 @@ proc LWDAQ_interface_init {} {
 #
 proc LWDAQ_init_main_window {} {
 	upvar #0 LWDAQ_Info info
-	if {!$info(gui_enabled)} {return 1}
+	if {!$info(gui_enabled)} {return 0}
 
-# Give a title to the main window
+	# Give a title to the main window
 	wm title . $info(program_name)
 
-# Create a new menubar for the main window
+	# Create a new menubar for the main window
 	set info(menubar) ".menubar"
 	set m $info(menubar)
 	catch {destroy $m}
@@ -129,7 +128,7 @@ proc LWDAQ_init_main_window {} {
 		$info(program_menu) add command -label "Quit" -command LWDAQ_quit
 	}
 
-# Create the File menu
+	# Create the File menu
 	set info(file_menu) $m.file 
 	catch {destroy $info(file_menu)}
 	menu $info(file_menu) -tearoff 0
@@ -146,16 +145,16 @@ proc LWDAQ_init_main_window {} {
 	$info(file_menu) add command -label "System Monitor" -command LWDAQ_monitor_open
 	$info(file_menu) add command -label "System Reset" -command LWDAQ_reset
 
-# Create the Instrument menu
+	# Create the Instrument menu
 	LWDAQ_make_instrument_menu
 
-# Create the Tool menu
+	# Create the Tool menu
 	LWDAQ_make_tool_menu
 	
-# Create the Spawn menu
+	# Create the Spawn menu
 	LWDAQ_make_spawn_menu
 
-# Create the Help menu.
+	# Create the Help menu.
 	set info(help_menu) $m.help 
 	catch {destroy $info(help_menu)}
 	menu $info(help_menu) -tearoff 0
@@ -171,12 +170,19 @@ proc LWDAQ_init_main_window {} {
 	$info(help_menu) add command -label "Open Source Instruments" -command \
 		{LWDAQ_url_open http://www.opensourceinstruments.com}
 
-# Set up the main window.
+	# Set up the main window.
 	catch {destroy .frame}
 	frame .frame
 	pack .frame -side top -fill x
 	button .frame.quit -text "Quit" -command "LWDAQ_quit" -padx 20 -pady 5
-	pack .frame.quit -side left -expand 1 -padx 140 -pady 20
+	switch $info(os) {
+		"MacOS" {pack .frame.quit -side left -expand 1 -padx 100 -pady 20}
+		"Linux" {pack .frame.quit -side left -expand 1 -padx 160 -pady 20}
+		"Windows" {pack .frame.quit -side left -expand 1 -padx 140 -pady 20}
+		default {pack .frame.quit -side left -expand 1 -padx 100 -pady 20}
+	}
+
+	return 1	
 }
 
 #
@@ -273,7 +279,8 @@ proc LWDAQ_preferences {} {
 #
 proc LWDAQ_make_tool_menu {} {
 	upvar #0 LWDAQ_Info info
-# Install the tool menu in the menu bar.
+
+	# Install the tool menu in the menu bar.
 	set info(tool_menu) $info(menubar).tools
 	set m $info(tool_menu)
 	catch {destroy $m}
@@ -287,7 +294,8 @@ proc LWDAQ_make_tool_menu {} {
 		[list LWDAQ_post "LWDAQ_edit_script New"]
 	$info(tool_menu) add command -label "Toolmaker" -command \
 		[list LWDAQ_post LWDAQ_Toolmaker front]
-# Add entries for each tool in the tool folder.
+
+	# Add entries for each tool in the tool folder.
 	set files [glob -nocomplain [file join $info(tools_dir) *.tcl]]
 	if {[llength $files] != 0} {
 		set tools ""
@@ -301,7 +309,8 @@ proc LWDAQ_make_tool_menu {} {
 				[list LWDAQ_post [list LWDAQ_run_tool $file_name] front]
 		}
 	}
-# Add entries for subdirectory in the tool folder.
+
+	# Add entries for subdirectory in the tool folder.
 	set allsubdirs [glob -nocomplain -types d [file join $info(tools_dir) *]]
 	set toolsubdirs ""
 	if {[llength $allsubdirs] != 0} {
@@ -332,7 +341,8 @@ proc LWDAQ_make_tool_menu {} {
 			}
 		}
 	}
-# Done.
+
+	# Done.
 	return 1
 }
 
