@@ -67,8 +67,8 @@ proc Videoarchiver_init {} {
 		set info(mplayer) [file join $info(os_dir) mplayer]
 	} elseif {$info(os) == "Linux"} {
 		set info(ssh) "/usr/bin/ssh"
-		set info(ffmpeg) [file join $info(os_dir) $LWDAQ_Info(arch) ffmpeg/ffmpeg]
-		set info(mplayer) [file join $info(os_dir) $LWDAQ_Info(arch) mplayer]
+		set info(ffmpeg) [file join $info(os_dir) ffmpeg/ffmpeg]
+		set info(mplayer) [file join $info(os_dir) mplayer]
 	} else {
 		error "Videoarchiver does not support $info(os)."
 		return ""
