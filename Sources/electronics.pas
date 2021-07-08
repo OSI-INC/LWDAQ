@@ -1408,8 +1408,7 @@ begin
 		result:='';
 {
 		We go through the messages looking for those with the extract_id and count them.
-		We write the time and sample to the return string, and also to an xy_graph in
-		memory.
+		We write the time and sample to the return string.
 }
 		trace:=new_xy_graph(num_selected);
 		num_extracted:=0;
@@ -1431,9 +1430,8 @@ begin
 			end;
 		end;
 {
-		We have counted the messages with extract_id. Now we create an xy-graph
-		of the correct length and containing for x the time values and for y the
-		message indices.
+		We create an xy-graph of the correct length and containing for x the
+		time values and for y the message indices.
 }
 		if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
 		electronics_trace:=new_xy_graph(num_extracted);	

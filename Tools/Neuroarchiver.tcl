@@ -61,7 +61,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "144"
+	LWDAQ_tool_init "Neuroarchiver" "145"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -568,9 +568,9 @@ proc Neuroarchiver_init {} {
 #
 # Colors for windows.
 #
-	set info(title_color) "purple"
-	set info(label_color) "purple"
-	set info(variable_bg) "tan"
+	set info(title_color) "darkgreen"
+	set info(label_color) "darkgreen"
+	set info(variable_bg) "lightgray"
 #
 # We apply a window function to the signal before we take the fourier 
 # transform. This function smooths the signal to its average value 
@@ -7212,7 +7212,7 @@ proc Neuroarchiver_open {} {
 			-width 20 -bg $info(variable_bg)
 		button $f.pick -text "Pick" -command "Neuroarchiver_command record Pick"
 		button $f.pick_dir -text "PickDir" -command "Neuroarchiver_command record PickDir"
-		button $f.metadata -text "Header" \
+		button $f.metadata -text "EditHeader" \
 			-command "LWDAQ_post Neuroarchiver_metadata_header_edit"
 		label $f.lac -text "End (s):" -fg $info(label_color) -width 6
 		label $f.eac -textvariable Neuroarchiver_config(record_end_time) -width 6
@@ -7334,12 +7334,9 @@ proc Neuroarchiver_open {} {
 		label $f.ee -textvariable Neuroarchiver_info(play_end_time) -width 8 \
 			-bg $info(variable_bg) -anchor w
 		pack $f.le $f.ee -side left -expand yes
-		checkbutton $f.seq -variable Neuroarchiver_config(sequential_play) -text "Seq"
+		checkbutton $f.seq -variable Neuroarchiver_config(sequential_play) \
+			-text "Sequential"
 		pack $f.seq -side left -expand yes
-		button $f.export -text "Export" -command "LWDAQ_post Neuroarchiver_exporter_open"
-		pack $f.export -side left -expand yes
-		button $f.clock -text "Clock" -command "LWDAQ_post Neuroarchiver_datetime"
-		pack $f.clock -side left -expand yes
 	
 		set f $w.play.ac
 		frame $f -bd 1
@@ -7374,8 +7371,6 @@ proc Neuroarchiver_open {} {
 			LWDAQ_post [list LWDAQ_post Neuroarchiver_overview]
 		}
 		pack $f.overview -side left -expand yes
-		button $f.baselines -text "Calibration" -command "Neuroarchiver_calibration"
-		pack $f.baselines -side left -expand yes
 	
 		label $f.v -text "Video:" -fg $info(label_color)
 		pack $f.v -side left -expand no
@@ -7397,12 +7392,8 @@ proc Neuroarchiver_open {} {
 		checkbutton $f.quiet -variable Neuroarchiver_config(quiet_processing) -text "Quiet"
 		pack $f.f $f.g $f.enable $f.save $f.quiet -side left -expand yes
 		label $f.lchannels -text "Select:" -anchor e -fg $info(label_color)
-		entry $f.echannels -textvariable Neuroarchiver_config(channel_select) -width 35
+		entry $f.echannels -textvariable Neuroarchiver_config(channel_select) -width 50
 		pack $f.lchannels $f.echannels -side left -expand yes
-		button $f.cb -text "Classifier" -command "LWDAQ_post Neuroclassifier_open"
-		pack $f.cb -side left -expand yes
-		button $f.tb -text "Tracker" -command "LWDAQ_post Neurotracker_open"
-		pack $f.tb -side left -expand yes
 	
 		set f $w.play.d
 		frame $f -bd 1
@@ -7426,6 +7417,29 @@ proc Neuroarchiver_open {} {
 		label $f.le -textvariable Neuroarchiver_info(num_events) -width 5
 		button $f.mark -text Mark -command [list LWDAQ_post "Neuroarchiver_print_event"]
 		pack $f.il $f.ie $f.ll $f.le $f.mark -side left -expand yes
+
+		set f $w.play.e
+		frame $f -bd 1
+		pack $f -side top -fill x
+		
+		label $f.e -text "Extensions:" -anchor w -fg $info(label_color)
+		pack $f.e -side left
+		button $f.baselines -text "Calibration" -command "Neuroarchiver_calibration"
+		pack $f.baselines -side left -expand yes
+		button $f.cb -text "Classifier" -command "LWDAQ_post Neuroclassifier_open"
+		pack $f.cb -side left -expand yes
+		button $f.clock -text "Clock" -command "LWDAQ_post Neuroarchiver_datetime"
+		pack $f.clock -side left -expand yes
+		button $f.conf -text "Configure" -command "Neuroarchiver_configure"
+		pack $f.conf -side left -expand yes
+		button $f.help -text "Help" -command "LWDAQ_tool_help Neuroarchiver"
+		pack $f.help -side left -expand yes
+		button $f.export -text "Export" -command "LWDAQ_post Neuroarchiver_exporter_open"
+		pack $f.export -side left -expand yes
+		button $f.tb -text "Tracker" -command "LWDAQ_post Neurotracker_open"
+		pack $f.tb -side left -expand yes
+		checkbutton $f.verbose -variable Neuroarchiver_config(verbose) -text "Verbose"
+		pack $f.verbose -side left -expand yes
 	}	
 
 	switch $info(mode) {
