@@ -15,16 +15,9 @@
 #undef BUILD_tk
 #undef STATIC_BUILD
 #include "tk.h"
-#include "tkPort.h"
 
 #ifdef TK_TEST
-#ifdef __cplusplus
-extern "C" {
-#endif
 extern Tcl_PackageInitProc Tktest_Init;
-#ifdef __cplusplus
-}
-#endif
 #endif /* TK_TEST */
 
 /*
@@ -37,11 +30,7 @@ extern Tcl_PackageInitProc Tktest_Init;
 #define TK_LOCAL_APPINIT Tcl_AppInit
 #endif
 #ifndef MODULE_SCOPE
-#   ifdef __cplusplus
-#	define MODULE_SCOPE extern "C"
-#   else
-#	define MODULE_SCOPE extern
-#   endif
+#   define MODULE_SCOPE extern
 #endif
 MODULE_SCOPE int TK_LOCAL_APPINIT(Tcl_Interp *);
 MODULE_SCOPE int main(int, char **);
@@ -121,13 +110,6 @@ Tcl_AppInit(
 	return TCL_ERROR;
     }
     Tcl_StaticPackage(interp, "Tk", Tk_Init, Tk_SafeInit);
-
-#if defined(USE_CUSTOM_EXIT_PROC)
-    if (TkpWantsExitProc()) {
-	/* The cast below avoids warnings from old gcc compilers. */
-	Tcl_SetExitProc((void *)TkpExitProc);
-    }
-#endif
 
 #ifdef TK_TEST
     if (Tktest_Init(interp) == TCL_ERROR) {
