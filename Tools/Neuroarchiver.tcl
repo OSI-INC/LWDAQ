@@ -676,7 +676,8 @@ proc Neuroarchiver_init {} {
 #
 # Video playback parameters. We define executable names for ffmpeg and mplayer.
 #
-	set info(video_library_archive) "http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
+	set info(video_library_archive) \
+		"http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
 	set config(video_dir) $LWDAQ_Info(working_dir)
 	set info(video_file) [file join $config(video_dir) Video.mp4]
 	set info(video_stop_time) 0.0
@@ -705,8 +706,8 @@ proc Neuroarchiver_init {} {
 		set info(mplayer) [file join $os_dir mplayer]
 	} elseif {$LWDAQ_Info(os) == "Linux"} {
 		set info(ssh) "/usr/bin/ssh"
-		set info(ffmpeg) [file join $os_dir $LWDAQ_Info(arch) ffmpeg/ffmpeg]
-		set info(mplayer) [file join $os_dir $LWDAQ_Info(arch) mplayer]
+		set info(ffmpeg) [file join $os_dir ffmpeg/ffmpeg]
+		set info(mplayer) [file join $os_dir mplayer]
 	} else {
 		error "Videoarchiver does not support $LWDAQ_Info(os)."
 		return ""
