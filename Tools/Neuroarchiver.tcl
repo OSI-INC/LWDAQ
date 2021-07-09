@@ -98,8 +98,7 @@ proc Neuroarchiver_init {} {
 # Recording data acquisition parameters.
 #
 	set config(daq_receiver) "A3027"
-	set config(daq_ip_addr) "10.0.0.37"
-	set config(daq_driver_socket) "1"
+	set config(receiver_versions) "A3018 A3027 A3032 A3038A"
 #
 # A flag to tell us if the Neuroarchiver is running with graphics.
 #
@@ -201,7 +200,7 @@ proc Neuroarchiver_init {} {
 	set info(overview_fsd) 2
 #
 # During play-back and processing, we step through each channel selected by the
-# user (see channel_select parameter) and for each channel we create a graph of
+# user (see processing_channels parameter) and for each channel we create a graph of
 # its signal versus time, which we display in the v-t window, and its amplitude
 # versus frequency, which we display in the a-t window. The empty value for
 # these two graphs is a point at the origin. When we have real data in the
@@ -478,7 +477,7 @@ proc Neuroarchiver_init {} {
 # specifies channel 5 with frequency 512 and scatter 8. We have default values
 # for frequency, which will be used if we do not specify values.
 #
-	set config(channel_select) "*"
+	set config(processing_channels) "*"
 	set config(default_frequency) "128 256 512 1024 2048 4096"
 	set config(standing_values) ""
 	set config(unaccepted_values) ""
@@ -808,7 +807,7 @@ proc Neuroarchiver_print_event {{event ""}} {
 	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
 
 	if {$event == ""} {
-		set event "$info(play_file_tail) $info(t_min) \"$config(channel_select)\"\
+		set event "$info(play_file_tail) $info(t_min) \"$config(processing_channels)\"\
 			\"Event in $config(play_interval)-s interval\""
 	}
 
@@ -2121,7 +2120,7 @@ proc Neuroarchiver_overview {{fn ""}} {
 	set ov_config(t_max) 0
 	set ov_config(num_samples) $config(overview_num_samples)
 	set ov_config(activity) ""
-	set ov_config(select) $config(channel_select)
+	set ov_config(select) $config(processing_channels)
 	set ov_config(status) "Idle"
 	foreach v {v_range v_offset vt_mode} {
 		set ov_config($v) $config($v)
@@ -2846,7 +2845,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 		incr info(classifier_index)
 	}
 	if {$event == ""} {
-		set id [lindex $config(channel_select) 0]
+		set id [lindex $config(processing_channels) 0]
 		if {([llength $id]>1) || ($id == "*")} {
 			if {$info(window) == ""} {raise "."} {raise $info(window)}
 			Neuroarchiver_print "ERROR: Select a single channel to add to the library."
@@ -3585,8 +3584,8 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 		}
 		pack $f.cl $f.go $f.stop $f.allt $f.not -side left -expand yes
 		label $f.ssl -text "Channels Numbers:"
-		set nbc(channel_select) "1 2 3 4 5 6 7 8 9 10 11 12 13 14"
-		entry $f.sse -textvariable nbc(channel_select) -width 35
+		set nbc(processing_channels) "1 2 3 4 5 6 7 8 9 10 11 12 13 14"
+		entry $f.sse -textvariable nbc(processing_channels) -width 35
 		pack $f.ssl $f.sse -side left
 		label $f.ll -text "Limit:" -fg blue
 		entry $f.le -textvariable Neuroarchiver_config(classifier_match_limit) \
@@ -3715,7 +3714,7 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 			# signal in this file, so we define variables for these counts. We
 			# will count intervals and loss intervals individually also.
 			for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
-				if 	{[lsearch $nbc(channel_select) $id] >= 0} {
+				if 	{[lsearch $nbc(processing_channels) $id] >= 0} {
 					set nbc(en_$id) 1
 					set loss_count_$id 0
 					set count_$id 0
@@ -4311,10 +4310,10 @@ proc Neuroarchiver_exporter_open {} {
 	set f [frame $w.select]
 	pack $f -side top -fill x
 	label $f.lchannels -text "Select (ID:SPS):" -anchor w -fg green
-	entry $f.echannels -textvariable Neuroarchiver_config(channel_select) -width 70
+	entry $f.echannels -textvariable Neuroarchiver_config(processing_channels) -width 70
 	pack $f.lchannels $f.echannels -side left -expand yes
 	button $f.auto -text "Autofill" -command {
-		set Neuroarchiver_config(channel_select) "*"
+		set Neuroarchiver_config(processing_channels) "*"
 		LWDAQ_post Neuroarchiver_play "Step"
 		LWDAQ_post Neuroarchiver_exporter_autofill
 	}
@@ -4372,10 +4371,10 @@ proc Neuroarchiver_exporter_autofill {} {
 	if {$autofill == ""} {
 		LWDAQ_print $info(export_text) "Autofill found no active channels.\
 			Setting channel select to \"*\". Play one interval and try again."
-		set config(channel_select) "*"
+		set config(processing_channels) "*"
 		return "FAIL"
 	}
-	set config(channel_select) [string trim $autofill]
+	set config(processing_channels) [string trim $autofill]
 	return "SUCCESS"
 }
 
@@ -4423,8 +4422,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		LWDAQ_print $info(export_text) "Export directory $config(export_dir)."
 	
 		# Check the channel select string and clean up existing export files.
-		set config(channel_select) [string trim $config(channel_select)]
-		foreach channel $config(channel_select) {
+		set config(processing_channels) [string trim $config(processing_channels)]
+		foreach channel $config(processing_channels) {
 			if {$channel == "*"} {
 				LWDAQ_print $info(export_text) \
 					"ERROR: Cannot use wildcard channel select, aborting export."
@@ -5406,6 +5405,56 @@ proc Neuroarchiver_plot_spectrum {{color ""} {spectrum ""}} {
 }
 
 #
+# Neuroarchiver_set_receiver configures the Recorder for recording from a particular
+# type of receiver.
+#
+proc Neuroarchiver_set_receiver {version} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+	upvar #0 LWDAQ_config_Recorder iconfig
+	upvar #0 LWDAQ_info_Recorder iinfo
+	global LWDAQ_Info
+
+	if {$info(record_control) != "Idle"} {
+		Neuroarchiver_print "WARNING: Change receiver version only when idle."
+		return "ABORT"
+	}
+
+	switch $version {
+		"A3018" {
+			set iconfig(payload_length) 0
+			set config(tracker_coordinates) ""
+			Neuroarchiver_print "Receiver $version\:\
+				Specify driver socket, channel select not supported."
+		}
+		"A3027" {
+			set iconfig(payload_length) 0
+			set config(tracker_coordinates) ""
+			Neuroarchiver_print "Receiver $version\:\
+				Specify driver socket, channel select not supported."
+		}
+		"A3032" {
+			set iconfig(payload_length) $info(A3032_payload)
+			set config(tracker_coordinates) $info(A3032_coordinates)
+			Neuroarchiver_print "Receiver $version\:\
+				Specify driver socket, channel select not supported."
+		}
+		"A3038A" {
+			set iconfig(payload_length) $info(A3038A_payload)
+			set config(tracker_coordinates) $info(A3038A_coordinates)
+			Neuroarchiver_print "Receiver $version\:\
+				No need to specify driver socket, channel selection supported."
+		}
+		default {
+			set iconfig(payload_length) 0
+			set config(tracker_coordinates) ""
+		}
+	}
+
+	return $version
+}
+
+#
 # Neuroarchiver_record manages the recording of data to archive files. It is the
 # recorder's execution procedure. It calls the Recorder Instrument to produce
 # a block of data with a fixed number of clock messages. It stores these
@@ -5507,34 +5556,6 @@ proc Neuroarchiver_record {{command ""}} {
 		# Set the timestamp for the new file, with resolution one second.
 		set config(record_start_clock) [clock seconds]
 		
-		# Configure the Recorder Instrument with IP address and driver socket
-		# number. Set the payload length and tracker coordinates based upon the
-		# receiver version.
-		set iconfig(daq_ip_addr) $config(daq_ip_addr)
-		set iconfig(daq_driver_socket) $config(daq_driver_socket)
-		switch $config(daq_receiver) {
-			"A3018" {
-				set iconfig(payload_length) 0
-				set config(tracker_coordinates) ""
-			}
-			"A3027" {
-				set iconfig(payload_length) 0
-				set config(tracker_coordinates) ""
-			}
-			"A3032" {
-				set iconfig(payload_length) $info(A3032_payload)
-				set config(tracker_coordinates) $info(A3032_coordinates)
-			}
-			"A3038A" {
-				set iconfig(payload_length) $info(A3038A_payload)
-				set config(tracker_coordinates) $info(A3038A_coordinates)
-			}
-			default {
-				set iconfig(payload_length) 0
-				set config(tracker_coordinates) ""
-			}
-		}
-
 		# Reset the data recorder, but only if the comand is Reset or if
 		# the synchronize flag is set.
 		if {($info(record_control) == "Reset") || $config(synchronize)} {
@@ -6338,9 +6359,9 @@ proc Neuroarchiver_play {{command ""}} {
 		}
 	}
 
-	# We select some or all active channels based on the channel_select
+	# We select some or all active channels based on the processing_channels
 	# string entered by the user.
-	if {[string trim $config(channel_select)] == "*"} {
+	if {[string trim $config(processing_channels)] == "*"} {
 		set channels ""
 		foreach {id qty} $channel_list {
 			if {($qty > ($config(activity_rate) * $info(play_interval_copy))) \
@@ -6350,7 +6371,7 @@ proc Neuroarchiver_play {{command ""}} {
 			}
 		}
 	} {
-		set channels $config(channel_select)
+		set channels $config(processing_channels)
 	}
 	
 	# We read the processor script from disk.
@@ -6759,7 +6780,7 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 	if {$config(isolate_events)} {
 		set cs [lindex $event 2]
 		if {$cs != "?"} {
-			set config(channel_select) $cs
+			set config(processing_channels) $cs
 		}
 	}
 	
@@ -7184,46 +7205,80 @@ proc Neuroarchiver_open {} {
 			button $f.$b -text $a -command "Neuroarchiver_command record $a"
 			pack $f.$b -side left -expand yes
 		}
+		
+		button $f.signals -text "Signals" -command "LWDAQ_open Recorder"
+		pack $f.signals -side left -expand yes
 	
-		label $f.ipl -text "IP:" -fg $info(label_color)
-		entry $f.ipe -textvariable Neuroarchiver_config(daq_ip_addr) -width 14
-		pack $f.ipl $f.ipe -side left -expand yes
-		label $f.sl -text "Socket:" -fg $info(label_color)
-		entry $f.se -textvariable Neuroarchiver_config(daq_driver_socket) -width 2
-		pack $f.sl $f.se -side left -expand yes
-		tk_optionMenu $f.mr Neuroarchiver_config(daq_receiver) \
-			"A3018" "A3027" "A3032" "A3038A"
+		button $f.conf -text "Configure" -command "Neuroarchiver_configure"
+		pack $f.conf -side left -expand yes
+		button $f.help -text "Help" -command "LWDAQ_tool_help Neuroarchiver"
+		pack $f.help -side left -expand yes
+		checkbutton $f.synch -variable Neuroarchiver_config(synchronize) -text "Synchronize"
+		pack $f.synch -side left -expand yes
+		checkbutton $f.verbose -variable Neuroarchiver_config(verbose) -text "Verbose"
+		pack $f.verbose -side left -expand yes
+	
+		set f $w.record.b
+		frame $f
+		pack $f -side top -fill x
+
+		label $f.a -text "Receiver:" -anchor w -fg $info(label_color)
+		pack $f.a -side left
+
+		set m [tk_optionMenu $f.mr Neuroarchiver_config(daq_receiver) "none"]
+		$m delete 0 end
+		foreach version $config(receiver_versions) {
+			$m add command -label $version \
+				-command [list Neuroarchiver_set_receiver $version]
+		}	
 		pack $f.mr -side left -expand yes
-		label $f.fvl -text "FV:" -fg $info(label_color)
+
+		label $f.ipl -text "ip_addr:" -fg $info(label_color)
+		entry $f.ipe -textvariable LWDAQ_config_Recorder(daq_ip_addr) -width 14
+		pack $f.ipl $f.ipe -side left -expand yes
+
+		label $f.sl -text "driver_sckt:" -fg $info(label_color)
+		entry $f.se -textvariable LWDAQ_config_Recorder(daq_driver_socket) -width 2
+		pack $f.sl $f.se -side left -expand yes
+
+		label $f.lchannels -text "Select:" -anchor e -fg $info(label_color)
+		entry $f.echannels -textvariable LWDAQ_config_Recorder(daq_channels) -width 20
+		pack $f.lchannels $f.echannels -side left -expand yes
+
+		label $f.fvl -text "firmware:" -fg $info(label_color)
 		label $f.fvd -textvariable LWDAQ_info_Recorder(firmware_version) -width 2
 		pack $f.fvl $f.fvd -side left -expand yes
 
-		button $f.conf -text "Configure" -command "Neuroarchiver_configure"
-		button $f.help -text "Help" -command "LWDAQ_tool_help Neuroarchiver"
-		checkbutton $f.d -variable Neuroarchiver_config(verbose) -text "Verbose"
-		pack $f.conf $f.help $f.d -side left -expand yes
-	
-		set f $w.record.b
+		set f $w.record.c
 		frame $f
 		pack $f -side top -fill x
 	
 		label $f.a -text "Archive:" -anchor w -fg $info(label_color)
 		pack $f.a -side left
+		
 		label $f.b -textvariable Neuroarchiver_info(record_file_tail) \
 			-width 20 -bg $info(variable_bg)
+		pack $f.b -side left -expand yes
+		
 		button $f.pick -text "Pick" -command "Neuroarchiver_command record Pick"
+		pack $f.pick -side left -expand yes
+		
 		button $f.pick_dir -text "PickDir" -command "Neuroarchiver_command record PickDir"
-		button $f.metadata -text "EditHeader" \
+		pack $f.pick_dir -side left -expand yes
+		
+		button $f.metadata -text "Header" \
 			-command "LWDAQ_post Neuroarchiver_metadata_header_edit"
-		label $f.lac -text "End (s):" -fg $info(label_color) -width 6
+		pack $f.metadata -side left -expand yes
+		
+		label $f.lac -text "Length (s):" -fg $info(label_color) 
+		pack $f.lac -side left -expand yes
 		label $f.eac -textvariable Neuroarchiver_config(record_end_time) -width 6
+		pack $f.eac -side left -expand yes
+		
 		label $f.le -text "Autocreate (s):" -fg $info(label_color)
+		pack $f.le -side left -expand yes
 		entry $f.ee -textvariable Neuroarchiver_config(autocreate) -width 6
-		pack $f.b $f.pick $f.pick_dir $f.metadata $f.lac $f.eac $f.le $f.ee \
-			-side left -expand yes
-
-		checkbutton $f.synch -variable Neuroarchiver_config(synchronize) -text "Synchronize"
-		pack $f.synch $f.synch -side left -expand yes
+		pack $f.ee -side left -expand yes
 	}
 	
 	if {($info(mode) == "Archiver") \
@@ -7331,7 +7386,7 @@ proc Neuroarchiver_open {} {
 		label $f.li -text "Time (s):" -fg $info(label_color)
 		entry $f.ei -textvariable Neuroarchiver_config(play_time) -width 8
 		pack $f.lrs $f.mrs $f.li $f.ei -side left -expand yes
-		label $f.le -text "End (s):" -fg $info(label_color)
+		label $f.le -text "Length (s):" -fg $info(label_color)
 		label $f.ee -textvariable Neuroarchiver_info(play_end_time) -width 8 \
 			-bg $info(variable_bg) -anchor w
 		pack $f.le $f.ee -side left -expand yes
@@ -7393,7 +7448,7 @@ proc Neuroarchiver_open {} {
 		checkbutton $f.quiet -variable Neuroarchiver_config(quiet_processing) -text "Quiet"
 		pack $f.f $f.g $f.enable $f.save $f.quiet -side left -expand yes
 		label $f.lchannels -text "Select:" -anchor e -fg $info(label_color)
-		entry $f.echannels -textvariable Neuroarchiver_config(channel_select) -width 50
+		entry $f.echannels -textvariable Neuroarchiver_config(processing_channels) -width 50
 		pack $f.lchannels $f.echannels -side left -expand yes
 	
 		set f $w.play.d
