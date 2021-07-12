@@ -772,6 +772,7 @@ proc LWDAQ_set_bg {widget color} {
 	if {[winfo exists $widget]} {		
 		if {[$widget cget -bg] != $color} {
 			$widget configure -bg $color
+			update idletasks
 		}
 	}
 }
@@ -788,6 +789,7 @@ proc LWDAQ_set_fg {widget color} {
 	if {[winfo exists $widget]} {		
 		if {[$widget cget -fg] != $color} {
 			$widget configure -fg $color
+			update idletasks
 		}
 	}
 }
