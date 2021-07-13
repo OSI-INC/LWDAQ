@@ -687,7 +687,9 @@ function read_integer(var s:string):integer;
 function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
 function read_x_graph(var s:string):x_graph_ptr;
+function read_x_graph_fpc(var s:string):x_graph_type;
 function read_xy_graph(var s:string):xy_graph_ptr;
+function read_xy_graph_fpc(var s:string):xy_graph_type;
 procedure read_matrix(var s:string;var M:matrix_type);
 function read_kinematic_mount(var s:string):kinematic_mount_type;
 procedure write_ij(var s:string;p:ij_point_type);
@@ -1777,6 +1779,23 @@ begin
 end;
 
 {
+	read_x_graph_fpc is a temporary routine we put in place as part of
+	our transition to fpc's automatic de-allocation of dynamic 
+	variables. It returns an x_graph_type rather than an x_graph_ptr.
+}
+function read_x_graph_fpc(var s:string):x_graph_type;
+
+var 
+	num_points:integer;
+	gp:x_graph_ptr;
+
+begin
+	gp:=read_x_graph(s);
+	read_x_graph_fpc:=gp^;
+	dispose_x_graph(gp);
+end;
+
+{
 	Reads a sequence of space-delimited numbers from a string into
 	an xy_graph_type and returns a pointer to this graph. Does not
 	alter the original string. Returns an error if there are an odd
@@ -1826,6 +1845,23 @@ begin
 }
 	dispose_x_graph(gp1);
 	read_xy_graph:=gp2;
+end;
+
+{
+	read_xy_graph_fpc is a temporary routine we put in place as part of
+	our transition to fpc's automatic de-allocation of dynamic 
+	variables. It returns an xy_graph_type rather than an xy_graph_ptr.
+}
+function read_xy_graph_fpc(var s:string):xy_graph_type;
+
+var 
+	num_points:integer;
+	gp:xy_graph_ptr;
+
+begin
+	gp:=read_xy_graph(s);
+	read_xy_graph_fpc:=gp^;
+	dispose_xy_graph(gp);
 end;
 
 {

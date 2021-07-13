@@ -46,7 +46,7 @@ endif
 # we specify in our Pascal code. 
 ifeq ($(OS),Windows)
 	TCL_FLAGS = -k-L../LWDAQ.app/Contents/Windows/bin
-	FPC_FLAGS = -Px86_64 -O3 
+	FPC_FLAGS = -Px86_64 -O3
 endif
 
 # On Linux, weak linking is the default, so we don't have to tell the Pascal

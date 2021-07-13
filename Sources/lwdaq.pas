@@ -3330,7 +3330,7 @@ begin
 		detectors.
 	}
 	field:=Tcl_ObjString(argv[2]);
-	detector_coordinates:=read_xy_graph(field)^;
+	detector_coordinates:=read_xy_graph_fpc(field);
 	num_detectors:=length(detector_coordinates);
 	if num_detectors=0 then begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -3350,7 +3350,7 @@ begin
 		else if (option='-slices') then num_slices:=Tcl_ObjInteger(vp)			
 		else if (option='-background') then begin
 			field:=Tcl_ObjString(vp);
-			detector_background:=read_x_graph(field)^;
+			detector_background:=read_x_graph_fpc(field);
 		end else if (option='-percentile') then percentile:=Tcl_ObjReal(vp)			
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
