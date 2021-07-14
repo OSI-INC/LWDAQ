@@ -5551,6 +5551,8 @@ proc Neuroarchiver_set_receiver {version} {
 			set config(tracker_coordinates) ""
 		}
 	}
+	
+	set config(daq_receiver) $version
 
 	return $version
 }
@@ -7319,7 +7321,7 @@ proc Neuroarchiver_open {} {
 		label $f.a -text "Receiver:" -anchor w -fg $info(label_color)
 		pack $f.a -side left
 
-		set m [tk_optionMenu $f.mr Neuroarchiver_config(daq_receiver) "none"]
+		set m [tk_optionMenu $f.mr Neuroarchiver_config(daq_receiver) "None"]
 		$m delete 0 end
 		foreach version $config(receiver_versions) {
 			$m add command -label $version \
