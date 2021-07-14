@@ -61,7 +61,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "145"
+	LWDAQ_tool_init "Neuroarchiver" "146"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -613,11 +613,9 @@ proc Neuroarchiver_init {} {
 	set info(tracker_width) 640
 	set info(tracker_height) 320
 	set info(tracker_image_border_pixels) 10
-	set config(tracker_scale) "32" 
-	set config(tracker_extent) "100"
-	set config(tracker_percentile) "50"
-	set config(tracker_threshold) "60"
-	set config(tracker_sps) "1"
+	set config(tracker_decade_scale) "30" 
+	set config(tracker_centroid_extent) "100"
+	set config(tracker_sample_rate) "1"
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
@@ -3111,23 +3109,20 @@ proc Neuroclassifier_classify {metrics setup} {
 }
 
 #
-# Neuroclassifier_processing accepts a characteristics line as
-# input. If there are mutliple channels recorded in this line, 
-# the routine separates the characteristics of each channel and
-# forms a list of events, one for each channel. It searches the 
-# event library for each event, in case the event is a repeat of
-# one that already exists in the library. If so, it hilites
-# the event in the library and makes it visible in the text
-# window. Otherwise, the routine checks to see if the event
-# qualifies as unusual. The first metric should be greater than
-# the classifier threshold. If the event is unusual, the
-# routine finds the closest match to the event in the library
-# and classifies the event as being of the same type. In either
-# case, the routine plots the characteristics of the event
-# upon the map. In the special case where we are re-processing
-# the event libarary to obtain new metrics, the routine replaces
-# the existing baseline power and metrics for each library event
-# with the newly-calculated values from the processor.
+# Neuroclassifier_processing accepts a characteristics line as input. If there
+# are mutliple channels recorded in this line, the routine separates the
+# characteristics of each channel and forms a list of events, one for each
+# channel. It searches the event library for each event, in case the event is a
+# repeat of one that already exists in the library. If so, it hilites the event
+# in the library and makes it visible in the text window. Otherwise, the routine
+# checks to see if the event qualifies as unusual. The first metric should be
+# greater than the classifier threshold. If the event is unusual, the routine
+# finds the closest match to the event in the library and classifies the event
+# as being of the same type. In either case, the routine plots the
+# characteristics of the event upon the map. In the special case where we are
+# re-processing the event libarary to obtain new metrics, the routine replaces
+# the existing baseline power and metrics for each library event with the
+# newly-calculated values from the processor.
 #
 proc Neuroclassifier_processing {characteristics} {
 	upvar #0 Neuroarchiver_config config
@@ -3210,12 +3205,11 @@ proc Neuroclassifier_processing {characteristics} {
 			$t tag configure hilite -background lightgreen
 			$t see $index
 			
-			# Because we have already identified the type of this event
-			# by eye, and stored it as such in the event list, we can be
-			# certain of its type. But even if we know the type, if the 
-			# power metric is below the event threshold, we will call the
-			# interval Normal, and we over-write its type in the event
-			# string we will display.
+			# Because we have already identified the type of this event by eye,
+			# and stored it as such in the event list, we can be certain of its
+			# type. But even if we know the type, if the power metric is below
+			# the event threshold, we will call the interval Normal, and we
+			# over-write its type in the event string we will display.
 			if {[lindex $idc [expr $info(cbo)+1]] >= $config(classifier_threshold)} {
 				set type [lindex $event [expr $info(sii) + $info(cto)]]
 			} {
@@ -3867,16 +3861,17 @@ proc Neuroclassifier_load {{name ""}} {
 
 #
 # Neurotracker_extract calculates the position of a transmitter over an array of
-# detector coils and returns the position as a sequency of x-y coordinates. The routine
-# relies upon a prior call to lwdaq_recorder filling a list of power measurements that
-# correspond to some device we want to locate. This list exists in the lwdaq library
-# global variable space, but not in the LWDAQ TclTk variable space. The indices allow the 
-# lwdaq_alt routine to find the message payloads in the data image that correspond
-# to the device.
+# detector coils and returns the position as a sequency of x-y coordinates. The
+# routine relies upon a prior call to lwdaq_recorder filling a list of power
+# measurements that correspond to some device we want to locate. This list
+# exists in the lwdaq library global variable space, but not in the LWDAQ TclTk
+# variable space. The indices allow the lwdaq_alt routine to find the message
+# payloads in the data image that correspond to the device.
 #
 proc Neurotracker_extract {} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
+	upvar #0 Neuroarchiver_info(tracker_history_$info(channel_num)) history
 
 	# Determine the number of detectors.
 	set num_detectors [expr [llength $config(tracker_coordinates)]/2]
@@ -3889,7 +3884,7 @@ proc Neurotracker_extract {} {
 	
 	# Calculate the number of slices into which we should divide the playback
 	# interval for location tracking.
-	set num_slices [expr $config(tracker_sps) * $config(play_interval)]
+	set num_slices [expr $config(tracker_sample_rate) * $config(play_interval)]
 	if {$num_slices < 1.0} {
 		set num_slices 1
 	} else {
@@ -3904,9 +3899,8 @@ proc Neurotracker_extract {} {
 		set track [lwdaq_alt $info(data_image) \
 			$config(tracker_coordinates) \
 			-payload $config(player_payload_length) \
-			-scale $config(tracker_scale) \
-			-extent $config(tracker_extent) \
-			-percentile $config(tracker_percentile) \
+			-scale $config(tracker_decade_scale) \
+			-extent $config(tracker_centroid_extent) \
 			-slices $num_slices \
 			-background $config(tracker_background)]
 	} {
@@ -3932,48 +3926,34 @@ proc Neurotracker_extract {} {
 	# Extract the tracker powers and determine the maximum power. When we have
 	# more than one slice, we use the powers obtained in the first slice.
 	set info(tracker_powers) [lrange $track 0 [expr $num_detectors - 1]]
-	set max_power 0.0
-	foreach p $info(tracker_powers) {
-		if {$p > $max_power} {
-			set max_power $p
-		}
-	}
 		
-	# Check to see if we have a tracker history for this channel. If not,
-	# create an empty history.
-	if {![info exists info(tracker_history_$info(channel_num))]} {
-		set info(tracker_history_$info(channel_num)) ""
-	}
-	
-	# We extract the newly-calculated tracker position. If we have excessive
-	# signal loss, as specified by the info(loss) parameter, or if the
-	# maximum coil power is insufficient, as specified by tracker_threshold,
-	# we ignore this calculation and use the previous tracker position. If we
-	# have more than one slice, we use the position measurement of the first 
-	# slice.
-	if {($info(loss)/100.0 < (1-$config(loss_fraction))) \
-			&& ($max_power >= $config(tracker_threshold))} {
-		set info(tracker_x) [lindex $track $num_detectors]
-		set info(tracker_y) [lindex $track [expr $num_detectors + 1]]
+	# Check to see if we have a tracker history for this channel. If so, keep
+	# the most recent position and throw away the others. If not, create an empty 
+	# with the origin as the first point.
+	if {[info exists history]} {
+		set history [list [lindex $history end]]
 	} {
-		if {$info(tracker_history_$info(channel_num)) != ""} {
-			set info(tracker_x) [lindex $info(tracker_history_$info(channel_num)) 0]
-			set info(tracker_y) [lindex $info(tracker_history_$info(channel_num)) 1]
-		} {
-			set info(tracker_x) 0.0
-			set info(tracker_y) 0.0
-		}
+		set history [list "0.0 0.0"]
 	}
 	
-	# Push the new positions into the history. This history is what we use when we
-	# plot the latest position on the screen. The tracker_x and tracker_y variables
-	# are for processors.
-	set info(tracker_history_$info(channel_num)) "$info(tracker_x) $info(tracker_y)\
-		[lrange $info(tracker_history_$info(channel_num)) 0 1]"
+	# We extract the newly-calculated tracker positions and place them in our 
+	# history.
+	set track [split $track \n]
+	foreach sample $track {
+		if {($info(loss)/100.0 < (1-$config(loss_fraction)))} {
+			set info(tracker_x) [lindex $sample $num_detectors]
+			set info(tracker_y) [lindex $sample [expr $num_detectors + 1]]
+		} {
+			set info(tracker_x) [lindex $history end 0]
+			set info(tracker_y) [lindex $history end 1]
+		}
 		
-	# In verbose mode, we print out the tracker powers and tracker position.
-	Neuroarchiver_print "Tracker: $info(tracker_powers)\
-		$info(tracker_x) $info(tracker_y)" verbose	
+		# Add the new positions into the history.
+		lappend history "$info(tracker_x) $info(tracker_y)"
+	}
+			
+	# In verbose mode, we print the last slice tracker result.
+	Neuroarchiver_print "Tracker: [lindex $track end]" verbose	
 		
 	# Return a success flag.
 	return "SUCCESS"
@@ -4003,7 +3983,7 @@ proc Neurotracker_open {} {
 	# Create configuration fields.
 	set f [frame $w.config]
 	pack $f -side top -fill x
-	foreach a {scale extent threshold slices} {
+	foreach a {decade_scale centroid_extent sample_rate} {
 		label $f.l$a -text $a
 		entry $f.e$a -textvariable Neuroarchiver_config(tracker_$a) -width 4
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -4119,6 +4099,7 @@ proc Neurotracker_fresh_graphs {} {
 proc Neurotracker_plot {{color ""} {locations ""}} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
+	upvar #0 Neuroarchiver_info(tracker_history_$info(channel_num)) history
 	global LWDAQ_Info	
 
 	# Abort if running in no-gui mode or window does not exist.
@@ -4127,35 +4108,46 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 	
 	# Set colors and the source of the location values.
 	if {$color == ""} {set color [Neuroarchiver_color $info(channel_num)]}
-	if {$locations == ""} {set locations $info(tracker_history_$info(channel_num))}
+	
+	# If the locations string is empty, we get the locations we want to plot from
+	# the history string. 
+	if {$locations == ""} {
+		if {![info exists history]} {return "ERROR"}
+		set locations $history
+		if {[lindex $locations 0] == "0.0 0.0"} {
+			set locations [lrange $locations 1 end]
+		}
+	}
 	
 	# Extract the current location from the location history.
-	if {[llength $locations] > 1} {
-		set tracker_x [lindex $locations 0]
-		set tracker_y [lindex $locations 1]
+	if {[llength $locations] >= 1} {
+		set tracker_x [lindex $locations end 0]
+		set tracker_y [lindex $locations end 1]
 	} {
-		set tracker_x 0
-		set tracker_y 0
+		set tracker_x 0.0
+		set tracker_y 0.0
 	}
 	
 	# Find the range of x and y values we must cover.
 	scan $info(tracker_range) %f%f%f%f x_min x_max y_min y_max
 	
-	# Plot the locations in the tracker image.
+	# Plot the new locations.
 	if {$config(tracker_persistence) == "Path"} {
-		lwdaq_graph $locations $info(tracker_image) \
+		lwdaq_graph [join $locations] $info(tracker_image) \
 			-y_min $y_min -y_max $y_max -x_min $x_min -x_max $x_max -color $color
 	}
 
-	# Make a mark at the current location.
+	# Make a mark at all the new locations.
 	if {$config(tracker_persistence) == "Mark"} {
-		set x $tracker_x
-		set y $tracker_y
-		set w $config(tracker_mark_cm)
-		lwdaq_graph "[expr $x-$w] [expr $y-$w] [expr $x-$w] [expr $y+$w] \
-			[expr $x+$w] [expr $y+$w] [expr $x+$w] [expr $y-$w] [expr $x-$w] [expr $y-$w]" \
-			$info(tracker_image) \
-			-y_min $y_min -y_max $y_max -x_min $x_min -x_max $x_max -color $color
+		foreach point $locations {
+			set x [lindex $point 0]
+			set y [lindex $point 1]
+			set w $config(tracker_mark_cm)
+			lwdaq_graph "[expr $x-$w] [expr $y-$w] [expr $x-$w] [expr $y+$w] \
+				[expr $x+$w] [expr $y+$w] [expr $x+$w] [expr $y-$w] [expr $x-$w] [expr $y-$w]" \
+				$info(tracker_image) \
+				-y_min $y_min -y_max $y_max -x_min $x_min -x_max $x_max -color $color
+		} 
 	}
 
 	# Determine border and color.
@@ -4194,7 +4186,7 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 		}
 	}
 
-	# Place a mark on the display to show averge position.
+	# Place a circle on the most recent position.
 	set x [expr round(1.0*($tracker_x-$x_min)*$info(tracker_width) \
 		/($x_max-$x_min)) + $bd]
 	set y [expr round($info(tracker_height) \
@@ -4398,7 +4390,7 @@ proc Neuroarchiver_exporter_open {} {
 	checkbutton $f.te -variable Neuroarchiver_config(export_tracker) \
 		-text "Tracker" -fg $info(label_color)
 	label $f.lsps -text "Tracker Sample Rate (SPS):" -anchor w -fg $info(label_color)
-	entry $f.esps -textvariable Neuroarchiver_config(tracker_sps) -width 3
+	entry $f.esps -textvariable Neuroarchiver_config(tracker_sample_rate) -width 3
 	pack $f.te $f.lsps $f.esps -side left -expand yes
 
 	checkbutton $f.pwr -variable Neuroarchiver_config(export_powers) \
@@ -4544,7 +4536,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			if {$config(export_tracker)} {
 				set efn [file join $config(export_dir) "T$info(export_start_s)\_$id\.$ext"]
 				LWDAQ_print $info(export_text) "Exporting tracker $id at\
-					$config(tracker_sps) SPS to $efn."
+					$config(tracker_sample_rate) SPS to $efn."
 				if {[file exists $efn]} {
 					LWDAQ_print $info(export_text) "Deleting existing file\
 						[file tail $efn] in export directory."
