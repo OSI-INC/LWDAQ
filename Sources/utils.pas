@@ -1786,7 +1786,6 @@ end;
 function read_x_graph_fpc(var s:string):x_graph_type;
 
 var 
-	num_points:integer;
 	gp:x_graph_ptr;
 
 begin
@@ -1855,7 +1854,6 @@ end;
 function read_xy_graph_fpc(var s:string):xy_graph_type;
 
 var 
-	num_points:integer;
 	gp:xy_graph_ptr;
 
 begin

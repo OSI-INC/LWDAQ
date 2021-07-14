@@ -3396,6 +3396,11 @@ begin
 		one or more slices, so prepare result arrays.
 	}
 	slice_size:=num_samples div num_slices;
+	if slice_size < 1 then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Fewer than one message per slice in lwdaq_alt.');
+		exit;
+	end;
 	setlength(detector_samples,slice_size);
 
 	{
@@ -3405,7 +3410,7 @@ begin
 	result:='';
 	for slice_num:=0 to num_slices-1 do begin
 		{
-			Calculate the percentile power value for each detector coil in this
+			Calculate the median power value for each detector coil in this
 			slice of time. Obtain the maximum, and minimum coil powers in case
 			we need them. As a first guess at the location, use the location of
 			the coil with the maximum power.

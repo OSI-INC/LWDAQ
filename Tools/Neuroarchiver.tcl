@@ -643,8 +643,6 @@ proc Neuroarchiver_init {} {
 	set info(tracker_powers) "0"
 	set info(tracker_x) "0"
 	set info(tracker_y) "0"
-	set info(tracker_x_previous) "0"
-	set info(tracker_y_previous) "0"
 #
 # The Playback Clock default settings.
 #
@@ -3918,14 +3916,12 @@ proc Neurotracker_extract {} {
 		return "ERROR"
 	}
 	
-	# Set the tracker_result variable to the fill tracker string so all the
-	# measurement of power and position for all slices can be written to disk by
-	# the exporter.
+	# Set the tracker_result variable to the full tracker string.
 	set info(tracker_result) $track
 		
-	# Extract the tracker powers and determine the maximum power. When we have
-	# more than one slice, we use the powers obtained in the first slice.
-	set info(tracker_powers) [lrange $track 0 [expr $num_detectors - 1]]
+	# Extract the tracker powers from the final tracker slice.
+	set track [split $track \n]
+	set info(tracker_powers) [lrange [lindex $track end] 0 [expr $num_detectors - 1]]
 		
 	# Check to see if we have a tracker history for this channel. If so, keep
 	# the most recent position and throw away the others. If not, create an empty 
@@ -3933,26 +3929,25 @@ proc Neurotracker_extract {} {
 	if {[info exists history]} {
 		set history [list [lindex $history end]]
 	} {
-		set history [list "0.0 0.0"]
+		set history [list]
 	}
 	
 	# We extract the newly-calculated tracker positions and place them in our 
 	# history.
-	set track [split $track \n]
 	foreach sample $track {
 		if {($info(loss)/100.0 < (1-$config(loss_fraction)))} {
 			set info(tracker_x) [lindex $sample $num_detectors]
 			set info(tracker_y) [lindex $sample [expr $num_detectors + 1]]
 		} {
-			set info(tracker_x) [lindex $history end 0]
-			set info(tracker_y) [lindex $history end 1]
+			set info(tracker_x) "0.0"
+			set info(tracker_y) "0.0"
 		}
 		
 		# Add the new positions into the history.
 		lappend history "$info(tracker_x) $info(tracker_y)"
 	}
 			
-	# In verbose mode, we print the last slice tracker result.
+	# In verbose mode, we print the first tracker slice.
 	Neuroarchiver_print "Tracker: [lindex $track end]" verbose	
 		
 	# Return a success flag.
@@ -4114,30 +4109,18 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 	if {$locations == ""} {
 		if {![info exists history]} {return "ERROR"}
 		set locations $history
-		if {[lindex $locations 0] == "0.0 0.0"} {
-			set locations [lrange $locations 1 end]
-		}
-	}
-	
-	# Extract the current location from the location history.
-	if {[llength $locations] >= 1} {
-		set tracker_x [lindex $locations end 0]
-		set tracker_y [lindex $locations end 1]
-	} {
-		set tracker_x 0.0
-		set tracker_y 0.0
 	}
 	
 	# Find the range of x and y values we must cover.
 	scan $info(tracker_range) %f%f%f%f x_min x_max y_min y_max
 	
-	# Plot the new locations.
+	# Plot the path if requested.
 	if {$config(tracker_persistence) == "Path"} {
 		lwdaq_graph [join $locations] $info(tracker_image) \
 			-y_min $y_min -y_max $y_max -x_min $x_min -x_max $x_max -color $color
 	}
 
-	# Make a mark at all the new locations.
+	# Make marks if requested.
 	if {$config(tracker_persistence) == "Mark"} {
 		foreach point $locations {
 			set x [lindex $point 0]
@@ -4187,16 +4170,20 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 	}
 
 	# Place a circle on the most recent position.
-	set x [expr round(1.0*($tracker_x-$x_min)*$info(tracker_width) \
-		/($x_max-$x_min)) + $bd]
-	set y [expr round($info(tracker_height) \
-		-1.0*($tracker_y-$y_min)*$info(tracker_height) \
-		/($y_max-$y_min)) + $bd]
-	set pw 4
-	$info(tracker_plot) create oval \
-		[expr $x-$pw] [expr $y-$pw] \
-		[expr $x+$pw] [expr $y+$pw] \
-		-outline $tkc -fill $tkc -tag location		
+	if {[llength $locations] >= 1} {
+		set tracker_x [lindex $locations end 0]
+		set tracker_y [lindex $locations end 1]
+		set x [expr round(1.0*($tracker_x-$x_min)*$info(tracker_width) \
+			/($x_max-$x_min)) + $bd]
+		set y [expr round($info(tracker_height) \
+			-1.0*($tracker_y-$y_min)*$info(tracker_height) \
+			/($y_max-$y_min)) + $bd]
+		set pw 4
+		$info(tracker_plot) create oval \
+			[expr $x-$pw] [expr $y-$pw] \
+			[expr $x+$pw] [expr $y+$pw] \
+			-outline $tkc -fill $tkc -tag location	
+	}	
 
 	# Detect errors.
 	if {[lwdaq_error_string] != ""} {Neuroarchiver_print [lwdaq_error_string]}
@@ -4230,7 +4217,7 @@ proc Neurotracker_clear {} {
 	set names [array names info]
 	foreach a $names {
 		if {[string match "tracker_history_*" $a]} {
-			set info($a) ""
+			unset info($a)
 		}
 	}
 	set saved $config(tracker_persistence)
