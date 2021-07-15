@@ -502,7 +502,7 @@ proc Neuroarchiver_init {} {
 		set config(enable_af) 0
 	}
 	set config(af_calculate) 1
-	set config(alt_calculate) 1
+	set config(alt_calculate) 0
 #
 # The reconstruct flag turns on reconstruction. There are few times when we
 # don't want reconstruction, but one such time might be when we don't know the
@@ -614,8 +614,8 @@ proc Neuroarchiver_init {} {
 	set info(tracker_height) 320
 	set info(tracker_image_border_pixels) 10
 	set config(tracker_decade_scale) "30" 
-	set config(tracker_centroid_extent) "100"
-	set config(tracker_sample_rate) "1"
+	set config(tracker_centroid_extent) "20"
+	set config(tracker_sample_rate) "16"
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
@@ -3871,17 +3871,29 @@ proc Neurotracker_extract {} {
 	upvar #0 Neuroarchiver_config config
 	upvar #0 Neuroarchiver_info(tracker_history_$info(channel_num)) history
 
+	# Determine if this is a lossy interval.
+	if {$info(loss)/100.0 < (1-$config(loss_fraction))} {
+		set lossy 0
+	} {
+		set lossy 1
+	}
+	
+	# Set error flag.
+	set error_flag 0
+	
 	# Determine the number of detectors.
 	set num_detectors [expr [llength $config(tracker_coordinates)]/2]
 	
 	# If the playload length does not match the number of detector coils,
 	# we abort, because we are not playing a tracker archive.
 	if {($config(player_payload_length) != $num_detectors + 1)} {
-		return "ABORT"
+		Neuroarchiver_print "ERROR: Cannot find tracker power measurements in archive."
+		return "ERROR"
 	}
 	
 	# Calculate the number of slices into which we should divide the playback
-	# interval for location tracking.
+	# interval for location tracking. If we see an error, set an error flag
+	# and print the error to the Neuroarchiver text window, but don't abort.
 	set num_slices [expr $config(tracker_sample_rate) * $config(play_interval)]
 	if {$num_slices < 1.0} {
 		set num_slices 1
@@ -3889,33 +3901,34 @@ proc Neurotracker_extract {} {
 		set num_slices [expr round($num_slices)]
 	}
 	
-	# If we have a signal for the current channel, obtain a tracker 
-	# measurement, which will be one line per slice. If we don't have
-	# a signal, perhaps because of reception loss, we create a fake
-	# tracker measurement consisting of the same number of lines.	
-	if {$info(signal) != "0 0"} {
-		set track [lwdaq_alt $info(data_image) \
-			$config(tracker_coordinates) \
-			-payload $config(player_payload_length) \
-			-scale $config(tracker_decade_scale) \
-			-extent $config(tracker_centroid_extent) \
-			-slices $num_slices \
-			-background $config(tracker_background)]
-	} {
+	# If we have a signal for the current channel, obtain a tracker measurement,
+	# which will be one line per slice. 
+	if {($info(signal) != "0 0") && !$lossy} {
+		if {[catch {
+			set track [lwdaq_alt $info(data_image) \
+				$config(tracker_coordinates) \
+				-payload $config(player_payload_length) \
+				-scale $config(tracker_decade_scale) \
+				-extent $config(tracker_centroid_extent) \
+				-slices $num_slices \
+				-background $config(tracker_background)]
+		} error_result]} {
+			Neuroarchiver_print $error_result
+			set error_flag 1
+		}
+	} 
+	
+	# If we don't have a signal, perhaps because of reception loss, we create a
+	# fake tracker measurement consisting of the same number of lines. We do the
+	# same in the case of an error.
+	if {($info(signal) == "0 0") || $lossy || $error_flag} {
 		set track ""
 		for {set slice_num 0} {$slice_num < $num_slices} {incr slice_num} {
 			append track "$config(tracker_background) 0.0 0.0\n"
 		}
-		set tack [string trim $track]
+		set track [string trim $track]
 	}
 			
-	# Check for errors. Print any error messages and return an error flag, but don't
-	# generate a Tcl error.
-	if {[LWDAQ_is_error_result $track]} {
-		Neuroarchiver_print $track
-		return "ERROR"
-	}
-	
 	# Set the tracker_result variable to the full tracker string.
 	set info(tracker_result) $track
 		
@@ -3932,18 +3945,12 @@ proc Neurotracker_extract {} {
 		set history [list]
 	}
 	
-	# We extract the newly-calculated tracker positions and place them in our 
-	# history.
+	# We extract the tracker positions and place them in our history. We assign
+	# the global tracker x and y variables to the position we obtain in the final
+	# slice.
 	foreach sample $track {
-		if {($info(loss)/100.0 < (1-$config(loss_fraction)))} {
-			set info(tracker_x) [lindex $sample $num_detectors]
-			set info(tracker_y) [lindex $sample [expr $num_detectors + 1]]
-		} {
-			set info(tracker_x) "0.0"
-			set info(tracker_y) "0.0"
-		}
-		
-		# Add the new positions into the history.
+		set info(tracker_x) [lindex $sample $num_detectors]
+		set info(tracker_y) [lindex $sample [expr $num_detectors + 1]]
 		lappend history "$info(tracker_x) $info(tracker_y)"
 	}
 			
@@ -3951,7 +3958,11 @@ proc Neurotracker_extract {} {
 	Neuroarchiver_print "Tracker: [lindex $track end]" verbose	
 		
 	# Return a success flag.
-	return "SUCCESS"
+	if {$error_flag} {
+		return "ERROR"
+	} {
+		return "SUCCESS"
+	}
 }
 
 #
