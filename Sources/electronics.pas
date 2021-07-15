@@ -981,7 +981,6 @@ type
 		index:integer; {the index of the original message in image}
 	end;
 	message_array_type=array of message_type;
-	message_array_ptr_type=^message_array_type;
 	
 var 
 	message_length:integer=4;
@@ -994,14 +993,14 @@ var
 	message_index:integer=0;
 	max_index:integer=0;
 	num_bad_messages:integer=0;
-	mp,msp:message_array_ptr_type;
+	mp,msp:message_array_type;
 	result:string;
 	error_report:string;
 	instruction:string='';
 	option:string='';
 	word:string='';
 	message_string:string='';
-	trace:xy_graph_ptr;
+	trace:xy_graph_type;
 	sample_num:integer=0;
 	null_count:integer=0;
 	null_block_length:integer=0;
@@ -1093,38 +1092,6 @@ var
 		block_move(pm,pn,message_length);
 	end;
 	
-	{
-		new_message_array allocates space for as many messages as we 
-		are likely to need.
-	}
-	function new_message_array(n:integer):message_array_ptr_type;
-	var
-		mp:message_array_ptr_type;
-	begin
-		new_message_array:=nil;
-		new(mp);
-		setlength(mp^,n);
-		if mp=nil then begin
-			report_error('Failed to allocate for message array in new_message_array');
-			exit;
-		end;
-		inc_num_outstanding_ptrs(length(mp^),'new_message_array');
-		new_message_array:=mp;
-	end;
-
-	{
-		dispose_message_array frees up the message array memory. When
-		we pass data back out of this routine, we use a global string
-		variable called lwdaq_sct_recorder.
-	}
-	procedure dispose_message_array(mp:message_array_ptr_type);
-	begin
-		if mp=nil then exit;
-		dec_num_outstanding_ptrs(length(mp^),'ispose_message_array');
-		dispose(mp);
-	end;
-
-	
 begin
 {
 	Allocate return string and check image pointer.
@@ -1186,8 +1153,7 @@ begin
 	those that are missing or corrupted, this index will be carried over, so
 	that the array keeps track of where the data for each message originated.
 }
-	mp:=new_message_array(max_num_selected);
-	if mp=nil then exit;
+	setlength(mp,max_num_selected);
 {
 	We scan through the messages in the image and construct an array that is
 	easier for us to manipulate. If we have specified data_size = n, we go
@@ -1301,7 +1267,7 @@ begin
 						or (time-id_previous[id].time>1) then begin
 					id_qty[id]:=id_qty[id]+1;
 					id_previous[id]:=m;
-					mp^[num_selected]:=m;
+					mp[num_selected]:=m;
 					inc(num_selected);
 				end;
 			end;
@@ -1330,8 +1296,8 @@ begin
 }
 	if instruction='purge' then begin
 		for message_num:=0 to num_selected-1 do
-			if message_num<>mp^[message_num].index then
-				copy_message(ip,mp^[message_num].index,message_num);
+			if message_num<>mp[message_num].index then
+				copy_message(ip,mp[message_num].index,message_num);
 		m.id:=0;
 		m.sample:=0;
 		m.time:=0;
@@ -1410,13 +1376,13 @@ begin
 		We go through the messages looking for those with the extract_id and count them.
 		We write the time and sample to the return string.
 }
-		trace:=new_xy_graph(num_selected);
+		setlength(trace,num_selected);
 		num_extracted:=0;
 		for message_num:=0 to num_selected-1 do begin
-			with mp^[message_num] do begin
+			with mp[message_num] do begin
 				if id=extract_id then begin
-					trace^[num_extracted].x:=time;
-					trace^[num_extracted].y:=index;
+					trace[num_extracted].x:=time;
+					trace[num_extracted].y:=index;
 					inc(num_extracted);
 					writestr(message_string,time:1,' ',sample:1);
 					if length(result)>0 then message_string:=eol+message_string;
@@ -1436,8 +1402,7 @@ begin
 		if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
 		electronics_trace:=new_xy_graph(num_extracted);	
 		for message_num:=0 to num_extracted-1 do
-			electronics_trace^[message_num]:=trace^[message_num];
-		dispose_xy_graph(trace);
+			electronics_trace^[message_num]:=trace[message_num];
 {
 	Record number of clocks and number extracted to the image result string.
 }
@@ -1459,7 +1424,7 @@ begin
 			message_index:=-1;
 			message_num:=0;
 			while (message_index<0) and (message_num<num_selected) do begin
-				m:=mp^[message_num];
+				m:=mp[message_num];
 				if m.id=clock_id then begin
 					if clock_index=clock_num then message_index:=m.index;
 					inc(clock_index);
@@ -1480,25 +1445,21 @@ begin
 	if instruction='reconstruct' then begin
 		if (num_clocks<min_reconstruct_clocks) then begin
 			report_error('Too few clock messages for reconstruction in lwdaq_sct_recorder');
-			dispose_message_array(mp);
 			exit;
 		end;
 		reconstruct_id:=read_integer(command);
 		if (reconstruct_id<min_id) or (reconstruct_id>max_id) then begin
 			report_error('Invalid reconstruct_id in lwdaq_sct_recorder');
-			dispose_message_array(mp);
 			exit;
 		end;
 		period:=read_integer(command);
 		if (period<min_period) or (period>max_period) then begin
 			report_error('Invalid period in lwdaq_sct_recorder');
-			dispose_message_array(mp);
 			exit;
 		end;
 		standing_value:=read_integer(command);
 		if (standing_value<min_sample) or (standing_value>max_sample) then begin
 			report_error('Invalid standing_value in lwdaq_sct_recorder');
-			dispose_message_array(mp);
 			exit;
 		end;
 {
@@ -1514,11 +1475,7 @@ begin
 {
 	Create a message stack.
 }
-		msp:=new_message_array(max_num_selected);
-		if msp=nil then begin
-			dispose_message_array(mp);
-			exit;
-		end;
+		setlength(msp,max_num_selected);
 {
 	We extract unaccepted values from the command string and place them at
 	the front of the new message stack.
@@ -1526,7 +1483,7 @@ begin
 		stack_height:=0;	
 		word:=read_word(command);
 		while word<>'' do begin
-			with msp^[stack_height] do begin
+			with msp[stack_height] do begin
 				id:=reconstruct_id;
 				timestamp:=0;
 				time:=0;
@@ -1534,8 +1491,6 @@ begin
 				sample:=read_integer(word);
 				if (sample<min_sample) or (sample>max_sample) then begin
 					report_error('Invalid sample in lwdaq_sct_recorder');
-					dispose_message_array(mp);
-					dispose_message_array(msp);
 					exit;
 				end;
 			end;
@@ -1547,9 +1502,9 @@ begin
 	message stack. We assume the messages are in chronological order.
 }
 		for message_num:=0 to num_selected-1 do begin
-			with mp^[message_num] do begin
+			with mp[message_num] do begin
 				if (id=reconstruct_id) then begin 
-					msp^[stack_height]:=mp^[message_num];
+					msp[stack_height]:=mp[message_num];
 					inc(stack_height);
 				end;
 			end;
@@ -1558,7 +1513,6 @@ begin
 	We replace the old message array with the newly-created message stack, which
 	contains only messages from the reconstruct signal.
 }
-		dispose_message_array(mp);
 		mp:=msp;
 		num_selected:=stack_height;
 {
@@ -1573,7 +1527,7 @@ begin
 }
 		for phase_index:=0 to period-1 do phase_histogram[phase_index]:=0;
 		for message_num:=0 to num_selected-1 do
-			inc(phase_histogram[mp^[message_num].time mod period]);
+			inc(phase_histogram[mp[message_num].time mod period]);
 		winning_window_score:=0;
 		window_phase:=0;
 		for phase_index:=0 to period-1 do begin
@@ -1604,11 +1558,7 @@ begin
 	with the standing value at the center of the window. By this procedure, we
 	also eliminate messages that fall outside the windows.
 }		
-		msp:=new_message_array(max_num_selected);
-		if msp=nil then begin
-			dispose_message_array(mp);
-			exit;
-		end;
+		setlength(msp,max_num_selected);
 		stack_height:=0;
 		num_missing:=0;
 		num_bad:=0;
@@ -1616,10 +1566,10 @@ begin
 		while window_time<num_clocks*clock_period-window_extent do begin
 			num_candidates:=0;
 			while (message_num<num_selected) and
-					(mp^[message_num].time-window_time<=window_extent) and
+					(mp[message_num].time-window_time<=window_extent) and
 					(num_candidates<max_num_candidates) do begin
-				if abs(mp^[message_num].time-window_time)<=window_extent then begin
-					candidate_list[num_candidates]:=mp^[message_num];
+				if abs(mp[message_num].time-window_time)<=window_extent then begin
+					candidate_list[num_candidates]:=mp[message_num];
 					inc(num_candidates);
 				end;
 				inc(message_num);
@@ -1631,7 +1581,7 @@ begin
 					id:=reconstruct_id;
 					sample:=standing_value;
 					time:=window_time;
-					if stack_height>0 then index:=msp^[stack_height-1].index
+					if stack_height>0 then index:=msp[stack_height-1].index
 					else index:=-1;
 				end;
 			end;
@@ -1652,7 +1602,7 @@ begin
 				m:=candidate_list[best_num];
 				num_bad:=num_bad+num_candidates-1;
 			end;
-			msp^[stack_height]:=m;
+			msp[stack_height]:=m;
 			inc(stack_height);
 			window_time:=window_time+period;
 		end;
@@ -1670,7 +1620,7 @@ begin
 }
 		unaccepted:='';
 		while message_num<num_selected do begin
-			writestr(unaccepted,unaccepted,mp^[message_num].sample,' ');
+			writestr(unaccepted,unaccepted,mp[message_num].sample,' ');
 			inc(message_num);
 		end;
 {
@@ -1682,19 +1632,18 @@ begin
 		valid_index:=-1;
 		message_num:=0;
 		while (message_num<stack_height) and (valid_index=-1) do begin
-			valid_index:=msp^[message_num].index;
+			valid_index:=msp[message_num].index;
 			inc(message_num);
 		end;
 		message_num:=0;
-		while (message_num<stack_height) and (msp^[message_num].index=-1) do begin
-			msp^[message_num].index:=valid_index;
+		while (message_num<stack_height) and (msp[message_num].index=-1) do begin
+			msp[message_num].index:=valid_index;
 			inc(message_num);
 		end;
 {
 	We are now finished with the previous message list, so we dispose of it and
 	replace it with our message stack.
 }
-		dispose_message_array(mp);
 		mp:=msp;
 		num_selected:=stack_height;
 {
@@ -1707,7 +1656,7 @@ begin
 		electronics_trace:=new_xy_graph(num_selected);		
 		if num_selected>0 then begin
 			for message_num:=0 to num_selected-1 do begin
-				with mp^[message_num] do begin
+				with mp[message_num] do begin
 					electronics_trace^[message_num].x:=time;
 					electronics_trace^[message_num].y:=index;				
 					writestr(message_string,time:1,' ',sample:1);
@@ -1715,7 +1664,6 @@ begin
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
 						report_error('Too many messages for result string in lwdaq_sct_recorder');
-						dispose_message_array(mp);
 						exit;
 					end;
 				end;
@@ -1756,7 +1704,6 @@ begin
 				id_num:=read_integer(word);
 				if (id_num<min_id) or (id_num>max_id) then begin
 					report_error('Invalid id_num in lwdaq_sct_recorder');
-					dispose_message_array(mp);
 					exit;
 				end;
 				id_valid[id_num]:=true;	
@@ -1766,7 +1713,7 @@ begin
  		
  		if num_errors>0 then
 			for message_num:=0 to num_selected-1 do
-				mp^[message_num].time:=message_num;
+				mp[message_num].time:=message_num;
  		
 		num_bad_messages:=0;
 		
@@ -1774,36 +1721,35 @@ begin
 		for id_num:=min_id to max_id do begin
 			if id_valid[id_num] then begin
 				if id_qty[id_num]>0 then begin
-					trace:=new_xy_graph(id_qty[id_num]);
+					setlength(trace,id_qty[id_num]);
 					sample_num:=0;
 					for message_num:=0 to num_selected-1 do
-						with mp^[message_num] do begin
+						with mp[message_num] do begin
 							if id=id_num then begin
-								trace^[sample_num].x:=time;
-								trace^[sample_num].y:=sample;
+								trace[sample_num].x:=time;
+								trace[sample_num].y:=sample;
 								inc(sample_num);
 							end;
 						end;
-					ave:=average_y_xy_graph(trace);
-					stdev:=stdev_y_xy_graph(trace);
-					min:=min_y_xy_graph(trace);
-					max:=max_y_xy_graph(trace);
+					ave:=average_y_xy_graph(@trace);
+					stdev:=stdev_y_xy_graph(@trace);
+					min:=min_y_xy_graph(@trace);
+					max:=max_y_xy_graph(@trace);
 					if display_mode='CP' then 
-						display_real_graph(ip,trace,
+						display_real_graph(ip,@trace,
 							overlay_color_from_integer(id_num),
-							mp^[0].time,mp^[num_selected-1].time,
+							mp[0].time,mp[num_selected-1].time,
 							display_min+ave,display_max+ave,0,0)
 					else if display_mode='NP' then
-						display_real_graph(ip,trace,
+						display_real_graph(ip,@trace,
 							overlay_color_from_integer(id_num),
-							mp^[0].time,mp^[num_selected-1].time,
+							mp[0].time,mp[num_selected-1].time,
 							0,0,0,0)
 					else 
-						display_real_graph(ip,trace,
+						display_real_graph(ip,@trace,
 							overlay_color_from_integer(id_num),
-							mp^[0].time,mp^[num_selected-1].time,
+							mp[0].time,mp[num_selected-1].time,
 							display_min,display_max,0,0);
-					dispose_xy_graph(trace);
 				end else begin
 					ave:=0;
 					stdev:=0;
@@ -1840,7 +1786,6 @@ begin
 {
  	Clean up.
 }
-	dispose_message_array(mp);
 	lwdaq_sct_recorder:=result;
 end;
 

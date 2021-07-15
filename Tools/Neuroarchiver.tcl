@@ -3871,6 +3871,15 @@ proc Neurotracker_extract {} {
 	upvar #0 Neuroarchiver_config config
 	upvar #0 Neuroarchiver_info(tracker_history_$info(channel_num)) history
 
+	# Determine the number of detectors.
+	set num_detectors [expr [llength $config(tracker_coordinates)]/2]
+	
+	# If the playload length does not match the number of detector coils,
+	# we abort, because we are not playing a tracker archive.
+	if {($config(player_payload_length) != $num_detectors + 1)} {
+		return "ABORT"
+	}
+	
 	# Determine if this is a lossy interval.
 	if {$info(loss)/100.0 < (1-$config(loss_fraction))} {
 		set lossy 0
@@ -3880,16 +3889,6 @@ proc Neurotracker_extract {} {
 	
 	# Set error flag.
 	set error_flag 0
-	
-	# Determine the number of detectors.
-	set num_detectors [expr [llength $config(tracker_coordinates)]/2]
-	
-	# If the playload length does not match the number of detector coils,
-	# we abort, because we are not playing a tracker archive.
-	if {($config(player_payload_length) != $num_detectors + 1)} {
-		Neuroarchiver_print "ERROR: Cannot find tracker power measurements in archive."
-		return "ERROR"
-	}
 	
 	# Calculate the number of slices into which we should divide the playback
 	# interval for location tracking. If we see an error, set an error flag
