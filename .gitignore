@@ -7,3 +7,5 @@
 /Build/*.so
 /Build/*.dylib
 /Build/*.dll
+/Build/*.ppu
+/Build/*.exe

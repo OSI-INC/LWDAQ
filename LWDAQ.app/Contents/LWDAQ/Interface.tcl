@@ -178,7 +178,7 @@ proc LWDAQ_init_main_window {} {
 	switch $info(os) {
 		"MacOS" {pack .frame.quit -side left -expand 1 -padx 100 -pady 20}
 		"Linux" {pack .frame.quit -side left -expand 1 -padx 160 -pady 20}
-		"Windows" {pack .frame.quit -side left -expand 1 -padx 140 -pady 20}
+		"Windows" {pack .frame.quit -side left -expand 1 -padx 160 -pady 20}
 		default {pack .frame.quit -side left -expand 1 -padx 100 -pady 20}
 	}
 
