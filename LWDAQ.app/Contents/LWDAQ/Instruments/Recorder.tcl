@@ -70,6 +70,7 @@ proc LWDAQ_init_Recorder {} {
 	set info(sel_ch_cmd) "84"
 	set info(sel_all_cmd) "FF84"
 	set info(sel_none_cmd) "0084"
+	set info(all_sets_cmd) "1F04"
 	set info(channel_activity) ""
 	set info(activity_threshold) "10"
 	set info(errors_for_stop) 10
@@ -341,6 +342,12 @@ proc LWDAQ_reset_Recorder {} {
 		# Wait for command to complete.
 		LWDAQ_wait_for_driver $sock
 		
+		# For backward-compatibility with Octal Data Receivers (ODR, assembly
+		# number A3027) with firmware versions 10, 11, and 12, we include this
+		# command that configures an ODR to receive from all channels rather
+		# than only channels 1-14.
+		LWDAQ_transmit_command_hex $sock $info(all_sets_cmd)
+	
 		# Send a list of channels to select for recording. If the list is simply a
 		# wildcard, we configure the receiver to record all channels. If the list
 		# contains only integers, we first instruct the receiver to accept no
@@ -370,7 +377,7 @@ proc LWDAQ_reset_Recorder {} {
 				}
 			}
 		}
-		
+				
 		# Wait for completion and close socket.
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
