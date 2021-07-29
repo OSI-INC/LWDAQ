@@ -11,7 +11,7 @@ lappend LWDAQ_Info(children) "$ch Videoarchiver"
 puts "Child process initialized, using channel $ch\."
 puts $ch {if {![info exists LWDAQ_Info]} {source LWDAQ.app/Contents/LWDAQ/Init.tcl}}
 puts "Configuring child process as stand-alone Videoarchiver..."
-puts $ch {set Videoarchiver_mode Main}
+puts $ch {set Videoarchiver_mode "Child"}
 puts $ch {LWDAQ_run_tool Videoarchiver.tcl}
 switch $LWDAQ_Info(os) {
 	"MacOS" {
@@ -20,6 +20,9 @@ switch $LWDAQ_Info(os) {
 		puts $ch "destroy .menubar.spawn"
 	}
 	"Windows" {
+		puts $ch "destroy .menubar.instruments"
+		puts $ch "destroy .menubar.tools"
+		puts $ch "destroy .menubar.spawn"
 		puts $ch "destroy .menubar"
 	}
 	"Linux" {

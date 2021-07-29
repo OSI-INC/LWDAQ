@@ -61,14 +61,14 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "146"
+	LWDAQ_tool_init "Neuroarchiver" "147"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
 # main window, and to implement the Recorder only, the Player only, or both.
 #
 	if {![info exists Neuroarchiver_mode]} {
-		set info(mode) "Archiver"
+		set info(mode) "Main"
 	} {
 		set info(mode) $Neuroarchiver_mode
 	}
@@ -7272,25 +7272,25 @@ proc Neuroarchiver_open {} {
 	scan [wm maxsize .] %d%d x y
 	
 	switch $info(mode) {
-		"Archiver" {
-			wm title $w "Neuro-Archiver $info(version)"
+		"Main" {
+			wm title $w "Neuroarchiver $info(version), Running in Main Process"
 			wm maxsize $w [expr $x*2] [expr $y*2]
 		}	
 		"Player" {
-			wm title . "Neuro-Player $info(version)"
+			wm title . "Neuroplayer $info(version), Running in Child Process"
 			wm maxsize . [expr $x*2] [expr $y*2]
 		}	
 		"Recorder" {
-			wm title . "Neuro-Recorder $info(version)"
+			wm title . "Neurorecorder $info(version), Running in Child Process"
 			wm maxsize . [expr $x*2] [expr $y*2]
 		}	
 		"Combined" {
-			wm title . "Neuro-Archiver $info(version)"
+			wm title . "Neuroplayer with Neurorecorder $info(version), Running in Child Process"
 			wm maxsize . [expr $x*2] [expr $y*2]
 		}	
 	}
 	
-	if {($info(mode) == "Archiver") \
+	if {($info(mode) == "Main") \
 		|| ($info(mode) == "Recorder") \
 		|| ($info(mode) == "Combined")} {
 		set f $w.record
@@ -7387,7 +7387,7 @@ proc Neuroarchiver_open {} {
 		pack $f.ee -side left -expand yes
 	}
 	
-	if {($info(mode) == "Archiver") \
+	if {($info(mode) == "Main") \
 		|| ($info(mode) == "Player") \
 		|| ($info(mode) == "Combined")} {
 		set f $w.displays
@@ -7618,13 +7618,13 @@ proc Neuroarchiver_open {} {
 	}	
 
 	switch $info(mode) {
-		"Archiver" {set info(text) [LWDAQ_text_widget $w 100 10 1 1]}
+		"Main" {set info(text) [LWDAQ_text_widget $w 100 10 1 1]}
 		"Player" {set info(text) [LWDAQ_text_widget $w 100 10 1 1]}
 		"Combined" {set info(text) [LWDAQ_text_widget $w 100 10 1 1]}
 		"Recorder" {set info(text) [LWDAQ_text_widget $w 80 5 1 1]}
 	}
 	
-	if {($info(mode) == "Archiver") \
+	if {($info(mode) == "Main") \
 		|| ($info(mode) == "Player") \
 		|| ($info(mode) == "Combined")} {
 		LWDAQ_bind_command_key $w Left {Neuroarchiver_command play Back}
@@ -7659,7 +7659,7 @@ proc Neuroarchiver_close {} {
 
 Neuroarchiver_init 
 switch $Neuroarchiver_info(mode) {
-	"Archiver" {
+	"Main" {
 		Neuroarchiver_open
 		Neuroarchiver_fresh_graphs 1
 	}

@@ -2,7 +2,6 @@
 # of the Neuroarchiver Tool.
 #
 # Copyright (C) 2021 Kevan Hashemi, Open Source Instruments Inc.
-#
 
 cd $LWDAQ_Info(program_dir)
 puts "Spawning child process..."
@@ -12,7 +11,7 @@ lappend LWDAQ_Info(children) "$ch Neuroplayer"
 puts "Child process initialized, using channel $ch\."
 puts $ch {if {![info exists LWDAQ_Info]} {source LWDAQ.app/Contents/LWDAQ/Init.tcl}}
 puts "Configuring child process as stand-alone Neuroplayer..."
-puts $ch {set Neuroarchiver_mode Player}
+puts $ch {set Neuroarchiver_mode "Player"}
 puts $ch {LWDAQ_run_tool Neuroarchiver.tcl}
 switch $LWDAQ_Info(os) {
 	"MacOS" {

@@ -26,7 +26,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "19"
+	LWDAQ_tool_init "Videoarchiver" "20"
 
 	# We check the global Videoarchiver_mode variable, which is the means by
 	# which we can direct the Videoarchiver to use the LWDAQ main window or
@@ -43,7 +43,7 @@ proc Videoarchiver_init {} {
 	# that window already exists. If it does exist, we abort. When we are taking
 	# over the main window, we proceed anyway.
 	switch $info(mode) {
-		"Main" {set info(window) ""}
+		"Child" {set info(window) ""}
 		default {
 			if {[LWDAQ_widget_exists $info(window)]} {return "ABORT"}
 		}
@@ -1059,16 +1059,18 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 
 	# Check the state of the camera.
 	if {$command == "Start"} {
+		LWDAQ_process_stop $info(monitor_process)
+		catch {close $info(monitor_channel)}
+		set info(monitor_channel) "none"
+		set info(monitor_cam) "0"
 		if {$info(cam$n\_state) != "Record"} {
 			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Can start monitor\
 				only when recording."
 			return "ERROR"
 		}
-		LWDAQ_process_stop $info(monitor_process)
-		catch {close $info(monitor_channel)}
 		set info(monitor_cam) $n
 		set info(monitor_channel) [open "| $info(mplayer) \
-			-title \"Monitor for $info(cam$n\_id)\" \
+			-title \"Monitor for $info(cam$n\_id) $ip\" \
 			-slave -demuxer lavf -idle -really-quiet \
 			-fixed-vo -zoom -xy $config(display_zoom) -geometry 10%:10% \
 			>& monitor_log.txt" w]
@@ -1370,7 +1372,7 @@ proc Videoarchiver_transfer {n} {
 	global LWDAQ_Info
 	
 	# Know when to quit. The transfer process quits if the window is gone.
-  	if {![winfo exists $info(window)]} {
+  	if {![LWDAQ_widget_exists $info(window)]} {
 		return "STOP"
  	}
 
@@ -1487,11 +1489,12 @@ proc Videoarchiver_transfer {n} {
 						lag $lag s, $freq GHz, $temp C, $ip." $config(v_col)
 				}
 				
-				# If the recording monitor is running for this channe, load the new segments 
+				# If the recording monitor is running for this channel, load the new segments 
 				# into the monitor
 				if {($info(monitor_cam) == $n) && ($info(monitor_channel) != "none")} {
 					set when "loading monitor"
-					foreach sf $seg_list {Videoarchiver_monitor $n Write "loadfile $sf 1"}
+					foreach sf $seg_list {Videoarchiver_monitor $n Write \
+						"loadfile [file join [Videoarchiver_segdir $n] $sf] 1"}
 					if {$config(verbose)} {
 						regexp {V([0-9]{10})} [lindex $seg_list 0] match tfirst
 						set tnow [clock seconds]
@@ -1721,7 +1724,7 @@ proc Videoarchiver_stop {n} {
 	set info(cam$n\_lag) "?"
 	LWDAQ_set_fg $info(cam$n\_laglabel) gray
 
- 	if {![winfo exists $info(window)]} {
+ 	if {![LWDAQ_widget_exists $info(window)]} {
  		set info(text) stdout
  	}
 	
@@ -1834,7 +1837,7 @@ proc Videoarchiver_directory {{post 1}} {
 	# currently recording or even stalled.
 	foreach n $info(cam_list) {
 		if {($info(cam$n\_state) == "Record") || ($info(cam$n\_state) == "Stalled")} {
-			LWDAQ_print $into(text) "ERROR: Cannot change recording directory while\
+			LWDAQ_print $info(text) "ERROR: Cannot change recording directory while\
 				$info(cam$n\_id) is recording."
 			return "ERROR"
 		}
@@ -2323,12 +2326,12 @@ proc Videoarchiver_configure {} {
 	
 	# This is the standard configuration routine, which returns the name
 	# of a frame widget into which we can put more buttons.
-	set f [LWDAQ_tool_configure $info(name)]
+	set f [LWDAQ_tool_configure $info(name) 2]
 	
 	foreach a {View_Restart_Log Clear_Restart_Log} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Videoarchiver_$b"
-		pack $f.$b -side left -expand 1
+		pack $f.$b -side top -expand 1
 	}
 	
 	return "SUCCESS" 
@@ -2342,8 +2345,20 @@ proc Videoarchiver_open {} {
 	upvar #0 Videoarchiver_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return "ABORT"}
 	if {$w == "."} {set w ""}
+	scan [wm maxsize .] %d%d x y
+	
+	switch $info(mode) {
+		"Main" {
+			wm title $w "Videoarchiver $info(version), Running in Main Process"
+			wm maxsize $w [expr $x*2] [expr $y*2]
+		}	
+		"Child" {
+			wm title . "Videoarchiver $info(version), Running in Child Process"
+			wm maxsize . [expr $x*2] [expr $y*2]
+		}	
+	}
 	
 	set padx 0
 	set f $w.f1
