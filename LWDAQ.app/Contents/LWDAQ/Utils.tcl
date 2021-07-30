@@ -28,6 +28,7 @@
 #
 proc LWDAQ_utils_init {} {
 	upvar #0 LWDAQ_Info info
+	set info(quit) 0
 	set info(queue_run) 0
 	set info(queue_ms) 10
 	set info(queue_events) [list]
@@ -73,6 +74,7 @@ proc LWDAQ_utils_init {} {
 proc LWDAQ_quit {} {
 	upvar #0 LWDAQ_Info info
 	LWDAQ_close_all_sockets
+	set LWDAQ_Info(quit) 1
 	exit
 }
 

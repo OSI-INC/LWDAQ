@@ -47,7 +47,8 @@ if {[regexp -nocase "Linux" $tcl_platform(os)]} {
 set LWDAQ_Info(arch) "x86_64"
 
 # Set the user-defined flags to their default values.
-set LWDAQ_Info(console_enabled) 1
+set LWDAQ_Info(run_mode) "--gui"
+set LWDAQ_Info(console_enabled) "0"
 set LWDAQ_Info(configuration_file) ""
 set LWDAQ_Info(argv) ""
 
@@ -63,22 +64,27 @@ foreach a $argv {
 		}
 		"--no-console" {
 			set LWDAQ_Info(console_enabled) 0
+			set LWDAQ_Info(run_mode) $a
 		}
 		"--gui" {
 			switch $LWDAQ_Info(os) {
-				"MacOS" {set LWDAQ_Info(console_enabled) 1}
+				"MacOS" {set LWDAQ_Info(console_enabled) 0}
 				"Windows" {set LWDAQ_Info(console_enabled) 0}
 				"Linux" {set LWDAQ_Info(console_enabled) 1}
 			}
+			set LWDAQ_Info(run_mode) $a
 		}
 		"--no-gui" {
 			set LWDAQ_Info(console_enabled) 1
+			set LWDAQ_Info(run_mode) $a
 		}
 		"--child" {
 			set LWDAQ_Info(console_enabled) 0
+			set LWDAQ_Info(run_mode) $a
 		}
 		"--pipe" {
 			set LWDAQ_Info(console_enabled) 0
+			set LWDAQ_Info(run_mode) $a
 		}
 		default {
 			if {$LWDAQ_Info(configuration_file) == ""} {
@@ -113,51 +119,13 @@ if {!$LWDAQ_Info(gui_enabled)} {
 # Determine whether or not we have a graphical slave console available
 # through the TK "console" command.
 if {$LWDAQ_Info(console_enabled)} {
+	set LWDAQ_Info(slave_console) 0
+} {
 	if {[info commands console] == "console"} {
 		set LWDAQ_Info(slave_console) 1
 	} {
 		set LWDAQ_Info(slave_console) 0
 	}
-} {
-	set LWDAQ_Info(slave_console) 0
-}
-
-#
-# LWDAQ_stdin_console_start turns the standard input, which will exist when
-# we start LWDAQ from a terminal on UNIX, LINUX, and even Windows and MacOS.
-# The console is primitive in its current incarnation: no up or down-arrow 
-# implementation to give you previous commands, no left or right arrows to
-# navigate through the command. But it's better than nothing.
-#
-proc LWDAQ_stdin_console_start {} {
-	global LWDAQ_Info
-	fconfigure stdin -translation auto -buffering line
-	fileevent stdin readable LWDAQ_stdin_console_execute
-	puts -nonewline stdout $LWDAQ_Info(console_prompt)
-	flush stdout
-}
-
-#
-# LWDAQ_stdin_console_execute executes a command supplied from the stdin console,
-# if it exists, and writes the result to the stdout console.
-#
-proc LWDAQ_stdin_console_execute {} {
-	global LWDAQ_Info
-	catch {
-		gets stdin line
-		catch {uplevel $line} result
-		if {$result != ""} {puts stdout $result}
-	}
-	puts -nonewline stdout $LWDAQ_Info(console_prompt)
-	flush stdout
-}
-
-#
-# LWDAQ_stdin_console_stop turns off the file event associated with the standard
-# input and so stops theconsole that uses stdin and stdout.
-#
-proc LWDAQ_stdin_console_stop {} {
-	fileevent stdin readable ""
 }
 
 #
@@ -337,6 +305,48 @@ if {$num_errors > 0} {
 	puts "Initialization concluded with $num_errors errors."
 }
 
+#
+# LWDAQ_stdin_console_start turns the standard input, which will exist when
+# we start LWDAQ from a terminal on UNIX, LINUX, and even Windows and MacOS.
+# The console is primitive in its current incarnation: no up or down-arrow 
+# implementation to give you previous commands, no left or right arrows to
+# navigate through the command. But it's better than nothing.
+#
+proc LWDAQ_stdin_console_start {} {
+	global LWDAQ_Info
+	fconfigure stdin -translation auto -buffering line
+	fileevent stdin readable LWDAQ_stdin_console_execute
+	puts -nonewline stdout $LWDAQ_Info(console_prompt)
+	flush stdout
+}
+
+#
+# LWDAQ_stdin_console_execute executes a command supplied from the stdin console,
+# if it exists, and writes the result to the stdout console.
+#
+proc LWDAQ_stdin_console_execute {} {
+	global LWDAQ_Info
+	if {[catch {
+		if {[gets stdin line] > 0} {
+			set result [uplevel $line]
+			if {$result != ""} {puts stdout $result}
+		}
+	} error_result]} {
+		puts $error_result
+	}
+	puts -nonewline stdout $LWDAQ_Info(console_prompt)
+	flush stdout
+}
+
+#
+# LWDAQ_stdin_console_stop turns off the file event associated with the standard
+# input and so stops theconsole that uses stdin and stdout.
+#
+proc LWDAQ_stdin_console_stop {} {
+	fileevent stdin readable ""
+}
+
+
 # If we have a slave console and we have errors, open it so that the errors will
 # be visible. If we don't have a slave console, and our console interface is
 # enabled, start our standard input console.
@@ -353,9 +363,24 @@ if {$LWDAQ_Info(slave_console)} {
 # If we ran LWDAQ from tclsh, or any other TCL-only shell, the shell
 # will be inclined to terminate now that it has run Init.tcl. We keep
 # the shell alive by telling it to wait until LWDAQ_Info(quit) is set. 
-# You can force the shell to quit with the "exit" command.
+# You can force the shell to quit with the "exit" command. If we are
+# running in a pipe, however, we will read all available input from
+# stdin, then exit.
 if {!$LWDAQ_Info(gui_enabled)} {
-	vwait LWDAQ_Info(quit)
+	if {$LWDAQ_Info(run_mode) == "--pipe"} {
+		fconfigure stdin -translation auto -buffering line
+		while {[gets stdin line] > 0} {
+			if {[catch {
+				set result [eval $line]
+				puts "$result"
+			} error_result]} {
+				puts $error_result
+				break
+			}
+		}
+	} {
+		vwait LWDAQ_Info(quit)
+	}
 }
 
 # Return a value of 1 to show success.

@@ -130,6 +130,9 @@ proc LWDAQ_run_tool {{file_name ""}} {
 	set fn $file_name
 	if {$fn == ""} {set fn [LWDAQ_get_file_name]}
 	if {$fn == ""} {return ""}
+	if {[file extension $file_name] == ""} {
+		set file_name "$file_name\.tcl"
+	}
 	if {![file exists $fn]} {
 		set fn [file join $LWDAQ_Info(working_dir) $file_name]
 		if {![file exists $fn]} {
@@ -137,7 +140,7 @@ proc LWDAQ_run_tool {{file_name ""}} {
 			if {![file exists $fn]} {
 				set fn [file join $LWDAQ_Info(tools_dir) More $file_name]
 				if {![file exists $fn]} {
-					error "cannot find tool file \"$file_name\""
+					error "Cannot find tool file \"$file_name\""
 				}
 			}
 		}
