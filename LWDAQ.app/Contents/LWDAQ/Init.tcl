@@ -27,7 +27,7 @@ set num_errors 0
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.2"
-set LWDAQ_Info(program_patchlevel) "10.2.8"
+set LWDAQ_Info(program_patchlevel) "10.2.9"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 set LWDAQ_Info(console_prompt) "LWDAQ% "
 	
@@ -61,17 +61,24 @@ foreach a $argv {
 		"-psn*" {
 		# We ignore these process serial number arguments.
 		}
-		"--console" {
-			set LWDAQ_Info(console_enabled) 1
-		}
 		"--no-console" {
 			set LWDAQ_Info(console_enabled) 0
 		}
 		"--gui" {
-			set LWDAQ_Info(console_enabled) 1
+			switch $LWDAQ_Info(os) {
+				"MacOS" {set LWDAQ_Info(console_enabled) 1}
+				"Windows" {set LWDAQ_Info(console_enabled) 0}
+				"Linux" {set LWDAQ_Info(console_enabled) 1}
+			}
 		}
 		"--no-gui" {
 			set LWDAQ_Info(console_enabled) 1
+		}
+		"--child" {
+			set LWDAQ_Info(console_enabled) 0
+		}
+		"--pipe" {
+			set LWDAQ_Info(console_enabled) 0
 		}
 		default {
 			if {$LWDAQ_Info(configuration_file) == ""} {
@@ -88,6 +95,7 @@ foreach a $argv {
 	}
 }
 
+
 # Decide whether or not we should enable LWDAQ's graphical user
 # interface (GUI). If LWDAQ is running in the "wish" shell, which is the
 # TclTk shell, we turn on the GUI. But if LWDAQ is running in "tclsh", 
@@ -101,24 +109,6 @@ set LWDAQ_Info(gui_enabled) \
 if {!$LWDAQ_Info(gui_enabled)} {
 	proc winfo {args} {return 0}
 }
-
-# If the GUI is enabled, we enable the LWDAQ console. If the
-# GUI is disabled, and enable_console has been set to 0, we 
-# will disable the console. When the console is disabled, 
-# LWDAQ can run in the background. If enable_console has been
-# set already, we make sure that it has been set to zero, or
-# else we set it to 1.
-if {$LWDAQ_Info(gui_enabled)} {
-	set LWDAQ_Info(console_enabled) 1
-} {
-	if {![info exists LWDAQ_Info(console_enabled)]} {
-		set LWDAQ_Info(console_enabled) 1
-	} {
-		if {$LWDAQ_Info(console_enabled) != "0"} {
-			set LWDAQ_Info(console_enabled) 1
-		}
-	}
-} 
 
 # Determine whether or not we have a graphical slave console available
 # through the TK "console" command.
@@ -140,20 +130,11 @@ if {$LWDAQ_Info(console_enabled)} {
 # navigate through the command. But it's better than nothing.
 #
 proc LWDAQ_stdin_console_start {} {
+	global LWDAQ_Info
 	fconfigure stdin -translation auto -buffering line
 	fileevent stdin readable LWDAQ_stdin_console_execute
-	LWDAQ_stdin_console_prompt
-}
-
-#
-# LWDAQ_stdin_console_prompt writes the LWDAQ prompt to the stdin console.
-#
-proc LWDAQ_stdin_console_prompt {} {
-	global LWDAQ_Info
-	catch {
-		puts -nonewline stdout $LWDAQ_Info(console_prompt)
-		flush stdout
-	}
+	puts -nonewline stdout $LWDAQ_Info(console_prompt)
+	flush stdout
 }
 
 #
@@ -161,12 +142,22 @@ proc LWDAQ_stdin_console_prompt {} {
 # if it exists, and writes the result to the stdout console.
 #
 proc LWDAQ_stdin_console_execute {} {
+	global LWDAQ_Info
 	catch {
 		gets stdin line
 		catch {uplevel $line} result
 		if {$result != ""} {puts stdout $result}
 	}
-	LWDAQ_stdin_console_prompt
+	puts -nonewline stdout $LWDAQ_Info(console_prompt)
+	flush stdout
+}
+
+#
+# LWDAQ_stdin_console_stop turns off the file event associated with the standard
+# input and so stops theconsole that uses stdin and stdout.
+#
+proc LWDAQ_stdin_console_stop {} {
+	fileevent stdin readable ""
 }
 
 #
@@ -337,7 +328,7 @@ if {$LWDAQ_Info(configuration_file) != ""} {
 
 # Check to see if there are spaces in the LWDAQ program directory.
 if {[regexp { } $LWDAQ_Info(program_dir)]} {
-	puts "WARNING: Installation directory \"$LWDAQ_Info(program_dir)\" contains spaces."
+	puts "ERROR: Installation directory \"$LWDAQ_Info(program_dir)\" contains spaces."
 	incr num_errors
 }
 

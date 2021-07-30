@@ -43,9 +43,11 @@ REM Default values for options and configuration
 REM file name.
 REM ------------------------------------------
 
-set option=--gui
-set console=--console
 set script=%1
+set gui_enabled=1
+set console_enabled=0
+set background=1
+set option=--gui
 
 REM ------------------------------------------
 REM Attempt to extract options and configuration
@@ -53,22 +55,37 @@ REM file name from the command line parameters.
 REM ------------------------------------------
 
 if [%1]==[--no-gui] (
-  set option=--no-gui
-  set console=--console
-  set script=%2
+	set option=%1
+	set gui_enabled=0
+	set console_enabled=1
+	set background=0
+	set script=%2
 ) 
 if [%1]==[--gui] (
-  set option=--gui
-  set console=--console
-  set script=%2
+	set option=%1
+	set gui_enabled=1
+	set console_enabled=0
+	set background=1
+	set script=%2
 )
 if [%1]==[--no-console] (
-  set option=--no-console
-  set console=--no-console
-  set script=%2
+	set option=%1
+	set gui_enabled=0
+	set console_enabled=0
+	set background=1
+	set script=%2
+)
+if [%1]==[--child] (
+	set option=%1
+	set gui_enabled=1
+	set console_enabled=0
+	set background=1
+	set script=%2
 )
 echo Option: %option%
-echo Console: %console%
+echo Background: %background%
+echo Console: %console_enabled%
+echo Graphics: %gui_enabled%
 
 REM ------------------------------------------
 REM If the start-up script name is not an
@@ -79,12 +96,20 @@ REM terminal. We ignore an empty string file
 REM name.
 REM ------------------------------------------
 
-if [%script%]==[] goto donescript
+if [%script%]==[] (
+	if [%option%]==[--no-console] (
+		echo ERROR: No configuration file specified with no-console option.
+		goto done
+	) else (
+		echo Configuration: none
+		goto donescript
+	)
+)
 if not exist %script% (
   echo ERROR: Bad option or script %script%.
   goto done
 ) else (
-  echo Script: %script%
+  echo Configuration: %script%
 )
 :donescript
 
@@ -92,14 +117,11 @@ REM ------------------------------------------
 REM Choose the shell based upon the option.
 REM ------------------------------------------
 
-if [%option%]==[--no-gui] (
+if [%gui_enabled%]==[0] (
   set shell=%LWDAQ_DIR%LWDAQ.app\Contents\Windows\bin\tclsh86.exe
 )
-if [%option%]==[--gui] (
+if [%gui_enabled%]==[1] (
   set shell=%LWDAQ_DIR%LWDAQ.app\Contents\Windows\bin\wish86.exe
-)
-if [%option%]==[--no-console] (
-  set shell=%LWDAQ_DIR%LWDAQ.app\Contents\Windows\bin\tclsh86.exe
 )
 if not exist "%shell%" (
   echo ERROR: Cannot find shell %shell%.  
@@ -126,17 +148,13 @@ REM within this batch file, depending upon the
 REM options.
 REM ------------------------------------------
 
-if [%option%]==[--no-gui] (
+if [%background%]==[0] (
   SETLOCAL
   set path="%path%"
-  "%shell%" "%initializer%" %console% %script%
+  "%shell%" "%initializer%" %option% %script%
 )
-if [%option%]==[--gui] (
-  start "LWDAQ --gui" "%shell%" "%initializer%" %console% %script%
+if [%background%]==[1] (
+  start "LWDAQ %option%" "%shell%" "%initializer%" %option% %script%
 )
-if [%option%]==[--no-console] (
-  start "LWDAQ --no-console" "%shell%" "%initializer%" %console% %script%
-)
-
 
 :done

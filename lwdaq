@@ -88,29 +88,36 @@ OPTION_FOUND=0
 if [ "$OPTION" == "--pipe" ] 
 then 
 	GUI_ENABLED=0
-	CONSOLE_ENABLED=0
 	RUN_IN_BACKGROUND=0
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--no-console" ] 
 then 
 	GUI_ENABLED=0
-	CONSOLE_ENABLED=0
 	RUN_IN_BACKGROUND=1
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--no-gui" ] 
 then 
 	GUI_ENABLED=0
-	CONSOLE_ENABLED=1
 	RUN_IN_BACKGROUND=0
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--gui" ] 
 then 
 	GUI_ENABLED=1
-	CONSOLE_ENABLED=1
-	RUN_IN_BACKGROUND=0
+	if [ "$OS" == "Linux" ]
+	then
+		RUN_IN_BACKGROUND=0
+	else
+		RUN_IN_BACKGROUND=1
+	fi
+	OPTION_FOUND=1
+fi
+if [ "$OPTION" == "--child" ] 
+then 
+	GUI_ENABLED=1
+	RUN_IN_BACKGROUND=1
 	OPTION_FOUND=1
 fi
 
@@ -120,13 +127,11 @@ if [ $OPTION_FOUND == 0 ]
 then
 	echo "WARNING: Unrecognised option '$OPTION', defaulting to --no-gui."
 	GUI_ENABLED=0
-	CONSOLE_ENABLED=1
 	RUN_IN_BACKGROUND=0
 fi
 
 # Report the process options.
 echo "GUI_ENABLED: $GUI_ENABLED"
-echo "CONSOLE_ENABLED: $CONSOLE_ENABLED"
 echo "RUN_IN_BACKGROUND: $RUN_IN_BACKGROUND"
 
 # Report local directory in which relative file names will be resolved.
@@ -143,7 +148,13 @@ then
 		exit
 	fi
 else
-	echo "CONFIG_FILE: None specified"
+	if [ "$OPTION" == "--no-console" ]
+	then
+		echo "ERROR: No configuration file specified with no-console option."
+		exit
+	else
+		echo "CONFIG_FILE: None"
+	fi
 fi
 
 # Pick the TclTk shell based upon the options, operating system
@@ -196,25 +207,10 @@ echo "SHELL: $SHELL"
 INIT_FILE="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Init.tcl"
 
 # Launch the shell and pass to it the start-up script and any additional
-# parameters we may have passed to this bash script. If we have 
-# disabled the console, then we launch the application in the
-# background and re-direct its output to the null device. All output
-# will be lost, and the process will run in the background until
-# you kill it from a terminal, or through some means of coummunication
-# with the process established by the start-up script. For example,
-# the start-up script could start the LWDAQ System Server, which
-# allow you to quit the LWDAQ process with an "exit" command.
-if [ $CONSOLE_ENABLED == 1 ]
+# parameters we may have passed to this bash script.
+if [ $RUN_IN_BACKGROUND == 1 ]
 then
-	$SHELL $INIT_FILE --console $CONFIG_FILE "$@"	
+	$SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" &
 else
-	if [ $RUN_IN_BACKGROUND == 1 ]
-	then
-		$SHELL $INIT_FILE --no-console $CONFIG_FILE "$@" &
-	else
-		$SHELL $INIT_FILE --no-console $CONFIG_FILE "$@"
-	fi
+	$SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@"
 fi
-
-# We're done.
-exit

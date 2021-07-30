@@ -158,13 +158,13 @@ proc LWDAQ_spawn_tool {tool} {
 	set fn [file join $info(spawn_dir) $tool\.tcl]
 	switch $info(os) {
 		"MacOS" {
-			exec ./lwdaq $fn &
+			exec ./lwdaq --child $fn &
 		}
 		"Windows" {
-			exec ./LWDAQ.bat $fn &
+			exec ./LWDAQ.bat --child $fn &
 		}
 		"Linux" {
-			exec ./lwdaq $fn &
+			exec ./lwdaq $fn --child &
 		}
 	}
  	return $tool

@@ -1,6 +1,3 @@
-if {![info exists LWDAQ_Info]} {
-	source LWDAQ.app/Contents/LWDAQ/Init.tcl
-}
 set Neuroarchiver_mode "Recorder"
 LWDAQ_run_tool Neuroarchiver.tcl
 switch $LWDAQ_Info(os) {
