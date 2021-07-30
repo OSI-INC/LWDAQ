@@ -347,9 +347,8 @@ proc LWDAQ_make_tool_menu {} {
 }
 
 #
-# LWDAQ_make_spawn_menu destroys the current spawn menu and
-# makes a new one that matches the current selection of
-# tools in the Spawn folder.
+# LWDAQ_make_spawn_menu destroys the current spawn menu and makes a new one that
+# matches the current selection of tools in the Spawn folder.
 #
 proc LWDAQ_make_spawn_menu {} {
 	upvar #0 LWDAQ_Info info
@@ -358,16 +357,16 @@ proc LWDAQ_make_spawn_menu {} {
 	catch {destroy $m}
 	menu $m -tearoff 0
 	$info(menubar) add cascade -menu $m -label "Spawn"
-	set files [glob -nocomplain [file join $info(spawn_dir) *.tcl]]
-	if {[llength $files] != 0} {
-		set spawn ""
-		foreach s $files {lappend spawn [file tail $s]}
-		set spawn [lsort -dictionary $spawn]
-		foreach s $spawn {
-			set menu_name [lindex [split $s .] 0]
-			set file_name [file join $info(spawn_dir) $s]
-			$m add command -label $menu_name -command \
-				[list LWDAQ_post [list LWDAQ_run_tool $file_name] front]
+	set spawn_files [glob -nocomplain [file join $info(spawn_dir) *.tcl]]
+	if {[llength $spawn_files] != 0} {
+		set spawn_tools [list]
+		foreach sfn $spawn_files {
+			lappend spawn_tools [lindex [split [file tail $sfn] .] 0]
+		}
+		set spawn_tools [lsort -dictionary $spawn_tools]
+		foreach tool $spawn_tools {
+			$m add command -label $tool -command \
+				[list LWDAQ_post [list LWDAQ_spawn_tool $tool] front]
 		}
 	}
 	return 1

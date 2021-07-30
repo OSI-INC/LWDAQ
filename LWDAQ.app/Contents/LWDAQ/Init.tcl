@@ -140,8 +140,8 @@ if {$LWDAQ_Info(console_enabled)} {
 # navigate through the command. But it's better than nothing.
 #
 proc LWDAQ_stdin_console_start {} {
-	fileevent stdin readable LWDAQ_stdin_console_execute
 	fconfigure stdin -translation auto -buffering line
+	fileevent stdin readable LWDAQ_stdin_console_execute
 	LWDAQ_stdin_console_prompt
 }
 
@@ -207,9 +207,9 @@ if {[catch {
 	set LWDAQ_Info(program_dir) [file normalize [file join $LWDAQ_Info(contents_dir) .. ..]]
 	set LWDAQ_Info(lib_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
 	set LWDAQ_Info(package_dir) [file join $LWDAQ_Info(lib_dir) Packages]
+	set LWDAQ_Info(spawn_dir) [file join $LWDAQ_Info(lib_dir) Spawn]
 	set LWDAQ_Info(scripts_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
 	set LWDAQ_Info(tools_dir) [file join $LWDAQ_Info(program_dir) Tools]
-	set LWDAQ_Info(spawn_dir) [file join $LWDAQ_Info(program_dir) Spawn]
 	set LWDAQ_Info(sources_dir)  [file join $LWDAQ_Info(program_dir) Sources]
 	set LWDAQ_Info(instruments_dir) [file join $LWDAQ_Info(scripts_dir) Instruments]
 	set LWDAQ_Info(startup_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Startup]

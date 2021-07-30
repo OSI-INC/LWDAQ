@@ -148,6 +148,29 @@ proc LWDAQ_run_tool {{file_name ""}} {
 }
 
 #
+# LWDAQ_spawn_tool runs a tool in a new and independent LWDAQ process. 
+# In the spawned LWDAQ, the main window does not contain the Quit button,
+# but instead presents the Tool window. 
+#
+proc LWDAQ_spawn_tool {tool} {
+	upvar LWDAQ_Info info
+	cd $info(program_dir)
+	set fn [file join $info(spawn_dir) $tool\.tcl]
+	switch $info(os) {
+		"MacOS" {
+			exec ./lwdaq $fn &
+		}
+		"Windows" {
+			exec ./LWDAQ.bat $fn &
+		}
+		"Linux" {
+			exec ./lwdaq $fn &
+		}
+	}
+ 	return $tool
+}
+
+#
 # LWDAQ_tool_startup initializes the tool directory and file variables.
 # We are retiring this routine, but keep in for backward-compatibility
 # with older versions of LWDAQ. Before LWDAQ 7.1.10, a solitary too
