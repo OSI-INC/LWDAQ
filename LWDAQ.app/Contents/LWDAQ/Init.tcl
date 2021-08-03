@@ -27,7 +27,7 @@ set num_errors 0
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.2"
-set LWDAQ_Info(program_patchlevel) "10.2.9"
+set LWDAQ_Info(program_patchlevel) "10.2.10"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 set LWDAQ_Info(console_prompt) "LWDAQ% "
 	
@@ -327,15 +327,15 @@ proc LWDAQ_stdin_console_start {} {
 proc LWDAQ_stdin_console_execute {} {
 	global LWDAQ_Info
 	if {[catch {
-		if {[gets stdin line] > 0} {
+		if {[gets stdin line] >= 0} {
 			set result [uplevel $line]
 			if {$result != ""} {puts stdout $result}
+			puts -nonewline stdout $LWDAQ_Info(console_prompt)
+			flush stdout
 		}
 	} error_result]} {
 		puts $error_result
 	}
-	puts -nonewline stdout $LWDAQ_Info(console_prompt)
-	flush stdout
 }
 
 #
