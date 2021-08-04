@@ -71,6 +71,7 @@ proc LWDAQ_init_Recorder {} {
 	set info(sel_all_cmd) "FF84"
 	set info(sel_none_cmd) "0084"
 	set info(all_sets_cmd) "1F04"
+	set info(sleep_cmd) "0000"
 	set info(channel_activity) ""
 	set info(activity_threshold) "10"
 	set info(errors_for_stop) 10
@@ -377,7 +378,13 @@ proc LWDAQ_reset_Recorder {} {
 				}
 			}
 		}
-				
+			
+		# Sometimes we accidentally send a receiver reset and configure to the wrong
+		# device. Receivers ignore the sleep command, so we send a sleep command now,
+		# hoping that whatever device we may have activated with the reset will now
+		# go to sleep.
+		LWDAQ_sleep $sock
+			
 		# Wait for completion and close socket.
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
