@@ -151,9 +151,6 @@ proc LWDAQ_init_main_window {} {
 	# Create the Tool menu
 	LWDAQ_make_tool_menu
 	
-	# Create the Spawn menu
-	LWDAQ_make_spawn_menu
-
 	# Create the Help menu.
 	set info(help_menu) $m.help 
 	catch {destroy $info(help_menu)}
@@ -273,9 +270,9 @@ proc LWDAQ_preferences {} {
 }
 
 #
-# LWDAQ_make_tool_menu destroys the current tool menu and
-# makes a new one that matches the current selection of
-# tools in the Tools folder.
+# LWDAQ_make_tool_menu destroys the current tool menu and makes a new one that
+# matches the current selection of tools in the Tools, More, and Spawn
+# directories.
 #
 proc LWDAQ_make_tool_menu {} {
 	upvar #0 LWDAQ_Info info
@@ -286,16 +283,31 @@ proc LWDAQ_make_tool_menu {} {
 	catch {destroy $m}
 	menu $m -tearoff 0
 	$info(menubar) add cascade -menu $m -label "Tool"
-	$info(tool_menu) add command -label "Run Tool" -command \
+	$m add command -label "Run Tool" -command \
 		[list LWDAQ_post LWDAQ_run_tool front]
-	$info(tool_menu) add command -label "Edit Script" -command \
+	$m add command -label "Edit Script" -command \
 		[list LWDAQ_post "LWDAQ_edit_script Open"]
-	$info(tool_menu) add command -label "New Script" -command \
+	$m add command -label "New Script" -command \
 		[list LWDAQ_post "LWDAQ_edit_script New"]
-	$info(tool_menu) add command -label "Toolmaker" -command \
+	$m add command -label "Toolmaker" -command \
 		[list LWDAQ_post LWDAQ_Toolmaker front]
 
-	# Add entries for each tool in the tool folder.
+	# Create the spawn submenu using all files in the Spawn directory.
+	set spawn_files [glob -nocomplain [file join $info(spawn_dir) *.tcl]]
+	if {[llength $spawn_files] != 0} {
+		$m add separator
+		set spawn_tools [list]
+		foreach sfn $spawn_files {
+			lappend spawn_tools [lindex [split [file tail $sfn] .] 0]
+		}
+		set spawn_tools [lsort -dictionary $spawn_tools]
+		foreach tool $spawn_tools {
+			$m add command -label $tool -command \
+				[list LWDAQ_post [list LWDAQ_spawn_tool $tool] front]
+		}
+	}
+
+	# Create the main run submenu using all files in the Tools directory.
 	set files [glob -nocomplain [file join $info(tools_dir) *.tcl]]
 	if {[llength $files] != 0} {
 		set tools ""
@@ -310,7 +322,7 @@ proc LWDAQ_make_tool_menu {} {
 		}
 	}
 
-	# Add entries for subdirectory in the tool folder.
+	# Create the more submenu using files in the More directory.
 	set allsubdirs [glob -nocomplain -types d [file join $info(tools_dir) *]]
 	set toolsubdirs ""
 	if {[llength $allsubdirs] != 0} {
@@ -343,32 +355,6 @@ proc LWDAQ_make_tool_menu {} {
 	}
 
 	# Done.
-	return 1
-}
-
-#
-# LWDAQ_make_spawn_menu destroys the current spawn menu and makes a new one that
-# matches the current selection of tools in the Spawn folder.
-#
-proc LWDAQ_make_spawn_menu {} {
-	upvar #0 LWDAQ_Info info
-	set info(spawn_menu) $info(menubar).spawn
-	set m $info(spawn_menu)
-	catch {destroy $m}
-	menu $m -tearoff 0
-	$info(menubar) add cascade -menu $m -label "Spawn"
-	set spawn_files [glob -nocomplain [file join $info(spawn_dir) *.tcl]]
-	if {[llength $spawn_files] != 0} {
-		set spawn_tools [list]
-		foreach sfn $spawn_files {
-			lappend spawn_tools [lindex [split [file tail $sfn] .] 0]
-		}
-		set spawn_tools [lsort -dictionary $spawn_tools]
-		foreach tool $spawn_tools {
-			$m add command -label $tool -command \
-				[list LWDAQ_post [list LWDAQ_spawn_tool $tool] front]
-		}
-	}
 	return 1
 }
 

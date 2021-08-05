@@ -142,7 +142,7 @@ foreach a {step back save load} {
 # make text window
 set t [text $w.t -relief sunken -bd 1 \
 	-border 2 -yscrollcommand "$w.scroll set" \
-	-setgrid 1 -height 10 -width 100]
+	-setgrid 1 -height 14 -width 100]
 if {[info tclversion] >= 8.4} {$t configure -undo 1 -autosep 1}
 scrollbar $w.scroll -command "$t yview"
 pack $w.scroll -side right -fill y
@@ -176,7 +176,18 @@ proc sudoku_print {args} {
 
 # welcome message.
 sudoku_print .s.t "Welcome to Sudoku Version II" blue
-sudoku_print .s.t "For help, see Sudoku.tcl source code comments.\n"
+sudoku_print .s.t {
+Enter starting values into boxes. Press Step. Multiple numbers will appear in
+other boxes, showing possibilities. Press Step repeatedly. If only one number
+remains in each box, we have our solution. If two or more numbers remain in
+several boxes, we choose a box with the fewest choices and eliminate one number.
+Proceed with Step until we until we reach a solution or a contradiction. If
+contradiction, use Back button to return to the point where we chose a number to
+eliminate, and choose another to eliminate. Proceed with Step. If no choice
+leads to a solution, the original numbers we entered are not consistent with any
+solution. For more details of the program, open Tools/Sudoku.tcl with text
+editor and read comments at top of script.
+}
 
 # routine to read a saved sudoku.
 proc sudoku_load {} {
