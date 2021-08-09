@@ -1020,7 +1020,7 @@ proc Neuroarchiver_metadata_header {} {
 
 	set header "<c>\
 			\nDate Created: [clock format [clock seconds] -format $config(datetime_format)].\
-			\nCreator: Neuroarchiver $info(version), LWDAQ_$LWDAQ_Info(program_patchlevel).\
+			\nCreator: Neurorecorder $info(version), LWDAQ_$LWDAQ_Info(program_patchlevel).\
 			\n</c>\
 			\n<payload>$iconfig(payload_length)</payload>\
 			\n<coordinates>$config(tracker_coordinates)</coordinates>"
