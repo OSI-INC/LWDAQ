@@ -97,8 +97,8 @@ proc Neuroarchiver_init {} {
 #
 # Recording data acquisition parameters.
 #
-	set config(daq_receiver) "A3027"
-	set config(receiver_versions) "A3018 A3027 A3032 A3038"
+	set config(receiver_type) "A3027"
+	set config(receiver_options) "A3018 A3027 A3032 A3038"
 #
 # A flag to tell us if the Neuroarchiver is running with graphics.
 #
@@ -1016,12 +1016,13 @@ proc Neuroarchiver_metadata_header {} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 	upvar #0 LWDAQ_config_Recorder iconfig
+	upvar #0 LWDAQ_info_Recorder iinfo
 	global LWDAQ_Info	
 
 	set header "<c>\
-			\nDate Created: [clock format [clock seconds] -format $config(datetime_format)].\
+			\nCreated: [clock format [clock seconds] -format $config(datetime_format)].\
 			\nCreator: Neurorecorder $info(version), LWDAQ_$LWDAQ_Info(program_patchlevel).\
-			\n</c>\
+			\nReceiver: Type $iinfo(receiver_type) with firmware $iinfo(receiver_firmware).</c>\
 			\n<payload>$iconfig(payload_length)</payload>\
 			\n<coordinates>$config(tracker_coordinates)</coordinates>"
 	if {[string trim $info(metadata_header)] != ""} {
@@ -5526,11 +5527,6 @@ proc Neuroarchiver_set_receiver {version} {
 	upvar #0 LWDAQ_info_Recorder iinfo
 	global LWDAQ_Info
 
-	if {$info(record_control) != "Idle"} {
-		Neuroarchiver_print "WARNING: Change receiver version only when idle."
-		return "ABORT"
-	}
-
 	switch $version {
 		"A3018" {
 			set iconfig(payload_length) 0
@@ -5562,7 +5558,7 @@ proc Neuroarchiver_set_receiver {version} {
 		}
 	}
 	
-	set config(daq_receiver) $version
+	set config(receiver_type) $version
 
 	return $version
 }
@@ -5672,6 +5668,11 @@ proc Neuroarchiver_record {{command ""}} {
 				Neuroarchiver_print "$result"
 				set info(record_control) "Idle"
 				return "SUCCESS"
+			}
+			if {$iinfo(receiver_type) != $config(receiver_type)} {
+				Neuroarchiver_print "WARNING: Detected $iinfo(receiver_type)\
+					data receiver, reconfiguring for the $iinfo(receiver_type)."
+				Neuroarchiver_set_receiver $iinfo(receiver_type)	
 			}
 		}
 		set ms_reset [clock milliseconds]		
@@ -7331,9 +7332,9 @@ proc Neuroarchiver_open {} {
 		label $f.a -text "Receiver:" -anchor w -fg $info(label_color)
 		pack $f.a -side left
 
-		set m [tk_optionMenu $f.mr Neuroarchiver_config(daq_receiver) "None"]
+		set m [tk_optionMenu $f.mr Neuroarchiver_config(receiver_type) "None"]
 		$m delete 0 end
-		foreach version $config(receiver_versions) {
+		foreach version $config(receiver_options) {
 			$m add command -label $version \
 				-command [list Neuroarchiver_set_receiver $version]
 		}	
@@ -7352,7 +7353,7 @@ proc Neuroarchiver_open {} {
 		pack $f.lchannels $f.echannels -side left -expand yes
 
 		label $f.fvl -text "firmware:" -fg $info(label_color)
-		label $f.fvd -textvariable LWDAQ_info_Recorder(firmware_version) -width 2
+		label $f.fvd -textvariable LWDAQ_info_Recorder(receiver_firmware) -width 2
 		pack $f.fvl $f.fvd -side left -expand yes
 
 		set f $w.record.c

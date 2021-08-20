@@ -87,8 +87,8 @@ proc LWDAQ_init_Recorder {} {
 	set info(acquire_end_ms) 0
 	set info(purge_duplicates) 1
 	set info(payload_options) "0 16"
-	set info(firmware_version) "?"
-	set info(receiver_version) "?"
+	set info(receiver_firmware) "?"
+	set info(receiver_type) "?"
 	set info(fv_range) 30
 	set info(aux_list_name) LWDAQ_aux_Recorder
 	global $info(aux_list_name)
@@ -299,11 +299,11 @@ proc LWDAQ_reset_Recorder {} {
 
 	if {[catch {
 		# Clear the firmware version to unknown.
-		set info(firmware_version) "?"
-		set info(receiver_version) "?"
+		set info(receiver_firmware) "?"
+		set info(receiver_type) "?"
 		
 		# Start the reset and configure.
-		LWDAQ_print $info(text) "Resetting data receiver..."
+		LWDAQ_print -nonewline $info(text) "Resetting receiver, "
 		LWDAQ_update
 
 		# Open a socket and log in to the driver.
@@ -320,7 +320,7 @@ proc LWDAQ_reset_Recorder {} {
 		
 		# Read a few clock messages from the receiver and try to identify
 		# what type of receiver it is, and determine its message payload.
-		LWDAQ_print $info(text) "Querying data receiver... "
+		LWDAQ_print -nonewline $info(text) "detecting type, "
 		LWDAQ_update
 		
 		# Download a small block of messages from the receiver.
@@ -340,41 +340,37 @@ proc LWDAQ_reset_Recorder {} {
 			-height $info(config_size)]
 		lwdaq_data_manipulate $img clear
 		lwdaq_data_manipulate $img write 0 $data
-		set info(firmware_version) "?"
-		set info(receiver_version) "?"
+		set info(receiver_firmware) "?"
+		set info(receiver_type) "?"
 		foreach payload $info(payload_options) {
 			set bb [lwdaq_recorder $img "-payload $payload print 0 1"]
 			if {[regexp {Version ([0-9]+)} $bb match fv]} {
-				set info(firmware_version) [expr $fv % $info(fv_range)]
+				set info(receiver_firmware) [expr $fv % $info(fv_range)]
 				switch [expr $fv / $info(fv_range)] {
 					0 {
-						set info(receiver_version) "A3018"
+						set info(receiver_type) "A3018"
 						set config(payload_length) 0
 					}
 					1 {
-						set info(receiver_version) "A3027"
+						set info(receiver_type) "A3027"
 						set config(payload_length) 0
 					}
 					2 {
-						set info(receiver_version) "A3032"
+						set info(receiver_type) "A3032"
 						set config(payload_length) 16
 					}
 					3 {
-						set info(receiver_version) "A3038"
+						set info(receiver_type) "A3038"
 						set config(payload_length) 16
 					}
-					default {set info(receiver_version) "?"}					
+					default {set info(receiver_type) "?"}					
 				}
 				break
 			}
 		}
 		lwdaq_image_destroy $img
-		if {$info(receiver_version) != "?"} {
-			LWDAQ_print $info(text) "Data receiver $info(receiver_version),\
-				firmware $info(firmware_version),\
-				payload $config(payload_length) bytes."
-		} {
-			LWDAQ_print $info(text) "ERROR: Failed to identify data receiver."
+		if {$info(receiver_type) == "?"} {
+			LWDAQ_print $info(text) "\nERROR: Failed to identify data receiver."
 		}
 		
 		# For backward-compatibility with Octal Data Receivers (ODR, assembly
@@ -388,7 +384,7 @@ proc LWDAQ_reset_Recorder {} {
 		# contains only integers, we first instruct the receiver to accept no
 		# channels, then to accept the channels listed. 
 		if {[string trim $config(daq_channels)] == "*"} {
-			LWDAQ_print $info(text) "Selecting all channels for recording. "
+			LWDAQ_print -nonewline $info(text) "selecting all channels, "
 			LWDAQ_transmit_command_hex $sock $info(sel_all_cmd)
 		} {
 			set cmd_list [list $info(sel_none_cmd)]
@@ -398,14 +394,13 @@ proc LWDAQ_reset_Recorder {} {
 					lappend cmd_list "[format %02X $ch]$info(sel_ch_cmd)"
 					lappend ch_list $ch
 				} {
-					LWDAQ_print $info(text) "ERROR:\
-						Invalid channel number \"$ch\". "
+					LWDAQ_print $info(text) "\nERROR: Invalid channel number \"$ch\". "
 					set ch_list [list]
 					break
 				}
 			}
 			if {[llength $ch_list] > 0} {
-				LWDAQ_print $info(text) "Selecting channels $ch_list for recording. "
+				LWDAQ_print -nonewline $info(text) "selecting channels $ch_list, "
 				LWDAQ_transmit_command_hex $sock $info(sel_none_cmd)
 				foreach cmd $cmd_list {
 					LWDAQ_transmit_command_hex $sock $cmd
@@ -441,13 +436,14 @@ proc LWDAQ_reset_Recorder {} {
 		set info(messages_per_clock) $info(min_messages_per_clock)
 
 		# Notification to user.		
-		LWDAQ_print $info(text) "Reset and configure complete."
+		LWDAQ_print $info(text) "done."
 	} error_result]} { 
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		incr LWDAQ_Info(num_daq_errors)
 		LWDAQ_print $info(text) "\nERROR: $error_result" red
 		return "ERROR: $error_result"
 	}
+	
 	return 1
 }
 
@@ -488,11 +484,11 @@ proc LWDAQ_controls_Recorder {} {
 	pack $g.reset -side left -expand 1
 
 	label $g.lrv -text "Receiver:" 
-	label $g.erv -textvariable LWDAQ_info_Recorder(receiver_version) -width 5
+	label $g.erv -textvariable LWDAQ_info_Recorder(receiver_type) -width 5
 	pack $g.lrv $g.erv -side left -expand 1
 	
 	label $g.lfv -text "Firmware:" 
-	label $g.efv -textvariable LWDAQ_info_Recorder(firmware_version) -width 3
+	label $g.efv -textvariable LWDAQ_info_Recorder(receiver_firmware) -width 3
 	pack $g.lfv $g.efv -side left -expand 1
 
 	set g $w.channels
