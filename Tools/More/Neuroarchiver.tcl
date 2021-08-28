@@ -61,7 +61,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "147"
+	LWDAQ_tool_init "Neuroarchiver" "148"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -614,7 +614,8 @@ proc Neuroarchiver_init {} {
 	set info(tracker_height) 320
 	set info(tracker_image_border_pixels) 10
 	set config(tracker_decade_scale) "30" 
-	set config(tracker_centroid_extent) "20"
+	set config(tracker_extent_radius) "20"
+	set config(tracker_anchor_extent) "0"
 	set config(tracker_sample_rate) "16"
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
@@ -3909,7 +3910,8 @@ proc Neurotracker_extract {} {
 				$config(tracker_coordinates) \
 				-payload $config(player_payload_length) \
 				-scale $config(tracker_decade_scale) \
-				-extent $config(tracker_centroid_extent) \
+				-extent $config(tracker_extent_radius) \
+				-anchor $config(tracker_anchor_extent) \
 				-slices $num_slices \
 				-background $config(tracker_background)]
 		} error_result]} {
@@ -3989,7 +3991,7 @@ proc Neurotracker_open {} {
 	# Create configuration fields.
 	set f [frame $w.config]
 	pack $f -side top -fill x
-	foreach a {decade_scale centroid_extent sample_rate} {
+	foreach a {decade_scale extent_radius sample_rate} {
 		label $f.l$a -text $a
 		entry $f.e$a -textvariable Neuroarchiver_config(tracker_$a) -width 4
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -3999,9 +4001,12 @@ proc Neurotracker_open {} {
 		Neuroarchiver_config(tracker_persistence) \
 		None Path Mark
 	pack $f.lp $f.mp -side left -expand yes
-	checkbutton $f.sdp -text "Coils" \
+	checkbutton $f.tsc -text "Coils" \
 		-variable Neuroarchiver_config(tracker_show_coils)
-	pack $f.sdp -side left -expand yes
+	pack $f.tsc -side left -expand yes
+	checkbutton $f.tae -text "Anchor" \
+		-variable Neuroarchiver_config(tracker_anchor_extent)
+	pack $f.tae -side left -expand yes
 	
 	# Create control buttons.
 	set f [frame $w.control]

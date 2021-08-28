@@ -3221,6 +3221,7 @@ end;
 <tr><td>-percentile</td><td>Fraction of power measurements below chosen value, default 50.</td></tr>
 <tr><td>-background</td><td>String of background power levels to be subtracted from coil powers, default all 0.</td></tr>
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
+<tr><td>-anchor</td><td>Anchor the extent to the coil with maximum power, default 0.</td></tr>
 </table></center>
 
 <p>The output contains a string of detector power values followed by <i>x</i> and <i>y</i> position in whatever units we used to specify the coil centers. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the powers and position for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals, which is faster, and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period. Because the calculations use a sort routine to obtain the median power in each slice, the execution time for eight calculations each of length one second is less than the execution time for one calculation of length one second.</p>
@@ -3256,10 +3257,11 @@ var
 	percentile:real=50; {median power value will be used}
 	scale:real=30; {eight-bit counts per decade of power, default for A3038}
 	num_slices:integer=1; {default one}
+	anchor:boolean=false; {default false}
 {
 	Result variables.
 }
-	location:xy_point_type;
+	location,max_location:xy_point_type;
 	detector_powers:x_graph_type;
 	detector_average_powers:x_graph_type;
 {
@@ -3347,6 +3349,7 @@ begin
 		if (option='-payload') then payload:=Tcl_ObjInteger(vp)			
 		else if (option='-scale') then scale:=Tcl_ObjReal(vp)			
 		else if (option='-extent') then extent:=Tcl_ObjReal(vp)			
+		else if (option='-anchor') then anchor:=Tcl_ObjBoolean(vp)			
 		else if (option='-slices') then num_slices:=Tcl_ObjInteger(vp)			
 		else if (option='-background') then begin
 			field:=Tcl_ObjString(vp);
@@ -3355,7 +3358,7 @@ begin
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"image -payload -extent -scale -background -percentile -slices" in '
+				+'"image -payload -extent -anchor -scale -background -percentile -slices" in '
 				+'lwdaq_alt.');
 			exit;
 		end;
@@ -3412,12 +3415,11 @@ begin
 		{
 			Calculate the median power value for each detector coil in this
 			slice of time. Obtain the maximum, and minimum coil powers in case
-			we need them. As a first guess at the location, use the location of
-			the coil with the maximum power.
+			we need them. Record the location of the coil with the maximum power.
 		}
 		min_power:=power_hi;
 		max_power:=power_lo;
-		location:=detector_coordinates[0];
+		max_location:=detector_coordinates[0];
 		for detector_num:=0 to num_detectors-1 do begin
 			for sample_num:=0 to slice_size-1 do
 				detector_samples[sample_num]:=
@@ -3429,13 +3431,20 @@ begin
 				detector_average_powers[detector_num]+detector_powers[detector_num]/num_slices;
 			if (detector_powers[detector_num]>max_power) then begin
 				max_power:=detector_powers[detector_num];
-				location:=detector_coordinates[detector_num];
+				max_location:=detector_coordinates[detector_num];
 			end;
 			if (detector_powers[detector_num]<min_power) then 
 				min_power:=detector_powers[detector_num];
 			gui_support('');
 		end;
 		
+ 		{
+ 			As a first guess at the location, use the location of the coil with
+ 			the maximum power. Use the same coil as the initial anchor
+ 			location.
+		}
+		location:=max_location;
+			
 		{
 			The detector coil power measurements we obtain from the tracker are
 			logarithmic. We want to perform a weighted centroid on the power
@@ -3449,13 +3458,16 @@ begin
 			centroid. We use the minimum coil power measurement as our
 			reference. When the power measurement is equal to the minimum coil
 			power, our anti-logarithm will produce the relative power value of
-			1.0. We reject any coils that are farther than the centroid extent
-			from the location of the transmitter. We start by assuming the
-			transmitter is at the location of the coil with the maximum power,
-			and obtain a first estimate of location. We repeat the centroid
-			calculation using this first estimate and so obtain a second
-			estimate. We repeat num_calculations times to obtain our final
-			estimate.
+			1.0. We reject any coils that are farther than the extent from a
+			reference point. With the anchor option false, we use our calculated
+			location of the transmitter to draw the extent circle for the next
+			calculation of location. We start by assuming the transmitter is at
+			the location of the coil with the maximum power, and obtain a first
+			estimate of location. We repeat the centroid calculation using this
+			first estimate and so obtain a second estimate. We repeat
+			num_calculations times to obtain our final estimate. When the anchor
+			option is true, we anchor the extent to the coil with the maximum
+			power and perform only one calculation.
 		}
 		for calculation_num:=1 to num_calculations do begin
 			sum_x:=0;
@@ -3485,6 +3497,7 @@ begin
 				location.x:=error_value;
 				location.y:=error_value;
 			end;
+			if anchor then break;
 		end;
 		
 		field:='';
