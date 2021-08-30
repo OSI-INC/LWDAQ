@@ -341,8 +341,8 @@ proc Neuroarchiver_init {} {
 # and modify in the configuration panel. We begin with the files the
 # Neuroarchiver uses to record, play back, process, and report.
 #
-	set config(play_dir) $LWDAQ_Info(working_dir)
-	set config(record_dir) $LWDAQ_Info(working_dir)
+	set config(play_dir) [file normalize [file join $LWDAQ_Info(program_dir) ..]]
+	set config(record_dir) $config(play_dir)
 	set config(record_file) [file join $config(record_dir) Archive.ndf]
 	set config(play_file) [file join $config(play_dir) Archive.ndf]
 	set config(processor_file) [file join $config(play_dir) Processor.tcl]
