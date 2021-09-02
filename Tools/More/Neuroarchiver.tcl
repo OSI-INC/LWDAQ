@@ -614,7 +614,7 @@ proc Neuroarchiver_init {} {
 	set info(tracker_height) 320
 	set info(tracker_image_border_pixels) 10
 	set config(tracker_decade_scale) "30" 
-	set config(tracker_extent_radius) "20"
+	set config(tracker_extent_radius) "30"
 	set config(tracker_anchor_extent) "0"
 	set config(tracker_sample_rate) "16"
 	set config(tracker_persistence) "None"
