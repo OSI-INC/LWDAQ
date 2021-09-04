@@ -4,7 +4,7 @@
 # the LWDAQ software.
 
 # Mount point for remote disk.
-RMT="/Users/kevan/BNDSFTP"
+RMT="/Users/kevan/BND-SFTP"
 
 # Determine operating system. Default is Unix. 
 OS=UNIX

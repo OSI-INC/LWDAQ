@@ -39,13 +39,16 @@
 #
 # Version 27: Limit significant figures in file saving.
 #
+# Version 28: Switch active graph selection from menu button to entry box and allow
+# graphs from 0 to 255.
+#
 
 proc Spectrometer_init {} {
 	upvar #0 Spectrometer_info info
 	upvar #0 Spectrometer_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Spectrometer" "27"
+	LWDAQ_tool_init "Spectrometer" "28"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# Software constants for the Spectrometer Tool.
@@ -53,7 +56,6 @@ proc Spectrometer_init {} {
 	set info(instrument) "RFPM"
 	set info(graph_width) "900"
 	set info(graph_height) "300"
-	set info(graph_names) "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16"
 	set info(measurement_names) "SCT Peak Average"
 	set info(cursor_y) "0"
 	set info(image_name) spectrometer
@@ -67,9 +69,13 @@ proc Spectrometer_init {} {
 	set info(gain_c3) "1"
 	set info(peak_v_limit) "0.8"
 	set info(ave_v_limit) "0.3"
+	set info(graph_names) ""
+	for {set graph_name 0} {$graph_name < 256} {incr graph_name} {
+		lappend info(graph_names) $graph_name
+	}
   		
   	# Configuration parameters for the Spectrometer Tool.
-	set config(active_graph) [lindex $info(graph_names) 0]
+	set config(active_graph) "[lindex $info(graph_names) 0]"
 	set config(measurement_type) [lindex $info(measurement_names) 0]
 	set config(count_max) "100"
 	set config(count_min) "0"
@@ -355,13 +361,9 @@ proc Spectrometer_open {} {
 	pack $f.lstep $f.estep -side left -expand 1
 
 	label $f.lgraph -text "Active Graph:"
-	tk_optionMenu $f.m Spectrometer_config(active_graph) none
-	foreach gn $info(graph_names) {
-		$f.m.menu add command -label $gn \
-			-command "set Spectrometer_config(active_graph) $gn"
-	}
-	set config(active_graph) [lindex $info(graph_names) 0]
-	pack $f.lgraph $f.m -side left -expand 1
+	entry $f.ag -textvariable Spectrometer_config(active_graph) -width 4
+	set config(active_graph) "0"
+	pack $f.lgraph $f.ag -side left -expand 1
 	
 	button $f.clear -text "Clear" -command Spectrometer_clear
 	pack $f.clear -side left -expand 1
