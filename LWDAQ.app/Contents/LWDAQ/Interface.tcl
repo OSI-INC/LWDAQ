@@ -39,7 +39,7 @@ proc LWDAQ_interface_init {} {
 	set LWDAQ_Info(default_to_stdout) 0
 	set LWDAQ_Info(error_color) red
 	set LWDAQ_Info(warning_color) blue
-	set LWDAQ_Info(suggestion_color) orange
+	set LWDAQ_Info(suggestion_color) green
 	set LWDAQ_Info(numbered_colors) "red green blue orange yellow\
 		magenta brown salmon LightSlateBlue black gray40 gray60 maroon\
 		green4 blue4 brown4"

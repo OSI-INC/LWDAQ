@@ -933,8 +933,8 @@ end;
 
 	The "list" instruction returns a list of signal identifiers and the number
 	of samples in the signal. Signals with no samples are omitted from the list.
-	The list takes the form of the identifiers sample quantities separated by
-	spaces.
+	The list takes the form of channel identifier followed by number of samples
+	separated by spaces.
 
 	The "get" instruction performs no analysis of messages, but instead returns
 	only the id, value, and timestamp of a list of messages. We Specify each
