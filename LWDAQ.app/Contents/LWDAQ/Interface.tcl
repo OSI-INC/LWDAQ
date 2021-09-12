@@ -763,12 +763,12 @@ proc LWDAQ_set_bg {widget color} {
 }
 
 #
-# LWDAQ_set_fg takes the name of a widget and makes sure its foreground
-# color is set to "color". If the foreground is already "color", the routine
-# does nothing. If graphics are disabled, the routine does nothing. This
-# routine abbreviates our code, and avoids unnecessary drawing by first 
-# checking to see if the foreground color has already been set to the desired
-# value. It is similar to LWDAQ_set_bg.
+# LWDAQ_set_fg takes the name of a widget and makes sure its foreground color is
+# set to "color". If the foreground is already "color", the routine does
+# nothing. If graphics are disabled, the routine does nothing. This routine
+# abbreviates our code, and avoids unnecessary drawing by first checking to see
+# if the foreground color has already been set to the desired value. It is
+# similar to LWDAQ_set_bg.
 #
 proc LWDAQ_set_fg {widget color} {
 	if {[winfo exists $widget]} {		
@@ -780,8 +780,22 @@ proc LWDAQ_set_fg {widget color} {
 }
 
 #
-# LWDAQ_toplevel_window will make a new top-level window with a
-# unique name, and returns its name.
+# LWDAQ_inside_widget takes a widget name and widget-local x and y coordinate 
+# and returns true iff the point (x,y) is inside the widget. There may be an 
+# existing TclTk routine for this, but we can't find it.
+#
+proc LWDAQ_inside_widget {w x y} {
+	if {($x >= 0) && ($x < [winfo width $w]) \
+		&& ($y >= 0) && ($y < [winfo height $w]) } {
+		return 1	
+	} {
+		return 0
+	}
+}
+
+#
+# LWDAQ_toplevel_window will make a new top-level window with a unique name, and
+# returns its name.
 #
 proc LWDAQ_toplevel_window { {title ""} } {
 	set count 0
@@ -793,10 +807,9 @@ proc LWDAQ_toplevel_window { {title ""} } {
 }
 
 #
-# LWDAQ_toplevel_text_window creates a new text window. It returns
-# the name of the toplevel window containing the text widget. You can
-# construct the name of the text widget itself by adding .text to the
-# window name.
+# LWDAQ_toplevel_text_window creates a new text window. It returns the name of
+# the toplevel window containing the text widget. You can construct the name of
+# the text widget itself by adding .text to the window name.
 #
 proc LWDAQ_toplevel_text_window {{width 84} {height 30}} {
 	set w [LWDAQ_toplevel_window]
@@ -805,8 +818,8 @@ proc LWDAQ_toplevel_text_window {{width 84} {height 30}} {
 }
 
 #
-# LWDAQ_save_text_window saves the contents of text window
-# $window_name to a file named $file_name.
+# LWDAQ_save_text_window saves the contents of text window $window_name to a
+# file named $file_name.
 #
 proc LWDAQ_save_text_window {window_name file_name} {
 	set f [open $file_name w]
@@ -815,11 +828,9 @@ proc LWDAQ_save_text_window {window_name file_name} {
 }
 
 #
-# LWDAQ_view_text_file reads a text file into a new
-# top-level text window. The routine returns the name
-# of the top-level window. The name of the text widget
-# used to display the file is $w.text, where $w is
-# the top-level window name.
+# LWDAQ_view_text_file reads a text file into a new top-level text window. The
+# routine returns the name of the top-level window. The name of the text widget
+# used to display the file is $w.text, where $w is the top-level window name.
 #
 proc LWDAQ_view_text_file {file_name} {
 	set w [LWDAQ_toplevel_window]
@@ -833,14 +844,12 @@ proc LWDAQ_view_text_file {file_name} {
 }
 
 #
-# LWDAQ_Macos_Open_File opens files dropped on the LWDAQ icon
-# in Macos. Our code is based upon an example script
-# provided to the MACTCL forum on 28-FEB-07 by Jon Guyer.
-# When it opens image files, the routine looks at the 
-# first word in the image results string. If that word
-# is the name of an Instrument, the routine opens the
-# file in that instrument. Otherwise, it opens the file
-# in the Viewer instrument.
+# LWDAQ_Macos_Open_File opens files dropped on the LWDAQ icon in Macos. Our code
+# is based upon an example script provided to the MACTCL forum on 28-FEB-07 by
+# Jon Guyer. When it opens image files, the routine looks at the first word in
+# the image results string. If that word is the name of an Instrument, the
+# routine opens the file in that instrument. Otherwise, it opens the file in the
+# Viewer instrument.
 #
 proc LWDAQ_MacOS_Open_File {theAppleEvent theReplyAE} {
 	upvar #0 LWDAQ_Info info
@@ -858,9 +867,8 @@ proc LWDAQ_MacOS_Open_File {theAppleEvent theReplyAE} {
 }
 
 #
-# LWDAQ_open_document takes a file name and opens the file
-# according to its file extensions. On MacOS, we call this 
-# procedure from tk::mac::OpenDocument.
+# LWDAQ_open_document takes a file name and opens the file according to its file
+# extensions. On MacOS, we call this procedure from tk::mac::OpenDocument.
 #
 proc LWDAQ_open_document {fn} {
 	if {[file exists $fn]} {

@@ -5061,14 +5061,25 @@ proc Neuroarchiver_calibration {{name ""}} {
 	set f [frame $w.controls]
 	pack $f -side left -fill both
 
-	label $f.lsel -text "Include String:" -fg blue
-	entry $f.einc -textvariable Neuroarchiver_config(calib_include) -width 35
 	button $f.refresh -text "Update Panel" -command {
 		destroy $Neuroarchiver_info(window)\.baselines
 		LWDAQ_post Neuroarchiver_calibration
 	}
-	pack $f.lsel $f.einc $f.refresh -side top
+	pack $f.refresh -side top
+	button $f.rstclr -text "Reset Colors" -command {
+		set Neuroarchiver_config(color_table) {0 0}
+		destroy $Neuroarchiver_info(window)\.baselines
+		LWDAQ_post Neuroarchiver_calibration
+	}
+	pack $f.rstclr -side top
+
+	label $f.lsel -text "Include String:" -fg blue
+	entry $f.einc -textvariable Neuroarchiver_config(calib_include) -width 35
+	pack $f.lsel $f.einc -side top
 	
+	label $f.bpl -text "Baseline Power Control:" -fg blue
+	pack $f.bpl -side top 
+
 	set f [frame $w.controls.f1  -border 4]
 	pack $f -side top -fill both
 
@@ -5162,7 +5173,11 @@ proc Neuroarchiver_calibration {{name ""}} {
 					|| ([lsearch $inclist $id] >= 0)} {
 				set color [lwdaq tkcolor [Neuroarchiver_color $id]]
 				label $f.l$id -text $id -anchor w
-				label $f.c$id -text "  " -bg $color
+				label $f.c$id -text "   " -bg $color
+				bind $f.c$id <ButtonPress> \
+					[list Neuroarchiver_color_swap $id $f.c$id Press %x %y]
+				bind $f.c$id <ButtonRelease> \
+					[list Neuroarchiver_color_swap $id $f.c$id Release %x %y]
 				entry $f.e$id -textvariable Neuroarchiver_info(bp_$id) \
 					-relief sunken -bd 1 -width 7
 				grid $f.l$id $f.c$id $f.e$id -sticky ew
@@ -5310,16 +5325,21 @@ proc Neuroarchiver_activity {} {
 	pack $ff -side top -fill x -expand 1
 	
 	# Controls.
-	label $ff.include -text "Include:" -fg blue
+	label $ff.include -text "Include Channels:" -fg blue
 	pack $ff.include -side left -expand yes
 	entry $ff.string -textvariable Neuroarchiver_config(activity_include) -width 35
 	pack $ff.string -side left -expand yes
-	button $ff.update -text "Update" -command {
+	
+	# Make another frame for controls.
+	set ff [frame $w.controls2]
+	pack $ff -side top -fill x -expand 1
+	
+	button $ff.update -text "Update Panel" -command {
 		destroy $Neuroarchiver_info(window)\.activity
 		LWDAQ_post Neuroarchiver_activity
 	}
 	pack $ff.update -side left -expand yes
-	button $ff.reset -text "Reset" -command {
+	button $ff.reset -text "Reset States" -command {
 		for {set id $Neuroarchiver_info(min_id)} \
 			{$id < $Neuroarchiver_info(max_id)} \
 			{incr id} {
@@ -5329,6 +5349,13 @@ proc Neuroarchiver_activity {} {
 		}
 	}
 	pack $ff.reset -side left -expand yes
+	button $ff.rstclr -text "Reset Colors" -command {
+		set Neuroarchiver_config(color_table) {0 0}
+		destroy $Neuroarchiver_info(window)\.activity
+		LWDAQ_post Neuroarchiver_activity
+	}
+	pack $ff.rstclr -side left -expand yes
+
 
 	# Make large frame for the activity columns.
 	set ff [frame $w.activity]
@@ -5362,7 +5389,7 @@ proc Neuroarchiver_activity {} {
 			set f [frame $ff.column_$count -relief groove -border 4]
 			pack $f -side left -fill y -expand 1
 			label $f.id -text "ID" -fg purple
-			label $f.cc -text "  " -fg purple
+			label $f.cc -text "   " -fg purple
 			label $f.csps -text "Qty" -fg purple
 			label $f.msps -text "SPS" -fg purple
 			label $f.alert -text "State" -fg purple
@@ -5377,6 +5404,10 @@ proc Neuroarchiver_activity {} {
 			label $f.id_$count -text $id -anchor w
 			set color [lwdaq tkcolor [Neuroarchiver_color $id]]
 			label $f.cc_$count -text " " -bg $color
+			bind $f.cc_$count <ButtonPress> \
+				[list Neuroarchiver_color_swap $id $f.cc_$count Press %x %y]
+			bind $f.cc_$count <ButtonRelease> \
+				[list Neuroarchiver_color_swap $id $f.cc_$count Release %x %y]
 			label $f.csps_$count -textvariable Neuroarchiver_info(qty_$id) -width 4
 			label $f.msps_$count -textvariable Neuroarchiver_info(sps_$id) -width 4
 			label $f.status_$count -textvariable Neuroarchiver_info(status_$id) -width 6
@@ -5388,6 +5419,34 @@ proc Neuroarchiver_activity {} {
 	}
 }
 
+#
+# Neuroarchiver_color_swap uses mouse events to switch the display colors.
+#
+proc Neuroarchiver_color_swap {id w e x y} {
+	upvar #0 Neuroarchiver_config config
+	upvar #0 Neuroarchiver_info info	
+	
+	if {$e == "Press"} {
+		set color white
+	}
+	if {$e == "Release"} {
+		if {[LWDAQ_inside_widget $w $x $y]} {
+			set index [lsearch -index 0 $config(color_table) $id]
+			if {$index >= 0} {
+				set code [lindex $config(color_table) $index 1]
+				set code [expr $code + 1]
+				lset config(color_table) $index 1 $code
+			} {
+				set code [expr $id + 31]
+				lappend config(color_table) "$id $code"
+			}
+			set color [lwdaq tkcolor [Neuroarchiver_color $code]]
+		} {
+			set color [lwdaq tkcolor [Neuroarchiver_color $id]]
+		}
+	}
+	$w configure -bg $color
+}
 
 #
 # Neuroarchiver_frequency_reset sets all the frequency and frequency alerts
