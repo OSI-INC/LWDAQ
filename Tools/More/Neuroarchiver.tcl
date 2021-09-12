@@ -3,29 +3,27 @@
 #
 # Copyright (C) 2007-2021 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place - Suite 330, Boston, MA 02111-1307, USA.
 #
-# The Neuroarchiver records signals from Subcutaneous Transmitters 
-# manufactured by Open Source Instruments. For detailed help, see:
+# The Neuroarchiver records signals from Subcutaneous Transmitters manufactured
+# by Open Source Instruments. For detailed help, see:
 #
 # http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html
 #
-# The Neuroarchiver uses NDF (Neuroscience Data Format) files to store
-# data to disk. It provides play-back of data stored on file, with signal
-# plotting and processing.
+# The Neuroarchiver uses NDF (Neuroscience Data Format) files to store data to
+# disk. It provides play-back of data stored on file, with signal plotting and
+# processing.
 #
 
 #
@@ -200,7 +198,7 @@ proc Neuroarchiver_init {} {
 	set info(overview_fsd) 2
 #
 # During play-back and processing, we step through each channel selected by the
-# user (see processing_channels parameter) and for each channel we create a
+# user with the channel_selector parameter. For each channel we create a
 # graph of its signal versus time, which we display in the v-t window, and its
 # amplitude versus frequency, which we display in the a-t window. The empty
 # value for these two graphs is a point at the origin. When we have real data in
@@ -222,11 +220,19 @@ proc Neuroarchiver_init {} {
 	set info(spectrum) "0 0"
 	set info(values) "0"
 #
-# During play-back, we obtain a list of the number of messages available in
-# each channel number. We include in this list any channels that have more
-# than the config(active_threshold) parameter, which we define below.
+# Any channel with a activity_threshold samples per second in the playback
+# interval will be considered active. 
 #
-	set info(channel_activity) ""
+	set config(activity_threshold) 14
+#
+# During play-back, we obtain a list of all channels in which there exists
+# at least one sample. From this list we select any channels from which we
+# have received more than activity_threshold samples per second. We include
+# these in the active_channels string. Each element of the string takes
+# the form "id:qty" where id is the channel number and qty is the number of
+# samples received during the playback interval.
+#
+	set info(active_channels) ""
 #
 # When we determine a channel's expected message frequency in one routine,
 # we want to save the frequency in a place that other routines can read it.
@@ -272,8 +278,8 @@ proc Neuroarchiver_init {} {
 	}
 	set config(loss_fraction) 0.8
 	set config(extra_fraction) 1.1
-	set config(calib_include) "Okay Loss Extra"
-	set info(calib_selected) ""
+	set config(calibration_include) "Okay Loss Extra"
+	set info(calibration_selected) ""
 	set config(activity_include) "Okay Loss Extra Off"
 	set info(activity_selected) ""
 	set config(activity_rows) 23
@@ -482,7 +488,7 @@ proc Neuroarchiver_init {} {
 # specifies channel 5 with frequency 512 and scatter 8. We have default values
 # for frequency, which will be used if we do not specify values.
 #
-	set config(processing_channels) "*"
+	set config(channel_selector) "*"
 	set config(default_frequency) "128 256 512 1024 2048 4096"
 	set config(standing_values) ""
 	set config(unaccepted_values) ""
@@ -527,12 +533,6 @@ proc Neuroarchiver_init {} {
 	set info(value_range) [expr $info(max_message_value) + 1]
 	set info(clock_cycle_period) \
 		[expr ($info(max_message_value)+1)/$info(clocks_per_second)]
-#
-# Any channel with enough messages in the playback interval will be considered
-# active. The activity rate is the minimum message rate, in messages per second,
-# that will be treated as active.
-#
-	set config(activity_rate) 40
 #
 # The Neuroarchiver will record events to a log, in particular warnings and
 # errors generated during playback and recording.
@@ -815,7 +815,7 @@ proc Neuroarchiver_print_event {{event ""}} {
 	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
 
 	if {$event == ""} {
-		set event "$info(play_file_tail) $info(t_min) \"$config(processing_channels)\"\
+		set event "$info(play_file_tail) $info(t_min) \"$config(channel_selector)\"\
 			\"Event in $config(play_interval)-s interval\""
 	}
 
@@ -1849,8 +1849,10 @@ proc Neuroarchiver_command {target action} {
 # value is zero, the filter is disabled. Values greater than zero enable the filter, 
 # so that any sample that stands out by more than the threshold from the surrounding 
 # samples will be removed from the data and replaced by the previous valid sample.
+# If status_only is set, we don't reconstruct, but return after determining if 
+# there is loss, extra, or okay reception.
 # 
-proc Neuroarchiver_signal {{channel_code ""}} {
+proc Neuroarchiver_signal {{channel_code ""} {status_only 0}} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 	
@@ -1869,10 +1871,9 @@ proc Neuroarchiver_signal {{channel_code ""}} {
 	
 	# We look up how many messages were received in the activity string.
 	set num_received 0
-	if {[regexp " $id:(\[0-9\]*)" " $info(channel_activity)" m a]} {
+	if {[regexp " $id:(\[0-9\]*)" " $info(active_channels)" m a]} {
 		set num_received $a 
 	}
-	set info(num_received) $num_received
 	
 	# The frequency may be set by the channel code. If not, we look at the
 	# expected frequency value that may be defined through the activity panel.
@@ -1911,9 +1912,18 @@ proc Neuroarchiver_signal {{channel_code ""}} {
 	} else {
 		set info(status_$id) "Okay"
 	}
-	set info(frequency) $frequency
 	set info(sps_$id) $frequency
 	
+	# If we are here only to the status and nominal sample rate of the transmitter,
+	# we return now with an empty signal string.
+	if {$status_only} {
+		return "0 0"
+	}
+	
+	# Set global parameters.
+	set info(num_received) $num_received
+	set info(frequency) $frequency
+
 	# We calculate the number of messages expected and the period
 	# of the nominal sample rate in clock ticks.
 	set num_expected [expr $frequency * $info(play_interval_copy)]
@@ -2179,13 +2189,9 @@ proc Neuroarchiver_overview {{fn ""} } {
 		# Initialize the display parameters.
 		set ov_config(t_min) 0
 		set ov_config(t_max) 0
-		set ov_config(activity) ""
-		set ov_config(select) $config(processing_channels)
 		set ov_config(status) "Idle"
-		foreach v {v_range v_offset vt_mode} {
-			set ov_config($v) $config($v)
-		}
-	
+		set ov_config(cursor_cc) 0
+			
 		# Make a frame for the plot.
 		set f $w.plot
 		frame $f 
@@ -2218,14 +2224,25 @@ proc Neuroarchiver_overview {{fn ""} } {
 		pack $f.export -side left -expand yes
 		foreach a "SP CP NP" {
 			set b [string tolower $a]
-			radiobutton $f.$b -variable Neuroarchiver_overview(vt_mode) \
+			radiobutton $f.$b -variable Neuroarchiver_config(vt_mode) \
 				-text $a -value $a
 			pack $f.$b -side left -expand no
 		}
 		foreach v {v_range v_offset} {
 			label $f.l$v -text $v -width [string length $v]
-			entry $f.e$v -textvariable Neuroarchiver_overview($v) -width 5
+			entry $f.e$v -textvariable Neuroarchiver_config($v) -width 5
 			pack $f.l$v $f.e$v -side left -expand yes
+		}
+		label $f.cursor -text "  " \
+			-bg [lwdaq tkcolor [Neuroarchiver_color $ov_config(cursor_cc)]]
+		set ov_config(cursor_label) $f.cursor
+		pack $f.cursor -side left -expand yes
+		bind $f.cursor <ButtonPress> {
+			incr Neuroarchiver_overview(cursor_cc)
+			set color [lwdaq tkcolor [Neuroarchiver_color \
+				$Neuroarchiver_overview(cursor_cc)]]
+			$Neuroarchiver_overview(cursor_label) configure -bg $color
+			$Neuroarchiver_overview(plot) itemconfigure "cursor" -fill $color
 		}
 		button $f.nf -text "Next_NDF" -command \
 			[list LWDAQ_post [list Neuroarchiver_overview_newndf +1]]
@@ -2246,8 +2263,8 @@ proc Neuroarchiver_overview {{fn ""} } {
 		entry $f.et_max -textvariable Neuroarchiver_overview(t_max) -width 6
 		label $f.lt_end -text "t_end"
 		label $f.et_end -textvariable Neuroarchiver_overview(t_end) -width 6
-		label $f.ls -text "Overview Select:" -anchor e
-		entry $f.es -textvariable Neuroarchiver_overview(select) -width 30
+		label $f.ls -text "Select:" -anchor e
+		entry $f.es -textvariable Neuroarchiver_config(channel_selector) -width 30
 		pack $f.lt_min $f.et_min $f.lt_max $f.et_max \
 			$f.lt_end $f.et_end $f.ls $f.es -side left -expand yes
 
@@ -2308,7 +2325,7 @@ proc Neuroarchiver_overview_jump {x y} {
 	
 	# Jump to the new location, using the file nake to seek the playback tree.
 	Neuroarchiver_jump "$ov_config(fn_tail) [format %.1f $ptime] \
-			\"$ov_config(select)\" \"Overview Jump\"" 0
+			\"$config(channel_selector)\" \"Overview Jump\"" 0
 }
 
 #
@@ -2347,8 +2364,8 @@ proc Neuroarchiver_overview_cursor {} {
 			- $ov_config(t_min)) \
 		* $info(overview_width) \
 		/ ($ov_config(t_max) - $ov_config(t_min)))]
-	$ov_config(plot) create line "$x 0 $x $info(overview_height)" \
-		-fill red -tag "cursor"
+	$ov_config(plot) create line "$x 0 $x $info(overview_height)" -tag "cursor" \
+		-fill [lwdaq tkcolor [Neuroarchiver_color $ov_config(cursor_cc)]]
 	
 	return "SUCCESS"
 }
@@ -2400,13 +2417,13 @@ proc Neuroarchiver_overview_plot {{export 0}} {
 	
 	# Create an array of graphs, one for each possible channel.
 	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
-		if {($ov_config(select) == "*") \
-			|| ([lsearch $ov_config(select) "$id"] >= 0) \
-			|| ([lsearch $ov_config(select) "$id\:*"] >= 0) } {
+		if {($config(channel_selector) == "*") \
+			|| ([lsearch $config(channel_selector) "$id"] >= 0) \
+			|| ([lsearch $config(channel_selector) "$id\:*"] >= 0) } {
 			set graph($id) ""
 		}
 	}
-	if {[lsearch $ov_config(select) "0"] >= 0} {
+	if {[lsearch $config(channel_selector) "0"] >= 0} {
 		set graph(0) ""
 	}
 
@@ -2507,17 +2524,17 @@ proc Neuroarchiver_overview_plot {{export 0}} {
 	}
 
 	# Create the plot viewing ranges from the user parameters.
-	if {$ov_config(vt_mode) == "CP"} {
-		set v_min [expr - $ov_config(v_range) / 2 ]
-		set v_max [expr + $ov_config(v_range) / 2]
+	if {$config(vt_mode) == "CP"} {
+		set v_min [expr - $config(v_range) / 2 ]
+		set v_max [expr + $config(v_range) / 2]
 		set ac 1
-	} elseif {$ov_config(vt_mode) == "NP"} {
+	} elseif {$config(vt_mode) == "NP"} {
 		set v_min 0
 		set v_max 0
 		set ac 0
 	} else {
-		set v_min $ov_config(v_offset)
-		set v_max [expr $ov_config(v_offset) + $ov_config(v_range)]
+		set v_min $config(v_offset)
+		set v_max [expr $config(v_offset) + $config(v_range)]
 		set ac 0
 	}
 
@@ -2531,7 +2548,7 @@ proc Neuroarchiver_overview_plot {{export 0}} {
 	set ov_config(activity) ""
 	for {set id 0} {$id <= $info(max_id)} {incr id} {
 		if {![info exists graph($id)]} {continue}
-		if {($ov_config(select) == "*") \
+		if {($config(channel_selector) == "*") \
 			&& ([llength $graph($id)] / 2 < \
 			[expr $config(overview_activity_fraction)\
 			* $config(overview_num_samples)])} {continue}
@@ -2962,7 +2979,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 		incr info(classifier_index)
 	}
 	if {$event == ""} {
-		set id [lindex $config(processing_channels) 0]
+		set id [lindex $config(channel_selector) 0]
 		if {([llength $id]>1) || ($id == "*")} {
 			if {$info(window) == ""} {raise "."} {raise $info(window)}
 			Neuroarchiver_print "ERROR: Select a single channel to add to the library."
@@ -3697,7 +3714,7 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 		}
 		pack $f.cl $f.go $f.stop $f.allt $f.not -side left -expand yes
 		label $f.ssl -text "Channels Numbers:"
-		set nbc(processing_channels) "1 2 3 4 5 6 7 8 9 10 11 12 13 14"
+		set nbc(channel_selector) "1 2 3 4 5 6 7 8 9 10 11 12 13 14"
 		entry $f.sse -textvariable nbc(processing_channels) -width 35
 		pack $f.ssl $f.sse -side left
 		label $f.ll -text "Limit:" -fg blue
@@ -4483,9 +4500,9 @@ proc Neuroarchiver_exporter_open {} {
 	pack $f -side top -fill x
 	
 	label $f.lchannels -text "Select (ID:SPS):" -anchor w -fg $info(label_color)
-	entry $f.echannels -textvariable Neuroarchiver_config(processing_channels) -width 70	
+	entry $f.echannels -textvariable Neuroarchiver_config(channel_selector) -width 70	
 	button $f.auto -text "Autofill" -command {
-		set Neuroarchiver_config(processing_channels) "*"
+		set Neuroarchiver_config(channel_selector) "*"
 		LWDAQ_post [list Neuroarchiver_play "Repeat"]
 		LWDAQ_post Neuroarchiver_exporter_autofill
 	}
@@ -4546,10 +4563,10 @@ proc Neuroarchiver_exporter_autofill {} {
 	if {$autofill == ""} {
 		LWDAQ_print $info(export_text) "Autofill found no active channels.\
 			Setting channel select to \"*\". Play one interval and try again."
-		set config(processing_channels) "*"
+		set config(channel_selector) "*"
 		return "FAIL"
 	}
-	set config(processing_channels) [string trim $autofill]
+	set config(channel_selector) [string trim $autofill]
 	return "SUCCESS"
 }
 
@@ -4601,8 +4618,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		LWDAQ_print $info(export_text) "Export directory $config(export_dir)."
 		
 		# Check the channel select string and clean up existing export files.
-		set config(processing_channels) [string trim $config(processing_channels)]
-		foreach channel $config(processing_channels) {
+		set config(channel_selector) [string trim $config(channel_selector)]
+		foreach channel $config(channel_selector) {
 			if {$channel == "*"} {
 				LWDAQ_print $info(export_text) \
 					"ERROR: Cannot use wildcard channel select, aborting export."
@@ -5074,7 +5091,7 @@ proc Neuroarchiver_calibration {{name ""}} {
 	pack $f.rstclr -side top
 
 	label $f.lsel -text "Include String:" -fg blue
-	entry $f.einc -textvariable Neuroarchiver_config(calib_include) -width 35
+	entry $f.einc -textvariable Neuroarchiver_config(calibration_include) -width 35
 	pack $f.lsel $f.einc -side top
 	
 	label $f.bpl -text "Baseline Power Control:" -fg blue
@@ -5139,7 +5156,7 @@ proc Neuroarchiver_calibration {{name ""}} {
 	# window, and the codes for including channels based upon their alert
 	# values.
 	set inclist ""
-	foreach inc_code $config(calib_include)	{
+	foreach inc_code $config(calibration_include)	{
 		if {[regexp {([0-9]+)\-([0-9]+)} $inc_code match a b]} {
 			for {set id $a} {$id <= $b} {incr id} {
 				lappend inclist $id
@@ -5176,8 +5193,6 @@ proc Neuroarchiver_calibration {{name ""}} {
 				label $f.c$id -text "   " -bg $color
 				bind $f.c$id <ButtonPress> \
 					[list Neuroarchiver_color_swap $id $f.c$id Press %x %y]
-				bind $f.c$id <ButtonRelease> \
-					[list Neuroarchiver_color_swap $id $f.c$id Release %x %y]
 				entry $f.e$id -textvariable Neuroarchiver_info(bp_$id) \
 					-relief sunken -bd 1 -width 7
 				grid $f.l$id $f.c$id $f.e$id -sticky ew
@@ -5343,9 +5358,7 @@ proc Neuroarchiver_activity {} {
 		for {set id $Neuroarchiver_info(min_id)} \
 			{$id < $Neuroarchiver_info(max_id)} \
 			{incr id} {
-			if {[set Neuroarchiver_info(status_$id)] == "Off"} {
-				set Neuroarchiver_info(status_$id) "None"
-			}
+			set Neuroarchiver_info(status_$id) "None"
 		}
 	}
 	pack $ff.reset -side left -expand yes
@@ -5406,8 +5419,6 @@ proc Neuroarchiver_activity {} {
 			label $f.cc_$count -text " " -bg $color
 			bind $f.cc_$count <ButtonPress> \
 				[list Neuroarchiver_color_swap $id $f.cc_$count Press %x %y]
-			bind $f.cc_$count <ButtonRelease> \
-				[list Neuroarchiver_color_swap $id $f.cc_$count Release %x %y]
 			label $f.csps_$count -textvariable Neuroarchiver_info(qty_$id) -width 4
 			label $f.msps_$count -textvariable Neuroarchiver_info(sps_$id) -width 4
 			label $f.status_$count -textvariable Neuroarchiver_info(status_$id) -width 6
@@ -5427,9 +5438,6 @@ proc Neuroarchiver_color_swap {id w e x y} {
 	upvar #0 Neuroarchiver_info info	
 	
 	if {$e == "Press"} {
-		set color white
-	}
-	if {$e == "Release"} {
 		if {[LWDAQ_inside_widget $w $x $y]} {
 			set index [lsearch -index 0 $config(color_table) $id]
 			if {$index >= 0} {
@@ -5444,6 +5452,8 @@ proc Neuroarchiver_color_swap {id w e x y} {
 		} {
 			set color [lwdaq tkcolor [Neuroarchiver_color $id]]
 		}
+	} {
+		set color "white"
 	}
 	$w configure -bg $color
 }
@@ -6715,58 +6725,78 @@ proc Neuroarchiver_play {{command ""}} {
 	# Get a list of the available channel numbers and message counts. The list
 	# includes any channel in which we have at least one message. It takes the
 	# form of a space-delimited string of channel numbers and message counts.
-	set channel_list [lwdaq_recorder $info(data_image) \
+	set all_message_channels [lwdaq_recorder $info(data_image) \
 		"-payload $config(player_payload_length) \
 			-size $info(data_size) list"]
 
 	# We make a list of the active channels, in which channel numbers and numbers
 	# of samples are separated by colons as in 4:256 for channel four with two
 	# hundred and fifty six samples in the interval.
-	if {![LWDAQ_is_error_result $channel_list]} {
+	if {![LWDAQ_is_error_result $all_message_channels]} {
 		for {set id $info(min_id)} {$id < $info(max_id)} {incr id} {
 			set info(qty_$id) 0
 		}
-		set info(channel_activity) ""
-		foreach {id qty} $channel_list {
+		set info(active_channels) ""
+		foreach {id qty} $all_message_channels {
 			set info(qty_$id) $qty
-			if {$qty > $config(activity_rate) * $info(play_interval_copy)} {
+			if {$qty > $config(activity_threshold) * $info(play_interval_copy)} {
 				if {($id >= $info(min_id)) && ($id <= $info(max_id))} {
-					lappend info(channel_activity) "$id:$qty"
+					lappend info(active_channels) "$id:$qty"
 				}
 			}
 		}
 	} {
-		Neuroarchiver_print $channel_list
-		set info(channel_activity) ""
-		set channel_list ""
+		Neuroarchiver_print $all_message_channels
+		set info(active_channels) ""
+		set all_message_channels ""
 	}
 
-	# If the activity or calibratin panels are open, we change channel alerts to
+	# If the activity or calibration panels are open, we change channel alerts to
 	# "None" for channels that are not active.
-	if {[winfo exists $info(window)\.activity] || \
-		[winfo exists $info(window)\.calibration]} {
+	if {[winfo exists $info(window)\.activity]} {
 		foreach id $info(activity_selected) {
 			if {[set info(status_$id)] != "None"} {
-				if {[lsearch $info(channel_activity) "$id\:*"] < 0} {
+				if {[lsearch $info(active_channels) "$id\:*"] < 0} {
+					set info(status_$id) "Off"
+				}
+			}
+		}
+	}
+	if {[winfo exists $info(window)\.calibration]} {
+		foreach id $info(calibration_selected) {
+			if {[set info(status_$id)] != "None"} {
+				if {[lsearch $info(active_channels) "$id\:*"] < 0} {
 					set info(status_$id) "Off"
 				}
 			}
 		}
 	}
 	
-	# We select some or all active channels based on the processing_channels
-	# string entered by the user.
-	if {[string trim $config(processing_channels)] == "*"} {
-		set channels ""
-		foreach {id qty} $channel_list {
-			if {($qty > ($config(activity_rate) * $info(play_interval_copy))) \
-				&& ($id >= $info(min_id)) \
-				&& ($id <= $info(max_id)) } {
-				lappend channels "$id"
-			}
+	# We select all active channels or all channels specied by the channel selector
+	# string directly. The selected_channels elements either take the form of "id:sps"
+	# or just "id", where "sps" is the nominal sample rate of the channel, as specified
+	# by the use. The active_channels elements are "id:qty", where qty is the actual
+	# number of samples received, as opposed to the nominal sample rate.
+	if {[string trim $config(channel_selector)] == "*"} {
+		set selected_channels ""
+		foreach code $info(active_channels) {
+			set id [lindex [split $code :] 0]
+			lappend selected_channels $id
 		}
 	} {
-		set channels $config(processing_channels)
+		set selected_channels $config(channel_selector)
+	}
+	
+	# Some active channels may be ignored by a user-specified channel list. We will
+	# determine quality of reception for these now, before moving on to processing
+	# the selected channels. We pass a status-only flag to the signal procedure, which
+	# causes it to return before performing any reconstruction.
+	foreach code $info(active_channels) {
+		set id [lindex [split $code :] 0]
+		if {([lsearch $selected_channels "$id"] < 0) \
+				&& ([lsearch $selected_channels "$id\:*"] < 0)} {
+			Neuroarchiver_signal $id 1
+		}
 	}
 	
 	# We read the processor script from disk.
@@ -6788,7 +6818,7 @@ proc Neuroarchiver_play {{command ""}} {
 	# enable_vt is set, or if the processor itself sets force_vt in one of
 	# its plotting routines.
 	set info(force_vt) 0
-	foreach info(channel_code) $channels {
+	foreach info(channel_code) $selected_channels {
 		set info(channel_num) [lindex [split $info(channel_code) :] 0]
 		if {![string is integer -strict $info(channel_num)] \
 				|| ($info(channel_num) < $info(clock_id)) \
@@ -7174,7 +7204,7 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 	if {$config(isolate_events)} {
 		set cs [lindex $event 2]
 		if {$cs != "?"} {
-			set config(processing_channels) $cs
+			set config(channel_selector) $cs
 		}
 	}
 	
@@ -7795,10 +7825,10 @@ proc Neuroarchiver_open {} {
 			"Linux" {set width 100}
 			default {set width 100}
 		}
-		label $f.ae -textvariable Neuroarchiver_info(channel_activity) \
+		label $f.ae -textvariable Neuroarchiver_info(active_channels) \
 			-width $width -bg $info(variable_bg) -anchor w
 		pack $f.ae -side left -expand yes
-		button $f.ab -text "Details" -command "LWDAQ_post Neuroarchiver_activity"
+		button $f.ab -text "Panel" -command "LWDAQ_post Neuroarchiver_activity"
 		pack $f.ab -side left -expand yes
 
 		set f $w.play.b
@@ -7851,7 +7881,7 @@ proc Neuroarchiver_open {} {
 			"Linux" {set width 40}
 			default {set width 40}
 		}
-		entry $f.echannels -textvariable Neuroarchiver_config(processing_channels) \
+		entry $f.echannels -textvariable Neuroarchiver_config(channel_selector) \
 			-width $width
 		pack $f.lchannels $f.echannels -side left -expand yes
 	
