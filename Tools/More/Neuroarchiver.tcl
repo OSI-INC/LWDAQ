@@ -190,7 +190,7 @@ proc Neuroarchiver_init {} {
 #
 	set config(overview_num_samples) 20000
 	set config(overview_activity_fraction) 0.01
-	set info(overview_width) 800
+	set info(overview_width) 1000
 	set info(overview_height) 250
 	set info(overview_image) "_neuroarchiver_ov_image_"
 	lwdaq_image_destroy $info(overview_image)
@@ -257,24 +257,26 @@ proc Neuroarchiver_init {} {
 	set config(bp_set) 200.0
 	set info(bp_reset) 10000.0
 #
-# We set the array of selected frequencies for reconstruction to an empty string.
-# During reconstruction, we will set them to a value picked from the default
-# frequency string. We also have a f_alert parameter for each channel, that we
-# set to "Extra" if we have too many, "Loss" if we have too few, "None" if 
-# the channel has not been active yet, and "Okay" if we have the correct number.
-# Once the channel becomes inactive, it's most recent alert remains in place.
+# We set the array of selected frequencies for reconstruction to an empty
+# string. During reconstruction, we will set them to a value picked from the
+# default frequency string. We also have a f_alert parameter for each channel,
+# that we set to "Extra" if we have too many, "Poor" if we have too few, "None"
+# if the channel has not been active yet, "Okay" if we have the correct number,
+# and "Gone" if it was active once, but has since vanished. Once the channel
+# becomes inactive, it's most recent alert remains in place.
 #
 	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
-		set info(rec_$id) "0"
-		set info(nom_$id) "0"
-		set info(alert_$id) "None"
+		set info(qty_$id) "0"
+		set info(sps_$id) "0"
+		set info(status_$id) "None"
 	}
 	set config(loss_fraction) 0.8
 	set config(extra_fraction) 1.1
-	set config(calib_include) "Active"
+	set config(calib_include) "Okay Loss Extra"
 	set info(calib_selected) ""
-	set config(activity_include) "Active"
+	set config(activity_include) "Okay Loss Extra Off"
 	set info(activity_selected) ""
+	set config(activity_rows) 23
 #
 # When we read and write sets of baseline powers to archive metadata, we can use
 # a name to distinguish different sets stored therein, or we can opt for no name
@@ -555,10 +557,10 @@ proc Neuroarchiver_init {} {
 	set config(v_range) 65535
 	set config(v_offset) 0
 	set config(vt_mode) "SP"
-	set config(a_max) 10000
+	set config(a_max) 100
 	set config(a_min) 0.0
 	set config(f_min) 0.0
-	set config(f_max) 200
+	set config(f_max) 100
 	set config(log_frequency) 0
 	set config(log_amplitude) 0
 #
@@ -955,7 +957,7 @@ proc Neuroarchiver_list {{index 0} {fl ""}} {
 		$w.text insert end "  Metadata  " "e_$i textbutton"
 		$w.text insert end "   "
 		$w.text tag bind o_$i <Button> [list LWDAQ_post \
-			[list Neuroarchiver_overview 1 $fn]]
+			[list Neuroarchiver_overview $fn]]
 		$w.text insert end "  Overview  " "o_$i textbutton"
 		$w.text insert end "\n"
 		set metadata [LWDAQ_ndf_string_read $fn]
@@ -1897,20 +1899,20 @@ proc Neuroarchiver_signal {{channel_code ""}} {
 	}
 	if {$num_received > [expr $config(extra_fraction) \
 			* $frequency * $info(play_interval_copy)]} {
-		if {$info(alert_$id) != "Extra"} {
+		if {$info(status_$id) != "Extra"} {
 			Neuroarchiver_print \
 				"WARNING: Extra samples on channel $id\
 				at $config(play_time) s in [file tail $config(play_file)]."
-			set info(alert_$id) "Extra"
+			set info(status_$id) "Extra"
 		}
 	} elseif {$num_received < [expr $config(loss_fraction) \
 			* $frequency * $info(play_interval_copy)]} {
-		set info(alert_$id) "Loss"
+		set info(status_$id) "Loss"
 	} else {
-		set info(alert_$id) "Okay"
+		set info(status_$id) "Okay"
 	}
 	set info(frequency) $frequency
-	set info(nom_$id) $frequency
+	set info(sps_$id) $frequency
 	
 	# We calculate the number of messages expected and the period
 	# of the nominal sample rate in clock ticks.
@@ -2061,6 +2063,21 @@ proc Neuroarchiver_values {{signal ""}} {
 }
 
 #
+# Neuroarchiver_color returns a color code that is equal to the identifier
+# it is passed, unless there is a color switch value in the color table.
+#
+proc Neuroarchiver_color {id} {
+	upvar #0 Neuroarchiver_config config
+
+	set index [lsearch -index 0 $config(color_table) $id]
+	if {$index >= 0} {
+		return [lindex $config(color_table) $index 1]
+	} {
+		return $id
+	}
+}
+
+#
 # Neuroarchiver_spectrum calculates the discrete Fourier transform of the
 # signal. It returns the spectrum as a sequence of real numbers separated by
 # spaces. Each pair of numbers is the amplitude and phase of a component in the
@@ -2106,9 +2123,10 @@ proc Neuroarchiver_spectrum {{values ""}} {
 # the archvie and plot the results. An Export button provides a way to
 # export the graph data to disk for plotting in other programs.
 #
-proc Neuroarchiver_overview {{index 0} {fn ""} } {
+proc Neuroarchiver_overview {{fn ""} } {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
+	upvar #0 Neuroarchiver_overview ov_config
 	global LWDAQ_Info
 	
 	# Use play file if none specified.
@@ -2122,157 +2140,142 @@ proc Neuroarchiver_overview {{index 0} {fn ""} } {
 		return "ERROR"
 	}
 
-	# Delete all unused overview images.
-	foreach name [image names] {
-		if {![image inuse $name]} {
-			if {[string match "_neuroarchiver_ov_photo_*" $name]} {
-				image delete $name
-			}
-		}
-	}
-
-	# If the index is greater than zero, look for a matching overview window. If
-	# we find it, we raise it. We check the overview file name, and if it's
-	# different, we plot again.
-	if {$index > 0} {
-		set w $info(window)\.overview_$index
-		if {[winfo exists $w]} {
-			raise $w
-			upvar #0 Neuroarchiver_overview_$index ov_config
-			if {$ov_config(fn) != $fn} {
-				Neuroarchiver_overview_plot $index
-			}
-			return "SUCCESS"
-		}
-	}
-
-	# If the index is zero, find a free window name, otherwise create the window
-	# name.
-	if {$index == 0} {
-		set index 1
-		while {[winfo exists [set w $info(window)\.list_$index]} {
-			incr index
-		}
-	}
-	
 	# Now we have the index providing an unused list name, so create the window
 	# and its configuration array.
-	toplevel $w
-	upvar #0 Neuroarchiver_overview_$index ov_config
+	set w $info(window)\.overview
+
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "Archive Overview, Neuroarchiver $info(version)"
+		set existing_window 0
+		set existing_file 0
+	} {
+		raise $w
+		set existing_window 1
+		if {$ov_config(fn) != [file normalize $fn]} {
+			$ov_config(plot) delete cursor
+			set existing_file 0
+		} {
+			set existing_file 1
+		}
+	}
 	set ov_config(w) $w
 
-	# Use the play file if none is specified.
+	# Set file variables.
 	set ov_config(fn) [file normalize $fn]
+	set ov_config(fn_tail) [file tail $ov_config(fn)]
 	
 	# Try to determine the start time of the archive.
 	if {![regexp {([0-9]{10})\.ndf} [file tail $ov_config(fn)] match atime]} {
 		set atime 0
 	}
 	set ov_config(atime) $atime
+
+	if {!$existing_window} {	
+		# Create a new photo in which to plot our graph.
+		set ov_config(photo) [image create photo "_neuroarchiver_ov_photo_" \
+			-width $info(overview_width) -height $info(overview_height)]
+
+		# Initialize the display parameters.
+		set ov_config(t_min) 0
+		set ov_config(t_max) 0
+		set ov_config(activity) ""
+		set ov_config(select) $config(processing_channels)
+		set ov_config(status) "Idle"
+		foreach v {v_range v_offset vt_mode} {
+			set ov_config($v) $config($v)
+		}
 	
-	# Set title of window.
-	wm title $w "Overview of [file tail $ov_config(fn)], Start Time\
-		[Neuroarchiver_datetime_convert $atime],\
-		Neuroarchiver $info(version)"
+		# Make a frame for the plot.
+		set f $w.plot
+		frame $f 
+		pack $f -side top -fill x
+	
+		# Create graph display. We create a canvas widget and display a lwdaq
+		# image in the widget.
+		set plot $f.canvas
+		canvas $plot -bd 2 -relief sunken \
+			-width [expr $info(overview_width) + 1] \
+			-height [expr $info(overview_height) + 1]
+		pack $plot -side top -expand 1
+		$plot create image 0 0 -anchor nw -image $ov_config(photo)
+		bind $plot <Double-Button-1> \
+			[list LWDAQ_post [list Neuroarchiver_overview_jump %x %y]]
+		set ov_config(plot) $plot
 
-	# Create a new photo in which to plot our graph.
-	set ov_config(photo) [image create photo "_neuroarchiver_ov_photo_$index" \
-		-width $info(overview_width) -height $info(overview_height)]
+		# Create value controls.	
+		set f $w.value
+		frame $f 
+		pack $f -side top -fill x
+		label $f.status -textvariable Neuroarchiver_overview(status) \
+			-fg blue -bg white -width 10
+		pack $f.status -side left -expand yes
+		button $f.plot -text "Plot" -command \
+			[list LWDAQ_post [list Neuroarchiver_overview_plot 0]]
+		pack $f.plot -side left -expand yes
+		button $f.export -text "Export" -command \
+			[list LWDAQ_post [list Neuroarchiver_overview_plot 1]]
+		pack $f.export -side left -expand yes
+		foreach a "SP CP NP" {
+			set b [string tolower $a]
+			radiobutton $f.$b -variable Neuroarchiver_overview(vt_mode) \
+				-text $a -value $a
+			pack $f.$b -side left -expand no
+		}
+		foreach v {v_range v_offset} {
+			label $f.l$v -text $v -width [string length $v]
+			entry $f.e$v -textvariable Neuroarchiver_overview($v) -width 5
+			pack $f.l$v $f.e$v -side left -expand yes
+		}
+		button $f.nf -text "Next_NDF" -command \
+			[list LWDAQ_post [list Neuroarchiver_overview_newndf +1]]
+		button $f.pf -text "Prev_NDF" -command \
+			[list LWDAQ_post [list Neuroarchiver_overview_newndf -1]]
+		pack $f.nf $f.pf -side left -expand yes
 
-	# Initialize the display parameters.
-	set ov_config(t_min) 0
-	set ov_config(t_max) 0
-	set ov_config(num_samples) $config(overview_num_samples)
-	set ov_config(activity) ""
-	set ov_config(select) $config(processing_channels)
-	set ov_config(status) "Idle"
-	foreach v {v_range v_offset vt_mode} {
-		set ov_config($v) $config($v)
+		# Create time controls
+		set f $w.time
+		frame $f 
+		pack $f -side top -fill x
+		label $f.tfn -text "Archive::"
+		label $f.lfn -textvariable Neuroarchiver_overview(fn_tail) -width 14
+		pack $f.tfn $f.lfn -side left -expand yes
+		label $f.lt_min -text "t_min"
+		entry $f.et_min -textvariable Neuroarchiver_overview(t_min) -width 6
+		label $f.lt_max -text "t_max"
+		entry $f.et_max -textvariable Neuroarchiver_overview(t_max) -width 6
+		label $f.lt_end -text "t_end"
+		label $f.et_end -textvariable Neuroarchiver_overview(t_end) -width 6
+		label $f.ls -text "Overview Select:" -anchor e
+		entry $f.es -textvariable Neuroarchiver_overview(select) -width 30
+		pack $f.lt_min $f.et_min $f.lt_max $f.et_max \
+			$f.lt_end $f.et_end $f.ls $f.es -side left -expand yes
+
+		# Create activity display
+		set f $w.activy
+		frame $f
+		pack $f -side top -fill x
+		label $f.la -text "Samples (id:qty):" -anchor e
+		label $f.ea -textvariable Neuroarchiver_overview(activity) \
+			-anchor w -width 100 -bg lightgray
+		pack $f.la $f.ea -side left -expand yes
 	}
 	
-	# Make a frame for the plot.
-	set f $w.plot
-	frame $f 
-	pack $f -side top -fill x
-	
-	# Create graph display. We create a canvas widget and display a lwdaq
-	# image in the widget.
-	set plot $f.canvas
-	canvas $plot -bd 2 -relief sunken \
-		-width $info(overview_width) \
-		-height $info(overview_height)
-	pack $plot -side top -expand 1
-	$plot create image 0 0 -anchor nw -image $ov_config(photo)
-	bind $plot <Double-Button-1> \
-		[list LWDAQ_post [list Neuroarchiver_overview_jump $index %x %y]]
+	if {!$existing_file} {
+		# Get the end time of the archive and check the file syntax.
+		set ov_config(status) "Seeking"
+		if {[catch {
+			set ov_config(t_end) [Neuroarchiver_end_time $ov_config(fn)]
+		} message]} {
+			Neuroarchiver_print "ERROR: $message."
+			return "FAIL"
+		}
+		set ov_config(t_max) $ov_config(t_end)
+		set ov_config(status) "Idle"
 
-	# Create value controls.	
-	set f $w.value
-	frame $f 
-	pack $f -side top -fill x
-	label $f.status -textvariable Neuroarchiver_overview_$index\(status) \
-		-fg blue -bg white -width 10
-	pack $f.status -side left -expand yes
-	button $f.plot -text "Plot" -command \
-		[list LWDAQ_post [list Neuroarchiver_overview_plot $index 0]]
-	pack $f.plot -side left -expand yes
-	button $f.export -text "Export" -command \
-		[list LWDAQ_post [list Neuroarchiver_overview_plot $index 1]]
-	pack $f.export -side left -expand yes
-	foreach a "SP CP NP" {
-		set b [string tolower $a]
-		radiobutton $f.$b -variable Neuroarchiver_overview_$index\(vt_mode) \
-			-text $a -value $a
-		pack $f.$b -side left -expand no
+		# Plot the archive.	
+		Neuroarchiver_overview_plot
 	}
-	foreach v {v_range v_offset num_samples} {
-		label $f.l$v -text $v -width [string length $v]
-		entry $f.e$v -textvariable Neuroarchiver_overview_$index\($v) -width 5
-		pack $f.l$v $f.e$v -side left -expand yes
-	}
-	button $f.nf -text "Next" -command \
-		[list LWDAQ_post [list Neuroarchiver_overview_newndf $index +1]]
-	button $f.pf -text "Prev" -command \
-		[list LWDAQ_post [list Neuroarchiver_overview_newndf $index -1]]
-	pack $f.nf $f.pf -side left -expand yes
-
-	# Create time controls
-	set f $w.time
-	frame $f 
-	pack $f -side top -fill x
-	label $f.lt_min -text "t_min"
-	entry $f.et_min -textvariable Neuroarchiver_overview_$index\(t_min) -width 6
-	label $f.lt_max -text "t_max"
-	entry $f.et_max -textvariable Neuroarchiver_overview_$index\(t_max) -width 6
-	label $f.lt_end -text "t_end"
-	label $f.et_end -textvariable Neuroarchiver_overview_$index\(t_end) -width 6
-	label $f.ls -text "Select:" -anchor e
-	entry $f.es -textvariable Neuroarchiver_overview_$index\(select) -width 35
-	pack $f.lt_min $f.et_min $f.lt_max $f.et_max \
-		$f.lt_end $f.et_end $f.ls $f.es -side left -expand yes
-
-	# Create activity display
-	set f $w.activy
-	frame $f
-	pack $f -side top -fill x
-	label $f.la -text "Points (id:qty):" -anchor e
-	label $f.ea -textvariable Neuroarchiver_overview_$index\(activity) \
-		-anchor w -width 90 -bg lightgray
-	pack $f.la $f.ea -side left -expand yes
-	
-	# Get the end time of the archive and check the file syntax.
-	set ov_config(status) "Seeking"
-	if {[catch {
-		set ov_config(t_end) [Neuroarchiver_end_time $ov_config(fn)]
-	} message]} {
-		Neuroarchiver_print "ERROR: $message."
-		return "FAIL"
-	}
-	set ov_config(t_max) $ov_config(t_end)
-	set ov_config(status) "Idle"
-
-	Neuroarchiver_overview_plot $index
-	Neuroarchiver_overview_cursor $index
 	
 	return "SUCCESS"
 }
@@ -2284,36 +2287,70 @@ proc Neuroarchiver_overview {{index 0} {fn ""} } {
 # second so that accompanying synchronous video will have a key frame to
 # show at the start of the interval.
 #
-proc Neuroarchiver_overview_jump {i x y} {
+proc Neuroarchiver_overview_jump {x y} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
-	upvar #0 Neuroarchiver_overview_$i ov_config
+	upvar #0 Neuroarchiver_overview ov_config
 
-	set ptime [expr round(1.0 * ($x - 2.0) / $info(overview_width) \
-		* ($ov_config(t_max) - $ov_config(t_min)))]
-	if {$ov_config(atime)>0} {
-		Neuroarchiver_jump "$ov_config(atime) [format %.1f $ptime]\
+	# Check the window and declare the overview array.
+	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+	if {![info exists ov_config]} {return "ABORT"}
+	if {![winfo exists $ov_config(w)]} {return "ABORT"}
+
+	# Calculate the play time.
+	set ptime [expr round( 1.0 \
+		* $x \
+		/ $info(overview_width) \
+		* ($ov_config(t_max) - $ov_config(t_min)) \
+		+ $ov_config(t_min) \
+		- (0.5 * $config(play_interval)) )]
+	if {$ptime < 0} {set ptime 0}
+	
+	# Jump to the new location, using the file nake to seek the playback tree.
+	Neuroarchiver_jump "$ov_config(fn_tail) [format %.1f $ptime] \
 			\"$ov_config(select)\" \"Overview Jump\"" 0
-	} {
-		Neuroarchiver_jump "[file tail $ov_config(fn)] [format %.1f $ptime]\
-			\"$ov_config(select)\" \"Overview Jump\"" 0
-	}
-	Neuroarchiver_overview_cursor $i
 }
 
 #
-# Neuroarchiver_color returns a color code that is equal to the identifier
-# it is passed, unless there is a color switch value in the color table.
+# Neuroarchiver_overview_cursor draws a vertical line over the plot to show the
+# start of the current playback interval, assuming the file displayed is the 
+# current play file.
 #
-proc Neuroarchiver_color {id} {
+proc Neuroarchiver_overview_cursor {} {
+	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
+	upvar #0 Neuroarchiver_overview ov_config
 
-	set index [lsearch -index 0 $config(color_table) $id]
-	if {$index >= 0} {
-		return [lindex $config(color_table) $index 1]
-	} {
-		return $id
+	# Check the window and declare the overview array.
+	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+	if {![info exists ov_config]} {return "ABORT"}
+	if {![winfo exists $ov_config(w)]} {return "ABORT"}
+
+	# Delete the old cursor, if any.
+	$ov_config(plot) delete cursor
+
+	# Check to see if the overview is showing the play file.
+	if {[file tail $config(play_file)] != [file tail $ov_config(fn)]} {
+		return "ABORT"
 	}
+	
+	# Check to see if the play time is in the overview time span.
+	if {($config(play_time) < $ov_config(t_min)) \
+		|| ($config(play_time) > $ov_config(t_max))} {
+		return "ABORT"
+	}
+	
+	# Draw the new cursor.
+	set x [expr round(1.0 \
+		* ($config(play_time)  \
+			+ (0.5 * $config(play_interval)) \
+			- $ov_config(t_min)) \
+		* $info(overview_width) \
+		/ ($ov_config(t_max) - $ov_config(t_min)))]
+	$ov_config(plot) create line "$x 0 $x $info(overview_height)" \
+		-fill red -tag "cursor"
+	
+	return "SUCCESS"
 }
 
 #
@@ -2324,10 +2361,10 @@ proc Neuroarchiver_color {id} {
 # will contain the archive time of a sample and the sample value. These files
 # will be written to the directory that contains the overview archive.
 #
-proc Neuroarchiver_overview_plot {i {export 0}} {
+proc Neuroarchiver_overview_plot {{export 0}} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
-	upvar #0 Neuroarchiver_overview_$i ov_config
+	upvar #0 Neuroarchiver_overview ov_config
 	global LWDAQ_Info
 
 	# Check the window and declare the overview array.
@@ -2346,6 +2383,9 @@ proc Neuroarchiver_overview_plot {i {export 0}} {
 		return "FAIL"
 	}
 	
+	# Delete the old cursor, if any.
+	$ov_config(plot) delete cursor
+
 	# Draw a grid on the overview graph.
 	lwdaq_graph "0 0" $info(overview_image) -fill 1 \
 		-x_min 0 -x_max 1 -x_div $config(overview_t_div) \
@@ -2357,12 +2397,12 @@ proc Neuroarchiver_overview_plot {i {export 0}} {
 	
 	# Check the input parameters.
 	if {$ov_config(t_min) < 0} {set ov_config(t_min) 0}
-	if {$ov_config(num_samples) <= 1} {set ov_config(num_samples) 1}
 	
 	# Create an array of graphs, one for each possible channel.
 	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
 		if {($ov_config(select) == "*") \
-			|| ([lsearch $ov_config(select) "$id"] >= 0) } {
+			|| ([lsearch $ov_config(select) "$id"] >= 0) \
+			|| ([lsearch $ov_config(select) "$id\:*"] >= 0) } {
 			set graph($id) ""
 		}
 	}
@@ -2380,7 +2420,7 @@ proc Neuroarchiver_overview_plot {i {export 0}} {
 
 	# Read num_samples messages from the archive at random locations.
 	set ov_config(status) "Reading"
-	set ave_step [expr 2.0 * ($index_max - $index_min) / $ov_config(num_samples)]
+	set ave_step [expr 2.0 * ($index_max - $index_min) / $config(overview_num_samples)]
 	set message_length [expr $info(core_message_length) + $config(player_payload_length)]
 	set addr [expr $data_start + $message_length * $index_min]
 	set addr_end [expr $data_start + $message_length * $index_max]
@@ -2391,8 +2431,14 @@ proc Neuroarchiver_overview_plot {i {export 0}} {
 		LWDAQ_support
 		seek $f $addr
 		binary scan [read $f $message_length] cSc id value timestamp
-		lappend samples "[expr $id & 0xff] [expr $value & 0xffff]"
-		set addr [expr $addr + $message_length * round(1 + ($ave_step-1)*rand())]
+		set id [expr $id & 0xff]
+		set value [expr $value & 0xffff]
+		if {[info exists graph($id)] || ($id == 0)} {
+			lappend samples "$id $value"
+			set addr [expr $addr + $message_length * round(1 + ($ave_step-1)*rand())]
+		} {
+			set addr [expr $addr + $message_length]
+		}
 	}
 	close $f
 	
@@ -2445,6 +2491,21 @@ proc Neuroarchiver_overview_plot {i {export 0}} {
 		}
 	}	
 	
+	# Apply the glitch filter to the graphs of values and check their lengths.
+	if {$config(glitch_threshold) > 0} {
+		set saved_config [lwdaq_config]
+		lwdaq_config -fsd $info(overview_fsd)
+		for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
+			if {[info exists graph($id)]} {
+				set filtered_graph [lwdaq glitch_filter_y $config(glitch_threshold) $graph($id)]
+				if {![LWDAQ_is_error_result $filtered_graph]} {
+					set graph($id) $filtered_graph
+				}
+			}
+		}
+		eval lwdaq_config $saved_config
+	}
+
 	# Create the plot viewing ranges from the user parameters.
 	if {$ov_config(vt_mode) == "CP"} {
 		set v_min [expr - $ov_config(v_range) / 2 ]
@@ -2470,17 +2531,13 @@ proc Neuroarchiver_overview_plot {i {export 0}} {
 	set ov_config(activity) ""
 	for {set id 0} {$id <= $info(max_id)} {incr id} {
 		if {![info exists graph($id)]} {continue}
-		if {[llength $graph($id)] / 2 < \
+		if {($ov_config(select) == "*") \
+			&& ([llength $graph($id)] / 2 < \
 			[expr $config(overview_activity_fraction)\
-			* $ov_config(num_samples)]} {continue}
+			* $config(overview_num_samples)])} {continue}
 		LWDAQ_support
 		if {![winfo exists $w]} {return "ABORT"}
 		append ov_config(activity) "$id:[expr [llength $graph($id)] / 2] "
-		if {($ov_config(select) != "*") \
-			&& ([lsearch $ov_config(select) "$id"] < 0) \
-			&& ([lsearch $ov_config(select) "$id:\*"] < 0) } {continue}
-		if {($ov_config(select) == "*") \
-			&& ($id == 0)} {continue}
 		lwdaq_graph $graph($id) $info(overview_image) \
 			-x_min $ov_config(t_min) -x_max $ov_config(t_max) \
 			-y_min $v_min -y_max $v_max \
@@ -2493,22 +2550,12 @@ proc Neuroarchiver_overview_plot {i {export 0}} {
 		}		
 	}
 	
+	# Re-draw the cursor.
+	Neuroarchiver_overview_cursor
+	
 	# Done.
 	set ov_config(status) "Idle"
 	return "SUCCESS"
-}
-
-#
-# Neuroarchiver_overview_cursor draws a vertical line over the plot to show the
-# start of the current playback interval, assuming the file displayed is the 
-# current play file.
-#
-proc Neuroarchiver_overview_cursor {i} {
-	upvar #0 Neuroarchiver_info info
-	upvar #0 Neuroarchiver_config config
-	upvar #0 Neuroarchiver_overview_$i ov_config
-
-	Neuroarchiver_print "Hello from overview cursor $i."
 }
 
 #
@@ -2516,10 +2563,10 @@ proc Neuroarchiver_overview_cursor {i} {
 # after the overview file in the Player Directory Tree, switches the overview to
 # the new file, and plots its contents.
 #
-proc Neuroarchiver_overview_newndf {i step} {
+proc Neuroarchiver_overview_newndf {step} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
-	upvar #0 Neuroarchiver_overview_$i ov_config
+	upvar #0 Neuroarchiver_overview ov_config
 
 	# Set the status show we are searching for the requested file.
 	set ov_config(status) "Searching"
@@ -2547,6 +2594,7 @@ proc Neuroarchiver_overview_newndf {i step} {
 		return "FAIL"	
 	}
 	set ov_config(fn) $file_name
+	set ov_config(fn_tail) [file tail $ov_config(fn)]
 	
 	# Try to determine the start time of the new archive.
 	if {![regexp {([0-9]{10})\.ndf} [file tail $ov_config(fn)] match atime]} {
@@ -2559,17 +2607,9 @@ proc Neuroarchiver_overview_newndf {i step} {
 	set ov_config(t_max) $ov_config(t_end)
 	set ov_config(t_min) 0.0
 
-	# Change the window title.
-	wm title $ov_config(w) "Overview of [file tail $ov_config(fn)], Start Time\
-		[Neuroarchiver_datetime_convert $atime],\
-		Neuroarchiver $info(version)"
-		
 	# Plot the overview of the new archive.
 	set ov_config(status) "Idle"
-	Neuroarchiver_overview_plot $i
-
-	# Clear all pending overview newndf events from the queue.
-	LWDAQ_queue_clear "Neuroarchiver_overview_newndf*"
+	Neuroarchiver_overview_plot
 }
 
 #
@@ -4499,8 +4539,8 @@ proc Neuroarchiver_exporter_autofill {} {
 
 	set autofill ""
 	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
-		if {$info(alert_$id) == "Okay"} {
-			append autofill "$id\:[set info(nom_$id)] "
+		if {$info(status_$id) == "Okay"} {
+			append autofill "$id\:[set info(sps_$id)] "
 		}		
 	}
 	if {$autofill == ""} {
@@ -5023,7 +5063,7 @@ proc Neuroarchiver_calibration {{name ""}} {
 
 	label $f.lsel -text "Include String:" -fg blue
 	entry $f.einc -textvariable Neuroarchiver_config(calib_include) -width 35
-	button $f.refresh -text "Refresh List" -command {
+	button $f.refresh -text "Update Panel" -command {
 		destroy $Neuroarchiver_info(window)\.baselines
 		LWDAQ_post Neuroarchiver_calibration
 	}
@@ -5107,23 +5147,22 @@ proc Neuroarchiver_calibration {{name ""}} {
 		if {$id % $info(set_size) == $info(set_size) - 1} {continue}
 		if {$id % $info(set_size) == 0} {continue}
 
-		if {$count % 29 == 0} {
+		if {$count % $config(activity_rows) == 0} {
 			set f [frame $w.calib$count -relief groove -border 4]
 			pack $f -side left -fill y -expand 1
-			label $f.id -text "CC" -fg purple
-			label $f.color -text "ID" -fg purple
+			label $f.id -text "ID" -fg purple
+			label $f.color -text "  " -fg purple
 			label $f.baseline -text "BP" -fg purple
-			grid $f.color $f.id $f.baseline -sticky ew
+			grid $f.id $f.color $f.baseline -sticky ew
 			incr count
 		} {
-			set alert_code [set info(alert_$id)] 
+			set status_code [set info(status_$id)] 
 			if {([lsearch $inclist "All"] >= 0) \
-					|| (($alert_code != "None") && ([lsearch $inclist "Active"] >= 0)) \
-					|| ([lsearch $inclist $alert_code] >= 0) \
+					|| ([lsearch $inclist $status_code] >= 0) \
 					|| ([lsearch $inclist $id] >= 0)} {
 				set color [lwdaq tkcolor [Neuroarchiver_color $id]]
-				label $f.c$id -text "  " -bg $color
 				label $f.l$id -text $id -anchor w
+				label $f.c$id -text "  " -bg $color
 				entry $f.e$id -textvariable Neuroarchiver_info(bp_$id) \
 					-relief sunken -bd 1 -width 7
 				grid $f.l$id $f.c$id $f.e$id -sticky ew
@@ -5195,7 +5234,7 @@ proc Neuroarchiver_baselines_write {name} {
 	}
 	
 	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
-		if {$info(alert_$id) != "None"} {
+		if {$info(status_$id) != "None"} {
 			append metadata "$id $info(bp_$id)\n"
 		}
 	}
@@ -5271,13 +5310,25 @@ proc Neuroarchiver_activity {} {
 	pack $ff -side top -fill x -expand 1
 	
 	# Controls.
-	button $ff.refresh -text "Refresh" -command {
+	label $ff.include -text "Include:" -fg blue
+	pack $ff.include -side left -expand yes
+	entry $ff.string -textvariable Neuroarchiver_config(activity_include) -width 35
+	pack $ff.string -side left -expand yes
+	button $ff.update -text "Update" -command {
 		destroy $Neuroarchiver_info(window)\.activity
 		LWDAQ_post Neuroarchiver_activity
 	}
-	label $ff.include -text "Include:" -fg blue
-	entry $ff.string -textvariable Neuroarchiver_config(activity_include) -width 35
-	pack $ff.include $ff.string $ff.refresh -side left -expand yes
+	pack $ff.update -side left -expand yes
+	button $ff.reset -text "Reset" -command {
+		for {set id $Neuroarchiver_info(min_id)} \
+			{$id < $Neuroarchiver_info(max_id)} \
+			{incr id} {
+			if {[set Neuroarchiver_info(status_$id)] == "Off"} {
+				set Neuroarchiver_info(status_$id) "None"
+			}
+		}
+	}
+	pack $ff.reset -side left -expand yes
 
 	# Make large frame for the activity columns.
 	set ff [frame $w.activity]
@@ -5307,31 +5358,30 @@ proc Neuroarchiver_activity {} {
 		if {$id % $info(set_size) == $info(set_size) - 1} {continue}
 		if {$id % $info(set_size) == 0} {continue}
 		
-		if {$count % 29 == 0} {
+		if {$count % $config(activity_rows) == 0} {
 			set f [frame $ff.column_$count -relief groove -border 4]
 			pack $f -side left -fill y -expand 1
 			label $f.id -text "ID" -fg purple
-			label $f.cc -text "CC" -fg purple
+			label $f.cc -text "  " -fg purple
 			label $f.csps -text "Qty" -fg purple
-			label $f.msps -text "Nom" -fg purple
+			label $f.msps -text "SPS" -fg purple
 			label $f.alert -text "State" -fg purple
 			grid $f.id $f.cc $f.csps $f.msps $f.alert -sticky ew
 			incr count
 		}
 
-		set alert_code [set info(alert_$id)] 
+		set status_code [set info(status_$id)] 
 		if {([lsearch $inclist "All"] >= 0) \
-				|| (($alert_code != "None") && ([lsearch $inclist "Active"] >= 0)) \
-				|| ([lsearch $inclist $alert_code] >= 0) \
+				|| ([lsearch $inclist $status_code] >= 0) \
 				|| ([lsearch $inclist $id] >= 0)} {
 			label $f.id_$count -text $id -anchor w
 			set color [lwdaq tkcolor [Neuroarchiver_color $id]]
 			label $f.cc_$count -text " " -bg $color
-			label $f.csps_$count -textvariable Neuroarchiver_info(rec_$id) -width 4
-			label $f.msps_$count -textvariable Neuroarchiver_info(nom_$id) -width 4
-			label $f.alert_$count -textvariable Neuroarchiver_info(alert_$id) -width 6
+			label $f.csps_$count -textvariable Neuroarchiver_info(qty_$id) -width 4
+			label $f.msps_$count -textvariable Neuroarchiver_info(sps_$id) -width 4
+			label $f.status_$count -textvariable Neuroarchiver_info(status_$id) -width 6
 			grid $f.id_$count $f.cc_$count $f.csps_$count \
-				$f.msps_$count $f.alert_$count -sticky ew
+				$f.msps_$count $f.status_$count -sticky ew
 			lappend info(activity_selected) $id
 			incr count
 		}
@@ -5351,7 +5401,7 @@ proc Neuroarchiver_frequency_reset {} {
 		set info(csps_$i) 0
 		set info(qsps_$i) "*"
 		set info(msps_$i) "0"
-		set info(alert_$i) "None"
+		set info(status_$i) "None"
 	}
 }
 
@@ -6615,11 +6665,11 @@ proc Neuroarchiver_play {{command ""}} {
 	# hundred and fifty six samples in the interval.
 	if {![LWDAQ_is_error_result $channel_list]} {
 		for {set id $info(min_id)} {$id < $info(max_id)} {incr id} {
-			set info(rec_$id) 0
+			set info(qty_$id) 0
 		}
 		set info(channel_activity) ""
 		foreach {id qty} $channel_list {
-			set info(rec_$id) $qty
+			set info(qty_$id) $qty
 			if {$qty > $config(activity_rate) * $info(play_interval_copy)} {
 				if {($id >= $info(min_id)) && ($id <= $info(max_id))} {
 					lappend info(channel_activity) "$id:$qty"
@@ -6637,8 +6687,10 @@ proc Neuroarchiver_play {{command ""}} {
 	if {[winfo exists $info(window)\.activity] || \
 		[winfo exists $info(window)\.calibration]} {
 		foreach id $info(activity_selected) {
-			if {[lsearch $info(channel_activity) "$id\:*"] < 0} {
-				set info(alert_$id) "None"
+			if {[set info(status_$id)] != "None"} {
+				if {[lsearch $info(channel_activity) "$id\:*"] < 0} {
+					set info(status_$id) "Off"
+				}
 			}
 		}
 	}
@@ -6774,6 +6826,7 @@ proc Neuroarchiver_play {{command ""}} {
 	# Draw the graphs on the screen if the graphics are enabled.
 	Neuroarchiver_draw_graphs
 	Neurotracker_draw_graphs
+	Neuroarchiver_overview_cursor
 	
 	# Play any video that needs to be played, specifying the current play time as a
 	# Unix time, and the current interval length.
@@ -7686,7 +7739,7 @@ proc Neuroarchiver_open {} {
 		label $f.ae -textvariable Neuroarchiver_info(channel_activity) \
 			-width $width -bg $info(variable_bg) -anchor w
 		pack $f.ae -side left -expand yes
-		button $f.ab -text "Details" -command "Neuroarchiver_activity"
+		button $f.ab -text "Details" -command "LWDAQ_post Neuroarchiver_activity"
 		pack $f.ab -side left -expand yes
 
 		set f $w.play.b
@@ -7709,7 +7762,7 @@ proc Neuroarchiver_open {} {
 		}
 		pack $f.metadata -side left -expand yes
 		button $f.overview -text "Overview" -command {
-			LWDAQ_post [list LWDAQ_post "Neuroarchiver_overview 1"]
+			LWDAQ_post [list LWDAQ_post "Neuroarchiver_overview"]
 		}
 		pack $f.overview -side left -expand yes
 	
