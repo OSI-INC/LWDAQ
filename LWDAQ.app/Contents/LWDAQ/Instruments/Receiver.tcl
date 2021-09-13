@@ -1,4 +1,4 @@
-# Long-Wire Data Acquisition Software (LWDAQ)
+# Receiver Instrument, Long-Wire Data Acquisition Software (LWDAQ)
 # Copyright (C) 2006-2021 Kevan Hashemi, Brandeis University
 #
 # This program is free software; you can redistribute it and/or
@@ -16,17 +16,18 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #
-# Recorder.tcl defines the Recorder instrument for LWDAQ.
+# Receiver.tcl defines the Receiver Instrument for LWDAQ, which until 13-SEP-21
+# was called the Recorder Instrument, as defined in Recorder.tcl.
 #
 
 #
-# LWDAQ_init_Recorder creates all elements of the Recorder instrument's
+# LWDAQ_init_Receiver creates all elements of the Receiver Instrument's
 # config and info arrays.
 #
-proc LWDAQ_init_Recorder {} {
+proc LWDAQ_init_Receiver {} {
 	global LWDAQ_Info LWDAQ_Driver
-	upvar #0 LWDAQ_info_Recorder info
-	upvar #0 LWDAQ_config_Recorder config
+	upvar #0 LWDAQ_info_Receiver info
+	upvar #0 LWDAQ_config_Receiver config
 	array unset config
 	array unset info
 	
@@ -34,7 +35,7 @@ proc LWDAQ_init_Recorder {} {
 	# instrument window. The only info variables set in the 
 	# LWDAQ_open_Instrument procedure are those which are checked
 	# only when the instrument window is open.
-	set info(name) "Recorder"
+	set info(name) "Receiver"
 	set info(control) "Idle"
 	set info(window) [string tolower .$info(name)]
 	set info(text) $info(window).text
@@ -90,7 +91,7 @@ proc LWDAQ_init_Recorder {} {
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
 	set info(fv_range) 30
-	set info(aux_list_name) LWDAQ_aux_Recorder
+	set info(aux_list_name) LWDAQ_aux_Receiver
 	global $info(aux_list_name)
 	set $info(aux_list_name) ""
 	set info(aux_list_length) 0
@@ -100,9 +101,9 @@ proc LWDAQ_init_Recorder {} {
 	set info(show_errors) 0
 	set info(show_error_extent) 20
 	
-	set info(buffer_image) "_recorder_buffer_image_"
+	set info(buffer_image) "_receiver_buffer_image_"
 	catch {lwdaq_image_destroy $info(buffer_image)}
-	set info(scratch_image) "_recorder_scratch_image_"
+	set info(scratch_image) "_receiver_scratch_image_"
 	catch {lwdaq_image_destroy $info(scratch_image)}
 		
 	# All elements of the config array will be displayed in the
@@ -126,13 +127,13 @@ proc LWDAQ_init_Recorder {} {
 }
 
 #
-# LWDAQ_analysis_Recorder applies Recorder analysis to an image 
+# LWDAQ_analysis_Receiver applies receiver analysis to an image 
 # in the lwdaq image list. By default, the routine uses the
 # image $config(memory_name).
 #
-proc LWDAQ_analysis_Recorder {{image_name ""}} {
-	upvar #0 LWDAQ_config_Recorder config
-	upvar #0 LWDAQ_info_Recorder info
+proc LWDAQ_analysis_Receiver {{image_name ""}} {
+	upvar #0 LWDAQ_config_Receiver config
+	upvar #0 LWDAQ_info_Receiver info
 	upvar #0 $info(aux_list_name) aux_messages
 
 	# By default, we use the image whose name we passed in to this routine,
@@ -147,7 +148,7 @@ proc LWDAQ_analysis_Recorder {{image_name ""}} {
 		# We get the number of errors, the number of clock messages, and the total
 		# number of messages. We also get the message index of the first clock message.
 		# We will use the first clock index later.
-		scan [lwdaq_recorder $image_name \
+		scan [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) clocks 0"] %d%d%d%d \
 			num_errors num_clocks num_messages first_index
 		if {$num_errors > 0} {
@@ -189,14 +190,14 @@ proc LWDAQ_analysis_Recorder {{image_name ""}} {
 		# of each channel, and the number of messages present. For the clock 
 		# channel, it gives the minimum and maximum timestamp values. This string is
 		# the result of analysis for printing in the instrument window.
-		set result [lwdaq_recorder $image_name \
+		set result [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) \
 			plot $display_min $display_max \
 			$info(display_mode) $id_list"]
 			
 		# We obtain a list of the channels with at least one message present
 		# in the image, and the number of messages for each of these channels.
-		set channels [lwdaq_recorder $image_name "-payload $config(payload_length) list"]
+		set channels [lwdaq_receiver $image_name "-payload $config(payload_length) list"]
 		if {![LWDAQ_is_error_result $channels]} {
 			set ca ""
 			foreach {c a} $channels {
@@ -213,7 +214,7 @@ proc LWDAQ_analysis_Recorder {{image_name ""}} {
 		set new_aux_messages ""
 		foreach {c a} $channels {
 			if {$c % $info(set_size) == $info(set_size) - 1} {
-				set messages [lwdaq_recorder $image_name \
+				set messages [lwdaq_receiver $image_name \
 					"-payload $config(payload_length) extract $c"]
 				if {[LWDAQ_is_error_result $messages]} {error $messages}
 				foreach {mt md} $messages {
@@ -228,7 +229,7 @@ proc LWDAQ_analysis_Recorder {{image_name ""}} {
 		# time of the first clock message in the data. This time is a sixteen-bit
 		# value that has counted the number of 256-tick periods since the data receiver
 		# clock was last reset, wrapping around to zero every time it overflows.
-		scan [lwdaq_recorder $image_name \
+		scan [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) get $first_index"] %d%d%d cid bts fvn
 
 		# We take each new auxiliary message and break it up into three parts. The
@@ -269,32 +270,32 @@ proc LWDAQ_analysis_Recorder {{image_name ""}} {
 }
 
 #
-# LWDAQ_refresh_Recorder refreshes the display of the data, given new
+# LWDAQ_refresh_Receiver refreshes the display of the data, given new
 # display settings.
 #
-proc LWDAQ_refresh_Recorder {} {
-	upvar #0 LWDAQ_config_Recorder config
-	upvar #0 LWDAQ_info_Recorder info
+proc LWDAQ_refresh_Receiver {} {
+	upvar #0 LWDAQ_config_Receiver config
+	upvar #0 LWDAQ_info_Receiver info
 	if {[lwdaq_image_exists $config(memory_name)] != ""} {
-		LWDAQ_analysis_Recorder $config(memory_name)
+		LWDAQ_analysis_Receiver $config(memory_name)
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
 }
 
 #
-# LWDAQ_reset_Recorder resets and configures a data receiver. It resets the data receiver 
+# LWDAQ_reset_Receiver resets and configures a data receiver. It resets the data receiver 
 # address and timestamp registers, thus emptying its message buffer and resetting its clock. 
-# It destroys the recorder instrument's data buffer and working image, and clears the 
+# It destroys the receiver instrument's data buffer and working image, and clears the 
 # auxiliary message list. It resets the acquired data time, a parameter we use to stop the
-# Recorder Instrument attempting download too many messages from the data receiver. If the
+# Receiver Instrument attempting download too many messages from the data receiver. If the
 # receiver is capable of saving a list of enabled channels that it should select for
 # recording, the reset routine sends the daq_channels list to the receiver so as to select
 # them.
 #
-proc LWDAQ_reset_Recorder {} {
-	upvar #0 LWDAQ_config_Recorder config
-	upvar #0 LWDAQ_info_Recorder info
+proc LWDAQ_reset_Receiver {} {
+	upvar #0 LWDAQ_config_Receiver config
+	upvar #0 LWDAQ_info_Receiver info
 	global LWDAQ_Driver LWDAQ_Info
 
 	if {[catch {
@@ -343,7 +344,7 @@ proc LWDAQ_reset_Recorder {} {
 		set info(receiver_firmware) "?"
 		set info(receiver_type) "?"
 		foreach payload $info(payload_options) {
-			set bb [lwdaq_recorder $img "-payload $payload print 0 1"]
+			set bb [lwdaq_receiver $img "-payload $payload print 0 1"]
 			if {[regexp {Version ([0-9]+)} $bb match fv]} {
 				set info(receiver_firmware) [expr $fv % $info(fv_range)]
 				switch [expr $fv / $info(fv_range)] {
@@ -448,13 +449,12 @@ proc LWDAQ_reset_Recorder {} {
 }
 
 #
-# LWDAQ_controls_Recorder creates secial controls 
-# for the Recorder instrument.
+# LWDAQ_controls_Receiver creates secial controls for the Receiver instrument.
 #
-proc LWDAQ_controls_Recorder {} {
+proc LWDAQ_controls_Receiver {} {
 	global LWDAQ_Info LWDAQ_Driver
-	upvar #0 LWDAQ_config_Recorder config
-	upvar #0 LWDAQ_info_Recorder info
+	upvar #0 LWDAQ_config_Receiver config
+	upvar #0 LWDAQ_info_Receiver info
 
 	set w $info(window)
 	if {![winfo exists $w]} {return 0}
@@ -467,28 +467,28 @@ proc LWDAQ_controls_Recorder {} {
 			"Offset:" {display_offset} \
 			"Range:" {display_range} } {
 		label $g.l$element_name -text $label_name 
-		entry $g.e$element_name -textvariable LWDAQ_info_Recorder($element_name) \
+		entry $g.e$element_name -textvariable LWDAQ_info_Receiver($element_name) \
 			-relief sunken -bd 1 -width 6
 		pack $g.l$element_name $g.e$element_name -side left -expand 1
-		bind $g.e$element_name <Return> LWDAQ_refresh_Recorder
+		bind $g.e$element_name <Return> LWDAQ_refresh_Receiver
 	}
 
 	foreach a "SP CP NP" {
 		set b [string tolower $a]
-		radiobutton $g.$b -variable LWDAQ_info_Recorder(display_mode) \
+		radiobutton $g.$b -variable LWDAQ_info_Receiver(display_mode) \
 			-text $a -value $a
 		pack $g.$b -side left -expand 0
 	}
 	
-	button $g.reset -text "Reset and Configure" -command "LWDAQ_post LWDAQ_reset_Recorder"
+	button $g.reset -text "Reset and Configure" -command "LWDAQ_post LWDAQ_reset_Receiver"
 	pack $g.reset -side left -expand 1
 
 	label $g.lrv -text "Receiver:" 
-	label $g.erv -textvariable LWDAQ_info_Recorder(receiver_type) -width 5
+	label $g.erv -textvariable LWDAQ_info_Receiver(receiver_type) -width 5
 	pack $g.lrv $g.erv -side left -expand 1
 	
 	label $g.lfv -text "Firmware:" 
-	label $g.efv -textvariable LWDAQ_info_Recorder(receiver_firmware) -width 3
+	label $g.efv -textvariable LWDAQ_info_Receiver(receiver_firmware) -width 3
 	pack $g.lfv $g.efv -side left -expand 1
 
 	set g $w.channels
@@ -497,13 +497,13 @@ proc LWDAQ_controls_Recorder {} {
 
 	label $g.l -text "Activity (id:qty) "
 	pack $g.l -side left
-	label $g.c -textvariable LWDAQ_info_Recorder(channel_activity) \
+	label $g.c -textvariable LWDAQ_info_Receiver(channel_activity) \
 		-relief sunken -anchor w -width 90
 	pack $g.c -side left -expand yes
 }
 
 #
-# LWDAQ_daq_Recorder reads data from a data device. It fetches the data
+# LWDAQ_daq_Receiver reads data from a data device. It fetches the data
 # in blocks, and opens and closes a socket to the driver for each block.
 # Although opening and closing sockets introduces a delay into the data
 # acquisition, it allows another LWDAQ process to use the same LWDAQ
@@ -511,7 +511,7 @@ proc LWDAQ_controls_Recorder {} {
 # running on the same LWDAQ Driver, or a single data receiver and two
 # animal location trackers, or a spectrometer. There is no way to obtain
 # from a data receiver the number of messages available for download in
-# its memory. The LWDAQ_daq_Recorder routine estimates the number of 
+# its memory. The LWDAQ_daq_Receiver routine estimates the number of 
 # messages available using aquire_end_ms, which it updates after every
 # block download to be equal to or greater than the millisecond absolute
 # time of the last clock message in the block. By subtracting the end
@@ -522,10 +522,10 @@ proc LWDAQ_controls_Recorder {} {
 # time and the clock frequency to get its estimate of the number of 
 # messages avaialable in the data receiver. 
 #
-proc LWDAQ_daq_Recorder {} {
+proc LWDAQ_daq_Receiver {} {
 	global LWDAQ_Driver LWDAQ_Info
-	upvar #0 LWDAQ_info_Recorder info
-	upvar #0 LWDAQ_config_Recorder config
+	upvar #0 LWDAQ_info_Receiver info
+	upvar #0 LWDAQ_config_Receiver config
 
 	# If they don't exist, create the buffer and scratch images.
 	if {[lwdaq_image_exists $info(buffer_image)] == ""} {
@@ -552,13 +552,13 @@ proc LWDAQ_daq_Recorder {} {
 	# Check the buffer contents. If we have just reset the data receiver, this 
 	# buffer will be empty, and no error will be caused by having the wrong
 	# payload length.
-	scan [lwdaq_recorder $info(buffer_image) \
+	scan [lwdaq_receiver $info(buffer_image) \
 		"-payload $config(payload_length) clocks 0 $daq_num_clocks"] %d%d%d%d%d \
 		num_errors num_clocks num_messages start_index end_index
 		
 	if {[catch {
 		# Set the block counter, which counts how many times we download a 
-		# block of messages from the recorder.
+		# block of messages from the receiver.
 		set block_counter 0
 		
 		# We download data until we have more than daq_num_clocks clock messages.
@@ -658,17 +658,17 @@ proc LWDAQ_daq_Recorder {} {
 			
 			# Check the block for errors and count the number of clocks and messages
 			# it containes.
-			scan [lwdaq_recorder $info(scratch_image) \
+			scan [lwdaq_receiver $info(scratch_image) \
 				"-payload $config(payload_length) clocks"] %d%d%d \
 				num_errors num_new_clocks num_new_messages
 
 			# We use the show_errors and show_error_extent parameters to control
 			# the display of raw message blocks that contain errors.
 			if {($num_errors > 0) && $info(show_errors)} {
-				set result [lwdaq_recorder $info(scratch_image) \
+				set result [lwdaq_receiver $info(scratch_image) \
 					"-payload $config(payload_length) print 0 1"]
 				if {[regexp {index=([0-9]+)} $result match index]} {
-					set result [lwdaq_recorder $info(scratch_image) \
+					set result [lwdaq_receiver $info(scratch_image) \
 						"-payload $config(payload_length) print \
 						[expr $index-$info(show_error_extent)] \
 						[expr $index+$info(show_error_extent)]"]
@@ -689,7 +689,7 @@ proc LWDAQ_daq_Recorder {} {
 			# continuity of clock messages within the data buffer.
 			if {$num_errors > 0} {
 				foreach pl $info(payload_options) {
-					scan [lwdaq_recorder $info(scratch_image) \
+					scan [lwdaq_receiver $info(scratch_image) \
 						"-payload $pl clocks"] %d%d%d ne nc nm
 					if {$ne == 0} {break}
 				}
@@ -714,7 +714,7 @@ proc LWDAQ_daq_Recorder {} {
 			# block before we do any processing.
 			if {$info(purge_duplicates)} {
 				set num_unique_messages \
-					[lwdaq_recorder $info(scratch_image) \
+					[lwdaq_receiver $info(scratch_image) \
 						"-payload $config(payload_length) purge"]
 				set data [lwdaq_data_manipulate $info(scratch_image) read \
 					0 [expr $num_unique_messages * $message_length]]
@@ -792,7 +792,7 @@ proc LWDAQ_daq_Recorder {} {
 				[expr $num_messages * $message_length] $data
 
 			# Check the new buffer contents.
-			scan [lwdaq_recorder $info(buffer_image) \
+			scan [lwdaq_receiver $info(buffer_image) \
 				"-payload $config(payload_length) clocks 0 $daq_num_clocks"] %d%d%d%d%d \
 				num_errors num_clocks num_messages start_index end_index
 			
@@ -846,8 +846,8 @@ proc LWDAQ_daq_Recorder {} {
 		return "ERROR: $error_result"
 	}
 	
-	# Create the new data image, storing extra data in the
-	# Recorder's buffer image.
+	# Create the new data image, storing extra data in the Receiver
+	# Instruments's buffer image.
 	set config(memory_name) [lwdaq_image_create \
 		-width $info(daq_image_width) \
 		-height $info(daq_image_height) \

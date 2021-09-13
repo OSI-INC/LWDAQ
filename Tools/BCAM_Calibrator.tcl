@@ -32,13 +32,14 @@
 # V27: Add support for more apparatus versions.
 # V28: Add support for source block with elements 4-8 flashing.
 # V29: Expand source database to provide for source calibration as well as camera.
+# V30: Correct some GUI bugs.
 
 proc BCAM_Calibrator_init {} {
 	upvar #0 BCAM_Calibrator_info info
 	upvar #0 BCAM_Calibrator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "BCAM_Calibrator" "29"
+	LWDAQ_tool_init "BCAM_Calibrator" "30"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set config(apparatus_file) "apparatus_database.txt"
@@ -108,6 +109,7 @@ proc BCAM_Calibrator_init {} {
 
 	set info(control) "Idle"
 	set info(state) "Start"
+	set info(instruction) "Loading..."
 	set info(display_image) "bcam_calibrator_image"
 	
 	return 1	
@@ -789,7 +791,7 @@ proc BCAM_Calibrator_do {step} {
 	if {($info(state) == "Start")} {
 		if {$step == "Establish"} {
 			set info(state_history) [list "Start"]
-			set info(title)	"Press Execute to load apparatus file and\
+			set info(instruction)	"Press Execute to load apparatus file and\
 				create calibration file."
 			LWDAQ_print $info(text) \
 				"Press \"Configure\" and \"Choose Apparatus File\" to\
@@ -867,7 +869,7 @@ proc BCAM_Calibrator_do {step} {
 	
 	if {$info(state) == "Define_Calibration"} {
 		if {$step == "Establish"} {
-			set info(title)	"Select calibration, apparatus, operator, and id."
+			set info(instruction)	"Select calibration, apparatus, operator, and id."
 			return 1
 		}
 		if {$step == "Execute"} {
@@ -924,7 +926,7 @@ proc BCAM_Calibrator_do {step} {
 
 	if {$info(state) == "Test"} {
 		if {$step == "Establish"} {
-			set info(title)	"Press Execute for Test Image, Forward When Satisfied."
+			set info(instruction)	"Press Execute for Test Image, Forward When Satisfied."
 			return 1
 		}
 		if {$step == "Execute"} {
@@ -950,7 +952,7 @@ proc BCAM_Calibrator_do {step} {
 		set orientation [string replace $info(state) 0 14]
 		
 		if {$step == "Establish"} {
-			set info(title) "Capture Image, \
+			set info(instruction) "Capture Image, \
 				Source Block [string toupper $range] Range,\
 				Roll Cage $orientation\-DEGREE Orientation."
 			return 1
@@ -986,7 +988,7 @@ proc BCAM_Calibrator_do {step} {
 		set orientation [string replace $info(state) 0 12]
 		
 		if {$step == "Establish"} {
-			set info(title) "Capture Image With\
+			set info(instruction) "Capture Image With\
 				Roll Cage in $orientation\-DEGREE Orientation."
 			return 1
 		}
@@ -1011,7 +1013,7 @@ proc BCAM_Calibrator_do {step} {
 	
 	if {$info(state) == "Calculate"} {
 		if {$step == "Establish"} {
-			set info(title) "Calculate Calibration Constants."
+			set info(instruction) "Calculate Calibration Constants."
 			return 1
 		}
 		if {$step == "Execute"} {
@@ -1075,9 +1077,9 @@ proc BCAM_Calibrator_do {step} {
 		if {$step == "Establish"} {
 			if {$config(auto_store) && ($config(calculation_status) == "PASS")} {
 				BCAM_Calibrator_store
-				set info(title) "Press Execute to move on."
+				set info(instruction) "Press Execute to move on."
 			} {
-				set info(title) "Press Store to save constants, Execute to move on."
+				set info(instruction) "Press Store to save constants, Execute to move on."
 			}
 			return 1
 		}
@@ -1117,20 +1119,17 @@ proc BCAM_Calibrator_open {} {
 	if {$w == ""} {return 0}
 	
 	set f $w.status
-	frame $f
+	frame $f -padx 2 -pady 2
 	pack $f -side top -fill x
 	
-	label $f.title \
-		-textvariable BCAM_Calibrator_info(title) \
-		-width 70
+	label $f.title -textvariable BCAM_Calibrator_info(instruction) -width 70
 	pack $f.title -side left
 	
-	label $f.control -textvariable BCAM_Calibrator_info(control) \
-		-width 10
-	pack $f.control -side right
+	label $f.control -textvariable BCAM_Calibrator_info(control) -width 10
+	pack $f.control -side left
 	
 	set f $w.controls
-	frame $f
+	frame $f -padx 2 -pady 2
 	pack $f -side top -fill x
 	
 	foreach a {Execute Backward Forward} {
@@ -1139,7 +1138,6 @@ proc BCAM_Calibrator_open {} {
 		pack $f.$b -side left -expand 1
 		set info($b\_button) $f.$b
 	}
-	focus $info(execute_button)
 	foreach a {Stop Configure} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command BCAM_Calibrator_$b
@@ -1154,7 +1152,7 @@ proc BCAM_Calibrator_open {} {
 	}
 	
 	set f $w.type_ver_id
-	frame $f 
+	frame $f -padx 2 -pady 2 
 	pack $f -side top -fill x
 	
 	label $f.ptitle -text "Parameter:" 	

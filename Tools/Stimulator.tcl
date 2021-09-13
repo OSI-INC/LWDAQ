@@ -503,8 +503,8 @@ proc Stimulator_clear {n} {
 proc Stimulator_monitor {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
-	global LWDAQ_info_Recorder 
-	upvar #0 $LWDAQ_info_Recorder(aux_list_name) aux
+	global LWDAQ_info_Receiver 
+	upvar #0 $LWDAQ_info_Receiver(aux_list_name) aux
 	global LWDAQ_Info
 	
 	if {![winfo exists $info(window)]} {return 0}
@@ -528,9 +528,9 @@ proc Stimulator_monitor {} {
 	}
 	
 	# If acknowledgement monitoring is enabled, check for their arrival. The 
-	# acknowledgements we obtain from the Recorder Instrument's auxilliary
+	# acknowledgements we obtain from the Receiver Instrument's auxilliary
 	# message list, which is accessible here by the name "aux". This list will
-	# contain new acknowledgements only if the Recorder Instrument is downloading
+	# contain new acknowledgements only if the Receiver Instrument is downloading
 	# live data, either because it is Looping, or because the Neuroarchiver is
 	# calling it repeatedly to obtain and record the data.
 	if {$config(ack_enable)} {

@@ -51,7 +51,7 @@ function lwdaq_A2057_voltmeter(ip:image_ptr_type;
 function lwdaq_A2065_inclinometer(ip:image_ptr_type;
 	v_trigger,v_min,v_max,harmonic:real):string;
 	
-function lwdaq_sct_recorder(ip:image_ptr_type;command:string):string;
+function lwdaq_sct_receiver(ip:image_ptr_type;command:string):string;
 
 function lwdaq_A3008_rfpm(ip:image_ptr_type;
 	v_min,v_max:real;rms:boolean):string;
@@ -802,7 +802,7 @@ begin
 end;
 
 {
-	lwdaq_sct_recorder analyzes recorder messages. These messages have a
+	lwdaq_sct_receiver analyzes receiver messages. These messages have a
 	four-byte core, and may be accompanied by one or more bytes of payload data.
 	The routine assumes that the first byte of the second image row is the first
 	byte of a message. Each message takes the following form: an eight-bit
@@ -942,7 +942,7 @@ end;
 	greater than the maximum number of messages the image can hold, or less than
 	zero, will return zero values for all parameters.
 }
-function lwdaq_sct_recorder(ip:image_ptr_type;command:string):string;
+function lwdaq_sct_receiver(ip:image_ptr_type;command:string):string;
 	
 const
 	core_message_length=4;
@@ -1028,7 +1028,7 @@ var
 	previous_clock,previous_timestamp:integer;
 	window_time,num_candidates:integer;
 	start_index,end_index:integer;
-	recorder_version:integer;	
+	receiver_version:integer;	
 	unaccepted:string;
 	payload_index:integer=0;
 	done_with_options:boolean=false;
@@ -1096,8 +1096,8 @@ begin
 {
 	Allocate return string and check image pointer.
 }
-	result:='ERROR: Recorder suffered an undocumented failure.';
-	lwdaq_sct_recorder:=result;
+	result:='ERROR: Receiver suffered an undocumented failure.';
+	lwdaq_sct_receiver:=result;
 	if ip=nil then exit;
 	ip^.results:='';
 {
@@ -1124,7 +1124,7 @@ begin
 	max_num_selected:=trunc((length(ip^.intensity)-ip^.i_size)/message_length)-1;
 {
 	The get instruction does not need a message array or any analysis. We 
-	execute the instruction and then exit the recorder procedure. The get
+	execute the instruction and then exit the receiver procedure. The get
 	instruction returns the message at a specified message index in the
 	image data.
 }
@@ -1142,7 +1142,7 @@ begin
 			end;
 			word:=read_word(command);
 		end;
-		lwdaq_sct_recorder:=result;
+		lwdaq_sct_receiver:=result;
 		exit;
 	end;
 {
@@ -1183,7 +1183,7 @@ begin
 	routine will report timestamp errors to its error string. A clock error can
 	be the result of data acquisition failing to keep up with data recording. A
 	timestamp error is almost always serious because it indicates a loss of one
-	or more bytes of data from the recorder. The four-byte messages become
+	or more bytes of data from the receiver. The four-byte messages become
 	misaligned with respect to the four-byte boundaries in the image. A
 	timestamp error can also indicate actual corruption of data bits. We observe
 	timestamp errors during electrical events like static discharge and power
@@ -1218,7 +1218,7 @@ begin
 	num_clocks:=0;
 	previous_clock:=0;
 	previous_timestamp:=0;
-	recorder_version:=-1;
+	receiver_version:=-1;
 	while (num_messages<=max_index) and ((null_block_length=0) or (data_size>0)) do begin
 		message_string:='';
 		m:=image_message(ip,num_messages);
@@ -1233,7 +1233,7 @@ begin
 						' previous=',previous_clock:1,
 						eol)
 				else
-					recorder_version:=m.timestamp;
+					receiver_version:=m.timestamp;
 				m.time:=num_clocks*clock_period;
 				inc(num_clocks);
 				previous_timestamp:=0;
@@ -1313,7 +1313,7 @@ begin
 	hexadecimal printing of the core message bytes, separated by a space.
 }
 	if instruction='print' then begin
-		writestr(result,'Data Recorder Version ',recorder_version:1,'.',eol,
+		writestr(result,'Data Receiver Version ',receiver_version:1,'.',eol,
 			'Total ',num_messages:1,' messages, ',
 			num_clocks:1,' clocks, ',
 			num_errors:1,' errors, and ',
@@ -1368,7 +1368,7 @@ begin
 	if instruction='extract' then begin
 		extract_id:=read_integer(command);
 		if (extract_id<min_id) or (extract_id>max_id) then begin
-			report_error('Invalid extract_id in lwdaq_sct_recorder');
+			report_error('Invalid extract_id in lwdaq_sct_receiver');
 			exit;
 		end;
 		result:='';
@@ -1389,7 +1389,7 @@ begin
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
 						report_error('Too many messages for result string in '
-							+'lwdaq_sct_recorder');
+							+'lwdaq_sct_receiver');
 						exit;
 					end;
 				end;
@@ -1444,22 +1444,22 @@ begin
 }
 	if instruction='reconstruct' then begin
 		if (num_clocks<min_reconstruct_clocks) then begin
-			report_error('Too few clock messages for reconstruction in lwdaq_sct_recorder');
+			report_error('Too few clock messages for reconstruction in lwdaq_sct_receiver');
 			exit;
 		end;
 		reconstruct_id:=read_integer(command);
 		if (reconstruct_id<min_id) or (reconstruct_id>max_id) then begin
-			report_error('Invalid reconstruct_id in lwdaq_sct_recorder');
+			report_error('Invalid reconstruct_id in lwdaq_sct_receiver');
 			exit;
 		end;
 		period:=read_integer(command);
 		if (period<min_period) or (period>max_period) then begin
-			report_error('Invalid period in lwdaq_sct_recorder');
+			report_error('Invalid period in lwdaq_sct_receiver');
 			exit;
 		end;
 		standing_value:=read_integer(command);
 		if (standing_value<min_sample) or (standing_value>max_sample) then begin
-			report_error('Invalid standing_value in lwdaq_sct_recorder');
+			report_error('Invalid standing_value in lwdaq_sct_receiver');
 			exit;
 		end;
 {
@@ -1490,7 +1490,7 @@ begin
 				index:=-1;
 				sample:=read_integer(word);
 				if (sample<min_sample) or (sample>max_sample) then begin
-					report_error('Invalid sample in lwdaq_sct_recorder');
+					report_error('Invalid sample in lwdaq_sct_receiver');
 					exit;
 				end;
 			end;
@@ -1663,7 +1663,7 @@ begin
 					if length(result)>0 then message_string:=eol+message_string;
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
-						report_error('Too many messages for result string in lwdaq_sct_recorder');
+						report_error('Too many messages for result string in lwdaq_sct_receiver');
 						exit;
 					end;
 				end;
@@ -1703,7 +1703,7 @@ begin
 			while word<>'' do begin
 				id_num:=read_integer(word);
 				if (id_num<min_id) or (id_num>max_id) then begin
-					report_error('Invalid id_num in lwdaq_sct_recorder');
+					report_error('Invalid id_num in lwdaq_sct_receiver');
 					exit;
 				end;
 				id_valid[id_num]:=true;	
@@ -1786,7 +1786,7 @@ begin
 {
  	Clean up.
 }
-	lwdaq_sct_recorder:=result;
+	lwdaq_sct_receiver:=result;
 end;
 
 {
@@ -1818,17 +1818,17 @@ begin
 	input_string:=ip^.results;
 	num_samples:=read_integer(input_string);
 	if (num_samples>(ip^.j_size-1)*ip^.i_size) or (num_samples<1) then begin
-		report_error('Invalid num_samples in lwdaq_sct_recorder');
+		report_error('Invalid num_samples in lwdaq_sct_receiver');
 		exit;
 	end;
 	startup_skip:=read_integer(input_string);
 	if (startup_skip>ip^.i_size) or (startup_skip<=0) then begin
-		report_error('Invalid startup_skip in lwdaq_sct_recorder');
+		report_error('Invalid startup_skip in lwdaq_sct_receiver');
 		exit;
 	end;
 	num_channels:=read_integer(input_string);
 	if (num_channels>max_num_channels) or (num_channels<=0) then begin
-		report_error('Invalid num_channels in lwdaq_sct_recorder');
+		report_error('Invalid num_channels in lwdaq_sct_receiver');
 		exit;
 	end;
 

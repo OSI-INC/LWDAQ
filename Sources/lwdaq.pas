@@ -3027,24 +3027,24 @@ begin
 end;
 
 {
-<p>lwdaq_recorder steps through the data bytes of an image, looking for valid four-byte
+<p>lwdaq_receiver steps through the data bytes of an image, looking for valid four-byte
 messages, such as those transmitted by a Subcutaneous Transmitter (<a
 href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>) and
 received by an Octal Data Receiver (<a
 href="http://www.opensourceinstruments.com/Electronics/A3018/M3027.html">A3027</a>). The
-lwdaq_recorder command takes two arguments. The first is the name of the image that
+lwdaq_receiver command takes two arguments. The first is the name of the image that
 contains the message data. The second is a command string. The command string in turn
-contains an instruction and some parameters. The function of lwdaq_recorder we describe in
+contains an instruction and some parameters. The function of lwdaq_receiver we describe in
 detail, with examples, in the <a
-href="http://www.opensourceinstruments.com/Electronics/A3018/Recorder.html"> Recorder
-Instrument</a> manual. The lwdaq_recorder command calls another routine
-<i>lwdaq_sct_recorder</i>, which is defined in <a
+href="http://www.opensourceinstruments.com/Electronics/A3018/Receiver.html">Receiver
+Instrument</a> manual. The lwdaq_receiver command calls another routine
+<i>lwdaq_sct_receiver</i>, which is defined in <a
 href="http://www.bndhep.net/Software/Sources/electronics.pas">electronics.pas</a >. The
-paragraphs below are the comments from the head of this lwdaq_sct_recorder function, and
-describe how to compose the command string we pass through lwdaq_recorder to
-lwdaq_sct_recorder.</p>
+paragraphs below are the comments from the head of this lwdaq_sct_receiver function, and
+describe how to compose the command string we pass through lwdaq_receiver to
+lwdaq_sct_receiver.</p>
 
-<p>lwdaq_sct_recorder analyzes recorder messages. These messages have a four-byte core,
+<p>lwdaq_sct_receiver analyzes receiver messages. These messages have a four-byte core,
 and may be accompanied by one or more bytes of payload data. The routine assumes that the
 first byte of the second image row is the first byte of a message. Each message takes the
 following form: an eight-bit signal identifier, a sixteen-bit sample value, an eight-bit
@@ -3167,7 +3167,7 @@ The first message it message zero. A message index greater than the maximum numb
 messages the image can hold, or less than zero, will return zero values for all
 parameters.</p>
 }
-function lwdaq_recorder(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
+function lwdaq_receiver(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 var 
 	ip:image_ptr_type=nil;
@@ -3178,12 +3178,12 @@ var
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
-	lwdaq_recorder:=Tcl_Error;
+	lwdaq_receiver:=Tcl_Error;
 	
 	if argc<>3 then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Wrong number of arguments, must be "'
-			+'lwdaq_recorder image command".');
+			+'lwdaq_receiver image command".');
 		exit;
 	end;
 
@@ -3192,20 +3192,20 @@ begin
 	if not valid_image_ptr(ip) then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Image "'+image_name+'" does not exist in '
-			+'lwdaq_recorder.');
+			+'lwdaq_receiver.');
 		exit;
 	end;
 	command:=Tcl_ObjString(argv[2]);
 	
-	result:=lwdaq_sct_recorder(ip,command);
+	result:=lwdaq_sct_receiver(ip,command);
 	
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
-	lwdaq_recorder:=Tcl_OK;
+	lwdaq_receiver:=Tcl_OK;
 end;
 
 {
-<p>lwdaq_alt extracts power measurements from data recorded in an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>). The routine assumes that the global electronics_trace is a valid xy_graph_ptr created by lwdaq_recorder, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Recorder Instrument image to which we applied the lwdaq_recorder routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_recorder">lwdaq_recorder</a> with either the "extract" or "reconstruct" instructions.</p>
+<p>lwdaq_alt extracts power measurements from data recorded in an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>). The routine assumes that the global electronics_trace is a valid xy_graph_ptr created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
 
 <p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more detector coil power measurements.</p>
 
@@ -5158,7 +5158,7 @@ begin
 	tcl_createobjcommand(interp,'lwdaq_voltmeter',lwdaq_voltmeter,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_rfpm',lwdaq_rfpm,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_inclinometer',lwdaq_inclinometer,0,nil);
-	tcl_createobjcommand(interp,'lwdaq_recorder',lwdaq_recorder,0,nil);
+	tcl_createobjcommand(interp,'lwdaq_receiver',lwdaq_receiver,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_alt',lwdaq_alt,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_metrics',lwdaq_metrics,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_calibration',lwdaq_calibration,0,nil);

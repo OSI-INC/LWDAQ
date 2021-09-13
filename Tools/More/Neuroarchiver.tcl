@@ -1,5 +1,5 @@
-# Neruoarchiver.tcl, Interprets, Analyzes, and Archives Data from 
-# the Recorder Instrument, a Polite LWDAQ Tool.
+# Neruoarchiver.tcl, A LWDAQ Tool to download, record, display, and analyze
+# telemetry signals from subcutanous transmitters./
 #
 # Copyright (C) 2007-2021 Kevan Hashemi, Open Source Instruments Inc.
 #
@@ -105,8 +105,8 @@ proc Neuroarchiver_init {} {
 # The Neuroarchiver uses four LWDAQ images to hold data. The vt_image and
 # af_image are those behind the display of the signal trace and the signal
 # spectrum respectively. The buffer_image and data_image are used by the
-# play-back process to buffer data from disk and pass data to the recorder
-# instrument analysis routines respectively.
+# play-back process to buffer data from disk and pass data to the Receiver
+# Instrument analysis routines respectively.
 #
 	set info(vt_image) "_neuroarchiver_vt_image_"
 	set info(af_image) "_neuroarchiver_af_image_"
@@ -1046,8 +1046,8 @@ proc Neuroarchiver_metadata_view {fn} {
 proc Neuroarchiver_metadata_header {} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
-	upvar #0 LWDAQ_config_Recorder iconfig
-	upvar #0 LWDAQ_info_Recorder iinfo
+	upvar #0 LWDAQ_config_Receiver iconfig
+	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info	
 
 	set header "<c>\
@@ -1403,7 +1403,7 @@ proc Neuroarchiver_sequential_time {fn seek_time {lo_time 0.0} {lo_index 0}} {
 			set target_hi -1
 		}
 
-		set clocks [lwdaq_recorder $image_name \
+		set clocks [lwdaq_receiver $image_name \
 			"-payload $config(player_payload_length) \
 			-size [expr $data_size / $message_length] clocks $target_lo $target_hi -1"]
 		scan $clocks %d%d%d%d%d%d num_errors num_clocks num_messages \
@@ -1840,7 +1840,7 @@ proc Neuroarchiver_command {target action} {
 # data image. The "reconstructed" signal is the extracted signal with substitute
 # messages inserted and bad messages removed, so as to create a signal with
 # info(frequency) messages. To perform extraction and reconstruction, the routine
-# calls lwdaq_recorder from the lwdaq library. See the Recorder Manual for more
+# calls lwdaq_receiver from the lwdaq library. See the Receiver Manual for more
 # information, and also the LWDAQ Command Reference. The routine takes a single
 # parameter: a channel code, which is of the form "id" or "id:f" or "id:f" where
 # "id" is the channel number and "f" is its nominal message rate per second. Once 
@@ -1937,7 +1937,7 @@ proc Neuroarchiver_signal {{channel_code ""} {status_only 0}} {
 	# standing value to our standing value list.
 	set standing_value_index [lsearch -index 0 $config(standing_values) $id]
 	if {$standing_value_index < 0} {
-		set signal [lwdaq_recorder $info(data_image) \
+		set signal [lwdaq_receiver $info(data_image) \
 			"-payload $config(player_payload_length) \
 				-size $info(data_size) \
 				extract $id"]
@@ -1966,7 +1966,7 @@ proc Neuroarchiver_signal {{channel_code ""} {status_only 0}} {
 		# start of this one, as a consequence of transmission scatter.
 		# We have a standing value in case the first message is missing.
 		# The reconstruction always returns the nominal number of messages.
-		set signal [lwdaq_recorder $info(data_image) \
+		set signal [lwdaq_receiver $info(data_image) \
 			"-payload $config(player_payload_length) \
 			-size $info(data_size) \
 			reconstruct $id $period $standing_value \
@@ -1976,7 +1976,7 @@ proc Neuroarchiver_signal {{channel_code ""} {status_only 0}} {
 		# There is no detection of duplicate of bad messages, no filling in
 		# of missing messages. Thus we may get more or fewer messages than
 		# the nominal number.
-		set signal [lwdaq_recorder $info(data_image) \
+		set signal [lwdaq_receiver $info(data_image) \
 			"-payload $config(player_payload_length) \
 				-size $info(data_size) extract $id $period"]
 	}
@@ -3994,7 +3994,7 @@ proc Neuroclassifier_load {{name ""}} {
 #
 # Neurotracker_extract calculates the position of a transmitter over an array of
 # detector coils and returns the position as a sequency of x-y coordinates. The
-# routine relies upon a prior call to lwdaq_recorder filling a list of power
+# routine relies upon a prior call to lwdaq_receiver filling a list of power
 # measurements that correspond to some device we want to locate. This list
 # exists in the lwdaq library global variable space, but not in the LWDAQ TclTk
 # variable space. The indices allow the lwdaq_alt routine to find the message
@@ -5799,14 +5799,14 @@ proc Neuroarchiver_plot_spectrum {{color ""} {spectrum ""}} {
 }
 
 #
-# Neuroarchiver_set_receiver configures the Recorder for recording from a particular
-# type of receiver.
+# Neuroarchiver_set_receiver configures the Receiver Instrument for recording
+# from a particular type of receiver.
 #
 proc Neuroarchiver_set_receiver {version} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
-	upvar #0 LWDAQ_config_Recorder iconfig
-	upvar #0 LWDAQ_info_Recorder iinfo
+	upvar #0 LWDAQ_config_Receiver iconfig
+	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info
 
 	switch $version {
@@ -5847,7 +5847,7 @@ proc Neuroarchiver_set_receiver {version} {
 
 #
 # Neuroarchiver_record manages the recording of data to archive files. It is the
-# recorder's execution procedure. It calls the Recorder Instrument to produce a
+# recorder's execution procedure. It calls the Receiver Instrument to produce a
 # block of data with a fixed number of clock messages. It stores these messages
 # to disk. If the control variable, config(record_control), is "Start", the
 # procedure posts itself again with control "Record". The recorder calculates
@@ -5857,8 +5857,8 @@ proc Neuroarchiver_set_receiver {version} {
 proc Neuroarchiver_record {{command ""}} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
-	upvar #0 LWDAQ_config_Recorder iconfig
-	upvar #0 LWDAQ_info_Recorder iinfo
+	upvar #0 LWDAQ_config_Receiver iconfig
+	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info
 
 	# Make sure we have the info array.
@@ -5941,10 +5941,10 @@ proc Neuroarchiver_record {{command ""}} {
 		# Set the timestamp for the new file, with resolution one second.
 		set config(record_start_clock) [clock seconds]
 		
-		# Reset the data recorder, but only if the comand is Reset or if
+		# Reset the data receiver, but only if the comand is Reset or if
 		# the synchronize flag is set.
 		if {($info(record_control) == "Start") || $config(synchronize)} {
-			set result [LWDAQ_reset_Recorder]
+			set result [LWDAQ_reset_Receiver]
 			if {[LWDAQ_is_error_result $result]} {
 				Neuroarchiver_print "$result"
 				set info(record_control) "Idle"
@@ -5990,7 +5990,7 @@ proc Neuroarchiver_record {{command ""}} {
 		set info(record_control) "Record"
 	}
 
-	# If Record, we download data from the data recorder and write it to
+	# If Record, we download data from the data receiver and write it to
 	# the archive.
 	if {$info(record_control) == "Record"} {
 		# If we have already caught up with our recording, we don't bother trying to
@@ -6029,11 +6029,11 @@ proc Neuroarchiver_record {{command ""}} {
 		# Set the record label to the download color.
 		LWDAQ_set_bg $info(record_control_label) "yellow"
 		
-		# If the Recorder happens to be looping, stop it.
+		# If the Receiver Instrument happens to be looping, stop it.
 		if {$iinfo(control) == "Loop"} {set iinfo(control) "Acquire"}
 
-		# Set the number of clocks we want to download using the Recorder Instrument.
-		# The Recorder Instrument will giveus exactly this number of clocks, unless there
+		# Set the number of clocks we want to download using the Receiver Instrument.
+		# The Receiver Instrument will giveus exactly this number of clocks, unless there
 		# is an error.
 		set iconfig(daq_num_clocks) \
 			[expr round($config(record_interval) * $info(clocks_per_second))]
@@ -6044,17 +6044,17 @@ proc Neuroarchiver_record {{command ""}} {
 		set LWDAQ_Info(max_daq_attempts) 1	
 	
 		# Download a block of messages from the data receiver into a LWDAQ image, the name
-		# of which is $iconfig(memory_name). The Recorder Instrument returns a string that
+		# of which is $iconfig(memory_name). The Receiver Instrument returns a string that
 		# describes the data block, or reports an error.
-		set daq_result [LWDAQ_acquire Recorder]
+		set daq_result [LWDAQ_acquire Receiver]
 		
 		# We restore the global max_daq_attempts variable.
 		set LWDAQ_Info(max_daq_attempts) $saved_max_daq_attempts
 		
 		# If the attempt to download encountered an error, report it to the
 		# Neuroarchvier text window with the current date and time. When it
-		# encounters an error, the Recorder Instrument will try to reset the
-		# data receiver, which will clear its data memory. The Recorder
+		# encounters an error, the Receiver Instrument will try to reset the
+		# data receiver, which will clear its data memory. The Receiver
 		# Instrument will set its acquire_end_ms parameter accordingly. We post
 		# the Neuroarchiver_record command again, so we can make another
 		# attempt. The Neuroarchiver will never give up trying to download data
@@ -6141,8 +6141,8 @@ proc Neuroarchiver_record {{command ""}} {
 proc Neuroarchiver_play {{command ""}} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
-	upvar #0 LWDAQ_config_Recorder iconfig
-	upvar #0 LWDAQ_info_Recorder iinfo
+	upvar #0 LWDAQ_config_Receiver iconfig
+	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info
 
 	# Make sure we have the info array.
@@ -6454,7 +6454,7 @@ proc Neuroarchiver_play {{command ""}} {
 	# have just jumped to a new time, but will contain left-over data from previous 
 	# file reads if we are simply moving on through the same file.
 	set play_num_clocks [expr round($info(play_interval_copy) * $info(clocks_per_second))]
-	set clocks [lwdaq_recorder $info(buffer_image) \
+	set clocks [lwdaq_receiver $info(buffer_image) \
 		"-payload $config(player_payload_length) \
 			-size $info(buffer_size) clocks 0 $play_num_clocks"]
 	scan $clocks %d%d%d%d%d num_buff_errors num_clocks num_messages start_index end_index
@@ -6489,7 +6489,7 @@ proc Neuroarchiver_play {{command ""}} {
 				[expr $info(buffer_size) * $message_length] $data
 			set info(buffer_size) [expr $info(buffer_size) \
 				+ ([string length $data] / $message_length)]
-			set clocks [lwdaq_recorder $info(buffer_image) \
+			set clocks [lwdaq_receiver $info(buffer_image) \
 				"-payload $config(player_payload_length) \
 					-size $info(buffer_size) clocks 0 $play_num_clocks"]
 			scan $clocks %d%d%d%d%d num_buff_errors num_clocks num_messages start_index end_index
@@ -6619,11 +6619,11 @@ proc Neuroarchiver_play {{command ""}} {
 	# interval, but the one before that, which we obtain with the index -1.
 	# We set the num_errors parameter so it contains the number of clock 
 	# message errors in the interval data.
-	set clocks [lwdaq_recorder $info(data_image) \
+	set clocks [lwdaq_receiver $info(data_image) \
 		"-payload $config(player_payload_length) \
 			-size $info(data_size) clocks 0 -1"]
 	scan $clocks %d%d%d%d%d info(num_errors) num_clocks num_messages first_index last_index
-	set indices [lwdaq_recorder $info(data_image) \
+	set indices [lwdaq_receiver $info(data_image) \
 		"-payload $config(player_payload_length) \
 			-size $info(data_size) get $first_index $last_index"]
 	set first_clock [lindex $indices 1]
@@ -6666,7 +6666,7 @@ proc Neuroarchiver_play {{command ""}} {
 	}
 	
 	# We report upon the number of errors within this interval, as provided 
-	# by the lwdaq_recorder routine.
+	# by the lwdaq_receiver routine.
 	if {$info(num_errors) > 0} {
 		Neuroarchiver_print "WARNING: Encountered $info(num_errors) errors\
 			in [file tail $config(play_file)] between $config(play_time) s and\
@@ -6685,7 +6685,7 @@ proc Neuroarchiver_play {{command ""}} {
 	# We show the raw message data in the text window if the user wants to see
 	# it in verbose mode, or if we have encountered an error in verbose mode.
 	if {($config(show_messages) || ($info(num_errors) > 0)) && $config(verbose)} {
-		set report [lwdaq_recorder $info(data_image) \
+		set report [lwdaq_receiver $info(data_image) \
 			"-payload $config(player_payload_length) \
 				-size $info(data_size) print 0 1"]
 		if {[regexp {index=([0-9]*) } $report match index]} {
@@ -6698,11 +6698,11 @@ proc Neuroarchiver_play {{command ""}} {
 			if {$lo_index < 0} {set lo_index 0}
 			set hi_index [expr $index + $extent]
 			if {$hi_index < $lo_index + 2*$extent} {set hi_index [expr $lo_index + 2*$extent]}
-			Neuroarchiver_print [lwdaq_recorder $info(data_image) \
+			Neuroarchiver_print [lwdaq_receiver $info(data_image) \
 				"-payload $config(player_payload_length) \
 					-size $info(data_size) print $lo_index $hi_index"]
 		} {
-			Neuroarchiver_print [lwdaq_recorder $info(data_image) \
+			Neuroarchiver_print [lwdaq_receiver $info(data_image) \
 				"-payload $config(player_payload_length) \
 					-size $info(data_size) print 0 $config(show_messages)"]
 		}
@@ -6725,7 +6725,7 @@ proc Neuroarchiver_play {{command ""}} {
 	# Get a list of the available channel numbers and message counts. The list
 	# includes any channel in which we have at least one message. It takes the
 	# form of a space-delimited string of channel numbers and message counts.
-	set all_message_channels [lwdaq_recorder $info(data_image) \
+	set all_message_channels [lwdaq_receiver $info(data_image) \
 		"-payload $config(player_payload_length) \
 			-size $info(data_size) list"]
 
@@ -7631,7 +7631,7 @@ proc Neuroarchiver_open {} {
 			pack $f.$b -side left -expand yes
 		}
 		
-		button $f.signals -text "View Signals" -command "LWDAQ_open Recorder"
+		button $f.signals -text "Receiver" -command "LWDAQ_open Receiver"
 		pack $f.signals -side left -expand yes
 	
 		button $f.conf -text "Configure" -command "Neuroarchiver_configure"
@@ -7659,19 +7659,19 @@ proc Neuroarchiver_open {} {
 		pack $f.mr -side left -expand yes
 
 		label $f.ipl -text "ip_addr:" -fg $info(label_color)
-		entry $f.ipe -textvariable LWDAQ_config_Recorder(daq_ip_addr) -width 14
+		entry $f.ipe -textvariable LWDAQ_config_Receiver(daq_ip_addr) -width 14
 		pack $f.ipl $f.ipe -side left -expand yes
 
 		label $f.sl -text "driver_sckt:" -fg $info(label_color)
-		entry $f.se -textvariable LWDAQ_config_Recorder(daq_driver_socket) -width 2
+		entry $f.se -textvariable LWDAQ_config_Receiver(daq_driver_socket) -width 2
 		pack $f.sl $f.se -side left -expand yes
 
 		label $f.lchannels -text "Select:" -anchor e -fg $info(label_color)
-		entry $f.echannels -textvariable LWDAQ_config_Recorder(daq_channels) -width 20
+		entry $f.echannels -textvariable LWDAQ_config_Receiver(daq_channels) -width 20
 		pack $f.lchannels $f.echannels -side left -expand yes
 
 		label $f.fvl -text "firmware:" -fg $info(label_color)
-		label $f.fvd -textvariable LWDAQ_info_Recorder(receiver_firmware) -width 2
+		label $f.fvd -textvariable LWDAQ_info_Receiver(receiver_firmware) -width 2
 		pack $f.fvl $f.fvd -side left -expand yes
 
 		set f $w.record.c

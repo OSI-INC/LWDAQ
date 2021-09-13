@@ -36,7 +36,7 @@ proc Function_Generator_init {} {
 	upvar #0 Function_Generator_global global
 	upvar #0 Function_Generator_row row
 	upvar #0 Function_Generator_column column
-	upvar #0 LWDAQ_config_Recorder iconfig
+	upvar #0 LWDAQ_config_Receiver iconfig
 	upvar #0 Function_Generator_data data
 	global LWDAQ_Info
 	global LWDAQ_Driver
@@ -494,8 +494,8 @@ proc Function_Generator_frequency_sweep {{index "-1"}} {
 	upvar #0 Function_Generator_info info
 	upvar #0 Function_Generator_config config
 	upvar #0 Function_Generator_data data
-	upvar #0 LWDAQ_config_Recorder iconfig
-	upvar #0 LWDAQ_info_Recorder iinfo
+	upvar #0 LWDAQ_config_Receiver iconfig
+	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info	
 	
 	if {$index < 0} {
@@ -566,7 +566,7 @@ proc Function_Generator_frequency_sweep {{index "-1"}} {
 		Function_Generator_adjust_sample_period
 		LWDAQ_wait_ms [expr round(1.0*$config(setup_delay_ms)/$config(input_frequency))]
 
-		LWDAQ_reset_Recorder
+		LWDAQ_reset_Receiver
 		set iconfig(analysis_channels) $config(channels)
 		set result [LWDAQ_acquire Recorder]
 		set iconfig(analysis_channels) "*"
@@ -964,7 +964,7 @@ proc Function_Generator_update_filter {val} {
 proc Function_Generator_open {} {
 	upvar #0 Function_Generator_config config
 	upvar #0 Function_Generator_info info
-	upvar #0 LWDAQ_config_Recorder iconfig
+	upvar #0 LWDAQ_config_Receiver iconfig
 		
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return 0}
@@ -1077,17 +1077,17 @@ proc Function_Generator_open {} {
 	checkbutton $c2.cbutton -text "Save" -variable Function_Generator_info(record_yn)
 		
 	label $c2.l_Rdriverip -text "Recorder IP Address" -anchor w 
-	entry $c2.e_Rdriverip -textvariable LWDAQ_config_Recorder(daq_ip_addr) \
+	entry $c2.e_Rdriverip -textvariable LWDAQ_config_Receiver(daq_ip_addr) \
 		-relief sunken -bd 1 -width 15 -justify right
 	grid $c2.l_Rdriverip $c2.e_Rdriverip -sticky news
 		
 	label $c2.l_Rdriversocket -text "Recorder Driver Socket" -anchor w 
-	entry $c2.e_Rdriversocket -textvariable LWDAQ_config_Recorder(daq_driver_socket) \
+	entry $c2.e_Rdriversocket -textvariable LWDAQ_config_Receiver(daq_driver_socket) \
 		-relief sunken -bd 1 -width 15 -justify right
 	grid $c2.l_Rdriversocket $c2.e_Rdriversocket -sticky news
 		
 	label $c2.l_Rmuxsocket -text "Recorder Mux Socket" -anchor w
-	entry $c2.e_Rmuxsocket -textvariable LWDAQ_config_Recorder(daq_mux_socket) \
+	entry $c2.e_Rmuxsocket -textvariable LWDAQ_config_Receiver(daq_mux_socket) \
 		-relief sunken -bd 1 -width 15 -justify right					
 	grid $c2.l_Rmuxsocket $c2.e_Rmuxsocket -sticky news
 	

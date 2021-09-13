@@ -16,7 +16,7 @@ The Long-Wire Data Acquisition ([LWDAQ](http://www.bndhep.net/Electronics/LWDAQ/
 
 [OSI Neuroarchiver](http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html): Separate manual for Neuroarchiver Tool.
 
-[OSI Neuroarchiver](http://www.opensourceinstruments.com/Electronics/A3018/Recorder.html): Separate manual for Neuroarchiver Tool.
+[OSI Neuroarchiver](http://www.opensourceinstruments.com/Electronics/A3018/Receiver.html): Separate manual for Neuroarchiver Tool.
 
 
 

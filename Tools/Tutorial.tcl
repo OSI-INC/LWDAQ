@@ -334,7 +334,7 @@ end."
 			 upvar #0 LWDAQ_info_Diagnostic dinfo
 			 upvar #0 LWDAQ_config_Diagnostic dconfig
         LWDAQ_open $instrument
-        LWDAQ_print $iinfo(text) "Welcome to the $instrument instrument!"
+        LWDAQ_print $iinfo(text) "Welcome to the $Instrument!"
 			 set instrumentname "$instrument" 
 			 if {$instrumentname == "Diagnostic"} 	{
 					 LWDAQ_print $info(text) "Using the LWDAQ Tutorial, you will learn to fill in some of the more basic parameters for 
