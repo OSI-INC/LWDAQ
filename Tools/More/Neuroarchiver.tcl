@@ -6402,8 +6402,8 @@ proc Neuroarchiver_play {{command ""}} {
 	# disk while we play it back.
 	if {$info(saved_play_file_mtime) != [file mtime $config(play_file)]} {
 		set info(saved_play_file_mtime) [file mtime $config(play_file)]
-		set info(play_end_time) [Neuroarchiver_end_time $config(play_file) \
-			$config(play_time) $info(player_payload) $config(play_index)]
+		set info(play_end_time) \
+			[Neuroarchiver_end_time $config(play_file) $info(player_payload)]
 	}
 
 	# If Pick or First we are done.
