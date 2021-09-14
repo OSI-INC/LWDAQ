@@ -2217,11 +2217,11 @@ proc Neuroarchiver_overview {{fn ""} } {
 			-fg blue -bg white -width 10
 		pack $f.status -side left -expand yes
 		button $f.plot -text "Plot" -command \
-			[list LWDAQ_post [list Neuroarchiver_overview_plot 0]]
+			[list LWDAQ_post Neuroarchiver_overview_plot]
 		pack $f.plot -side left -expand yes
-		button $f.export -text "Export" -command \
-			[list LWDAQ_post [list Neuroarchiver_overview_plot 1]]
-		pack $f.export -side left -expand yes
+		button $f.excerpt -text "Excerpt" -command \
+			[list LWDAQ_post Neuroarchiver_overview_excerpt]
+		pack $f.excerpt -side left -expand yes
 		foreach a "SP CP NP" {
 			set b [string tolower $a]
 			radiobutton $f.$b -variable Neuroarchiver_config(vt_mode) \
@@ -2272,9 +2272,15 @@ proc Neuroarchiver_overview {{fn ""} } {
 		set f $w.activy
 		frame $f
 		pack $f -side top -fill x
+		switch $LWDAQ_Info(os) {
+			"MacOS" {set width 100}
+			"Windows" {set width 90}
+			"Linux" {set width 90}
+			default {set width 90}
+		}		
 		label $f.la -text "Samples (id:qty):" -anchor e
 		label $f.ea -textvariable Neuroarchiver_overview(activity) \
-			-anchor w -width 100 -bg lightgray
+			-anchor w -width $width -bg lightgray
 		pack $f.la $f.ea -side left -expand yes
 	}
 	
@@ -2372,13 +2378,9 @@ proc Neuroarchiver_overview_cursor {} {
 
 #
 # Neuroarchiver_overview_plot selects an existing overview window and re-plots
-# its graphs using the current display parameters. If the export parameter is 
-# non-zero, the routine exports the selected channels each to a separate file
-# named En.txt, where n is the channel number. Each line in the export file 
-# will contain the archive time of a sample and the sample value. These files
-# will be written to the directory that contains the overview archive.
+# its graphs using the current display parameters. 
 #
-proc Neuroarchiver_overview_plot {{export 0}} {
+proc Neuroarchiver_overview_plot {} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 	upvar #0 Neuroarchiver_overview ov_config
@@ -2540,11 +2542,7 @@ proc Neuroarchiver_overview_plot {{export 0}} {
 
 	# Plot all graphs that have more than the activity threshold number of 
 	# points in them.
-	if {$export} {
-		set ov_config(status) "Exporting"
-	} {
-		set ov_config(status) "Plotting"
-	}
+	set ov_config(status) "Plotting"
 	set ov_config(activity) ""
 	for {set id 0} {$id <= $info(max_id)} {incr id} {
 		if {![info exists graph($id)]} {continue}
@@ -2560,11 +2558,6 @@ proc Neuroarchiver_overview_plot {{export 0}} {
 			-y_min $v_min -y_max $v_max \
 			-color [Neuroarchiver_color $id] -ac_couple $ac 
 		lwdaq_draw $info(overview_image) $ov_config(photo)
-		if {$export} {
-			set f [open [file join [file dirname $ov_config(fn)] E$id\.txt] w]
-			foreach {at sv} $graph($id) {puts $f "$at $sv"}
-			close $f
-		}		
 	}
 	
 	# Re-draw the cursor.
@@ -2573,6 +2566,53 @@ proc Neuroarchiver_overview_plot {{export 0}} {
 	# Done.
 	set ov_config(status) "Idle"
 	return "SUCCESS"
+}
+
+#
+# Neuroarchiver_overview_excerpt extracts the overview time interval and writes
+# it to disk as a newly-created NDF file, including all channels. This new archive
+# will be written to a file Ex.ndf in the same directory as the original archive,
+# where x is the UNIX time taken from the original archive name. The new archive's
+# metadata will include a comment giving the original file name and the time
+# period extracted.
+#
+proc Neuroarchiver_overview_excerpt {} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+	upvar #0 Neuroarchiver_overview ov_config
+	
+	Neuroarchiver_print "Excerpting $ov_config(t_min) to $ov_config(t_max) in\
+		$ov_config(fn_tail)."
+	set ov_config(t_min) [expr $round($ov_config(t_min))]
+	set ov_config(t_max) [expr $round($ov_config(t_max))]
+	
+	# Check that the archive exists and is an ndf file. Extract the
+	# data start address and data length.
+	if {[catch {
+		scan [LWDAQ_ndf_data_check $ov_config(fn)] %u%u data_start data_length
+	} error_message]} {
+		Neuroarchiver_print "ERROR: Checking archive, $error_message."
+		return "FAIL"
+	}
+	
+	scan [Neuroarchiver_seek_time $ov_config(fn) $ov_config(t_min)] \
+		%f%u%f%u ov_config(t_min) index_min dummy1 dummy2
+	scan [Neuroarchiver_seek_time $ov_config(fn) $ov_config(t_max)] \
+		%f%u%f%u dummy1 dummy2 ov_config(t_max) index_max
+	set message_length [expr $info(core_message_length) + $config(player_payload_length)]
+	set addr [expr $data_start + $message_length * $index_min]
+	set addr_end [expr $data_start + $message_length * $index_max]
+
+	set ov_config(status) "Excerpting"
+	LWDAQ_support
+	
+	Neuroarchiver_print "Excerpting $ov_config(t_min) to $ov_config(t_max) in\
+		$ov_config(fn_tail)."
+
+	set excerpt_atime [expr $ov_config(atime) + round($ov
+	set exerpt_fn [file join [file dirname $ov_config(fn)] E
+				
+	set ov_config(status) "Idle"
 }
 
 #
@@ -5580,31 +5620,41 @@ proc Neuroarchiver_magnified_view {figure} {
 	upvar #0 Neuroarchiver_config config
 
 	if {$figure == "vt"} {
-		if {[winfo exists $info(vt_view)]} {
-			raise $info(vt_view)
+		set w $info(vt_view)
+		if {[winfo exists $w]} {
+			raise $w
 			return "ABORT"
 		}
-		toplevel $info(vt_view)
-		wm title $info(vt_view) "Voltage vs. Time Magnified View"
+		toplevel $w
+		wm title $w "Voltage vs. Time Magnified View"
    		set info(vt_view_photo) [image create photo "_neuroarchiver_vt_view_photo_"]
-   		set l $info(vt_view)\.plot
+   		set l $w.plot
    		label $l -image $info(vt_view_photo)
 		pack $l -side top
-		Neuroarchiver_draw_graphs
 	}
 	if {$figure == "af"} {
-		if {[winfo exists $info(af_view)]} {
-			raise $info(af_view)
+		set w $info(af_view)
+		if {[winfo exists $w]} {
+			raise $w
 			return "ABORT"
 		}
-		toplevel $info(af_view)
-		wm title $info(af_view) "Amplitude vs. Frequency Magnified View"
+		toplevel $w
+		wm title $w "Amplitude vs. Frequency Magnified View"
    		set info(af_view_photo) [image create photo "_neuroarchiver_af_view_photo_"]
-   		set l $info(af_view)\.plot
+   		set l $w\.plot
    		label $l -image $info(af_view_photo)
 		pack $l -side top
-		Neuroarchiver_draw_graphs
 	}
+	
+	set f [frame $w.controls] 
+	pack $f -side top
+	foreach a {Play Stop Repeat Back} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "Neuroarchiver_command play $a"
+		pack $f.$b -side left -expand yes
+	}	
+		
+	Neuroarchiver_draw_graphs
 	
 	return $figure
 }
@@ -7821,8 +7871,8 @@ proc Neuroarchiver_open {} {
 		pack $f.al -side left 
 		switch $LWDAQ_Info(os) {
 			"MacOS" {set width 110}
-			"Windows" {set width 90}
-			"Linux" {set width 100}
+			"Windows" {set width 85}
+			"Linux" {set width 95}
 			default {set width 100}
 		}
 		label $f.ae -textvariable Neuroarchiver_info(active_channels) \

@@ -1313,10 +1313,9 @@ begin
 	hexadecimal printing of the core message bytes, separated by a space.
 }
 	if instruction='print' then begin
-		writestr(result,'Data Receiver Version ',receiver_version:1,'.',eol,
-			'Total ',num_messages:1,' messages, ',
+		writestr(result,'Total ',num_messages:1,' messages, ',
 			num_clocks:1,' clocks, ',
-			num_errors:1,' errors, and ',
+			num_errors:1,' errors, ',
 			null_count:1,' null messages.',eol);
 		if error_report<>'' then insert(error_report,result,length(result)+1);
 			
@@ -1358,7 +1357,9 @@ begin
 				message_index:=end_index-1;
 			end;
 		end;
-		insert('End of Messages',result,length(result)+1);
+		writestr(message_string,
+			'Data Receiver Version ',receiver_version:1,'.');
+		insert(message_string,result,length(result)+1);
 	end;
 {
 	If "extract" then return all messages from the specified signal. Even if the
