@@ -5674,7 +5674,7 @@ proc Neuroarchiver_magnified_view {figure} {
 			return "ABORT"
 		}
 		toplevel $w
-		wm title $w "Voltage vs. Time Magnified View"
+		wm title $w "Voltage vs. Time Magnified View, Neuroarchiver $info(version)"
    		set info(vt_view_photo) [image create photo "_neuroarchiver_vt_view_photo_"]
    		set l $w.plot
    		label $l -image $info(vt_view_photo)
@@ -5687,7 +5687,7 @@ proc Neuroarchiver_magnified_view {figure} {
 			return "ABORT"
 		}
 		toplevel $w
-		wm title $w "Amplitude vs. Frequency Magnified View"
+		wm title $w "Amplitude vs. Frequency Magnified View, Neuroarchiver $info(version)"
    		set info(af_view_photo) [image create photo "_neuroarchiver_af_view_photo_"]
    		set l $w\.plot
    		label $l -image $info(af_view_photo)
@@ -5695,13 +5695,44 @@ proc Neuroarchiver_magnified_view {figure} {
 	}
 	
 	set f [frame $w.controls] 
+	label $f.b -textvariable Neuroarchiver_info(play_file_tail) \
+		-width 20 -bg $info(variable_bg)
+	pack $f.b -side left -expand yes
+	button $f.pick -text "Pick" -command "Neuroarchiver_command play Pick"
+	pack $f.pick -side left -expand yes
+	if {$figure == "vt"} {
+		foreach a "SP CP NP" {
+			set b [string tolower $a]
+			radiobutton $f.$b -variable Neuroarchiver_config(vt_mode) \
+				-text $a -value $a
+			pack $f.$b -side left -expand yes
+		}	
+		label $f.lv_range -text "v_range:" -fg $info(label_color)
+		entry $f.ev_range -textvariable Neuroarchiver_config(v_range) -width 5
+		pack $f.lv_range $f.ev_range -side left -expand yes
+	}
 	pack $f -side top
-	foreach a {Play Stop Repeat Back} {
+	foreach a {Play Step Stop Repeat Back} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Neuroarchiver_command play $a"
 		pack $f.$b -side left -expand yes
 	}	
-		
+	button $f.metadata -text "Metadata" -command {
+		LWDAQ_post [list Neuroarchiver_metadata_view play]
+	}
+	pack $f.metadata -side left -expand yes
+	button $f.overview -text "Overview" -command {
+		LWDAQ_post [list LWDAQ_post "Neuroarchiver_overview"]
+	}
+	pack $f.overview -side left -expand yes
+	
+	LWDAQ_bind_command_key $w Left {Neuroarchiver_command play Back}
+	LWDAQ_bind_command_key $w Right {Neuroarchiver_command play Step}
+	LWDAQ_bind_command_key $w greater {Neuroarchiver_command play Play}
+	LWDAQ_bind_command_key $w Up [list LWDAQ_post {Neuroarchiver_jump Next_NDF 0}]
+	LWDAQ_bind_command_key $w Down [list LWDAQ_post {Neuroarchiver_jump Previous_NDF 0}]
+	LWDAQ_bind_command_key $w less [list LWDAQ_post {Neuroarchiver_jump Current_NDF 0}]
+
 	Neuroarchiver_draw_graphs
 	
 	return $figure
