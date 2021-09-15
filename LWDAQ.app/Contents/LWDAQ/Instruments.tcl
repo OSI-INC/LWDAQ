@@ -29,6 +29,7 @@ proc LWDAQ_instruments_init {} {
 	set info(line_purge_period) 100
 	set info(max_daq_attempts) 5
 	set info(num_daq_errors) 0
+	set info(instrument_counter_max) 10000
 	set instrument_files [glob [file join $info(instruments_dir) *.tcl]]
 	set info(instruments) [list]
 	foreach i $instrument_files {
@@ -285,7 +286,6 @@ proc LWDAQ_instrument_analyze {instrument {id ""}} {
 		lwdaq_image_manipulate $config(memory_name) none -clear 1
 	}
 
-
 	if {[winfo exists $info(window)]} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
@@ -327,6 +327,9 @@ proc LWDAQ_acquire {instrument} {
 	}
 	
 	incr info(counter) 
+	if {$info(counter) > $LWDAQ_Info(instrument_counter_max)} {
+		set info(counter) 1
+	}
 	set result ""
 	set match 0
 	

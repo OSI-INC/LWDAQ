@@ -2,16 +2,12 @@ set Neuroarchiver_mode "Recorder"
 LWDAQ_run_tool Neuroarchiver.tcl
 switch $LWDAQ_Info(os) {
 	"MacOS" {
-		destroy .menubar.instruments
-		destroy .menubar.tools
-		destroy .menubar.spawn
+		.menubar delete 1 2
 	}
 	"Windows" {
-		destroy .menubar.instruments
-		destroy .menubar.tools
-		destroy .menubar.spawn
-		destroy .menubar
+		.menubar delete 3 4
 	}
 	"Linux" {
+		.menubar delete 3 4
 	}
 }
