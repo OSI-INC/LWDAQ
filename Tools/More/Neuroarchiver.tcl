@@ -59,7 +59,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "150"
+	LWDAQ_tool_init "Neuroarchiver" "151"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -2879,7 +2879,7 @@ proc Neuroclassifier_plot {tag event} {
 	# Abort if running in no-graphics mode.
 	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
 	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
-
+	
 	set pointsize $info(classifier_point_size)
 	set c $info(classifier_map)
 
@@ -3069,7 +3069,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 		if {([llength $id]>1) || ($id == "*")} {
 			if {$info(window) == ""} {raise "."} {raise $info(window)}
 			Neuroarchiver_print "ERROR: Select a single channel to add to the library."
-			return ""
+			return "ERROR"
 		}
 		set event "[file tail $config(play_file)]\
 			[Neuroarchiver_play_time_format \
@@ -3094,7 +3094,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 		LWDAQ_post [list Neuroclassifier_jump $event]
 	}
 
-	return $event
+	return "SUCCESS"
 }
 
 #
@@ -3181,9 +3181,18 @@ proc Neuroclassifier_display {event_list} {
 	set info(classifier_index) 1
 	set info(classifier_display_control) "Run"
 	foreach event $event_list {
-		Neuroclassifier_add $info(classifier_index) $event
-		Neuroclassifier_plot event_$info(classifier_index) $event
-		incr info(classifier_index)
+		# Add the event to the library and plot it. Catch errors, which
+		# will arise when we read the wrong file for an event list.
+		if {[catch {
+			Neuroclassifier_add $info(classifier_index) $event
+			Neuroclassifier_plot event_$info(classifier_index) $event
+			incr info(classifier_index)
+		} error_message]} {
+			Neuroarchiver_print "ERROR: Bad event \"$event\"."
+			return "ERROR"
+		}
+		
+		# Check for user pressing Stop.
 		LWDAQ_support
 		if {$info(classifier_display_control) != "Run"} {
 			return "ABORT"
@@ -5271,22 +5280,25 @@ proc Neuroarchiver_calibration {{name ""}} {
 			label $f.baseline -text "BP" -fg purple
 			grid $f.id $f.color $f.baseline -sticky ew
 			incr count
-		} {
-			set status_code [set info(status_$id)] 
-			if {([lsearch $inclist "All"] >= 0) \
-					|| ([lsearch $inclist $status_code] >= 0) \
-					|| ([lsearch $inclist $id] >= 0)} {
-				set color [lwdaq tkcolor [Neuroarchiver_color $id]]
-				label $f.l$id -text $id -anchor w
-				label $f.c$id -text "   " -bg $color
-				bind $f.c$id <ButtonPress> \
-					[list Neuroarchiver_color_swap $id $f.c$id Press %x %y]
-				entry $f.e$id -textvariable Neuroarchiver_info(bp_$id) \
-					-relief sunken -bd 1 -width 7
-				grid $f.l$id $f.c$id $f.e$id -sticky ew
-				incr count
-			}	
+		} 
+
+		if {([set info(status_$id)] != "None") && ([set info(qty_$id)] == 0)} {
+			set info(status_$id) "Off"
 		}
+		
+		if {([lsearch $inclist "All"] >= 0) \
+				|| ([lsearch $inclist [set info(status_$id)] ] >= 0) \
+				|| ([lsearch $inclist $id] >= 0)} {
+			set color [lwdaq tkcolor [Neuroarchiver_color $id]]
+			label $f.l$id -text $id -anchor w
+			label $f.c$id -text "   " -bg $color
+			bind $f.c$id <ButtonPress> \
+				[list Neuroarchiver_color_swap $id $f.c$id Press %x %y]
+			entry $f.e$id -textvariable Neuroarchiver_info(bp_$id) \
+				-relief sunken -bd 1 -width 7
+			grid $f.l$id $f.c$id $f.e$id -sticky ew
+			incr count
+		}	
 	}
 }
 
@@ -5462,7 +5474,7 @@ proc Neuroarchiver_activity {} {
 	set ff [frame $w.activity]
 	pack $ff -side top -fill x -expand 1
 
-	# Get a list of the channels we are supposed to display in the calibration
+	# Get a list of the channels we are supposed to display in the activity
 	# window, and the codes for including channels based upon their alert
 	# values.
 	set inclist ""
@@ -5498,9 +5510,12 @@ proc Neuroarchiver_activity {} {
 			incr count
 		}
 
-		set status_code [set info(status_$id)] 
+		if {([set info(status_$id)] != "None") && ([set info(qty_$id)] == 0)} {
+			set info(status_$id) "Off"
+		}
+		
 		if {([lsearch $inclist "All"] >= 0) \
-				|| ([lsearch $inclist $status_code] >= 0) \
+				|| ([lsearch $inclist [set info(status_$id)]] >= 0) \
 				|| ([lsearch $inclist $id] >= 0)} {
 			label $f.id_$count -text $id -anchor w
 			set color [lwdaq tkcolor [Neuroarchiver_color $id]]
