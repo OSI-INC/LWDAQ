@@ -44,7 +44,7 @@
 #
 # Version 20: Add support for D-BCAM Head with all peripheral components.
 #
-# Version 21: Add support for 36-Way Injector. In crease max_mux_current.
+# Version 21: Add support for 36-Way Injector. Increase max_mux_current.
 #
 # Version 22: Add the Show Signatures button. Help is direct link to Analyzer page.
 #

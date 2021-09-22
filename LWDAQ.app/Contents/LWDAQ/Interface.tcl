@@ -68,11 +68,11 @@ proc LWDAQ_interface_init {} {
 		proc tkAboutDialog {} {LWDAQ_about}
 	}
 	if {($LWDAQ_Info(os) == "Linux") && $LWDAQ_Info(gui_enabled)} {
-		font configure TkTextFont -size 12 -family Helvetica -weight bold
-		font configure TkDefaultFont -size 12 -family Helvetica -weight bold
-		font configure TkFixedFont -size 12 -family Courier -weight bold
-		font configure TkMenuFont -size 12 -family Helvetica -weight bold
-		font configure TkCaptionFont -size 12 -family Helvetica -weight bold
+		font configure TkTextFont -size 10
+		font configure TkDefaultFont -size 10
+		font configure TkFixedFont -size 10 -family Courier
+		font configure TkMenuFont -size 10
+		font configure TkCaptionFont -size 10
 		proc tkAboutDialog {} {LWDAQ_about}
 	}
 	if {($LWDAQ_Info(os) == "Windows") && $LWDAQ_Info(gui_enabled)} {

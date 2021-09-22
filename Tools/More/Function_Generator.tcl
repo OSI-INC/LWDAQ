@@ -568,7 +568,7 @@ proc Function_Generator_frequency_sweep {{index "-1"}} {
 
 		LWDAQ_reset_Receiver
 		set iconfig(analysis_channels) $config(channels)
-		set result [LWDAQ_acquire Recorder]
+		set result [LWDAQ_acquire Receiver]
 		set iconfig(analysis_channels) "*"
 		if {[LWDAQ_is_error_result $result]} {
 			LWDAQ_print $info(text) $result
