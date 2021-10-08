@@ -70,7 +70,7 @@ proc LWDAQ_interface_init {} {
 	if {($LWDAQ_Info(os) == "Linux") && $LWDAQ_Info(gui_enabled)} {
 		font configure TkTextFont -size 10
 		font configure TkDefaultFont -size 10
-		font configure TkFixedFont -size 10 -family Courier
+		font configure TkFixedFont -size 11 -family Courier
 		font configure TkMenuFont -size 10
 		font configure TkCaptionFont -size 10
 		proc tkAboutDialog {} {LWDAQ_about}

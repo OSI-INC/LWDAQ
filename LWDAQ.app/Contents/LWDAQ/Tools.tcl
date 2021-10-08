@@ -504,25 +504,6 @@ proc LWDAQ_Toolmaker_execute {{save 1}} {
 	pack $f -side top
 	set t [LWDAQ_text_widget $w 60 15 1 1]	
 
-	# Print out the script but move the cursor down to the
-	# end of the script print-out.
-	LWDAQ_print $t "Script:" green
-	set script_lines [split $script \n]
-	if {[llength $script_lines] <= 4} {
-		foreach line $script_lines {
-			LWDAQ_print $t $line blue
-		}
-	} {
-		LWDAQ_print $t [lindex $script_lines 0] blue
-		LWDAQ_print $t [lindex $script_lines 1] blue
-		LWDAQ_print $t "..." blue
-		LWDAQ_print $t [lindex $script_lines end-1] blue
-		LWDAQ_print $t [lindex $script_lines end] blue
-		LWDAQ_print $t "Executing..." green
-	}
-	$t see end
-	LWDAQ_update
-	
 	# Execute the script at the global scope. If the script generates
 	# an error, we catch the error and write it to the execution text
 	# widget.
@@ -536,8 +517,6 @@ proc LWDAQ_Toolmaker_execute {{save 1}} {
 		}
 	}
 
-	# Notify user that execution is complete
-	LWDAQ_print $t "Done." green
 	return 1
 }
 

@@ -1,296 +1,266 @@
 <script>
-# NDF Archive Duplicate Machine. This Toolmaker script copies
-# NDF files from a source to a destination directory. It
-# copies only if the destination archive does not exist.
-# If there are archives in the destination that do not exist
-# in the source directory, the script deletes these files.
-# At the end, the set of NDF files in the destination 
-# directory will be the same as those in the source directory.
+# Toolmaker script that flashes all LEDs on a thirty-size way injector (A2080B)
+# and checks their power dissipation. The power level to which they are each
+# turned on is the final digit in the command, and varies from 0 to A (zero to
+# ten) in the P2080A03 firmware. The script starts by turning on LED 1, then
+# goes through to LED 58. The script uses the Diagnostic Instrument to flash the
+# LEDs so that it can measure current consumption from +15V and -15V. Specify
+# the driver address and socket number in the fields provided by this tool.
 
-# Get source and destination directory names.
-set src [LWDAQ_get_dir_name]
-LWDAQ_print $t "Source Directory: $src"
-set dest [LWDAQ_get_dir_name]
-LWDAQ_print $t "Destination Directory: $dest"
+set max_power 2000 
+set min_power 1600
+set run_injector_test 0
 
-# Get list of NDF files in each directory.
-set srcfiles [glob [file join $src *.ndf]]
-set destfiles [glob [file join $dest *.ndf]]
-
-# Make a list of the existing and non-existing files. We will
-# copy the non-existing files, provided there is at least one
-# existing file.
-set copyfiles [list]
-set existingfiles [list]
-foreach fn $srcfiles {
-	if {[lsearch $destfiles *[file tail $fn]] >= 0} {
-		lappend existingfiles $fn
-	} {
-		lappend copyfiles $fn
-	}
+foreach {c} {go stop} {
+	button $f.$c -text $c -command $c\_injector_test
+	pack $f.$c -side left
+}
+foreach {element} {daq_ip_addr daq_driver_socket daq_mux_socket} {
+	label $f.lbl$element -text $element 
+	entry $f.ety$element -textvariable LWDAQ_config_Diagnostic($element) -width 10
+	pack $f.lbl$element $f.ety$element -side left
 }
 
-# If there are no existing files, issue a warning.
-if {[llength $existingfiles] == 0} {
-	LWDAQ_print $t "WARNING: No matching files in destination folder."
-} 
+proc go_injector_test {{start 1}} {
+	global t run_injector_test 
+	global max_power min_power 
+	global LWDAQ_info_Diagnostic LWDAQ_config_Diagnostic
 
-# If there are files in the destination folder that do not
-# exist in the source folder, and there is some overlap to
-# indicate that the destination is correct for the source,
-# delete the files in the destination that do not exist
-# in the source.
-if {[llength $existingfiles] > 0} {
-	set deletefiles [list]
-	foreach fn $destfiles {
-		if {[lsearch $srcfiles *[file tail $fn]] < 0} {
-			lappend deletefiles $fn
+	set LWDAQ_config_Diagnostic(daq_actions) "transmit"
+	
+	if {$start} {
+		if {$run_injector_test} {
+			return
+		} else {
+			set run_injector_test 1
+		}
+	} 
+
+	set count 0
+	set okay 1
+	foreach i {1 2 3 4 5 6 7 8 \
+		17 18 19 20 21 22 23 24 \
+		33 34 35 36 37 38 39 40 41 42 \
+		49 50 51 52 53 54 55 56 57 58} {
+		set LWDAQ_info_Diagnostic(commands) "0000"
+		set result [LWDAQ_acquire Diagnostic]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $t $result
+			break
+		}
+		if {![winfo exists $t]} {break}
+		if {!$run_injector_test} {
+			LWDAQ_print $t "Test aborted.\n" purple
+			return
+		}
+		set P15V [lindex $result 8]
+		set N15V [lindex $result 12]
+		set command [format %02X $i]87
+		set LWDAQ_info_Diagnostic(commands) $command
+		set result [LWDAQ_acquire Diagnostic]
+		set P15V [format %.1f [expr [lindex $result 8] - $P15V]]
+		set N15V [format %.1f [expr [lindex $result 12] - $N15V]]
+		set power [format %.1f [expr $N15V * 15.0 + $N15V * 15.0]]
+		incr count
+		if {($power <= $max_power) && ($power >= $min_power)} {
+			LWDAQ_print $t "LED $count okay, $power mW."
+		} {
+			LWDAQ_print $t "LED $count faulty, $power mW." orange
+			set okay 0
 		}
 	}
-	LWDAQ_print $t "Found [llength $deletefiles] unrecognized files in destination." 
-	set i 0
-	set n [llength $deletefiles]
-	foreach fn $deletefiles {
-		if {![winfo exists $t]} {break}
-		incr i
-		LWDAQ_print $t "Delete $i of $n [file tail $fn] in $dest..."
-		LWDAQ_support
-		file delete $fn
+	
+	set LWDAQ_info_Diagnostic(commands) "0000"
+	set result [LWDAQ_acquire Diagnostic]
+	if {$okay} {
+		LWDAQ_print $t "All $count LEDs okay.\n" green
+	} else {
+		LWDAQ_print $t "One or more faulty LEDs.\n" red
 	}
+	set run_injector_test 0
 }
 
-# If there is some overlap, copy those files that don't exist
-# in the destination foler.
-if {[llength $existingfiles] > 0} {
-	LWDAQ_print $t "Found [llength $srcfiles] NDF files in source."
-	LWDAQ_print $t "Found [llength $existingfiles] matching files in destination."
-	LWDAQ_print $t "Copying [llength $copyfiles] files to destination."
-	set i 0
-	set n [llength $copyfiles]
-	foreach fn $copyfiles {
-		if {![winfo exists $t]} {break}
-		incr i
-		LWDAQ_print $t "Copy $i of $n [file tail $fn]..."
-		LWDAQ_support
-		file copy $fn [file join $dest [file tail $fn]]
-	}
+proc stop_injector_test {} {
+	global run_injector_test
+	set run_injector_test 0
 }
 </script>
 
 <script>
-# NDF Archive Duplicate Machine. This Toolmaker script copies
-# NDF files from a source to a destination directory. It
-# copies only if the destination archive does not exist.
-# If there are archives in the destination that do not exist
-# in the source directory, the script deletes these files.
-# At the end, the set of NDF files in the destination 
-# directory will be the same as those in the source directory.
+# Toolmaker script that flashes all LEDs on a thirty-size way injector (A2080B)
+# and checks their power dissipation. The power level to which they are each
+# turned on is the final digit in the command, and varies from 0 to A (zero to
+# ten) in the P2080A03 firmware. The script starts by turning on LED 1, then
+# goes through to LED 58. The script uses the Diagnostic Instrument to flash the
+# LEDs so that it can measure current consumption from +15V and -15V. Specify
+# the driver address and socket number in the fields provided by this tool.
 
-# Get source and destination directory names.
-set src [LWDAQ_get_dir_name]
-LWDAQ_print $t "Source Directory: $src"
-set dest [LWDAQ_get_dir_name]
-LWDAQ_print $t "Destination Directory: $dest"
+set max_power 2000 
+set min_power 1600
+set run_injector_test 0
 
-# Get list of NDF files in each directory.
-set srcfiles [glob [file join $src *.ndf]]
-set destfiles [glob [file join $dest *.ndf]]
-
-# Make a list of the existing and non-existing files. We will
-# copy the non-existing files, provided there is at least one
-# existing file.
-set copyfiles [list]
-set existingfiles [list]
-foreach fn $srcfiles {
-	if {[lsearch $destfiles *[file tail $fn]] >= 0} {
-		lappend existingfiles $fn
-	} {
-		lappend copyfiles $fn
-	}
+foreach {c} {go stop} {
+	button $f.$c -text $c -command $c\_injector_test
+	pack $f.$c -side left
+}
+foreach {element} {daq_ip_addr daq_driver_socket daq_mux_socket} {
+	label $f.lbl$element -text $element 
+	entry $f.ety$element -textvariable LWDAQ_config_Diagnostic($element) \
+		-width [expr [string length [set LWDAQ_config_Diagnostic($element)] + 4]]
+	pack $f.lbl$element $f.ety$element -side left
 }
 
-# If there are no existing files, issue a warning.
-if {[llength $existingfiles] == 0} {
-	LWDAQ_print $t "WARNING: No matching files in destination folder."
-} 
+proc go_injector_test {{start 1}} {
+	global t run_injector_test 
+	global max_power min_power 
+	global LWDAQ_info_Diagnostic LWDAQ_config_Diagnostic
 
-# If there are files in the destination folder that do not
-# exist in the source folder, and there is some overlap to
-# indicate that the destination is correct for the source,
-# delete the files in the destination that do not exist
-# in the source.
-if {[llength $existingfiles] > 0} {
-	set deletefiles [list]
-	foreach fn $destfiles {
-		if {[lsearch $srcfiles *[file tail $fn]] < 0} {
-			lappend deletefiles $fn
+	set LWDAQ_config_Diagnostic(daq_actions) "transmit"
+	
+	if {$start} {
+		if {$run_injector_test} {
+			return
+		} else {
+			set run_injector_test 1
+		}
+	} 
+
+	set count 0
+	set okay 1
+	foreach i {1 2 3 4 5 6 7 8 \
+		17 18 19 20 21 22 23 24 \
+		33 34 35 36 37 38 39 40 41 42 \
+		49 50 51 52 53 54 55 56 57 58} {
+		set LWDAQ_info_Diagnostic(commands) "0000"
+		set result [LWDAQ_acquire Diagnostic]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $t $result
+			break
+		}
+		if {![winfo exists $t]} {break}
+		if {!$run_injector_test} {
+			LWDAQ_print $t "Test aborted.\n" purple
+			return
+		}
+		set P15V [lindex $result 8]
+		set N15V [lindex $result 12]
+		set command [format %02X $i]87
+		set LWDAQ_info_Diagnostic(commands) $command
+		set result [LWDAQ_acquire Diagnostic]
+		set P15V [format %.1f [expr [lindex $result 8] - $P15V]]
+		set N15V [format %.1f [expr [lindex $result 12] - $N15V]]
+		set power [format %.1f [expr $N15V * 15.0 + $N15V * 15.0]]
+		incr count
+		if {($power <= $max_power) && ($power >= $min_power)} {
+			LWDAQ_print $t "LED $count okay, $power mW."
+		} {
+			LWDAQ_print $t "LED $count faulty, $power mW." orange
+			set okay 0
 		}
 	}
-	LWDAQ_print $t "Found [llength $deletefiles] unrecognized files in destination." 
-	set i 0
-	set n [llength $deletefiles]
-	foreach fn $deletefiles {
+	
+	set LWDAQ_info_Diagnostic(commands) "0000"
+	set result [LWDAQ_acquire Diagnostic]
+	if {$okay} {
+		LWDAQ_print $t "All $count LEDs okay.\n" green
+	} else {
+		LWDAQ_print $t "One or more faulty LEDs.\n" red
+	}
+	set run_injector_test 0
+}
+
+proc stop_injector_test {} {
+	global run_injector_test
+	set run_injector_test 0
+}
+</script>
+
+<script>
+# Toolmaker script that flashes all LEDs on a thirty-size way injector (A2080B)
+# and checks their power dissipation. The power level to which they are each
+# turned on is the final digit in the command, and varies from 0 to A (zero to
+# ten) in the P2080A03 firmware. The script starts by turning on LED 1, then
+# goes through to LED 58. The script uses the Diagnostic Instrument to flash the
+# LEDs so that it can measure current consumption from +15V and -15V. Specify
+# the driver address and socket number in the fields provided by this tool.
+
+set max_power 2000 
+set min_power 1600
+set run_injector_test 0
+
+foreach {c} {go stop} {
+	button $f.$c -text $c -command $c\_injector_test
+	pack $f.$c -side left
+}
+foreach {element} {daq_ip_addr daq_driver_socket daq_mux_socket} {
+	label $f.lbl$element -text $element 
+	entry $f.ety$element -textvariable LWDAQ_config_Diagnostic($element) \
+		-width [expr [string length [set LWDAQ_config_Diagnostic($element)]] + 4]
+	pack $f.lbl$element $f.ety$element -side left
+}
+
+proc go_injector_test {{start 1}} {
+	global t run_injector_test 
+	global max_power min_power 
+	global LWDAQ_info_Diagnostic LWDAQ_config_Diagnostic
+
+	set LWDAQ_config_Diagnostic(daq_actions) "transmit"
+	
+	if {$start} {
+		if {$run_injector_test} {
+			return
+		} else {
+			set run_injector_test 1
+		}
+	} 
+
+	set count 0
+	set okay 1
+	foreach i {1 2 3 4 5 6 7 8 \
+		17 18 19 20 21 22 23 24 \
+		33 34 35 36 37 38 39 40 41 42 \
+		49 50 51 52 53 54 55 56 57 58} {
+		set LWDAQ_info_Diagnostic(commands) "0000"
+		set result [LWDAQ_acquire Diagnostic]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $t $result
+			break
+		}
 		if {![winfo exists $t]} {break}
-		incr i
-		LWDAQ_print $t "Delete $i of $n [file tail $fn] in $dest..."
-		LWDAQ_support
-		file delete $fn
+		if {!$run_injector_test} {
+			LWDAQ_print $t "Test aborted.\n" purple
+			return
+		}
+		set P15V [lindex $result 8]
+		set N15V [lindex $result 12]
+		set command [format %02X $i]87
+		set LWDAQ_info_Diagnostic(commands) $command
+		set result [LWDAQ_acquire Diagnostic]
+		set P15V [format %.1f [expr [lindex $result 8] - $P15V]]
+		set N15V [format %.1f [expr [lindex $result 12] - $N15V]]
+		set power [format %.1f [expr $N15V * 15.0 + $N15V * 15.0]]
+		incr count
+		if {($power <= $max_power) && ($power >= $min_power)} {
+			LWDAQ_print $t "LED $count okay, $power mW."
+		} {
+			LWDAQ_print $t "LED $count faulty, $power mW." orange
+			set okay 0
+		}
 	}
-}
-
-# If there is some overlap, copy those files that don't exist
-# in the destination foler.
-if {[llength $existingfiles] > 0} {
-	LWDAQ_print $t "Found [llength $srcfiles] NDF files in source."
-	LWDAQ_print $t "Found [llength $existingfiles] matching files in destination."
-	LWDAQ_print $t "Copying [llength $copyfiles] files to destination."
-	set i 0
-	set n [llength $copyfiles]
-	foreach fn $copyfiles {
-		if {![winfo exists $t]} {break}
-		incr i
-		LWDAQ_print $t "Copy $i of $n [file tail $fn]..."
-		LWDAQ_support
-		file copy $fn [file join $dest [file tail $fn]]
-	}
-}
-</script>
-
-<script>
-# Restores NDF files from source directory to destination directory.
-# Assumes the destination directory contains a file called NDF_List.txt
-# of files to be restored.
-
-# Get source directory.
-set src [LWDAQ_get_dir_name]
-LWDAQ_print $t "Source Directory: $src"
-
-set listfile [LWDAQ_get_file_name]
-set dest [file dirname $listfile]
-LWDAQ_print $t "Destination Directory: $dest"
-LWDAQ_print $t "List File: $listfile"
-
-# Get list of NDF files in source directory.
-set srcfiles [LWDAQ_find_files $src *.ndf]
-LWDAQ_print $t "Found [llength $srcfiles] in source tree."
-set destfiles [LWDAQ_find_files $dest *.ndf]
-LWDAQ_print $t "Found [llength $destfiles] in destination tree."
-
-# Get list of NDF files to copy.
-set f [open $listfile r]
-set copyfiles [split [string trim [read $f]] " \n\t"]
-close $f
-LWDAQ_print $t "Want to restore [llength $copyfiles] to destination."
-
-foreach ft $copyfiles {
-	if {![winfo exists $t]} {break}
-	set i [lsearch $srcfiles *$ft]
-	set j [lsearch $destfiles *$ft]
-	if {($i >= 0) && ($j < 0)} {
-		set fs [lindex $srcfiles $i]
-		set fd [file join $dest $ft]
-		LWDAQ_print $t "Copying: $fs to $fd."
-		file copy $fs $fd 
-		LWDAQ_support
-	} elseif {($i < 0) && ($j < 0)} {
-		LWDAQ_print $t "ERROR: Cannot find $ft in either location."
-	} elseif {($i < 0) && ($j >= 0)} {
-		LWDAQ_print $t "WARNING: Found $ft in destination but not source."
+	
+	set LWDAQ_info_Diagnostic(commands) "0000"
+	set result [LWDAQ_acquire Diagnostic]
+	if {$okay} {
+		LWDAQ_print $t "All $count LEDs okay.\n" green
 	} else {
-		LWDAQ_print $t "Exists: Found $ft in both locations."
+		LWDAQ_print $t "One or more faulty LEDs.\n" red
 	}
+	set run_injector_test 0
 }
-</script>
 
-<script>
-# Restores NDF files from source directory to destination directory.
-# Assumes the destination directory contains a file called NDF_List.txt
-# of files to be restored.
-
-# Get source directory.
-set src [LWDAQ_get_dir_name]
-LWDAQ_print $t "Source Directory: $src"
-
-set listfile [LWDAQ_get_file_name]
-set dest [file dirname $listfile]
-LWDAQ_print $t "Destination Directory: $dest"
-LWDAQ_print $t "List File: $listfile"
-
-# Get list of NDF files in source directory.
-set srcfiles [LWDAQ_find_files $src *.ndf]
-LWDAQ_print $t "Found [llength $srcfiles] in source tree."
-set destfiles [LWDAQ_find_files $dest *.ndf]
-LWDAQ_print $t "Found [llength $destfiles] in destination tree."
-
-# Get list of NDF files to copy.
-set f [open $listfile r]
-set copyfiles [split [string trim [read $f]] " \n\t"]
-close $f
-LWDAQ_print $t "Want to restore [llength $copyfiles] to destination."
-
-foreach ft $copyfiles {
-	if {![winfo exists $t]} {break}
-	set i [lsearch $srcfiles *$ft]
-	set j [lsearch $destfiles *$ft]
-	if {($i >= 0) && ($j < 0)} {
-		set fs [lindex $srcfiles $i]
-		set fd [file join $dest $ft]
-		LWDAQ_print $t "Copying: $fs to $fd."
-		file copy $fs $fd 
-		LWDAQ_support
-	} elseif {($i < 0) && ($j < 0)} {
-		LWDAQ_print $t "ERROR: Cannot find $ft in either location."
-	} elseif {($i < 0) && ($j >= 0)} {
-		LWDAQ_print $t "WARNING: Found $ft in destination but not source."
-	} else {
-		LWDAQ_print $t "Exists: Found $ft in both locations."
-	}
-}
-</script>
-
-<script>
-# Restores NDF files from source directory to destination directory.
-# Assumes the destination directory contains a file called NDF_List.txt
-# of files to be restored.
-
-# Get source directory.
-set src [LWDAQ_get_dir_name]
-LWDAQ_print $t "Source Directory: $src"
-
-set listfile [LWDAQ_get_file_name]
-set dest [file dirname $listfile]
-LWDAQ_print $t "Destination Directory: $dest"
-LWDAQ_print $t "List File: $listfile"
-
-# Get list of NDF files in source directory.
-set srcfiles [LWDAQ_find_files $src *.ndf]
-LWDAQ_print $t "Found [llength $srcfiles] in source tree."
-set destfiles [LWDAQ_find_files $dest *.ndf]
-LWDAQ_print $t "Found [llength $destfiles] in destination tree."
-
-# Get list of NDF files to copy.
-set f [open $listfile r]
-set copyfiles [split [string trim [read $f]] " \n\t"]
-close $f
-LWDAQ_print $t "Want to restore [llength $copyfiles] to destination."
-
-foreach ft $copyfiles {
-	if {![winfo exists $t]} {break}
-	set i [lsearch $srcfiles *$ft]
-	set j [lsearch $destfiles *$ft]
-	if {($i >= 0) && ($j < 0)} {
-		set fs [lindex $srcfiles $i]
-		set fd [file join $dest $ft]
-		LWDAQ_print $t "Copying: $fs to $fd."
-		file copy $fs $fd 
-		LWDAQ_support
-	} elseif {($i < 0) && ($j < 0)} {
-		LWDAQ_print $t "ERROR: Cannot find $ft in either location."
-	} elseif {($i < 0) && ($j >= 0)} {
-		LWDAQ_print $t "WARNING: Found $ft in destination but not source."
-	} else {
-		LWDAQ_print $t "Exists: Found $ft in both locations."
-	}
+proc stop_injector_test {} {
+	global run_injector_test
+	set run_injector_test 0
 }
 </script>
 

@@ -28,6 +28,7 @@
 # Version 2.10 Restore "*" for analysis channels after acquire.
 # Version 3.1 The function generator sweep uses the LWDAQ event queue.
 # Version 3.2 Allow specification of multiple channels.
+# Version 3.3 Sort channel numbers correctly for printou.
 
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
@@ -42,7 +43,7 @@ proc Function_Generator_init {} {
 	global LWDAQ_Driver
 
 	
-	LWDAQ_tool_init "Function_Generator" "3.2"
+	LWDAQ_tool_init "Function_Generator" "3.3"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -609,7 +610,7 @@ proc Function_Generator_print_response {} {
 	upvar #0 Function_Generator_data data
 	upvar #0 Function_Generator_config config
 
-	foreach c [lsort -increasing $config(channels)] {
+	foreach c [lsort -increasing -integer $config(channels)] {
 		LWDAQ_print -nonewline $info(text) \
 			"$config(version)$config(batch)\.$c\t"
 	}

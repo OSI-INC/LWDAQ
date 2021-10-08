@@ -60,7 +60,7 @@ proc Analyzer_init {} {
 	set info(lines_per_measurement) 18
 	set info(data_image) "_analyzer_data_image"
 	
-	set config(ip_addr) "129.64.37.79"
+	set config(ip_addr) "10.0.0.37"
 	set config(base_addr) "00000000"
 	set config(driver_start_socket) 1
 	set config(driver_end_socket) 8

@@ -67,7 +67,7 @@ proc LWDAQ_init_Terminal {} {
 	set config(image_source) "daq"
 	set config(file_name) "./Images/$info(name)\*"
 	set config(memory_name) "lwdaq_image_1"
-	set config(daq_ip_addr) "129.64.37.79"
+	set config(daq_ip_addr) "10.0.0.37"
 	set config(daq_driver_socket) 1
 	set config(daq_mux_socket) 1
 	set config(analysis_enable) 0
