@@ -3787,8 +3787,8 @@ function lwdaq_graph(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):inte
 
 var 
 	ip:image_ptr_type=nil;
-	gp:xy_graph_ptr=nil;
-	gpy:x_graph_ptr=nil;
+	gxy:xy_graph_type;
+	gx:x_graph_type;
 	image_name:string='';
 	result:string='';
 	option:string;
@@ -3879,44 +3879,42 @@ begin
 
 	result:=Tcl_ObjString(argv[1]);
 	if y_only then begin
-		gpy:=read_x_graph(result);
-		gp:=new_xy_graph(length(gpy^));
-		for point_num:=0 to length(gpy^)-1 do begin
-			gp^[point_num].x:=point_num;
-			gp^[point_num].y:=gpy^[point_num];
+		gx:=read_x_graph_fpc(result);
+		setlength(gxy,length(gx));
+		for point_num:=0 to length(gx)-1 do begin
+			gxy[point_num].x:=point_num;
+			gxy[point_num].y:=gx[point_num];
 		end;
-		dispose_x_graph(gpy);
 	end;
 	if x_only then begin 
-		gpy:=read_x_graph(result);
-		gp:=new_xy_graph(length(gpy^));
-		for point_num:=0 to length(gpy^)-1 do begin
-			gp^[point_num].y:=-point_num;
-			gp^[point_num].x:=gpy^[point_num];
+		gx:=read_x_graph_fpc(result);
+		setlength(gxy,length(gx));
+		for point_num:=0 to length(gx)-1 do begin
+			gxy[point_num].y:=-point_num;
+			gxy[point_num].x:=gx[point_num];
 		end;
-		dispose_x_graph(gpy);
 	end;
 	if (not y_only) and (not x_only) then 
-		gp:=read_xy_graph(result);
+		gxy:=read_xy_graph_fpc(result);
 
-	if glitch>0 then glitch_filter_y(gp,glitch);
+	if glitch>0 then glitch_filter_y(@gxy,glitch);
 
 	if ac_couple then begin
-		average:=average_y_xy_graph(gp);
+		average:=average_y_xy_graph(@gxy);
 		if not in_image then
-			display_real_graph(ip,gp,overlay_color_from_integer(color),
+			display_real_graph(ip,@gxy,overlay_color_from_integer(color),
 				x_min,x_max,y_min+average,y_max+average,x_div,y_div)
 		else
-			draw_real_graph(ip,gp,color,
+			draw_real_graph(ip,@gxy,color,
 				x_min,x_max,y_min+average,y_max+average);
 	end else 
 		if not in_image then
-			display_real_graph(ip,gp,overlay_color_from_integer(color),
+			display_real_graph(ip,@gxy,overlay_color_from_integer(color),
 				x_min,x_max,y_min,y_max,x_div,y_div)
 		else
-			draw_real_graph(ip,gp,color,
+			draw_real_graph(ip,@gxy,color,
 				x_min,x_max,y_min,y_max);
-	dispose_xy_graph(gp);
+
 	if entire then ip^.analysis_bounds:=saved_bounds;
 
 	writestr(result,num_points:1);
@@ -4300,8 +4298,8 @@ var
 	threshold:real;
 	amplitude,offset,average:real;
 	a,b:sinusoid_type;
-	gp,gp2:xy_graph_ptr;
-	gpx,frequencies,signal,gpx2:x_graph_ptr;
+	gp,gp2:xy_graph_type;
+	gpx,frequencies,signal,gpx2:x_graph_type;
 	M,N:matrix_type;
 	num_rows,num_elements,num_columns:integer;
 	num_glitches:integer=0;
@@ -4671,9 +4669,8 @@ point, and a zero vector.</p>
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gp:=read_xy_graph(result);
-		straight_line_fit(gp,slope ,intercept,rms_residual);
-		dispose_xy_graph(gp);
+		gp:=read_xy_graph_fpc(result);
+		straight_line_fit(@gp,slope ,intercept,rms_residual);
 		writestr(result,slope:fsr:fsd,' ',intercept:fsr:fsd,' ',rms_residual:fsr:fsd);
 		Tcl_SetReturnString(interp,result);
 	end 
@@ -4688,13 +4685,12 @@ point, and a zero vector.</p>
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gpx:=read_x_graph(result);
-		writestr(result,average_x_graph(gpx):fsr:fsd,' ',
-			stdev_x_graph(gpx):fsr:fsd,' ',
-			max_x_graph(gpx):fsr:fsd,' ',
-			min_x_graph(gpx):fsr:fsd,' ',
-			mad_x_graph(gpx):fsr:fsd);
-		dispose_x_graph(gpx);
+		gpx:=read_x_graph_fpc(result);
+		writestr(result,average_x_graph(@gpx):fsr:fsd,' ',
+			stdev_x_graph(@gpx):fsr:fsd,' ',
+			max_x_graph(@gpx):fsr:fsd,' ',
+			min_x_graph(@gpx):fsr:fsd,' ',
+			mad_x_graph(@gpx):fsr:fsd);
 		Tcl_SetReturnString(interp,result);
 	end 
 	else if option='linear_interpolate' then begin
@@ -4709,9 +4705,8 @@ point, and a zero vector.</p>
 		end;
 		position:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gp:=read_xy_graph(result);
-		linear_interpolate(gp,position,interpolation);
-		dispose_xy_graph(gp);
+		gp:=read_xy_graph_fpc(result);
+		linear_interpolate(@gp,position,interpolation);
 		writestr(result,interpolation:fsr:fsd);
 		Tcl_SetReturnString(interp,result);
 	end 
@@ -4801,18 +4796,18 @@ lwdaq frequency_components "0 1 2 3 4 5" "0 0 0 0 1 1 1 1"
 				+'"lwdaq '+option+' frequencies waveform".');
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		frequencies:=read_x_graph(result);
+		frequencies:=read_x_graph_fpc(result);
 		result:=Tcl_ObjString(argv[3]);
-		signal:=read_x_graph(result);
-		average:=average_x_graph(signal);
-		for i:=0 to length(signal^)-1 do signal^[i]:=signal^[i]-average;
+		signal:=read_x_graph_fpc(result);
+		average:=average_x_graph(@signal);
+		for i:=0 to length(signal)-1 do signal[i]:=signal[i]-average;
 		result:='';
-		for i:=0 to length(frequencies^)-1 do begin
-			if frequencies^[i]=0 then begin
+		for i:=0 to length(frequencies)-1 do begin
+			if frequencies[i]=0 then begin
 				amplitude:=average;
 				offset:=0;
 			end else begin
-				frequency_component(frequencies^[i],signal,amplitude,offset);
+				frequency_component(frequencies[i],@signal,amplitude,offset);
 			end;
 			writestr(s,amplitude:fsr:fsd,' ',offset:fsr:fsd,' ');
 			insert(s,result,length(result)+1);
@@ -4823,8 +4818,6 @@ lwdaq frequency_components "0 1 2 3 4 5" "0 0 0 0 1 1 1 1"
 				exit;
 			end;
 		end;
-		dispose_x_graph(signal);
-		dispose_x_graph(frequencies);
 		Tcl_SetReturnString(interp,result);
 	end 
 	else if option='window_function' then begin
@@ -4848,10 +4841,9 @@ lwdaq window_function 5 "0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
 		end;
 		extent:=Tcl_ObjInteger(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gpx:=read_x_graph(result);
-		window_function(gpx,extent);
-		result:=string_from_x_graph(gpx);
-		dispose_x_graph(gpx);
+		gpx:=read_x_graph_fpc(result);
+		window_function(@gpx,extent);
+		result:=string_from_x_graph(@gpx);
 		Tcl_SetReturnString(interp,result);
 	end 
 	else if option='glitch_filter' then begin
@@ -4877,11 +4869,10 @@ lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
 		end;
 		threshold:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gpx:=read_x_graph(result);
+		gpx:=read_x_graph_fpc(result);
 		if abs(threshold)>0 then 
-			num_glitches:=glitch_filter(gpx,abs(threshold));
-		result:=string_from_x_graph(gpx);
-		dispose_x_graph(gpx);
+			num_glitches:=glitch_filter(@gpx,abs(threshold));
+		result:=string_from_x_graph(@gpx);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
 			insert(s,result,length(result)+1);
@@ -4906,10 +4897,9 @@ lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 
 		end;
 		threshold:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gp:=read_xy_graph(result);
-		num_glitches:=glitch_filter_y(gp,abs(threshold));
-		result:=string_from_xy_graph(gp);
-		dispose_xy_graph(gp);
+		gp:=read_xy_graph_fpc(result);
+		num_glitches:=glitch_filter_y(@gp,abs(threshold));
+		result:=string_from_xy_graph(@gp);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
 			insert(s,result,length(result)+1);
@@ -4934,10 +4924,9 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 		end;
 		threshold:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gp:=read_xy_graph(result);
-		num_glitches:=glitch_filter_xy(gp,abs(threshold));
-		result:=string_from_xy_graph(gp);
-		dispose_xy_graph(gp);
+		gp:=read_xy_graph_fpc(result);
+		num_glitches:=glitch_filter_xy(@gp,abs(threshold));
+		result:=string_from_xy_graph(@gp);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
 			insert(s,result,length(result)+1);
@@ -4962,13 +4951,11 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gpx:=read_x_graph(result);
+		gpx:=read_x_graph_fpc(result);
 		threshold:=Tcl_ObjReal(argv[3]);
 		extent:=Tcl_ObjInteger(argv[4]);
-		gp:=spikes_x_graph(gpx,threshold,extent);
-		dispose_x_graph(gpx);
-		result:=string_from_xy_graph(gp);
-		dispose_xy_graph(gp);
+		gp:=spikes_x_graph(@gpx,threshold,extent)^;
+		result:=string_from_xy_graph(@gp);
 		Tcl_SetReturnString(interp,result);
 	end
 	else if option='coastline_x' then begin
@@ -4982,9 +4969,8 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gpx:=read_x_graph(result);
-		writestr(result,coastline_x_graph(gpx):fsr:fsd);
-		dispose_x_graph(gpx);
+		gpx:=read_x_graph_fpc(result);
+		writestr(result,coastline_x_graph(@gpx):fsr:fsd);
 		Tcl_SetReturnString(interp,result);
 	end
 	else if option='coastline_x_progress' then begin
@@ -4998,11 +4984,9 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gpx:=read_x_graph(result);
-		gpx2:=coastline_x_graph_progress(gpx);
-		result:=string_from_x_graph(gpx2);
-		dispose_x_graph(gpx2);
-		dispose_x_graph(gpx);
+		gpx:=read_x_graph_fpc(result);
+		gpx2:=coastline_x_graph_progress(@gpx)^;
+		result:=string_from_x_graph(@gpx2);
 		Tcl_SetReturnString(interp,result);
 	end
 	else if option='coastline_xy' then begin
@@ -5016,9 +5000,8 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gp:=read_xy_graph(result);
-		writestr(result,coastline_xy_graph(gp):fsr:fsd);
-		dispose_xy_graph(gp);
+		gp:=read_xy_graph_fpc(result);
+		writestr(result,coastline_xy_graph(@gp):fsr:fsd);
 		Tcl_SetReturnString(interp,result);
 	end
 	else if option='coastline_xy_progress' then begin
@@ -5032,11 +5015,9 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gp:=read_xy_graph(result);
-		gp2:=coastline_xy_graph_progress(gp);
-		result:=string_from_xy_graph(gp2);
-		dispose_xy_graph(gp2);
-		dispose_xy_graph(gp);
+		gp:=read_xy_graph_fpc(result);
+		gp2:=coastline_xy_graph_progress(@gp)^;
+		result:=string_from_xy_graph(@gp2);
 		Tcl_SetReturnString(interp,result);
 	end
 	else if option='matrix_inverse' then begin
