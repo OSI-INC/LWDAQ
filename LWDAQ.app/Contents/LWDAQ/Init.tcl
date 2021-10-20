@@ -140,7 +140,7 @@ if {[catch {
 	
 	# Set directory variables
 	set LWDAQ_Info(exec_dir) [file dirname [info nameofexecutable]]
-
+	
 	if {$LWDAQ_Info(os) == "MacOS"} {
 		set LWDAQ_Info(contents_dir) [file normalize \
 			[file join $LWDAQ_Info(exec_dir) ..]]

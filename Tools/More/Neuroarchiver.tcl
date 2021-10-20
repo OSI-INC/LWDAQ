@@ -4163,7 +4163,7 @@ proc Neurotracker_extract {} {
 		
 	# Extract the tracker powers from the final tracker slice.
 	set track [split $track \n]
-	set info(tracker_powers) [lrange [lindex $track end] 0 [expr $num_detectors - 1]]
+	set info(tracker_powers) [lrange [lindex $track end] 2 end]
 		
 	# Check to see if we have a tracker history for this channel. If so, keep
 	# the most recent position and throw away the others. If not, create an empty 
@@ -4178,8 +4178,8 @@ proc Neurotracker_extract {} {
 	# the global tracker x and y variables to the position we obtain in the final
 	# slice.
 	foreach sample $track {
-		set info(tracker_x) [lindex $sample $num_detectors]
-		set info(tracker_y) [lindex $sample [expr $num_detectors + 1]]
+		set info(tracker_x) [lindex $sample 0]
+		set info(tracker_y) [lindex $sample 1]
 		lappend history "$info(tracker_x) $info(tracker_y)"
 	}
 			

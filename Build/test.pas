@@ -27,6 +27,7 @@ var
 	good:boolean;
 	gpx:x_graph_ptr;
 	gpxy:xy_graph_ptr;
+	gxy:xy_graph_type;
 	gpxyz:xyz_graph_ptr;
 	start_ms:qword;
 	A,B,C:matrix_type;
@@ -373,12 +374,11 @@ begin
 		
 	dispose_xy_graph(gpxy);
 
-	writeln('Translating string back into xy-graph with xy_graph_from_string ',reps:1,' times');
+	writeln('Translating string back into xy-graph with read_xy_graph_fpc ',reps:1,' times');
 	start_ms:=clock_milliseconds;
 	for i:=1 to reps do
 		begin
-			gpxy:=read_xy_graph(s);
-			dispose_xy_graph(gpxy);
+			gxy:=read_xy_graph_fpc(s);
 		end;
 	writeln('Each translation takes ',1.0*(clock_milliseconds-start_ms)/reps*us_per_ms:1:1,' us.');
 

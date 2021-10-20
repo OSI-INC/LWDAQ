@@ -3205,9 +3205,9 @@ begin
 end;
 
 {
-<p>lwdaq_alt extracts power measurements from data recorded in an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>). The routine assumes that the global electronics_trace is a valid xy_graph_ptr created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
+<p>lwdaq_alt extracts power measurements from data recorded in an Animal Location Tracker (ALT), such as the <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>, so as to measure the location of Subcutaneous Transmitters (SCTs), such as the <a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>. The routine assumes that the global electronics_trace is a valid xy_graph_ptr created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
 
-<p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more detector coil power measurements.</p>
+<p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements.</p>
 
 <p>The second parameter is a list of x-y coordinates, one for each detector coil. When calculating the location of a transmitter, lwdaq_alt will center each detector on these coordinates. All coordinates are assumed to be greater than or equal to zero, so that (-1,-1) will be recognised as an error location.</p>
 
@@ -3224,9 +3224,9 @@ end;
 <tr><td>-anchor</td><td>Anchor the extent to the coil with maximum power, default 0.</td></tr>
 </table></center>
 
-<p>The output contains a string of detector power values followed by <i>x</i> and <i>y</i> position in whatever units we used to specify the coil centers. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the powers and position for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals, which is faster, and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period. Because the calculations use a sort routine to obtain the median power in each slice, the execution time for eight calculations each of length one second is less than the execution time for one calculation of length one second.</p>
+<p>The output contains <i>x</i> and <i>y</i> position in whatever units we used to specify the coil centers, followed by  a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the positions and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period.</p>
 
-<p>The -background option allows us to specify background power levels for all detector coils, in anticipation of a need to calibrate detectors. By default, these background powers are all zero. The -extent value sets a maximum distance from the location of the transmitter to a coil used to calculate the transmitter location. The -payload value is the number of bytes added to the core four-byte message in order to accommodate the tracker power values. A fifteen-coil tracker has payload sixteen. The sixteenth byte we use for a version number, but its main purpose is to fill out the total message length to a four-byte boundary.
+<p>The -background option allows us to specify background power levels for all detector coils, in anticipation of a need to calibrate detectors. By default, these background powers are all zero. The -extent value sets a maximum distance from the location of the transmitter to a coil used to calculate the transmitter location. The -payload value is the number of bytes added to the core four-byte message in order to accommodate the power values. A fifteen-coil tracker has payload sixteen and returns sixteen power values. The first fifteen are the powers from the coils, in the order defined by the tracker's geometry map. The sixteenth value is either zero or the power we obtain from an auxilliary detector module.</p>
 }
 function lwdaq_alt(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3420,7 +3420,7 @@ begin
 		min_power:=power_hi;
 		max_power:=power_lo;
 		max_location:=detector_coordinates[0];
-		for detector_num:=0 to num_detectors-1 do begin
+		for detector_num:=0 to payload-1 do begin
 			for sample_num:=0 to slice_size-1 do
 				detector_samples[sample_num]:=
 					power_measurement((slice_num*slice_size)+sample_num,detector_num);
@@ -3501,12 +3501,10 @@ begin
 		end;
 		
 		field:='';
-		for detector_num:=0 to num_detectors-1 do
+		writestr(field,location.x:1:3,' ',location.y:1:3,' ');
+		for detector_num:=0 to payload-1 do
 			writestr(field,field,detector_powers[detector_num]:1:1,' ');
-		insert(field,result,length(result)+1);	
-		
-		writestr(field,location.x:1:3,' ',location.y:1:3);
-		insert(field,result,length(result)+1);	
+		insert(field,result,length(result)+1);			
 		if slice_num<num_slices-1 then
 			insert(eol,result,length(result)+1);
 	end;
