@@ -571,7 +571,7 @@ end;
 	drop until we can barely see any sign of the pattern, even with image
 	intensification, the peak ratio is 3.0.
 }
-procedure profile_by_fourier(profile_ptr:x_graph_ptr;
+procedure profile_by_fourier(var profile:x_graph_type;
 	var period,offset:real);
 
 const
@@ -580,8 +580,8 @@ const
 	
 var
 	max_amplitude,sum_amplitude:real;
-	ft:xy_graph_ptr;
-	dp:x_graph_ptr;
+	ft:xy_graph_type;
+	dp:x_graph_type;
 	k,n,p2s,np,k_min,k_max:integer;
 	message:string;
 	
@@ -591,9 +591,8 @@ begin
 }
 	period:=0;
 	offset:=0;
-	if profile_ptr=nil then exit;
-	if length(profile_ptr^)<=1 then begin
-		report_error('length(profile_ptr^)<=1 in profile_by_fourier.');
+	if length(profile)<=1 then begin
+		report_error('length(profile)<=1 in profile_by_fourier.');
 		exit;
 	end;
 {
@@ -602,28 +601,27 @@ begin
 	only graphs containing a number of points that is a perfect power of two.
 }
 	p2s:=1;
-	np:=length(profile_ptr^);
+	np:=length(profile);
 	while (p2s*2 <= np) do p2s:=p2s*2;
 {
 	Create a new graph with this power of two number of points. Fill the graph
 	with points from the profile until we run out of profile points. After that,
 	apply a windowing function to the profile.
 }
-	dp:=new_x_graph(p2s);	
-	for n:=0 to length(dp^)-1 do dp^[n]:=profile_ptr^[n];
-	window_function(dp,round(window_fraction*p2s*one_half));
+	setlength(dp,p2s);	
+	for n:=0 to length(dp)-1 do dp[n]:=profile[n];
+	window_function(@dp,round(window_fraction*p2s*one_half));
 {
 	Determine the minimum and maximum frequency components that we will consider
 	as the potential square frequency.
 }
-	k_min:=round(length(dp^)/length(profile_ptr^)*rasnik_min_squares_across)+1;
-	k_max:=round(length(dp^)/rasnik_min_pixels_per_square)-1;
+	k_min:=round(length(dp)/length(profile)*rasnik_min_squares_across)+1;
+	k_max:=round(length(dp)/rasnik_min_pixels_per_square)-1;
 {
 	Calculate the fast fourier transform of the extended graph.
 }
 	ft:=fft_real(dp);
-	dispose_x_graph(dp);
-	if ft=nil then exit;
+	if length(ft)=0 then exit;
 {
 	Find the peak in the transform, subject to the constraint that we cannot have
 	too few squares in our profile, nor can the period be too small.
@@ -633,16 +631,16 @@ begin
 	period:=0;
 	offset:=0;
 	for k:=k_min to k_max do begin
-		sum_amplitude:=sum_amplitude+abs(ft^[k].x);
-		if (abs(ft^[k].x)>max_amplitude) then begin
-			max_amplitude:=abs(ft^[k].x);
+		sum_amplitude:=sum_amplitude+abs(ft[k].x);
+		if (abs(ft[k].x)>max_amplitude) then begin
+			max_amplitude:=abs(ft[k].x);
 			period:=p2s/k;
-			offset:=-ft^[k].y*period/2/pi;
+			offset:=-ft[k].y*period/2/pi;
 			if offset<0 then offset:=offset+period;
 		end;
 		if show_details then begin
 			writestr(message,'index: ',k:1,' period: ',
-				p2s/k:1:4,' amplitude: ',ft^[k].x:1:4);
+				p2s/k:1:4,' amplitude: ',ft[k].x:1:4);
 			gui_writeln(message);
 		end;
 	end;
@@ -663,10 +661,6 @@ begin
 		period:=0;
 		report_error(message+' in profile_by_fourier.');
 	end;
-{
-	Dispose of the transform and we're done.
-}
-	dispose_xy_graph(ft);
 end;
 
 {
@@ -678,9 +672,9 @@ end;
 	If the period it calculates from the maxima is too far from the initial value,
 	the routine rejects its own value and returns zero period to indicate failure.
 }
-procedure profile_by_maxima(profile_ptr:x_graph_ptr;
+procedure profile_by_maxima(var profile:x_graph_type;
 	var period,offset:real;
-	var filtered_ptr:x_graph_ptr);
+	var filtered:x_graph_type);
 
 const
 	feature_extent=2;
@@ -693,7 +687,7 @@ const
 	window_extent=10;
 
 var
-	feature_list_ptr:xyz_graph_ptr;
+	feature_list:xyz_graph_type;
 	profile_index,num_features:integer;
 	feature_index,previous_valid_feature_index:integer;
 	first_good_feature_index,band_pass_extent:integer;
@@ -713,40 +707,40 @@ var
 		g:=1/T;
 		h:=-1/(2*T);
 		sum:=0;
-		for k:=index-b to index-a-1 do sum:=sum+profile_ptr^[k]*h; 
-		for k:=index-a to index+a do sum:=sum+profile_ptr^[k]*g;
-		for k:=index+a+1 to index+b do sum:=sum+profile_ptr^[k]*h;
+		for k:=index-b to index-a-1 do sum:=sum+profile[k]*h; 
+		for k:=index-a to index+a do sum:=sum+profile[k]*g;
+		for k:=index+a+1 to index+b do sum:=sum+profile[k]*h;
 		start_up_band_pass_filter:=sum;
 	end;
 
 	function band_pass_filter(index:integer):real;
 	begin
-		band_pass_filter:=filtered_ptr^[index-1]
-			-h*profile_ptr^[index-b-1]
-			+(h-g)*profile_ptr^[index-a-1]
-			-(h-g)*profile_ptr^[index+a]
-			+h*profile_ptr^[index+b];
+		band_pass_filter:=filtered[index-1]
+			-h*profile[index-b-1]
+			+(h-g)*profile[index-a-1]
+			-(h-g)*profile[index+a]
+			+h*profile[index+b];
 	end;
 
 begin
-	if profile_ptr=nil then exit;
+	if length(profile)=0 then exit;
 	initial_period:=period;
 {
 	 We prepare the profile by applying a window function, which improves
 	 the performance of both the fourier transform and our band-pass filter. 
 }
-	window_function(profile_ptr,window_extent);
+	window_function(@profile,window_extent);
 {
 	Generate a band-pass filtered profile.
 }
-	filtered_ptr:=new_x_graph(length(profile_ptr^));
+	setlength(filtered,length(profile));
 	band_pass_extent:=trunc(period*extent_fraction)+1;
-	for profile_index:=band_pass_extent to length(profile_ptr^)-band_pass_extent-1 do begin
+	for profile_index:=band_pass_extent to length(profile)-band_pass_extent-1 do begin
 		if profile_index=band_pass_extent then
-			filtered_ptr^[profile_index]:=
+			filtered[profile_index]:=
 				start_up_band_pass_filter(profile_index,period)
 		else 
-			filtered_ptr^[profile_index]:=
+			filtered[profile_index]:=
 				band_pass_filter(profile_index)
 	end;
 {
@@ -754,13 +748,13 @@ begin
 	with end values.
 }
 	for profile_index:=0 to band_pass_extent-1 do begin
-		filtered_ptr^[profile_index]:=
-			filtered_ptr^[band_pass_extent];
+		filtered[profile_index]:=
+			filtered[band_pass_extent];
 	end;
-	for profile_index:=length(filtered_ptr^)-band_pass_extent 
-			to length(filtered_ptr^)-1 do begin
-		filtered_ptr^[profile_index]:=
-			filtered_ptr^[length(filtered_ptr^)-band_pass_extent-1];
+	for profile_index:=length(filtered)-band_pass_extent 
+			to length(filtered)-1 do begin
+		filtered[profile_index]:=
+			filtered[length(filtered)-band_pass_extent-1];
 	end;
 {
 	The average intensity of the filtered profile will be close to zero. The
@@ -769,28 +763,28 @@ begin
 }
 	max_filtered:=0;
 	for profile_index:=band_pass_extent+feature_extent+1 
-			to length(filtered_ptr^)-1-band_pass_extent-feature_extent-1 do
-		if filtered_ptr^[profile_index]>max_filtered then
-			max_filtered:=filtered_ptr^[profile_index];
+			to length(filtered)-1-band_pass_extent-feature_extent-1 do
+		if filtered[profile_index]>max_filtered then
+			max_filtered:=filtered[profile_index];
 {
 	Record the maxima of band-pass filtered profile in the feature array
 }
-	feature_list_ptr:=new_xyz_graph(max_num_features);
+	setlength(feature_list,max_num_features);
 	num_features:=0;
 	for profile_index:=band_pass_extent+feature_extent+1 
-			to length(filtered_ptr^)-1-band_pass_extent-feature_extent-1 do begin
-		if (filtered_ptr^[profile_index]>filtered_ptr^[profile_index-1]) 
-			and (filtered_ptr^[profile_index]>filtered_ptr^[profile_index-1-1]) 
-			and (filtered_ptr^[profile_index]>filtered_ptr^[profile_index+1]) 
-			and (filtered_ptr^[profile_index]>filtered_ptr^[profile_index+1+1]) 
-			and (filtered_ptr^[profile_index]>max_filtered*max_fraction) then begin
+			to length(filtered)-1-band_pass_extent-feature_extent-1 do begin
+		if (filtered[profile_index]>filtered[profile_index-1]) 
+			and (filtered[profile_index]>filtered[profile_index-1-1]) 
+			and (filtered[profile_index]>filtered[profile_index+1]) 
+			and (filtered[profile_index]>filtered[profile_index+1+1]) 
+			and (filtered[profile_index]>max_filtered*max_fraction) then begin
 			if num_features<max_num_features then begin 
-				with feature_list_ptr^[num_features] do begin
+				with feature_list[num_features] do begin
 					y:=profile_index;
 					z:=1;
 					if num_features=0 then x:=0
-					else x:=feature_list_ptr^[num_features-1].x
-							+round((y-feature_list_ptr^[num_features-1].y)/period);
+					else x:=feature_list[num_features-1].x
+							+round((y-feature_list[num_features-1].y)/period);
 				end;
 				inc(num_features);
 			end;
@@ -801,11 +795,11 @@ begin
 }
 	for feature_index:=0 to num_features-1 do begin
 		if feature_index>0 then
-			if (feature_list_ptr^[feature_index].x=feature_list_ptr^[feature_index-1].x) then
-				feature_list_ptr^[feature_index].z:=0;
+			if (feature_list[feature_index].x=feature_list[feature_index-1].x) then
+				feature_list[feature_index].z:=0;
 		if feature_index<num_features-1-1 then
-			if (feature_list_ptr^[feature_index].x=feature_list_ptr^[feature_index+1].x) then
-				feature_list_ptr^[feature_index].z:=0;
+			if (feature_list[feature_index].x=feature_list[feature_index+1].x) then
+				feature_list[feature_index].z:=0;
 	end;
 {
 	Find the first good feature in the feature list. Ulrich Landgraf fixed our
@@ -817,30 +811,30 @@ begin
 	feature_index:=0;
 	good:=false;
 	while (not good) and (feature_index+1<num_features) do begin 
-		step:=(feature_list_ptr^[feature_index+1].y-feature_list_ptr^[feature_index].y)/period;
+		step:=(feature_list[feature_index+1].y-feature_list[feature_index].y)/period;
 		good:=(abs(step-round(step))<step_tolerance) and
-					(feature_list_ptr^[feature_index].z<>0);
+					(feature_list[feature_index].z<>0);
 		if not good then begin
-			feature_list_ptr^[feature_index].z:=0;
+			feature_list[feature_index].z:=0;
 			inc(feature_index);
 		end;
 	end;
 	if good then first_good_feature_index:=feature_index
 	else first_good_feature_index:=0;
-	feature_list_ptr^[first_good_feature_index].x:=0;
+	feature_list[first_good_feature_index].x:=0;
 {
 	Correct the x-values of remaining features, and eliminate any features that
 	appear to be out of place. 
 }
 	previous_valid_feature_index:=first_good_feature_index;
 	for feature_index:=first_good_feature_index+1 to num_features-1 do begin
-		with feature_list_ptr^[feature_index] do begin
+		with feature_list[feature_index] do begin
 			if z<>0 then begin
-				step:=(y-feature_list_ptr^[previous_valid_feature_index].y)/period;
+				step:=(y-feature_list[previous_valid_feature_index].y)/period;
 				if (abs(step-round(step))>step_tolerance) then begin
 					z:=0;
 				end else begin
-					x:=feature_list_ptr^[previous_valid_feature_index].x+round(step);
+					x:=feature_list[previous_valid_feature_index].x+round(step);
 					previous_valid_feature_index:=feature_index;
 				end;
 			end;
@@ -850,32 +844,28 @@ begin
 	Mark feature list so weighted_straight_line_fit ignores unused features.
 }
 	if num_features<max_num_features then
-		feature_list_ptr^[num_features].z:=ignore_remaining_data;
+		feature_list[num_features].z:=ignore_remaining_data;
 {
 	Get profile period and offset using least-squares fit. We won't do this 
 	unless the period passed into the routine was non-zero.
 }
 	if initial_period<>0 then
-		weighted_straight_line_fit(feature_list_ptr,period,offset,residual);
-{
-	Dispose of feature arrray.
-}
-	dispose_xyz_graph(feature_list_ptr);
+		weighted_straight_line_fit(@feature_list,period,offset,residual);
 {
 	Check the period and offset.
 }
 	message:='';
 	if num_features<min_num_features then
 		message:='Too few features'
-	else if period>length(filtered_ptr^)/rasnik_min_squares_across then 
+	else if period>length(filtered)/rasnik_min_squares_across then 
 		message:='Period too large'
 	else if period<rasnik_min_pixels_per_square then 
 		message:='Period too small'
 	else if (not (period>=0)) and (not (period<=0)) then
 		message:='Period undefined'
-	else if offset>length(filtered_ptr^) then 
+	else if offset>length(filtered) then 
 		message:='Offset too large and positive'
-	else if offset<-length(filtered_ptr^) then 
+	else if offset<-length(filtered) then 
 		message:='Offset too large and negative'
 	else if (not (offset>=0)) and (not (offset<=0)) then
 		message:='Offset undefined'
@@ -910,11 +900,11 @@ const
 	max_distortion=1.5;
 	
 var
-	profile_ptr,filtered_profile_ptr:x_graph_ptr;
+	profile,filtered_profile:x_graph_type;
 	slice_num:integer;
 	slice_top,slice_bottom,slice_left,slice_right,slice_step,slice_width,slice_height:real;
-	offsets_ptr:x_graph_ptr;
-	data_ptr:xy_graph_ptr;
+	offsets:x_graph_type;
+	data:xy_graph_type;
 	slope_i,slope_j,skew_i,skew_j,residual_i,residual_j:real;
 	offset_i,offset_j,period_i,period_j:real;
 	period,offset:real;
@@ -933,8 +923,8 @@ begin
 
 	if valid_image_ptr(iip) then begin
 		original_i_bounds:=iip^.analysis_bounds;
-		offsets_ptr:=new_x_graph(rasnik_num_slices);
-		data_ptr:=new_xy_graph(rasnik_num_slices);
+		setlength(offsets,rasnik_num_slices);
+		setlength(data,rasnik_num_slices);
 {
 	We are going to divide the horizontal derivative image into horizontal
 	slices. Each slice will give us a measurement of the period and phase of the
@@ -971,11 +961,11 @@ begin
 }
 				top:=original_i_bounds.top+round((slice_num)*slice_step);
 				bottom:=top+round(slice_height);
-				profile_ptr:=image_profile_row(iip);
-				if profile_ptr=nil then exit;
+				profile:=image_profile_row(iip);
+				if length(profile)=0 then exit;
 				if show_fitting then begin
 					display_ccd_rectangle(iip,iip^.analysis_bounds,bounds_color);
-					display_profile_row(iip,profile_ptr,profile_color);
+					display_profile_row(iip,@profile,profile_color);
 				end;
 {
 	Upon the first slice, we use a fourier transform to obtain the approximate
@@ -984,20 +974,20 @@ begin
 	a period and an offset from the left side of the slice to the first peak in
 	the intensity profile, which is the first vertical edge.
 }
-				if slice_num=0 then profile_by_fourier(profile_ptr,period,offset);
+				if slice_num=0 then profile_by_fourier(profile,period,offset);
 {
 	We use this approximate period to set up a band-pass filter, which gives us
 	a better estimate of the period and offset.
 }
-				profile_by_maxima(profile_ptr,period,offset,filtered_profile_ptr);
+				profile_by_maxima(profile,period,offset,filtered_profile);
 				if show_fitting then begin
-					if period>0 then display_profile_row(iip,filtered_profile_ptr,good_color)
-					else display_profile_row(iip,filtered_profile_ptr,bad_color);
+					if period>0 then display_profile_row(iip,@filtered_profile,good_color)
+					else display_profile_row(iip,@filtered_profile,bad_color);
 				end;
 {
 	If the band-pass filter fails, revert to the fourier transform.
 }
-				if period=0 then profile_by_fourier(profile_ptr,period,offset);
+				if period=0 then profile_by_fourier(profile,period,offset);
 {
 	We summarize each slice with its offset from the top edge of the image and
 	a period measurement that we associate with the center-height of the slice.
@@ -1005,13 +995,11 @@ begin
 	center of the slice from left to right, and we re-define zero offset to be the
 	left edge of the image, rather than the left edge of the slice.
 }
-				offsets_ptr^[slice_num]:=offset
+				offsets[slice_num]:=offset
 					+round((right-left)*one_half/period)*period
 					+left;
-				data_ptr^[slice_num].x:=(top+bottom)*one_half;
-				data_ptr^[slice_num].y:=period;
-				dispose_x_graph(filtered_profile_ptr);
-				dispose_x_graph(profile_ptr);
+				data[slice_num].x:=(top+bottom)*one_half;
+				data[slice_num].y:=period;
 				if period=0 then break;
 			end;
 		end;
@@ -1019,11 +1007,7 @@ begin
 			gui_draw(iip^.name);
 			gui_wait('Filtered intensity profile in horizontal slices.');
 		end;
-		if period=0 then begin
-			dispose_xy_graph(data_ptr);
-			dispose_x_graph(offsets_ptr);
-			exit;
-		end;
+		if period=0 then exit;
 {
 	We obtain the slope of the slice periods with vertical position in the image, and the 
 	intercept also. We obtain our final estimate of period by taking the intercept of this
@@ -1031,7 +1015,7 @@ begin
 	meanwhile, is a measure of the image skew in the vertical direction. We divide the slope
 	by our final estimate of period to get the vertical skew.
 }
-		straight_line_fit(data_ptr,skew_j,period_i,residual_i);
+		straight_line_fit(@data,skew_j,period_i,residual_i);
 		with original_i_bounds do 
 			period_i:=period_i+one_half*(bottom+top)*skew_j;
 		skew_j:=skew_j/period_i;
@@ -1040,13 +1024,13 @@ begin
 	vertical edge.
 }
 		for slice_num:=1 to rasnik_num_slices-1 do begin
-			while offsets_ptr^[slice_num]-offsets_ptr^[slice_num-1]
+			while offsets[slice_num]-offsets[slice_num-1]
 					>period_i*modulo_tolerance do begin
-				offsets_ptr^[slice_num]:=offsets_ptr^[slice_num]-period_i;
+				offsets[slice_num]:=offsets[slice_num]-period_i;
 			end;
-			while offsets_ptr^[slice_num]-offsets_ptr^[slice_num-1]
+			while offsets[slice_num]-offsets[slice_num-1]
 					<-period_i*modulo_tolerance do begin
-				offsets_ptr^[slice_num]:=offsets_ptr^[slice_num]+period_i;
+				offsets[slice_num]:=offsets[slice_num]+period_i;
 			end;
 		end;
 {
@@ -1056,11 +1040,9 @@ begin
 	image y=0, and the slope of the line as it proceeds down the image.
 }
 		for slice_num:=0 to rasnik_num_slices-1 do
-			data_ptr^[slice_num].y:=offsets_ptr^[slice_num];
-		straight_line_fit(data_ptr,slope_i,offset_i,residual_i);
+			data[slice_num].y:=offsets[slice_num];
+		straight_line_fit(@data,slope_i,offset_i,residual_i);
 		
-		dispose_xy_graph(data_ptr);
-		dispose_x_graph(offsets_ptr);
 		iip^.analysis_bounds:=original_i_bounds;
 	end;
 
@@ -1072,8 +1054,8 @@ begin
 	if valid_image_ptr(jip) then begin
 		original_j_bounds:=jip^.analysis_bounds;
 		original_i_bounds:=iip^.analysis_bounds;
-		offsets_ptr:=new_x_graph(rasnik_num_slices);
-		data_ptr:=new_xy_graph(rasnik_num_slices);
+		setlength(offsets,rasnik_num_slices);
+		setlength(data,rasnik_num_slices);
 	
 		with original_j_bounds do begin
 			slice_width:=(right-left+1) div rasnik_num_slices;
@@ -1091,26 +1073,24 @@ begin
 			with jip^.analysis_bounds do begin
 				left:=original_j_bounds.left+round((slice_num)*slice_step);
 				right:=left+round(slice_width);
-				profile_ptr:=image_profile_column(jip);
-				if profile_ptr=nil then exit;
+				profile:=image_profile_column(jip);
+				if length(profile)=0 then exit;
 				if show_fitting then begin
 					display_ccd_rectangle(jip,jip^.analysis_bounds,bounds_color);
-					display_profile_column(jip,profile_ptr,profile_color);
+					display_profile_column(jip,@profile,profile_color);
 				end;
-				if slice_num=0 then profile_by_fourier(profile_ptr,period,offset);
-				profile_by_maxima(profile_ptr,period,offset,filtered_profile_ptr);
+				if slice_num=0 then profile_by_fourier(profile,period,offset);
+				profile_by_maxima(profile,period,offset,filtered_profile);
 				if show_fitting then begin
-					if period>0 then display_profile_column(jip,filtered_profile_ptr,good_color)
-					else display_profile_column(jip,filtered_profile_ptr,bad_color);
+					if period>0 then display_profile_column(jip,@filtered_profile,good_color)
+					else display_profile_column(jip,@filtered_profile,bad_color);
 				end;
-				if period=0 then profile_by_fourier(profile_ptr,period,offset);
-				offsets_ptr^[slice_num]:=offset
+				if period=0 then profile_by_fourier(profile,period,offset);
+				offsets[slice_num]:=offset
 					+round((bottom-top)*one_half/period)*period
 					+top;
-				data_ptr^[slice_num].x:=(right+left)*one_half;
-				data_ptr^[slice_num].y:=period;
-				dispose_x_graph(filtered_profile_ptr);
-				dispose_x_graph(profile_ptr);
+				data[slice_num].x:=(right+left)*one_half;
+				data[slice_num].y:=period;
 				if period=0 then break;
 			end;
 		end;
@@ -1118,36 +1098,30 @@ begin
 			gui_draw(jip^.name);
 			gui_wait('Raw and filtered profiles in vertical slices.');
 		end;
-		if period=0 then begin
-			dispose_xy_graph(data_ptr);
-			dispose_x_graph(offsets_ptr);
-			exit;
-		end;
+		if period=0 then exit;
 	
-		straight_line_fit(data_ptr,skew_i,period_j,residual_j);
+		straight_line_fit(@data,skew_i,period_j,residual_j);
 		with original_i_bounds do
 			period_j:=period_j+one_half*(left+right)*skew_i;
 		skew_i:=skew_i/period_j;
 	
 		for slice_num:=1 to rasnik_num_slices-1 do begin
-			while offsets_ptr^[slice_num]-offsets_ptr^[slice_num-1]
+			while offsets[slice_num]-offsets[slice_num-1]
 					>period_j*modulo_tolerance do begin
-				offsets_ptr^[slice_num]:=offsets_ptr^[slice_num]-period_j;
+				offsets[slice_num]:=offsets[slice_num]-period_j;
 			end;
-			while offsets_ptr^[slice_num]-offsets_ptr^[slice_num-1]
+			while offsets[slice_num]-offsets[slice_num-1]
 					<-period_j*modulo_tolerance do begin
-				offsets_ptr^[slice_num]:=offsets_ptr^[slice_num]+period_j;
+				offsets[slice_num]:=offsets[slice_num]+period_j;
 			end;
 		end;
 
 		for slice_num:=0 to rasnik_num_slices-1 do begin
-			data_ptr^[slice_num].y:=offsets_ptr^[slice_num];
+			data[slice_num].y:=offsets[slice_num];
 		end;
 			
-		straight_line_fit(data_ptr,slope_j,offset_j,residual_j);
+		straight_line_fit(@data,slope_j,offset_j,residual_j);
 		
-		dispose_xy_graph(data_ptr);
-		dispose_x_graph(offsets_ptr);
 		jip^.analysis_bounds:=original_j_bounds;
 	end;
 
@@ -1304,8 +1278,8 @@ var
 	start_line,end_line,scan_line,ccd_line:ij_line_type;
 	pattern_positive:boolean;
 	previous_line:integer;
-	graph_ptr:xyz_graph_ptr;
-	gp:xy_graph_ptr;
+	graph:xyz_graph_type;
+	gp:xy_graph_type;
 	num_points:integer;
 	i,j,line_num,cut_num,count,total_num_lines,num_valid_lines:integer;
 	line:array [-rasnik_max_extent..rasnik_max_extent] of line_type;
@@ -1384,11 +1358,7 @@ begin
 	graph of intercepts to obtain the line spacing and also a best estimate
 	of the horizontal pattern position.
 }
-		graph_ptr:=new_xyz_graph(line_data_size+1);
-		if graph_ptr=nil then begin
-			report_error('Failed to allocate graph_ptr in rasnik_refine_pattern.');
-			exit;
-		end;
+		setlength(graph,line_data_size+1);
 {
 	We go through all the pattern vertical edges. For each edge we define a
 	center-line in pattern space. If this line crosses the image analysis
@@ -1479,7 +1449,7 @@ begin
 						if (num_points>=line_data_size) then break;
 						cp.i:=i;cp.j:=j;
 						ip:=i_from_c(cp);
-						with graph_ptr^[num_points] do begin
+						with graph[num_points] do begin
 							x:=ip.y;
 							y:=ip.x;
 							z:=get_px(iip,j,i);
@@ -1494,8 +1464,8 @@ begin
 }
 				with line[line_num] do begin
 					if (num_points>min_num_points_per_line) then begin
-						graph_ptr^[num_points].z:=ignore_remaining_data;
-						weighted_straight_line_fit(graph_ptr,slope,intercept,residual);
+						graph[num_points].z:=ignore_remaining_data;
+						weighted_straight_line_fit(@graph,slope,intercept,residual);
 						if math_error(slope) or math_error(intercept) then continue;
 {
 	We now have a slope and intercept, which we use to define a line in image coordinates
@@ -1515,11 +1485,6 @@ begin
 				end;
 			end;
 		end;
-{
-	We dispose of the graph we used to fit lines to the edge pixels, and check for 
-	math errors in the fit result.
-}
-		dispose_xyz_graph(graph_ptr);
 {
 	We remove from our list of valid lines any that have pixel fit residual greater
 	than residual_cut times the minimum residual.
@@ -1600,11 +1565,11 @@ begin
 	the center of the analysis bounds. The slope of the straight line gives us
 	the x-direction skew, which we call skew_i.
 }
-		graph_ptr:=new_xyz_graph(line_data_size);
+		setlength(graph,line_data_size);
 		num_points:=0;
 		for line_num:=-pp^.extent to pp^.extent do begin
 			if line[line_num].valid then begin
-				with graph_ptr^[num_points] do begin
+				with graph[num_points] do begin
 					y:=line[line_num].slope;
 					x:=line[line_num].intercept;
 					z:=1;
@@ -1612,13 +1577,12 @@ begin
 				inc(num_points);
 			end;
 		end;
-		graph_ptr^[num_points].z:=ignore_remaining_data;
+		graph[num_points].z:=ignore_remaining_data;
 		if (num_points<min_num_lines) then begin
 			report_error('Too few edges in rasnik_refine_pattern.');
 			exit;
 		end;
-		weighted_straight_line_fit(graph_ptr,skew_i,slope_i,residual_i);
-		dispose_xyz_graph(graph_ptr);
+		weighted_straight_line_fit(@graph,skew_i,slope_i,residual_i);
 		with iip^.analysis_bounds do mid_point:=(right+left)*one_half;
 		slope_i:=slope_i+skew_i*mid_point;
 {
@@ -1628,7 +1592,7 @@ begin
 	vertical line that bisects the analysis bounds, and we give its position
 	where it crosses the horizontal line that bisects the analysis bounds.
 }
-		graph_ptr:=new_xyz_graph(line_data_size);
+		setlength(graph,line_data_size);
 		num_points:=0;
 		previous_line:=-1;
 		with iip^.analysis_bounds do mid_point:=(bottom+top)*one_half;
@@ -1645,7 +1609,7 @@ begin
 	zero, so fit_x=0.
 }
 				if previous_line<0 then begin
-					with graph_ptr^[num_points] do begin
+					with graph[num_points] do begin
 						with line[line_num] do y:=intercept+mid_point*slope;
 						x:=0;
 						z:=1;
@@ -1658,10 +1622,10 @@ begin
 	with the mid-point line.
 }
 				else begin
-					with graph_ptr^[num_points] do begin
+					with graph[num_points] do begin
 						with line[line_num] do y:=intercept+mid_point*slope;
-						x:=graph_ptr^[previous_line].x
-							+ round((y-graph_ptr^[previous_line].y)
+						x:=graph[previous_line].x
+							+ round((y-graph[previous_line].y)
 								/pp^.image_y_width);
 						z:=1;
 					end;
@@ -1675,14 +1639,12 @@ begin
 	obtain a the horizontal spacing of the pattern's vertical edges as a function
 	of image x-coordinate, as well as the location of these edges.
 }
-		gp:=new_xy_graph(num_points);
+		setlength(gp,num_points);
 		for line_num:=0 to num_points-1 do begin
-			gp^[line_num].x:=graph_ptr^[line_num].x;
-			gp^[line_num].y:=graph_ptr^[line_num].y;
+			gp[line_num].x:=graph[line_num].x;
+			gp[line_num].y:=graph[line_num].y;
 		end;
-		dispose_xyz_graph(graph_ptr);
-		parabolic_line_fit(gp,parabola_i,period_i,offset_i,residual_i);
-		dispose_xy_graph(gp);
+		parabolic_line_fit(@gp,parabola_i,period_i,offset_i,residual_i);
 {
 	We move across to an edge closer to the center of the analyis bounds. Our
 	fit_x=0 edge is close to the left side of the analysis bounds, so shift over
@@ -1771,7 +1733,7 @@ begin
 	graph of intercepts to obtain the line spacing and also a best estimate
 	of the vertical pattern position.
 }
-		graph_ptr:=new_xyz_graph(line_data_size+1);
+		setlength(graph,line_data_size+1);
 {
 	We go through all the pattern horizontal edges. For each edge we define a
 	center-line in pattern space. If this line crosses the image analysis
@@ -1862,7 +1824,7 @@ begin
 						if (num_points>=line_data_size) then break;
 						cp.i:=i;cp.j:=j;
 						ip:=i_from_c(cp);
-						with graph_ptr^[num_points] do begin
+						with graph[num_points] do begin
 							x:=ip.x;
 							y:=ip.y;
 							z:=get_px(jip,j,i);
@@ -1879,8 +1841,8 @@ begin
 }
 				with line[line_num] do begin				
 					if (num_points>min_num_points_per_line) then begin
-						graph_ptr^[num_points].z:=ignore_remaining_data;
-						weighted_straight_line_fit(graph_ptr,slope,intercept,residual);
+						graph[num_points].z:=ignore_remaining_data;
+						weighted_straight_line_fit(@graph,slope,intercept,residual);
 						if math_error(slope) or math_error(intercept) then continue;
 {
 	We use the slope and intercept to define a line in image coordinates that
@@ -1900,10 +1862,6 @@ begin
 				end;
 			end;		
 		end;
-{
-	We dispose of the graph we used to fit lines to the edge pixels.
-}
-		dispose_xyz_graph(graph_ptr);
 {
 	We remove from our list of valid horizontal lines any that have residual
 	greater than residual_cut times the minimum residual.
@@ -1985,11 +1943,11 @@ begin
 	analysis bounds. The slope of the straight line gives us the y-direction
 	skew, which we call skew_j.
 }	
-		graph_ptr:=new_xyz_graph(line_data_size);
+		setlength(graph,line_data_size);
 		num_points:=0;
 		for line_num:=-pp^.extent to pp^.extent do begin
 			if line[line_num].valid then begin
-				with graph_ptr^[num_points] do begin
+				with graph[num_points] do begin
 					y:=line[line_num].slope;
 					x:=line[line_num].intercept;
 					z:=1;
@@ -1997,13 +1955,12 @@ begin
 				inc(num_points);
 			end;
 		end;
-		graph_ptr^[num_points].z:=ignore_remaining_data;
+		graph[num_points].z:=ignore_remaining_data;
 		if (num_points<min_num_lines) then begin
 			report_error('Too few edges in rasnik_refine_pattern.');
 			exit;
 		end;
-		weighted_straight_line_fit(graph_ptr,skew_j,slope_j,residual_j);
-		dispose_xyz_graph(graph_ptr);
+		weighted_straight_line_fit(@graph,skew_j,slope_j,residual_j);
 		with jip^.analysis_bounds do mid_point:=(top+bottom)*one_half;
 		slope_j:=slope_j+skew_j*mid_point;
 {
@@ -2013,7 +1970,7 @@ begin
 	horizontal line that bisects the analysis bounds, and we give its position
 	where it crosses the vertical line that bisects the analysis bounds.
 }		
-		graph_ptr:=new_xyz_graph(line_data_size);
+		setlength(graph,line_data_size);
 		num_points:=0;
 		previous_line:=-1;
 		with jip^.analysis_bounds do mid_point:=(right+left)*one_half;
@@ -2030,7 +1987,7 @@ begin
 	zero, so fit_x=0.
 }
 				if previous_line<0 then begin
-					with graph_ptr^[num_points] do begin
+					with graph[num_points] do begin
 						with line[line_num] do y:=intercept+mid_point*slope;
 						x:=0;
 						z:=1;
@@ -2043,10 +2000,10 @@ begin
 	with the mid-point line.
 }
 				else begin
-					with graph_ptr^[num_points] do begin
+					with graph[num_points] do begin
 						with line[line_num] do y:=intercept+mid_point*slope;
-						x:=graph_ptr^[previous_line].x
-							+ round((y-graph_ptr^[previous_line].y)
+						x:=graph[previous_line].x
+							+ round((y-graph[previous_line].y)
 								/pp^.image_y_width);
 						z:=1;
 					end;
@@ -2060,14 +2017,12 @@ begin
 	obtain a the vertical spacing of the pattern's horizontal edges as a function
 	of image y-coordinate, as well as the location of these edges.
 }
-		gp:=new_xy_graph(num_points);
+		setlength(gp,num_points);
 		for line_num:=0 to num_points-1 do begin
-			gp^[line_num].x:=graph_ptr^[line_num].x;
-			gp^[line_num].y:=graph_ptr^[line_num].y;
+			gp[line_num].x:=graph[line_num].x;
+			gp[line_num].y:=graph[line_num].y;
 		end;
-		dispose_xyz_graph(graph_ptr);
-		parabolic_line_fit(gp,parabola_j,period_j,offset_j,residual_j);
-		dispose_xy_graph(gp);
+		parabolic_line_fit(@gp,parabola_j,period_j,offset_j,residual_j);
 {
 	We move across to an edge closer to the center of the analyis bounds. Our
 	fit_x=0 edge is close to the top side of the analysis bounds, so shift down

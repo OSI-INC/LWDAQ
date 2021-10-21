@@ -745,7 +745,7 @@ end;
 procedure display_profile_row(ip:image_ptr_type;profile_ptr:x_graph_ptr;color:integer);
 
 var
-	graph_ptr:xy_graph_ptr;
+	graph:xy_graph_type;
 	index:integer;
 
 begin
@@ -758,18 +758,16 @@ begin
 		end;
 	end;
 
-	graph_ptr:=new_xy_graph(length(profile_ptr^));
+	setlength(graph,length(profile_ptr^));
 
-	for index:=0 to length(graph_ptr^)-1 do begin
-		with graph_ptr^[index] do begin
+	for index:=0 to length(graph)-1 do begin
+		with graph[index] do begin
 			x:=index;
 			y:=profile_ptr^[index];
 		end;
 	end;
 
-	display_real_graph(ip,graph_ptr,color,0,0,0,0,0,0);
-	
-	dispose_xy_graph(graph_ptr);
+	display_real_graph(ip,@graph,color,0,0,0,0,0,0);
 end;
 
 {
@@ -781,7 +779,7 @@ procedure display_profile_column(ip:image_ptr_type;profile_ptr:x_graph_ptr;
 	color:integer);
 
 var
-	graph_ptr:xy_graph_ptr;
+	graph:xy_graph_type;
 	index:integer;
 	
 begin
@@ -795,18 +793,16 @@ begin
 	end;
 	
 	
-	graph_ptr:=new_xy_graph(length(profile_ptr^));
+	setlength(graph,length(profile_ptr^));
 	
-	for index:=0 to length(graph_ptr^)-1 do begin
-		with graph_ptr^[index] do begin
+	for index:=0 to length(graph)-1 do begin
+		with graph[index] do begin
 			y:=ip^.analysis_bounds.bottom-index;
 			x:=-profile_ptr^[index];
 		end;
 	end;
 	
-	display_real_graph(ip,graph_ptr,color,0,0,0,0,0,0);
-	
-	dispose_xy_graph(graph_ptr);
+	display_real_graph(ip,@graph,color,0,0,0,0,0,0);
 end;
 
 end.

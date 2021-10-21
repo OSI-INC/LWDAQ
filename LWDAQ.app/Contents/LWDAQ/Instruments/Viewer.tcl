@@ -104,7 +104,7 @@ proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
 		set image_name $config(memory_name)
 	}
 	if {[lwdaq_image_exists $image_name] == ""} {
-		return "ERROR: Image \"$config(memory_name)\" does not exist."	
+		return "ERROR: Image \"$image_name\" does not exist."	
 	}
 	
 	if {$info(file_use_daq_bounds)} {
@@ -122,12 +122,12 @@ proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
 		set result [lrange $result 1 end]
 	}
  	if {$report} {
-		lwdaq_draw $config(memory_name) $info(photo) \
+		lwdaq_draw $image_name $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 		LWDAQ_print -nonewline $info(text) "$instrument: " darkgreen
 		LWDAQ_print $info(text) $result	
 	}	
-	set info(image_results) [lwdaq_image_results $config(memory_name)]
+	set info(image_results) [lwdaq_image_results $image_name]
 
 	set info(verbose_description) $iinfo(verbose_description)
 

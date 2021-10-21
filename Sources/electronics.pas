@@ -29,7 +29,7 @@ uses
 	transforms,image_manip,images,utils;
 	
 var
-	electronics_trace:xy_graph_ptr=nil;
+	electronics_trace:xy_graph_type;
 
 function lwdaq_A2037_monitor(ip:image_ptr_type;
 	t_min,t_max,v_min,v_max:real;
@@ -192,8 +192,8 @@ const
 var 
 	result:string='';
 	input_string:string='';
-	p15V,p15I,p5V,p5I,n15V,n15I:xy_graph_ptr; {voltages in V, currents in mA}
-	c_gain,d_gain:xy_graph_ptr;{properties of adc input}
+	p15V,p15I,p5V,p5I,n15V,n15I:xy_graph_type; {voltages in V, currents in mA}
+	c_gain,d_gain:xy_graph_type;{properties of adc input}
 	n:integer;
 	p15V_ave:real=0;
 	p5V_ave:real=0;
@@ -217,72 +217,64 @@ begin
 	
 	writestr(result,sv:1:0,' ',an:1:0,' ',hv:1:0,' ',fv:1:0,' ',lt:1:0,' ',tr:1:0);
 
-	c_gain:=new_xy_graph(ip^.i_size);
-	d_gain:=new_xy_graph(ip^.i_size);
-	p15V:=new_xy_graph(ip^.i_size);
-	p15I:=new_xy_graph(ip^.i_size);
-	p5V:=new_xy_graph(ip^.i_size);
-	p5I:=new_xy_graph(ip^.i_size);
-	n15V:=new_xy_graph(ip^.i_size);
-	n15I:=new_xy_graph(ip^.i_size);
+	setlength(c_gain,ip^.i_size);
+	setlength(d_gain,ip^.i_size);
+	setlength(p15V,ip^.i_size);
+	setlength(p15I,ip^.i_size);
+	setlength(p5V,ip^.i_size);
+	setlength(p5I,ip^.i_size);
+	setlength(n15V,ip^.i_size);
+	setlength(n15I,ip^.i_size);
 	for n:=0 to ip^.i_size-1 do begin
-		c_gain^[n].y:=(sample_A2037E_adc16(ip,1,n)-sample_A2037E_adc16(ip,8,n))
+		c_gain[n].y:=(sample_A2037E_adc16(ip,1,n)-sample_A2037E_adc16(ip,8,n))
 			/reference;
-		d_gain^[n].y:=(sample_A2037E_adc16(ip,0,n)-sample_A2037E_adc16(ip,8,n))
+		d_gain[n].y:=(sample_A2037E_adc16(ip,0,n)-sample_A2037E_adc16(ip,8,n))
 			/(reference*beta);
-		if d_gain^[n].y=0 then d_gain^[n].y:=1;
-		p15V^[n].y:=(sample_A2037E_adc16(ip,3,n)-sample_A2037E_adc16(ip,8,n))
-			/(d_gain^[n].y*beta);
-		p15I^[n].y:=(sample_A2037E_adc16(ip,2,n)-sample_A2037E_adc16(ip,8,n)
-			-c_gain^[n].y*p15V^[n].y)*mA_per_A/(d_gain^[n].y*alpha);
-		p5V^[n].y:=(sample_A2037E_adc16(ip,5,n)-sample_A2037E_adc16(ip,8,n))
-			/(d_gain^[n].y*beta);
-		p5I^[n].y:=(sample_A2037E_adc16(ip,4,n)-sample_A2037E_adc16(ip,8,n)
-			-c_gain^[n].y*p5V^[n].y)*mA_per_A/(d_gain^[n].y*gamma);
-		n15V^[n].y:=-(sample_A2037E_adc16(ip,7,n)
-			-sample_A2037E_adc16(ip,8,n))/(d_gain^[n].y*beta*nigcf);
-		n15I^[n].y:=(sample_A2037E_adc16(ip,6,n)-sample_A2037E_adc16(ip,8,n)
-			-c_gain^[n].y*n15V^[n].y)*mA_per_A/(d_gain^[n].y*alpha);
-		c_gain^[n].x:=period*n;
-		d_gain^[n].x:=period*n;
-		p15V^[n].x:=period*n;
-		p15I^[n].x:=period*n;
-		p5V^[n].x:=period*n;
-		p5I^[n].x:=period*n;
-		n15V^[n].x:=period*n;
-		n15I^[n].x:=period*n;
+		if d_gain[n].y=0 then d_gain[n].y:=1;
+		p15V[n].y:=(sample_A2037E_adc16(ip,3,n)-sample_A2037E_adc16(ip,8,n))
+			/(d_gain[n].y*beta);
+		p15I[n].y:=(sample_A2037E_adc16(ip,2,n)-sample_A2037E_adc16(ip,8,n)
+			-c_gain[n].y*p15V[n].y)*mA_per_A/(d_gain[n].y*alpha);
+		p5V[n].y:=(sample_A2037E_adc16(ip,5,n)-sample_A2037E_adc16(ip,8,n))
+			/(d_gain[n].y*beta);
+		p5I[n].y:=(sample_A2037E_adc16(ip,4,n)-sample_A2037E_adc16(ip,8,n)
+			-c_gain[n].y*p5V[n].y)*mA_per_A/(d_gain[n].y*gamma);
+		n15V[n].y:=-(sample_A2037E_adc16(ip,7,n)
+			-sample_A2037E_adc16(ip,8,n))/(d_gain[n].y*beta*nigcf);
+		n15I[n].y:=(sample_A2037E_adc16(ip,6,n)-sample_A2037E_adc16(ip,8,n)
+			-c_gain[n].y*n15V[n].y)*mA_per_A/(d_gain[n].y*alpha);
+		c_gain[n].x:=period*n;
+		d_gain[n].x:=period*n;
+		p15V[n].x:=period*n;
+		p15I[n].x:=period*n;
+		p5V[n].x:=period*n;
+		p5I[n].x:=period*n;
+		n15V[n].x:=period*n;
+		n15I[n].x:=period*n;
 	end;
-	p15V_ave:=average_y_xy_graph(p15V);
-	p5V_ave:=average_y_xy_graph(p5V);
-	n15V_ave:=average_y_xy_graph(n15V);
+	p15V_ave:=average_y_xy_graph(@p15V);
+	p5V_ave:=average_y_xy_graph(@p5V);
+	n15V_ave:=average_y_xy_graph(@n15V);
 	writestr(result,result,' ',
-		p15V_ave:5:3,' ',average_y_xy_graph(p15I):5:3,' ',
-		p5V_ave:5:3,' ',average_y_xy_graph(p5I):5:3,' ',
-		n15V_ave:5:3,' ',average_y_xy_graph(n15I):5:3,' ',
-		average_y_xy_graph(c_gain):6:4,' ',average_y_xy_graph(d_gain):3:1);
+		p15V_ave:5:3,' ',average_y_xy_graph(@p15I):5:3,' ',
+		p5V_ave:5:3,' ',average_y_xy_graph(@p5I):5:3,' ',
+		n15V_ave:5:3,' ',average_y_xy_graph(@n15I):5:3,' ',
+		average_y_xy_graph(@c_gain):6:4,' ',average_y_xy_graph(@d_gain):3:1);
 		
 	draw_oscilloscope_scale(ip,num_divisions);
 	if ac_couple then begin
-		display_real_graph(ip,p15V,yellow_color,
+		display_real_graph(ip,@p15V,yellow_color,
 			t_min,t_max,v_min+p15V_ave,v_max+p15V_ave,0,0);
-		display_real_graph(ip,p5V,red_color,
+		display_real_graph(ip,@p5V,red_color,
 			t_min,t_max,v_min+p5V_ave,v_max+p5V_ave,0,0);
-		display_real_graph(ip,n15V,green_color,
+		display_real_graph(ip,@n15V,green_color,
 			t_min,t_max,v_min+n15V_ave,v_max+n15V_ave,0,0);
 	end 
 	else begin
-		display_real_graph(ip,p15V,yellow_color,t_min,t_max,v_min,v_max,0,0);
-		display_real_graph(ip,p5V,red_color,t_min,t_max,v_min,v_max,0,0);
-		display_real_graph(ip,n15V,green_color,t_min,t_max,v_min,v_max,0,0);
+		display_real_graph(ip,@p15V,yellow_color,t_min,t_max,v_min,v_max,0,0);
+		display_real_graph(ip,@p5V,red_color,t_min,t_max,v_min,v_max,0,0);
+		display_real_graph(ip,@n15V,green_color,t_min,t_max,v_min,v_max,0,0);
 	end;
-	dispose_xy_graph(c_gain);
-	dispose_xy_graph(d_gain);
-	dispose_xy_graph(p15V);
-	dispose_xy_graph(p15I);
-	dispose_xy_graph(p5V);
-	dispose_xy_graph(p5I);
-	dispose_xy_graph(n15V);
-	dispose_xy_graph(n15I);
 	
 	lwdaq_A2037_monitor:=result;
 end;
@@ -307,7 +299,7 @@ const
 var 
 	result:string='';
 	input_string:string='';
-	gauge:xy_graph_ptr; 
+	gauge:xy_graph_type; 
 	n,channel_num,num_channels:integer;
 	gauge_ave,ref_top_voltage,ref_bottom_voltage,period:real;
 
@@ -328,7 +320,7 @@ begin
 	
 	draw_oscilloscope_scale(ip,num_divisions);
 
-	gauge:=new_xy_graph(ip^.i_size);
+	setlength(gauge,ip^.i_size);
 	
 	for channel_num:=0 to num_channels-1 do begin
 		ref_bottom_voltage:=0;
@@ -349,31 +341,30 @@ begin
 			ref_top_voltage:=ref_bottom_voltage+1;
 
 		for n:=0 to ip^.i_size-1 do begin
-			gauge^[n].y:=
+			gauge[n].y:=
 				(sample_A2037E_adc16(ip,channel_row
 						+rows_per_channel*channel_num,n)
 							-ref_bottom_voltage)
 				/(ref_top_voltage-ref_bottom_voltage)
 				*(ref_top-ref_bottom) 
 				+ref_bottom;
-			gauge^[n].x:=period*n;
+			gauge[n].x:=period*n;
 		end;
-		gauge_ave:=average_y_xy_graph(gauge);
+		gauge_ave:=average_y_xy_graph(@gauge);
 
 		if ac_couple then
-			display_real_graph(ip,gauge,
+			display_real_graph(ip,@gauge,
 				overlay_color_from_integer(channel_num),
 				t_min,t_max,y_min+gauge_ave,y_max+gauge_ave,0,0)
 		else 
-			display_real_graph(ip,gauge,
+			display_real_graph(ip,@gauge,
 				overlay_color_from_integer(channel_num),
 				t_min,t_max,y_min,y_max,0,0);
 
 		if ave then writestr(result,result,gauge_ave:5:3,' ');
-		if stdev then writestr(result,result,stdev_y_xy_graph(gauge):5:3,' ');
+		if stdev then writestr(result,result,stdev_y_xy_graph(@gauge):5:3,' ');
 	end;
 
-	if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
 	electronics_trace:=gauge;
 
 	lwdaq_A2053_gauge:=result;
@@ -397,7 +388,7 @@ const
 var 
 	result:string='';
 	input_string:string='';
-	temperature,log_temperature,fit,log_fit:xy_graph_ptr; 
+	temperature,log_temperature,fit,log_fit:xy_graph_type; 
 	num_ambient_samples,num_cooling_samples:integer;
 	n,cooling_start_index:integer;
 	ref_top_voltage,ref_bottom_voltage,period:real;
@@ -435,14 +426,14 @@ begin
 		exit;
 	end;
 
-	temperature:=new_xy_graph(ip^.i_size);
+	setlength(temperature,ip^.i_size);
 	for n:=0 to ip^.i_size-1 do begin
-		temperature^[n].y:=
+		temperature[n].y:=
 			(sample_A2037E_adc16(ip,1,n)-ref_bottom_voltage)
 			/(ref_top_voltage-ref_bottom_voltage)
 			*(ref_top-ref_bottom) 
 			+ref_bottom;
-		temperature^[n].x:=period*n;
+		temperature[n].x:=period*n;
 	end;
 
 	num_ambient_samples:=round(ambient_divisions*ip^.i_size/num_divisions)-1;
@@ -458,52 +449,47 @@ begin
 	
 	ambient_temp:=0;
 	for n:=0 to num_ambient_samples-1 do
-		ambient_temp:=ambient_temp+temperature^[n].y;
+		ambient_temp:=ambient_temp+temperature[n].y;
 	ambient_temp:=ambient_temp/num_ambient_samples;
-	peak_temp:=temperature^[num_ambient_samples+2].y;
-	start_temp:=temperature^[ip^.i_size-num_cooling_samples].y;
-	end_temp:=temperature^[ip^.i_size-1].y;
-	log_temperature:=new_xy_graph(num_cooling_samples);
+	peak_temp:=temperature[num_ambient_samples+2].y;
+	start_temp:=temperature[ip^.i_size-num_cooling_samples].y;
+	end_temp:=temperature[ip^.i_size-1].y;
+	setlength(log_temperature,num_cooling_samples);
 	for n:=0 to num_cooling_samples-1 do begin
-		t_relative:=temperature^[n+cooling_start_index].y-ambient_temp;
+		t_relative:=temperature[n+cooling_start_index].y-ambient_temp;
 		if t_relative>0 then
-			log_temperature^[n].y:=ln(t_relative)
+			log_temperature[n].y:=ln(t_relative)
 		else begin
-			report_error('t_relative<=0 at n='
-				+string_from_integer(n,1)+'.');
+			report_error('t_relative<=0 at n='+string_from_integer(n,1)+'.');
 			exit;
 		end;
-		log_temperature^[n].x:=temperature^[n+cooling_start_index].x;
+		log_temperature[n].x:=temperature[n+cooling_start_index].x;
 	end;
-	straight_line_fit(log_temperature,slope,intercept,rms_residual);
+	straight_line_fit(@log_temperature,slope,intercept,rms_residual);
 
-	log_fit:=new_xy_graph(num_cooling_samples);
+	setlength(log_fit,num_cooling_samples);
 	for n:=0 to num_cooling_samples-1 do begin
-		log_fit^[n].y:=log_temperature^[n].x*slope+intercept;
-		log_fit^[n].x:=log_temperature^[n].x;
+		log_fit[n].y:=log_temperature[n].x*slope+intercept;
+		log_fit[n].x:=log_temperature[n].x;
 	end;
 
 	rms_residual:=0;
-	fit:=new_xy_graph(num_cooling_samples);
+	setlength(fit,num_cooling_samples);
 	for n:=0 to num_cooling_samples-1 do begin
-		fit^[n].y:=exp(log_fit^[n].y)+ambient_temp;
-		fit^[n].x:=log_fit^[n].x;
+		fit[n].y:=exp(log_fit[n].y)+ambient_temp;
+		fit[n].x:=log_fit[n].x;
 		rms_residual:=rms_residual
-			+sqr(temperature^[n+cooling_start_index].y-fit^[n].y);
+			+sqr(temperature[n+cooling_start_index].y-fit[n].y);
 	end;
 	rms_residual:=sqrt(rms_residual/num_cooling_samples);
 
-	display_real_graph(ip,log_fit,green_color,t_min,t_max,0,0,0,0);
-	display_real_graph(ip,log_temperature,red_color,t_min,t_max,0,0,0,0);
-	display_real_graph(ip,fit,
+	display_real_graph(ip,@log_fit,green_color,t_min,t_max,0,0,0,0);
+	display_real_graph(ip,@log_temperature,red_color,t_min,t_max,0,0,0,0);
+	display_real_graph(ip,@fit,
 		green_color,t_min,t_max,c_min+ambient_temp,c_max+ambient_temp,0,0);
-	display_real_graph(ip,temperature,
+	display_real_graph(ip,@temperature,
 		red_color,t_min,t_max,c_min+ambient_temp,c_max+ambient_temp,0,0);
-	dispose_xy_graph(fit);
-	dispose_xy_graph(log_fit);
-	dispose_xy_graph(log_temperature);
 
-	if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
 	electronics_trace:=temperature;
 
 	writestr(result,-slope:8:6,' ',rms_residual:8:6,' ',
@@ -538,8 +524,8 @@ const
 var 
 	result:string='';
 	input_string:string='';
-	trace,reference,transform:xy_graph_ptr;
-	subset:x_graph_ptr;
+	trace,reference,transform:xy_graph_type;
+	subset:x_graph_type;
 	n,num_samples,num_channels,channel_num:integer;
 	subset_size,redundancy_factor:integer;
 	ave:real=0;
@@ -586,18 +572,17 @@ begin
 	draw_oscilloscope_scale(ip,num_divisions);
 
 	if auto_calib then begin
-		reference:=new_xy_graph(ip^.i_size);
+		setlength(reference,ip^.i_size);
 		for n:=0 to ip^.i_size-1 do begin
-			reference^[n].y:=sample_A2037E_adc16(ip,0,n);
-			reference^[n].x:=n;
+			reference[n].y:=sample_A2037E_adc16(ip,0,n);
+			reference[n].x:=n;
 		end;
-		ref_bottom:=average_y_xy_graph(reference);	
+		ref_bottom:=average_y_xy_graph(@reference);	
 		for n:=0 to ip^.i_size-1 do begin
-			reference^[n].y:=sample_A2037E_adc16(ip,redundancy_factor*num_channels+1,n);
-			reference^[n].x:=n;
+			reference[n].y:=sample_A2037E_adc16(ip,redundancy_factor*num_channels+1,n);
+			reference[n].x:=n;
 		end;
-		ref_top:=average_y_xy_graph(reference);	
-		dispose_xy_graph(reference);
+		ref_top:=average_y_xy_graph(@reference);	
 		if abs(ref_top-ref_bottom)<small_real then begin
 			report_error('ref_top=ref_bottom with auto_calib');
 			exit;
@@ -605,15 +590,15 @@ begin
 	end;
 
 	num_samples:=ip^.i_size*redundancy_factor;
-	trace:=new_xy_graph(num_samples);
+	setlength(trace,num_samples);
 
 	for channel_num:=0 to num_channels-1 do begin
 {
 	Extract channel voltages from the image.
 }
 		for n:=0 to num_samples-1 do begin
-			trace^[n].x:=period*n;
-			trace^[n].y:=sample_A2037E_adc16(ip,redundancy_factor*channel_num+1,n);
+			trace[n].x:=period*n;
+			trace[n].y:=sample_A2037E_adc16(ip,redundancy_factor*channel_num+1,n);
 		end;
 {
 	If we are asking for auto-calibration using the top and bottom reference
@@ -621,19 +606,19 @@ begin
 }
 		if auto_calib then
 			for n:=0 to num_samples-1 do
-				trace^[n].y:=(trace^[n].y-ref_bottom)
+				trace[n].y:=(trace[n].y-ref_bottom)
 					/ (ref_top-ref_bottom)
 					* (ref_top_V-ref_bottom_V)
 					/ channel_gain
 					+ ref_bottom_V;
-		ave:=average_y_xy_graph(trace);
-		stdev:=stdev_y_xy_graph(trace);
+		ave:=average_y_xy_graph(@trace);
+		stdev:=stdev_y_xy_graph(@trace);
 {
 	If we want to ac-couple the signal, subtract its average value now.
 }
 		if ac_couple then
 			for n:=0 to num_samples-1 do
-				trace^[n].y:=trace^[n].y-ave;
+				trace[n].y:=trace[n].y-ave;
 {
 	Find the sample just before the trigger event.
 }
@@ -641,12 +626,12 @@ begin
 		n:=0;
 		while (trigger=0) and (n<num_samples-1) do begin
 			if (positive_trigger and 
-				(trace^[n].y<=v_trigger) and 
-				(trace^[n+1].y>v_trigger)) 
+				(trace[n].y<=v_trigger) and 
+				(trace[n+1].y>v_trigger)) 
 					or
 				(not positive_trigger and 
-				(trace^[n].y>=v_trigger) and 
-				(trace^[n+1].y<v_trigger)) then begin
+				(trace[n].y>=v_trigger) and 
+				(trace[n+1].y<v_trigger)) then begin
 				trigger:=n;
 			end;
 			inc(n);
@@ -657,19 +642,19 @@ begin
 }
 		if (trigger<>0) then begin
 			n:=round(trigger);
-			if abs(trace^[n+1].y-trace^[n].y)>small_real then 
-				trigger:=n+(v_trigger-trace^[n].y)/(trace^[n+1].y-trace^[n].y);
+			if abs(trace[n+1].y-trace[n].y)>small_real then 
+				trigger:=n+(v_trigger-trace[n].y)/(trace[n+1].y-trace[n].y);
 		end;
 {
 	Use the trigger to offset the time axis of the trace, making the trigger instant
 	the time zero instant.
 }
-		for n:=0 to num_samples-1 do trace^[n].x:=trace^[n].x-trigger*period;
+		for n:=0 to num_samples-1 do trace[n].x:=trace[n].x-trigger*period;
 {
 	Display a graph of the voltage versus time, with time zero representing the moment
 	of the first trigger.
 }
-		display_real_graph(ip,trace,
+		display_real_graph(ip,@trace,
 			overlay_color_from_integer(channel_num),
 			t_min,t_max,v_min,v_max,0,0);
 {
@@ -678,19 +663,17 @@ begin
 }
 		subset_size:=1;
 		while (subset_size<=num_samples/2.0) do subset_size:=subset_size*2;
-		subset:=new_x_graph(subset_size);		
-		for n:=0 to subset_size-1 do subset^[n]:=trace^[n].y;
+		setlength(subset,subset_size);		
+		for n:=0 to subset_size-1 do subset[n]:=trace[n].y;
 		transform:=fft_real(subset);
-		dispose_x_graph(subset);
 		amplitude:=0;
 		frequency:=0;
 		for n:=1 to (subset_size div 2)-1 do begin
-			if transform^[n].x>amplitude then begin
-				amplitude:=transform^[n].x;
+			if transform[n].x>amplitude then begin
+				amplitude:=transform[n].x;
 				frequency:=n/subset_size/period;
 			end;
 		end;
-		dispose_xy_graph(transform);
 {
 	Add measurements to the result string.
 }
@@ -702,7 +685,6 @@ begin
 	trace, should it exist. Note that if we displayed more than one channel, only the final 
 	channel's trace will be available.
 }
-	if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
 	electronics_trace:=trace;
 	
 	lwdaq_A2057_voltmeter:=result;
@@ -731,8 +713,8 @@ const
 var 
 	result:string='';
 	input_string:string='';
-	trace:xy_graph_ptr;
-	signal:x_graph_ptr;
+	trace:xy_graph_type;
+	signal:x_graph_type;
 	n,num_samples,num_channels,channel_num:integer;
 	redundancy_factor,trigger:integer;
 	amplitude,offset,period:real;
@@ -760,8 +742,8 @@ begin
 		exit;
 	end;
 
-	trace:=new_xy_graph(num_samples);
-	signal:=new_x_graph(num_samples);
+	setlength(trace,num_samples);
+	setlength(signal,num_samples);
 
 	for channel_num:=0 to num_channels-1 do begin
 		trigger:=startup_skip;
@@ -777,12 +759,12 @@ begin
 			end;
 		end;
 		for n:=0 to num_samples-1 do begin
-			trace^[n].x:=n;
-			trace^[n].y:=sample_A2037E_adc16(ip,0,
+			trace[n].x:=n;
+			trace[n].y:=sample_A2037E_adc16(ip,0,
 				redundancy_factor*channel_num*num_samples+n+trigger);
-			signal^[n]:=trace^[n].y;
+			signal[n]:=trace[n].y;
 		end;
-		display_real_graph(ip,trace,
+		display_real_graph(ip,@trace,
 			overlay_color_from_integer(channel_num),
 				0,num_samples-1,v_min,v_max,0,0);
 		if (harmonic>0) then period:=num_samples/harmonic
@@ -790,12 +772,10 @@ begin
 		calculate_ft_term(period,signal,amplitude,offset);
 		writestr(result,result,' ',amplitude:fsr:fsd);
 	end;
-	dispose_x_graph(signal);
 {
 	We make the trace available with a global pointer, after disposing of the pre-existing
 	trace, should it exist.
 }
-	if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
 	electronics_trace:=trace;
 
 	lwdaq_A2065_inclinometer:=result;
@@ -1400,10 +1380,9 @@ begin
 		We create an xy-graph of the correct length and containing for x the
 		time values and for y the message indices.
 }
-		if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
-		electronics_trace:=new_xy_graph(num_extracted);	
+		setlength(electronics_trace,num_extracted);	
 		for message_num:=0 to num_extracted-1 do
-			electronics_trace^[message_num]:=trace[message_num];
+			electronics_trace[message_num]:=trace[message_num];
 {
 	Record number of clocks and number extracted to the image result string.
 }
@@ -1653,13 +1632,12 @@ begin
 	record the time and origin index of each reconstructed message.
 }
 		result:='';
-		if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
-		electronics_trace:=new_xy_graph(num_selected);		
+		setlength(electronics_trace,num_selected);		
 		if num_selected>0 then begin
 			for message_num:=0 to num_selected-1 do begin
 				with mp[message_num] do begin
-					electronics_trace^[message_num].x:=time;
-					electronics_trace^[message_num].y:=index;				
+					electronics_trace[message_num].x:=time;
+					electronics_trace[message_num].y:=index;				
 					writestr(message_string,time:1,' ',sample:1);
 					if length(result)>0 then message_string:=eol+message_string;
 					insert(message_string,result,length(result)+1);
@@ -1805,7 +1783,7 @@ const
 var 
 	result:string='';
 	input_string:string='';
-	trace:xy_graph_ptr;
+	trace:xy_graph_type;
 	n,num_samples,num_channels,channel_num:integer;
 	startup_skip:integer;
 	max,min:real;
@@ -1833,21 +1811,21 @@ begin
 		exit;
 	end;
 
-	trace:=new_xy_graph(num_samples);
+	setlength(trace,num_samples);
 	for channel_num:=0 to num_channels-1 do begin
 		for n:=0 to num_samples-1 do begin
-			trace^[n].x:=n;
-			trace^[n].y:=sample_A2037E_adc8(ip,0,
+			trace[n].x:=n;
+			trace[n].y:=sample_A2037E_adc8(ip,0,
 				channel_num*(num_samples+startup_skip)+n+startup_skip);
 		end;
-		max:=max_y_xy_graph(trace);
-		min:=min_y_xy_graph(trace);
+		max:=max_y_xy_graph(@trace);
+		min:=min_y_xy_graph(@trace);
 		if rms then 
-			writestr(result,result,' ',stdev_y_xy_graph(trace):fsr:fsd)
+			writestr(result,result,' ',stdev_y_xy_graph(@trace):fsr:fsd)
 		else
 			writestr(result,result,' ',(max-min):fsr:fsd);
 		if (max<v_max) and (min>v_min) then 
-			display_real_graph(ip,trace,
+			display_real_graph(ip,@trace,
 				overlay_color_from_integer(channel_num),
 				0,num_samples-1,v_min,v_max,0,0);
 	end;
@@ -1855,11 +1833,15 @@ begin
 	We make the trace available with a global pointer, after disposing of the pre-existing
 	trace, should it exist.
 }
-	if electronics_trace<>nil then dispose_xy_graph(electronics_trace);
 	electronics_trace:=trace;
 
 	lwdaq_A3008_rfpm:=result;
 end;
 
-
+{
+	initialization sets up the utils variables.
+}
+initialization 
+	setlength(electronics_trace,0);
+	
 end.

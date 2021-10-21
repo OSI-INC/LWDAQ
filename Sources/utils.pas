@@ -292,8 +292,6 @@ type
 {
 	One-Dimensional Graph Manipulation.
 }
-function new_x_graph(num_points:integer):x_graph_ptr;
-procedure dispose_x_graph(gp:x_graph_ptr);
 function average_x_graph(gp:x_graph_ptr):real;
 function max_x_graph(gp:x_graph_ptr):real;
 function min_x_graph(gp:x_graph_ptr):real;
@@ -302,15 +300,13 @@ function mad_x_graph(gp:x_graph_ptr):real;
 function median_x_graph(gp:x_graph_ptr):real;
 function percentile_x_graph(gp:x_graph_ptr;percentile:real):real;
 function coastline_x_graph(gp:x_graph_ptr):real;
-function coastline_x_graph_progress(gp:x_graph_ptr):x_graph_ptr;
-function spikes_x_graph(gp:x_graph_ptr; threshold:real; extent:integer):xy_graph_ptr;
+function coastline_x_graph_progress(gp:x_graph_ptr):x_graph_type;
+function spikes_x_graph(gp:x_graph_ptr; threshold:real; extent:integer):xy_graph_type;
 function slope_x_graph(gp:x_graph_ptr;index,extent:integer):real;
 
 {
 	Two-Dimensional Graph Manipulation.
 }
-function new_xy_graph(num_points:integer):xy_graph_ptr;
-procedure dispose_xy_graph(gp:xy_graph_ptr);
 function average_xy_graph(gp:xy_graph_ptr):xy_point_type;
 function stdev_xy_graph(gp:xy_graph_ptr):xy_point_type;
 function average_y_xy_graph(gp:xy_graph_ptr):real;
@@ -318,13 +314,7 @@ function max_y_xy_graph(gp:xy_graph_ptr):real;
 function min_y_xy_graph(gp:xy_graph_ptr):real;
 function stdev_y_xy_graph(gp:xy_graph_ptr):real;
 function coastline_xy_graph(gp:xy_graph_ptr):real;
-function coastline_xy_graph_progress(gp:xy_graph_ptr):xy_graph_ptr;
-
-{
-	Three-Dimensional Graph Manipulation.
-}
-function new_xyz_graph(num_points:integer):xyz_graph_ptr;
-procedure dispose_xyz_graph(gp:xyz_graph_ptr);
+function coastline_xy_graph_progress(gp:xy_graph_ptr):xy_graph_type;
 
 {
 	Matrix Manipulation and Inversion. We have a library of routines that allow
@@ -462,17 +452,19 @@ function nearest_neighbor(var point,lib:matrix_type):integer;
 {
 	Signal Processing.
 }
-function recursive_filter(x:x_graph_ptr;a_list,b_list:string):x_graph_ptr;
+function recursive_filter(x:x_graph_ptr;a_list,b_list:string):x_graph_type;
 function glitch_filter(dp:x_graph_ptr;threshold:real):integer;
 function glitch_filter_y(gp:xy_graph_ptr;threshold:real):integer;
 function glitch_filter_xy(gp:xy_graph_ptr;threshold:real):integer;
 procedure window_function(dp:x_graph_ptr;extent:integer);
-procedure calculate_ft_term(period:real;dp:x_graph_ptr;var amplitude,offset:real);
-procedure frequency_component(frequency:real;dp:x_graph_ptr;var amplitude,offset:real);
-function fft(dp:xy_graph_ptr):xy_graph_ptr;
-function fft_inverse(ft:xy_graph_ptr):xy_graph_ptr;
-function fft_real(dp:x_graph_ptr):xy_graph_ptr;
-function fft_real_inverse(ft:xy_graph_ptr):x_graph_ptr;
+procedure calculate_ft_term(period:real;
+	var dp:x_graph_type;var amplitude,offset:real);
+procedure frequency_component(frequency:real;
+	var dp:x_graph_type;var amplitude,offset:real);
+function fft(var dp:xy_graph_type):xy_graph_type;
+function fft_inverse(var ft:xy_graph_type):xy_graph_type;
+function fft_real(var dp:x_graph_type):xy_graph_type;
+function fft_real_inverse(var ft:xy_graph_type):x_graph_type;
 
 {
 	Pixel Array Geometry. We provide routines for manipulating shapes in pixel
@@ -643,8 +635,8 @@ function alphanumeric_char(c:char):boolean;
 function strings_in_order(a,b:string):boolean;
 function string_match(key,subject:string):boolean;
 function string_checksum(s:string):integer;
-function string_from_x_graph(gp:x_graph_ptr):string;
-function string_from_xy_graph(gp:xy_graph_ptr):string;
+function string_from_x_graph(var gp:x_graph_type):string;
+function string_from_xy_graph(var gp:xy_graph_type):string;
 function digit_from_char(c:char):integer;
 function char_from_digit(digit:integer):char;
 function boolean_from_string(s:string):boolean;
@@ -686,10 +678,8 @@ function read_real(var s:string):real;
 function read_integer(var s:string):integer;
 function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
-function read_x_graph(var s:string):x_graph_ptr;
-function read_x_graph_fpc(var s:string):x_graph_type;
-function read_xy_graph(var s:string):xy_graph_ptr;
-function read_xy_graph_fpc(var s:string):xy_graph_type;
+function read_x_graph(var s:string):x_graph_type;
+function read_xy_graph(var s:string):xy_graph_type;
 procedure read_matrix(var s:string;var M:matrix_type);
 function read_kinematic_mount(var s:string):kinematic_mount_type;
 procedure write_ij(var s:string;p:ij_point_type);
@@ -1720,15 +1710,14 @@ begin
 end;
 
 {
-	Reads a sequence of space-delimited numbers from a string into
-	an x_graph_type and returns a pointer to this graph. Does not
-	alter the original string.
+	Reads a sequence of space-delimited numbers from a string into an
+	x_graph_type and returns this graph. Does not alter the original string.
 }
-function read_x_graph(var s:string):x_graph_ptr;
+function read_x_graph(var s:string):x_graph_type;
 
 var 
 	num_points,point_num,index:integer;
-	gp1,gp2:x_graph_ptr;
+	gp1,gp2:x_graph_type;
 	w:string;
 	okay:boolean;
 
@@ -1737,7 +1726,7 @@ begin
 	Create a new graph long enough to accommodate the largest 
 	possible number of numerical entries in the string.
 }
-	gp1:=new_x_graph(length(s));
+	setlength(gp1,length(s));
 {
 	Read all available numerical entries from the string and put
 	them in the new graph. If we encounter a bad numerical entry,
@@ -1755,7 +1744,7 @@ begin
 			inc(index);
 		end;
 		if w<>'' then begin
-			gp1^[num_points]:=real_from_string(w,okay);
+			gp1[num_points]:=real_from_string(w,okay);
 			inc(num_points);
 		end;
 	end;
@@ -1764,48 +1753,30 @@ begin
 	and fill it.
 }
 	if num_points>0 then begin
-		gp2:=new_x_graph(num_points);
+		setlength(gp2,num_points);
 		for point_num:=0 to num_points-1 do
-			gp2^[point_num]:=gp1^[point_num];
+			gp2[point_num]:=gp1[point_num];
 	end else begin
-		gp2:=new_x_graph(1);
-		gp2^[0]:=0;
+		setlength(gp2,1);
+		gp2[0]:=0;
 	end;
 {
-	Dispose of the initial graph and return the fully-populated graph.
+	Return the fully-populated graph.
 }
-	dispose_x_graph(gp1);
 	read_x_graph:=gp2;
 end;
 
 {
-	read_x_graph_fpc is a temporary routine we put in place as part of
-	our transition to fpc's automatic de-allocation of dynamic 
-	variables. It returns an x_graph_type rather than an x_graph_ptr.
+	Reads a sequence of space-delimited numbers from a string into an
+	xy_graph_type and returns this graph. Does not alter the original string.
+	Returns an error if there are an odd number of numbers in the string.
 }
-function read_x_graph_fpc(var s:string):x_graph_type;
-
-var 
-	gp:x_graph_ptr;
-
-begin
-	gp:=read_x_graph(s);
-	read_x_graph_fpc:=gp^;
-	dispose_x_graph(gp);
-end;
-
-{
-	Reads a sequence of space-delimited numbers from a string into
-	an xy_graph_type and returns a pointer to this graph. Does not
-	alter the original string. Returns an error if there are an odd
-	number of numbers in the string.
-}
-function read_xy_graph(var s:string):xy_graph_ptr;
+function read_xy_graph(var s:string):xy_graph_type;
 
 var 
 	value_num,point_num:integer;
-	gp1:x_graph_ptr;
-	gp2:xy_graph_ptr;
+	gp1:x_graph_type;
+	gp2:xy_graph_type;
 
 begin
 {
@@ -1815,16 +1786,16 @@ begin
 {
 	Create an xy graph of the correct size.
 }
-	if length(gp1^)>1 then begin
-		gp2:=new_xy_graph(length(gp1^) div 2);
+	if length(gp1)>1 then begin
+		setlength(gp2,length(gp1) div 2);
 {
 	Go through the x-graph, reading pairs of x and y into the xy-graph.
 }
 		point_num:=0;
 		value_num:=0;
-		while (value_num<=length(gp1^)-1) do begin
-			gp2^[point_num].x:=gp1^[value_num];
-			gp2^[point_num].y:=gp1^[value_num+1];
+		while (value_num<=length(gp1)-1) do begin
+			gp2[point_num].x:=gp1[value_num];
+			gp2[point_num].y:=gp1[value_num+1];
 			inc(point_num);
 			inc(value_num);
 			inc(value_num);
@@ -1832,34 +1803,17 @@ begin
 {
 	If there's an extra number on the end, we issue an error.
 }
-		if value_num<length(gp1^)-1 then
+		if value_num<length(gp1)-1 then
 			report_error('Missing y-value for final point in read_xy_graph.');
 	end else begin
-		gp2:=new_xy_graph(1);
-		gp2^[0].x:=0;
-		gp2^[0].y:=0;
+		setlength(gp2,1);
+		gp2[0].x:=0;
+		gp2[0].y:=0;
 	end;
 {
-	Dispose of the x-graph and return the xy-graph.
+	Return the xy-graph.
 }
-	dispose_x_graph(gp1);
 	read_xy_graph:=gp2;
-end;
-
-{
-	read_xy_graph_fpc is a temporary routine we put in place as part of
-	our transition to fpc's automatic de-allocation of dynamic 
-	variables. It returns an xy_graph_type rather than an xy_graph_ptr.
-}
-function read_xy_graph_fpc(var s:string):xy_graph_type;
-
-var 
-	gp:xy_graph_ptr;
-
-begin
-	gp:=read_xy_graph(s);
-	read_xy_graph_fpc:=gp^;
-	dispose_xy_graph(gp);
 end;
 
 {
@@ -2274,7 +2228,7 @@ end;
 	our long_string_length, the routine generates an error and returns the
 	partially-completed string.
 }
-function string_from_x_graph(gp:x_graph_ptr):string;
+function string_from_x_graph(var gp:x_graph_type):string;
 var
 	i:integer;
 	ls,ss:string;
@@ -2284,15 +2238,14 @@ begin
 	If the inputs are invalid, we return an empty string.
 }
 	string_from_x_graph:='';
-	if gp=nil then exit;
-	if length(gp^)=0 then exit;
+	if length(gp)=0 then exit;
 {
 	Go through the data and write values to the string. If we overflow the string,
 	dispose of the long string, report an error, and return a nil pointer.
 }
 	ls:='';
-	for i:=0 to length(gp^)-1 do begin
-		writestr(ss,gp^[i]:fsr:fsd,' ');
+	for i:=0 to length(gp)-1 do begin
+		writestr(ss,gp[i]:fsr:fsd,' ');
 		insert(ss,ls,length(ls)+1);
 		if length(ls)>long_string_length then begin
 			report_error('length(ls)>long_string_length in string_from_x_graph.');
@@ -2309,7 +2262,7 @@ end;
 	string_from_xy_graph is like string_from_x_graph but for an x-y graph. It
 	writes both coordinates of the xy points to a string.
 }
-function string_from_xy_graph(gp:xy_graph_ptr):string;
+function string_from_xy_graph(var gp:xy_graph_type):string;
 
 var
 	i:integer;
@@ -2320,15 +2273,14 @@ begin
 	If the inputs are invalid, we return an empty string.
 }
 	string_from_xy_graph:='';
-	if gp=nil then exit;
-	if length(gp^)=0 then exit;
+	if length(gp)=0 then exit;
 {
 	Go through the data and write values to the string. If we overflow the string,
 	dispose of the long string, report an error, and return a nil pointer.
 }
 	ls:='';
-	for i:=0 to length(gp^)-1 do begin
-		writestr(ss,gp^[i].x:fsr:fsd,' ',gp^[i].y:fsr:fsd,' ');
+	for i:=0 to length(gp)-1 do begin
+		writestr(ss,gp[i].x:fsr:fsd,' ',gp[i].y:fsr:fsd,' ');
 		insert(ss,ls,length(ls)+1);
 		if length(ls)>long_string_length then begin
 			report_error('length(ls)>long_string_length in string_from_x_graph.');
@@ -2340,62 +2292,6 @@ begin
 }
 	string_from_xy_graph:=ls;
 end;
-
-{
-	The following functions allocate and dispose of space for one, two,
-	and three-dimensional graphs.
-}
-function new_x_graph(num_points:integer):x_graph_ptr;
-var gp:x_graph_ptr;
-begin
-	if num_points<=0 then num_points:=1;
-	new(gp);
-	setlength(gp^,num_points);
-	inc_num_outstanding_ptrs(length(gp^),'new_x_graph');
-	new_x_graph:=gp;
-end;
-
-procedure dispose_x_graph(gp:x_graph_ptr);
-begin
-	if gp=nil then exit;
-	dec_num_outstanding_ptrs(length(gp^),'dispose_x_graph');
-	dispose(gp);
-end;
-
-function new_xy_graph(num_points:integer):xy_graph_ptr;
-var gp:xy_graph_ptr;
-begin
-	if num_points<=0 then num_points:=1;
-	new(gp);
-	setlength(gp^,num_points);
-	inc_num_outstanding_ptrs(length(gp^),'new_xy_graph');
-	new_xy_graph:=gp;
-end;
-
-procedure dispose_xy_graph(gp:xy_graph_ptr);
-begin
-	if gp=nil then exit;
-	dec_num_outstanding_ptrs(length(gp^),'dispose_xy_graph');
-	dispose(gp);
-end;
-
-function new_xyz_graph(num_points:integer):xyz_graph_ptr;
-var gp:xyz_graph_ptr;
-begin
-	if num_points<=0 then num_points:=1;
-	new(gp);
-	setlength(gp^,num_points);
-	inc_num_outstanding_ptrs(length(gp^),'new_xyz_graph');
-	new_xyz_graph:=gp;
-end;
-
-procedure dispose_xyz_graph(gp:xyz_graph_ptr);
-begin
-	if gp=nil then exit;
-	dec_num_outstanding_ptrs(length(gp^),'dispose_xyz_graph');
-	dispose(gp);
-end;
-
 
 {
 	average_x_graph calculates the average of the values in a one-dimentional
@@ -2559,20 +2455,18 @@ function percentile_x_graph(gp:x_graph_ptr;percentile:real):real;
 
 var 
 	p:real=0;
-	g:x_graph_ptr;
+	g:x_graph_type;
 
 begin
 	if length(gp^)<=1 then begin
 		percentile_x_graph:=gp^[0];
 		exit;
 	end;
-	g:=new_x_graph(length(gp^));
-	g^:=gp^;
-	x_graph_ascending(g);
+	g:=gp^;
+	x_graph_ascending(@g);
 	if (percentile<0) then percentile:=0;
 	if (percentile>100) then percentile:=100;
-	p:=g^[round((length(g^)-1)*(1.0*percentile/100))];
-	dispose_x_graph(g);
+	p:=g[round((length(g)-1)*(1.0*percentile/100))];
 	percentile_x_graph:=p;
 	check_for_math_error(p);
 end;
@@ -2602,10 +2496,10 @@ begin
 	check_for_math_error(sum);
 end;
 
-function coastline_x_graph_progress(gp:x_graph_ptr):x_graph_ptr;
+function coastline_x_graph_progress(gp:x_graph_ptr):x_graph_type;
 var 
 	i:integer;
-	cp:x_graph_ptr;
+	cp:x_graph_type;
 begin
 	coastline_x_graph_progress:=nil;
 	if gp=nil then exit;
@@ -2613,14 +2507,10 @@ begin
 		report_error('length(gp^)<=1 in coastline_x_graph_progress');
 		exit;
 	end;
-	cp:=new_x_graph(length(gp^));
-	if cp=nil then begin
-		report_error('failed to allocate for cp in coastline_x_graph_progress');
-		exit;
-	end;
-	cp^[0]:=0;
+	setlength(cp,length(gp^));
+	cp[0]:=0;
 	for i:=1 to length(gp^)-1 do begin
-		cp^[i]:=cp^[i-1]+abs(gp^[i]-gp^[i-1]);
+		cp[i]:=cp[i-1]+abs(gp^[i]-gp^[i-1]);
 	end;
 	coastline_x_graph_progress:=cp;
 end;
@@ -2632,12 +2522,13 @@ end;
 	first coordinate, while the second coordinate is given by the values
 	in the x-graph.
 }
-function spikes_x_graph(gp:x_graph_ptr; threshold:real; extent:integer):xy_graph_ptr;
+function spikes_x_graph(gp:x_graph_ptr;
+	threshold:real;extent:integer):xy_graph_type;
 const
 	max_spikes=100;
 var
 	i,j,next_j,num_spikes,spike_index:integer;
-	s1,s2:xy_graph_ptr;
+	s1,s2:xy_graph_type;
 	scale,shortest_step,step,dev,max_dev:real;
 begin
 	spikes_x_graph:=nil;
@@ -2648,7 +2539,7 @@ begin
 	end;
 	scale:=coastline_x_graph(gp)/length(gp^);
 	num_spikes:=0;
-	s1:=new_xy_graph(max_spikes);
+	setlength(s1,max_spikes);
 	j:=1;
 	while (j<length(gp^)) and (num_spikes<max_spikes) do begin
 		shortest_step:=sqrt(sqr((gp^[j]-gp^[j-1])/scale)+1);
@@ -2674,20 +2565,19 @@ begin
 		end;
 		
 		if (max_dev>threshold) then begin
-			s1^[num_spikes].x:=spike_index;
-			s1^[num_spikes].y:=max_dev;
+			s1[num_spikes].x:=spike_index;
+			s1[num_spikes].y:=max_dev;
 			inc(num_spikes);
 		end;
 		j:=next_j+1;
 	end;
 	if (num_spikes>0) then begin
-		s2:=new_xy_graph(num_spikes);
+		setlength(s2,num_spikes);
 		for j:=0 to num_spikes-1 do
-			s2^[j]:=s1^[j];
+			s2[j]:=s1[j];
 	end else begin
-		s2:=nil;
+		setlength(s2,0);
 	end;
-	dispose_xy_graph(s1);
 	spikes_x_graph:=s2;
 end;
 
@@ -2814,10 +2704,10 @@ begin
 	check_for_math_error(sum);
 end;
 
-function coastline_xy_graph_progress(gp:xy_graph_ptr):xy_graph_ptr;
+function coastline_xy_graph_progress(gp:xy_graph_ptr):xy_graph_type;
 var 
 	i:integer;
-	cp:xy_graph_ptr;
+	cp:xy_graph_type;
 begin
 	coastline_xy_graph_progress:=nil;
 	if gp=nil then exit;
@@ -2825,16 +2715,12 @@ begin
 		report_error('length(gp^)<=1 in coastline_xy_graph_progress');
 		exit;
 	end;
-	cp:=new_xy_graph(length(gp^));
-	if cp=nil then begin
-		report_error('failed to allocate for cp in coastline_xy_graph_progress');
-		exit;
-	end;
-	cp^[0].x:=gp^[0].x;
-	cp^[0].y:=0;
+	setlength(cp,length(gp^));
+	cp[0].x:=gp^[0].x;
+	cp[0].y:=0;
 	for i:=1 to length(gp^)-1 do begin
-		cp^[i].x:=gp^[i].x;
-		cp^[i].y:=cp^[i-1].y+xy_separation(gp^[i],gp^[i-1]);
+		cp[i].x:=gp^[i].x;
+		cp[i].y:=cp[i-1].y+xy_separation(gp^[i],gp^[i-1]);
 	end;
 	coastline_xy_graph_progress:=cp;
 end;
@@ -2887,7 +2773,7 @@ end;
 	assume b[0] = 0. The routine receives its data via an x-graph and
 	returns data as an x-graph.
 }
-function recursive_filter(x:x_graph_ptr;a_list,b_list:string):x_graph_ptr;
+function recursive_filter(x:x_graph_ptr;a_list,b_list:string):x_graph_type;
 
 const
 	min_num_points=2;
@@ -2898,7 +2784,7 @@ var
 	i,k,n,end_b,end_a:integer;
 	a:array [0..max_n] of real;
 	b:array [1..max_n] of real;
-	y:x_graph_ptr;
+	y:x_graph_type;
 	dc_gain,p,q:real;
 
 begin
@@ -2909,7 +2795,7 @@ begin
 		exit;
 	end;	
 	n:=length(x^);
-	y:=new_x_graph(n);
+	setlength(y,n);
 	
 	for i:=0 to max_n do a[i]:=0;
 	end_a:=0;
@@ -2932,13 +2818,13 @@ begin
 	else dc_gain:=1;
 	
 	for k:=0 to n-1 do begin
-		y^[k]:=0;
+		y[k]:=0;
 		for i:=0 to end_a-1 do
-			if (k-i)>=0 then y^[k]:=y^[k]+a[i]*x^[k-i]
-			else y^[k]:=y^[k]+a[i]*x^[0];
+			if (k-i)>=0 then y[k]:=y[k]+a[i]*x^[k-i]
+			else y[k]:=y[k]+a[i]*x^[0];
 		for i:=1 to end_b-1 do
-			if (k-i)>=0 then y^[k]:=y^[k]+b[i]*y^[k-i]
-			else y^[k]:=y^[k]+b[i]*x^[0]*dc_gain;
+			if (k-i)>=0 then y[k]:=y[k]+b[i]*y[k-i]
+			else y[k]:=y[k]+b[i]*x^[0]*dc_gain;
 	end;
 	
 	recursive_filter:=y;
@@ -3064,7 +2950,7 @@ function glitch_filter(dp:x_graph_ptr;threshold:real):integer;
 
 var
 	n:integer;
-	gp:xy_graph_ptr=nil;
+	gp:xy_graph_type;
 	
 begin
 {
@@ -3076,23 +2962,22 @@ begin
 {
 	Create an xy-graph.
 }
-	gp:=new_xy_graph(length(dp^));
+	setlength(gp,length(dp^));
 	if gp=nil then exit;
 {
 	Copy the data values into the xy-graph as the y-values and set all the x-values to zero. 
-	Call glitch_filter_xy on the new xy-graph, then copy the y-values out again.
+	Call glitch_filter_xy on the new xy-graph.
 }
 	for n:=0 to length(dp^)-1 do begin
-		gp^[n].y:=dp^[n];
-		gp^[n].x:=0;
+		gp[n].y:=dp^[n];
+		gp[n].x:=0;
 	end;
-	glitch_filter:=glitch_filter_xy(gp,threshold);
-	for n:=0 to length(dp^)-1 do
-		dp^[n]:=gp^[n].y;
+	glitch_filter:=glitch_filter_xy(@gp,threshold);
 {
-	Dispose the x-graph we created for the one-dimensional glitch routine.
+	Copy the glitch filter output back into the original graph.
 }
-	dispose_xy_graph(gp);
+	for n:=0 to length(dp^)-1 do
+		dp^[n]:=gp[n].y;
 end;
 
 {
@@ -3103,7 +2988,7 @@ function glitch_filter_y(gp:xy_graph_ptr;threshold:real):integer;
 
 var
 	n:integer;
-	gp2:xy_graph_ptr=nil;
+	gp2:xy_graph_type=nil;
 	
 begin
 {
@@ -3116,27 +3001,23 @@ begin
 {
 	Create an new xy-graph.
 }
-	gp2:=new_xy_graph(length(gp^));
+	setlength(gp2,length(gp^));
 	if gp=nil then exit;
 {
 	Copy the y values from gp into the y-values of gp2 and set the x-values of gp2 all
 	to zero. Call glitch_filter_xy on gp2.
 }
 	for n:=0 to length(gp^)-1 do begin
-		gp2^[n].y:=gp^[n].y;
-		gp2^[n].x:=0;
+		gp2[n].y:=gp^[n].y;
+		gp2[n].x:=0;
 	end;
-	glitch_filter_y:=glitch_filter_xy(gp2,threshold);
+	glitch_filter_y:=glitch_filter_xy(@gp2,threshold);
 {
 	Copy the glitch-filtered y-values out of gp2 into gp. We leave the x-values of gp 
 	as they were: only the y-values are being glitch filtered.
 }
 	for n:=0 to length(gp^)-1 do
-		gp^[n].y:=gp2^[n].y;
-{
-	Dispose the x-graph we created for the one-dimensional glitch routine.
-}
-	dispose_xy_graph(gp2);
+		gp^[n].y:=gp2[n].y;
 end;
 
 {
@@ -3282,8 +3163,6 @@ var
 	s:string;
 	
 begin
-	s:='';
-	gui_writeln(s);
 	s:='Index, Elapsed (ms), Comment:';
 	gui_writeln(s);
 	for index:=0 to mark_time_index-1 do begin
@@ -4630,7 +4509,7 @@ end;
 	convenient for image analysis. 
 }
 procedure calculate_ft_term(period:real;
-	dp:x_graph_ptr;
+	var dp:x_graph_type;
 	var amplitude,offset:real);
 
 const
@@ -4641,23 +4520,22 @@ var
 	phase_step,phase,a,b:real;
 
 begin
-	if dp=nil then exit;
-	if (length(dp^)<1) or (period<0) then exit;
+	if (length(dp)<1) or (period<0) then exit;
 	if (period=0) then begin
 		phase:=0;
-		amplitude:=average_x_graph(dp);
+		amplitude:=average_x_graph(@dp);
 	end else begin
 		phase_step:=2*pi/period;
 		phase:=0;
 		a:=0;
 		b:=0;
-		for n:=0 to length(dp^)-1 do begin
-			a:=a+cos(phase)*dp^[n];
-			b:=b+sin(phase)*dp^[n];
+		for n:=0 to length(dp)-1 do begin
+			a:=a+cos(phase)*dp[n];
+			b:=b+sin(phase)*dp[n];
 			phase:=phase+phase_step;
 		end;
 		offset:=-period*full_arctan(a,b)/(2*pi);
-		amplitude:=sqrt(sqr(a)+sqr(b))*scaling_factor/length(dp^);
+		amplitude:=sqrt(sqr(a)+sqr(b))*scaling_factor/length(dp);
 	end;
 	check_for_math_error(offset);
 	check_for_math_error(amplitude);
@@ -4672,7 +4550,7 @@ end;
 	fft routine.
 }
 procedure frequency_component(frequency:real;
-	dp:x_graph_ptr;
+	var dp:x_graph_type;
 	var amplitude,offset:real);
 
 const
@@ -4685,19 +4563,18 @@ var
 begin
 	amplitude:=0;
 	offset:=0;
-	if dp=nil then exit;
-	if (length(dp^)<1) then exit;
-	phase_step:=2*pi*frequency/length(dp^);
+	if (length(dp)<1) then exit;
+	phase_step:=2*pi*frequency/length(dp);
 	phase:=0;
 	a:=0;
 	b:=0;
-	for n:=0 to length(dp^)-1 do begin
-		a:=a+cos(phase)*dp^[n];
-		b:=b+sin(phase)*dp^[n];
+	for n:=0 to length(dp)-1 do begin
+		a:=a+cos(phase)*dp[n];
+		b:=b+sin(phase)*dp[n];
 		phase:=phase+phase_step;
 	end;
-	amplitude:=sqrt(sqr(a)+sqr(b))*scaling_factor/length(dp^);
-	if frequency<>0 then offset:=-length(dp^)*full_arctan(a,b)/(2*pi*frequency);
+	amplitude:=sqrt(sqr(a)+sqr(b))*scaling_factor/length(dp);
+	if frequency<>0 then offset:=-length(dp)*full_arctan(a,b)/(2*pi*frequency);
 	check_for_math_error(offset);
 	check_for_math_error(amplitude);
 end;
@@ -4752,10 +4629,10 @@ end;
 	terms, so that X(k) -> X(N-k), but note that X(N) = X(0) so the first term
 	remains in place.
 }
-function fft(dp:xy_graph_ptr):xy_graph_ptr;
+function fft(var dp:xy_graph_type):xy_graph_type;
 
 var
-	tp,sp:xy_graph_ptr;
+	tp,sp:xy_graph_type;
 
 {
 	The fft_step routine is the heart of the fft procedure. It implements the
@@ -4778,7 +4655,7 @@ var
 		sc:xy_point_type;
 		
 	begin
-		np:=length(dp^) div step;
+		np:=length(dp) div step;
 		npd2:=np div 2;
 		if np>1 then begin
 			fft_step(step*2,start);
@@ -4790,27 +4667,27 @@ var
 				sc.y:=sin(-2*pi*k/np);
 				i_even:=start+2*k*step;
 				i_odd:=i_even+step;
-				sp^[i_new].x:=
-					tp^[i_even].x
-					+sc.x*tp^[i_odd].x-sc.y*tp^[i_odd].y;
-				sp^[i_new].y:=
-					tp^[i_even].y
-					+sc.x*tp^[i_odd].y+sc.y*tp^[i_odd].x;
+				sp[i_new].x:=
+					tp[i_even].x
+					+sc.x*tp[i_odd].x-sc.y*tp[i_odd].y;
+				sp[i_new].y:=
+					tp[i_even].y
+					+sc.x*tp[i_odd].y+sc.y*tp[i_odd].x;
 				i_new:=i_new+npd2*step;
-				sp^[i_new].x:=
-					tp^[i_even].x
-					-sc.x*tp^[i_odd].x+sc.y*tp^[i_odd].y;
-				sp^[i_new].y:=
-					tp^[i_even].y
-					-sc.x*tp^[i_odd].y-sc.y*tp^[i_odd].x;				
+				sp[i_new].x:=
+					tp[i_even].x
+					-sc.x*tp[i_odd].x+sc.y*tp[i_odd].y;
+				sp[i_new].y:=
+					tp[i_even].y
+					-sc.x*tp[i_odd].y-sc.y*tp[i_odd].x;				
 			end;
 			
 			for k:=0 to np-1 do begin
 				i_new:=start+k*step;
-				tp^[i_new]:=sp^[i_new];
+				tp[i_new]:=sp[i_new];
 			end;
 		end else begin
-			tp^[start]:=dp^[start];
+			tp[start]:=dp[start];
 		end;
 	end;
 
@@ -4822,45 +4699,43 @@ begin
 {
 	A nil pointer indicates a problem.
 }
-	fft:=nil;
-	if dp=nil then exit;
+	setlength(fft,0);
 {
 	We insist upon at least one data point.
 }
-	if length(dp^)<1 then begin
-		report_error('length(dp^)<1 in fft');
+	if length(dp)<1 then begin
+		report_error('length(dp)<1 in fft');
 		exit;
 	end;
 {
 	We insist upon a number of samples that is a perfect power of two.
 }
-	i:=length(dp^);
+	i:=length(dp);
 	while ((i mod 2) = 0) do i:=i div 2;
 	if (i>1) then begin
-		report_error('length(dp^) is not a power of two in fft');
+		report_error('length(dp) is not a power of two in fft');
 		exit;
 	end;
 {
 	We allocate space for our transform and for a scratch area, in which
 	we will assemble intermediate transform components.
 }
-	tp:=new_xy_graph(length(dp^));
-	sp:=new_xy_graph(length(dp^));
+	setlength(tp,length(dp));
+	setlength(sp,length(dp));
 {
 	Apply our recursive fft_step routine to the data.
 }
 	fft_step(1,0);
 {
-	Scale all the components by 1/N.
+	Scale all the components by 1/N. At this point, we are sure that N>0.
 }
-	scale:=1/length(tp^);
-	for i:=0 to length(tp^)-1 do begin
-		tp^[i]:=xy_scale(tp^[i],scale);
+	scale:=1/length(tp);
+	for i:=0 to length(tp)-1 do begin
+		tp[i]:=xy_scale(tp[i],scale);
 	end;
 {
 	Dispose of the scratch area and return the completed transform.
 }
-	dispose_xy_graph(sp);
 	fft:=tp;
 end;
 
@@ -4874,35 +4749,34 @@ end;
 	that, we scale the resulting components by N so that they have the correct
 	magnitude.
 }
-function fft_inverse(ft:xy_graph_ptr):xy_graph_ptr;
+function fft_inverse(var ft:xy_graph_type):xy_graph_type;
 
 var
-	ftr,dp:xy_graph_ptr;
+	ftr,dp:xy_graph_type;
 	k,n:integer;
 	
 begin
 {
 	A nil pointer indicates a problem.
 }
-	fft_inverse:=nil;
-	if ft=nil then exit;
+	setlength(fft_inverse,0);
+	if length(ft)<1 then exit;
 {
 	Create a reverse-order array.
 }
-	ftr:=new_xy_graph(length(ft^));
-	for k:=0 to length(ft^)-1 do
-		ftr^[k]:=ft^[(length(ft^)-k) mod length(ft^)];
+	setlength(ftr,length(ft));
+	for k:=0 to length(ft)-1 do
+		ftr[k]:=ft[(length(ft)-k) mod length(ft)];
 {
 	Obtain the inverse-transform.
 }
 	dp:=fft(ftr);
-	dispose_xy_graph(ftr);	
-	if dp=nil then exit;
+	if length(dp)=0 then exit;
 {
 	Scale the points by N.
 }
-	for n:=0 to length(dp^)-1 do 
-		dp^[n]:=xy_scale(dp^[n],length(dp^));
+	for n:=0 to length(dp)-1 do 
+		dp[n]:=xy_scale(dp[n],length(dp));
 {
 	Return the complex-valued data points.
 }
@@ -4932,44 +4806,41 @@ end;
 	always 0 or pi, never anything in between, and we can represent phase 0 with
 	a positive magnitude and phase pi with a negative. 
 }
-function fft_real(dp:x_graph_ptr):xy_graph_ptr;
+function fft_real(var dp:x_graph_type):xy_graph_type;
 
 var 
-	dpxy,ft:xy_graph_ptr;
+	dpxy,ft:xy_graph_type;
 	n,k:integer;
 	
 begin
 {
 	A nil pointer indicates a problem.
 }
-	fft_real:=nil;
-	if dp=nil then exit;
-	if length(dp^)<=1 then exit;
+	setlength(fft_real,0);
+	if length(dp)<=1 then exit;
 {
 	Copy our real data into a complex array.
 }
-	dpxy:=new_xy_graph(length(dp^));
-	for n:=0 to length(dp^)-1 do begin
-		dpxy^[n].x:=dp^[n];
-		dpxy^[n].y:=0;
+	setlength(dpxy,length(dp));
+	for n:=0 to length(dp)-1 do begin
+		dpxy[n].x:=dp[n];
+		dpxy[n].y:=0;
 	end;
 {
 	Obtain the complex-valued transform.
 }
 	ft:=fft(dpxy);
-	dispose_xy_graph(dpxy);
-	if ft=nil then exit;
+	if length(ft)<0 then exit;
 {
 	Convert complex transform to compact magnitude-phase transform.
 }
-	dpxy:=new_xy_graph(length(dp^) div 2);
-	dpxy^[0].x:=ft^[0].x;
-	dpxy^[0].y:=ft^[length(dpxy^)].x;
-	for k:=1 to length(dpxy^)-1 do begin
-		dpxy^[k].x:=2*xy_length(ft^[k]);
-		dpxy^[k].y:=xy_bearing(ft^[k]);
+	setlength(dpxy,length(dp) div 2);
+	dpxy[0].x:=ft[0].x;
+	dpxy[0].y:=ft[length(dpxy)].x;
+	for k:=1 to length(dpxy)-1 do begin
+		dpxy[k].x:=2*xy_length(ft[k]);
+		dpxy[k].y:=xy_bearing(ft[k]);
 	end;
-	dispose_xy_graph(ft);
 {
 	Return the compact transform.
 }
@@ -4988,48 +4859,46 @@ end;
 	sinusoid with a*cos(2*pi*k*n/N - p). That is: we are passing into the
 	inverse routine the amplitudes and phases of a set of cosine waves.
 }
-function fft_real_inverse(ft:xy_graph_ptr):x_graph_ptr;
+function fft_real_inverse(var ft:xy_graph_type):x_graph_type;
 
 var
-	ftxy,dpxy:xy_graph_ptr;
-	dp:x_graph_ptr;
+	ftxy,dpxy:xy_graph_type;
+	dp:x_graph_type;
 	k,n:integer;
 	
 begin
 {
 	A nil pointer indicates a problem.
 }
-	fft_real_inverse:=nil;
-	if ft=nil then exit;
+	setlength(fft_real_inverse,0);
+	if length(ft)<1 then exit;
 {
 	Convert the N/2 magnitude-phase components of the compact transform
 	into a complex-valued series of N components.
 }
-	ftxy:=new_xy_graph(2*length(ft^));
-	ftxy^[0].x:=ft^[0].x;
-	ftxy^[0].y:=0;
-	for k:=1 to length(ft^)-1 do begin
-		ftxy^[k].x:=ft^[k].x/2*cos(ft^[k].y);
-		ftxy^[k].y:=ft^[k].x/2*sin(ft^[k].y);
+	setlength(ftxy,2*length(ft));
+	ftxy[0].x:=ft[0].x;
+	ftxy[0].y:=0;
+	for k:=1 to length(ft)-1 do begin
+		ftxy[k].x:=ft[k].x/2*cos(ft[k].y);
+		ftxy[k].y:=ft[k].x/2*sin(ft[k].y);
 	end;
-	ftxy^[length(ft^)].x:=ft^[0].y;
-	ftxy^[length(ft^)].y:=0;
-	for k:=(length(ft^)+1) to (2*length(ft^)-1) do begin
-		ftxy^[k].x:=ftxy^[2*length(ft^)-k].x;
-		ftxy^[k].y:=-ftxy^[2*length(ft^)-k].y;
+	ftxy[length(ft)].x:=ft[0].y;
+	ftxy[length(ft)].y:=0;
+	for k:=(length(ft)+1) to (2*length(ft)-1) do begin
+		ftxy[k].x:=ftxy[2*length(ft)-k].x;
+		ftxy[k].y:=-ftxy[2*length(ft)-k].y;
 	end;
 {
 	Obtain the inverse transform.
 }
 	dpxy:=fft_inverse(ftxy);
-	dispose_xy_graph(ftxy);
 {
 	Extract real values.
 }
-	dp:=new_x_graph(length(dpxy^));
-	for n:=0 to length(dpxy^)-1 do
-		dp^[n]:=dpxy^[n].x;
-	dispose_xy_graph(dpxy);
+	setlength(dp,length(dpxy));
+	for n:=0 to length(dpxy)-1 do
+		dp[n]:=dpxy[n].x;
 {
 	Return the result.
 }

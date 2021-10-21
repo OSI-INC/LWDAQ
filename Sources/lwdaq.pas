@@ -937,7 +937,7 @@ function lwdaq_image_histogram(data,interp:pointer;argc:integer;var argv:Tcl_Arg
 var 
 	image_name:string='';
 	result:string='';
-	hp:xy_graph_ptr;
+	hg:xy_graph_type;
 	ip:image_ptr_type;
 	i:integer;
 
@@ -962,10 +962,9 @@ begin
 		exit;
 	end;
 	
-	hp:=image_histogram(ip);
-	for i:=0 to length(hp^)-1 do
-		writestr(result,result,hp^[i].x:1:0,' ',hp^[i].y:1:0,' ');
-	dispose_xy_graph(hp);
+	hg:=image_histogram(ip);
+	for i:=0 to length(hg)-1 do
+		writestr(result,result,hg[i].x:1:0,' ',hg[i].y:1:0,' ');
 	
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
@@ -983,7 +982,7 @@ var
 	arg_index:integer;
 	image_name:string='';
 	result:string='';
-	pp:x_graph_ptr;
+	pp:x_graph_type;
 	ip:image_ptr_type;
 	vp:pointer;	
 	i:integer;
@@ -1027,9 +1026,8 @@ begin
 
 	if row then pp:=image_profile_row(ip)
 	else pp:=image_profile_column(ip);
-	for i:=0 to length(pp^)-1 do writestr(result,result,pp^[i]:fsr:fsd,' ');
-	dispose_x_graph(pp);
-	
+	for i:=0 to length(pp)-1 do writestr(result,result,pp[i]:fsr:fsd,' ');
+
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
 	lwdaq_image_profile:=Tcl_OK;
@@ -1875,8 +1873,8 @@ var
 	residual:real=0;
 	density:real=0;
 	stdev:real=0;
-	gpx:x_graph_ptr;
-	gpxy:xy_graph_ptr;
+	gpx:x_graph_type;
+	gpxy:xy_graph_type;
 	j:integer;
 		
 begin
@@ -1925,14 +1923,12 @@ begin
 		
 	start_timer('finding intensity-slope','lwdaq_dosimeter');
 	gpx:=image_profile_column(ip);
-	gpxy:=new_xy_graph(length(gpx^));
-	for j:=0 to length(gpx^)-1 do begin
-		gpxy^[j].x:=j;
-		gpxy^[j].y:=gpx^[j];
+	setlength(gpxy,length(gpx));
+	for j:=0 to length(gpx)-1 do begin
+		gpxy[j].x:=j;
+		gpxy[j].y:=gpx[j];
 	end;
-	straight_line_fit(gpxy,slope,intercept,residual);
-	dispose_xy_graph(gpxy);
-	dispose_x_graph(gpx);
+	straight_line_fit(@gpxy,slope,intercept,residual);
 	
 	if subtract_gradient then begin
 		mark_time('subtracting gradient','lwdaq_dosimeter');
@@ -2459,7 +2455,7 @@ var
 	i:integer=1;
 	j:integer=1;
 	slp:spot_list_ptr_type;
-	pp:x_graph_ptr;
+	pp:x_graph_type;
 	saved_bounds:ij_rectangle_type;
 	ref_line:ij_line_type;
 	threshold:string='50';
@@ -2577,14 +2573,12 @@ begin
 		saved_bounds:=ip^.analysis_bounds;
 		pp:=image_profile_row(iip);
 		ip^.analysis_bounds:=iip^.analysis_bounds;
-		display_profile_row(ip,pp,yellow_color);
+		display_profile_row(ip,@pp,yellow_color);
 		ip^.analysis_bounds:=saved_bounds;
-		dispose_x_graph(pp);
 		mark_time('displaying intensity profile','lwdaq_wps');
 		pp:=image_profile_row(ip);
-		display_profile_row(ip,pp,green_color);
+		display_profile_row(ip,@pp,green_color);
 		ip^.analysis_bounds:=saved_bounds;
-		dispose_x_graph(pp);
 	end;
 	mark_time('displaying lines','lwdaq_wps');
 	spot_list_display_vertical_lines(ip,slp,red_color);
@@ -3205,7 +3199,7 @@ begin
 end;
 
 {
-<p>lwdaq_alt extracts power measurements from data recorded in an Animal Location Tracker (ALT), such as the <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>, so as to measure the location of Subcutaneous Transmitters (SCTs), such as the <a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>. The routine assumes that the global electronics_trace is a valid xy_graph_ptr created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
+<p>lwdaq_alt extracts power measurements from data recorded in an Animal Location Tracker (ALT), such as the <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>, so as to measure the location of Subcutaneous Transmitters (SCTs), such as the <a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>. The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
 
 <p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements.</p>
 
@@ -3286,7 +3280,7 @@ var
 	function power_measurement(sn,dn:integer):integer;
 	var n,i:integer;
 	begin
-		i:=round(electronics_trace^[sn].y);
+		i:=round(electronics_trace[sn].y);
 		if i>=0 then begin
 			n:=i*(payload+core_message_length)
 				+core_message_length
@@ -3319,7 +3313,7 @@ begin
 		exit;
 	end;
 	
-	num_samples:=length(electronics_trace^);
+	num_samples:=length(electronics_trace);
 	if num_samples=0 then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Number of samples is zero in lwdaq_alt.');
@@ -3332,7 +3326,7 @@ begin
 		detectors.
 	}
 	field:=Tcl_ObjString(argv[2]);
-	detector_coordinates:=read_xy_graph_fpc(field);
+	detector_coordinates:=read_xy_graph(field);
 	num_detectors:=length(detector_coordinates);
 	if num_detectors=0 then begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -3353,7 +3347,7 @@ begin
 		else if (option='-slices') then num_slices:=Tcl_ObjInteger(vp)			
 		else if (option='-background') then begin
 			field:=Tcl_ObjString(vp);
-			detector_background:=read_x_graph_fpc(field);
+			detector_background:=read_x_graph(field);
 		end else if (option='-percentile') then percentile:=Tcl_ObjReal(vp)			
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -3374,7 +3368,7 @@ begin
 			detector_background[detector_num]:=0;
 	end;
 
-	if electronics_trace=nil then begin
+	if length(electronics_trace)=0 then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Electronics trace does not exist in lwdaq_alt.');
 		exit;
@@ -3879,7 +3873,7 @@ begin
 
 	result:=Tcl_ObjString(argv[1]);
 	if y_only then begin
-		gx:=read_x_graph_fpc(result);
+		gx:=read_x_graph(result);
 		setlength(gxy,length(gx));
 		for point_num:=0 to length(gx)-1 do begin
 			gxy[point_num].x:=point_num;
@@ -3887,7 +3881,7 @@ begin
 		end;
 	end;
 	if x_only then begin 
-		gx:=read_x_graph_fpc(result);
+		gx:=read_x_graph(result);
 		setlength(gxy,length(gx));
 		for point_num:=0 to length(gx)-1 do begin
 			gxy[point_num].y:=-point_num;
@@ -3895,7 +3889,7 @@ begin
 		end;
 	end;
 	if (not y_only) and (not x_only) then 
-		gxy:=read_xy_graph_fpc(result);
+		gxy:=read_xy_graph(result);
 
 	if glitch>0 then glitch_filter_y(@gxy,glitch);
 
@@ -3940,9 +3934,9 @@ end;
 function lwdaq_filter(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 var 
-	vt_signal:xy_graph_ptr=nil;
-	signal:x_graph_ptr=nil;
-	filtered:x_graph_ptr=nil;
+	vt_signal:xy_graph_type;
+	signal:x_graph_type;
+	filtered:x_graph_type;
 	a_list:string='';
 	b_list:string='';
 	option:string='';
@@ -3991,14 +3985,14 @@ begin
 	result:=Tcl_ObjString(argv[arg_index]);
 	if tv_format then begin
 		vt_signal:=read_xy_graph(result);
-		signal:=new_x_graph(length(vt_signal^));
-		for point_num:=0 to length(signal^)-1 do
-			signal^[point_num]:=vt_signal^[point_num].y;
+		setlength(signal,length(vt_signal));
+		for point_num:=0 to length(signal)-1 do
+			signal[point_num]:=vt_signal[point_num].y;
 	end else begin
 		signal:=read_x_graph(result);
 	end;
 	if ave_start then
-		signal^[0]:=average_x_graph(signal);
+		signal[0]:=average_x_graph(@signal);
 	inc(arg_index);
 	a_list:=Tcl_ObjString(argv[arg_index]);
 	inc(arg_index);
@@ -4007,25 +4001,22 @@ begin
 {
 	Call the dsp routine on the signal.
 }
-	filtered:=recursive_filter(signal,a_list,b_list);	
+	filtered:=recursive_filter(@signal,a_list,b_list);	
 {
 	Prepare the output data.
 }
 	if filtered<>nil then begin
 		if tv_format then begin
-			for point_num:=0 to length(filtered^)-1 do
-				vt_signal^[point_num].y:=filtered^[point_num];
+			for point_num:=0 to length(filtered)-1 do
+				vt_signal[point_num].y:=filtered[point_num];
 			result:=string_from_xy_graph(vt_signal);
 		end else
 			result:=string_from_x_graph(filtered);
-		dispose_x_graph(filtered);
 		Tcl_SetReturnString(interp,result);
 	end;
 {
 	Dispose of pointers and check for errors.
 }
-	dispose_x_graph(signal);
-	if tv_format then dispose_xy_graph(vt_signal);	
 	if error_string<>'' then Tcl_SetReturnString(interp,error_string);
 	lwdaq_filter:=Tcl_OK;
 end;
@@ -4142,9 +4133,9 @@ lwdaq_fft $dft -inverse 1
 function lwdaq_fft(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 var 
-	gp:xy_graph_ptr=nil;
-	ft:xy_graph_ptr=nil;
-	gpx:x_graph_ptr=nil;
+	gp:xy_graph_type;
+	ft:xy_graph_type;
+	gpx:x_graph_type;
 	option:string='';
 	arg_index:integer;
 	vp:pointer;	
@@ -4205,16 +4196,13 @@ begin
 		if complex then begin
 			gp:=read_xy_graph(result);
 			ft:=fft(gp);
-			dispose_xy_graph(gp);
 		end else begin
 			gpx:=read_x_graph(result);
-			if glitch>0 then glitch_filter(gpx,glitch);
-			if window>0 then window_function(gpx,window);
+			if glitch>0 then glitch_filter(@gpx,glitch);
+			if window>0 then window_function(@gpx,window);
 			ft:=fft_real(gpx);
-			dispose_x_graph(gpx);
 		end;
 		result:=string_from_xy_graph(ft);
-		dispose_xy_graph(ft);
 	end;
 {
 	The reverse transform.
@@ -4224,14 +4212,10 @@ begin
 		ft:=read_xy_graph(result);
 		if complex then begin
 			gp:=fft_inverse(ft);
-			dispose_xy_graph(ft);
 			result:=string_from_xy_graph(gp);
-			dispose_xy_graph(gp);
 		end else begin
 			gpx:=fft_real_inverse(ft);
-			dispose_xy_graph(ft);
 			result:=string_from_x_graph(gpx);
-			dispose_x_graph(gpx);
 		end;
 	end;
 {
@@ -4252,7 +4236,7 @@ var
 	command:string='';
 	select:string='';
 	result:string='';
-	gp:x_graph_ptr;
+	gp:x_graph_type;
 
 begin
 	error_string:='';
@@ -4272,14 +4256,13 @@ begin
 
 	metrics:='invalid command';
 	select:=read_word(command);
-	if select='A' then metrics:=metric_calculation_A(gp,command)
-	else if select='B' then metrics:=metric_calculation_B(gp,command)
-	else if select='C' then metrics:=metric_calculation_C(gp,command)
-	else if select='D' then metrics:=metric_calculation_D(gp,command)
-	else if select='E' then metrics:=metric_calculation_E(gp,command)
+	if select='A' then metrics:=metric_calculation_A(@gp,command)
+	else if select='B' then metrics:=metric_calculation_B(@gp,command)
+	else if select='C' then metrics:=metric_calculation_C(@gp,command)
+	else if select='D' then metrics:=metric_calculation_D(@gp,command)
+	else if select='E' then metrics:=metric_calculation_E(@gp,command)
 	else report_error('invalid selection "'+select+'" in lwdaq_metrics');
 
-	dispose_x_graph(gp);
 	Tcl_SetReturnString(interp,metrics);
 	if error_string<>'' then Tcl_SetReturnString(interp,error_string);
 	lwdaq_metrics:=Tcl_OK;
@@ -4669,7 +4652,7 @@ point, and a zero vector.</p>
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gp:=read_xy_graph_fpc(result);
+		gp:=read_xy_graph(result);
 		straight_line_fit(@gp,slope ,intercept,rms_residual);
 		writestr(result,slope:fsr:fsd,' ',intercept:fsr:fsd,' ',rms_residual:fsr:fsd);
 		Tcl_SetReturnString(interp,result);
@@ -4685,7 +4668,7 @@ point, and a zero vector.</p>
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gpx:=read_x_graph_fpc(result);
+		gpx:=read_x_graph(result);
 		writestr(result,average_x_graph(@gpx):fsr:fsd,' ',
 			stdev_x_graph(@gpx):fsr:fsd,' ',
 			max_x_graph(@gpx):fsr:fsd,' ',
@@ -4705,7 +4688,7 @@ point, and a zero vector.</p>
 		end;
 		position:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gp:=read_xy_graph_fpc(result);
+		gp:=read_xy_graph(result);
 		linear_interpolate(@gp,position,interpolation);
 		writestr(result,interpolation:fsr:fsd);
 		Tcl_SetReturnString(interp,result);
@@ -4796,9 +4779,9 @@ lwdaq frequency_components "0 1 2 3 4 5" "0 0 0 0 1 1 1 1"
 				+'"lwdaq '+option+' frequencies waveform".');
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		frequencies:=read_x_graph_fpc(result);
+		frequencies:=read_x_graph(result);
 		result:=Tcl_ObjString(argv[3]);
-		signal:=read_x_graph_fpc(result);
+		signal:=read_x_graph(result);
 		average:=average_x_graph(@signal);
 		for i:=0 to length(signal)-1 do signal[i]:=signal[i]-average;
 		result:='';
@@ -4807,7 +4790,7 @@ lwdaq frequency_components "0 1 2 3 4 5" "0 0 0 0 1 1 1 1"
 				amplitude:=average;
 				offset:=0;
 			end else begin
-				frequency_component(frequencies[i],@signal,amplitude,offset);
+				frequency_component(frequencies[i],signal,amplitude,offset);
 			end;
 			writestr(s,amplitude:fsr:fsd,' ',offset:fsr:fsd,' ');
 			insert(s,result,length(result)+1);
@@ -4841,9 +4824,9 @@ lwdaq window_function 5 "0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
 		end;
 		extent:=Tcl_ObjInteger(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gpx:=read_x_graph_fpc(result);
+		gpx:=read_x_graph(result);
 		window_function(@gpx,extent);
-		result:=string_from_x_graph(@gpx);
+		result:=string_from_x_graph(gpx);
 		Tcl_SetReturnString(interp,result);
 	end 
 	else if option='glitch_filter' then begin
@@ -4869,10 +4852,10 @@ lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
 		end;
 		threshold:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gpx:=read_x_graph_fpc(result);
+		gpx:=read_x_graph(result);
 		if abs(threshold)>0 then 
 			num_glitches:=glitch_filter(@gpx,abs(threshold));
-		result:=string_from_x_graph(@gpx);
+		result:=string_from_x_graph(gpx);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
 			insert(s,result,length(result)+1);
@@ -4897,9 +4880,9 @@ lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 
 		end;
 		threshold:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gp:=read_xy_graph_fpc(result);
+		gp:=read_xy_graph(result);
 		num_glitches:=glitch_filter_y(@gp,abs(threshold));
-		result:=string_from_xy_graph(@gp);
+		result:=string_from_xy_graph(gp);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
 			insert(s,result,length(result)+1);
@@ -4924,9 +4907,9 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 		end;
 		threshold:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
-		gp:=read_xy_graph_fpc(result);
+		gp:=read_xy_graph(result);
 		num_glitches:=glitch_filter_xy(@gp,abs(threshold));
-		result:=string_from_xy_graph(@gp);
+		result:=string_from_xy_graph(gp);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
 			insert(s,result,length(result)+1);
@@ -4951,11 +4934,11 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gpx:=read_x_graph_fpc(result);
+		gpx:=read_x_graph(result);
 		threshold:=Tcl_ObjReal(argv[3]);
 		extent:=Tcl_ObjInteger(argv[4]);
-		gp:=spikes_x_graph(@gpx,threshold,extent)^;
-		result:=string_from_xy_graph(@gp);
+		gp:=spikes_x_graph(@gpx,threshold,extent);
+		result:=string_from_xy_graph(gp);
 		Tcl_SetReturnString(interp,result);
 	end
 	else if option='coastline_x' then begin
@@ -4969,7 +4952,7 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gpx:=read_x_graph_fpc(result);
+		gpx:=read_x_graph(result);
 		writestr(result,coastline_x_graph(@gpx):fsr:fsd);
 		Tcl_SetReturnString(interp,result);
 	end
@@ -4984,9 +4967,9 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gpx:=read_x_graph_fpc(result);
-		gpx2:=coastline_x_graph_progress(@gpx)^;
-		result:=string_from_x_graph(@gpx2);
+		gpx:=read_x_graph(result);
+		gpx2:=coastline_x_graph_progress(@gpx);
+		result:=string_from_x_graph(gpx2);
 		Tcl_SetReturnString(interp,result);
 	end
 	else if option='coastline_xy' then begin
@@ -5000,7 +4983,7 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gp:=read_xy_graph_fpc(result);
+		gp:=read_xy_graph(result);
 		writestr(result,coastline_xy_graph(@gp):fsr:fsd);
 		Tcl_SetReturnString(interp,result);
 	end
@@ -5015,9 +4998,9 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 			exit;
 		end;
 		result:=Tcl_ObjString(argv[2]);
-		gp:=read_xy_graph_fpc(result);
-		gp2:=coastline_xy_graph_progress(@gp)^;
-		result:=string_from_xy_graph(@gp2);
+		gp:=read_xy_graph(result);
+		gp2:=coastline_xy_graph_progress(@gp);
+		result:=string_from_xy_graph(gp2);
 		Tcl_SetReturnString(interp,result);
 	end
 	else if option='matrix_inverse' then begin

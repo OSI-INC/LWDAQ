@@ -618,7 +618,7 @@ const
 	num_points=10000;
 
 var 
-	hp:xy_graph_ptr;
+	hp:xy_graph_type;
 	point:ij_point_type;
 	num_bins,point_num,i,counter,median:integer;
 	sum:real;
@@ -630,10 +630,10 @@ begin
 	end;
 
 	num_bins:=max_intensity-min_intensity+1;
-	hp:=new_xy_graph(num_bins);
+	setlength(hp,num_bins);
 
 	for i:=min_intensity to max_intensity do begin
-		with hp^[i-min_intensity] do begin
+		with hp[i-min_intensity] do begin
 			x:=i;
 			y:=0;
 		end;
@@ -644,7 +644,7 @@ begin
 		point:=ij_random_point(ip^.analysis_bounds);
 		i:=get_px(ip,point.j,point.i);
 		if (i>=min_intensity) and (i<=max_intensity) then begin
-			hp^[i-min_intensity].y:=hp^[i-min_intensity].y+1;
+			hp[i-min_intensity].y:=hp[i-min_intensity].y+1;
 			inc(counter);
 		end;
 	end;
@@ -652,7 +652,7 @@ begin
 	sum:=0;
 	median:=min_intensity;
 	for i:=min_intensity to max_intensity do begin
-		sum:=sum+hp^[i-min_intensity].y;
+		sum:=sum+hp[i-min_intensity].y;
 		if sum<=one_half*counter then median:=i;
 	end;
 	

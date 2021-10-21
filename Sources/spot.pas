@@ -251,35 +251,34 @@ const
 	
 var
 	i,j,pixel_num:integer;
-	gp:xyz_graph_ptr;
+	gp:xyz_graph_type;
 	slope,intercept,residual:real;
 
 begin
 	if not spot.valid then exit;
 	if ip=nil then exit;
 	
-	gp:=new_xyz_graph(max_pixels);
+	setlength(gp,max_pixels);
 	
 	pixel_num:=0;
-	gp^[pixel_num].z:=ignore_remaining_data;
+	gp[pixel_num].z:=ignore_remaining_data;
 	with spot.bounds do begin
 		for j:=top to bottom do begin
 			for i:=left to right do begin
 				if (get_ov(ip,j,i)=spot.color_code) and (pixel_num<max_pixels-1) then begin
-					with gp^[pixel_num] do begin
+					with gp[pixel_num] do begin
 						x:=j+ccd_origin_y;
 						y:=i+ccd_origin_x;
 						z:=get_px(ip,j,i);
 					end;
 					inc(pixel_num);
-					gp^[pixel_num].z:=ignore_remaining_data;
+					gp[pixel_num].z:=ignore_remaining_data;
 				end;
 			end;
 		end;
 	end;
 
-	weighted_straight_line_fit(gp,slope,intercept,residual);
-	dispose_xyz_graph(gp);
+	weighted_straight_line_fit(@gp,slope,intercept,residual);
 
 	if math_error(slope) 
 			or math_error(intercept) 

@@ -54,18 +54,19 @@ implementation
 function find_peaks_valleys(
 	gp:x_graph_ptr;
 	left_to_right:boolean;
-	threshold:real):x_graph_ptr;
+	threshold:real):x_graph_type;
 
 var
 	i,state,min_i,max_i,num_valleys,num_peaks,i_step:integer;
 	max,min:real;
-	pv_gp:x_graph_ptr;
+	pv_gp:x_graph_type;
 	
 begin
 	find_peaks_valleys:=nil;
-	pv_gp:=new_x_graph(length(gp^));
-	if (pv_gp=nil) then begin
-		report_error('failed to allocate pv_gp in  find_peaks_valleys');
+	if gp=nil then exit;
+	setlength(pv_gp,length(gp^));
+	if length(pv_gp)=0 then begin
+		report_error('failed to allocate pv_gp in find_peaks_valleys');
 		exit;
 	end;
 	
@@ -94,7 +95,7 @@ begin
 			min_i:=i;
 		end;
 		if (abs(gp^[i]-min)>threshold) and (state<>-1) then begin
-			pv_gp^[num_valleys+num_peaks+1]:=min_i;
+			pv_gp[num_valleys+num_peaks+1]:=min_i;
 			inc(num_valleys);
 			max:=gp^[i];
 			max_i:=i;
@@ -102,7 +103,7 @@ begin
 			min_i:=i;
 			state:=-1;
 		end else if (abs(gp^[i]-max)>threshold) and (state<>+1) then begin
-			pv_gp^[num_valleys+num_peaks+1]:=max_i;
+			pv_gp[num_valleys+num_peaks+1]:=max_i;
 			inc(num_peaks);
 			max:=gp^[i];
 			max_i:=i;
@@ -115,18 +116,18 @@ begin
 {
 	Add one more minimum or maximum to our list, assuming the list has space.
 }
-	if (state=+1) and (num_valleys+num_peaks+1<length(pv_gp^)) then begin
-		pv_gp^[num_valleys+num_peaks+1]:=min_i;
+	if (state=+1) and (num_valleys+num_peaks+1<length(pv_gp)) then begin
+		pv_gp[num_valleys+num_peaks+1]:=min_i;
 		inc(num_valleys);
 	end;
-	if (state=-1) and (num_valleys+num_peaks+1<length(pv_gp^)) then begin
-		pv_gp^[num_valleys+num_peaks+1]:=max_i;
+	if (state=-1) and (num_valleys+num_peaks+1<length(pv_gp)) then begin
+		pv_gp[num_valleys+num_peaks+1]:=max_i;
 		inc(num_peaks);
 	end;
 {
 	Record the number of maxima and valleys in the first element of the list.
 }
-	pv_gp^[0]:=num_peaks+num_valleys;
+	pv_gp[0]:=num_peaks+num_valleys;
 {
 	Return the list.
 }
@@ -185,7 +186,7 @@ var
 	i,limit:integer;
 	sum_x,sum_x2:longreal;
 	ave,stdev,mad,min,max,med:real;
-	list_gp,maxima_gp,minima_gp,minmax_gp:x_graph_ptr;
+	list_gp,maxima_gp,minima_gp,minmax_gp:x_graph_type;
 	s:string;
 	
 {
@@ -240,8 +241,8 @@ var
 			if (min_c>0) 
 					and (sqr(gp^[i]-min)/mad/min_c>periodicity_threshold) 
 					and (state<>-1) then begin
-				minima_gp^[num_min]:=min_i;
-				minmax_gp^[num_min+num_max]:=min_i;
+				minima_gp[num_min]:=min_i;
+				minmax_gp[num_min+num_max]:=min_i;
 				inc(num_min);
 				max:=gp^[i];
 				max_i:=i;
@@ -253,8 +254,8 @@ var
 			end else if (max_c>0) 
 					and (sqr(gp^[i]-max)/mad/max_c>periodicity_threshold) 
 					and (state<>+1) then begin
-				maxima_gp^[num_max]:=max_i;
-				minmax_gp^[num_min+num_max]:=max_i;
+				maxima_gp[num_max]:=max_i;
+				minmax_gp[num_min+num_max]:=max_i;
 				inc(num_max);
 				max:=gp^[i];
 				max_i:=i;
@@ -271,7 +272,7 @@ var
 }
 		if print_diagnostics then begin
 			writestr(s,'minima/maxima: ');
-			for i:=0 to num_max+num_min-1 do writestr(s,s,minmax_gp^[i]:0:0,' ');
+			for i:=0 to num_max+num_min-1 do writestr(s,s,minmax_gp[i]:0:0,' ');
 			gui_writeln(s);
 		end;
 {
@@ -279,28 +280,28 @@ var
 	of any periodic waveform present in the signal. Assemble all the steps in the
 	list graph.
 }
-		for i:=1 to num_min-1 do list_gp^[i-1]:=abs(minima_gp^[i]-minima_gp^[i-1]);
-		for i:=1 to num_max-1 do list_gp^[i-1+num_min-1]:=abs(maxima_gp^[i]-maxima_gp^[i-1]);
+		for i:=1 to num_min-1 do list_gp[i-1]:=abs(minima_gp[i]-minima_gp[i-1]);
+		for i:=1 to num_max-1 do list_gp[i-1+num_min-1]:=abs(maxima_gp[i]-maxima_gp[i-1]);
 		num_steps:=num_min-1+num_max-1;
 		if print_diagnostics then begin
 			writestr(s,'unsorted steps: ');
-			for i:=0 to num_steps-1 do writestr(s,s,list_gp^[i]:0:0,' ');
+			for i:=0 to num_steps-1 do writestr(s,s,list_gp[i]:0:0,' ');
 			gui_writeln(s);
 		end;
 {
 	Sort the steps in descending order of size and obtain the median step
 	size.
 }
-		quick_sort(0,num_steps-1,x_graph_swap,x_graph_lt,list_gp);
+		quick_sort(0,num_steps-1,x_graph_swap,x_graph_lt,@list_gp);
 		if print_diagnostics then begin
 			writestr(s,'sorted steps: ');
-			for i:=0 to num_steps-1 do writestr(s,s,list_gp^[i]:0:0,' ');
+			for i:=0 to num_steps-1 do writestr(s,s,list_gp[i]:0:0,' ');
 			gui_writeln(s);
 		end;
 		if num_steps>1 then 
-			med:=list_gp^[round((num_steps-1)/2.0)]
+			med:=list_gp[round((num_steps-1)/2.0)]
 		else 
-			med:=list_gp^[0];
+			med:=list_gp[0];
 {
 	Select the steps that are within periodicity_fraction of the median
 	step.
@@ -310,12 +311,12 @@ var
 		sum_x2:=0;
 		num_steps_accepted:=0;
 		for i:=0 to num_steps-1 do begin
-			if (list_gp^[i]<=med/periodicity_fraction) 
-				and (list_gp^[i]>=med*periodicity_fraction) then begin
-				sum_x:=sum_x+list_gp^[i];
-				sum_x2:=sum_x2+list_gp^[i]*list_gp^[i];
+			if (list_gp[i]<=med/periodicity_fraction) 
+				and (list_gp[i]>=med*periodicity_fraction) then begin
+				sum_x:=sum_x+list_gp[i];
+				sum_x2:=sum_x2+list_gp[i]*list_gp[i];
 				inc(num_steps_accepted);
-				if print_diagnostics then writestr(s,s,list_gp^[i]:0:0,' ');
+				if print_diagnostics then writestr(s,s,list_gp[i]:0:0,' ');
 			end;
 		end;
 		if print_diagnostics then gui_writeln(s);
@@ -340,7 +341,7 @@ var
 	
 			num_degenerate_pairs:=0;
 			for i:=1 to num_steps-1 do 
-				if abs(minmax_gp^[i]-minmax_gp^[i-1])
+				if abs(minmax_gp[i]-minmax_gp[i-1])
 					<=length(gp^)*periodicity_degeneracy_fraction then begin
 					inc(num_degenerate_pairs);
 					p:=p*periodicity_degeneracy_shrink;
@@ -383,10 +384,10 @@ begin
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	list_gp:=new_x_graph(length(gp^));
-	maxima_gp:=new_x_graph(length(gp^));
-	minima_gp:=new_x_graph(length(gp^));
-	minmax_gp:=new_x_graph(length(gp^));
+	setlength(list_gp,length(gp^));
+	setlength(maxima_gp,length(gp^));
+	setlength(minima_gp,length(gp^));
+	setlength(minmax_gp,length(gp^));
 	if (list_gp=nil) or (maxima_gp=nil) 
 			or (minima_gp=nil) or (minmax_gp=nil) then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_A');
@@ -418,15 +419,15 @@ begin
 	coastline:=0;
 	min:=gp^[0];
 	max:=gp^[0];
-	list_gp^[0]:=0;
+	list_gp[0]:=0;
 	for i:=0 to length(gp^)-1 do begin
 		sum_x:=sum_x+gp^[i];
 		sum_x2:=sum_x2+gp^[i]*gp^[i];
 		if gp^[i]>max then max:=gp^[i];
 		if gp^[i]<min then min:=gp^[i];
 		if (i>0) then begin
-			list_gp^[i]:=abs(gp^[i]-gp^[i-1]);
-			coastline:=coastline+list_gp^[i];
+			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			coastline:=coastline+list_gp[i];
 		end;
 	end;
 	check_for_math_error(sum_x);
@@ -452,10 +453,10 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency metric.
 }
-	x_graph_descending(list_gp);
-	limit:=round(intermittency_fraction*length(list_gp^));
+	x_graph_descending(@list_gp);
+	limit:=round(intermittency_fraction*length(list_gp));
 	sum_x:=0;
-	for i:=0 to limit-1 do sum_x:=sum_x+list_gp^[i];
+	for i:=0 to limit-1 do sum_x:=sum_x+list_gp[i];
 	if sum_x>0 then intermittency:=sum_x/coastline
 	else intermittency:=0.001;
 	if print_diagnostics then begin
@@ -496,12 +497,12 @@ begin
 	features of the signal. We apply a sigmoidal function to get the spiminess
 	metric between zero and one.
 }
-	for i:=0 to length(list_gp^)-1 do list_gp^[i]:=gp^[i]-ave;
-	x_graph_descending_abs(list_gp);
-	limit:=round(spikiness_fraction*length(list_gp^));
+	for i:=0 to length(list_gp)-1 do list_gp[i]:=gp^[i]-ave;
+	x_graph_descending_abs(@list_gp);
+	limit:=round(spikiness_fraction*length(list_gp));
 	sum_x:=0;
-	for i:=0 to limit-1 do sum_x:=sum_x+abs(list_gp^[i]);
-	if sum_x>0 then spikiness:=sum_x/mad/length(list_gp^)
+	for i:=0 to limit-1 do sum_x:=sum_x+abs(list_gp[i]);
+	if sum_x>0 then spikiness:=sum_x/mad/length(list_gp)
 	else spikiness:=0.001;
 	if print_diagnostics then begin
 		writestr(s,'spikiness: ',spikiness:0:3,' sum_x ',sum_x:0:1);
@@ -518,8 +519,8 @@ begin
 }
 	sum_x2:=0;
 	for i:=0 to limit-1 do 
-		if list_gp^[i]>0 then
-			sum_x2:=sum_x2+abs(list_gp^[i]);
+		if list_gp[i]>0 then
+			sum_x2:=sum_x2+abs(list_gp[i]);
 	if sum_x>0 then asymmetry:=sum_x2/sum_x
 	else asymmetry:=0.5;
 	if print_diagnostics then begin
@@ -550,12 +551,8 @@ begin
 		periodicity_center / periodicity,
 		periodicity_exponent));
 {
-	Dispose of our graphs.
+	If we have collected an error, exit.
 }
-	dispose_x_graph(maxima_gp);
-	dispose_x_graph(minima_gp);
-	dispose_x_graph(minmax_gp);
-	dispose_x_graph(list_gp);
 	if error_string<>'' then exit;
 {
 	Create the return string.
@@ -653,7 +650,7 @@ var
 	i,j,limit,num_pv_s,num_pv_p:integer;
 	sum_x,sum_x2,sum_separation,high_coastline:longreal;
 	ave,stdev,mad,min,max,range,mas:real;
-	list_gp,pv_gp:x_graph_ptr;
+	list_gp,pv_gp:x_graph_type;
 	hi_step,best_step,small_step,num_steps,num_steps_accepted:integer;
 	num_degenerate_pairs:integer=0;
 	s:string;
@@ -671,8 +668,8 @@ begin
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	list_gp:=new_x_graph(length(gp^));
-	if (list_gp=nil) then begin
+	setlength(list_gp,length(gp^));
+	if length(list_gp)=0 then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_B');
 		exit;
 	end;
@@ -704,15 +701,15 @@ begin
 	coastline:=0;
 	min:=gp^[0];
 	max:=gp^[0];
-	list_gp^[0]:=0;
+	list_gp[0]:=0;
 	for i:=0 to length(gp^)-1 do begin
 		sum_x:=sum_x+gp^[i];
 		sum_x2:=sum_x2+gp^[i]*gp^[i];
 		if gp^[i]>max then max:=gp^[i];
 		if gp^[i]<min then min:=gp^[i];
 		if (i>0) then begin
-			list_gp^[i]:=abs(gp^[i]-gp^[i-1]);
-			coastline:=coastline+list_gp^[i];
+			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			coastline:=coastline+list_gp[i];
 		end;
 	end;
 	check_for_math_error(sum_x);
@@ -742,10 +739,10 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency metric.
 }
-	x_graph_descending(list_gp);
-	limit:=round(intermittency_fraction*length(list_gp^));
+	x_graph_descending(@list_gp);
+	limit:=round(intermittency_fraction*length(list_gp));
 	high_coastline:=0;
-	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp^[i];
+	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp[i];
 	if high_coastline>0 then intermittency:=high_coastline/coastline
 	else intermittency:=0.001;
 	if print_diagnostics then begin
@@ -796,13 +793,13 @@ begin
 	signal range, so we convert to signal units by multiplying by the range.
 }
 	pv_gp:=find_peaks_valleys(gp,true,spikiness_threshold*range);
-	num_pv_s:=round(pv_gp^[0]);
+	num_pv_s:=round(pv_gp[0]);
 {
 	Diagnostic printing to aid debugging.
 } 
 	if print_diagnostics then begin
 		writestr(s,'Spikiness Peaks and Valleys: ');
-		for i:=1 to num_pv_s do writestr(s,s,pv_gp^[i]:0:0,' ');
+		for i:=1 to num_pv_s do writestr(s,s,pv_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -812,7 +809,7 @@ begin
 	sum_separation:=0;
 	for i:=1 to num_pv_s-1 do begin
 		sum_separation:=sum_separation
-			+abs(gp^[round(pv_gp^[i+1])]-gp^[round(pv_gp^[i])])/range;
+			+abs(gp^[round(pv_gp[i+1])]-gp^[round(pv_gp[i])])/range;
 	end;
 	if num_pv_s>1 then spikiness:=sum_separation/(num_pv_s-1)
 	else spikiness:=0;
@@ -823,10 +820,6 @@ begin
 			' sum_separation=',sum_separation:0:3);
 		gui_writeln(s);
 	end;
-{
-	We are done with the spikiness peak and valley list.
-}
-	dispose_x_graph(pv_gp);
 {
 	Calculate the spikiness metric, which lies between zero and one.
 }
@@ -839,13 +832,13 @@ begin
 	locations of the peaks and valleys in our signal.
 }
 	pv_gp:=find_peaks_valleys(gp,true,periodicity_threshold*range);
-	num_pv_p:=round(pv_gp^[0]);
+	num_pv_p:=round(pv_gp[0]);
 {
 	Diagnostic printing to aid debugging.
 } 
 	if print_diagnostics then begin
 		writestr(s,'Periodicity Peaks and Valleys: ');
-		for i:=1 to num_pv_p do writestr(s,s,pv_gp^[i]:0:0,' ');
+		for i:=1 to num_pv_p do writestr(s,s,pv_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -853,11 +846,11 @@ begin
 	them in order of decreasing size.
 }
 	num_steps:=num_pv_p-1-1;
-	for i:=1 to num_steps do list_gp^[i-1]:=abs(pv_gp^[i+2]-pv_gp^[i]);
-	quick_sort(0,num_steps-1,x_graph_swap,x_graph_lt,list_gp);
+	for i:=1 to num_steps do list_gp[i-1]:=abs(pv_gp[i+2]-pv_gp[i]);
+	quick_sort(0,num_steps-1,x_graph_swap,x_graph_lt,@list_gp);
 	if print_diagnostics then begin
 		writestr(s,'Sorted Step Sizes: ');
-		for i:=0 to num_steps-1 do writestr(s,s,list_gp^[i]:0:0,' ');
+		for i:=0 to num_steps-1 do writestr(s,s,list_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -871,17 +864,17 @@ begin
 	best_step:=0;
 	hi_step:=0;
 	for j:=0 to num_steps-1 do begin
-		if best_step<>round(list_gp^[j]) then begin
+		if best_step<>round(list_gp[j]) then begin
 			while (hi_step<num_steps) and
-					(list_gp^[hi_step]>list_gp^[j]/periodicity_fraction) do
+					(list_gp[hi_step]>list_gp[j]/periodicity_fraction) do
 				inc(hi_step);
 			i:=hi_step;
 			while (i<num_steps) and
-					(list_gp^[i]>=list_gp^[j]*periodicity_fraction) do
+					(list_gp[i]>=list_gp[j]*periodicity_fraction) do
 				inc(i);
 			if i-hi_step+1>num_steps_accepted then begin
 				num_steps_accepted:=i-hi_step+1;
-				best_step:=round(list_gp^[j]);
+				best_step:=round(list_gp[j]);
 			end;
 		end;
 	end;
@@ -892,9 +885,9 @@ begin
 	if print_diagnostics then begin
 		writestr(s,'Selected Step Sizes: ');
 		for i:=0 to num_steps-1 do 
-			if (list_gp^[i]<=best_step/periodicity_fraction) 
-				and (list_gp^[i]>=best_step*periodicity_fraction) then
-			writestr(s,s,list_gp^[i]:0:0,' ');
+			if (list_gp[i]<=best_step/periodicity_fraction) 
+				and (list_gp[i]>=best_step*periodicity_fraction) then
+			writestr(s,s,list_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -913,7 +906,7 @@ begin
 			periodicity:=periodicity*best_step/small_step;
 		num_degenerate_pairs:=0;
 		for i:=1 to num_steps-1 do 
-			if abs(pv_gp^[i+1]-pv_gp^[i])
+			if abs(pv_gp[i+1]-pv_gp[i])
 				<=periodicity_degenerate_step then begin
 				inc(num_degenerate_pairs);
 				periodicity:=periodicity*periodicity_degeneracy_shrink;
@@ -936,10 +929,6 @@ begin
 }
 	if best_step>0 then frequency:=length(gp^)/best_step
 	else frequency:=length(gp^);
-{
-	We are done with the peak and valley list.
-}
-	dispose_x_graph(pv_gp);
 {
 	In diagnostic operation we print more information about the accepted steps.
 }
@@ -964,9 +953,8 @@ begin
 		periodicity_center / periodicity,
 		periodicity_exponent));
 {
-	Dispose of our list graph.
+	If we have collected an error, exiot.
 }
-	dispose_x_graph(list_gp);
 	if error_string<>'' then exit;
 {
 	Create the return string.
@@ -1067,7 +1055,7 @@ var
 	mas, {mean absolute step size, coastline divided by number of points}
 	las {linear absolute step size, range divided by number of points}
 	:real;
-	list_gp,pv_gp:x_graph_ptr;
+	list_gp,pv_gp:x_graph_type;
 	hi_step,best_step,small_step,num_steps,num_steps_accepted:integer;
 	num_degenerate_pairs:integer=0;
 	s:string;
@@ -1085,7 +1073,7 @@ begin
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	list_gp:=new_x_graph(length(gp^));
+	setlength(list_gp,length(gp^));
 	if (list_gp=nil) then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_C');
 		exit;
@@ -1117,15 +1105,15 @@ begin
 	coastline:=0;
 	min:=gp^[0];
 	max:=gp^[0];
-	list_gp^[0]:=0;
+	list_gp[0]:=0;
 	for i:=0 to length(gp^)-1 do begin
 		sum_x:=sum_x+gp^[i];
 		sum_x2:=sum_x2+gp^[i]*gp^[i];
 		if gp^[i]>max then max:=gp^[i];
 		if gp^[i]<min then min:=gp^[i];
 		if (i>0) then begin
-			list_gp^[i]:=abs(gp^[i]-gp^[i-1]);
-			coastline:=coastline+list_gp^[i];
+			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			coastline:=coastline+list_gp[i];
 		end;
 	end;
 	check_for_math_error(sum_x);
@@ -1162,10 +1150,10 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency measure.
 }
-	x_graph_descending(list_gp);
-	limit:=round(intermittency_fraction*length(list_gp^));
+	x_graph_descending(@list_gp);
+	limit:=round(intermittency_fraction*length(list_gp));
 	high_coastline:=0;
-	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp^[i];
+	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp[i];
 	if high_coastline>0 then intermittency:=high_coastline/coastline
 	else intermittency:=small_value;
 	if print_diagnostics then begin
@@ -1214,13 +1202,13 @@ begin
 	signal range, so we convert to signal units by multiplying by the range.
 }
 	pv_gp:=find_peaks_valleys(gp,true,coherence_threshold*range);
-	num_pv_minor:=round(pv_gp^[0]);
+	num_pv_minor:=round(pv_gp[0]);
 {
 	Diagnostic printing to aid debugging.
 } 
 	if print_diagnostics then begin
 		writestr(s,'Coherence Peaks and Valleys: ');
-		for i:=1 to num_pv_minor do writestr(s,s,pv_gp^[i]:0:0,' ');
+		for i:=1 to num_pv_minor do writestr(s,s,pv_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -1230,7 +1218,7 @@ begin
 	sum_separation:=0;
 	for i:=1 to num_pv_minor-1 do begin
 		sum_separation:=sum_separation
-			+abs(gp^[round(pv_gp^[i+1])]-gp^[round(pv_gp^[i])])/range;
+			+abs(gp^[round(pv_gp[i+1])]-gp^[round(pv_gp[i])])/range;
 	end;
 	if num_pv_minor>1 then coherence:=sum_separation/(num_pv_minor-1)
 	else coherence:=0;
@@ -1243,21 +1231,17 @@ begin
 		gui_writeln(s);
 	end;
 {
-	We are done with the coherence peak and valley list.
-}
-	dispose_x_graph(pv_gp);
-{
 	We begin our calculation of rhythm by making a list of the major peaks and
 	valleys.
 }
 	pv_gp:=find_peaks_valleys(gp,true,rhythm_threshold*range);
-	num_pv_major:=round(pv_gp^[0]);
+	num_pv_major:=round(pv_gp[0]);
 {
 	Diagnostic printing to aid debugging.
 } 
 	if print_diagnostics then begin
 		writestr(s,'Rhythm Peaks and Valleys: ');
-		for i:=1 to num_pv_major do writestr(s,s,pv_gp^[i]:0:0,' ');
+		for i:=1 to num_pv_major do writestr(s,s,pv_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -1265,11 +1249,11 @@ begin
 	them in order of decreasing size.
 }
 	num_steps:=num_pv_major-1-1;
-	for i:=1 to num_steps do list_gp^[i-1]:=abs(pv_gp^[i+2]-pv_gp^[i]);
-	quick_sort(0,num_steps-1,x_graph_swap,x_graph_lt,list_gp);
+	for i:=1 to num_steps do list_gp[i-1]:=abs(pv_gp[i+2]-pv_gp[i]);
+	quick_sort(0,num_steps-1,x_graph_swap,x_graph_lt,@list_gp);
 	if print_diagnostics then begin
 		writestr(s,'Sorted Step Sizes: ');
-		for i:=0 to num_steps-1 do writestr(s,s,list_gp^[i]:0:0,' ');
+		for i:=0 to num_steps-1 do writestr(s,s,list_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -1283,17 +1267,17 @@ begin
 	best_step:=0;
 	hi_step:=0;
 	for j:=0 to num_steps-1 do begin
-		if best_step<>round(list_gp^[j]) then begin
+		if best_step<>round(list_gp[j]) then begin
 			while (hi_step<num_steps) and
-					(list_gp^[hi_step]>list_gp^[j]/rhythm_fraction) do
+					(list_gp[hi_step]>list_gp[j]/rhythm_fraction) do
 				inc(hi_step);
 			i:=hi_step;
 			while (i<num_steps) and
-					(list_gp^[i]>=list_gp^[j]*rhythm_fraction) do
+					(list_gp[i]>=list_gp[j]*rhythm_fraction) do
 				inc(i);
 			if i-hi_step>num_steps_accepted then begin
 				num_steps_accepted:=i-hi_step;
-				best_step:=round(list_gp^[j]);
+				best_step:=round(list_gp[j]);
 			end;
 		end;
 	end;
@@ -1304,9 +1288,9 @@ begin
 	if print_diagnostics then begin
 		writestr(s,'Selected Step Sizes: ');
 		for i:=0 to num_steps-1 do 
-			if (list_gp^[i]<=best_step/rhythm_fraction) 
-				and (list_gp^[i]>=best_step*rhythm_fraction) then
-			writestr(s,s,list_gp^[i]:0:0,' ');
+			if (list_gp[i]<=best_step/rhythm_fraction) 
+				and (list_gp[i]>=best_step*rhythm_fraction) then
+			writestr(s,s,list_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -1325,7 +1309,7 @@ begin
 			rhythm:=rhythm*best_step/small_step;
 		num_degenerate_pairs:=0;
 		for i:=1 to num_steps-1 do 
-			if abs(pv_gp^[i+1]-pv_gp^[i])
+			if abs(pv_gp[i+1]-pv_gp[i])
 				<=rhythm_degenerate_step then begin
 				inc(num_degenerate_pairs);
 				rhythm:=rhythm*rhythm_degeneracy_shrink;
@@ -1349,10 +1333,6 @@ begin
 	if best_step>0 then frequency:=length(gp^)/best_step
 	else frequency:=length(gp^);
 {
-	We are done with the peak and valley list.
-}
-	dispose_x_graph(pv_gp);
-{
 	In diagnostic operation we print more information about the accepted steps.
 }
 	if print_diagnostics then begin
@@ -1374,9 +1354,8 @@ begin
 }
 	rhythm:=rhythm+rhythm_offset;
 {
-	Dispose of our list graph.
+	If we have collected an error, exit.
 }
-	dispose_x_graph(list_gp);
 	if error_string<>'' then exit;
 {
 	Create the return string.
@@ -1485,7 +1464,7 @@ var
 	range, {maximum-minimum}
 	mas {mean absolute step size, coastline divided by number of points}
 	:real;
-	list_gp,pv_gp:x_graph_ptr;
+	list_gp,pv_gp:x_graph_type;
 	hi_step,best_step,small_step,num_steps:integer;
 	num_steps_accepted:integer;
 	num_degenerate_pairs:integer=0;
@@ -1504,7 +1483,7 @@ begin
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	list_gp:=new_x_graph(length(gp^));
+	setlength(list_gp,length(gp^));
 	if (list_gp=nil) then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_D');
 		exit;
@@ -1529,15 +1508,15 @@ begin
 	coastline:=0;
 	min:=gp^[0];
 	max:=gp^[0];
-	list_gp^[0]:=0;
+	list_gp[0]:=0;
 	for i:=0 to length(gp^)-1 do begin
 		sum_x:=sum_x+gp^[i];
 		sum_x2:=sum_x2+gp^[i]*gp^[i];
 		if gp^[i]>max then max:=gp^[i];
 		if gp^[i]<min then min:=gp^[i];
 		if (i>0) then begin
-			list_gp^[i]:=abs(gp^[i]-gp^[i-1]);
-			coastline:=coastline+list_gp^[i];
+			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			coastline:=coastline+list_gp[i];
 		end;
 	end;
 	check_for_math_error(sum_x);
@@ -1575,10 +1554,10 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency measure.
 }
-	x_graph_descending(list_gp);
-	limit:=round(intermittency_fraction*length(list_gp^));
+	x_graph_descending(@list_gp);
+	limit:=round(intermittency_fraction*length(list_gp));
 	high_coastline:=0;
-	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp^[i];
+	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp[i];
 	if high_coastline>0 then intermittency:=high_coastline/coastline
 	else intermittency:=small_value;
 	if print_diagnostics then begin
@@ -1606,7 +1585,7 @@ begin
 	signal range, so we convert it to counts by multiplying by the range.
 }
 	pv_gp:=find_peaks_valleys(gp,true,coherence_threshold*range);
-	num_pv_coherence:=round(pv_gp^[0]);
+	num_pv_coherence:=round(pv_gp[0]);
 {
 	Each entry in the peak and valley list is an index into the original signal.
 	We score each peak and valley by looking at the height and breadth of the
@@ -1615,18 +1594,14 @@ begin
 	valley.
 }
 	for i:=2 to num_pv_coherence do begin
-		score:=(gp^[round(pv_gp^[i])]-gp^[round(pv_gp^[i-1])])
-			* (pv_gp^[i]-pv_gp^[i-1]);
-		list_gp^[i-2]:=score;
+		score:=(gp^[round(pv_gp[i])]-gp^[round(pv_gp[i-1])])
+			* (pv_gp[i]-pv_gp[i-1]);
+		list_gp[i-2]:=score;
 	end;
-{
-	We are done with the coherence peak and valley list.
-}
-	dispose_x_graph(pv_gp);
 {
 	We go through the list of areas and sort by decreasing absolute area.
 }
-	quick_sort(0,num_pv_coherence-3,x_graph_swap,x_graph_lt_abs,list_gp);
+	quick_sort(0,num_pv_coherence-3,x_graph_swap,x_graph_lt_abs,@list_gp);
 {
 	Diagnostic printing to aid debugging.
 } 
@@ -1634,7 +1609,7 @@ begin
 		writestr(s,'Coherence Scores Sorted: ');
 		for i:=0 to num_pv_coherence-3 do 
 			if i<coherence_regions then 
-				writestr(s,s,list_gp^[i]:0:0,' ');
+				writestr(s,s,list_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -1645,7 +1620,7 @@ begin
 	asymmetry_score:=0;
 	for i:=0 to num_pv_coherence-3 do begin
 		if i<coherence_regions then begin
-			coherence_score:=coherence_score+abs(list_gp^[i]);
+			coherence_score:=coherence_score+abs(list_gp[i]);
 		end;
 	end;
 {
@@ -1679,19 +1654,18 @@ begin
 	valleys.
 }
 	pv_gp:=find_peaks_valleys(gp,true,rhythm_threshold*range/rhythm_minor_factor);
-	num_pv_minor:=round(pv_gp^[0]);
-	dispose_x_graph(pv_gp);
+	num_pv_minor:=round(pv_gp[0]);
 {
 	And now a list of major peaks and valleys.
 }
 	pv_gp:=find_peaks_valleys(gp,true,rhythm_threshold*range);
-	num_pv_major:=round(pv_gp^[0]);
+	num_pv_major:=round(pv_gp[0]);
 {
 	Diagnostic printing to aid debugging.
 } 
 	if print_diagnostics then begin
 		writestr(s,'Rhythm Peaks and Valleys: ');
-		for i:=1 to num_pv_major do writestr(s,s,pv_gp^[i]:0:0,' ');
+		for i:=1 to num_pv_major do writestr(s,s,pv_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -1699,11 +1673,11 @@ begin
 	them in order of decreasing size.
 }
 	num_steps:=num_pv_major-1-1;
-	for i:=1 to num_steps do list_gp^[i-1]:=abs(pv_gp^[i+2]-pv_gp^[i]);
-	quick_sort(0,num_steps-1,x_graph_swap,x_graph_lt,list_gp);
+	for i:=1 to num_steps do list_gp[i-1]:=abs(pv_gp[i+2]-pv_gp[i]);
+	quick_sort(0,num_steps-1,x_graph_swap,x_graph_lt,@list_gp);
 	if print_diagnostics then begin
 		writestr(s,'Sorted Step Sizes: ');
-		for i:=0 to num_steps-1 do writestr(s,s,list_gp^[i]:0:0,' ');
+		for i:=0 to num_steps-1 do writestr(s,s,list_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -1717,17 +1691,17 @@ begin
 	best_step:=0;
 	hi_step:=0;
 	for j:=0 to num_steps-1 do begin
-		if best_step<>round(list_gp^[j]) then begin
+		if best_step<>round(list_gp[j]) then begin
 			while (hi_step<num_steps) and
-					(list_gp^[hi_step]>list_gp^[j]/rhythm_fraction) do
+					(list_gp[hi_step]>list_gp[j]/rhythm_fraction) do
 				inc(hi_step);
 			i:=hi_step;
 			while (i<num_steps) and
-					(list_gp^[i]>=list_gp^[j]*rhythm_fraction) do
+					(list_gp[i]>=list_gp[j]*rhythm_fraction) do
 				inc(i);
 			if i-hi_step>num_steps_accepted then begin
 				num_steps_accepted:=i-hi_step;
-				best_step:=round(list_gp^[j]);
+				best_step:=round(list_gp[j]);
 			end;
 		end;
 	end;
@@ -1738,9 +1712,9 @@ begin
 	if print_diagnostics then begin
 		writestr(s,'Selected Step Sizes: ');
 		for i:=0 to num_steps-1 do 
-			if (list_gp^[i]<=best_step/rhythm_fraction) 
-				and (list_gp^[i]>=best_step*rhythm_fraction) then
-			writestr(s,s,list_gp^[i]:0:0,' ');
+			if (list_gp[i]<=best_step/rhythm_fraction) 
+				and (list_gp[i]>=best_step*rhythm_fraction) then
+			writestr(s,s,list_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -1759,7 +1733,7 @@ begin
 			rhythm:=rhythm*best_step/small_step;
 		num_degenerate_pairs:=0;
 		for i:=1 to num_steps-1 do 
-			if abs(pv_gp^[i+1]-pv_gp^[i])
+			if abs(pv_gp[i+1]-pv_gp[i])
 				<=rhythm_degenerate_step then begin
 				inc(num_degenerate_pairs);
 				rhythm:=rhythm*rhythm_degeneracy_shrink;
@@ -1782,10 +1756,6 @@ begin
 }
 	if best_step>0 then frequency:=length(gp^)/best_step
 	else frequency:=length(gp^);
-{
-	We are done with the peak and valley list.
-}
-	dispose_x_graph(pv_gp);
 {
 	In diagnostic operation we print more information about the accepted steps.
 }
@@ -1821,26 +1791,25 @@ begin
 				if gp^[j]<bottom then bottom:=gp^[j];
 			end;
 		end;
-		list_gp^[num_sections]:=top-bottom;
+		list_gp[num_sections]:=top-bottom;
 		inc(num_sections);
 		i:=i+spikiness_extent;
 	end;
-	quick_sort(0,num_sections-1,x_graph_swap,x_graph_lt,list_gp);
-	med_range:=list_gp^[round(num_sections/2.0)];
-	spikiness:=list_gp^[0]/med_range;
+	quick_sort(0,num_sections-1,x_graph_swap,x_graph_lt,@list_gp);
+	med_range:=list_gp[round(num_sections/2.0)];
+	spikiness:=list_gp[0]/med_range;
 	if print_diagnostics then begin
 		writestr(s,'Spikiness: ',spikiness:0:2,
 		' extent=',spikiness_extent:1,
 		' median=',med_range:1:0,
-		' max=',list_gp^[0]:1:0,
-		' min=',list_gp^[num_sections-1]:1:0,
+		' max=',list_gp[0]:1:0,
+		' min=',list_gp[num_sections-1]:1:0,
 		' num_sections=',num_sections:1);
 		gui_writeln(s);
 	end;
 {
-	Dispose of our list graph.
+	If we have collected an error, exit.
 }
-	dispose_x_graph(list_gp);
 	if error_string<>'' then exit;
 {
 	Create the return string.
@@ -1915,7 +1884,7 @@ var
 	range, {maximum-minimum}
 	mas {mean absolute step size, coastline divided by number of points}
 	:real;
-	list_gp,pv_gp:x_graph_ptr;
+	list_gp,pv_gp:x_graph_type;
 	s:string='';
 	
 begin
@@ -1931,7 +1900,7 @@ begin
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	list_gp:=new_x_graph(length(gp^));
+	setlength(list_gp,length(gp^));
 	if (list_gp=nil) then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_E');
 		exit;
@@ -1955,15 +1924,15 @@ begin
 	coastline:=0;
 	min:=gp^[0];
 	max:=gp^[0];
-	list_gp^[0]:=0;
+	list_gp[0]:=0;
 	for i:=0 to length(gp^)-1 do begin
 		sum_x:=sum_x+gp^[i];
 		sum_x2:=sum_x2+gp^[i]*gp^[i];
 		if gp^[i]>max then max:=gp^[i];
 		if gp^[i]<min then min:=gp^[i];
 		if (i>0) then begin
-			list_gp^[i]:=abs(gp^[i]-gp^[i-1]);
-			coastline:=coastline+list_gp^[i];
+			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			coastline:=coastline+list_gp[i];
 		end;
 	end;
 	check_for_math_error(sum_x);
@@ -2001,10 +1970,10 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency measure.
 }
-	x_graph_descending(list_gp);
-	limit:=round(intermittency_fraction*length(list_gp^));
+	x_graph_descending(@list_gp);
+	limit:=round(intermittency_fraction*length(list_gp));
 	high_coastline:=0;
-	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp^[i];
+	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp[i];
 	if high_coastline>0 then intermittency:=high_coastline/coastline
 	else intermittency:=small_value;
 	if print_diagnostics then begin
@@ -2036,7 +2005,7 @@ begin
 	valleys in the original signal.
 }
 	pv_gp:=find_peaks_valleys(gp,true,coherence_threshold*range);
-	num_pv_coherence:=round(pv_gp^[0]);
+	num_pv_coherence:=round(pv_gp[0]);
 {
 	We score each peak-valley and valley-peak transition by multiplying its
 	height by its breadth to obtain its area. The height is the change in signal
@@ -2045,20 +2014,16 @@ begin
 	peak-valley transition.
 }
 	for i:=2 to num_pv_coherence do begin
-		score:=(gp^[round(pv_gp^[i])]-gp^[round(pv_gp^[i-1])])
-			* (pv_gp^[i]-pv_gp^[i-1]);
-		list_gp^[i-2]:=abs(score);
+		score:=(gp^[round(pv_gp[i])]-gp^[round(pv_gp[i-1])])
+			* (pv_gp[i]-pv_gp[i-1]);
+		list_gp[i-2]:=abs(score);
 	end;
-{
-	We are done with the coherence peak and valley list, so dispose of it.
-}
-	dispose_x_graph(pv_gp);
 {
 	We go through the list of scores and sort by decreasing absolute area. We
 	have num_pv_coherence-1 scores, so we sort the list from index 0 to
 	num_pv_coherence-2.
 }
-	quick_sort(0,num_pv_coherence-2,x_graph_swap,x_graph_lt,list_gp);
+	quick_sort(0,num_pv_coherence-2,x_graph_swap,x_graph_lt,@list_gp);
 {
 	Diagnostic printing to aid debugging.
 } 
@@ -2066,7 +2031,7 @@ begin
 		writestr(s,'Coherence Scores Sorted: ');
 		for i:=0 to num_pv_coherence-3 do 
 			if i<coherence_regions then 
-				writestr(s,s,list_gp^[i]:0:0,' ');
+				writestr(s,s,list_gp[i]:0:0,' ');
 		gui_writeln(s);
 	end;
 {
@@ -2078,7 +2043,7 @@ begin
 	coherence_score:=0;
 	for i:=0 to num_pv_coherence-3 do begin
 		if i<coherence_regions then begin
-			coherence_score:=coherence_score+list_gp^[i];
+			coherence_score:=coherence_score+list_gp[i];
 		end;
 	end;
 {
@@ -2123,26 +2088,25 @@ begin
 				if gp^[j]<bottom then bottom:=gp^[j];
 			end;
 		end;
-		list_gp^[num_sections]:=top-bottom;
+		list_gp[num_sections]:=top-bottom;
 		inc(num_sections);
 		i:=i+spikiness_extent;
 	end;
-	quick_sort(0,num_sections-1,x_graph_swap,x_graph_lt,list_gp);
-	med_range:=list_gp^[round(num_sections/2.0)];
-	spikiness:=list_gp^[0]/med_range;
+	quick_sort(0,num_sections-1,x_graph_swap,x_graph_lt,@list_gp);
+	med_range:=list_gp[round(num_sections/2.0)];
+	spikiness:=list_gp[0]/med_range;
 	if print_diagnostics then begin
 		writestr(s,'Spikiness: ',spikiness:0:2,
 		' extent=',spikiness_extent:1,
 		' median=',med_range:1:0,
-		' max=',list_gp^[0]:1:0,
-		' min=',list_gp^[num_sections-1]:1:0,
+		' max=',list_gp[0]:1:0,
+		' min=',list_gp[num_sections-1]:1:0,
 		' num_sections=',num_sections:1);
 		gui_writeln(s);
 	end;
 {
-	Dispose of our list graph.
+	If we have collected an error, exit.
 }
-	dispose_x_graph(list_gp);
 	if error_string<>'' then exit;
 {
 	Create the return string.

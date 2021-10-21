@@ -35,8 +35,8 @@ function image_grad(ip:image_ptr_type):image_ptr_type;
 function image_shrink(ip:image_ptr_type;factor:integer):image_ptr_type;
 function image_enlarge(ip:image_ptr_type;factor:integer):image_ptr_type;
 function image_rotate(ip:image_ptr_type;rotation:real;center:xy_point_type):image_ptr_type;
-function image_profile_column(ip:image_ptr_type):x_graph_ptr;
-function image_profile_row(ip:image_ptr_type):x_graph_ptr;
+function image_profile_column(ip:image_ptr_type):x_graph_type;
+function image_profile_row(ip:image_ptr_type):x_graph_type;
 function image_quadratic_sum(oip_1,oip_2:image_ptr_type):image_ptr_type;
 function image_accumulate(oip_1,oip_2:image_ptr_type):image_ptr_type;
 function image_subtract(oip_1,oip_2:image_ptr_type):image_ptr_type;
@@ -45,7 +45,7 @@ function image_subtract_gradient(oip:image_ptr_type):image_ptr_type;
 procedure image_transfer_overlay(dip,sip:image_ptr_type);
 function image_bounds_subtract(oip_1,oip_2:image_ptr_type):image_ptr_type;
 function image_negate(ip:image_ptr_type):image_ptr_type;
-function image_histogram(ip:image_ptr_type):xy_graph_ptr;
+function image_histogram(ip:image_ptr_type):xy_graph_type;
 function image_invert(ip:image_ptr_type):image_ptr_type;
 function image_reverse_rows(ip:image_ptr_type):image_ptr_type;
 function image_soec(ip:image_ptr_type):image_ptr_type;
@@ -472,7 +472,7 @@ var
 	i,j:integer;
 	ave,diff:real;
 	nip:image_ptr_type;
-	gp:xy_graph_ptr;
+	gp:xy_graph_type;
 	h_slope,h_intercept,h_resid,v_slope,v_intercept,v_resid:real;
 
 begin
@@ -487,27 +487,25 @@ begin
 	if nip=nil then exit;
 
 	with nip^.analysis_bounds do begin
-		gp:=new_xy_graph(bottom-top+1);
+		setlength(gp,bottom-top+1);
 		for j:=top to bottom do begin
 			ave:=0;
 			for i:=left to right do ave:=ave+get_px(oip,j,i);
 			ave:=ave/(right-left+1);
-			gp^[j-top].x:=j-top;
-			gp^[j-top].y:=ave;
+			gp[j-top].x:=j-top;
+			gp[j-top].y:=ave;
 		end;
-		straight_line_fit(gp,v_slope,v_intercept,v_resid);
-		dispose_xy_graph(gp);
+		straight_line_fit(@gp,v_slope,v_intercept,v_resid);
 
-		gp:=new_xy_graph(right-left+1);
+		setlength(gp,right-left+1);
 		for i:=left to right do begin
 			ave:=0;
 			for j:=top to bottom do ave:=ave+get_px(oip,j,i);
 			ave:=ave/(bottom-top+1);
-			gp^[i-left].x:=i-left;
-			gp^[i-left].y:=ave;
+			gp[i-left].x:=i-left;
+			gp[i-left].y:=ave;
 		end;
-		straight_line_fit(gp,h_slope,h_intercept,h_resid);
-		dispose_xy_graph(gp);
+		straight_line_fit(@gp,h_slope,h_intercept,h_resid);
 		
 		for j:=top to bottom do begin
 			for i:=left to right do begin
@@ -976,11 +974,11 @@ end;
 	more confusion. So we leave the profile as an x-graph, just a sequence of numbers,
 	and allow the calling routine to handle the sequence in the way it sees fit.
 }
-function image_profile_row(ip:image_ptr_type):x_graph_ptr;
+function image_profile_row(ip:image_ptr_type):x_graph_type;
 
 var
 	i,j,sum:integer;
-	pp:x_graph_ptr;
+	pp:x_graph_type;
 	
 begin	
 	image_profile_row:=nil;
@@ -988,12 +986,12 @@ begin
 	if not valid_analysis_bounds(ip) then exit;
 	
 	with ip^.analysis_bounds do begin
-		pp:=new_x_graph(right-left+1);
+		setlength(pp,right-left+1);
 		for i:=left to right do begin 
 			sum:=0;
 			for j:=top to bottom do 
 				sum:=sum+get_px(ip,j,i);
-			pp^[i-left]:=sum/(bottom-top+1);
+			pp[i-left]:=sum/(bottom-top+1);
 		end;
 	end;
 	image_profile_row:=pp;
@@ -1002,11 +1000,11 @@ end;
 {
 	image_profile_column is like image_profile_row, but for columns.
 }
-function image_profile_column(ip:image_ptr_type):x_graph_ptr;
+function image_profile_column(ip:image_ptr_type):x_graph_type;
 
 var
 	i,j,sum:integer;
-	pp:x_graph_ptr;
+	pp:x_graph_type;
 
 begin	
 	image_profile_column:=nil;
@@ -1014,12 +1012,12 @@ begin
 	if not valid_analysis_bounds(ip) then exit;
 	
 	with ip^.analysis_bounds do begin
-		pp:=new_x_graph(bottom-top+1);
+		setlength(pp,bottom-top+1);
 		for j:=top to bottom do begin 
 			sum:=0;
 			for i:=left to right do 
 				sum:=sum+get_px(ip,j,i);
-			pp^[j-top]:=sum/(right-left+1);
+			pp[j-top]:=sum/(right-left+1);
 		end;
 	end;
 	image_profile_column:=pp;
@@ -1032,11 +1030,11 @@ end;
 	histogram gives the intensity, and the y-axis gives the frequency with
 	which this intensity occured in the analysis bounds of the image.
 }
-function image_histogram(ip:image_ptr_type):xy_graph_ptr;
+function image_histogram(ip:image_ptr_type):xy_graph_type;
 
 var
 	i,j,num_bins:integer;
-	hp:xy_graph_ptr;
+	hp:xy_graph_type;
 
 begin
 	image_histogram:=nil;
@@ -1045,10 +1043,10 @@ begin
 
 
 	num_bins:=max_intensity-min_intensity+1;
-	hp:=new_xy_graph(num_bins);
+	setlength(hp,num_bins);
 	
 	for i:=min_intensity to max_intensity do begin
-		with hp^[i-min_intensity] do begin
+		with hp[i-min_intensity] do begin
 			x:=i;
 			y:=0;
 		end;
@@ -1057,7 +1055,7 @@ begin
 	with ip^.analysis_bounds do begin
 		for j:=top to bottom do begin
 			for i:=left to right do begin
-				with hp^[get_px(ip,j,i)] do y:=y+1;
+				with hp[get_px(ip,j,i)] do y:=y+1;
 			end;
 		end;
 	end;	

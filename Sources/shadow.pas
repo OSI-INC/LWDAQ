@@ -296,8 +296,8 @@ var
 	shadow_num:integer;
 	notch_index,right_edge_index,left_edge_index:integer;
 	notch_list,right_edge_list,left_edge_list:shadow_list_type;
-	profile_ptr,derivative_ptr:x_graph_ptr;
-	graph_ptr:xy_graph_ptr;
+	profile,derivative:x_graph_type;
+	graph:xy_graph_type;
 	rms_residual,slope,intercept:real;
 	profile_max,profile_min,derivative_max,derivative_min:real;
 	ccd_line:ij_line_type;
@@ -348,7 +348,7 @@ begin
 {
 	obtain a horizontal profile by summing each column in ip^.analysis_bounds.
 }	
-	profile_ptr:=image_profile_row(ip);
+	profile:=image_profile_row(ip);
 {
 	find the minimum and maximum values of the profile.
 }	
@@ -356,55 +356,54 @@ begin
 	profile_min:=max_intensity;
 	with ip^.analysis_bounds do begin
 		for i:=left to right do begin
-			if profile_max<profile_ptr^[i-left] then profile_max:=profile_ptr^[i-left];
-			if profile_min>profile_ptr^[i-left] then profile_min:=profile_ptr^[i-left];
+			if profile_max<profile[i-left] then profile_max:=profile[i-left];
+			if profile_min>profile[i-left] then profile_min:=profile[i-left];
 		end;
 	end;
 {
 	display profile.
 }	
 	if show_details then 
-		display_profile_row(ip,profile_ptr,profile_color);
+		display_profile_row(ip,@profile,profile_color);
 {
 	calculate slope of profile.
 }
 	with ip^.analysis_bounds do begin
-		graph_ptr:=new_xy_graph(right-left+1);
+		setlength(graph,right-left+1);
 		for i:=left to right do begin
-			graph_ptr^[i-left].x:=i;
-			graph_ptr^[i-left].y:=profile_ptr^[i-left];
+			graph[i-left].x:=i;
+			graph[i-left].y:=profile[i-left];
 		end;
-		straight_line_fit(graph_ptr,slope,intercept,rms_residual);
-		dispose_xy_graph(graph_ptr);
+		straight_line_fit(@graph,slope,intercept,rms_residual);
 	end;
 {
 	calculate horizontal derivative of the intensity profile.
 }
 	with ip^.analysis_bounds do begin
-		derivative_ptr:=new_x_graph(right-left+1);
+		setlength(derivative,right-left+1);
 		derivative_max:=min_intensity;
 		derivative_min:=max_intensity;
 		for i:=left to right do begin
 			if i=left then 
-				derivative_ptr^[i-left]:=
-					profile_ptr^[i-left+1]-profile_ptr^[i-left];
+				derivative[i-left]:=
+					profile[i-left+1]-profile[i-left];
 			if (i>left) and (i<right) then 
-				derivative_ptr^[i-left]:=
-					(profile_ptr^[i-left+1]-profile_ptr^[i-left-1])*one_half;
+				derivative[i-left]:=
+					(profile[i-left+1]-profile[i-left-1])*one_half;
 			if i=right then 
-				derivative_ptr^[i-left]:=
-					profile_ptr^[i-left]-profile_ptr^[i-left-1];
-			if derivative_max<derivative_ptr^[i-left] then 
-				derivative_max:=derivative_ptr^[i-left];
-			if derivative_min>derivative_ptr^[i-left] then 
-				derivative_min:=derivative_ptr^[i-left];
+				derivative[i-left]:=
+					profile[i-left]-profile[i-left-1];
+			if derivative_max<derivative[i-left] then 
+				derivative_max:=derivative[i-left];
+			if derivative_min>derivative[i-left] then 
+				derivative_min:=derivative[i-left];
 		end;
 	end;
 {
 	display derivative.
 }
 	if show_details then 
-		display_profile_row(ip,derivative_ptr,profile_derivative_color);
+		display_profile_row(ip,@derivative,profile_derivative_color);
 {
 	find the notch-like shadows by looking at the profile.
 }
@@ -415,14 +414,14 @@ begin
 			i:=left;
 			notch_index:=0;
 			while (i<=right) and (notch_index<notch_list.num_shadows) do begin
-				if profile_ptr^[i-left]<(threshold+(i-left)*slope) then begin
+				if profile[i-left]<(threshold+(i-left)*slope) then begin
 					inc(notch_index);
 					left_i:=i;
 					right_i:=i;
 					repeat 
 						inc(right_i);
 					until (right_i>=right) or
-						(profile_ptr^[right_i-left]>(threshold+(right_i-left)*slope));	
+						(profile[right_i-left]>(threshold+(right_i-left)*slope));	
 					i:=(left_i+right_i) div 2;
 					notch_list.shadows[notch_index].columnrow.i:=i;
 					i:=left_i+min_separation;
@@ -465,14 +464,14 @@ begin
 			i:=left;
 			right_edge_index:=0;
 			while (i<=right) and (right_edge_index<right_edge_list.num_shadows) do begin
-				if derivative_ptr^[i-left]>threshold then begin
+				if derivative[i-left]>threshold then begin
 					inc(right_edge_index);
 					left_i:=i;
 					right_i:=i;
 					repeat 
 						right_i:=right_i+1;
 					until (right_i>=right) or
-						(derivative_ptr^[right_i-left]<threshold);				
+						(derivative[right_i-left]<threshold);				
 					i:=(left_i+right_i) div 2;
 					right_edge_list.shadows[right_edge_index].columnrow.i:=i;
 					i:=left_i+min_separation;
@@ -497,14 +496,14 @@ begin
 			i:=left;
 			left_edge_index:=0;
 			while (i<=right) and (left_edge_index<left_edge_list.num_shadows) do begin
-				if derivative_ptr^[i-left]<threshold then begin
+				if derivative[i-left]<threshold then begin
 					inc(left_edge_index);
 					left_i:=i;
 					right_i:=i;
 					repeat 
 						right_i:=right_i+1;
 					until (right_i>=right) or
-						(derivative_ptr^[right_i-left]>threshold);				
+						(derivative[right_i-left]>threshold);				
 					i:=(left_i+right_i) div 2;
 					left_edge_list.shadows[left_edge_index].columnrow.i:=i;
 					i:=left_i+min_separation;
@@ -519,11 +518,6 @@ begin
 		report_error('left_edge_index<left_edge_list.num_shadows in shadow_locate_approximate.');
 		exit;
 	end;
-{
-	dispose of the profile and derivative arrays.
-}
-	dispose_x_graph(profile_ptr);
-	dispose_x_graph(derivative_ptr);
 {
 	assemble shadow_list out of notch_list, right_edge_list, and left_edge_list.
 }

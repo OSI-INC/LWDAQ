@@ -24,11 +24,11 @@ var
 	x,slope,intercept,residual:real;
 	b1,b2:byte_array;
 	s:string;
-	good:boolean;
-	gpx:x_graph_ptr;
-	gpxy:xy_graph_ptr;
+	good:boolean=false;
+	gpx:x_graph_type;
+	gpxy:xy_graph_type;
 	gxy:xy_graph_type;
-	gpxyz:xyz_graph_ptr;
+	gpxyz:xyz_graph_type;
 	start_ms:qword;
 	A,B,C:matrix_type;
 	simplex:simplex_type;
@@ -36,8 +36,8 @@ var
 	bridge1,bridge2,bridge3:xyz_line_type;
 	plane1,plane2,plane3:xyz_plane_type;
 	line1,line2,line3:xyz_line_type;
-	dp:x_graph_ptr;
-	ft:xy_graph_ptr;
+	dp:x_graph_type;
+	ft:xy_graph_type;
 	ptr:pointer=nil;
 	
 procedure console_write(s:string);
@@ -72,11 +72,13 @@ begin
 	gui_writeln:=console_write;
 	gui_readln:=console_read;
 	gui_writeln('Hello from gui_writeln.');
-	s:=gui_readln('Enter a number or press return. ');
-	writeln('You entered: "',s,'".');
-	x:=real_from_string(s,good);
-	if not good then writeln('Hey! That was not a number')
-	else writeln('That was a real number.');
+	repeat
+		s:=gui_readln('Enter a number or press return. ');
+		writeln('You entered: "',s,'".');
+		x:=real_from_string(s,good);
+		if not good then writeln('Hey! That was not a number')
+		else writeln('That was a real number.');
+	until good;
 {
 	Check the routines that detect endianess of local platform, and swap
 	byte order.
@@ -102,10 +104,10 @@ begin
 		b1[i]:=i mod 256;
 
 	writeln('Copying 10 MByte with block_move ',reps:1,' times...');
-	start_timer('Start copies','block_move test');
-	for j:=1 to 1000 do 
+	start_timer('Start','block_move test');
+	for j:=1 to reps do 
 		block_move(@b1[0],@b2[0],bsize);
-	mark_time('Checking accuracy','block_move test');
+	mark_time('Check','block_move test');
 	good:=true;
 	for i:=1 to bsize-1 do 
 		if b1[i]<>b2[i] then begin
@@ -120,7 +122,7 @@ begin
 {
 	Write out the timer marks to show formatting.
 }	
-	writeln('Reporting timer marks for block copy...');
+	writeln('Reporting timer marks...');
 	report_time_marks;
 {
 	Test millisecond timer.
@@ -131,8 +133,7 @@ begin
 }
 	writeln('Testing block clear on 10-MByte array.');
 	setlength(b1,bsize);
-	for i:=0 to bsize-1 do
-		b1[i]:=i mod 256;
+	for i:=0 to bsize-1 do b1[i]:=i mod 256;
 	block_clear(@b1[0],bsize);
 	good:=true;
 	for i:=0 to bsize-1 do
@@ -146,8 +147,7 @@ begin
 	if good then writeln('Block clear accurate.');
 		
 	writeln('Testing block fill on 10-MByte array.');
-	for i:=0 to bsize-1 do
-		b1[i]:=i mod 256;
+	for i:=0 to bsize-1 do b1[i]:=i mod 256;
 	block_fill(@b1[0],bsize);
 	good:=true;
 	for i:=0 to bsize-1 do
@@ -210,47 +210,56 @@ begin
 	if good then writeln('Geometry routines accurate through ',reps:1,
 		' random plane-plane-plane intersections,');	
 {
-	Test x-graph generation, string interfaces, and pointer tracking.
+	Test x-graph generation, string interfaces, and pointer tracking, checking
+	frequently to see if we are failing to dispose of outstanding pointers.
 }
 	writeln('Turning on pointer tracking and testing graph routines...');
 	track_ptrs:=true;
 	
-	gpx:=new_x_graph(gsize);
-	for i:=0 to length(gpx^)-1 do 
-		gpx^[i]:=i;
-	writeln('Created and filled x-graph of length ',gsize,' and length(gpx^)=',length(gpx^),'.');
-	writeln('Translating gpx^ into string with string_from_x_graph ',reps:1,' times');
+	setlength(gpx,gsize);
+	for i:=0 to length(gpx)-1 do 
+		gpx[i]:=i;
+	writeln('Created and filled x-graph of length ',gsize,' and length(gpx)=',length(gpx),'.');
+	writeln('Translating gpx into string with string_from_x_graph ',reps:1,' times');
 	start_ms:=clock_milliseconds;
 	for i:=1 to reps do
 		s:=string_from_x_graph(gpx);
 	writeln('Each translation takes ',1.0*(clock_milliseconds-start_ms)/reps:1:2,' ms.');
-	dispose_x_graph(gpx);
-
 	writeln('Turning off pointer tracking...');
 	track_ptrs:=false;
+	if num_outstanding_ptrs>0 then begin
+		writestr(s,'Have ',num_outstanding_ptrs:1,
+			' outsanding pointers after translating gpx into string.');
+		print_error(s);
+		num_outstanding_ptrs:=0;
+	end;
 
 	writeln('Translating string back into x-graph with x_graph_from_string ',reps:1,' times');
 	start_ms:=clock_milliseconds;
 	for i:=1 to reps do
 		begin
 			gpx:=read_x_graph(s);
-			dispose_x_graph(gpx);
 		end;
 	writeln('Each translation takes ',1.0*(clock_milliseconds-start_ms)/reps:1:2,' ms.');
+	if num_outstanding_ptrs>0 then begin
+		writestr(s,'Have ',num_outstanding_ptrs:1,
+			' outsanding pointers after translating string to x-graph.');
+		print_error(s);
+		num_outstanding_ptrs:=0;
+	end;
 
 	gpx:=read_x_graph(s);
 	writeln('Checking accuracy of translation from x-graph to string and back.');
 	good:=true;
 	for i:=1 to gsize-1 do 
-		if gpx^[i]<>i then begin
+		if gpx[i]<>i then begin
 			if good then begin
-				writestr(s,'point ',i:1,' value ',gpx^[i]:fsr:fsd,
+				writestr(s,'point ',i:1,' value ',gpx[i]:fsr:fsd,
 					' in x-graph string translation');
 				print_error(s);
 			end;
 			good:=false;			
 		end;
-	dispose_x_graph(gpx);
 	if good then writeln('Translation accurate.');
 {
 	Check sorting and random number generator.
@@ -258,15 +267,15 @@ begin
 	fsd:=3;
 	fsr:=1;
 	writeln('Random list of ',tsize,' real numbers.');
-	gpx:=new_x_graph(tsize);
-	for i:=0 to length(gpx^) do
-		gpx^[i]:=random_0_to_1;
+	setlength(gpx,tsize);
+	for i:=0 to length(gpx) do
+		gpx[i]:=random_0_to_1;
 	writeln('gpx: ',string_from_x_graph(gpx));
-	x_graph_ascending(gpx);
+	x_graph_ascending(@gpx);
 	writeln('ascending: ',string_from_x_graph(gpx));
 	good:=true;
-	for i:=1 to length(gpx^)-1 do
-		if gpx^[i]<gpx^[i-1] then begin
+	for i:=1 to length(gpx)-1 do
+		if gpx[i]<gpx[i-1] then begin
 			if good then begin
 				writestr(s,'Element ',i:1,' less than element ',i-1:1,
 				' in x-graph ascending sort');
@@ -275,11 +284,11 @@ begin
 			good:=false;
 		end;
 		
-	x_graph_descending(gpx);
+	x_graph_descending(@gpx);
 	writeln('descending: ',string_from_x_graph(gpx));
 	good:=true;
-	for i:=1 to length(gpx^)-1 do
-		if gpx^[i]>gpx^[i-1] then begin
+	for i:=1 to length(gpx)-1 do
+		if gpx[i]>gpx[i-1] then begin
 			if good then begin
 				writestr(s,'Element ',i:1,' greater than element ',i-1:1,
 				' in x-graph descending sort');
@@ -287,98 +296,107 @@ begin
 			end;
 			good:=false;
 		end;
-	dispose_x_graph(gpx);
 
 	fsd:=0;
 	fsr:=1;
 	writeln('Simple integer list of same size.');
-	gpx:=new_x_graph(tsize);
-	for i:=0 to length(gpx^) do
-		gpx^[i]:=i+1;
+	setlength(gpx,tsize);
+	for i:=0 to length(gpx) do
+		gpx[i]:=i+1;
 	writeln('gpx: ',string_from_x_graph(gpx));
-	x_graph_descending(gpx);
+	x_graph_descending(@gpx);
 	writeln('descending: ',string_from_x_graph(gpx));
-	x_graph_ascending(gpx);
+	x_graph_ascending(@gpx);
 	writeln('ascending: ',string_from_x_graph(gpx));	
+	if num_outstanding_ptrs>0 then begin
+		writestr(s,'Have ',num_outstanding_ptrs:1,
+			' outsanding pointers after sorting x-graphs.');
+		print_error(s);
+		num_outstanding_ptrs:=0;
+	end;
 {
 	Routines that operate upon x-graphs.
 }
 	fsd:=2;
 	fsr:=1;
-	writeln('average_x_graph=',average_x_graph(gpx):fsr:fsd);
-	writeln('max_x_graph=',max_x_graph(gpx):fsr:fsd);
-	writeln('min_x_graph=',min_x_graph(gpx):fsr:fsd);
-	writeln('stdev_x_graph=',stdev_x_graph(gpx):fsr:fsd);
-	writeln('mad_x_graph=',mad_x_graph(gpx):fsr:fsd);
-	writeln('median_x_graph=',median_x_graph(gpx):fsr:fsd);
-	writeln('10% percentile_x_graph=',percentile_x_graph(gpx,10):fsr:fsd);
-	writeln('coastline_x_graph=',coastline_x_graph(gpx):fsr:fsd);
-	writeln('slope_x_graph=',slope_x_graph(gpx,tsize div 2,tsize div 4):fsr:fsd);
-	dispose_x_graph(gpx);
+	writeln('average_x_graph=',average_x_graph(@gpx):fsr:fsd);
+	writeln('max_x_graph=',max_x_graph(@gpx):fsr:fsd);
+	writeln('min_x_graph=',min_x_graph(@gpx):fsr:fsd);
+	writeln('stdev_x_graph=',stdev_x_graph(@gpx):fsr:fsd);
+	writeln('mad_x_graph=',mad_x_graph(@gpx):fsr:fsd);
+	writeln('median_x_graph=',median_x_graph(@gpx):fsr:fsd);
+	writeln('10% percentile_x_graph=',percentile_x_graph(@gpx,10):fsr:fsd);
+	writeln('coastline_x_graph=',coastline_x_graph(@gpx):fsr:fsd);
+	writeln('slope_x_graph=',slope_x_graph(@gpx,tsize div 2,tsize div 4):fsr:fsd);
 	if num_outstanding_ptrs>0 then begin
 		writestr(s,'Have ',num_outstanding_ptrs:1,
 			' outsanding pointers after x-graph checks.');
 		print_error(s);
 	end;
+	if num_outstanding_ptrs>0 then begin
+		writestr(s,'Have ',num_outstanding_ptrs:1,
+			' outsanding pointers after x-graph calculations.');
+		print_error(s);
+		num_outstanding_ptrs:=0;
+	end;
 {
 	Test the accuracy of the fast fourier trasform routines.
 }
-	writeln('Checking fast Fourier transform accuracy on a sum of five sinusoids.');
-	dp:=new_x_graph(fftsize);
+	writeln('Checking fast Fast Fourier Transform (FFT) accuracy on a sum of five sinusoids.');
+	setlength(dp,fftsize);
 	for i:=0 to fftsize-1 do
-		dp^[i]:=sin(2*pi*i/fftsize)+sin(4*pi*i/fftsize)
+		dp[i]:=sin(2*pi*i/fftsize)+sin(4*pi*i/fftsize)
 			+sin(6*pi*i/fftsize)+sin(8*pi*i/fftsize)+sin(16*pi*i/fftsize);
 	ft:=fft_real(dp);
-	dispose_x_graph(dp);
 	dp:=fft_real_inverse(ft);
 	good:=true;
 	for i:=0 to fftsize-1 do
-		if abs(dp^[i]-sin(2*pi*i/fftsize)-sin(4*pi*i/fftsize)
+		if abs(dp[i]-sin(2*pi*i/fftsize)-sin(4*pi*i/fftsize)
 			-sin(6*pi*i/fftsize)-sin(8*pi*i/fftsize)-sin(16*pi*i/fftsize))>0.001 then 
 			good:=false;
 	if good then writeln('Inverse of transformed signal agrees with original.')
 	else print_error('Inverse of transformed signal does not agree with original.');
-	dispose_x_graph(dp);
-	dispose_xy_graph(ft);
 {
 	Test the speed of the fast fourier trasform routines.
 }
 	writeln('Checking fast Fourier transform speed on white noise of ',fftsize:1,' points.');
-	dp:=new_x_graph(fftsize);
+	setlength(dp,fftsize);
 	start_ms:=clock_milliseconds;
 	for j:=1 to reps do begin
-		for i:=0 to fftsize-1 do dp^[i]:=random_0_to_1;
+		for i:=0 to fftsize-1 do dp[i]:=random_0_to_1;
 		ft:=fft_real(dp);
-		dispose_xy_graph(ft);
 	end;
-	dispose_x_graph(dp);
 	writeln('Each transform takes ',1.0*(clock_milliseconds-start_ms)/reps*us_per_ms:1:1,' us.');
+	if num_outstanding_ptrs>0 then begin
+		writestr(s,'Have ',num_outstanding_ptrs:1,
+			' outsanding pointers after FFT tests.');
+		print_error(s);
+		num_outstanding_ptrs:=0;
+	end;
 {
 	Test xy-graph generation and string interfaces.
 }
-	gpxy:=new_xy_graph(gsize);
-	for i:=0 to length(gpxy^)-1 do begin
-		gpxy^[i].x:=i;
-		gpxy^[i].y:=i+1;
+	setlength(gpxy,gsize);
+	for i:=0 to length(gpxy)-1 do begin
+		gpxy[i].x:=i;
+		gpxy[i].y:=i+1;
 	end;
-	writeln('Created and filled xy-graph of length ',gsize,' and length(gpxy^)=',length(gpxy^),'.');
+	writeln('Created and filled xy-graph of length ',gsize,' and length(gpxy)=',length(gpxy),'.');
 
-	straight_line_fit(gpxy,slope,intercept,residual);
+	straight_line_fit(@gpxy,slope,intercept,residual);
 	writeln('slope=',slope:fsr:fsd,' intercept=',intercept:fsr:fsd,' residual=',residual:fsr:fsd);
 
-	writeln('Translating gpxy^ into string with string_from_xy_graph ',reps:1,' times');
+	writeln('Translating gpxy into string with string_from_xy_graph ',reps:1,' times');
 	start_ms:=clock_milliseconds;
 	for i:=1 to reps do
 		s:=string_from_xy_graph(gpxy);
 	writeln('Each translation takes ',1.0*(clock_milliseconds-start_ms)/reps*us_per_ms:1:1,' us.');
 		
-	dispose_xy_graph(gpxy);
-
-	writeln('Translating string back into xy-graph with read_xy_graph_fpc ',reps:1,' times');
+	writeln('Translating string back into xy-graph with read_xy_graph ',reps:1,' times');
 	start_ms:=clock_milliseconds;
 	for i:=1 to reps do
 		begin
-			gxy:=read_xy_graph_fpc(s);
+			gxy:=read_xy_graph(s);
 		end;
 	writeln('Each translation takes ',1.0*(clock_milliseconds-start_ms)/reps*us_per_ms:1:1,' us.');
 
@@ -386,70 +404,61 @@ begin
 	writeln('Checking accuracy of translation from xy-graph to string and back.');
 	good:=true;
 	for i:=1 to gsize-1 do 
-		if (gpxy^[i].x<>i) then begin
+		if (gpxy[i].x<>i) then begin
 			if good then begin
-				writestr(s,'Point ',i:1,' x value ',gpxy^[i].x:fsr:fsd,
+				writestr(s,'Point ',i:1,' x value ',gpxy[i].x:fsr:fsd,
 				'in xy-graph translation');
 				print_error(s);
 			end;
 			good:=false;	
-		end else if (gpxy^[i].y<>i+1) then begin
+		end else if (gpxy[i].y<>i+1) then begin
 			if good then begin
-				writestr(s,'Point ',i:1,' y value ',gpxy^[i].y:fsr:fsd,
+				writestr(s,'Point ',i:1,' y value ',gpxy[i].y:fsr:fsd,
 				'in xy-graph translation');
 				print_error(s);
 			end;
 			good:=false;			
 		end;
 	if good then writeln('Translation accurate.');
-	dispose_xy_graph(gpxy);
 
 	if num_outstanding_ptrs>0 then begin
 		writestr(s,'Have ',num_outstanding_ptrs:1,
-			' outsanding pointers after xy-graph checks.');
+			' outsanding pointers after xy-graph to string tests.');
 		print_error(s);
+		num_outstanding_ptrs:=0;
 	end;
 {
 	Test xyz-graph generation.
 }
-	gpxyz:=new_xyz_graph(gsize);
-	for i:=0 to length(gpxyz^)-1 do 
-		with gpxyz^[i] do begin
+	setlength(gpxyz,gsize);
+	for i:=0 to length(gpxyz)-1 do 
+		with gpxyz[i] do begin
 			x:=i;
 			y:=i+1;
 			z:=i+2;
 	end;
-	writeln('Created and filled xyz-graph of length ',gsize,' and length(gpxyz^)=',length(gpxyz^),'.');
-	dispose_xyz_graph(gpxyz);
-
-	if num_outstanding_ptrs>0 then begin
-		writestr(s,'Have ',num_outstanding_ptrs:1,
-			' outsanding pointers after xyz-graph checks.');
-		print_error(s);
-	end;
+	writeln('Created and filled xyz-graph of length ',gsize,' and length(gpxyz)=',length(gpxyz),'.');
 {
 	Speed of quicksort.
 }
-	gpx:=new_x_graph(gsize);
+	setlength(gpx,gsize);
 	writeln('Generating and sorting list of ',gsize,' random elements ',reps,' times.');
 	start_ms:=clock_milliseconds;
 	for j:=1 to reps do begin
-		for i:=0 to length(gpx^) do
-			gpx^[i]:=random_0_to_1;
-		x_graph_ascending(gpx);
+		for i:=0 to length(gpx) do
+			gpx[i]:=random_0_to_1;
+		x_graph_ascending(@gpx);
 	end;
-	dispose_x_graph(gpx);
 	writeln('Each sort takes ',1.0*(clock_milliseconds-start_ms)/reps*us_per_ms:1:1,' us.');
 
-	gpx:=new_x_graph(gsize*10);
+	setlength(gpx,gsize*10);
 	writeln('Generating and sorting list of ',gsize*10,' random elements ',reps div 10,' times.');
 	start_ms:=clock_milliseconds;
 	for j:=1 to (reps div 10) do begin
-		for i:=0 to length(gpx^) do
-			gpx^[i]:=random_0_to_1;
-		x_graph_ascending(gpx);
+		for i:=0 to length(gpx) do
+			gpx[i]:=random_0_to_1;
+		x_graph_ascending(@gpx);
 	end;
-	dispose_x_graph(gpx);
 	writeln('Each sort takes ',1.0*(clock_milliseconds-start_ms)/(reps div 10)*us_per_ms:1:1,' us.');
 {
 	Math functions.
@@ -556,8 +565,4 @@ begin
 	writeln(error_string);
 	error_string:='';
 	writeln('End error string.');
-	if num_outstanding_ptrs>0 then
-		writeln('Have ',num_outstanding_ptrs:1,' outstanding pointers, should have none.')
-	else
-		writeln('No outstanding pointers left, which is what we want.');
 end.
