@@ -26,11 +26,11 @@ interface
 uses
 	utils;
 
-function metric_calculation_A(gp:x_graph_ptr;command:string):string;
-function metric_calculation_B(gp:x_graph_ptr;command:string):string;
-function metric_calculation_C(gp:x_graph_ptr;command:string):string;
-function metric_calculation_D(gp:x_graph_ptr;command:string):string;
-function metric_calculation_E(gp:x_graph_ptr;command:string):string;
+function metric_calculation_A(var gp:x_graph_type;command:string):string;
+function metric_calculation_B(var gp:x_graph_type;command:string):string;
+function metric_calculation_C(var gp:x_graph_type;command:string):string;
+function metric_calculation_D(var gp:x_graph_type;command:string):string;
+function metric_calculation_E(var gp:x_graph_type;command:string):string;
 
 
 implementation
@@ -52,7 +52,7 @@ implementation
 	alternate peaks and valleys through the list.
 }
 function find_peaks_valleys(
-	gp:x_graph_ptr;
+	var gp:x_graph_type;
 	left_to_right:boolean;
 	threshold:real):x_graph_type;
 
@@ -63,8 +63,7 @@ var
 	
 begin
 	find_peaks_valleys:=nil;
-	if gp=nil then exit;
-	setlength(pv_gp,length(gp^));
+	setlength(pv_gp,length(gp));
 	if length(pv_gp)=0 then begin
 		report_error('failed to allocate pv_gp in find_peaks_valleys');
 		exit;
@@ -75,39 +74,39 @@ begin
 		i:=0;
 	end else begin
 		i_step:=-1;
-		i:=length(gp^)-1;
+		i:=length(gp)-1;
 	end;
 	
-	min:=gp^[i];
-	max:=gp^[i];				
+	min:=gp[i];
+	max:=gp[i];				
 	max_i:=i;
 	min_i:=i;
 	state:=0;
 	num_valleys:=0;
 	num_peaks:=0;
-	while (i>=0) and (i<length(gp^)) do begin
-		if gp^[i]>max then begin
-			max:=gp^[i];
+	while (i>=0) and (i<length(gp)) do begin
+		if gp[i]>max then begin
+			max:=gp[i];
 			max_i:=i;
 		end;
-		if gp^[i]<min then begin
-			min:=gp^[i];
+		if gp[i]<min then begin
+			min:=gp[i];
 			min_i:=i;
 		end;
-		if (abs(gp^[i]-min)>threshold) and (state<>-1) then begin
+		if (abs(gp[i]-min)>threshold) and (state<>-1) then begin
 			pv_gp[num_valleys+num_peaks+1]:=min_i;
 			inc(num_valleys);
-			max:=gp^[i];
+			max:=gp[i];
 			max_i:=i;
-			min:=gp^[i];
+			min:=gp[i];
 			min_i:=i;
 			state:=-1;
-		end else if (abs(gp^[i]-max)>threshold) and (state<>+1) then begin
+		end else if (abs(gp[i]-max)>threshold) and (state<>+1) then begin
 			pv_gp[num_valleys+num_peaks+1]:=max_i;
 			inc(num_peaks);
-			max:=gp^[i];
+			max:=gp[i];
 			max_i:=i;
-			min:=gp^[i];
+			min:=gp[i];
 			min_i:=i;
 			state:=+1;
 		end;
@@ -155,7 +154,7 @@ end;
 	The routine returns six metrics as a string of real numbers, in the order we
 	list them above.
 }
-function metric_calculation_A(gp:x_graph_ptr;command:string):string;
+function metric_calculation_A(var gp:x_graph_type;command:string):string;
 
 const
 	amplitude_exponent=1.0;
@@ -212,10 +211,10 @@ var
 		if i_step>0 then begin
 			i:=i_step;
 		end else begin
-			i:=length(gp^)-1+i_step;
+			i:=length(gp)-1+i_step;
 		end;
-		min:=gp^[i];
-		max:=gp^[i];				
+		min:=gp[i];
+		max:=gp[i];				
 		max_i:=i;
 		max_c:=0;
 		min_i:=i;
@@ -223,44 +222,44 @@ var
 		state:=0;
 		num_min:=0;
 		num_max:=0;
-		while (i>0) and (i<length(gp^)-1) do begin
-			if gp^[i]>max then begin
-				max:=gp^[i];
+		while (i>0) and (i<length(gp)-1) do begin
+			if gp[i]>max then begin
+				max:=gp[i];
 				max_i:=i;
 				max_c:=0;
 			end else begin
-				max_c:=max_c+abs(gp^[i]-gp^[i-i_step]);
+				max_c:=max_c+abs(gp[i]-gp[i-i_step]);
 			end;
-			if gp^[i]<min then begin
-				min:=gp^[i];
+			if gp[i]<min then begin
+				min:=gp[i];
 				min_i:=i;
 				min_c:=0;
 			end else begin
-				min_c:=min_c+abs(gp^[i]-gp^[i-i_step]);
+				min_c:=min_c+abs(gp[i]-gp[i-i_step]);
 			end;
 			if (min_c>0) 
-					and (sqr(gp^[i]-min)/mad/min_c>periodicity_threshold) 
+					and (sqr(gp[i]-min)/mad/min_c>periodicity_threshold) 
 					and (state<>-1) then begin
 				minima_gp[num_min]:=min_i;
 				minmax_gp[num_min+num_max]:=min_i;
 				inc(num_min);
-				max:=gp^[i];
+				max:=gp[i];
 				max_i:=i;
 				max_c:=0;
-				min:=gp^[i];
+				min:=gp[i];
 				min_i:=i;
 				min_c:=0;
 				state:=-1;
 			end else if (max_c>0) 
-					and (sqr(gp^[i]-max)/mad/max_c>periodicity_threshold) 
+					and (sqr(gp[i]-max)/mad/max_c>periodicity_threshold) 
 					and (state<>+1) then begin
 				maxima_gp[num_max]:=max_i;
 				minmax_gp[num_min+num_max]:=max_i;
 				inc(num_max);
-				max:=gp^[i];
+				max:=gp[i];
 				max_i:=i;
 				max_c:=0;
-				min:=gp^[i];
+				min:=gp[i];
 				min_i:=i;
 				min_c:=0;
 				state:=+1;
@@ -335,14 +334,14 @@ var
 			if num_steps_accepted<periodicity_few_steps then
 				p:=p*num_steps_accepted/periodicity_few_steps;
 	
-			small_step:=length(gp^)/periodicity_many_steps;
+			small_step:=length(gp)/periodicity_many_steps;
 			if med<small_step then
 				p:=p*med/small_step;
 	
 			num_degenerate_pairs:=0;
 			for i:=1 to num_steps-1 do 
 				if abs(minmax_gp[i]-minmax_gp[i-1])
-					<=length(gp^)*periodicity_degeneracy_fraction then begin
+					<=length(gp)*periodicity_degeneracy_fraction then begin
 					inc(num_degenerate_pairs);
 					p:=p*periodicity_degeneracy_shrink;
 			end;
@@ -376,18 +375,17 @@ begin
 	We assign default values to the metrics and check the incoming graph pointer.
 }
 	metric_calculation_A:='0 0 0 0 0 0';
-	if gp=nil then exit;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in metric_calculation_A');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in metric_calculation_A');
 		exit;
 	end;
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	setlength(list_gp,length(gp^));
-	setlength(maxima_gp,length(gp^));
-	setlength(minima_gp,length(gp^));
-	setlength(minmax_gp,length(gp^));
+	setlength(list_gp,length(gp));
+	setlength(maxima_gp,length(gp));
+	setlength(minima_gp,length(gp));
+	setlength(minmax_gp,length(gp));
 	if (list_gp=nil) or (maxima_gp=nil) 
 			or (minima_gp=nil) or (minmax_gp=nil) then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_A');
@@ -417,24 +415,24 @@ begin
 	sum_x:=0;
 	sum_x2:=0;
 	coastline:=0;
-	min:=gp^[0];
-	max:=gp^[0];
+	min:=gp[0];
+	max:=gp[0];
 	list_gp[0]:=0;
-	for i:=0 to length(gp^)-1 do begin
-		sum_x:=sum_x+gp^[i];
-		sum_x2:=sum_x2+gp^[i]*gp^[i];
-		if gp^[i]>max then max:=gp^[i];
-		if gp^[i]<min then min:=gp^[i];
+	for i:=0 to length(gp)-1 do begin
+		sum_x:=sum_x+gp[i];
+		sum_x2:=sum_x2+gp[i]*gp[i];
+		if gp[i]>max then max:=gp[i];
+		if gp[i]<min then min:=gp[i];
 		if (i>0) then begin
-			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			list_gp[i]:=abs(gp[i]-gp[i-1]);
 			coastline:=coastline+list_gp[i];
 		end;
 	end;
 	check_for_math_error(sum_x);
 	check_for_math_error(sum_x2);
 	if error_string<>'' then exit;
-	ave:=sum_x/length(gp^);
-	stdev:=sqrt(sum_x2/length(gp^)-ave*ave);
+	ave:=sum_x/length(gp);
+	stdev:=sqrt(sum_x2/length(gp)-ave*ave);
 {
 	Calculate the amplitude metric, which lies between zero and one.
 }
@@ -453,7 +451,7 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency metric.
 }
-	x_graph_descending(@list_gp);
+	x_graph_descending(list_gp);
 	limit:=round(intermittency_fraction*length(list_gp));
 	sum_x:=0;
 	for i:=0 to limit-1 do sum_x:=sum_x+list_gp[i];
@@ -471,14 +469,14 @@ begin
 	in the calculation of the remaining metrics.
 }
 	mad:=0;
-	for i:=0 to length(gp^)-1 do
-		mad:=mad+abs(gp^[i]-ave);
-	mad:=mad/length(gp^);
+	for i:=0 to length(gp)-1 do
+		mad:=mad+abs(gp[i]-ave);
+	mad:=mad/length(gp);
 {
 	Divide the coastline by the mean absolute deviation to obtain a normalized 
 	coastline, then apply sigmoidal function to generate the coastline metric.
 }
-	if mad>0 then coastline:=coastline/mad/length(gp^)
+	if mad>0 then coastline:=coastline/mad/length(gp)
 	else coastline:=0.0;
 	if print_diagnostics then begin
 		writestr(s,'coastline: ',coastline:0:3,' mad ',mad:0:1);
@@ -497,8 +495,8 @@ begin
 	features of the signal. We apply a sigmoidal function to get the spiminess
 	metric between zero and one.
 }
-	for i:=0 to length(list_gp)-1 do list_gp[i]:=gp^[i]-ave;
-	x_graph_descending_abs(@list_gp);
+	for i:=0 to length(list_gp)-1 do list_gp[i]:=gp[i]-ave;
+	x_graph_descending_abs(list_gp);
 	limit:=round(spikiness_fraction*length(list_gp));
 	sum_x:=0;
 	for i:=0 to limit-1 do sum_x:=sum_x+abs(list_gp[i]);
@@ -610,7 +608,7 @@ end;
 	value is a multiple of 1 Hz. If two seconds long, the value is a multiple of
 	0.5 Hz.
 }
-function metric_calculation_B(gp:x_graph_ptr;command:string):string;
+function metric_calculation_B(var gp:x_graph_type;command:string):string;
 
 const
 	amplitude_exponent=1.0;
@@ -660,15 +658,14 @@ begin
 	We assign default values to the metrics and check the incoming graph pointer.
 }
 	metric_calculation_B:='0 0 0 0 0 0 0';
-	if gp=nil then exit;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in metric_calculation_B');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in metric_calculation_B');
 		exit;
 	end;
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	setlength(list_gp,length(gp^));
+	setlength(list_gp,length(gp));
 	if length(list_gp)=0 then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_B');
 		exit;
@@ -699,16 +696,16 @@ begin
 	sum_x:=0;
 	sum_x2:=0;
 	coastline:=0;
-	min:=gp^[0];
-	max:=gp^[0];
+	min:=gp[0];
+	max:=gp[0];
 	list_gp[0]:=0;
-	for i:=0 to length(gp^)-1 do begin
-		sum_x:=sum_x+gp^[i];
-		sum_x2:=sum_x2+gp^[i]*gp^[i];
-		if gp^[i]>max then max:=gp^[i];
-		if gp^[i]<min then min:=gp^[i];
+	for i:=0 to length(gp)-1 do begin
+		sum_x:=sum_x+gp[i];
+		sum_x2:=sum_x2+gp[i]*gp[i];
+		if gp[i]>max then max:=gp[i];
+		if gp[i]<min then min:=gp[i];
 		if (i>0) then begin
-			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			list_gp[i]:=abs(gp[i]-gp[i-1]);
 			coastline:=coastline+list_gp[i];
 		end;
 	end;
@@ -717,9 +714,9 @@ begin
 	if error_string<>'' then exit;
 	range:=max-min;
 	if range<=0 then exit;
-	ave:=sum_x/length(gp^);
-	stdev:=sqrt(sum_x2/length(gp^)-ave*ave);
-	mas:=coastline/length(gp^);
+	ave:=sum_x/length(gp);
+	stdev:=sqrt(sum_x2/length(gp)-ave*ave);
+	mas:=coastline/length(gp);
 {
 	Calculate the amplitude metric, which lies between zero and one.
 }
@@ -739,7 +736,7 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency metric.
 }
-	x_graph_descending(@list_gp);
+	x_graph_descending(list_gp);
 	limit:=round(intermittency_fraction*length(list_gp));
 	high_coastline:=0;
 	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp[i];
@@ -758,14 +755,14 @@ begin
 	in the calculation of the remaining metrics.
 }
 	mad:=0;
-	for i:=0 to length(gp^)-1 do
-		mad:=mad+abs(gp^[i]-ave);
-	mad:=mad/length(gp^);
+	for i:=0 to length(gp)-1 do
+		mad:=mad+abs(gp[i]-ave);
+	mad:=mad/length(gp);
 {
 	Divide the coastline by the mean absolute deviation to obtain a normalized 
 	coastline, then apply sigmoidal function to generate the coastline metric.
 }
-	coastline:=coastline/mad/length(gp^);
+	coastline:=coastline/mad/length(gp);
 	if print_diagnostics then begin
 		writestr(s,'Coastline: ',coastline:0:3,' mad=',mad:0:1,' mas=',mas:0:1);
 		gui_writeln(s);
@@ -809,7 +806,7 @@ begin
 	sum_separation:=0;
 	for i:=1 to num_pv_s-1 do begin
 		sum_separation:=sum_separation
-			+abs(gp^[round(pv_gp[i+1])]-gp^[round(pv_gp[i])])/range;
+			+abs(gp[round(pv_gp[i+1])]-gp[round(pv_gp[i])])/range;
 	end;
 	if num_pv_s>1 then spikiness:=sum_separation/(num_pv_s-1)
 	else spikiness:=0;
@@ -901,7 +898,7 @@ begin
 		periodicity:=num_steps_accepted/num_steps;
 		if num_steps_accepted<periodicity_few_steps then
 			periodicity:=periodicity*sqr(num_steps_accepted/periodicity_few_steps);
-		small_step:=1+trunc(length(gp^)/periodicity_many_steps);
+		small_step:=1+trunc(length(gp)/periodicity_many_steps);
 		if best_step<small_step then
 			periodicity:=periodicity*best_step/small_step;
 		num_degenerate_pairs:=0;
@@ -927,8 +924,8 @@ begin
 	Now that we have a best value for the periodic step size, we can produce an
 	estimate of frequency in units of cycles per interval.
 }
-	if best_step>0 then frequency:=length(gp^)/best_step
-	else frequency:=length(gp^);
+	if best_step>0 then frequency:=length(gp)/best_step
+	else frequency:=length(gp);
 {
 	In diagnostic operation we print more information about the accepted steps.
 }
@@ -1012,7 +1009,7 @@ end;
 	value is a multiple of 1 Hz. If two seconds long, the value is a multiple of
 	0.5 Hz.
 }
-function metric_calculation_C(gp:x_graph_ptr;command:string):string;
+function metric_calculation_C(var gp:x_graph_type;command:string):string;
 
 const
 	intermittency_fraction=0.1;
@@ -1065,15 +1062,14 @@ begin
 	We assign default values to the measures and check the incoming graph pointer.
 }
 	metric_calculation_C:='0 0 0 0 0 0 0 0';
-	if gp=nil then exit;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in metric_calculation_C');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in metric_calculation_C');
 		exit;
 	end;
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	setlength(list_gp,length(gp^));
+	setlength(list_gp,length(gp));
 	if (list_gp=nil) then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_C');
 		exit;
@@ -1103,16 +1099,16 @@ begin
 	sum_x:=0;
 	sum_x2:=0;
 	coastline:=0;
-	min:=gp^[0];
-	max:=gp^[0];
+	min:=gp[0];
+	max:=gp[0];
 	list_gp[0]:=0;
-	for i:=0 to length(gp^)-1 do begin
-		sum_x:=sum_x+gp^[i];
-		sum_x2:=sum_x2+gp^[i]*gp^[i];
-		if gp^[i]>max then max:=gp^[i];
-		if gp^[i]<min then min:=gp^[i];
+	for i:=0 to length(gp)-1 do begin
+		sum_x:=sum_x+gp[i];
+		sum_x2:=sum_x2+gp[i]*gp[i];
+		if gp[i]>max then max:=gp[i];
+		if gp[i]<min then min:=gp[i];
 		if (i>0) then begin
-			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			list_gp[i]:=abs(gp[i]-gp[i-1]);
 			coastline:=coastline+list_gp[i];
 		end;
 	end;
@@ -1121,17 +1117,17 @@ begin
 	if error_string<>'' then exit;
 	range:=max-min;
 	if range<=0 then exit;
-	ave:=sum_x/length(gp^);
-	stdev:=sqrt(sum_x2/length(gp^)-ave*ave);
-	mas:=coastline/length(gp^);
-	las:=range/length(gp^);
+	ave:=sum_x/length(gp);
+	stdev:=sqrt(sum_x2/length(gp)-ave*ave);
+	mas:=coastline/length(gp);
+	las:=range/length(gp);
 {
 	Calculate the mean absolute deviation of the signal.
 }
 	mad:=0;
-	for i:=0 to length(gp^)-1 do
-		mad:=mad+abs(gp^[i]-ave);
-	mad:=mad/length(gp^);
+	for i:=0 to length(gp)-1 do
+		mad:=mad+abs(gp[i]-ave);
+	mad:=mad/length(gp);
 {
 	Calculate the amplitude measure, which lies between zero and one.
 }
@@ -1150,7 +1146,7 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency measure.
 }
-	x_graph_descending(@list_gp);
+	x_graph_descending(list_gp);
 	limit:=round(intermittency_fraction*length(list_gp));
 	high_coastline:=0;
 	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp[i];
@@ -1182,10 +1178,10 @@ begin
 	count:=0;
 	upcount:=0;
 	downcount:=0;
-	for i:=0 to length(gp^)-1 do begin
-		if (gp^[i]-ave >= asymmetry_extent*stdev) then inc(upcount);
-		if (gp^[i]-ave <= -asymmetry_extent*stdev) then inc(downcount);
-		if (abs(gp^[i]-ave) >= asymmetry_weight*stdev) then inc(count);
+	for i:=0 to length(gp)-1 do begin
+		if (gp[i]-ave >= asymmetry_extent*stdev) then inc(upcount);
+		if (gp[i]-ave <= -asymmetry_extent*stdev) then inc(downcount);
+		if (abs(gp[i]-ave) >= asymmetry_weight*stdev) then inc(count);
 	end;
 	if count>0 then asymmetry:=1.0+1.0*(upcount-downcount)/count
 	else asymmetry:=1.0;
@@ -1218,7 +1214,7 @@ begin
 	sum_separation:=0;
 	for i:=1 to num_pv_minor-1 do begin
 		sum_separation:=sum_separation
-			+abs(gp^[round(pv_gp[i+1])]-gp^[round(pv_gp[i])])/range;
+			+abs(gp[round(pv_gp[i+1])]-gp[round(pv_gp[i])])/range;
 	end;
 	if num_pv_minor>1 then coherence:=sum_separation/(num_pv_minor-1)
 	else coherence:=0;
@@ -1304,7 +1300,7 @@ begin
 		rhythm:=num_steps_accepted/num_steps;
 		if num_steps_accepted<rhythm_few_steps then
 			rhythm:=rhythm*sqr(num_steps_accepted/rhythm_few_steps);
-		small_step:=1+trunc(length(gp^)/rhythm_many_steps);
+		small_step:=1+trunc(length(gp)/rhythm_many_steps);
 		if best_step<small_step then
 			rhythm:=rhythm*best_step/small_step;
 		num_degenerate_pairs:=0;
@@ -1330,8 +1326,8 @@ begin
 	Now that we have a best value for the periodic step size, we can produce an
 	estimate of frequency in units of cycles per interval.
 }
-	if best_step>0 then frequency:=length(gp^)/best_step
-	else frequency:=length(gp^);
+	if best_step>0 then frequency:=length(gp)/best_step
+	else frequency:=length(gp);
 {
 	In diagnostic operation we print more information about the accepted steps.
 }
@@ -1418,7 +1414,7 @@ end;
 	a section is, for sections in the center, equal to twice the extent. At the
 	start and end of the interval, however, the sections are thinner.
 }
-function metric_calculation_D(gp:x_graph_ptr;command:string):string;
+function metric_calculation_D(var gp:x_graph_type;command:string):string;
 
 const
 	intermittency_fraction=0.1;
@@ -1475,15 +1471,14 @@ begin
 	We assign default values to the measures and check the incoming graph pointer.
 }
 	metric_calculation_D:='0 0 0 0 0 0 0 0';
-	if gp=nil then exit;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in metric_calculation_D');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in metric_calculation_D');
 		exit;
 	end;
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	setlength(list_gp,length(gp^));
+	setlength(list_gp,length(gp));
 	if (list_gp=nil) then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_D');
 		exit;
@@ -1506,16 +1501,16 @@ begin
 	sum_x:=0;
 	sum_x2:=0;
 	coastline:=0;
-	min:=gp^[0];
-	max:=gp^[0];
+	min:=gp[0];
+	max:=gp[0];
 	list_gp[0]:=0;
-	for i:=0 to length(gp^)-1 do begin
-		sum_x:=sum_x+gp^[i];
-		sum_x2:=sum_x2+gp^[i]*gp^[i];
-		if gp^[i]>max then max:=gp^[i];
-		if gp^[i]<min then min:=gp^[i];
+	for i:=0 to length(gp)-1 do begin
+		sum_x:=sum_x+gp[i];
+		sum_x2:=sum_x2+gp[i]*gp[i];
+		if gp[i]>max then max:=gp[i];
+		if gp[i]<min then min:=gp[i];
 		if (i>0) then begin
-			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			list_gp[i]:=abs(gp[i]-gp[i-1]);
 			coastline:=coastline+list_gp[i];
 		end;
 	end;
@@ -1524,16 +1519,16 @@ begin
 	if error_string<>'' then exit;
 	range:=max-min;
 	if range<=0 then exit;
-	ave:=sum_x/length(gp^);
-	stdev:=sqrt(sum_x2/length(gp^)-ave*ave);
-	mas:=coastline/length(gp^);
+	ave:=sum_x/length(gp);
+	stdev:=sqrt(sum_x2/length(gp)-ave*ave);
+	mas:=coastline/length(gp);
 {
 	Calculate the mean absolute deviation of the signal.
 }
 	mad:=0;
-	for i:=0 to length(gp^)-1 do
-		mad:=mad+abs(gp^[i]-ave);
-	mad:=mad/length(gp^);
+	for i:=0 to length(gp)-1 do
+		mad:=mad+abs(gp[i]-ave);
+	mad:=mad/length(gp);
 {
 	Calculate the amplitude measure, which lies between zero and one.
 }
@@ -1554,7 +1549,7 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency measure.
 }
-	x_graph_descending(@list_gp);
+	x_graph_descending(list_gp);
 	limit:=round(intermittency_fraction*length(list_gp));
 	high_coastline:=0;
 	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp[i];
@@ -1594,7 +1589,7 @@ begin
 	valley.
 }
 	for i:=2 to num_pv_coherence do begin
-		score:=(gp^[round(pv_gp[i])]-gp^[round(pv_gp[i-1])])
+		score:=(gp[round(pv_gp[i])]-gp[round(pv_gp[i-1])])
 			* (pv_gp[i]-pv_gp[i-1]);
 		list_gp[i-2]:=score;
 	end;
@@ -1627,7 +1622,7 @@ begin
 	Coherence is a measure of how much of the mean absolute deviation area of
 	the signal is accounted for by the first ten discrete peaks and valleys.
 }
-	coherence:=coherence_score/mad/length(gp^);
+	coherence:=coherence_score/mad/length(gp);
 	if print_diagnostics then begin
 		writestr(s,'Coherence: ',coherence:0:3,
 			' threshold=',coherence_threshold*range:0:1,
@@ -1639,10 +1634,10 @@ begin
 	Calculate the asymmetry measure using the third moment of the signal.
 }
 	asymmetry_score:=0;
-	for i:=0 to length(gp^)-1 do begin
-		asymmetry_score:=asymmetry_score+xpyi((gp^[i]-ave)/stdev,3);
+	for i:=0 to length(gp)-1 do begin
+		asymmetry_score:=asymmetry_score+xpyi((gp[i]-ave)/stdev,3);
 	end;
-	asymmetry_score:=asymmetry_score/length(gp^);
+	asymmetry_score:=asymmetry_score/length(gp);
 	asymmetry:=exp(asymmetry_score);
 	if print_diagnostics then begin
 		writestr(s,'Asymmetry: ',asymmetry:0:3,' ',
@@ -1728,7 +1723,7 @@ begin
 		rhythm:=num_steps_accepted/num_steps;
 		if num_steps_accepted<rhythm_few_steps then
 			rhythm:=rhythm*sqr(num_steps_accepted/rhythm_few_steps);
-		small_step:=1+trunc(length(gp^)/rhythm_many_steps);
+		small_step:=1+trunc(length(gp)/rhythm_many_steps);
 		if best_step<small_step then
 			rhythm:=rhythm*best_step/small_step;
 		num_degenerate_pairs:=0;
@@ -1754,8 +1749,8 @@ begin
 	Now that we have a best value for the periodic step size, we can produce an
 	estimate of frequency in units of cycles per interval.
 }
-	if best_step>0 then frequency:=length(gp^)/best_step
-	else frequency:=length(gp^);
+	if best_step>0 then frequency:=length(gp)/best_step
+	else frequency:=length(gp);
 {
 	In diagnostic operation we print more information about the accepted steps.
 }
@@ -1782,13 +1777,13 @@ begin
 }
 	i:=0;
 	num_sections:=0;
-	while i<length(gp^) do begin
-		top:=gp^[i];
-		bottom:=gp^[i];
+	while i<length(gp) do begin
+		top:=gp[i];
+		bottom:=gp[i];
 		for j:=i-spikiness_extent to i+spikiness_extent do begin
-			if (j>=0) and (j<length(gp^)) then begin
-				if gp^[j]>top then top:=gp^[j];
-				if gp^[j]<bottom then bottom:=gp^[j];
+			if (j>=0) and (j<length(gp)) then begin
+				if gp[j]>top then top:=gp[j];
+				if gp[j]<bottom then bottom:=gp[j];
 			end;
 		end;
 		list_gp[num_sections]:=top-bottom;
@@ -1852,7 +1847,7 @@ end;
 	decreasing order of range. The spikiness is the ratio of the maximum range
 	to the median range.
 }
-function metric_calculation_E(gp:x_graph_ptr;command:string):string;
+function metric_calculation_E(var gp:x_graph_type;command:string):string;
 
 const
 	intermittency_fraction=0.1;
@@ -1892,15 +1887,14 @@ begin
 	We assign default values to the measures and check the incoming graph pointer.
 }
 	metric_calculation_E:='0 0 0 0 0 0 0 0';
-	if gp=nil then exit;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in metric_calculation_E');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in metric_calculation_E');
 		exit;
 	end;
 {
 	Allocate space for four graphs the same length as the input graph.
 }
-	setlength(list_gp,length(gp^));
+	setlength(list_gp,length(gp));
 	if (list_gp=nil) then begin
 		report_error('failed to allocate an x_graph_type in metric_calculation_E');
 		exit;
@@ -1922,16 +1916,16 @@ begin
 	sum_x:=0;
 	sum_x2:=0;
 	coastline:=0;
-	min:=gp^[0];
-	max:=gp^[0];
+	min:=gp[0];
+	max:=gp[0];
 	list_gp[0]:=0;
-	for i:=0 to length(gp^)-1 do begin
-		sum_x:=sum_x+gp^[i];
-		sum_x2:=sum_x2+gp^[i]*gp^[i];
-		if gp^[i]>max then max:=gp^[i];
-		if gp^[i]<min then min:=gp^[i];
+	for i:=0 to length(gp)-1 do begin
+		sum_x:=sum_x+gp[i];
+		sum_x2:=sum_x2+gp[i]*gp[i];
+		if gp[i]>max then max:=gp[i];
+		if gp[i]<min then min:=gp[i];
 		if (i>0) then begin
-			list_gp[i]:=abs(gp^[i]-gp^[i-1]);
+			list_gp[i]:=abs(gp[i]-gp[i-1]);
 			coastline:=coastline+list_gp[i];
 		end;
 	end;
@@ -1940,16 +1934,16 @@ begin
 	if error_string<>'' then exit;
 	range:=max-min;
 	if range<=0 then exit;
-	ave:=sum_x/length(gp^);
-	stdev:=sqrt(sum_x2/length(gp^)-ave*ave);
-	mas:=coastline/length(gp^);
+	ave:=sum_x/length(gp);
+	stdev:=sqrt(sum_x2/length(gp)-ave*ave);
+	mas:=coastline/length(gp);
 {
 	Calculate the mean absolute deviation of the signal.
 }
 	mad:=0;
-	for i:=0 to length(gp^)-1 do
-		mad:=mad+abs(gp^[i]-ave);
-	mad:=mad/length(gp^);
+	for i:=0 to length(gp)-1 do
+		mad:=mad+abs(gp[i]-ave);
+	mad:=mad/length(gp);
 {
 	Calculate the amplitude measure, which lies between zero and one.
 }
@@ -1970,7 +1964,7 @@ begin
 	concentrated the coastline is in features of the signal. We apply a
 	sigmoidal function to get the intermittency measure.
 }
-	x_graph_descending(@list_gp);
+	x_graph_descending(list_gp);
 	limit:=round(intermittency_fraction*length(list_gp));
 	high_coastline:=0;
 	for i:=0 to limit-1 do high_coastline:=high_coastline+list_gp[i];
@@ -1990,7 +1984,7 @@ begin
 	coastline_normalized:=mas/range;
 	if print_diagnostics then begin
 		writestr(s,'Coastline: ',coastline_normalized:0:4,
-			' mas=',mas:0:1,' range=',range:0:1,' num_points=',length(gp^):0);
+			' mas=',mas:0:1,' range=',range:0:1,' num_points=',length(gp):0);
 		gui_writeln(s);
 	end;
 {
@@ -2014,7 +2008,7 @@ begin
 	peak-valley transition.
 }
 	for i:=2 to num_pv_coherence do begin
-		score:=(gp^[round(pv_gp[i])]-gp^[round(pv_gp[i-1])])
+		score:=(gp[round(pv_gp[i])]-gp[round(pv_gp[i-1])])
 			* (pv_gp[i]-pv_gp[i-1]);
 		list_gp[i-2]:=abs(score);
 	end;
@@ -2052,7 +2046,7 @@ begin
 	rectangular area we need for normalized display: the range multiplied by the
 	number of samples.
 }
-	coherence:=coherence_score/range/length(gp^);
+	coherence:=coherence_score/range/length(gp);
 	if print_diagnostics then begin
 		writestr(s,'Coherence: ',coherence:0:3,
 			' threshold=',coherence_threshold*range:0:1,
@@ -2064,13 +2058,13 @@ begin
 	Calculate the asymmetry measure using the third moment of the signal.
 }
 	asymmetry_score:=0;
-	for i:=0 to length(gp^)-1 do begin
-		asymmetry_score:=asymmetry_score+xpyi((gp^[i]-ave)/stdev,3);
+	for i:=0 to length(gp)-1 do begin
+		asymmetry_score:=asymmetry_score+xpyi((gp[i]-ave)/stdev,3);
 	end;
-	asymmetry:=abs(asymmetry_score/length(gp^));
+	asymmetry:=abs(asymmetry_score/length(gp));
 	if print_diagnostics then begin
 		writestr(s,'Asymmetry: ',asymmetry:0:3,' ',
-			'score=',asymmetry_score:0:3,' num_points=',length(gp^):0,
+			'score=',asymmetry_score:0:3,' num_points=',length(gp):0,
 				' ave=',ave:0:3,' stdev=',stdev:0:3);
 		gui_writeln(s);
 	end;
@@ -2079,13 +2073,13 @@ begin
 }
 	i:=0;
 	num_sections:=0;
-	while i<length(gp^) do begin
-		top:=gp^[i];
-		bottom:=gp^[i];
+	while i<length(gp) do begin
+		top:=gp[i];
+		bottom:=gp[i];
 		for j:=i-spikiness_extent to i+spikiness_extent do begin
-			if (j>=0) and (j<length(gp^)) then begin
-				if gp^[j]>top then top:=gp^[j];
-				if gp^[j]<bottom then bottom:=gp^[j];
+			if (j>=0) and (j<length(gp)) then begin
+				if gp[j]>top then top:=gp[j];
+				if gp[j]<bottom then bottom:=gp[j];
 			end;
 		end;
 		list_gp[num_sections]:=top-bottom;

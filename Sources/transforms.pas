@@ -141,12 +141,16 @@ procedure display_ccd_rectangle_ellipse(ip:image_ptr_type;
 	rect:ij_rectangle_type;color:integer);
 procedure display_ccd_ellipse(ip:image_ptr_type;
 	ellipse:ij_ellipse_type;color:integer);
-procedure display_profile_row(ip:image_ptr_type;profile_ptr:x_graph_ptr;color:integer);
-procedure display_profile_column(ip:image_ptr_type;profile_ptr:x_graph_ptr;
+procedure display_profile_row(ip:image_ptr_type;
+	var profile:x_graph_type;color:integer);
+procedure display_profile_column(ip:image_ptr_type;
+	var profile:x_graph_type;
 	color:integer);
-procedure display_real_graph(ip:image_ptr_type;graph_ptr:xy_graph_ptr;
+procedure display_real_graph(ip:image_ptr_type;
+	var graph:xy_graph_type;
 	color:integer;x_min,x_max,y_min,y_max,x_div,y_div:real);
-procedure draw_real_graph(ip:image_ptr_type;graph_ptr:xy_graph_ptr;
+procedure draw_real_graph(ip:image_ptr_type;
+	var graph:xy_graph_type;
 	shade:integer;x_min,x_max,y_min,y_max:real);
 
 implementation
@@ -550,7 +554,8 @@ end;
 	the x-axis and y-axis grid lines. The grid lines are drawn in the image
 	overlay.
 }
-procedure display_real_graph(ip:image_ptr_type;graph_ptr:xy_graph_ptr;
+procedure display_real_graph(ip:image_ptr_type;
+	var graph:xy_graph_type;
 	color:integer;x_min,x_max,y_min,y_max,x_div,y_div:real);
 
 const
@@ -564,15 +569,15 @@ var
 
 begin
 	if not valid_image_ptr(ip) then exit;
-	if graph_ptr=nil then exit;
+	if length(graph)=0 then exit;
 	
 	if (x_min=0) and (x_max=0) then begin
-		with graph_ptr^[0] do begin
+		with graph[0] do begin
 			x_min:=x;
 			x_max:=x;
 		end;		
-		for index:=1 to length(graph_ptr^)-1 do begin
-			with graph_ptr^[index] do begin
+		for index:=1 to length(graph)-1 do begin
+			with graph[index] do begin
 				if x_max<x then x_max:=x;
 				if x_min>x then x_min:=x;
 			end;
@@ -586,12 +591,12 @@ begin
 	end;
 	
 	if (y_min=0) and (y_max=0) then begin
-		with graph_ptr^[0] do begin
+		with graph[0] do begin
 			y_min:=y;
 			y_max:=y;
 		end;		
-		for index:=1 to length(graph_ptr^)-1 do begin
-			with graph_ptr^[index] do begin
+		for index:=1 to length(graph)-1 do begin
+			with graph[index] do begin
 				if y_max<y then y_max:=y;
 				if y_min>y then y_min:=y;
 			end;
@@ -633,8 +638,8 @@ begin
 		end;
 	end;
 	
-	for index:=0 to length(graph_ptr^)-1 do begin
-		with ip^.analysis_bounds,line,graph_ptr^[index] do begin
+	for index:=0 to length(graph)-1 do begin
+		with ip^.analysis_bounds,line,graph[index] do begin
 			xx:=left+(x-x_min)*(right-left)/(x_max-x_min);
 			yy:=bottom-(y-y_min)*(bottom-top)/(y_max-y_min);
 			if (abs(xx)<max_integer) and (abs(yy)<max_integer) then begin
@@ -660,7 +665,8 @@ end;
 	image overlay, it draws the graph in the image itself, using a gray-scale value given by
 	"shade", which takes the place of "color" in display_real_graph.
 }
-procedure draw_real_graph(ip:image_ptr_type;graph_ptr:xy_graph_ptr;
+procedure draw_real_graph(ip:image_ptr_type;
+	var graph:xy_graph_type;
 	shade:integer;x_min,x_max,y_min,y_max:real);
 
 var
@@ -670,15 +676,15 @@ var
 
 begin
 	if not valid_image_ptr(ip) then exit;
-	if graph_ptr=nil then exit;
+	if length(graph)=0 then exit;
 	
 	if (x_min=0) and (x_max=0) then begin
-		with graph_ptr^[0] do begin
+		with graph[0] do begin
 			x_min:=x;
 			x_max:=x;
 		end;		
-		for index:=1 to length(graph_ptr^)-1 do begin
-			with graph_ptr^[index] do begin
+		for index:=1 to length(graph)-1 do begin
+			with graph[index] do begin
 				if x_max<x then x_max:=x;
 				if x_min>x then x_min:=x;
 			end;
@@ -692,12 +698,12 @@ begin
 	end;
 	
 	if (y_min=0) and (y_max=0) then begin
-		with graph_ptr^[0] do begin
+		with graph[0] do begin
 			y_min:=y;
 			y_max:=y;
 		end;		
-		for index:=1 to length(graph_ptr^)-1 do begin
-			with graph_ptr^[index] do begin
+		for index:=1 to length(graph)-1 do begin
+			with graph[index] do begin
 				if y_max<y then y_max:=y;
 				if y_min>y then y_min:=y;
 			end;
@@ -709,8 +715,8 @@ begin
 		report_error('y_min>=y_max in draw_real_graph.');
 		exit;
 	end;
-	for index:=0 to length(graph_ptr^)-1 do begin
-		with ip^.analysis_bounds,line,graph_ptr^[index] do begin
+	for index:=0 to length(graph)-1 do begin
+		with ip^.analysis_bounds,line,graph[index] do begin
 			xx:=left+(x-x_min)*(right-left)/(x_max-x_min);
 			yy:=bottom-(y-y_min)*(bottom-top)/(y_max-y_min);
 			if (abs(xx)<max_integer) and (abs(yy)<max_integer) then begin
@@ -742,7 +748,8 @@ end;
 	Larger row-values are higher up in the image. Look from the bottom of the image for
 	a standard x-y graph.
 }
-procedure display_profile_row(ip:image_ptr_type;profile_ptr:x_graph_ptr;color:integer);
+procedure display_profile_row(ip:image_ptr_type;
+	var profile:x_graph_type;color:integer);
 
 var
 	graph:xy_graph_type;
@@ -750,24 +757,24 @@ var
 
 begin
 	if not valid_image_ptr(ip) then exit;
-	if profile_ptr=nil then exit;
+	if length(profile)=0 then exit;
 	with ip^.analysis_bounds do begin
-		if length(profile_ptr^)<>(right-left+1) then begin
+		if length(profile)<>(right-left+1) then begin
 			report_error('Found num_points<>(right-left+1) in display_profile_row.');
 			exit;
 		end;
 	end;
 
-	setlength(graph,length(profile_ptr^));
+	setlength(graph,length(profile));
 
 	for index:=0 to length(graph)-1 do begin
 		with graph[index] do begin
 			x:=index;
-			y:=profile_ptr^[index];
+			y:=profile[index];
 		end;
 	end;
 
-	display_real_graph(ip,@graph,color,0,0,0,0,0,0);
+	display_real_graph(ip,graph,color,0,0,0,0,0,0);
 end;
 
 {
@@ -775,7 +782,8 @@ end;
 	Larger column values are farther to the left in the image. Look from the right
 	side of the image for a standard x-y graph.
 }
-procedure display_profile_column(ip:image_ptr_type;profile_ptr:x_graph_ptr;
+procedure display_profile_column(ip:image_ptr_type;
+	var profile:x_graph_type;
 	color:integer);
 
 var
@@ -784,25 +792,25 @@ var
 	
 begin
 	if not valid_image_ptr(ip) then exit;
-	if profile_ptr=nil then exit;
+	if length(profile)=0 then exit;
 	with ip^.analysis_bounds do begin
-		if length(profile_ptr^)<>(bottom-top+1) then begin
+		if length(profile)<>(bottom-top+1) then begin
 			report_error('Found num_points<>(bottom-top+1) in display_profile_column.');
 			exit;
 		end;
 	end;
 	
 	
-	setlength(graph,length(profile_ptr^));
+	setlength(graph,length(profile));
 	
 	for index:=0 to length(graph)-1 do begin
 		with graph[index] do begin
 			y:=ip^.analysis_bounds.bottom-index;
-			x:=-profile_ptr^[index];
+			x:=-profile[index];
 		end;
 	end;
 	
-	display_real_graph(ip,@graph,color,0,0,0,0,0,0);
+	display_real_graph(ip,graph,color,0,0,0,0,0,0);
 end;
 
 end.

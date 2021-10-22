@@ -292,29 +292,29 @@ type
 {
 	One-Dimensional Graph Manipulation.
 }
-function average_x_graph(gp:x_graph_ptr):real;
-function max_x_graph(gp:x_graph_ptr):real;
-function min_x_graph(gp:x_graph_ptr):real;
-function stdev_x_graph(gp:x_graph_ptr):real;
-function mad_x_graph(gp:x_graph_ptr):real;
-function median_x_graph(gp:x_graph_ptr):real;
-function percentile_x_graph(gp:x_graph_ptr;percentile:real):real;
-function coastline_x_graph(gp:x_graph_ptr):real;
-function coastline_x_graph_progress(gp:x_graph_ptr):x_graph_type;
-function spikes_x_graph(gp:x_graph_ptr; threshold:real; extent:integer):xy_graph_type;
-function slope_x_graph(gp:x_graph_ptr;index,extent:integer):real;
+function average_x_graph(var gp:x_graph_type):real;
+function max_x_graph(var gp:x_graph_type):real;
+function min_x_graph(var gp:x_graph_type):real;
+function stdev_x_graph(var gp:x_graph_type):real;
+function mad_x_graph(var gp:x_graph_type):real;
+function median_x_graph(var gp:x_graph_type):real;
+function percentile_x_graph(var gp:x_graph_type;percentile:real):real;
+function coastline_x_graph(var gp:x_graph_type):real;
+function coastline_x_graph_progress(var gp:x_graph_type):x_graph_type;
+function spikes_x_graph(var gp:x_graph_type; threshold:real; extent:integer):xy_graph_type;
+function slope_x_graph(var gp:x_graph_type;index,extent:integer):real;
 
 {
 	Two-Dimensional Graph Manipulation.
 }
-function average_xy_graph(gp:xy_graph_ptr):xy_point_type;
-function stdev_xy_graph(gp:xy_graph_ptr):xy_point_type;
-function average_y_xy_graph(gp:xy_graph_ptr):real;
-function max_y_xy_graph(gp:xy_graph_ptr):real;
-function min_y_xy_graph(gp:xy_graph_ptr):real;
-function stdev_y_xy_graph(gp:xy_graph_ptr):real;
-function coastline_xy_graph(gp:xy_graph_ptr):real;
-function coastline_xy_graph_progress(gp:xy_graph_ptr):xy_graph_type;
+function average_xy_graph(var gp:xy_graph_type):xy_point_type;
+function stdev_xy_graph(var gp:xy_graph_type):xy_point_type;
+function average_y_xy_graph(var gp:xy_graph_type):real;
+function max_y_xy_graph(var gp:xy_graph_type):real;
+function min_y_xy_graph(var gp:xy_graph_type):real;
+function stdev_y_xy_graph(var gp:xy_graph_type):real;
+function coastline_xy_graph(var gp:xy_graph_type):real;
+function coastline_xy_graph_progress(var gp:xy_graph_type):xy_graph_type;
 
 {
 	Matrix Manipulation and Inversion. We have a library of routines that allow
@@ -426,10 +426,10 @@ procedure quick_sort(a,b:integer;
 	swap:sort_swap_procedure_type;
 	after:sort_after_function_type;
 	lp:pointer);
-procedure x_graph_ascending(gp:x_graph_ptr);
-procedure x_graph_descending(gp:x_graph_ptr);
-procedure x_graph_ascending_abs(gp:x_graph_ptr);
-procedure x_graph_descending_abs(gp:x_graph_ptr);
+procedure x_graph_ascending(var gp:x_graph_type);
+procedure x_graph_descending(var gp:x_graph_type);
+procedure x_graph_ascending_abs(var gp:x_graph_type);
+procedure x_graph_descending_abs(var gp:x_graph_type);
 procedure x_graph_swap(a,b:integer;lp:pointer); 
 function x_graph_gt(a,b:integer;lp:pointer):boolean;
 function x_graph_lt(a,b:integer;lp:pointer):boolean;
@@ -439,24 +439,24 @@ function x_graph_lt_abs(a,b:integer;lp:pointer):boolean;
 {
 	Line Fitting and Interpolation.
 }
-procedure straight_line_fit(dp:xy_graph_ptr;
+procedure straight_line_fit(var dp:xy_graph_type;
 	var slope,intercept,rms_residual:real);
-procedure weighted_straight_line_fit (dp:xyz_graph_ptr;
+procedure weighted_straight_line_fit (var dp:xyz_graph_type;
 	var slope,intercept,rms_residual:real);
-procedure parabolic_line_fit(dp:xy_graph_ptr;
+procedure parabolic_line_fit(var dp:xy_graph_type;
 	var parabola,slope,intercept,rms_residual:real);
-procedure linear_interpolate(dp:xy_graph_ptr;position:real;
+procedure linear_interpolate(var dp:xy_graph_type;position:real;
 	var result:real);
 function nearest_neighbor(var point,lib:matrix_type):integer;
 
 {
 	Signal Processing.
 }
-function recursive_filter(x:x_graph_ptr;a_list,b_list:string):x_graph_type;
-function glitch_filter(dp:x_graph_ptr;threshold:real):integer;
-function glitch_filter_y(gp:xy_graph_ptr;threshold:real):integer;
-function glitch_filter_xy(gp:xy_graph_ptr;threshold:real):integer;
-procedure window_function(dp:x_graph_ptr;extent:integer);
+function recursive_filter(var x:x_graph_type;a_list,b_list:string):x_graph_type;
+function glitch_filter(var dp:x_graph_type;threshold:real):integer;
+function glitch_filter_y(var gp:xy_graph_type;threshold:real):integer;
+function glitch_filter_xy(var gp:xy_graph_type;threshold:real):integer;
+procedure window_function(var dp:x_graph_type;extent:integer);
 procedure calculate_ft_term(period:real;
 	var dp:x_graph_type;var amplitude,offset:real);
 procedure frequency_component(frequency:real;
@@ -2297,16 +2297,16 @@ end;
 	average_x_graph calculates the average of the values in a one-dimentional
 	graph.
 }
-function average_x_graph(gp:x_graph_ptr):real;
+function average_x_graph(var gp:x_graph_type):real;
 var i:integer;sum:longreal;ave:real;
 begin
-	if length(gp^)<1 then begin
+	if length(gp)<1 then begin
 		average_x_graph:=0;
 		exit;
 	end;
 	sum:=0;
-	for i:=0 to length(gp^)-1 do sum:=sum+gp^[i];
-	ave:=sum/length(gp^);
+	for i:=0 to length(gp)-1 do sum:=sum+gp[i];
+	ave:=sum/length(gp);
 	average_x_graph:=ave;
 	check_for_math_error(ave);
 end;
@@ -2314,16 +2314,16 @@ end;
 {
 	max_x_graph finds the maximum value in a one-dimentional graph.
 }
-function max_x_graph(gp:x_graph_ptr):real;
+function max_x_graph(var gp:x_graph_type):real;
 var i:integer;max:real;
 begin
-	if length(gp^)<1 then begin
+	if length(gp)<1 then begin
 		max_x_graph:=0;
 		exit;
 	end;
-	max:=gp^[0];
-	for i:=1 to length(gp^)-1 do 
-		if gp^[i]>max then max:=gp^[i];
+	max:=gp[0];
+	for i:=1 to length(gp)-1 do 
+		if gp[i]>max then max:=gp[i];
 	max_x_graph:=max;
 	check_for_math_error(max);
 end;
@@ -2331,16 +2331,16 @@ end;
 {
 	min_x_graph finds the minimum value in a one-dimentional graph.
 }
-function min_x_graph(gp:x_graph_ptr):real;
+function min_x_graph(var gp:x_graph_type):real;
 var i:integer;min:real;
 begin
-	if length(gp^)<1 then begin
+	if length(gp)<1 then begin
 		min_x_graph:=0;
 		exit;
 	end;
-	min:=gp^[0];
-	for i:=1 to length(gp^)-1 do 
-		if gp^[i]<min then min:=gp^[i];
+	min:=gp[0];
+	for i:=1 to length(gp)-1 do 
+		if gp[i]<min then min:=gp[i];
 	min_x_graph:=min;
 	check_for_math_error(min);
 end;
@@ -2349,20 +2349,20 @@ end;
 	stdev_x_graph calculates the standard deviation of the values in a
 	one-dimentional graph.
 }
-function stdev_x_graph(gp:x_graph_ptr):real;
+function stdev_x_graph(var gp:x_graph_type):real;
 var i:integer;sum,sum_sqr:longreal;stdev:real;
 begin
-	if length(gp^)<=1 then begin
+	if length(gp)<=1 then begin
 		stdev_x_graph:=0;
 		exit;
 	end;
 	sum:=0;
 	sum_sqr:=0;
-	for i:=0 to length(gp^)-1 do begin
-		sum:=sum+gp^[i];
-		sum_sqr:=sum_sqr+sqr(gp^[i]);
+	for i:=0 to length(gp)-1 do begin
+		sum:=sum+gp[i];
+		sum_sqr:=sum_sqr+sqr(gp[i]);
 	end;
-	stdev:=sqrt(sum_sqr/length(gp^)-sqr(sum/length(gp^)));
+	stdev:=sqrt(sum_sqr/length(gp)-sqr(sum/length(gp)));
 	stdev_x_graph:=stdev;
 	check_for_math_error(stdev);
 end;
@@ -2371,18 +2371,18 @@ end;
 	mad_x_graph calculates the mean absolute distance between values in a
 	one-dimentional graph.
 }
-function mad_x_graph(gp:x_graph_ptr):real;
+function mad_x_graph(var gp:x_graph_type):real;
 var i:integer;sum:longreal;mad,ave:real;
 begin
-	if length(gp^)<1 then begin
+	if length(gp)<1 then begin
 		mad_x_graph:=0;
 		exit;
 	end;
 	sum:=0;
 	ave:=average_x_graph(gp);
-	for i:=0 to length(gp^)-1 do 
-		sum:=sum+abs(gp^[i]-ave);
-	mad:=sum/length(gp^);
+	for i:=0 to length(gp)-1 do 
+		sum:=sum+abs(gp[i]-ave);
+	mad:=sum/length(gp);
 	mad_x_graph:=mad;
 	check_for_math_error(mad);
 end;
@@ -2396,51 +2396,60 @@ end;
 	descending_abs.
 }
 procedure x_graph_swap(a,b:integer;lp:pointer); 
-var x:real; 
+var x:real; g:x_graph_type;
 begin 
-	x:=x_graph_ptr(lp)^[a];
-	x_graph_ptr(lp)^[a]:=x_graph_ptr(lp)^[b];
-	x_graph_ptr(lp)^[b]:=x;
+	g:=x_graph_ptr(lp)^;
+	x:=g[a];
+	g[a]:=g[b];
+	g[b]:=x;
 end;
 
 function x_graph_gt(a,b:integer;lp:pointer):boolean;
+var g:x_graph_type;
 begin 
-	x_graph_gt:=(x_graph_ptr(lp)^[a] > x_graph_ptr(lp)^[b]); 
+	g:=x_graph_ptr(lp)^;
+	x_graph_gt:=(g[a] > g[b]); 
 end;
 
 function x_graph_lt(a,b:integer;lp:pointer):boolean;
+var g:x_graph_type;
 begin 
-	x_graph_lt:=(x_graph_ptr(lp)^[a] < x_graph_ptr(lp)^[b]); 
+	g:=x_graph_ptr(lp)^;
+	x_graph_lt:=(g[a] < g[b]); 
 end;
 
 function x_graph_gt_abs(a,b:integer;lp:pointer):boolean;
+var g:x_graph_type;
 begin 
-	x_graph_gt_abs:=(abs(x_graph_ptr(lp)^[a]) > abs(x_graph_ptr(lp)^[b])); 
+	g:=x_graph_ptr(lp)^;
+	x_graph_gt_abs:=(abs(g[a]) > abs(g[b])); 
 end;
 
 function x_graph_lt_abs(a,b:integer;lp:pointer):boolean;
+var g:x_graph_type;
 begin 
-	x_graph_lt_abs:=(abs(x_graph_ptr(lp)^[a]) < abs(x_graph_ptr(lp)^[b])); 
+	g:=x_graph_ptr(lp)^;
+	x_graph_lt_abs:=(abs(g[a]) < abs(g[b])); 
 end;
 
-procedure x_graph_ascending(gp:x_graph_ptr);
+procedure x_graph_ascending(var gp:x_graph_type);
 begin
-	quick_sort(0,length(gp^)-1,x_graph_swap,x_graph_gt,pointer(gp));
+	quick_sort(0,length(gp)-1,x_graph_swap,x_graph_gt,@gp);
 end;
 
-procedure x_graph_descending(gp:x_graph_ptr);
+procedure x_graph_descending(var gp:x_graph_type);
 begin
-	quick_sort(0,length(gp^)-1,x_graph_swap,x_graph_lt,pointer(gp));
+	quick_sort(0,length(gp)-1,x_graph_swap,x_graph_lt,@gp);
 end;
 
-procedure x_graph_ascending_abs(gp:x_graph_ptr);
+procedure x_graph_ascending_abs(var gp:x_graph_type);
 begin
-	quick_sort(0,length(gp^)-1,x_graph_swap,x_graph_gt_abs,pointer(gp));
+	quick_sort(0,length(gp)-1,x_graph_swap,x_graph_gt_abs,@gp);
 end;
 
-procedure x_graph_descending_abs(gp:x_graph_ptr);
+procedure x_graph_descending_abs(var gp:x_graph_type);
 begin
-	quick_sort(0,length(gp^)-1,x_graph_swap,x_graph_lt_abs,pointer(gp));
+	quick_sort(0,length(gp)-1,x_graph_swap,x_graph_lt_abs,@gp);
 end;
 
 {
@@ -2451,19 +2460,19 @@ end;
 	order to perform the calculation, we copy the x-graph and sort it in order of
 	increasing sample value using our quick-sort routine.
 }
-function percentile_x_graph(gp:x_graph_ptr;percentile:real):real;
+function percentile_x_graph(var gp:x_graph_type;percentile:real):real;
 
 var 
 	p:real=0;
 	g:x_graph_type;
 
 begin
-	if length(gp^)<=1 then begin
-		percentile_x_graph:=gp^[0];
+	if length(gp)<=1 then begin
+		percentile_x_graph:=gp[0];
 		exit;
 	end;
-	g:=gp^;
-	x_graph_ascending(@g);
+	g:=copy(gp,0,length(gp));
+	x_graph_ascending(g);
 	if (percentile<0) then percentile:=0;
 	if (percentile>100) then percentile:=100;
 	p:=g[round((length(g)-1)*(1.0*percentile/100))];
@@ -2475,42 +2484,42 @@ end;
 	median_x_graph returns the median value of a set of samles
 	stored in an x-graph.
 }
-function median_x_graph(gp:x_graph_ptr):real;
+function median_x_graph(var gp:x_graph_type):real;
 const median_percentile=50;
 begin
 	median_x_graph:=percentile_x_graph(gp,median_percentile);
 end;
 
-function coastline_x_graph(gp:x_graph_ptr):real;
+function coastline_x_graph(var gp:x_graph_type):real;
 var i:integer;sum:longreal;
 begin
 	coastline_x_graph:=0;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in coastline_x_graph');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in coastline_x_graph');
 		exit;
 	end;
 	sum:=0;
-	for i:=1 to length(gp^)-1 do 
-		sum:=sum+abs(gp^[i]-gp^[i-1]);
+	for i:=1 to length(gp)-1 do 
+		sum:=sum+abs(gp[i]-gp[i-1]);
 	coastline_x_graph:=sum;
 	check_for_math_error(sum);
 end;
 
-function coastline_x_graph_progress(gp:x_graph_ptr):x_graph_type;
+function coastline_x_graph_progress(var gp:x_graph_type):x_graph_type;
 var 
 	i:integer;
 	cp:x_graph_type;
 begin
 	coastline_x_graph_progress:=nil;
 	if gp=nil then exit;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in coastline_x_graph_progress');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in coastline_x_graph_progress');
 		exit;
 	end;
-	setlength(cp,length(gp^));
+	setlength(cp,length(gp));
 	cp[0]:=0;
-	for i:=1 to length(gp^)-1 do begin
-		cp[i]:=cp[i-1]+abs(gp^[i]-gp^[i-1]);
+	for i:=1 to length(gp)-1 do begin
+		cp[i]:=cp[i-1]+abs(gp[i]-gp[i-1]);
 	end;
 	coastline_x_graph_progress:=cp;
 end;
@@ -2522,7 +2531,7 @@ end;
 	first coordinate, while the second coordinate is given by the values
 	in the x-graph.
 }
-function spikes_x_graph(gp:x_graph_ptr;
+function spikes_x_graph(var gp:x_graph_type;
 	threshold:real;extent:integer):xy_graph_type;
 const
 	max_spikes=100;
@@ -2533,20 +2542,20 @@ var
 begin
 	spikes_x_graph:=nil;
 	if gp=nil then exit;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in spikes_x_graph');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in spikes_x_graph');
 		exit;
 	end;
-	scale:=coastline_x_graph(gp)/length(gp^);
+	scale:=coastline_x_graph(gp)/length(gp);
 	num_spikes:=0;
 	setlength(s1,max_spikes);
 	j:=1;
-	while (j<length(gp^)) and (num_spikes<max_spikes) do begin
-		shortest_step:=sqrt(sqr((gp^[j]-gp^[j-1])/scale)+1);
+	while (j<length(gp)) and (num_spikes<max_spikes) do begin
+		shortest_step:=sqrt(sqr((gp[j]-gp[j-1])/scale)+1);
 		next_j:=j;
 		i:=j+1;
-		while (shortest_step>i-j+1) and (extent>=i-j+1) and (i<length(gp^)) do begin
-			step:=sqrt(sqr((gp^[i]-gp^[j-1])/scale)+sqr(i-j+1));
+		while (shortest_step>i-j+1) and (extent>=i-j+1) and (i<length(gp)) do begin
+			step:=sqrt(sqr((gp[i]-gp[j-1])/scale)+sqr(i-j+1));
 			if (step<shortest_step) then begin
 				shortest_step:=step;
 				next_j:=i;
@@ -2557,7 +2566,7 @@ begin
 		spike_index:=j;
 		max_dev:=0;
 		for i:=j to next_j-1 do begin
-			dev:=sqrt(sqr((gp^[next_j]-gp^[i])/scale)+sqr(next_j-i));
+			dev:=sqrt(sqr((gp[next_j]-gp[i])/scale)+sqr(next_j-i));
 			if (dev>max_dev) then begin
 				max_dev:=dev;
 				spike_index:=i;
@@ -2585,60 +2594,60 @@ end;
 	The following routines operate upon the y-component of an
 	xy-graph.
 }
-function average_y_xy_graph(gp:xy_graph_ptr):real;
+function average_y_xy_graph(var gp:xy_graph_type):real;
 var i:integer;sum:longreal;ave:real;
 begin
-	if length(gp^)<1 then begin
+	if length(gp)<1 then begin
 		average_y_xy_graph:=0;
 		exit;
 	end;
 	sum:=0;
-	for i:=0 to length(gp^)-1 do 
-		sum:=sum+gp^[i].y;
-	ave:=sum/length(gp^);
+	for i:=0 to length(gp)-1 do 
+		sum:=sum+gp[i].y;
+	ave:=sum/length(gp);
 	average_y_xy_graph:=ave;
 	check_for_math_error(ave);
 end;
 
-function stdev_y_xy_graph(gp:xy_graph_ptr):real;
+function stdev_y_xy_graph(var gp:xy_graph_type):real;
 var i:integer;sum:longreal;stdev,ave:real;
 begin
-	if length(gp^)<=1 then begin
+	if length(gp)<=1 then begin
 		stdev_y_xy_graph:=0;
 		exit;
 	end;
 	sum:=0;
 	ave:=average_y_xy_graph(gp);
-	for i:=0 to length(gp^)-1 do 
-		sum:=sum+sqr(gp^[i].y-ave);
-	stdev:=sqrt(sum/(length(gp^)-1));
+	for i:=0 to length(gp)-1 do 
+		sum:=sum+sqr(gp[i].y-ave);
+	stdev:=sqrt(sum/(length(gp)-1));
 	stdev_y_xy_graph:=stdev;
 	check_for_math_error(stdev);
 end;
 
-function max_y_xy_graph(gp:xy_graph_ptr):real;
+function max_y_xy_graph(var gp:xy_graph_type):real;
 var i:integer;max:longreal;
 begin
-	if length(gp^)<1 then begin
+	if length(gp)<1 then begin
 		max_y_xy_graph:=0;
 		exit;
 	end;
-	max:=gp^[0].y;
-	for i:=1 to length(gp^)-1 do 
-		if max<gp^[i].y then max:=gp^[i].y;
+	max:=gp[0].y;
+	for i:=1 to length(gp)-1 do 
+		if max<gp[i].y then max:=gp[i].y;
 	max_y_xy_graph:=max;
 end;
 
-function min_y_xy_graph(gp:xy_graph_ptr):real;
+function min_y_xy_graph(var gp:xy_graph_type):real;
 var i:integer;min:longreal;
 begin
-	if length(gp^)<1 then begin
+	if length(gp)<1 then begin
 		min_y_xy_graph:=0;
 		exit;
 	end;
-	min:=gp^[0].y;
-	for i:=1 to length(gp^)-1 do 
-		if min>gp^[i].y then min:=gp^[i].y;
+	min:=gp[0].y;
+	for i:=1 to length(gp)-1 do 
+		if min>gp[i].y then min:=gp[i].y;
 	min_y_xy_graph:=min;
 end;
 
@@ -2647,80 +2656,80 @@ end;
 	locations in space for coastline, standard deviation of position,
 	and average position.
 }
-function average_xy_graph(gp:xy_graph_ptr):xy_point_type;
+function average_xy_graph(var gp:xy_graph_type):xy_point_type;
 var i:integer;p:xy_point_type;sum_x,sum_y:longreal;
 begin
-	if length(gp^)<1 then begin
+	if length(gp)<1 then begin
 		average_xy_graph:=xy_origin;
 		exit;
 	end;
 	sum_x:=0;
 	sum_y:=0;
-	for i:=0 to length(gp^)-1 do begin
-		sum_x:=sum_x+gp^[i].x;
-		sum_y:=sum_y+gp^[i].y;
+	for i:=0 to length(gp)-1 do begin
+		sum_x:=sum_x+gp[i].x;
+		sum_y:=sum_y+gp[i].y;
 	end;
-	p.x:=sum_x/length(gp^);
-	p.y:=sum_y/length(gp^);
+	p.x:=sum_x/length(gp);
+	p.y:=sum_y/length(gp);
 	average_xy_graph:=p;
 	check_for_math_error(p.x);
 	check_for_math_error(p.y);
 end;
 
-function stdev_xy_graph(gp:xy_graph_ptr):xy_point_type;
+function stdev_xy_graph(var gp:xy_graph_type):xy_point_type;
 var i:integer;p,ave:xy_point_type;sum_x,sum_y:longreal;
 begin
-	if length(gp^)<=1 then begin
+	if length(gp)<=1 then begin
 		stdev_xy_graph:=xy_origin;
 		exit;
 	end;
 	ave:=average_xy_graph(gp);
 	sum_x:=0;
 	sum_y:=0;
-	for i:=0 to length(gp^)-1 do begin
-		sum_x:=sum_x+sqr(gp^[i].x-ave.x);
-		sum_y:=sum_y+sqr(gp^[i].y-ave.y);
+	for i:=0 to length(gp)-1 do begin
+		sum_x:=sum_x+sqr(gp[i].x-ave.x);
+		sum_y:=sum_y+sqr(gp[i].y-ave.y);
 	end;
-	p.x:=sqrt(sum_x/(length(gp^)-1));
-	p.y:=sqrt(sum_y/(length(gp^)-1));
+	p.x:=sqrt(sum_x/(length(gp)-1));
+	p.y:=sqrt(sum_y/(length(gp)-1));
 	stdev_xy_graph:=p;
 	check_for_math_error(p.x);
 	check_for_math_error(p.y);
 end;
 
 
-function coastline_xy_graph(gp:xy_graph_ptr):real;
+function coastline_xy_graph(var gp:xy_graph_type):real;
 var i:integer;sum:longreal;
 begin
-	if length(gp^)<=1 then begin
+	if length(gp)<=1 then begin
 		coastline_xy_graph:=0;
-		report_error('length(gp^)<=1 in coastline_xy_graph');
+		report_error('length(gp)<=1 in coastline_xy_graph');
 		exit;
 	end;
 	sum:=0;
-	for i:=1 to length(gp^)-1 do 
-		sum:=sum+xy_separation(gp^[i],gp^[i-1]);
+	for i:=1 to length(gp)-1 do 
+		sum:=sum+xy_separation(gp[i],gp[i-1]);
 	coastline_xy_graph:=sum;
 	check_for_math_error(sum);
 end;
 
-function coastline_xy_graph_progress(gp:xy_graph_ptr):xy_graph_type;
+function coastline_xy_graph_progress(var gp:xy_graph_type):xy_graph_type;
 var 
 	i:integer;
 	cp:xy_graph_type;
 begin
 	coastline_xy_graph_progress:=nil;
 	if gp=nil then exit;
-	if length(gp^)<=1 then begin
-		report_error('length(gp^)<=1 in coastline_xy_graph_progress');
+	if length(gp)<=1 then begin
+		report_error('length(gp)<=1 in coastline_xy_graph_progress');
 		exit;
 	end;
-	setlength(cp,length(gp^));
-	cp[0].x:=gp^[0].x;
+	setlength(cp,length(gp));
+	cp[0].x:=gp[0].x;
 	cp[0].y:=0;
-	for i:=1 to length(gp^)-1 do begin
-		cp[i].x:=gp^[i].x;
-		cp[i].y:=cp[i-1].y+xy_separation(gp^[i],gp^[i-1]);
+	for i:=1 to length(gp)-1 do begin
+		cp[i].x:=gp[i].x;
+		cp[i].y:=cp[i-1].y+xy_separation(gp[i],gp[i-1]);
 	end;
 	coastline_xy_graph_progress:=cp;
 end;
@@ -2732,7 +2741,7 @@ end;
 	graph's average value. If we specify extent = 3 then the window
 	function affects the first and last 3 samples in the graph.
 }
-procedure window_function(dp:x_graph_ptr;extent:integer);
+procedure window_function(var dp:x_graph_type;extent:integer);
 
 const
 	min_multiple=2.0;
@@ -2743,17 +2752,17 @@ var
 	
 begin
 	if (extent<1) then exit;
-	if dp=nil then exit;
+	if length(dp)=0 then exit;
 	
-	m:=length(dp^);
+	m:=length(dp);
 	if (m<=1) then exit;
 	
 	a:=average_x_graph(dp);
 	if (min_multiple*extent>m) then extent:=round(m/min_multiple);
 
 	for n:=0 to extent-1 do begin
-		dp^[n]:=a+(dp^[n]-a)*n/extent;
-		dp^[m-n-1]:=a+(dp^[m-n-1]-a)*n/extent;
+		dp[n]:=a+(dp[n]-a)*n/extent;
+		dp[m-n-1]:=a+(dp[m-n-1]-a)*n/extent;
 	end;
 end;
 
@@ -2773,7 +2782,7 @@ end;
 	assume b[0] = 0. The routine receives its data via an x-graph and
 	returns data as an x-graph.
 }
-function recursive_filter(x:x_graph_ptr;a_list,b_list:string):x_graph_type;
+function recursive_filter(var x:x_graph_type;a_list,b_list:string):x_graph_type;
 
 const
 	min_num_points=2;
@@ -2789,12 +2798,11 @@ var
 
 begin
 	recursive_filter:=nil;
-	if (x=nil) then exit;
-	if (length(x^)<min_num_points) then begin
-		report_error('length(gp^)<min_num_points in recursive_filter');
+	if (length(x)<min_num_points) then begin
+		report_error('length(gp)<min_num_points in recursive_filter');
 		exit;
 	end;	
-	n:=length(x^);
+	n:=length(x);
 	setlength(y,n);
 	
 	for i:=0 to max_n do a[i]:=0;
@@ -2820,11 +2828,11 @@ begin
 	for k:=0 to n-1 do begin
 		y[k]:=0;
 		for i:=0 to end_a-1 do
-			if (k-i)>=0 then y[k]:=y[k]+a[i]*x^[k-i]
-			else y[k]:=y[k]+a[i]*x^[0];
+			if (k-i)>=0 then y[k]:=y[k]+a[i]*x[k-i]
+			else y[k]:=y[k]+a[i]*x[0];
 		for i:=1 to end_b-1 do
 			if (k-i)>=0 then y[k]:=y[k]+b[i]*y[k-i]
-			else y[k]:=y[k]+b[i]*x^[0]*dc_gain;
+			else y[k]:=y[k]+b[i]*x[0]*dc_gain;
 	end;
 	
 	recursive_filter:=y;
@@ -2843,7 +2851,7 @@ end;
 	remove large two-point or three-point glitches in one pass. The routine
 	returns the number of glitches it finds.
 }
-function glitch_filter_xy(gp:xy_graph_ptr;threshold:real):integer;
+function glitch_filter_xy(var gp:xy_graph_type;threshold:real):integer;
 
 const
 	glitch_length=2;
@@ -2864,25 +2872,25 @@ begin
 	glitch_filter_xy:=0;
 	if (threshold<=0) then exit;
 	if gp=nil then exit;
-	if (length(gp^)<=min_length) then exit;
+	if (length(gp)<=min_length) then exit;
 {
 	Our first guess at an inertial point for the filter, which is the point to 
 	which we will compare the first sample, is the first sample itself.
 }
-	inertial_point:=gp^[0];
+	inertial_point:=gp[0];
 {
 	Go through the sequence of points until we come to three that are within one
 	threshold of one another, and take the middle one as our inertial point. If
 	no such point exists, we will be using the first point as our inertial point.
 }
 	n:=1;
-	while (n<length(gp^)-1) do begin				
-		if (xy_separation(gp^[n-1],gp^[n])<threshold) 
-			and (xy_separation(gp^[n-1],gp^[n])>0.0) 
-			and (xy_separation(gp^[n+1],gp^[n])<threshold) 
-			and (xy_separation(gp^[n+1],gp^[n])>0.0) then begin
-			inertial_point:=gp^[n];
-			n:=length(gp^);
+	while (n<length(gp)-1) do begin				
+		if (xy_separation(gp[n-1],gp[n])<threshold) 
+			and (xy_separation(gp[n-1],gp[n])>0.0) 
+			and (xy_separation(gp[n+1],gp[n])<threshold) 
+			and (xy_separation(gp[n+1],gp[n])>0.0) then begin
+			inertial_point:=gp[n];
+			n:=length(gp);
 		end else inc(n);
 	end;
 {
@@ -2894,34 +2902,34 @@ begin
 	by replacing them with the inertial point.
 }
 	count:=0;
-	for n:=0 to length(gp^)-1 do begin
+	for n:=0 to length(gp)-1 do begin
 		glitch:=false;
-		separation:=xy_separation(gp^[n],inertial_point);
+		separation:=xy_separation(gp[n],inertial_point);
 		if separation>threshold then begin
 			c_start:=n-coastline_extent;
 			if c_start<0 then c_start:=0;
 			c_end:=c_start+2*coastline_extent;
-			if c_end>length(gp^)-1 then c_end:=length(gp^)-1;
+			if c_end>length(gp)-1 then c_end:=length(gp)-1;
 			if c_end-c_start<2*coastline_extent then c_start:=c_end-2*coastline_extent;
 			if c_start<0 then c_start:=0;
 
 			coastline_with:=0;
 			for m:=c_start+1 to c_end do 
-				coastline_with:=coastline_with+xy_separation(gp^[m],gp^[m-1]);
+				coastline_with:=coastline_with+xy_separation(gp[m],gp[m-1]);
 
 			coastline_without:=0;
 			if n=c_start then begin
 				for m:=c_start+glitch_length+1 to c_end do begin
-					coastline_without:=coastline_without+xy_separation(gp^[m],gp^[m-1]);
+					coastline_without:=coastline_without+xy_separation(gp[m],gp[m-1]);
 				end;
 			end else begin
 				for m:=c_start+1 to c_end do begin
 					if m<n then begin
-						coastline_without:=coastline_without+xy_separation(gp^[m],gp^[m-1]);
+						coastline_without:=coastline_without+xy_separation(gp[m],gp[m-1]);
 					end else if m=n+glitch_length then begin
-						coastline_without:=coastline_without+xy_separation(gp^[m],gp^[n-1]);
+						coastline_without:=coastline_without+xy_separation(gp[m],gp[n-1]);
 					end else if m>n+glitch_length then begin
-						coastline_without:=coastline_without+xy_separation(gp^[m],gp^[m-1]);
+						coastline_without:=coastline_without+xy_separation(gp[m],gp[m-1]);
 					end;
 				end;
 			end;
@@ -2931,12 +2939,12 @@ begin
 		
 		if glitch then begin
 			for m:=n to n+glitch_length-1 do
-				if m<length(gp^)-1 then
-					if xy_separation(gp^[m],inertial_point)>threshold then
-						gp^[m]:=inertial_point;
+				if m<length(gp)-1 then
+					if xy_separation(gp[m],inertial_point)>threshold then
+						gp[m]:=inertial_point;
 			inc(count);
 		end else 
-			inertial_point:=gp^[n];
+			inertial_point:=gp[n];
 	end;
 	
 	glitch_filter_xy:=count;
@@ -2946,7 +2954,7 @@ end;
 	glitch_filter calls glitch_filter_xy to remove glitches in a one-dimensional
 	signal.
 }
-function glitch_filter(dp:x_graph_ptr;threshold:real):integer;
+function glitch_filter(var dp:x_graph_type;threshold:real):integer;
 
 var
 	n:integer;
@@ -2958,33 +2966,33 @@ begin
 }
 	glitch_filter:=0;
 	if (threshold<=0) or (dp=nil) then exit;
-	if (length(dp^)<1) then exit;
+	if length(dp)<1 then exit;
 {
 	Create an xy-graph.
 }
-	setlength(gp,length(dp^));
+	setlength(gp,length(dp));
 	if gp=nil then exit;
 {
 	Copy the data values into the xy-graph as the y-values and set all the x-values to zero. 
 	Call glitch_filter_xy on the new xy-graph.
 }
-	for n:=0 to length(dp^)-1 do begin
-		gp[n].y:=dp^[n];
+	for n:=0 to length(dp)-1 do begin
+		gp[n].y:=dp[n];
 		gp[n].x:=0;
 	end;
-	glitch_filter:=glitch_filter_xy(@gp,threshold);
+	glitch_filter:=glitch_filter_xy(gp,threshold);
 {
 	Copy the glitch filter output back into the original graph.
 }
-	for n:=0 to length(dp^)-1 do
-		dp^[n]:=gp[n].y;
+	for n:=0 to length(dp)-1 do
+		dp[n]:=gp[n].y;
 end;
 
 {
 	glitch_filter_y applies glitch_filter_xy only to changes in the y-values of 
 	a sequence of xy points.
 }
-function glitch_filter_y(gp:xy_graph_ptr;threshold:real):integer;
+function glitch_filter_y(var gp:xy_graph_type;threshold:real):integer;
 
 var
 	n:integer;
@@ -2997,27 +3005,27 @@ begin
 	glitch_filter_y:=0;
 	if (threshold<=0) then exit;
 	if gp=nil then exit;
-	if (length(gp^)<1) then exit;
+	if (length(gp)<1) then exit;
 {
 	Create an new xy-graph.
 }
-	setlength(gp2,length(gp^));
+	setlength(gp2,length(gp));
 	if gp=nil then exit;
 {
 	Copy the y values from gp into the y-values of gp2 and set the x-values of gp2 all
 	to zero. Call glitch_filter_xy on gp2.
 }
-	for n:=0 to length(gp^)-1 do begin
-		gp2[n].y:=gp^[n].y;
+	for n:=0 to length(gp)-1 do begin
+		gp2[n].y:=gp[n].y;
 		gp2[n].x:=0;
 	end;
-	glitch_filter_y:=glitch_filter_xy(@gp2,threshold);
+	glitch_filter_y:=glitch_filter_xy(gp2,threshold);
 {
 	Copy the glitch-filtered y-values out of gp2 into gp. We leave the x-values of gp 
 	as they were: only the y-values are being glitch filtered.
 }
-	for n:=0 to length(gp^)-1 do
-		gp^[n].y:=gp2[n].y;
+	for n:=0 to length(gp)-1 do
+		gp[n].y:=gp2[n].y;
 end;
 
 {
@@ -3061,7 +3069,6 @@ begin
 		gui_writeln(s);
 	end;
 end;
-
 
 {
 	report_error appends an error message to the global error_string. The text of
@@ -3385,7 +3392,7 @@ end;
 	the slope or intercept are infinite, we set error_string to
 	a non-empty string using check_for_math_error.
 }
-procedure straight_line_fit(dp:xy_graph_ptr;
+procedure straight_line_fit(var dp:xy_graph_type;
 	var slope,intercept,rms_residual:real);
 
 const
@@ -3397,10 +3404,10 @@ var
 	
 begin 
 	slope:=0;intercept:=0;rms_residual:=0;
-	if length(dp^)>=min_num_points then begin
+	if length(dp)>=min_num_points then begin
 		k00:=0;k10:=0;k01:=0;k11:=0;k20:=0;
-		for index:=0 to length(dp^)-1 do begin
-			with dp^[index] do begin
+		for index:=0 to length(dp)-1 do begin
+			with dp[index] do begin
 				k00:=k00+1;
 				k10:=k10+x;
 				k01:=k01+y;
@@ -3416,17 +3423,17 @@ begin
 			intercept:=0;
 		end;
 		rms_residual:=0;
-		for index:=0 to length(dp^)-1 do begin
-			with dp^[index] do begin
+		for index:=0 to length(dp)-1 do begin
+			with dp[index] do begin
 				rms_residual:=rms_residual+sqr(x*slope+intercept-y);
 			end;
 		end;
-		if length(dp^)<>0 then 
-			rms_residual:=sqrt(rms_residual/length(dp^));
+		if length(dp)<>0 then 
+			rms_residual:=sqrt(rms_residual/length(dp));
 	end 
 	else begin
 		slope:=0;
-		if length(dp^)=1 then intercept:=dp^[0].y
+		if length(dp)=1 then intercept:=dp[0].y
 		else intercept:=0;
 		rms_residual:=0;
 	end;
@@ -3443,7 +3450,7 @@ end;
 	infinite, we set error_string to a non-empty string using
 	check_for_math_error.
 }
-procedure parabolic_line_fit(dp:xy_graph_ptr;
+procedure parabolic_line_fit(var dp:xy_graph_type;
 	var parabola,slope,intercept,rms_residual:real);
 
 const
@@ -3457,9 +3464,9 @@ var
 begin 
 	k00:=0;k10:=0;k01:=0;k11:=0;k20:=0;k21:=0;k30:=0;k40:=0;
 	slope:=0;intercept:=0;rms_residual:=0;
-	if length(dp^)>=min_num_points then begin
-		for index:=0 to length(dp^)-1 do begin
-			with dp^[index] do begin
+	if length(dp)>=min_num_points then begin
+		for index:=0 to length(dp)-1 do begin
+			with dp[index] do begin
 				k00:=k00+1;
 				k10:=k10+x;
 				k01:=k01+y;
@@ -3484,18 +3491,18 @@ begin
 			intercept:=0;
 		end;
 		rms_residual:=0;
-		for index:=0 to length(dp^)-1 do begin
-			with dp^[index] do begin
+		for index:=0 to length(dp)-1 do begin
+			with dp[index] do begin
 				rms_residual:=rms_residual+sqr(x*x*parabola+x*slope+intercept-y);
 			end;
 		end;
-		if length(dp^)<>0 then 
-			rms_residual:=sqrt(rms_residual/length(dp^));
+		if length(dp)<>0 then 
+			rms_residual:=sqrt(rms_residual/length(dp));
 	end 
 	else begin
 		parabola:=0;
 		slope:=0;
-		if length(dp^)=1 then intercept:=dp^[0].y
+		if length(dp)=1 then intercept:=dp[0].y
 		else intercept:=0;
 		rms_residual:=0;
 	end;
@@ -3507,11 +3514,11 @@ end;
 {
 	slope_x_graph calculates the slope of a sub-section of a one-dimensional
 	signal, where we treat each sample index as a unit of distance, so that
-	the sample zero is at position (gp^[0],0), sample one at (gp^[1],1), and 
+	the sample zero is at position (gp[0],0), sample one at (gp[1],1), and 
 	so on. The slope calculation is centered on sample index and is calculated
 	over samples index-extent to index+extent.
 }
-function slope_x_graph(gp:x_graph_ptr;index,extent:integer):real;
+function slope_x_graph(var gp:x_graph_type;index,extent:integer):real;
 
 const
 	min_num_points=2;
@@ -3522,12 +3529,12 @@ var
 	
 begin 
 	slope_x_graph:=0;
-	if length(gp^)<min_num_points then exit;
+	if length(gp)<min_num_points then exit;
 	
 	lo:=index-extent;
 	if lo<0 then lo:=0;
 	hi:=index+extent;
-	if hi>length(gp^)-1 then hi:=length(gp^)-1;
+	if hi>length(gp)-1 then hi:=length(gp)-1;
 	if hi-lo<min_num_points then exit;
 
 	slope:=0;
@@ -3535,8 +3542,8 @@ begin
 	for i:=lo to hi do begin
 		k00:=k00+1;
 		k10:=k10+i;
-		k01:=k01+gp^[i];
-		k11:=k11+i*gp^[i];
+		k01:=k01+gp[i];
+		k11:=k11+i*gp[i];
 		k20:=k20+i*i;
 	end;	
 	
@@ -3557,7 +3564,7 @@ end;
 	is negative, then weighted_straight_line fit ignores the rest of the
 	data in the graph.
 }
-procedure weighted_straight_line_fit (dp:xyz_graph_ptr;
+procedure weighted_straight_line_fit (var dp:xyz_graph_type;
 	var slope,intercept,rms_residual:real);
 
 const
@@ -3569,10 +3576,10 @@ var
 	
 begin 
 	slope:=0;intercept:=0;rms_residual:=0;
-	if length(dp^)>=min_num_points then begin
+	if length(dp)>=min_num_points then begin
 		k00:=0;k10:=0;k01:=0;k11:=0;k20:=0;
-		for index:=0 to length(dp^)-1 do begin
-			with dp^[index] do begin
+		for index:=0 to length(dp)-1 do begin
+			with dp[index] do begin
 				if (z=ignore_remaining_data) then break;
 				k00:=k00+z;
 				k10:=k10+x*z;
@@ -3592,15 +3599,15 @@ begin
 			end;
 			rms_residual:=0;
 			for index:=0 to num_points_used-1 do 
-				with dp^[index] do 
+				with dp[index] do 
 					rms_residual:=rms_residual+z*sqr(y-x*slope-intercept);
 			if k00>0 then rms_residual:=sqrt(rms_residual/k00)
 		end else 
-			if num_points_used=1 then intercept:=dp^[0].y
+			if num_points_used=1 then intercept:=dp[0].y
 	end 
 	else begin
 		slope:=0;
-		if length(dp^)=1 then intercept:=dp^[0].y
+		if length(dp)=1 then intercept:=dp[0].y
 		else intercept:=0;
 		rms_residual:=0;
 	end;
@@ -3613,7 +3620,7 @@ end;
 	the two nearest data points in a graph pointed to by dp. The data points
 	do not have to be in ascending order in the graph.
 }
-procedure linear_interpolate(dp:xy_graph_ptr;position:real; 
+procedure linear_interpolate(var dp:xy_graph_type;position:real; 
 	var result:real);
 
 const
@@ -3623,32 +3630,32 @@ var
 	index,lower_index,upper_index:integer;
 	
 begin
-	if length(dp^)<min_num_points then begin
-		if length(dp^)>0 then result:=dp^[0].y
+	if length(dp)<min_num_points then begin
+		if length(dp)>0 then result:=dp[0].y
 		else result:=0;
 	end else begin
 		lower_index:=0;
 		upper_index:=0;
-		for index:=1 to length(dp^)-1 do begin
-			if (dp^[lower_index].x<=dp^[index].x) 
-					and (dp^[index].x<=position) then
+		for index:=1 to length(dp)-1 do begin
+			if (dp[lower_index].x<=dp[index].x) 
+					and (dp[index].x<=position) then
 				lower_index:=index
-			else if (position<dp^[lower_index].x)
-					and (dp^[index].x<dp^[lower_index].x) then
+			else if (position<dp[lower_index].x)
+					and (dp[index].x<dp[lower_index].x) then
 				lower_index:=index;
-			if (dp^[upper_index].x>=dp^[index].x) 
-					and (dp^[index].x>=position) then
+			if (dp[upper_index].x>=dp[index].x) 
+					and (dp[index].x>=position) then
 				upper_index:=index
-			else if (position>dp^[upper_index].x)
-					and (dp^[index].x>dp^[upper_index].x) then
+			else if (position>dp[upper_index].x)
+					and (dp[index].x>dp[upper_index].x) then
 				upper_index:=index;
 		end;
-		if (dp^[upper_index].x<>dp^[lower_index].x) then
-			result:=(position-dp^[lower_index].x)
-					*(dp^[upper_index].y-dp^[lower_index].y)
-					/(dp^[upper_index].x-dp^[lower_index].x)
-					+dp^[lower_index].y
-		else result:=dp^[lower_index].y;
+		if (dp[upper_index].x<>dp[lower_index].x) then
+			result:=(position-dp[lower_index].x)
+					*(dp[upper_index].y-dp[lower_index].y)
+					/(dp[upper_index].x-dp[lower_index].x)
+					+dp[lower_index].y
+		else result:=dp[lower_index].y;
 	end;
 end;
 
@@ -4523,7 +4530,7 @@ begin
 	if (length(dp)<1) or (period<0) then exit;
 	if (period=0) then begin
 		phase:=0;
-		amplitude:=average_x_graph(@dp);
+		amplitude:=average_x_graph(dp);
 	end else begin
 		phase_step:=2*pi/period;
 		phase:=0;
@@ -4590,9 +4597,9 @@ end;
 	transform. The routine takes its data in an xy_graph and returns the
 	transform in another xy_graph. The routine is reversible also: if you pass
 	the transform back to fft, you will re-construct the original data. Each
-	term dp^[k] in the data is a complex number. The k'th term represents the
+	term dp[k] in the data is a complex number. The k'th term represents the
 	k'th sample, with the samples being numbered 0 to N-1. The real part of the
-	term is dp^[k].x and the imaginary part is dp^[k].y. When the data is a
+	term is dp[k].x and the imaginary part is dp[k].y. When the data is a
 	real-valued sequence of samples, the imaginary components are all zero. Each
 	term in the output is likewise a complex number. The k'th term represents a
 	sinusoidal function with frequency k/NT, where T is the sample period. The

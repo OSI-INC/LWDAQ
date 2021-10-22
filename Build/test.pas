@@ -64,21 +64,8 @@ begin
 end;
 
 begin
+	track_ptrs:=true;
 	append_errors:=true;
-{
-	Test gui_writeln and gui_readln by substitution of writeln.
-}
-	writeln('Testing gui_writeln and gui_readln...');
-	gui_writeln:=console_write;
-	gui_readln:=console_read;
-	gui_writeln('Hello from gui_writeln.');
-	repeat
-		s:=gui_readln('Enter a number or press return. ');
-		writeln('You entered: "',s,'".');
-		x:=real_from_string(s,good);
-		if not good then writeln('Hey! That was not a number')
-		else writeln('That was a real number.');
-	until good;
 {
 	Check the routines that detect endianess of local platform, and swap
 	byte order.
@@ -213,8 +200,7 @@ begin
 	Test x-graph generation, string interfaces, and pointer tracking, checking
 	frequently to see if we are failing to dispose of outstanding pointers.
 }
-	writeln('Turning on pointer tracking and testing graph routines...');
-	track_ptrs:=true;
+	writeln('Testing graph routines...');
 	
 	setlength(gpx,gsize);
 	for i:=0 to length(gpx)-1 do 
@@ -271,7 +257,7 @@ begin
 	for i:=0 to length(gpx) do
 		gpx[i]:=random_0_to_1;
 	writeln('gpx: ',string_from_x_graph(gpx));
-	x_graph_ascending(@gpx);
+	x_graph_ascending(gpx);
 	writeln('ascending: ',string_from_x_graph(gpx));
 	good:=true;
 	for i:=1 to length(gpx)-1 do
@@ -284,7 +270,7 @@ begin
 			good:=false;
 		end;
 		
-	x_graph_descending(@gpx);
+	x_graph_descending(gpx);
 	writeln('descending: ',string_from_x_graph(gpx));
 	good:=true;
 	for i:=1 to length(gpx)-1 do
@@ -304,9 +290,9 @@ begin
 	for i:=0 to length(gpx) do
 		gpx[i]:=i+1;
 	writeln('gpx: ',string_from_x_graph(gpx));
-	x_graph_descending(@gpx);
+	x_graph_descending(gpx);
 	writeln('descending: ',string_from_x_graph(gpx));
-	x_graph_ascending(@gpx);
+	x_graph_ascending(gpx);
 	writeln('ascending: ',string_from_x_graph(gpx));	
 	if num_outstanding_ptrs>0 then begin
 		writestr(s,'Have ',num_outstanding_ptrs:1,
@@ -319,15 +305,15 @@ begin
 }
 	fsd:=2;
 	fsr:=1;
-	writeln('average_x_graph=',average_x_graph(@gpx):fsr:fsd);
-	writeln('max_x_graph=',max_x_graph(@gpx):fsr:fsd);
-	writeln('min_x_graph=',min_x_graph(@gpx):fsr:fsd);
-	writeln('stdev_x_graph=',stdev_x_graph(@gpx):fsr:fsd);
-	writeln('mad_x_graph=',mad_x_graph(@gpx):fsr:fsd);
-	writeln('median_x_graph=',median_x_graph(@gpx):fsr:fsd);
-	writeln('10% percentile_x_graph=',percentile_x_graph(@gpx,10):fsr:fsd);
-	writeln('coastline_x_graph=',coastline_x_graph(@gpx):fsr:fsd);
-	writeln('slope_x_graph=',slope_x_graph(@gpx,tsize div 2,tsize div 4):fsr:fsd);
+	writeln('average_x_graph=',average_x_graph(gpx):fsr:fsd);
+	writeln('max_x_graph=',max_x_graph(gpx):fsr:fsd);
+	writeln('min_x_graph=',min_x_graph(gpx):fsr:fsd);
+	writeln('stdev_x_graph=',stdev_x_graph(gpx):fsr:fsd);
+	writeln('mad_x_graph=',mad_x_graph(gpx):fsr:fsd);
+	writeln('median_x_graph=',median_x_graph(gpx):fsr:fsd);
+	writeln('10% percentile_x_graph=',percentile_x_graph(gpx,10):fsr:fsd);
+	writeln('coastline_x_graph=',coastline_x_graph(gpx):fsr:fsd);
+	writeln('slope_x_graph=',slope_x_graph(gpx,tsize div 2,tsize div 4):fsr:fsd);
 	if num_outstanding_ptrs>0 then begin
 		writestr(s,'Have ',num_outstanding_ptrs:1,
 			' outsanding pointers after x-graph checks.');
@@ -383,7 +369,7 @@ begin
 	end;
 	writeln('Created and filled xy-graph of length ',gsize,' and length(gpxy)=',length(gpxy),'.');
 
-	straight_line_fit(@gpxy,slope,intercept,residual);
+	straight_line_fit(gpxy,slope,intercept,residual);
 	writeln('slope=',slope:fsr:fsd,' intercept=',intercept:fsr:fsd,' residual=',residual:fsr:fsd);
 
 	writeln('Translating gpxy into string with string_from_xy_graph ',reps:1,' times');
@@ -437,17 +423,18 @@ begin
 			y:=i+1;
 			z:=i+2;
 	end;
-	writeln('Created and filled xyz-graph of length ',gsize,' and length(gpxyz)=',length(gpxyz),'.');
+	writeln('Created and filled xyz-graph of length ',gsize,
+		' and length(gpxyz)=',length(gpxyz),'.');
 {
 	Speed of quicksort.
 }
-	setlength(gpx,gsize);
 	writeln('Generating and sorting list of ',gsize,' random elements ',reps,' times.');
+	setlength(gpx,gsize);
 	start_ms:=clock_milliseconds;
 	for j:=1 to reps do begin
-		for i:=0 to length(gpx) do
+		for i:=0 to length(gpx)-1 do
 			gpx[i]:=random_0_to_1;
-		x_graph_ascending(@gpx);
+		x_graph_ascending(gpx);
 	end;
 	writeln('Each sort takes ',1.0*(clock_milliseconds-start_ms)/reps*us_per_ms:1:1,' us.');
 
@@ -455,9 +442,9 @@ begin
 	writeln('Generating and sorting list of ',gsize*10,' random elements ',reps div 10,' times.');
 	start_ms:=clock_milliseconds;
 	for j:=1 to (reps div 10) do begin
-		for i:=0 to length(gpx) do
+		for i:=0 to length(gpx)-1 do
 			gpx[i]:=random_0_to_1;
-		x_graph_ascending(@gpx);
+		x_graph_ascending(gpx);
 	end;
 	writeln('Each sort takes ',1.0*(clock_milliseconds-start_ms)/(reps div 10)*us_per_ms:1:1,' us.');
 {
@@ -565,4 +552,19 @@ begin
 	writeln(error_string);
 	error_string:='';
 	writeln('End error string.');
+	writeln('There are ',num_outstanding_ptrs,' pointers outstanding.');
+{
+	Test gui_writeln and gui_readln by substitution of writeln.
+}
+	writeln('Testing gui_writeln and gui_readln...');
+	gui_writeln:=console_write;
+	gui_readln:=console_read;
+	gui_writeln('Hello from gui_writeln.');
+	repeat
+		s:=gui_readln('Enter a number or press return. ');
+		writeln('You entered: "',s,'".');
+		x:=real_from_string(s,good);
+		if not good then writeln('Hey! That was not a number')
+		else writeln('That was a real number.');
+	until good;
 end.

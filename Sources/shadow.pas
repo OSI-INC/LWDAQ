@@ -364,7 +364,7 @@ begin
 	display profile.
 }	
 	if show_details then 
-		display_profile_row(ip,@profile,profile_color);
+		display_profile_row(ip,profile,profile_color);
 {
 	calculate slope of profile.
 }
@@ -374,7 +374,7 @@ begin
 			graph[i-left].x:=i;
 			graph[i-left].y:=profile[i-left];
 		end;
-		straight_line_fit(@graph,slope,intercept,rms_residual);
+		straight_line_fit(graph,slope,intercept,rms_residual);
 	end;
 {
 	calculate horizontal derivative of the intensity profile.
@@ -403,7 +403,7 @@ begin
 	display derivative.
 }
 	if show_details then 
-		display_profile_row(ip,@derivative,profile_derivative_color);
+		display_profile_row(ip,derivative,profile_derivative_color);
 {
 	find the notch-like shadows by looking at the profile.
 }

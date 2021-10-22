@@ -89,7 +89,7 @@ p: p.pas $(OBJA)
 # The test target is an executable that runs a suit of tests of our analysis
 # library routines.
 test: test.pas $(OBJA)
-	fpc $< -otest.exe $(FPC_FLAGS) 
+	fpc $< -otest.exe $(FPC_FLAGS)
 
 # Compile the LWDAQ shared library. We don't list all the required objects in
 # the fpc command line because fpc will look for them as it compiles the dynamic

@@ -495,7 +495,7 @@ begin
 			gp[j-top].x:=j-top;
 			gp[j-top].y:=ave;
 		end;
-		straight_line_fit(@gp,v_slope,v_intercept,v_resid);
+		straight_line_fit(gp,v_slope,v_intercept,v_resid);
 
 		setlength(gp,right-left+1);
 		for i:=left to right do begin
@@ -505,7 +505,7 @@ begin
 			gp[i-left].x:=i-left;
 			gp[i-left].y:=ave;
 		end;
-		straight_line_fit(@gp,h_slope,h_intercept,h_resid);
+		straight_line_fit(gp,h_slope,h_intercept,h_resid);
 		
 		for j:=top to bottom do begin
 			for i:=left to right do begin

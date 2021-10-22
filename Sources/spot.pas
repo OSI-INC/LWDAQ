@@ -278,7 +278,7 @@ begin
 		end;
 	end;
 
-	weighted_straight_line_fit(@gp,slope,intercept,residual);
+	weighted_straight_line_fit(gp,slope,intercept,residual);
 
 	if math_error(slope) 
 			or math_error(intercept) 

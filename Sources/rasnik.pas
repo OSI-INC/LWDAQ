@@ -610,7 +610,7 @@ begin
 }
 	setlength(dp,p2s);	
 	for n:=0 to length(dp)-1 do dp[n]:=profile[n];
-	window_function(@dp,round(window_fraction*p2s*one_half));
+	window_function(dp,round(window_fraction*p2s*one_half));
 {
 	Determine the minimum and maximum frequency components that we will consider
 	as the potential square frequency.
@@ -729,7 +729,7 @@ begin
 	 We prepare the profile by applying a window function, which improves
 	 the performance of both the fourier transform and our band-pass filter. 
 }
-	window_function(@profile,window_extent);
+	window_function(profile,window_extent);
 {
 	Generate a band-pass filtered profile.
 }
@@ -850,7 +850,7 @@ begin
 	unless the period passed into the routine was non-zero.
 }
 	if initial_period<>0 then
-		weighted_straight_line_fit(@feature_list,period,offset,residual);
+		weighted_straight_line_fit(feature_list,period,offset,residual);
 {
 	Check the period and offset.
 }
@@ -965,7 +965,7 @@ begin
 				if length(profile)=0 then exit;
 				if show_fitting then begin
 					display_ccd_rectangle(iip,iip^.analysis_bounds,bounds_color);
-					display_profile_row(iip,@profile,profile_color);
+					display_profile_row(iip,profile,profile_color);
 				end;
 {
 	Upon the first slice, we use a fourier transform to obtain the approximate
@@ -981,8 +981,8 @@ begin
 }
 				profile_by_maxima(profile,period,offset,filtered_profile);
 				if show_fitting then begin
-					if period>0 then display_profile_row(iip,@filtered_profile,good_color)
-					else display_profile_row(iip,@filtered_profile,bad_color);
+					if period>0 then display_profile_row(iip,filtered_profile,good_color)
+					else display_profile_row(iip,filtered_profile,bad_color);
 				end;
 {
 	If the band-pass filter fails, revert to the fourier transform.
@@ -1015,7 +1015,7 @@ begin
 	meanwhile, is a measure of the image skew in the vertical direction. We divide the slope
 	by our final estimate of period to get the vertical skew.
 }
-		straight_line_fit(@data,skew_j,period_i,residual_i);
+		straight_line_fit(data,skew_j,period_i,residual_i);
 		with original_i_bounds do 
 			period_i:=period_i+one_half*(bottom+top)*skew_j;
 		skew_j:=skew_j/period_i;
@@ -1041,7 +1041,7 @@ begin
 }
 		for slice_num:=0 to rasnik_num_slices-1 do
 			data[slice_num].y:=offsets[slice_num];
-		straight_line_fit(@data,slope_i,offset_i,residual_i);
+		straight_line_fit(data,slope_i,offset_i,residual_i);
 		
 		iip^.analysis_bounds:=original_i_bounds;
 	end;
@@ -1077,13 +1077,13 @@ begin
 				if length(profile)=0 then exit;
 				if show_fitting then begin
 					display_ccd_rectangle(jip,jip^.analysis_bounds,bounds_color);
-					display_profile_column(jip,@profile,profile_color);
+					display_profile_column(jip,profile,profile_color);
 				end;
 				if slice_num=0 then profile_by_fourier(profile,period,offset);
 				profile_by_maxima(profile,period,offset,filtered_profile);
 				if show_fitting then begin
-					if period>0 then display_profile_column(jip,@filtered_profile,good_color)
-					else display_profile_column(jip,@filtered_profile,bad_color);
+					if period>0 then display_profile_column(jip,filtered_profile,good_color)
+					else display_profile_column(jip,filtered_profile,bad_color);
 				end;
 				if period=0 then profile_by_fourier(profile,period,offset);
 				offsets[slice_num]:=offset
@@ -1100,7 +1100,7 @@ begin
 		end;
 		if period=0 then exit;
 	
-		straight_line_fit(@data,skew_i,period_j,residual_j);
+		straight_line_fit(data,skew_i,period_j,residual_j);
 		with original_i_bounds do
 			period_j:=period_j+one_half*(left+right)*skew_i;
 		skew_i:=skew_i/period_j;
@@ -1120,7 +1120,7 @@ begin
 			data[slice_num].y:=offsets[slice_num];
 		end;
 			
-		straight_line_fit(@data,slope_j,offset_j,residual_j);
+		straight_line_fit(data,slope_j,offset_j,residual_j);
 		
 		jip^.analysis_bounds:=original_j_bounds;
 	end;
@@ -1161,6 +1161,7 @@ begin
 			if (pattern_x_width > max_distortion * pattern_y_width) or
 				(pattern_x_width < max_distortion / pattern_y_width) then begin
 				report_error('Pattern x and y widths do not agree in rasnik_find_pattern.');
+				dispose_rasnik_pattern(pp);
 				exit;
 			end;
 			image_x_skew:=skew_i;
@@ -1465,7 +1466,7 @@ begin
 				with line[line_num] do begin
 					if (num_points>min_num_points_per_line) then begin
 						graph[num_points].z:=ignore_remaining_data;
-						weighted_straight_line_fit(@graph,slope,intercept,residual);
+						weighted_straight_line_fit(graph,slope,intercept,residual);
 						if math_error(slope) or math_error(intercept) then continue;
 {
 	We now have a slope and intercept, which we use to define a line in image coordinates
@@ -1582,7 +1583,7 @@ begin
 			report_error('Too few edges in rasnik_refine_pattern.');
 			exit;
 		end;
-		weighted_straight_line_fit(@graph,skew_i,slope_i,residual_i);
+		weighted_straight_line_fit(graph,skew_i,slope_i,residual_i);
 		with iip^.analysis_bounds do mid_point:=(right+left)*one_half;
 		slope_i:=slope_i+skew_i*mid_point;
 {
@@ -1644,7 +1645,7 @@ begin
 			gp[line_num].x:=graph[line_num].x;
 			gp[line_num].y:=graph[line_num].y;
 		end;
-		parabolic_line_fit(@gp,parabola_i,period_i,offset_i,residual_i);
+		parabolic_line_fit(gp,parabola_i,period_i,offset_i,residual_i);
 {
 	We move across to an edge closer to the center of the analyis bounds. Our
 	fit_x=0 edge is close to the left side of the analysis bounds, so shift over
@@ -1842,7 +1843,7 @@ begin
 				with line[line_num] do begin				
 					if (num_points>min_num_points_per_line) then begin
 						graph[num_points].z:=ignore_remaining_data;
-						weighted_straight_line_fit(@graph,slope,intercept,residual);
+						weighted_straight_line_fit(graph,slope,intercept,residual);
 						if math_error(slope) or math_error(intercept) then continue;
 {
 	We use the slope and intercept to define a line in image coordinates that
@@ -1960,7 +1961,7 @@ begin
 			report_error('Too few edges in rasnik_refine_pattern.');
 			exit;
 		end;
-		weighted_straight_line_fit(@graph,skew_j,slope_j,residual_j);
+		weighted_straight_line_fit(graph,skew_j,slope_j,residual_j);
 		with jip^.analysis_bounds do mid_point:=(top+bottom)*one_half;
 		slope_j:=slope_j+skew_j*mid_point;
 {
@@ -2022,7 +2023,7 @@ begin
 			gp[line_num].x:=graph[line_num].x;
 			gp[line_num].y:=graph[line_num].y;
 		end;
-		parabolic_line_fit(@gp,parabola_j,period_j,offset_j,residual_j);
+		parabolic_line_fit(gp,parabola_j,period_j,offset_j,residual_j);
 {
 	We move across to an edge closer to the center of the analyis bounds. Our
 	fit_x=0 edge is close to the top side of the analysis bounds, so shift down

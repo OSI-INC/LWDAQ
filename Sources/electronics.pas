@@ -252,28 +252,28 @@ begin
 		n15V[n].x:=period*n;
 		n15I[n].x:=period*n;
 	end;
-	p15V_ave:=average_y_xy_graph(@p15V);
-	p5V_ave:=average_y_xy_graph(@p5V);
-	n15V_ave:=average_y_xy_graph(@n15V);
+	p15V_ave:=average_y_xy_graph(p15V);
+	p5V_ave:=average_y_xy_graph(p5V);
+	n15V_ave:=average_y_xy_graph(n15V);
 	writestr(result,result,' ',
-		p15V_ave:5:3,' ',average_y_xy_graph(@p15I):5:3,' ',
-		p5V_ave:5:3,' ',average_y_xy_graph(@p5I):5:3,' ',
-		n15V_ave:5:3,' ',average_y_xy_graph(@n15I):5:3,' ',
-		average_y_xy_graph(@c_gain):6:4,' ',average_y_xy_graph(@d_gain):3:1);
+		p15V_ave:5:3,' ',average_y_xy_graph(p15I):5:3,' ',
+		p5V_ave:5:3,' ',average_y_xy_graph(p5I):5:3,' ',
+		n15V_ave:5:3,' ',average_y_xy_graph(n15I):5:3,' ',
+		average_y_xy_graph(c_gain):6:4,' ',average_y_xy_graph(d_gain):3:1);
 		
 	draw_oscilloscope_scale(ip,num_divisions);
 	if ac_couple then begin
-		display_real_graph(ip,@p15V,yellow_color,
+		display_real_graph(ip,p15V,yellow_color,
 			t_min,t_max,v_min+p15V_ave,v_max+p15V_ave,0,0);
-		display_real_graph(ip,@p5V,red_color,
+		display_real_graph(ip,p5V,red_color,
 			t_min,t_max,v_min+p5V_ave,v_max+p5V_ave,0,0);
-		display_real_graph(ip,@n15V,green_color,
+		display_real_graph(ip,n15V,green_color,
 			t_min,t_max,v_min+n15V_ave,v_max+n15V_ave,0,0);
 	end 
 	else begin
-		display_real_graph(ip,@p15V,yellow_color,t_min,t_max,v_min,v_max,0,0);
-		display_real_graph(ip,@p5V,red_color,t_min,t_max,v_min,v_max,0,0);
-		display_real_graph(ip,@n15V,green_color,t_min,t_max,v_min,v_max,0,0);
+		display_real_graph(ip,p15V,yellow_color,t_min,t_max,v_min,v_max,0,0);
+		display_real_graph(ip,p5V,red_color,t_min,t_max,v_min,v_max,0,0);
+		display_real_graph(ip,n15V,green_color,t_min,t_max,v_min,v_max,0,0);
 	end;
 	
 	lwdaq_A2037_monitor:=result;
@@ -350,19 +350,19 @@ begin
 				+ref_bottom;
 			gauge[n].x:=period*n;
 		end;
-		gauge_ave:=average_y_xy_graph(@gauge);
+		gauge_ave:=average_y_xy_graph(gauge);
 
 		if ac_couple then
-			display_real_graph(ip,@gauge,
+			display_real_graph(ip,gauge,
 				overlay_color_from_integer(channel_num),
 				t_min,t_max,y_min+gauge_ave,y_max+gauge_ave,0,0)
 		else 
-			display_real_graph(ip,@gauge,
+			display_real_graph(ip,gauge,
 				overlay_color_from_integer(channel_num),
 				t_min,t_max,y_min,y_max,0,0);
 
 		if ave then writestr(result,result,gauge_ave:5:3,' ');
-		if stdev then writestr(result,result,stdev_y_xy_graph(@gauge):5:3,' ');
+		if stdev then writestr(result,result,stdev_y_xy_graph(gauge):5:3,' ');
 	end;
 
 	electronics_trace:=gauge;
@@ -465,7 +465,7 @@ begin
 		end;
 		log_temperature[n].x:=temperature[n+cooling_start_index].x;
 	end;
-	straight_line_fit(@log_temperature,slope,intercept,rms_residual);
+	straight_line_fit(log_temperature,slope,intercept,rms_residual);
 
 	setlength(log_fit,num_cooling_samples);
 	for n:=0 to num_cooling_samples-1 do begin
@@ -483,11 +483,11 @@ begin
 	end;
 	rms_residual:=sqrt(rms_residual/num_cooling_samples);
 
-	display_real_graph(ip,@log_fit,green_color,t_min,t_max,0,0,0,0);
-	display_real_graph(ip,@log_temperature,red_color,t_min,t_max,0,0,0,0);
-	display_real_graph(ip,@fit,
+	display_real_graph(ip,log_fit,green_color,t_min,t_max,0,0,0,0);
+	display_real_graph(ip,log_temperature,red_color,t_min,t_max,0,0,0,0);
+	display_real_graph(ip,fit,
 		green_color,t_min,t_max,c_min+ambient_temp,c_max+ambient_temp,0,0);
-	display_real_graph(ip,@temperature,
+	display_real_graph(ip,temperature,
 		red_color,t_min,t_max,c_min+ambient_temp,c_max+ambient_temp,0,0);
 
 	electronics_trace:=temperature;
@@ -577,12 +577,12 @@ begin
 			reference[n].y:=sample_A2037E_adc16(ip,0,n);
 			reference[n].x:=n;
 		end;
-		ref_bottom:=average_y_xy_graph(@reference);	
+		ref_bottom:=average_y_xy_graph(reference);	
 		for n:=0 to ip^.i_size-1 do begin
 			reference[n].y:=sample_A2037E_adc16(ip,redundancy_factor*num_channels+1,n);
 			reference[n].x:=n;
 		end;
-		ref_top:=average_y_xy_graph(@reference);	
+		ref_top:=average_y_xy_graph(reference);	
 		if abs(ref_top-ref_bottom)<small_real then begin
 			report_error('ref_top=ref_bottom with auto_calib');
 			exit;
@@ -611,8 +611,8 @@ begin
 					* (ref_top_V-ref_bottom_V)
 					/ channel_gain
 					+ ref_bottom_V;
-		ave:=average_y_xy_graph(@trace);
-		stdev:=stdev_y_xy_graph(@trace);
+		ave:=average_y_xy_graph(trace);
+		stdev:=stdev_y_xy_graph(trace);
 {
 	If we want to ac-couple the signal, subtract its average value now.
 }
@@ -654,7 +654,7 @@ begin
 	Display a graph of the voltage versus time, with time zero representing the moment
 	of the first trigger.
 }
-		display_real_graph(ip,@trace,
+		display_real_graph(ip,trace,
 			overlay_color_from_integer(channel_num),
 			t_min,t_max,v_min,v_max,0,0);
 {
@@ -764,7 +764,7 @@ begin
 				redundancy_factor*channel_num*num_samples+n+trigger);
 			signal[n]:=trace[n].y;
 		end;
-		display_real_graph(ip,@trace,
+		display_real_graph(ip,trace,
 			overlay_color_from_integer(channel_num),
 				0,num_samples-1,v_min,v_max,0,0);
 		if (harmonic>0) then period:=num_samples/harmonic
@@ -1710,22 +1710,22 @@ begin
 								inc(sample_num);
 							end;
 						end;
-					ave:=average_y_xy_graph(@trace);
-					stdev:=stdev_y_xy_graph(@trace);
-					min:=min_y_xy_graph(@trace);
-					max:=max_y_xy_graph(@trace);
+					ave:=average_y_xy_graph(trace);
+					stdev:=stdev_y_xy_graph(trace);
+					min:=min_y_xy_graph(trace);
+					max:=max_y_xy_graph(trace);
 					if display_mode='CP' then 
-						display_real_graph(ip,@trace,
+						display_real_graph(ip,trace,
 							overlay_color_from_integer(id_num),
 							mp[0].time,mp[num_selected-1].time,
 							display_min+ave,display_max+ave,0,0)
 					else if display_mode='NP' then
-						display_real_graph(ip,@trace,
+						display_real_graph(ip,trace,
 							overlay_color_from_integer(id_num),
 							mp[0].time,mp[num_selected-1].time,
 							0,0,0,0)
 					else 
-						display_real_graph(ip,@trace,
+						display_real_graph(ip,trace,
 							overlay_color_from_integer(id_num),
 							mp[0].time,mp[num_selected-1].time,
 							display_min,display_max,0,0);
@@ -1818,14 +1818,14 @@ begin
 			trace[n].y:=sample_A2037E_adc8(ip,0,
 				channel_num*(num_samples+startup_skip)+n+startup_skip);
 		end;
-		max:=max_y_xy_graph(@trace);
-		min:=min_y_xy_graph(@trace);
+		max:=max_y_xy_graph(trace);
+		min:=min_y_xy_graph(trace);
 		if rms then 
-			writestr(result,result,' ',stdev_y_xy_graph(@trace):fsr:fsd)
+			writestr(result,result,' ',stdev_y_xy_graph(trace):fsr:fsd)
 		else
 			writestr(result,result,' ',(max-min):fsr:fsd);
 		if (max<v_max) and (min>v_min) then 
-			display_real_graph(ip,@trace,
+			display_real_graph(ip,trace,
 				overlay_color_from_integer(channel_num),
 				0,num_samples-1,v_min,v_max,0,0);
 	end;
