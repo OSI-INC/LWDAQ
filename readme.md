@@ -12,11 +12,9 @@ The Long-Wire Data Acquisition ([LWDAQ](http://www.bndhep.net/Electronics/LWDAQ/
 
 [LWDAQ Specification](http://www.bndhep.net/Devices): LWDAQ hardware specification.
 
-[OSI Instruments](http://www.opensourceinstruments.com): Open Source Instruments (OSI) main page, with links to OSI-made instruments.
+[OSI Instruments](http://www.opensourceinstruments.com): Open Source Instruments (OSI) main page.
 
-[OSI Neuroarchiver](http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html): Separate manual for Neuroarchiver Tool.
-
-[OSI Neuroarchiver](http://www.opensourceinstruments.com/Electronics/A3018/Receiver.html): Separate manual for Neuroarchiver Tool.
+[OSI Neuroarchiver](http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html): Manual for Neuroarchiver Tool.
 
 
 
