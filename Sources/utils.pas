@@ -480,7 +480,7 @@ type
 	ij_ellipse_type=record a,b:ij_point_type; axis_length:real; end;
 	ij_ellipse_ptr_type=^ij_ellipse_type;
 	ij_graph_type=array  of ij_point_type;
-	ij_graph_ptr_type=^ij_graph_type;
+	ij_graph_ptr=^ij_graph_type;
 
 function ij_origin:ij_point_type;
 function ij_axis_j:ij_line_type;

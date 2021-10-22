@@ -3,38 +3,36 @@
 # LWDAQ Launch Program for Unix, Linux, and Darwin.
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 #
-# This shell program launches LWDAQ from a terminal on Linux, Unix, or
-# MacOS. On Windows, you can run the shell from Cygwin directly. On
-# MinGW you can run the shell only after you insert an empty line in
-# front of the hash-bang at the top of the script. The shell program
-# accepts options --no-gui, --gui, --no-console, or --pipe, as described
-# in the LWDAQ manual. After the option (if any), you can pass a TCL script
-# that will be executed by LWDAQ after it starts up. This script is the 
-# configuration script. Its full path name will be available in the global
-# variable LWDAQ_Info(configuration_file). If you specify a configuration 
-# script you can pass parameters into it by adding them to your command line.
-# These parameters will be placed in the global variable LWDAQ_Info(argv). 
-# The first argument after the configuration script will be element zero
-# in the list. The following line, for example, calls tclsh in the background 
-# and runs the tcl script config.tcl, passing two parameters into 
+# This shell program launches LWDAQ from a terminal on Linux, Unix, or MacOS. On
+# Windows, you can run the shell from Cygwin directly. On MinGW you can run the
+# shell only after you insert an empty line in front of the hash-bang at the top
+# of the script. The shell program accepts options --no-gui, --gui,
+# --no-console, or --pipe, as described in the LWDAQ manual. After the option
+# (if any), you can pass a TCL script that will be executed by LWDAQ after it
+# starts up. This script is the configuration script. Its full path name will be
+# available in the global variable LWDAQ_Info(configuration_file). If you
+# specify a configuration script you can pass parameters into it by adding them
+# to your command line. These parameters will be placed in the global variable
+# LWDAQ_Info(argv). The first argument after the configuration script will be
+# element zero in the list. The following line, for example, calls tclsh in the
+# background and runs the tcl script config.tcl, passing two parameters into
 # LWDAQ_Info(argv), data.txt and 34.56.
 #
 # ./lwdaq --no-console config.tcl data.txt 34.56
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
-# USA
+
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place - Suite 330, Boston, MA  02111-1307, USA
 #
 
 # Determine the location of the LWDAQ directory. We assume that this
@@ -63,13 +61,18 @@ fi
 echo "OS: $OS"
 echo "ARCH: $ARCH"
 
-# Determine the option and configuration script name. We look
-# for the "--" string at the start of the first parameter, and
-# if we find it, we use this as our option. Otherwise we create
-# the option "--gui". We shift the positional parameters to the
-# left so as to remove the option and configuration file, leaving
-# only additional positional parameters, should they exist. We
-# will pass these additional parameters to tclsh or wish later.
+# Determine the option and configuration script name. We look for the "--"
+# string at the start of the first parameter, and if we find it, we use this as
+# our option. Otherwise we create the option "--gui". We shift the positional
+# parameters to the left so as to remove the option and configuration file,
+# leaving only additional positional parameters, should they exist. We will pass
+# these additional parameters to tclsh or wish later. We will also pass the
+# value of OPTION into the LWDAQ process, be it --gui, --no-gui, --console,
+# --no-console, or --pipe, so that further handling of the option can take place
+# within LWDAQ. The --pipe and --no-console options are handled the same way in
+# this script: the process runs in the foreground with no graphics. Inside the
+# LWDAQ process, however, the way the console is set up to receive console
+# commands is different.
 if [ `expr "$1" : "--"` -eq 2 ] 
 then
 	OPTION=$1
@@ -82,23 +85,28 @@ else
 fi
 echo "OPTION: $OPTION"
 
-# Check to see if we should run in no-gui mode with
-# tclsh or with gui in wish.
+# Check to see if we should run in no-gui mode with tclsh or with gui in wish,
+# and also whether we should run in the background. The run mode options also
+# dictate whether or not the console will be enabled, but this decision is made
+# inside LWDAQ, so we are going to pass the OPTION into LWDAQ when we run LWDAQ.
 OPTION_FOUND=0
 if [ "$OPTION" == "--pipe" ] 
 then 
+	# Run without graphics, without console, in foreground.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--no-console" ] 
 then 
+	# Run without graphics, without console, in the background.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=1
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--no-gui" ] 
 then 
+	# Run without graphics, with console, in the foreground.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
 	OPTION_FOUND=1
@@ -108,14 +116,19 @@ then
 	GUI_ENABLED=1
 	if [ "$OS" == "Linux" ]
 	then
+		# On Linux, run with graphics, with console, in foreground so that we 
+		# can use the terminal as our console.
 		RUN_IN_BACKGROUND=0
 	else
+		# On Windows qnd MacOS, run with graphics, with console, in background so
+		# that we can use the slave console.
 		RUN_IN_BACKGROUND=1
 	fi
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--child" ] 
 then 
+	# Run with graphics, with console, in background.
 	GUI_ENABLED=1
 	RUN_IN_BACKGROUND=1
 	OPTION_FOUND=1

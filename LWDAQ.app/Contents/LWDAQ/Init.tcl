@@ -360,27 +360,12 @@ if {$LWDAQ_Info(slave_console)} {
 	}
 }
 
-# If we ran LWDAQ from tclsh, or any other TCL-only shell, the shell
-# will be inclined to terminate now that it has run Init.tcl. We keep
-# the shell alive by telling it to wait until LWDAQ_Info(quit) is set. 
-# You can force the shell to quit with the "exit" command. If we are
-# running in a pipe, however, we will read all available input from
-# stdin, then exit.
+# If we run without graphics, LWDAQ will be inclined to terminate now that it
+# has run Init.tcl. We keep the shell alive by telling it to wait until
+# LWDAQ_Info(quit) is set. You can force the shell to quit with the "exit"
+# command.
 if {!$LWDAQ_Info(gui_enabled)} {
-	if {$LWDAQ_Info(run_mode) == "--pipe"} {
-		fconfigure stdin -translation auto -buffering line
-		while {[gets stdin line] > 0} {
-			if {[catch {
-				set result [eval $line]
-				puts "$result"
-			} error_result]} {
-				puts $error_result
-				break
-			}
-		}
-	} {
-		vwait LWDAQ_Info(quit)
-	}
+	vwait LWDAQ_Info(quit)
 }
 
 # Return a value of 1 to show success.
