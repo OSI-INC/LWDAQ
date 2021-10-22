@@ -161,6 +161,9 @@ type
 		pixel_size_um:real;{width of a sensor pixel in um}
 	end;
 	rasnik_ptr_type=^rasnik_type;
+	
+var
+	rasnik_disable_skew:boolean=false;
 
 function new_rasnik_pattern:rasnik_pattern_ptr_type;
 procedure dispose_rasnik_pattern(pp:rasnik_pattern_ptr_type);
@@ -879,12 +882,11 @@ begin
 end;
 
 {
-	rasnik_find_pattern uses the i- and j-direction derivatives of a 
-	mask image to determine the approximate location of the mask pattern.  
-	The derivatives are specified by iip and jip. If only one of the i- or 
-	j-derivatives is valid, we calculate in only the i- or j-directions. In 
-	all cases, the routine picks a pattern origin close to the center of the 
-	analysis bounds.
+	rasnik_find_pattern uses the i- and j-direction derivatives of a mask image
+	to determine the approximate location of the mask pattern. The derivatives
+	are specified by iip and jip. If only one of the i- or j-derivatives is
+	valid, we calculate in only the i- or j-directions. In all cases, the
+	routine picks a pattern origin close to the center of the analysis bounds.
 }
 function rasnik_find_pattern(iip,jip:image_ptr_type;show_fitting:boolean)
 	:rasnik_pattern_ptr_type;
@@ -1016,9 +1018,15 @@ begin
 	by our final estimate of period to get the vertical skew.
 }
 		straight_line_fit(data,skew_j,period_i,residual_i);
+		if period_i>0 then 
+			skew_j:=skew_j/period_i 
+		else begin
+			skew_j:=0;
+			period_i:=1;
+		end;
+		if rasnik_disable_skew then skew_j:=0;
 		with original_i_bounds do 
 			period_i:=period_i+one_half*(bottom+top)*skew_j;
-		skew_j:=skew_j/period_i;
 {
 	We adjust the offsets of each slice left or right so they represent a single
 	vertical edge.
@@ -1101,9 +1109,15 @@ begin
 		if period=0 then exit;
 	
 		straight_line_fit(data,skew_i,period_j,residual_j);
+		if period_j>0 then 
+			skew_i:=skew_i/period_j
+		else begin
+			skew_i:=0;
+			period_j:=1;
+		end;
+		if rasnik_disable_skew then skew_i:=0;
 		with original_i_bounds do
 			period_j:=period_j+one_half*(left+right)*skew_i;
-		skew_i:=skew_i/period_j;
 	
 		for slice_num:=1 to rasnik_num_slices-1 do begin
 			while offsets[slice_num]-offsets[slice_num-1]
@@ -1164,9 +1178,11 @@ begin
 				dispose_rasnik_pattern(pp);
 				exit;
 			end;
-			image_x_skew:=skew_i;
-			image_y_skew:=skew_j;
-			image_slant:=arctan(slope_i+slope_j);
+			if not rasnik_disable_skew then begin
+				image_x_skew:=skew_i;
+				image_y_skew:=skew_j;
+				image_slant:=arctan(slope_i+slope_j);
+			end;
 			error:=(residual_i+residual_j)/sqrt(rasnik_num_slices);
 			with analysis_center_cp,iip^.analysis_bounds do begin
 				i:=round((left+right)*one_half);
@@ -1584,6 +1600,7 @@ begin
 			exit;
 		end;
 		weighted_straight_line_fit(graph,skew_i,slope_i,residual_i);
+		if rasnik_disable_skew then skew_i:=0;
 		with iip^.analysis_bounds do mid_point:=(right+left)*one_half;
 		slope_i:=slope_i+skew_i*mid_point;
 {
@@ -1962,6 +1979,7 @@ begin
 			exit;
 		end;
 		weighted_straight_line_fit(graph,skew_j,slope_j,residual_j);
+		if rasnik_disable_skew then skew_j:=0;
 		with jip^.analysis_bounds do mid_point:=(top+bottom)*one_half;
 		slope_j:=slope_j+skew_j*mid_point;
 {
@@ -2099,9 +2117,11 @@ begin
 			rotation:=arctan((slope_i-slope_j)*one_half);
 			image_x_width:=period_i;
 			image_y_width:=period_j;
-			image_x_skew:=skew_j;
-			image_y_skew:=skew_i;
-			image_slant:=slope_i+slope_j;
+			if not rasnik_disable_skew then begin
+				image_x_skew:=skew_j;
+				image_y_skew:=skew_i;
+				image_slant:=slope_i+slope_j;
+			end;
 			pattern_x_width:=image_x_width*cos(rotation);
 			pattern_y_width:=image_y_width*cos(rotation);
 			error:=sqrt((sqr(residual_i)+sqr(residual_j))/total_num_lines);
@@ -2119,7 +2139,9 @@ begin
 			image_x_width:=period_i;
 			image_y_width:=0;
 			image_x_skew:=0;
-			image_y_skew:=skew_i;
+			image_slant:=0;
+			if not rasnik_disable_skew then
+				image_y_skew:=skew_i;
 			pattern_x_width:=image_x_width*cos(rotation);
 			pattern_y_width:=image_y_width*cos(rotation);
 			error:=sqrt(sqr(residual_i)/total_num_lines);
@@ -2136,8 +2158,10 @@ begin
 			rotation:=arctan(slope_j);
 			image_x_width:=0;
 			image_y_width:=period_j;
-			image_x_skew:=skew_j;
+			if not rasnik_disable_skew then
+				image_x_skew:=skew_j;
 			image_y_skew:=0;
+			image_slant:=0;
 			pattern_x_width:=image_x_width*cos(rotation);
 			pattern_y_width:=image_y_width*cos(rotation);
 			error:=sqrt(sqr(residual_j)/total_num_lines);
@@ -2955,7 +2979,7 @@ begin
 	Calculate the position of the point in the mask that is projected
 	onto the reference point in the image.
 }
-with ip^.analysis_bounds do 
+	with ip^.analysis_bounds do 
 		mask_point:=rasnik_mask_position(pp,reference_point_um,square_size_um,pixel_size_um);
 {
 	Calculate the magnification, rotation, and fitting error.

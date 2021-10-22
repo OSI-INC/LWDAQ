@@ -62,6 +62,7 @@ proc LWDAQ_init_Rasnik {} {
 	set info(daq_source_ip_addr) "*"
 	set info(analysis_show_fitting) 0
 	set info(analysis_show_timing) 0
+	set info(analysis_disable_skew) 0
 	set info(analysis_reference_x_um) 0
 	set info(analysis_reference_y_um) 0
 	set info(analysis_rotation_mrad) 0
@@ -202,7 +203,8 @@ proc LWDAQ_analysis_Rasnik {{image_name ""}} {
 			-reference_y_um $ref_y \
 			-square_size_um $config(analysis_square_size_um) \
 			-rotation_mrad $info(analysis_rotation_mrad) \
-			-pattern_only $info(analysis_pattern_only)]
+			-pattern_only $info(analysis_pattern_only) \
+			-disable_skew $info(analysis_disable_skew)]
 		if {![LWDAQ_is_error_result $result]} {
 			scan $result "%f %f %f %f" x y mag_x mag_y
 			set error_message ""

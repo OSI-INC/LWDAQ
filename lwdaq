@@ -16,9 +16,9 @@
 # LWDAQ_Info(argv). The first argument after the configuration script will be
 # element zero in the list. The following line, for example, calls tclsh in the
 # background and runs the tcl script config.tcl, passing two parameters into
-# LWDAQ_Info(argv), data.txt and 34.56.
+# LWDAQ_Info(argv), data.txt and 34.58.
 #
-# ./lwdaq --no-console config.tcl data.txt 34.56
+# ./lwdaq --no-console config.tcl data.txt 34.58
 
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software

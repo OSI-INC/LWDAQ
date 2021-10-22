@@ -2007,13 +2007,14 @@ end;
 <tr><td>-show_fitting</td><td>If <> 0, show fitting stages with delay <i>value</i> ms.</td></tr>
 <tr><td>-rotation_mrad</td><td>If <> 0, pre-rotate image before analysis by &minus;<i>value</i>.</td></tr>
 <tr><td>-pattern_only</td><td>If 1, return pattern description not rasnik measurement.</td></tr>
+<tr><td>-disable_skew</td><td>If 1, forces skew and slant values to zero, default 0.</td></tr>
 </table></center>
 
 <p>See the <a href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Rasnik">Rasnik Instrument</a> Manual for more information about the option values, in particular the reference and orientation code meanings.</p>
 
 <p>The <i>rotation_mrad</i> option allows us to specify a large nominal rotation of the mask, positive is counter-clockwise. The rasnik routine will rotate the image so as to remove the large rotation, apply analysis, then un-rotate the image. The rotation takes place about the center of the analysis bounds.</p>
 
-<p>With the -pattern_only option set, the routine returns a description of the chessboard pattern it finds in the image. The result string contains seven numbers: origin.x, origin.y, pattern_x_width, pattern_y_width, rotation, error, and extent. The origin values are the image coordinates of the top-left corner of one of the squares in the chessboard. Units are pixels, not mircons. The next two numbers are the  width of the squares in the near-horizontal direction and their width in the near-vertical direction. Units are again pixels. The rotation is counter-clockwise in milliradians. The error is an estimate of the fitting accuracy in pixel widths. The extent is the number of squares from the image center over which the pattern extends.</p> 
+<p>With the -pattern_only option set, the routine returns a description of the chessboard pattern it finds in the image. The result string contains seven numbers: origin.x, origin.y, pattern_x_width, pattern_y_width, rotation, error, and extent. The origin values are the image coordinates of the top-left corner of one of the squares in the chessboard. Units are pixels, not mircons. The next two numbers are the  width of the squares in the near-horizontal direction and their width in the near-vertical direction. Units are again pixels. The rotation is counter-clockwise in milliradians. The error is an estimate of the fitting accuracy in pixel widths. The extent is the number of squares from the image center over which the pattern extends. If we know that our image is neither slanted nor skewed, but has instead been severely corrupted by poor focus and dirt, we can force the skew and slant to zero with -disable_skew. Now, when we apply the rasnik analysis a hundred times to the same poor image, we have a higher chance of finding the correct pattern by accident.</p> 
 }
 function lwdaq_rasnik(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2084,12 +2085,13 @@ begin
 		else if (option='-reference_x_um') then reference_x_um:=Tcl_ObjReal(vp)
 		else if (option='-reference_y_um') then reference_y_um:=Tcl_ObjReal(vp)
 		else if (option='-rotation_mrad') then rotation_mrad:=Tcl_ObjReal(vp)
+		else if (option='-disable_skew') then rasnik_disable_skew:=Tcl_ObjBoolean(vp)
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
 				+'"-orientation_code -square_size_um '
 				+'-pixel_size_um -reference_x_um -reference_y_um '
-				+'-show_fitting" in '
+				+'-show_fitting -disable_skew" in '
 				+'lwdaq_rasnik.');
 			exit;
 		end;
