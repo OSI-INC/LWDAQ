@@ -28,7 +28,8 @@
 # Version 2.10 Restore "*" for analysis channels after acquire.
 # Version 3.1 The function generator sweep uses the LWDAQ event queue.
 # Version 3.2 Allow specification of multiple channels.
-# Version 3.3 Sort channel numbers correctly for printou.
+# Version 3.3 Sort channel numbers correctly for printout.
+# Version 3.4 Fix repeat frequency value in 512SPS sweep.
 
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
@@ -129,7 +130,7 @@ proc Function_Generator_init {} {
 	set config(min_num_clocks_1024) 32
 	set config(frequencies_512) "0.25 0.5 1.0 2.0 5.0\
 		10.0 20.0 30.0 50.0 70.0 80.0 90.0 95.0 100.0 105.0\
-		100.0 120.0 125.0 130.0 135.0 140.0 145.0\
+		110.0 120.0 125.0 130.0 135.0 140.0 145.0\
 		150.0 155.0 160.0 170.0 180.0 190.0 200.0\
 		220.0 240.0 260.0 280.0 300.0 350.0 400.0 1000.0"
 	set config(min_num_clocks_512) 32
