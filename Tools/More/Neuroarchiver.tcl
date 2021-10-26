@@ -4105,7 +4105,8 @@ proc Neurotracker_extract {} {
 	
 	# If the playload length does not match the number of detector coils,
 	# we abort, because we are not playing a tracker archive.
-	if {($info(player_payload) != $num_detectors + 1)} {
+	if {($info(player_payload) < 1) || \
+		($info(player_payload) < $num_detectors)} {
 		return "ABORT"
 	}
 	
@@ -4156,7 +4157,7 @@ proc Neurotracker_extract {} {
 			append alt_result "$config(tracker_background) 0.0 0.0\n"
 		}
 	}
-			
+
 	# Set the tracker_result variable to the full lwdaq_alt result string.
 	set info(tracker_result) [split [string trim $alt_result] \n]
 		
@@ -4315,6 +4316,7 @@ proc Neurotracker_fresh_graphs {} {
 
 	# Mark the coil locations.
 	foreach {x y} $config(tracker_coordinates) {
+		if {($x < 0) || ($y < 0)} {continue}
 		lwdaq_graph "$x $y_min $x $y_max" $info(tracker_image) \
 			-x_min $x_min -x_max $x_max -x_div 0 \
 			-y_min $y_min -y_max $y_max -y_div 0 \
@@ -4390,6 +4392,7 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 		for {set i 0} {$i < $num_detectors} {incr i} {
 			set coil_x [lindex $config(tracker_coordinates) [expr 2*$i]]
 			set coil_y [lindex $config(tracker_coordinates) [expr 2*$i+1]]
+			if {($coil_x < 0) || ($coil_y < 0)} {continue}
 			set coil_p [lindex $info(tracker_powers) [expr $i]]
 			set x [expr round(1.0*($coil_x-$x_min)*$info(tracker_width) \
 				/($x_max-$x_min)) + $bd]
@@ -4853,23 +4856,22 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		if {$config(export_tracker)} {
 			set config(alt_calculate) "1"
 			if {[winfo exists $info(tracker_window)]} {
-				LWDAQ_print $info(export_text) "WARNING: Closing Neurotracker\
-					window to accelerate export."
-				destroy $info(tracker_window)
+				LWDAQ_print $info(export_text) "SUGGESTION: Close the Neurotracker\
+					panel to accelerate export."
 			}
 		} 
 	
 		if {$config(enable_vt)} {
-			LWDAQ_print $info(export_text) "SUGGESTION: Exporting is faster\
-				if you disable the Value vs. Time plot in the Player."
+			LWDAQ_print $info(export_text) "SUGGESTION: Disable Value vs. Time plot\
+				to accelerate export."
 		}
 		if {$config(enable_af)} {
-			LWDAQ_print $info(export_text) "SUGGESTION: Exporting is faster\
-				if you disable the Amplitude vs. Frequency plot in the Player."
+			LWDAQ_print $info(export_text) "SUGGESTION: Disable Amplitude vs. Frequency\
+				plot to accelerate export."
 		}
 		if {$config(play_interval) != $info(optimal_export_interval)} {
-			LWDAQ_print $info(export_text) "SUGGESTION: Exporting is faster\
-				with an 8-s interval in the Player."
+			LWDAQ_print $info(export_text) "SUGGESTION: Use 8-s playback interval\
+				to accelerate export."
 		}
 		
 		set info(export_state) "Play"	
@@ -6402,7 +6404,7 @@ proc Neuroarchiver_play {{command ""}} {
 		if {[llength $coordinates] >= 1} {
 			set config(tracker_coordinates) [lindex $coordinates end]
 		} {
-			set config(tracker_coordinates) $info(A3032_coordinates)
+			set config(tracker_coordinates) $info(A3038_coordinates)
 		}
 
 		set info(play_end_time) \
