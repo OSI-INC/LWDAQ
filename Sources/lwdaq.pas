@@ -3205,9 +3205,9 @@ end;
 
 <p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements.</p>
 
-<p>The second parameter is a list of x-y coordinates, one for each detector coil. When calculating the location of a transmitter, lwdaq_alt will center each detector on these coordinates. All coordinates are assumed to be greater than or equal to zero, so that (-1,-1) will be recognised as an error location.</p>
+<p>The second parameter is a list of x-y coordinates, one for each detector coil. When calculating the location of a transmitter, lwdaq_alt will center each detector on these coordinates. All coordinates are assumed to be greater than or equal to zero, so that (-1,-1) will be recognised as an invalid location. When we pass "-1 -1" as the coordinate of a coil, lwdaq_alt does not include the coil in its position calculation. We use position "-1 -1" for auxilliary antenna coils in animal location trackers. The A3038B, for example, provides fifteen tracker coils and a sixteenth auxilliary antenna input that may be used for reception of telemetry signals and for measuring background power.</p>
 
-<p>The routine supports the following options:</p>
+<p>The lwdaq_alt routine supports the following options:</p>
 
 <center><table border>
 <tr><th>Option</th><th>Function</th></tr>
@@ -3259,7 +3259,6 @@ var
 }
 	location,max_location:xy_point_type;
 	detector_powers:x_graph_type;
-	detector_average_powers:x_graph_type;
 {
 	Variables for calculations.
 }
@@ -3361,6 +3360,15 @@ begin
 	end;
 
 	{
+		The payload must be large enough for the number of detectors.
+	}	
+	if num_detectors>payload then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Payload length less than number of detector coordinates in lwdaq_alt.');
+		exit;
+	end;
+	
+	{
 		If no detector background power values were specified, we set the background
 		powers to zero, and no calibration of the power measurements will take place.
 	}
@@ -3369,26 +3377,6 @@ begin
 		for detector_num:=0 to num_detectors-1 do
 			detector_background[detector_num]:=0;
 	end;
-
-	if length(electronics_trace)=0 then begin
-		Tcl_SetReturnString(interp,error_prefix
-			+'Electronics trace does not exist in lwdaq_alt.');
-		exit;
-	end;
-	
-	if num_detectors>payload then begin
-		Tcl_SetReturnString(interp,error_prefix
-			+'Payload length less than number of detector coordinates in lwdaq_alt.');
-		exit;
-	end;
-	
-	{
-		Create two arrays for the detector powers and average detector powers.
-	}
-	setlength(detector_powers,num_detectors);
-	setlength(detector_average_powers,num_detectors);
-	for detector_num:=0 to num_detectors-1 do
-		detector_average_powers[detector_num]:=0;
 
 	{
 		We are going to calculate the location of the transmitter in each of
@@ -3400,6 +3388,11 @@ begin
 			+'Fewer than one message per slice in lwdaq_alt.');
 		exit;
 	end;
+
+	{
+		Create arrays for detector powers and samples.
+	}
+	setlength(detector_powers,num_detectors);
 	setlength(detector_samples,slice_size);
 
 	{
@@ -3410,26 +3403,26 @@ begin
 	for slice_num:=0 to num_slices-1 do begin
 		{
 			Calculate the median power value for each detector coil in this
-			slice of time. Obtain the maximum, and minimum coil powers in case
+			time slice. Obtain the maximum, and minimum coil powers in case
 			we need them. Record the location of the coil with the maximum power.
 		}
 		min_power:=power_hi;
 		max_power:=power_lo;
 		max_location:=detector_coordinates[0];
-		for detector_num:=0 to payload-1 do begin
+		for detector_num:=0 to num_detectors-1 do begin
 			for sample_num:=0 to slice_size-1 do
 				detector_samples[sample_num]:=
 					power_measurement((slice_num*slice_size)+sample_num,detector_num);
 			detector_powers[detector_num]:=
 				percentile_x_graph(detector_samples,percentile)
 				-detector_background[detector_num];
-			detector_average_powers[detector_num]:=
-				detector_average_powers[detector_num]+detector_powers[detector_num]/num_slices;
-			if (detector_powers[detector_num]>max_power) then begin
+			if (detector_coordinates[detector_num].x <> -1)
+				and (detector_powers[detector_num]>max_power) then begin
 				max_power:=detector_powers[detector_num];
 				max_location:=detector_coordinates[detector_num];
 			end;
-			if (detector_powers[detector_num]<min_power) then 
+			if (detector_coordinates[detector_num].x <> -1)
+				and (detector_powers[detector_num]<min_power) then 
 				min_power:=detector_powers[detector_num];
 			gui_support('');
 		end;
@@ -3470,12 +3463,12 @@ begin
 			sum_y:=0;
 			sum_power:=0;
 			for detector_num:=0 to num_detectors-1 do begin
-				if (detector_powers[detector_num]>min_power) and 
-					(xy_separation(
+				if (detector_coordinates[detector_num].x <> -1)
+					and (xy_separation(
 						detector_coordinates[detector_num],location)
 						<extent) then begin
 					scaled_power:=xpy(10,
-						(detector_powers[detector_num]-min_power)/scale);
+						(detector_powers[detector_num]-min_power+scale)/scale);
 					sum_x:=sum_x
 						+scaled_power
 						*detector_coordinates[detector_num].x;
@@ -3498,7 +3491,7 @@ begin
 		
 		field:='';
 		writestr(field,location.x:1:3,' ',location.y:1:3,' ');
-		for detector_num:=0 to payload-1 do
+		for detector_num:=0 to num_detectors-1 do
 			writestr(field,field,detector_powers[detector_num]:1:1,' ');
 		insert(field,result,length(result)+1);			
 		if slice_num<num_slices-1 then

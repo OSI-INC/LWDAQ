@@ -635,7 +635,8 @@ proc Neuroarchiver_init {} {
 		12 0 12 12 12 24 \
 		24 0 24 12 24 24 \
 		36 0 36 12 36 24 \
-		48 0 48 12 48 24"
+		48 0 48 12 48 24 \
+		-1 -1"
 	set info(A3032_coordinates) "0 0 0 8 0 16 \
 		8 0 8 8 8 16 \
 		16 0 16 8 16 16 \
@@ -644,9 +645,9 @@ proc Neuroarchiver_init {} {
 	set info(A3032_payload) "16"
 	set info(A3038_payload) "16"
 	set config(tracker_coordinates) ""
-	set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+	set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 	set info(tracker_range_border) "1.0"
-	set info(tracker_range) "-1.0 -1.0 +33.0 +17.0"
+	set info(tracker_range) "-1.0 -1.0 +49.0 +25.0"
 #
 # We store tracker results in the following variables so that they will be
 # accessible to exporters and plotter.
@@ -681,7 +682,6 @@ proc Neuroarchiver_init {} {
 	set config(export_video) "0"
 	set config(export_signal) "1"
 	set config(export_tracker) "0"
-	set config(export_powers) "0"
 	set config(export_format) "TXT"
 	set info(export_run_start) [clock seconds]
 	set config(export_reps) "1"
@@ -4133,7 +4133,7 @@ proc Neurotracker_extract {} {
 	# which will be one line per slice. 
 	if {($info(signal) != "0 0") && !$lossy} {
 		if {[catch {
-			set track [lwdaq_alt $info(data_image) \
+			set alt_result [lwdaq_alt $info(data_image) \
 				$config(tracker_coordinates) \
 				-payload $info(player_payload) \
 				-scale $config(tracker_decade_scale) \
@@ -4151,40 +4151,38 @@ proc Neurotracker_extract {} {
 	# fake tracker measurement consisting of the same number of lines. We do the
 	# same in the case of an error.
 	if {($info(signal) == "0 0") || $lossy || $error_flag} {
-		set track ""
+		set alt_result ""
 		for {set slice_num 0} {$slice_num < $num_slices} {incr slice_num} {
-			append track "$config(tracker_background) 0.0 0.0\n"
+			append alt_result "$config(tracker_background) 0.0 0.0\n"
 		}
-		set track [string trim $track]
 	}
 			
-	# Set the tracker_result variable to the full tracker string.
-	set info(tracker_result) $track
+	# Set the tracker_result variable to the full lwdaq_alt result string.
+	set info(tracker_result) [split [string trim $alt_result] \n]
 		
 	# Extract the tracker powers from the final tracker slice.
-	set track [split $track \n]
-	set info(tracker_powers) [lrange [lindex $track end] 2 end]
+	set info(tracker_powers) [lrange [lindex $info(tracker_result) end] 2 end]
 		
 	# Check to see if we have a tracker history for this channel. If so, keep
-	# the most recent position and throw away the others. If not, create an empty 
-	# with the origin as the first point.
+	# the most recent position and throw away the others. If not, create an
+	# empty history with the origin as the first point. We extract the tracker
+	# positions and place them in our history.
 	if {[info exists history]} {
 		set history [list [lindex $history end]]
 	} {
-		set history [list]
+		set history [list "0 0"]
 	}
-	
-	# We extract the tracker positions and place them in our history. We assign
-	# the global tracker x and y variables to the position we obtain in the final
-	# slice.
-	foreach sample $track {
-		set info(tracker_x) [lindex $sample 0]
-		set info(tracker_y) [lindex $sample 1]
-		lappend history "$info(tracker_x) $info(tracker_y)"
+	foreach slice $info(tracker_result) {
+		lappend history "[lindex $slice 0] [lindex $slice 1]"
 	}
+	 
+	# We assign the global tracker x and y variables to the position we obtain
+	# in the final slice.
+	set info(tracker_x) [lindex $info(tracker_result) end 0]
+	set info(tracker_y) [lindex $info(tracker_result) end 1]
 			
 	# In verbose mode, we print the first tracker slice.
-	Neuroarchiver_print "Tracker: [lindex $track end]" verbose	
+	Neuroarchiver_print "Tracker: [lindex $info(tracker_result) end]" verbose	
 		
 	# Return a success flag.
 	if {$error_flag} {
@@ -4382,13 +4380,14 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 
 	# Mark the coil powers.
 	if {$config(tracker_show_coils)} {
+		set num_detectors [expr [llength $config(tracker_coordinates)]/2]
 		set min_p 255
 		set max_p 0
 		foreach p $info(tracker_powers) {
 			if {$p > $max_p} {set max_p $p}
 			if {$p < $min_p} {set min_p $p}
 		}
-		for {set i 0} {$i < [llength $info(tracker_powers)]} {incr i} {
+		for {set i 0} {$i < $num_detectors} {incr i} {
 			set coil_x [lindex $config(tracker_coordinates) [expr 2*$i]]
 			set coil_y [lindex $config(tracker_coordinates) [expr 2*$i+1]]
 			set coil_p [lindex $info(tracker_powers) [expr $i]]
@@ -4623,10 +4622,6 @@ proc Neuroarchiver_exporter_open {} {
 	entry $f.esps -textvariable Neuroarchiver_config(tracker_sample_rate) -width 3
 	pack $f.te $f.lsps $f.esps -side left -expand yes
 
-	checkbutton $f.pwr -variable Neuroarchiver_config(export_powers) \
-		-text "Include Powers" -fg $info(label_color)
-	pack $f.pwr -side left -expand yes
-	
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
 	
 	# Initialize the export start time to the start of the current playback
@@ -4920,13 +4915,9 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			# Write tracker output to disk.
 			if {$config(export_tracker)} {
 				if {$config(export_format) == "TXT"} {
-					if {$config(export_powers)} {
-						set export_string $info(tracker_result)
-					} {
-						set export_string ""
-						foreach sample [split $info(tracker_result) \n] {
-							append export_string "[lrange $sample end-1 end]\n"
-						}
+					set export_string ""
+					foreach slice $info(tracker_result) {
+						append export_string "[lindex $slice 0] [lindex $slice 1]\n"
 					}
 					set fn [file join $config(export_dir) \
 						"T$info(export_start_s)\_$info(channel_num)\.txt"]
@@ -4937,15 +4928,11 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					set fn [file join $config(export_dir) \
 						"T$info(export_start_s)\_$info(channel_num)\.bin"]
 					set export_bytes ""
-					foreach sample [split $info(tracker_result) \n] {
-						if {$config(export_powers)} {
-							foreach value [lrange $sample 0 end-2] {
-							  append export_bytes [binary format c [expr round($value)]]
-							}
-						}
-						foreach value [lrange $sample end-1 end] {
-						  append export_bytes [binary format S [expr round($value*10.0)]]
-						}
+					foreach slice $info(tracker_result) {
+						append export_bytes [binary format S \
+							[expr round([lindex $slice 0]*10.0)]]
+						append export_bytes [binary format S \
+							[expr round([lindex $slice 1]*10.0)]]
 					}
 					set f [open $fn a]
 					fconfigure $f -translation binary
