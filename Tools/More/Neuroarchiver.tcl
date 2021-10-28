@@ -59,7 +59,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "151"
+	LWDAQ_tool_init "Neuroarchiver" "152"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -413,7 +413,7 @@ proc Neuroarchiver_init {} {
 # Constants for sequential playback, in which we go through the entire file,
 # looking at all clock messages to determine the play time.
 #
-	set info(sequential_block_length_messages) 100000
+	set info(sequential_block_length) 100000
 	set config(sequential_play) 0
 #
 # By default, the player moves from one file to the next automatically, or
@@ -1165,7 +1165,7 @@ proc Neuroarchiver_metadata_header_save {} {
 proc Neuroarchiver_seek_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
-	
+
 	if {$config(sequential_play)} {
 		return [Neuroarchiver_sequential_time $fn $payload $seek_time $lo_time $lo_index]
 	}
@@ -1365,14 +1365,13 @@ proc Neuroarchiver_seek_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 # a time increment of one clock period, and we search through every clock message
 # to find the correct time.
 #
-proc Neuroarchiver_sequential_time {fn seek_time payload {lo_time 0.0} {lo_index 0}} {
+proc Neuroarchiver_sequential_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 
 	set message_length [expr $info(core_message_length) + $payload]
-	set block_length [expr $message_length * $info(sequential_block_length_messages)]
+	set block_length [expr $message_length * $info(sequential_block_length)]
 	set image_width [expr round(sqrt($block_length)) + 10]
-
 	set image_name "_neuroarchiver_sequential_image_"
 	lwdaq_image_destroy $image_name
 	lwdaq_image_create -width $image_width -height $image_width	-name $image_name
@@ -4105,8 +4104,7 @@ proc Neurotracker_extract {} {
 	
 	# If the playload length does not match the number of detector coils,
 	# we abort, because we are not playing a tracker archive.
-	if {($info(player_payload) < 1) || \
-		($info(player_payload) < $num_detectors)} {
+	if {($info(player_payload) < 1) || ($info(player_payload) < $num_detectors)} {
 		return "ABORT"
 	}
 	
