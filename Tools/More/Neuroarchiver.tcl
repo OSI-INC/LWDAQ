@@ -59,7 +59,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "152"
+	LWDAQ_tool_init "Neuroarchiver" "153"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -1015,15 +1015,16 @@ proc Neuroarchiver_metadata_view {fn} {
 		return "FAIL"
 	}
 	
-	# Create a new top-level text window that is a child of the 
-	# Neuroarchiver window. 
+	# Create a new top-level text window that is a child of the Neuroarchiver
+	# window. Bind the Command-S key to save the metadata.
 	set i 1
 	while {[winfo exists [set w $info(window)\.metadata_$i]]} {incr i}
 	toplevel $w
 	wm title $w "[file tail $fn] Metadata"
 	LWDAQ_text_widget $w 60 20
-	LWDAQ_enable_text_undo $w.text	
-
+	LWDAQ_enable_text_undo $w.text
+	LWDAQ_bind_command_key $w s [list Neuroarchiver_metadata_write $w $fn]
+	
 	# Create the Save button.
 	frame $w.f
 	pack $w.f -side top
@@ -2643,7 +2644,7 @@ proc Neuroarchiver_overview_excerpt {} {
 	LWDAQ_ndf_data_append $excerpt_fn $contents
 		
 	Neuroarchiver_print "Created $excerpt_fn spanning\
-		$ov_config(t_min) $ov_config(t_max) of $ov_config(fn_tail)]."
+		$ov_config(t_min)-$ov_config(t_max) of $ov_config(fn_tail)."
 				
 	set ov_config(status) "Idle"
 }
@@ -8067,8 +8068,8 @@ proc Neuroarchiver_open {} {
 		LWDAQ_bind_command_key $w Left {Neuroarchiver_command play Back}
 		LWDAQ_bind_command_key $w Right {Neuroarchiver_command play Step}
 		LWDAQ_bind_command_key $w greater {Neuroarchiver_command play Play}
-		LWDAQ_bind_command_key $w Up [list LWDAQ_post {Neuroarchiver_jump Next_NDF 0}]
-		LWDAQ_bind_command_key $w Down [list LWDAQ_post {Neuroarchiver_jump Previous_NDF 0}]
+		LWDAQ_bind_command_key $w Down [list LWDAQ_post {Neuroarchiver_jump Next_NDF 0}]
+		LWDAQ_bind_command_key $w Up [list LWDAQ_post {Neuroarchiver_jump Previous_NDF 0}]
 		LWDAQ_bind_command_key $w less [list LWDAQ_post {Neuroarchiver_jump Current_NDF 0}]
 		$info(text) tag configure textbutton -background cyan
 		$info(text) tag bind textbutton <Enter> {%W configure -cursor arrow} 

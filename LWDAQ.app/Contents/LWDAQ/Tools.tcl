@@ -471,17 +471,17 @@ proc LWDAQ_tool_reload {name} {
 
 #
 # LWDAQ_Toolmaker_execute extracts the script in the Toolmaker's text window,
-# appends it to the Toolmaker script list, writes the script to a new toplevel
-# text window, and executes the script at the global level. It prints out results 
-# as the script requires, and print errors in red when they occur. The script 
-# can refer to the text widget with the global variable "t". Above the text window 
-# is a frame, "f", also declared at the global level, which is packed in the top 
-# of the window, but empty unless the script creates buttons and such like to fill 
-# it.
+# appends it to the Toolmaker script list, creates a new toplevel text window or
+# selects the existing toplevel execution window, and executes the script at the
+# global level. It prints out results as the script requires, and print errors
+# in red when they occur. The script can refer to the text widget with the
+# global variable "t". Above the text window is a frame, "f", also declared at
+# the global level, which is packed in the top of the window, but empty unless
+# the script creates buttons and such like to fill it.
 #
 proc LWDAQ_Toolmaker_execute {{save 1}} {
 	upvar #0 Toolmaker_info info
-	global t f
+	global t f w
 
 	# The script we execute will always be the one shown in the
 	# text window.
@@ -498,7 +498,8 @@ proc LWDAQ_Toolmaker_execute {{save 1}} {
 		$info(text) delete 1.0 end
 	}
 	
-	# Create the tool execution window.
+	# Destroy any existing execution window and create a new one.
+	catch {destroy $w}
 	set w [LWDAQ_toplevel_window "Toolmaker Execution"]
 	set f [frame $w.f]
 	pack $f -side top

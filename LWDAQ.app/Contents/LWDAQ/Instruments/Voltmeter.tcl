@@ -239,9 +239,8 @@ proc LWDAQ_set_voltmeter_device {device} {
 }
 
 #
-# LWDAQ_cmd_Voltmeter takes the top three nibbles of a sixteen
-# bit command word and adds the correct nibble at the end to set the
-# logic outputs.
+# LWDAQ_cmd_Voltmeter takes the top three nibbles of a sixteen bit command word
+# and adds the correct nibble at the end to set the logic outputs.
 #
 proc LWDAQ_cmd_Voltmeter {cmd} {
 	upvar #0 LWDAQ_info_Voltmeter info
@@ -292,7 +291,11 @@ proc LWDAQ_daq_Voltmeter {} {
 		* $info(display_num_div) \
 		/ $info(daq_image_width)]
 	if {$period < $LWDAQ_Driver(min_adc16_sample_period)} {
+		LWDAQ_print $info(text) "WARNING: Display timebase too short,\
+			setting to minimum possible timebase."
 		set period $LWDAQ_Driver(min_adc16_sample_period)
+		set info(display_s_per_div) [format %.6f \
+			[expr $period * $info(daq_image_width) / $info(display_num_div)]]
 	}
 	
 	# Convert sample period into delay timer ticks, depending upon the firmware

@@ -610,9 +610,10 @@ proc LWDAQ_set_command_reg {sock value} {
 }
 
 #
-# LWDAQ_set_command_reg_binary sets a driver's command register to 
-# $value, where $value is a binary string representation of the 
-# register's sixteen bits. 
+# LWDAQ_set_command_reg_binary sets a driver's command register to $value, where
+# $value is a binary string representation of the register's sixteen bits. For
+# example, the value "1111111111111111" represents hexadecimal value 0xFFFF, or
+# decimal value 65535.
 #
 proc LWDAQ_set_command_reg_binary {sock value} {
 	global LWDAQ_Driver
@@ -920,10 +921,10 @@ proc LWDAQ_transmit_command {sock value} {
 }
 
 #
-# LWDAQ_transmit_command_binary is the same as LWDAQ_transmit_command
-# except it takes a binary string representation of the command
-# value. Thus "0001001001001000" represents command "1248" in hexadecimal
-# notation, or "4680" in decimal.
+# LWDAQ_transmit_command_binary is the same as LWDAQ_transmit_command except it
+# takes a binary string representation of the command value. Thus the string
+# "0001001001001000" represents command "1248" in hexadecimal notation, or
+# "4680" in decimal.
 #
 proc LWDAQ_transmit_command_binary {sock value} {
 	global LWDAQ_Driver
@@ -933,10 +934,10 @@ proc LWDAQ_transmit_command_binary {sock value} {
 }
 
 #
-# LWDAQ_transmit_command_hex is the same as LWDAQ_transmit_command
-# except it takes a hexadecimal string representation of the command
-# value. Thus "1248" represents command "4680" in decimal and "FFFF"
-# represents "1111111111111111" as a binary string.
+# LWDAQ_transmit_command_hex is the same as LWDAQ_transmit_command except it
+# takes a hexadecimal string representation of the command value. Thus "1248"
+# represents command "4680" in decimal and "FFFF" represents "1111111111111111"
+# as a binary string.
 #
 proc LWDAQ_transmit_command_hex {sock value} {
 	global LWDAQ_Driver
