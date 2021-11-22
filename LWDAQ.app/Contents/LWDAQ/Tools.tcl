@@ -167,7 +167,7 @@ proc LWDAQ_spawn_tool {tool} {
 			exec ./LWDAQ.bat --child $fn &
 		}
 		"Linux" {
-			exec ./lwdaq $fn --child &
+			exec ./lwdaq --child $fn &
 		}
 	}
  	return $tool

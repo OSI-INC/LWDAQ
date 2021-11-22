@@ -153,6 +153,7 @@ proc LWDAQ_driver_init {} {
 	set LWDAQ_Driver(srst_addr) 41 ;# software reset location (byte)
 	set LWDAQ_Driver(ba_addr) 42 ;# base address location (four-byte)
 	set LWDAQ_Driver(amod_addr) 42 ;# address modifier location (byte)
+	set LWDAQ_Driver(fifo_av_addr) 61;# fifo blocks available (byte)
 	set LWDAQ_Driver(ram_portal_addr) 63 ;# RAM Portal location (byte)
 #
 # Timing Parameters

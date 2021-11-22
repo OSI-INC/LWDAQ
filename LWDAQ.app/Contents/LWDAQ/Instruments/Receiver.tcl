@@ -54,6 +54,8 @@ proc LWDAQ_init_Receiver {} {
 	set info(daq_image_bottom) -1
 	set info(daq_device_type) 3
 	set info(daq_password) "no_password"
+	set info(daq_fifo_av) 0
+	set info(daq_fifo_unit) 512
 	set info(verbose_description) "{Channel Number} \
 		{Number of Samples Recorded} \
 		{Average Value} \
@@ -284,13 +286,14 @@ proc LWDAQ_refresh_Receiver {} {
 }
 
 #
-# LWDAQ_reset_Receiver resets and configures a data receiver. It resets the data receiver 
-# address and timestamp registers, thus emptying its message buffer and resetting its clock. 
-# It destroys the receiver instrument's data buffer and working image, and clears the 
-# auxiliary message list. It resets the acquired data time, a parameter we use to stop the
-# Receiver Instrument attempting download too many messages from the data receiver. If the
-# receiver is capable of saving a list of enabled channels that it should select for
-# recording, the reset routine sends the daq_channels list to the receiver so as to select
+# LWDAQ_reset_Receiver resets and configures a data receiver. It resets the data
+# receiver address and timestamp registers, thus emptying its message buffer and
+# resetting its clock. It destroys the receiver instrument's data buffer and
+# working image, and clears the auxiliary message list. It resets the acquired
+# data time, a parameter we use to stop the Receiver Instrument attempting
+# download too many messages from the data receiver. If the receiver is capable
+# of saving a list of enabled channels that it should select for recording, the
+# reset routine sends the daq_channels list to the receiver so as to select
 # them.
 #
 proc LWDAQ_reset_Receiver {} {
@@ -351,18 +354,22 @@ proc LWDAQ_reset_Receiver {} {
 					0 {
 						set info(receiver_type) "A3018"
 						set config(payload_length) 0
+						set info(daq_fifo_av) 0
 					}
 					1 {
 						set info(receiver_type) "A3027"
 						set config(payload_length) 0
+						set info(daq_fifo_av) 0
 					}
 					2 {
 						set info(receiver_type) "A3032"
 						set config(payload_length) 16
+						set info(daq_fifo_av) 0
 					}
 					3 {
 						set info(receiver_type) "A3038"
 						set config(payload_length) 16
+						set info(daq_fifo_av) 1
 					}
 					default {set info(receiver_type) "?"}					
 				}
@@ -503,24 +510,25 @@ proc LWDAQ_controls_Receiver {} {
 }
 
 #
-# LWDAQ_daq_Receiver reads data from a data device. It fetches the data
-# in blocks, and opens and closes a socket to the driver for each block.
-# Although opening and closing sockets introduces a delay into the data
-# acquisition, it allows another LWDAQ process to use the same LWDAQ
-# driver in parallel, as may be required when we have two data receivers
-# running on the same LWDAQ Driver, or a single data receiver and two
-# animal location trackers, or a spectrometer. There is no way to obtain
-# from a data receiver the number of messages available for download in
-# its memory. The LWDAQ_daq_Receiver routine estimates the number of 
-# messages available using aquire_end_ms, which it updates after every
-# block download to be equal to or greater than the millisecond absolute
-# time of the last clock message in the block. By subtracting the end
-# time from the current time, the routine obtains an estimate of the 
-# length of time spanned by the messages available in the data receiver.
-# The routine also maintains an estimate of the number of messages per
-# clock message in the recording. It multiplies this ratio by the available
-# time and the clock frequency to get its estimate of the number of 
-# messages avaialable in the data receiver. 
+# LWDAQ_daq_Receiver reads data from a data device. It fetches the data in
+# blocks, and opens and closes a socket to the driver for each block. Although
+# opening and closing sockets introduces a delay into the data acquisition, it
+# allows another LWDAQ process to use the same LWDAQ driver in parallel, as may
+# be required when we have two data receivers running on the same LWDAQ Driver,
+# or a single data receiver and two animal location trackers, or a spectrometer.
+# Some receivers provide a register that gives the number of messages available
+# for download in its memory. But no receiver built before 2021 provides such a
+# register, so there is no way to determine the number of messages available for
+# download. For such receivers, the LWDAQ_daq_Receiver routine estimates the
+# number of messages available using aquire_end_ms, which it updates after every
+# block download to be equal to or greater than the millisecond absolute time of
+# the last clock message in the block. By subtracting the end time from the
+# current time, the routine obtains an estimate of the length of time spanned by
+# the messages available in the data receiver. The routine also maintains an
+# estimate of the number of messages per clock message in the recording. It
+# multiplies this ratio by the available time and the clock frequency to get its
+# estimate of the number of messages avaialable in the data
+# receiver. 
 #
 proc LWDAQ_daq_Receiver {} {
 	global LWDAQ_Driver LWDAQ_Info
@@ -577,25 +585,39 @@ proc LWDAQ_daq_Receiver {} {
 			# Configure the data receiver for data download.
 			LWDAQ_transmit_command_hex $sock $info(upload_cmd)
 
-			# Estimate the number of seconds of data available in the data receiver.
-			# If we think there are few or no seconds of data, we download a minimum
-			# duration. This minimum download, combined with the acquire lag we 
-			# introduce when we update our acquire time, allows us to overcome a 
-			# systematic error in our acquire time estimate, in which we think we have
-			# advanced farther in the data receiver buffer than is actually the case.
-			set time_fetch [expr 0.001 * ([clock milliseconds] - $info(acquire_end_ms))]
-			if {$time_fetch < $info(min_time_fetch)} {
-				set time_fetch $info(min_time_fetch)
-			}
-			if {$time_fetch > $info(max_time_fetch)} {
-				set time_fetch $info(max_time_fetch)
-			}
+			# If we have a fifo block counter, read the number of bytes
+			# available.
+			if {$info(daq_fifo_av)} {
+				set ac [expr [LWDAQ_byte_read $sock $LWDAQ_Driver(fifo_av_addr)] & 0xFF]
+				set block_length [expr \
+					($info(daq_fifo_unit) / $message_length) * $message_length * $ac \
+					+ round($info(min_time_fetch) * $info(clock_frequency)) \
+						* $message_length]
+			} 
 			
-			# Calculate the length of the block of data we are going to attempt
-			# to download from the data receiver.			
-			set block_length [expr $message_length \
-				* round( $time_fetch * $info(clock_frequency) ) \
-				* $info(messages_per_clock)]
+			
+			# If we don't have a block counter, estimate the number of seconds of
+			# data available in the data receiver. If we think there are few or
+			# no seconds of data, we download a minimum duration. This minimum
+			# download, combined with the acquire lag we introduce when we
+			# update our acquire time, allows us to overcome a systematic error
+			# in our acquire time estimate, in which we think we have advanced
+			# farther in the data receiver buffer than is actually the case.
+			if {!$info(daq_fifo_av)} {
+				set time_fetch [expr 0.001 * ([clock milliseconds] - $info(acquire_end_ms))]
+				if {$time_fetch < $info(min_time_fetch)} {
+					set time_fetch $info(min_time_fetch)
+				}
+				if {$time_fetch > $info(max_time_fetch)} {
+					set time_fetch $info(max_time_fetch)
+				}
+			
+				# Calculate the length of the block of data we are going to attempt
+				# to download from the data receiver.			
+				set block_length [expr $message_length \
+					* round( $time_fetch * $info(clock_frequency) ) \
+					* $info(messages_per_clock)]
+			}
 				
 			# We are going to measure how long it takes to transfer the block 
 			# of data from the receiver to the driver. We must first wait for
@@ -641,10 +663,10 @@ proc LWDAQ_daq_Receiver {} {
 				break
 			}
 			
-			# Calculate the block transfer time. If the data was waiting in the 
-			# receiver, it will transfer at roughly 1.4 MBytes/s to the driver 
-			# memory, for both the old and new drivers. If the driver has to wait
-			# for the data to arrive from transmitters and the receiver clock, 
+			# Calculate the block transfer time. If the data was waiting in the
+			# receiver, it will transfer at roughly 1.4 MBytes/s to the driver
+			# memory for both the old and new drivers. If the driver has to wait
+			# for the data to arrive from transmitters and the receiver clock,
 			# the transfer takes much longer. 
 			set block_ms [expr [clock milliseconds] - $block_start_ms]
 			if {$block_ms < 1} {set block_ms 1}
@@ -678,15 +700,17 @@ proc LWDAQ_daq_Receiver {} {
 				}
 			}
 				
-			# If we see errors in the new data, we check to see if this is because we are
-			# using the wrong payload length. If so, we throw away the data we just downloaded,
-			# reset the data receiver, close the socket, and abandon this acquisition. If not,
-			# we throw away the data, reset the receiver, close the socket, and keep trying.
-			# We throw away the data and reset the receiver because all algorithms for trying 
-			# to recover from data errors without resetting the receiver are vulnerable to rare 
-			# error sources that cause disastrous loss of data. By resetting the data receiver, 
-			# we make sure that it is in a known state for our next download. But we lose
-			# continuity of clock messages within the data buffer.
+			# If we see errors in the new data, we check to see if this is
+			# because we are using the wrong payload length. If so, we throw
+			# away the data we just downloaded, reset the data receiver, close
+			# the socket, and abandon this acquisition. If not, we throw away
+			# the data, reset the receiver, close the socket, and keep trying.
+			# We throw away the data and reset the receiver because all
+			# algorithms for trying to recover from data errors without
+			# resetting the receiver are vulnerable to rare error sources that
+			# cause disastrous loss of data. By resetting the data receiver, we
+			# make sure that it is in a known state for our next download. But
+			# we lose continuity of clock messages within the data buffer.
 			if {$num_errors > 0} {
 				foreach pl $info(payload_options) {
 					scan [lwdaq_receiver $info(scratch_image) \
@@ -736,42 +760,47 @@ proc LWDAQ_daq_Receiver {} {
 				set info(messages_per_clock) [expr 2 * $saved_messages_per_clock]
 			}
 			
-			# Adjust the acquire time using the number of new clock messages and the block
-			# transfer time. If the block transfer time was comparable to the interval time,
-			# we can assume the data receiver buffer is empty, which means the acquire time is
-			# equal to the current time. Otherwise, we add to the acquire time the time
-			# spanned by the messages in the block we downloaded, which we calculate from the
-			# number of clocks it contains and the clock frequency. If the clock on the data
-			# receiver is faster than the clock in our computer, we will download one second
-			# of data and think it spans more than one second. Our acquire time will be wrong:
-			# we think we have downloaded all the messages in the data receiver up to the
-			# acquire time, but we have failed to do so. As hours go by, we lag farther and
-			# farther behind the data in the data receiver until its buffer overflows. The
-			# acquire_lag is the number of clocks we subtract from the numer we have just
-			# acquired, so that our estimate of the time spanned by the data we download will
-			# always be lower than the actual time it spans. Occasionally we will reach the
-			# end of the buffer on the data receiver because it occurs earlier than our
-			# acquire time suggests. At that point, we will reset the acquire time to the
-			# current time because we detect the empty buffer with the block transfer time.
-			set clock_ms [clock milliseconds]
-			set acquired_ms [expr round( \
-				1000.0 * ($num_new_clocks + 1) / $info(clock_frequency) )]
-			if {$block_ms > 1000.0 * $info(empty_fraction) * $time_fetch} {
-				set info(acquire_end_ms) $clock_ms
-				set lag_ms 0
-				# Un-comment to report when we detect an empty receiver buffer.
-				# LWDAQ_print $info(text) "Empty buffer detected." purple
-
-			} {
-				set info(acquire_end_ms) [expr $info(acquire_end_ms) + $acquired_ms]
-				if {$info(acquire_end_ms) > $clock_ms} {
+			# Adjust the acquire time using the number of new clock messages and
+			# the block transfer time. If the block transfer time was comparable
+			# to the interval time, we can assume the data receiver buffer is
+			# empty, which means the acquire time is equal to the current time.
+			# Otherwise, we add to the acquire time the time spanned by the
+			# messages in the block we downloaded, which we calculate from the
+			# number of clocks it contains and the clock frequency. If the clock
+			# on the data receiver is faster than the clock in our computer, we
+			# will download one second of data and think it spans more than one
+			# second. Our acquire time will be wrong: we think we have
+			# downloaded all the messages in the data receiver up to the acquire
+			# time, but we have failed to do so. As hours go by, we lag farther
+			# and farther behind the data in the data receiver until its buffer
+			# overflows. The acquire_lag is the number of clocks we subtract
+			# from the numer we have just acquired, so that our estimate of the
+			# time spanned by the data we download will always be lower than the
+			# actual time it spans. Occasionally we will reach the end of the
+			# buffer on the data receiver because it occurs earlier than our
+			# acquire time suggests. At that point, we will reset the acquire
+			# time to the current time because we detect the empty buffer with
+			# the block transfer time.
+			if {!$info(daq_fifo_av)} {
+				set clock_ms [clock milliseconds]
+				set acquired_ms [expr round( \
+					1000.0 * ($num_new_clocks + 1) / $info(clock_frequency) )]
+				if {$block_ms > 1000.0 * $info(empty_fraction) * $time_fetch} {
 					set info(acquire_end_ms) $clock_ms
-				}
-				set lag_ms [expr $clock_ms - $info(acquire_end_ms)]
-			}	
-			# Un-comment to report various time parameters used to adapt to interruptions
-			# in data acquisition.
-			# LWDAQ_print $info(text) "$time_fetch $acquired_ms $lag_ms $block_ms" orange
+					set lag_ms 0
+					# Un-comment to report when we detect an empty receiver buffer.
+					# LWDAQ_print $info(text) "Empty buffer detected." purple
+
+				} {
+					set info(acquire_end_ms) [expr $info(acquire_end_ms) + $acquired_ms]
+					if {$info(acquire_end_ms) > $clock_ms} {
+						set info(acquire_end_ms) $clock_ms
+					}
+					set lag_ms [expr $clock_ms - $info(acquire_end_ms)]
+				}	
+				# LWDAQ_print $info(text) "$time_fetch $acquired_ms $lag_ms $block_ms" orange
+			}
+
 
 			# Check that we can fit the existing data in the buffer image. If not,
 			# discard the data instead of adding it to the buffer, stop this 
@@ -779,15 +808,16 @@ proc LWDAQ_daq_Receiver {} {
 			# of data.
 			if {($num_new_messages + $num_messages) * $message_length > \
 					[expr $info(daq_buffer_width) * ($info(daq_buffer_width) - 1)]} {
-				LWDAQ_print $info(text) "ERROR: Buffer overflow, abandoning this acquisition."
+				LWDAQ_print $info(text) "ERROR: Buffer overflow,\
+					abandoning this acquisition."
 				LWDAQ_socket_close $sock
 				set start_index 0
 				set end_index [expr $num_messages - 1]
 				break
 			}
 			
-			# Append the new messages to buffer image. If we purged the data, the purged
-			# data has already been copied back into the data array.
+			# Append the new messages to buffer image. If we purged the data,
+			# the purged data has already been copied back into the data array.
 			lwdaq_data_manipulate $info(buffer_image) write \
 				[expr $num_messages * $message_length] $data
 
@@ -796,9 +826,10 @@ proc LWDAQ_daq_Receiver {} {
 				"-payload $config(payload_length) clocks 0 $daq_num_clocks"] %d%d%d%d%d \
 				num_errors num_clocks num_messages start_index end_index
 			
-			# If we have too many errors in the message buffer, we reset the data receiver,
-			# wait for the driver to respond, close the socket, and break out of the 
-			# acquisition loop, returning the entire message buffer as data.
+			# If we have too many errors in the message buffer, we reset the
+			# data receiver, wait for the driver to respond, close the socket,
+			# and break out of the acquisition loop, returning the entire
+			# message buffer as data.
 			if {$num_errors > $info(errors_for_stop)} {
 				LWDAQ_print $info(text) \
 					"ERROR: Severely corrupted data.\
