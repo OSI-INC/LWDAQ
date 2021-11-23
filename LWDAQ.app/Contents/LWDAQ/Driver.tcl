@@ -1,47 +1,46 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+# Copyright (C) 2021 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #
-# Driver.tcl defines procedures that communicate with data acquisition
-# drivers and system controllers through TCPIP sockets. The Driver.tcl
-# routines call the sockeet-handling routines defined in Utils.tcl.
-#
-# The original purpose of the Driver.tcl routines, when we wrote them in
-# 2004, was to provide communication with the Long-Wire Data Acquisition 
-# Driver with Ethernet Interface (A2037E). In 2005 we enhanced the 
-# routines to support communication with the TCPIP-VME Interface (A2037A 
-# and A2037F). All these circuits used the LWDAQ Message Protocol for the 
-# exchange of TCPIP messages. In the code below, as well as in Utils.tcl, 
-# we refer to this protocol as "lwdaq". The lwdaq protocol uses a prefix
-# byte at the start of any message, followed by a four-byte, big-endian message
-# identifier, a four-byte big-endian content length, the message content 
-# (if any), and finally a suffix byte. When a client closes a lwdaq we
-# send a termination character to accelerate the socket closure in the 
-# lwdaq server. We describe the lwdaq message protocol, including the 
-# reserved message identifiers, in our LWDAQ Specification. Each socket 
-# opened by LWDAQ_socket_open has an entry in the open_sockets list of the 
-# LWDAQ_Info array.
-#
-# There are three components to the TCPIP communication with data
-# acquisition hardware. The Master is the computer that runs this software
-# and connects as a client to the server. The Relay is the embedded computer
-# that acts as the server. The Controller is the hardware and address
-# space we read from and write to with routines like LWDAQ_byte_write
-# and LWDAQ_byte_read.
+# Driver.tcl defines procedures that communicate with data acquisition drivers
+# and system controllers through TCPIP sockets. The Driver.tcl routines call the
+# sockeet-handling routines defined in Utils.tcl.
+
+# The original purpose of the Driver.tcl routines, when we wrote them in 2004,
+# was to provide communication with the Long-Wire Data Acquisition Driver with
+# Ethernet Interface (A2037E). In 2005 we enhanced the routines to support
+# communication with the TCPIP-VME Interface (A2037A and A2037F). All these
+# circuits used the LWDAQ Message Protocol for the exchange of TCPIP messages.
+# In the code below, as well as in Utils.tcl, we refer to this protocol as
+# "lwdaq". The lwdaq protocol uses a prefix byte at the start of any message,
+# followed by a four-byte, big-endian message identifier, a four-byte big-endian
+# content length, the message content (if any), and finally a suffix byte. When
+# a client closes a lwdaq we send a termination character to accelerate the
+# socket closure in the lwdaq server. We describe the lwdaq message protocol,
+# including the reserved message identifiers, in our LWDAQ Specification. Each
+# socket opened by LWDAQ_socket_open has an entry in the open_sockets list of
+# the LWDAQ_Info array.
+
+# There are three components to the TCPIP communication with data acquisition
+# hardware. The Master is the computer that runs this software and connects as a
+# client to the server. The Relay is the embedded computer that acts as the
+# server. The Controller is the hardware and address space we read from and
+# write to with routines like LWDAQ_byte_write and LWDAQ_byte_read.
 #
 
 #
@@ -253,11 +252,10 @@ proc LWDAQ_receive_data {sock} {
 }
 
 #
-# LWDAQ_receive_integer receives a data return message
-# and scans its contents for a four-byte integer in
-# big-endian byte order (most significant byte received
-# first). The routine returns a string of characters that
-# represent a decimal number.
+# LWDAQ_receive_integer receives a data return message and scans its contents
+# for a four-byte integer in big-endian byte order (most significant byte
+# received first). The routine returns a string of characters that represent a
+# decimal number.
 #
 proc LWDAQ_receive_integer {sock} {
 	set contents [LWDAQ_receive_data $sock]
@@ -266,10 +264,9 @@ proc LWDAQ_receive_integer {sock} {
 }
 
 #
-# LWDAQ_receive_byte receives a data return message
-# and scans its contents for single-byte integer. It
-# returns this integer as a string of characters representing
-# a decimal number.
+# LWDAQ_receive_byte receives a data return message and scans its contents for
+# single-byte integer. It returns this integer as a string of characters
+# representing a decimal number.
 #
 proc LWDAQ_receive_byte {sock} {
 	set contents [LWDAQ_receive_data $sock]
@@ -278,8 +275,8 @@ proc LWDAQ_receive_byte {sock} {
 }
 
 #
-# LWDAQ_software_version fetches the relay software version
-# from a driver through an open socket $sock.
+# LWDAQ_software_version fetches the relay software version from a driver
+# through an open socket $sock.
 #
 proc LWDAQ_software_version {sock} {
 	global LWDAQ_Driver
@@ -288,14 +285,13 @@ proc LWDAQ_software_version {sock} {
 }
 
 #
-# LWDAQ_byte_read reads a byte from the controller address
-# space on a driver. The read takes place through a socket open
-# with the driver called $sock, and reads a byte from controller
-# address $addr. The routine returns the byte as a decimal number.
-# The addr parameter is a string of characters representing a 
-# decimal number. The routine translates the parameter into a 
-# four-byte integer before transmitting it to the driver. The routine
-# returns a string of characters that represents a decimal number.
+# LWDAQ_byte_read reads a byte from the controller address space on a driver.
+# The read takes place through a socket open with the driver called $sock, and
+# reads a byte from controller address $addr. The routine returns the byte as a
+# decimal number. The addr parameter is a string of characters representing a
+# decimal number. The routine translates the parameter into a four-byte integer
+# before transmitting it to the driver. The routine returns a string of
+# characters that represents a decimal number.
 #
 proc LWDAQ_byte_read {sock addr} {
 	global LWDAQ_Driver
@@ -306,16 +302,14 @@ proc LWDAQ_byte_read {sock addr} {
 }
 
 #
-# LWDAQ_stream_read reads $stream_length bytes out of
-# controller address $addr on the driver at the other end of
-# TCPIP socket $sock, and returns the entire stream. The
-# routine is intended for use with the controller's stream
-# read location, which presents consecutive bytes in the 
-# controller RAM on consecutive reads by the relay. The 
-# addr and stream_length parameters are strings of characters
-# that represent decimal numbers. The routine translates both
-# into four-byte integers before transmitting them to the driver.
-# The routine returns a block of binary data.
+# LWDAQ_stream_read reads $stream_length bytes out of controller address $addr
+# on the driver at the other end of TCPIP socket $sock, and returns the entire
+# stream. The routine is intended for use with the controller's stream read
+# location, which presents consecutive bytes in the controller RAM on
+# consecutive reads by the relay. The addr and stream_length parameters are
+# strings of characters that represent decimal numbers. The routine translates
+# both into four-byte integers before transmitting them to the driver. The
+# routine returns a block of binary data.
 #
 proc LWDAQ_stream_read {sock addr stream_length} {
 	global LWDAQ_Driver
@@ -328,15 +322,13 @@ proc LWDAQ_stream_read {sock addr stream_length} {
 }
 
 #
-# LWDAQ_stream_delete writes a constant byte value
-# repeatedly to the same controller address, so as to clear
-# consecutive memory locations. It is like the stream read
-# in reverse, except the data value is always $value, where
-# $value is a string of digits that represent a decimal
-# value. The addr, stream_length, and value parameters are all
-# strings of characters that represent decimal numbers. The
-# routine translates the strings into two four-byte integers
-# and a byte value respectively before transmitting them to 
+# LWDAQ_stream_delete writes a constant byte value repeatedly to the same
+# controller address, so as to clear consecutive memory locations. It is like
+# the stream read in reverse, except the data value is always $value, where
+# $value is a string of digits that represent a decimal value. The addr,
+# stream_length, and value parameters are all strings of characters that
+# represent decimal numbers. The routine translates the strings into two
+# four-byte integers and a byte value respectively before transmitting them to
 # the driver.
 #
 proc LWDAQ_stream_delete {sock addr stream_length value} {
@@ -349,14 +341,12 @@ proc LWDAQ_stream_delete {sock addr stream_length value} {
 }
 
 #
-# LWDAQ_stream_write writes a block of bytes to the same
-# controller address so as to transfer them into a memory
-# block through a memory portal. It is like the stream read
-# in reverse. The addr parameter is a strings of characters 
-# that represents decimal number. The data parameter is a
-# block of binary bytes that will be transmitted without
-# modification. The routine translates the addr string into
-# a four-byte integer before transmitting to the driver.
+# LWDAQ_stream_write writes a block of bytes to the same controller address so
+# as to transfer them into a memory block through a memory portal. It is like
+# the stream read in reverse. The addr parameter is a strings of characters that
+# represents decimal number. The data parameter is a block of binary bytes that
+# will be transmitted without modification. The routine translates the addr
+# string into a four-byte integer before transmitting to the driver.
 #
 proc LWDAQ_stream_write {sock addr data} {
 	global LWDAQ_Driver
@@ -373,11 +363,10 @@ proc LWDAQ_stream_write {sock addr data} {
 }
 
 #
-# LWDAQ_byte_write writes byte $value through TCPIP socket
-# $sock to controller address $addr. The addr and value 
-# parameters are strings of characters that represent decimal
-# numbers. The routine translates these into a four-byte integer
-# and a single-byte value before transmitting them to the driver.
+# LWDAQ_byte_write writes byte $value through TCPIP socket $sock to controller
+# address $addr. The addr and value parameters are strings of characters that
+# represent decimal numbers. The routine translates these into a four-byte
+# integer and a single-byte value before transmitting them to the driver.
 #
 proc LWDAQ_byte_write {sock addr value} {
 	global LWDAQ_Driver
@@ -388,13 +377,12 @@ proc LWDAQ_byte_write {sock addr value} {
 }
 
 #
-# LWDAQ_byte_poll tells the relay at the other end
-# of TCPIP socket $sock to wait until the byte it reads
-# from address $addr has value $value. The value we pass to 
-# the routine is a string of characters that represent a decimal 
-# number. The routine converts this string into a binary byte. The
-# strings "-1" and "255" both get converted into the same binary
-# value, 255, which is -1 in 2's compliment.
+# LWDAQ_byte_poll tells the relay at the other end of TCPIP socket $sock to wait
+# until the byte it reads from address $addr has value $value. The value we pass
+# to the routine is a string of characters that represent a decimal number. The
+# routine converts this string into a binary byte. The strings "-1" and "255"
+# both get converted into the same binary value, 255, which is -1 in 2's
+# compliment.
 #
 proc LWDAQ_byte_poll {sock addr value} {
 	global LWDAQ_Driver

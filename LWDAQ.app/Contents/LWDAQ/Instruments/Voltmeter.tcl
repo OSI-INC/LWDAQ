@@ -1,6 +1,7 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
-# Copyright (C) 2004-2019 Kevan Hashemi, Brandeis University
+# Copyright (C) 2004-2020 Kevan Hashemi, Brandeis University
 # Copyright (C) 2015 Richard Studley, Brandeis University
+# Copyright (C) 2021 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

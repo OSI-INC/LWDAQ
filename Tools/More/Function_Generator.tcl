@@ -1,6 +1,6 @@
 # Function Generator, A LWDAQ Tool.
-# (C) 2015 Michael Bradshaw (origial program)
-# (C) 2015-2019 Kevan Hashemi (minor improvements)
+# (C) 2015 Michael Bradshaw, Open Source Instruments Inc.
+# (C) 2015-2021 Kevan Hashemi, Open Source Instruments Inc.
 
 #Version 1.1 Fixes:  
 #removed Recorder ip address/driversocket/mux socket initialization on startup
