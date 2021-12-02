@@ -29,7 +29,8 @@
 # Version 3.1 The function generator sweep uses the LWDAQ event queue.
 # Version 3.2 Allow specification of multiple channels.
 # Version 3.3 Sort channel numbers correctly for printout.
-# Version 3.4 Fix repeat frequency value in 512SPS sweep.
+# Version 3.4 Fix repeat frequency value in 512 SPS sweep.
+# Version 3.5 Add autofill for channel numbers.
 
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
@@ -73,6 +74,8 @@ proc Function_Generator_init {} {
 	set config(min_num_clocks) 32
 	set config(max_num_clocks) 512
 	set config(setup_delay_ms) 1000
+	set config(min_id) 1
+	set config(max_id) 254
 
 	#These values reflect the RC filters components installed on pcb.
 	set info(rcval,r8) 330.0
@@ -207,6 +210,26 @@ proc Function_Generator_set_file_name {} {
 	set a choose_database_file_name
 	button $top.$a -text "Browse" -command Function_Generator_browse
 	pack $top.$a -side left -expand 1
+}
+
+proc Function_Generator_autofill {} {
+	upvar #0 Function_Generator_config config
+	upvar #0 Function_Generator_info info
+	upvar #0 LWDAQ_info_Receiver iinfo
+
+	set autofill ""
+	LWDAQ_reset_Receiver
+	LWDAQ_acquire Receiver
+	for {set id $config(min_id)} {$id <= $config(max_id)} {incr id} {
+		if {[lsearch $iinfo(channel_activity) "$id\:*"] >= 0} {
+			append autofill "$id "
+		}		
+	}
+	if {$autofill == ""} {
+		LWDAQ_print $info(text) "Autofill found no active channels."
+	}
+	set config(channels) [string trim $autofill]
+	return $autofill
 }
 
 #
@@ -1059,7 +1082,6 @@ proc Function_Generator_open {} {
 	button $e1.auto_filter -text "Auto Filter Select" -command "LWDAQ_post Function_Generator_auto_filter"
     button $e1.off -text "Off" -command "LWDAQ_post Function_Generator_execute_stop"
 	button $e1.l_filterbutton -text "Choose Filter" -command Function_Generator_choose_filter
-	button $c2.fnamebutton -text "Choose File" -command Function_Generator_set_file_name
 	label $e1.control -textvariable Function_Generator_info(control) -fg blue -width 8
 	button $e1.fsweep -text "Sweep" -command "LWDAQ_post Function_Generator_frequency_sweep"
 	button $e1.stop -text "Stop" -command "set Function_Generator_info(control) Stop"
@@ -1076,19 +1098,18 @@ proc Function_Generator_open {} {
 	grid $c.l_amplitude $c.e_amplitude -sticky news
 	grid $c.upload $c.viewwv -sticky news
 
-	checkbutton $c2.cbutton -text "Save" -variable Function_Generator_info(record_yn)
 		
-	label $c2.l_Rdriverip -text "Recorder IP Address" -anchor w 
+	label $c2.l_Rdriverip -text "Receiver IP Address" -anchor w 
 	entry $c2.e_Rdriverip -textvariable LWDAQ_config_Receiver(daq_ip_addr) \
 		-relief sunken -bd 1 -width 15 -justify right
 	grid $c2.l_Rdriverip $c2.e_Rdriverip -sticky news
 		
-	label $c2.l_Rdriversocket -text "Recorder Driver Socket" -anchor w 
+	label $c2.l_Rdriversocket -text "Receiver Driver Socket" -anchor w 
 	entry $c2.e_Rdriversocket -textvariable LWDAQ_config_Receiver(daq_driver_socket) \
 		-relief sunken -bd 1 -width 15 -justify right
 	grid $c2.l_Rdriversocket $c2.e_Rdriversocket -sticky news
 		
-	label $c2.l_Rmuxsocket -text "Recorder Mux Socket" -anchor w
+	label $c2.l_Rmuxsocket -text "Receiver Mux Socket" -anchor w
 	entry $c2.e_Rmuxsocket -textvariable LWDAQ_config_Receiver(daq_mux_socket) \
 		-relief sunken -bd 1 -width 15 -justify right					
 	grid $c2.l_Rmuxsocket $c2.e_Rmuxsocket -sticky news
@@ -1100,6 +1121,12 @@ proc Function_Generator_open {} {
 		grid $c2.l_$b $c2.e_$b -sticky news
 	}
 
+	label $c2.l_autofill -text "Autodetect Channels"
+	button $c2.autofill -text "Autodetect" -command Function_Generator_autofill
+	grid $c2.l_autofill $c2.autofill -sticky news
+
+	checkbutton $c2.cbutton -text "Save" -variable Function_Generator_info(record_yn)
+	button $c2.fnamebutton -text "Choose File" -command Function_Generator_set_file_name
 	grid $c2.cbutton $c2.fnamebutton -sticky news
 
 	pack $e1.control $e1.fsweep $e1.stop $e1.fresponse $e1.fprint \

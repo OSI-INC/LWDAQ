@@ -51,6 +51,10 @@ proc Videoarchiver_init {} {
 	
 	# Set up directory names.
 	set info(main_dir) [file join $LWDAQ_Info(program_dir) Videoarchiver]
+	if {![file exists $info(main_dir)]} {
+		set info(main_dir) [file normalize \
+			[file join $LWDAQ_Info(program_dir) .. Videoarchiver]]
+	}
 	set info(scratch_dir) [file join $info(main_dir) Scratch]
 	set info(keys_dir) [file join $info(main_dir) Keys]
 	set info(os) $LWDAQ_Info(os)
@@ -1860,23 +1864,6 @@ proc Videoarchiver_directory {{post 1}} {
 }
 
 #
-# Neuroarchiver_video_download downloads the Videoarchiver zip archive with the
-# help of a browser.
-#
-proc Neuroarchiver_video_download {} {
-	upvar #0 Neuroarchiver_config config
-	upvar #0 Neuroarchiver_info info
-
-	set result [LWDAQ_url_download $info(library_archive)]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(text) $result
-		return "ERROR"
-	} else {
-		return "SUCCESS"
-	}
-}
-
-#
 # Videoarchiver_download_libraries downloads the Videoarchiver zip archive with the
 # help of a web browser.
 #
@@ -1907,11 +1894,13 @@ proc Videoarchiver_suggest_download {} {
 	$info(text) insert end "$info(library_archive)" "textbutton download"
 	$info(text) tag bind download <Button> Videoarchiver_download_libraries
 	$info(text) insert end "\n"
-	LWDAQ_print $info(text) \
-		"  After download, expand the zip archive. Move the entire Videoarchiver directory into\n \
-		your LWDAQ directory so as to create a directory LWDAQ/Videoarchvier. Close and re-start\n \
-		the Videoarchiver. You now have OpenCV, Mplayer, and FFMpeg installed for use by both the\n \
-		Videoarchiver and the Neuroarchiver on Linux, MacOS, and Windows."
+	LWDAQ_print $info(text) {
+After download, expand the zip archive. Move the entire Videoarchiver directory
+into the same directory as your LWDAQ installation, so the LWDAQ and
+Videoarchiver directories will be next to one another. You now have Mplayer, and
+FFMpeg installed for use by the Videoarchiver and Neuroplayer on Linux, MacOS,
+and Windows.
+	}
 }
 
 #

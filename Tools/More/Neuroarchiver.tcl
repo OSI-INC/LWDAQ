@@ -691,8 +691,13 @@ proc Neuroarchiver_init {} {
 #
 	set info(video_library_archive) \
 		"http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
+	set config(videoarchiver_dir) [file join $LWDAQ_Info(program_dir) Videoarchiver]
+	if {![file exists $config(videoarchiver_dir)]} {
+		set config(videoarchiver_dir) \
+			[file normalize [file join $LWDAQ_Info(program_dir) .. Videoarchiver]]
+	}
 	set config(video_dir) $LWDAQ_Info(working_dir)
-	set info(video_file) [file join $config(video_dir) Video.mp4]
+	set info(video_file) [file join $config(video_dir) V0000000000.mp4]
 	set info(video_stop_time) 0.0
 	set info(video_end_time) 0.0
 	set info(video_wait_ms) 100
@@ -701,14 +706,14 @@ proc Neuroarchiver_init {} {
 	set config(video_speed) "1.0"
 	set config(video_zoom) "1.0"
 	set info(video_state) "Idle"
-	set info(video_log) [file join $LWDAQ_Info(program_dir) \
-		Videoarchiver Scratch neuroarchiver_video_log.txt]
+	set info(video_log) [file join $config(videoarchiver_dir) \
+		Scratch neuroarchiver_video_log.txt]
 	set config(video_enable) "0"
 	set info(video_process) "0"
 	set info(video_channel) "file1"
 	set info(video_file_cache) [list]
 	set info(max_video_files) "100"
-	set os_dir [file join $LWDAQ_Info(program_dir) Videoarchiver $LWDAQ_Info(os)]
+	set os_dir [file join $config(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
 		set info(ssh) [file join $os_dir ssh/ssh.exe]	
 		set info(ffmpeg) [file join $os_dir ffmpeg/bin/ffmpeg.exe]
@@ -7405,11 +7410,13 @@ proc Neuroarchiver_video_suggest {} {
 		"$info(video_library_archive)" "textbutton download"
 	$info(text) tag bind download <Button> Neuroarchiver_video_download
 	$info(text) insert end "\n"
-	LWDAQ_print $info(text) \
-		"  After download, expand the zip archive. Move the entire Videoarchiver directory into\n \
-		your LWDAQ directory so as to create a directory LWDAQ/Videoarchvier. You now have\n \
-		Mplayer and FFMpeg installed for use by both the Videoarchiver and the Neuroarchiver\n \
-		on Linux, MacOS, and Windows. You may begin video playback in the Neuroarchiver immediately."
+	LWDAQ_print $info(text) {
+After download, expand the zip archive. Move the entire Videoarchiver directory
+into the same directory as your LWDAQ installation, so the LWDAQ and
+Videoarchiver directories will be next to one another. You now have Mplayer, and
+FFMpeg installed for use by the Videoarchiver and Neuroplayer on Linux, MacOS,
+and Windows.
+	}
 }
 
 #

@@ -1,6 +1,5 @@
 /**/.DS_Store
 /Tools/Data/*_Settings.tcl
-/Videoarchiver
 /LWDAQ.app/Contents/LWDAQ/Toolmaker.tcl
 /LWDAQ.app/Contents/LWDAQ/Packages/pkgIndex.tcl
 /Build/*.o

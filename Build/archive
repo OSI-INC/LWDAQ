@@ -53,8 +53,6 @@ MASTER_DIR=`pwd`
 echo "MASTER_DIR: $MASTER_DIR"
 LIB_DIR="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ"
 echo "LIB_DIR: $LIB_DIR"
-VBT_DIR="$LWDAQ_DIR/Videoarchiver"
-echo "VBT_DIR: $VBT_DIR"
 GIT_DIR="$LWDAQ_DIR/.git"
 echo "GIT_DIR: $GIT_DIR"
 
@@ -86,10 +84,8 @@ rm $LWDAQ_DIR/Tools/Data/*_Settings.tcl
 mv $LIB_DIR/Toolmaker.tcl $MASTER_DIR/Toolmaker.tcl
 mv $LIB_DIR/Toolmaker_Distribute.tcl $LIB_DIR/Toolmaker.tcl
 
-# We move the Videoarchiver and .git libraries out of the LWDAQ 
-# package because they are large. The user must download
-# these separately.
-mv $VBT_DIR $MASTER_DIR/VBT
+# We move the .git library out of the LWDAQ 
+# package because it is large.
 mv $GIT_DIR $MASTER_DIR/GIT
 
 # Move to master directory and define archive name.
@@ -118,7 +114,6 @@ fi
 echo "Restoring LWDAQ files."
 mv $LIB_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker_Distribute.tcl
 mv $MASTER_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
-mv $MASTER_DIR/VBT $VBT_DIR
 mv $MASTER_DIR/GIT $GIT_DIR
 
 # Copy documents to website.
