@@ -26,7 +26,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "20"
+	LWDAQ_tool_init "Videoarchiver" "21"
 
 	# We check the global Videoarchiver_mode variable, which is the means by
 	# which we can direct the Videoarchiver to use the LWDAQ main window or
@@ -305,8 +305,7 @@ proc Videoarchiver_view_restart_log {} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 
-	set fn [file join $info(scratch_dir) restart_log.txt]
-	set result [LWDAQ_view_text_file $fn]
+	set result [LWDAQ_view_text_file $config(restart_log)]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
 		return "ERROR"
@@ -323,8 +322,7 @@ proc Videoarchiver_clear_restart_log {} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 
-	set fn [file join $info(scratch_dir) restart_log.txt]
-	set f [open $fn w]
+	set f [open $config(restart_log) w]
 	puts $f "Cleared restart log at [clock format [clock seconds]]."
 	close $f
 	
@@ -2317,9 +2315,12 @@ proc Videoarchiver_configure {} {
 	# of a frame widget into which we can put more buttons.
 	set f [LWDAQ_tool_configure $info(name) 2]
 	
+	# Routines to view and clear the restart log. We make sure they run
+	# in the LWDAQ event queue so we don't get a file access conflict
+	# with the recording processes.
 	foreach a {View_Restart_Log Clear_Restart_Log} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "Videoarchiver_$b"
+		button $f.$b -text $a -command "LWDAQ_post Videoarchiver_$b"
 		pack $f.$b -side top -expand 1
 	}
 	
