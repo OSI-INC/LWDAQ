@@ -4838,7 +4838,7 @@ begin
 	Obtain the complex-valued transform.
 }
 	ft:=fft(dpxy);
-	if length(ft)<0 then exit;
+	if length(ft)=0 then exit;
 {
 	Convert complex transform to compact magnitude-phase transform.
 }
@@ -4901,6 +4901,7 @@ begin
 	Obtain the inverse transform.
 }
 	dpxy:=fft_inverse(ftxy);
+	if length(dpxy)=0 then exit;
 {
 	Extract real values.
 }
