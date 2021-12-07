@@ -96,7 +96,8 @@ proc Neuroarchiver_init {} {
 # Recording data acquisition parameters.
 #
 	set config(receiver_type) "A3027"
-	set config(receiver_options) "A3018 A3027 A3032 A3038"
+	set info(receiver_options) "A3018 A3027 A3032 A3038"
+	set info(alt_options) "A3032 A3038"
 #
 # A flag to tell us if the Neuroarchiver is running with graphics.
 #
@@ -545,18 +546,22 @@ proc Neuroarchiver_init {} {
 #
 	set config(log_warnings) 0
 	set config(log_file) [file join \
-		[file dirname $info(settings_file_name)] \
-		Neuroarchiver_log.txt ]
+		[file dirname $info(settings_file_name)] Neuroarchiver_log.txt]
 # 
 # Some errors we don't want to write more than once to the text window, so
 # we keep a copy of the most recent error to compare to.
 #
 	set info(previous_line) ""
 #
-# The num_errors parameter contains the number of errors detected in the
-# clock message sequence of the current interval's data.
+# The recorder_error_time parameter gives us the time when the Neurorecorder
+# first failed to download from the Data Receiver. A zero value means all is
+# well. The message interval gives us the length of time between error reports
+# to the text window.
 #
-	set info(num_errors) 0
+	set info(recorder_error_time) 0
+	set info(initial_message_interval) 10
+	set info(recorder_message_interval) $info(initial_message_interval)
+	set info(message_interval_multiplier) 3
 #
 # Plot display controls, each of which appear in an entry or checkbox.
 #
@@ -1062,16 +1067,16 @@ proc Neuroarchiver_metadata_header {} {
 	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info	
 
-	set header "<c>\
-			\nCreated: [clock format [clock seconds] -format $config(datetime_format)].\
+	set header "<c>Created: [clock format [clock seconds] -format $config(datetime_format)].\
 			\nCreator: Neurorecorder $info(version), LWDAQ_$LWDAQ_Info(program_patchlevel).\
-			\nReceiver: Type $iinfo(receiver_type) with firmware $iinfo(receiver_firmware).</c>\
-			\n<payload>$iconfig(payload_length)</payload>\
-			\n<coordinates>$config(tracker_coordinates)</coordinates>"
+			\nReceiver: Type $iinfo(receiver_type) with firmware $iinfo(receiver_firmware).\
+			\nPlatform: $LWDAQ_Info(os).</c>\n\n"
+	append header "<payload>$iconfig(payload_length)</payload>\n\n"
+	if {[lsearch $info(alt_options) $iinfo(receiver_type)] >= 0} {
+		append header "\n<coordinates>$config(tracker_coordinates)</coordinates>\n\n"
+	}
 	if {[string trim $info(metadata_header)] != ""} {
-		append header "<c>\
-			\n[string trim $info(metadata_header)]\
-			\n</c>"
+		append header "<c>[string trim $info(metadata_header)]</c>\n\n"
 	}
 
 	return $header
@@ -6073,6 +6078,8 @@ proc Neuroarchiver_record {{command ""}} {
 		# Reset the data receiver, but only if the comand is Reset or if
 		# the synchronize flag is set.
 		if {($info(record_control) == "Start") || $config(synchronize)} {
+			set info(recorder_error_time) 0
+			set info(recorder_message_interval) $info(initial_message_interval)
 			set result [LWDAQ_reset_Receiver]
 			if {[LWDAQ_is_error_result $result]} {
 				Neuroarchiver_print "$result"
@@ -6156,10 +6163,12 @@ proc Neuroarchiver_record {{command ""}} {
 		}
 		
 		# Set the record label to the download color.
-		LWDAQ_set_bg $info(record_control_label) "yellow"
+		if {($info(recorder_error_time) == 0)} {
+			LWDAQ_set_bg $info(record_control_label) yellow
+		}
 		
 		# If the Receiver Instrument happens to be looping, stop it.
-		if {$iinfo(control) == "Loop"} {set iinfo(control) "Acquire"}
+		if {$iinfo(control) == "Loop"} {set iinfo(control) "Stop"}
 
 		# Set the number of clocks we want to download using the Receiver Instrument.
 		# The Receiver Instrument will giveus exactly this number of clocks, unless there
@@ -6191,10 +6200,28 @@ proc Neuroarchiver_record {{command ""}} {
 		# recording process to the end of the event queue because our recovery
 		# is not urgent.
 		if {[LWDAQ_is_error_result $daq_result]} {
-			Neuroarchiver_print "$daq_result"
-			LWDAQ_set_bg $info(record_control_label) white
+			if {($info(recorder_error_time) == 0)} {
+				Neuroarchiver_print "$daq_result"
+				LWDAQ_set_bg $info(record_control_label) red
+				set info(recorder_error_time) [clock seconds]
+				set info(recorder_message_interval) $info(initial_message_interval)
+			} elseif {[clock seconds] - $info(recorder_error_time) \
+				> $info(recorder_message_interval)} {
+				Neuroarchiver_print "$daq_result"
+				set info(recorder_message_interval) \
+					[expr $info(initial_message_interval) \
+					* $info(message_interval_multiplier)]
+			}
 			LWDAQ_post Neuroarchiver_record end
 			return "FAIL"
+		} {
+			if {$info(recorder_error_time) != 0} {
+				LWDAQ_set_bg $info(record_control_label) yellow
+				Neuroarchiver_print "WARNING: Recording resumed after interruption of\
+					[expr [clock seconds] - $info(recorder_error_time)] s."
+				set info(recorder_error_time) 0
+				set info(recorder_message_interval) $info(initial_message_interval)
+			}
 		}
 		
 		# Append the new data to our NDF file. If the data write fails, we print
@@ -6745,12 +6772,12 @@ proc Neuroarchiver_play {{command ""}} {
 	# we get a count of errors in the data block. Note that the last clock
 	# in the interval is not the one that marks the beginning of the next
 	# interval, but the one before that, which we obtain with the index -1.
-	# We set the num_errors parameter so it contains the number of clock 
+	# We set the num_errors variable so it contains the number of clock 
 	# message errors in the interval data.
 	set clocks [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) \
 			-size $info(data_size) clocks 0 -1"]
-	scan $clocks %d%d%d%d%d info(num_errors) num_clocks num_messages first_index last_index
+	scan $clocks %d%d%d%d%d num_errors num_clocks num_messages first_index last_index
 	set indices [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) \
 			-size $info(data_size) get $first_index $last_index"]
@@ -6783,7 +6810,7 @@ proc Neuroarchiver_play {{command ""}} {
 	# messages it contains. We trust that the interval contains at least the
 	# required number of clocks, so it must span at least the play interval.
 	set display_span $info(play_interval_copy)
-	if {$info(num_errors) > 0} {
+	if {$num_errors > 0} {
 		set display_span [expr 1.0 * \
 			($last_clock - $first_clock + 1) / \
 			$info(clocks_per_second)]
@@ -6795,8 +6822,8 @@ proc Neuroarchiver_play {{command ""}} {
 	
 	# We report upon the number of errors within this interval, as provided 
 	# by the lwdaq_receiver routine.
-	if {$info(num_errors) > 0} {
-		Neuroarchiver_print "WARNING: Encountered $info(num_errors) errors\
+	if {$num_errors > 0} {
+		Neuroarchiver_print "WARNING: Encountered $num_errors errors\
 			in [file tail $config(play_file)] between $config(play_time) s and\
 			[expr $config(play_time) + $info(play_interval_copy)] s."
 	}	
@@ -6812,7 +6839,7 @@ proc Neuroarchiver_play {{command ""}} {
 	
 	# We show the raw message data in the text window if the user wants to see
 	# it in verbose mode, or if we have encountered an error in verbose mode.
-	if {($config(show_messages) || ($info(num_errors) > 0)) && $config(verbose)} {
+	if {($config(show_messages) || ($num_errors > 0)) && $config(verbose)} {
 		set report [lwdaq_receiver $info(data_image) \
 			"-payload $info(player_payload) \
 				-size $info(data_size) print 0 1"]
@@ -7782,7 +7809,7 @@ proc Neuroarchiver_open {} {
 
 		set m [tk_optionMenu $f.mr Neuroarchiver_config(receiver_type) "None"]
 		$m delete 0 end
-		foreach version $config(receiver_options) {
+		foreach version $info(receiver_options) {
 			$m add command -label $version \
 				-command [list Neuroarchiver_set_receiver $version]
 		}	
@@ -8083,13 +8110,6 @@ proc Neuroarchiver_open {} {
 		$info(text) tag bind textbutton <Leave> {%W configure -cursor xterm} 
 	}
 
-	if {($info(mode) == "Main") \
-		|| ($info(mode) == "Recorder") \
-		|| ($info(mode) == "Combined")} {
-		Neuroarchiver_print "NOTE: We replaced \"Reset\" and \"Record\" with\
-			\"Start\" in Neuroarchiver 149."
-	}
-		
 	return "SUCCESS"
 }
 
