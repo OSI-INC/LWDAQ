@@ -4644,6 +4644,10 @@ proc Neuroarchiver_exporter_open {} {
 		-text "Tracker Powers" -fg $info(label_color)
 	pack $f.tp -side left -expand yes
 
+	label $f.trl -text "Tracker Rate (SPS):" -fg $info(label_color)
+	entry $f.tre -textvariable Neuroarchiver_config(tracker_sample_rate) -width 4
+	pack $f.trl $f.tre -side left -expand yes
+
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
 	
 	# Initialize the export start time to the start of the current playback
