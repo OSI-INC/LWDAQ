@@ -650,7 +650,6 @@ proc Neuroarchiver_init {} {
 	set info(A3032_payload) "16"
 	set info(A3038_payload) "16"
 	set config(tracker_coordinates) ""
-	set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 	set info(tracker_range_border) "1.0"
 	set info(tracker_range) "-1.0 -1.0 +49.0 +25.0"
 #
@@ -4111,12 +4110,28 @@ proc Neurotracker_extract {} {
 	upvar #0 Neuroarchiver_config config
 	upvar #0 Neuroarchiver_info(tracker_history_$info(channel_num)) history
 
+	# Calculate the number of slices into which we should divide the playback
+	# interval for location tracking. If we see an error, set an error flag
+	# and print the error to the Neuroarchiver text window, but don't abort.
+	set num_slices [expr $config(tracker_sample_rate) * $config(play_interval)]
+	if {$num_slices < 1.0} {
+		set num_slices 1
+	} else {
+		set num_slices [expr round($num_slices)]
+	}
+	
 	# Determine the number of detectors.
 	set num_detectors [expr [llength $config(tracker_coordinates)]/2]
 	
 	# If the playload length does not match the number of detector coils,
-	# we abort, because we are not playing a tracker archive.
+	# we abort, because we are not playing a tracker archive. We full the
+	# tracker slice list with zeros for x and y position, and blank for 
+	# coil powers.
 	if {($info(player_payload) < 1) || ($info(player_payload) < $num_detectors)} {
+		set info(tracker_result) [list]
+		for {set slice_num 0} {$slice_num < $num_slices} {incr slice_num} {
+			lappend info(tracker_result) "0.0 0.0"
+		}
 		return "ABORT"
 	}
 	
@@ -4130,16 +4145,6 @@ proc Neurotracker_extract {} {
 	# Set error flag.
 	set error_flag 0
 	
-	# Calculate the number of slices into which we should divide the playback
-	# interval for location tracking. If we see an error, set an error flag
-	# and print the error to the Neuroarchiver text window, but don't abort.
-	set num_slices [expr $config(tracker_sample_rate) * $config(play_interval)]
-	if {$num_slices < 1.0} {
-		set num_slices 1
-	} else {
-		set num_slices [expr round($num_slices)]
-	}
-	
 	# If we have a signal for the current channel, obtain a tracker measurement,
 	# which will be one line per slice. 
 	if {($info(signal) != "0 0") && !$lossy} {
@@ -4149,8 +4154,7 @@ proc Neurotracker_extract {} {
 				-payload $info(player_payload) \
 				-scale $config(tracker_decade_scale) \
 				-extent $config(tracker_extent_radius) \
-				-slices $num_slices \
-				-background $config(tracker_background)]
+				-slices $num_slices]
 		} error_result]} {
 			Neuroarchiver_print $error_result
 			set error_flag 1
@@ -4161,13 +4165,20 @@ proc Neurotracker_extract {} {
 	# fake tracker measurement consisting of the same number of lines. We do the
 	# same in the case of an error.
 	if {($info(signal) == "0 0") || $lossy || $error_flag} {
+		set alt_slice "0.0 0.0"
+		for {set detector_num 1} {$detector_num <= $num_detectors} {incr detector_num} {
+			append alt_slice " 0.0"
+		}
+		append alt_slice "\n"
 		set alt_result ""
 		for {set slice_num 0} {$slice_num < $num_slices} {incr slice_num} {
-			append alt_result "$config(tracker_background) 0.0 0.0\n"
+			append alt_result $alt_slice
 		}
 	}
 
-	# Set the tracker_result variable to the full lwdaq_alt result string.
+	# Set the tracker_result variable to the full lwdaq_alt result string split
+	# into a list using line breaks. Now the result will contain one list entry
+	# per slice.
 	set info(tracker_result) [split [string trim $alt_result] \n]
 		
 	# Extract the tracker powers from the final tracker slice.
@@ -4771,7 +4782,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			if {$config(export_centroid) || $config(export_powers)} {
 				set efn [file join $config(export_dir) "T$info(export_start_s)\_$id\.$ext"]
 				LWDAQ_print -nonewline $info(export_text) "Exporting tracker "
-				foreach p {centroid activity powers} {
+				foreach p {centroid powers} {
 					if {$config(export_$p)} {
 						LWDAQ_print -nonewline $info(export_text) "$p "
 					}
@@ -4961,7 +4972,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 						}
 						if {$config(export_powers)} {
 							foreach p [lrange $slice 2 end] {
-								append export_bytes [binary format c $p]
+								append export_bytes [binary format c \
+									[expr round($p)]]
 							}
 						}
 					}
