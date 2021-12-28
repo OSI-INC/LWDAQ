@@ -3214,11 +3214,10 @@ end;
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-payload</td><td>Payload length in bytes, default 16.</td></tr>
 <tr><td>-scale</td><td>Number of eight-bit counts corresponding to 10 dB power increase, default 30.</td></tr>
-<tr><td>-extent</td><td>Radius for coil inclusion about calculated location, default &infin;.</td></tr>
+<tr><td>-extent</td><td>Radius for coil inclusion about coil with maximum power.</td></tr>
 <tr><td>-percentile</td><td>Fraction of power measurements below chosen value, default 50.</td></tr>
 <tr><td>-background</td><td>String of background power levels to be subtracted from coil powers, default all 0.</td></tr>
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
-<tr><td>-anchor</td><td>Anchor the extent to the coil with maximum power, default 0.</td></tr>
 </table></center>
 
 <p>The output contains <i>x</i> and <i>y</i> position in whatever units we used to specify the coil centers, followed by  a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the positions and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period.</p>
@@ -3232,7 +3231,6 @@ const
 	error_value=-1;
 	power_hi=255;
 	power_lo=0;
-	num_calculations=3;
 	num_coordinates=2;
 	max_iterations=100;
 
@@ -3252,9 +3250,8 @@ var
 	payload:integer=16; {value for any ALT with fifteen coils}
 	extent:real=1e10; {infinity}
 	percentile:real=50; {median power value will be used}
-	scale:real=30; {eight-bit counts per decade of power, default for A3038}
+	scale:real=30; {eight-bit counts per decade of weight}
 	num_slices:integer=1; {default one}
-	anchor:boolean=false; {default false}
 {
 	Result variables.
 }
@@ -3345,7 +3342,6 @@ begin
 		if (option='-payload') then payload:=Tcl_ObjInteger(vp)			
 		else if (option='-scale') then scale:=Tcl_ObjReal(vp)			
 		else if (option='-extent') then extent:=Tcl_ObjReal(vp)			
-		else if (option='-anchor') then anchor:=Tcl_ObjBoolean(vp)			
 		else if (option='-slices') then num_slices:=Tcl_ObjInteger(vp)			
 		else if (option='-background') then begin
 			field:=Tcl_ObjString(vp);
@@ -3354,7 +3350,7 @@ begin
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"image -payload -extent -anchor -scale -background -percentile -slices" in '
+				+'"image -payload -extent -scale -background -percentile -slices" in '
 				+'lwdaq_alt.');
 			exit;
 		end;
@@ -3428,68 +3424,49 @@ begin
 			gui_support('');
 		end;
 		
- 		{
- 			As a first guess at the location, use the location of the coil with
- 			the maximum power. Use the same coil as the initial anchor
- 			location.
-		}
-		location:=max_location;
-			
 		{
 			The detector coil power measurements we obtain from the tracker are
 			logarithmic. We want to perform a weighted centroid on the power
-			itself, not the logarithm of the power, so we are going to take the
-			anti-log of the power measurement. But we need to know what
-			increment in power measurement corresponcs to a factor of ten
-			increase in received power, and this scaling factor is what we have
-			in our "scale" parameter. We don't need to obtain an absolute power
-			value from the detector coils: so long as we know the relative
-			magnitude of the power received in each coil we can obtain the
-			centroid. We use the minimum coil power measurement as our
-			reference. When the power measurement is equal to the minimum coil
-			power, our anti-logarithm will produce the relative power value of
-			1.0. We reject any coils that are farther than the extent from a
-			reference point. With the anchor option false, we use our calculated
-			location of the transmitter to draw the extent circle for the next
-			calculation of location. We start by assuming the transmitter is at
-			the location of the coil with the maximum power, and obtain a first
-			estimate of location. We repeat the centroid calculation using this
-			first estimate and so obtain a second estimate. We repeat
-			num_calculations times to obtain our final estimate. When the anchor
-			option is true, we anchor the extent to the coil with the maximum
-			power and perform only one calculation.
+			itself, or the square root of the power, not on the logarithm of the
+			power. We take the anti-log of the power measurement. But we need to
+			know what increment in power measurement corresponcs to a factor of
+			ten increase in received power or received square root of power.
+			This scaling factor is what we have in our "scale" parameter. We use
+			the scale to obtain the "power weight". We don't need to obtain an
+			absolute power value from the detector coils: so long as we know the
+			relative magnitude of the power received in each coil we can obtain
+			the centroid. We assume that a power value of zero corresponds to
+			unit weight. We reject any coils that are farther than the extent
+			from the coil with maximum power.
 		}
-		for calculation_num:=1 to num_calculations do begin
-			sum_x:=0;
-			sum_y:=0;
-			sum_power:=0;
-			for detector_num:=0 to num_detectors-1 do begin
-				if (detector_coordinates[detector_num].x <> -1)
-					and (xy_separation(
-						detector_coordinates[detector_num],location)
-						<extent) then begin
-					scaled_power:=xpy(10,
-						(detector_powers[detector_num]-min_power+scale)/scale);
-					sum_x:=sum_x
-						+scaled_power
-						*detector_coordinates[detector_num].x;
-					sum_y:=sum_y
-						+scaled_power
-						*detector_coordinates[detector_num].y;
-					sum_power:=sum_power
-						+scaled_power;
-				end;
+		sum_x:=0;
+		sum_y:=0;
+		sum_power:=0;
+		for detector_num:=0 to num_detectors-1 do begin
+			if (detector_coordinates[detector_num].x <> -1)
+				and (xy_separation(
+					detector_coordinates[detector_num],max_location)
+					<extent) then begin
+				scaled_power:=xpy(10,
+					(detector_powers[detector_num]-min_power+scale)/scale);
+				sum_x:=sum_x
+					+scaled_power
+					*detector_coordinates[detector_num].x;
+				sum_y:=sum_y
+					+scaled_power
+					*detector_coordinates[detector_num].y;
+				sum_power:=sum_power
+					+scaled_power;
 			end;
-			if sum_power>0 then begin
-				location.x:=sum_x/sum_power;
-				location.y:=sum_y/sum_power;
-			end else begin
-				location.x:=error_value;
-				location.y:=error_value;
-			end;
-			if anchor then break;
 		end;
-		
+		if sum_power>0 then begin
+			location.x:=sum_x/sum_power;
+			location.y:=sum_y/sum_power;
+		end else begin
+			location.x:=error_value;
+			location.y:=error_value;
+		end;
+
 		field:='';
 		writestr(field,location.x:1:3,' ',location.y:1:3,' ');
 		for detector_num:=0 to num_detectors-1 do

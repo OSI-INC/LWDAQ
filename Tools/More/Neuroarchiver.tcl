@@ -283,7 +283,7 @@ proc Neuroarchiver_init {} {
 		set info(sps_$id) "0"
 		set info(status_$id) "None"
 	}
-	set config(loss_fraction) 0.8
+	set config(min_reception) 0.8
 	set config(extra_fraction) 1.1
 	set config(calibration_include) "Okay Loss Extra"
 	set info(calibration_selected) ""
@@ -629,9 +629,9 @@ proc Neuroarchiver_init {} {
 	set info(tracker_width) 640
 	set info(tracker_height) 320
 	set info(tracker_image_border_pixels) 10
-	set config(tracker_decade_scale) "30" 
-	set config(tracker_extent_radius) "30"
-	set config(tracker_anchor_extent) "0"
+	set config(tracker_decade_scale) "60" 
+	set config(tracker_extent_radius) "100"
+	set config(tracker_min_reception) "0.2"
 	set config(tracker_sample_rate) "16"
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
@@ -686,7 +686,8 @@ proc Neuroarchiver_init {} {
 	set info(export_epl) ""
 	set config(export_video) "0"
 	set config(export_signal) "1"
-	set config(export_tracker) "0"
+	set config(export_centroid) "0"
+	set config(export_powers) "0"
 	set config(export_format) "TXT"
 	set info(export_run_start) [clock seconds]
 	set config(export_reps) "1"
@@ -1921,7 +1922,7 @@ proc Neuroarchiver_signal {{channel_code ""} {status_only 0}} {
 				at $config(play_time) s in [file tail $config(play_file)]."
 			set info(status_$id) "Extra"
 		}
-	} elseif {$num_received < [expr $config(loss_fraction) \
+	} elseif {$num_received < [expr $config(min_reception) \
 			* $frequency * $info(play_interval_copy)]} {
 		set info(status_$id) "Loss"
 	} else {
@@ -4120,7 +4121,7 @@ proc Neurotracker_extract {} {
 	}
 	
 	# Determine if this is a lossy interval.
-	if {$info(loss)/100.0 < (1-$config(loss_fraction))} {
+	if {$info(loss)/100.0 < (1-$config(tracker_min_reception))} {
 		set lossy 0
 	} {
 		set lossy 1
@@ -4148,7 +4149,6 @@ proc Neurotracker_extract {} {
 				-payload $info(player_payload) \
 				-scale $config(tracker_decade_scale) \
 				-extent $config(tracker_extent_radius) \
-				-anchor $config(tracker_anchor_extent) \
 				-slices $num_slices \
 				-background $config(tracker_background)]
 		} error_result]} {
@@ -4239,9 +4239,6 @@ proc Neurotracker_open {} {
 	checkbutton $f.tsc -text "Coils" \
 		-variable Neuroarchiver_config(tracker_show_coils)
 	pack $f.tsc -side left -expand yes
-	checkbutton $f.tae -text "Anchor" \
-		-variable Neuroarchiver_config(tracker_anchor_extent)
-	pack $f.tae -side left -expand yes
 	
 	# Create control buttons.
 	set f [frame $w.control]
@@ -4628,11 +4625,13 @@ proc Neuroarchiver_exporter_open {} {
 		-text "Video" -fg $info(label_color)
 	pack $f.ve -side left -expand yes
 
-	checkbutton $f.te -variable Neuroarchiver_config(export_tracker) \
-		-text "Tracker" -fg $info(label_color)
-	label $f.lsps -text "Tracker Sample Rate (SPS):" -anchor w -fg $info(label_color)
-	entry $f.esps -textvariable Neuroarchiver_config(tracker_sample_rate) -width 3
-	pack $f.te $f.lsps $f.esps -side left -expand yes
+	checkbutton $f.te -variable Neuroarchiver_config(export_centroid) \
+		-text "Tracker Centroid" -fg $info(label_color)
+	pack $f.te -side left -expand yes
+
+	checkbutton $f.tp -variable Neuroarchiver_config(export_powers) \
+		-text "Tracker Powers" -fg $info(label_color)
+	pack $f.tp -side left -expand yes
 
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
 	
@@ -4765,18 +4764,23 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				set efn [file join $config(export_dir) "E$info(export_start_s)\_$id\.$ext"]
 				LWDAQ_print $info(export_text) "Exporting signal $id at $sps SPS to $efn."
 				if {[file exists $efn]} {
-					LWDAQ_print $info(export_text) "Deleting existing file\
-						[file tail $efn] in export directory."
-					file delete $efn
+					LWDAQ_print $info(export_text) "WARNING: Export file\
+						[file tail $efn] already exists, others may also exist."
 				}
 			}
-			if {$config(export_tracker)} {
+			if {$config(export_centroid) || $config(export_powers)} {
 				set efn [file join $config(export_dir) "T$info(export_start_s)\_$id\.$ext"]
-				LWDAQ_print $info(export_text) "Exporting tracker $id at\
+				LWDAQ_print -nonewline $info(export_text) "Exporting tracker "
+				foreach p {centroid activity powers} {
+					if {$config(export_$p)} {
+						LWDAQ_print -nonewline $info(export_text) "$p "
+					}
+				}
+				LWDAQ_print $info(export_text) "for signal $id at\
 					$config(tracker_sample_rate) SPS to $efn."
 				if {[file exists $efn]} {
-					LWDAQ_print $info(export_text) "Deleting existing file\
-						[file tail $efn] in export directory."
+					LWDAQ_print $info(export_text) "WARNING: Export file\
+						[file tail $efn] already exists, others may also exist."
 					file delete $efn
 				}
 			}
@@ -4862,7 +4866,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				accelerate export."
 			set config(video_enable) 0
 		}
-		if {$config(export_tracker)} {
+		
+		if {$config(export_centroid) || $config(export_powers)} {
 			set config(alt_calculate) "1"
 			if {[winfo exists $info(tracker_window)]} {
 				LWDAQ_print $info(export_text) "SUGGESTION: Close the Neurotracker\
@@ -4902,7 +4907,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			# Write the signal to disk.
 			if {$config(export_signal)} {
 				if {$config(export_format) == "TXT"} {
-					set fn [file join $config(export_dir) "E$info(export_start_s)\_$info(channel_num)\.txt"]
+					set fn [file join $config(export_dir) \
+						"E$info(export_start_s)\_$info(channel_num)\.txt"]
 					set export_string ""
 					foreach {timestamp value} $info(signal) {
 					  append export_string "$value\n"
@@ -4911,7 +4917,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					puts -nonewline $f $export_string
 					close $f
 				} elseif {$config(export_format) == "BIN"} {
-					set fn [file join $config(export_dir) "E$info(export_start_s)\_$info(channel_num)\.bin"]
+					set fn [file join $config(export_dir) \
+						"E$info(export_start_s)\_$info(channel_num)\.bin"]
 					set export_bytes ""
 					foreach {timestamp value} $info(signal) {
 					  append export_bytes [binary format S $value]
@@ -4924,11 +4931,17 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			}
 		
 			# Write tracker output to disk.
-			if {$config(export_tracker)} {
+			if {$config(export_centroid) || $config(export_powers)} {
 				if {$config(export_format) == "TXT"} {
 					set export_string ""
 					foreach slice $info(tracker_result) {
-						append export_string "[lindex $slice 0] [lindex $slice 1]\n"
+						if {$config(export_centroid) && $config(export_powers)} {
+							append export_string "$slice\n"
+						} elseif {$config(export_centroid)} {
+							append export_string "[lrange $slice 0 1]\n"
+						} elseif {$config(export_powers)} {
+							append export_string "[lrange $slice 2 end]\n"
+						}
 					}
 					set fn [file join $config(export_dir) \
 						"T$info(export_start_s)\_$info(channel_num)\.txt"]
@@ -4940,10 +4953,17 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 						"T$info(export_start_s)\_$info(channel_num)\.bin"]
 					set export_bytes ""
 					foreach slice $info(tracker_result) {
-						append export_bytes [binary format S \
-							[expr round([lindex $slice 0]*10.0)]]
-						append export_bytes [binary format S \
-							[expr round([lindex $slice 1]*10.0)]]
+						if {$config(export_centroid)} {
+							append export_bytes [binary format S \
+								[expr round([lindex $slice 0]*10.0)]]
+							append export_bytes [binary format S \
+								[expr round([lindex $slice 1]*10.0)]]
+						}
+						if {$config(export_powers)} {
+							foreach p [lrange $slice 2 end] {
+								append export_bytes [binary format c $p]
+							}
+						}
 					}
 					set f [open $fn a]
 					fconfigure $f -translation binary
@@ -6209,7 +6229,7 @@ proc Neuroarchiver_record {{command ""}} {
 				> $info(recorder_message_interval)} {
 				Neuroarchiver_print "$daq_result"
 				set info(recorder_message_interval) \
-					[expr $info(initial_message_interval) \
+					[expr $info(recorder_message_interval) \
 					* $info(message_interval_multiplier)]
 			}
 			LWDAQ_post Neuroarchiver_record end
