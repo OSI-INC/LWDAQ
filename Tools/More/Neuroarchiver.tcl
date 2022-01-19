@@ -59,7 +59,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "153"
+	LWDAQ_tool_init "Neuroarchiver" "154"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -205,8 +205,8 @@ proc Neuroarchiver_init {} {
 	set info(overview_fsd) 2
 #
 # During play-back and processing, we step through each channel selected by the
-# user with the channel_selector parameter. For each channel we create a
-# graph of its signal versus time, which we display in the v-t window, and its
+# user with the channel_selector parameter. For each channel we create a graph
+# of its signal versus time, which we display in the v-t window, and its
 # amplitude versus frequency, which we display in the a-t window. The empty
 # value for these two graphs is a point at the origin. When we have real data in
 # the graphs, each graph point is two numbers: an x and y value, which would
@@ -669,12 +669,13 @@ proc Neuroarchiver_init {} {
 	set info(datetime_start_time) [Neuroarchiver_datetime_convert [clock seconds]]
 	set info(datetime_archive_name) "M0000000000.ndf"
 	set info(datetime_panel) $info(window)\.clock
-	set info(export_panel) $info(window)\.export
 	set info(export_help_url) \
 		"http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html#Exporting%20Data"
 #
-# Export boundaries.
+# Export settings.
 #
+	set info(export_panel) $info(window)\.export
+	set info(edf_panel) $info(window)\.edf
 	set info(export_start_s) "0000000000"
 	set info(export_end_s) $info(export_start_s)
 	set config(export_start) [Neuroarchiver_datetime_convert $info(export_start_s)]
@@ -686,6 +687,7 @@ proc Neuroarchiver_init {} {
 	set config(export_video) "0"
 	set config(export_signal) "1"
 	set config(export_centroid) "0"
+	set config(export_single_file) "0" 
 	set config(export_powers) "0"
 	set config(export_format) "TXT"
 	set info(export_run_start) [clock seconds]
@@ -4552,6 +4554,20 @@ proc Neuroarchiver_exporter_open {} {
 	label $f.state -textvariable Neuroarchiver_info(export_state) -fg blue -width 10
 	button $f.export -text "Start" -command "LWDAQ_post Neuroarchiver_export"
 	button $f.stop -text "Stop" -command {Neuroarchiver_export "Stop"}
+	pack $f.state $f.export $f.stop -side left -expand yes
+	
+	label $f.lformat -text "File:" -anchor w -fg $info(label_color)
+	pack $f.lformat -side left -expand yes
+	foreach a "TXT BIN EDF" {
+		set b [string tolower $a]
+		radiobutton $f.$b -variable Neuroarchiver_config(export_format) \
+			-text $a -value $a
+		pack $f.$b -side left -expand yes
+	}
+	checkbutton $f.sf -variable Neuroarchiver_config(export_single_file) \
+		-text "Single File"
+	pack $f.sf -side left -expand yes	
+	
 	button $f.dir -text "PickDir" -command {
 		set ndir [LWDAQ_get_dir_name]
 		if {($ndir != "") && ([file exists $ndir])} {
@@ -4560,15 +4576,8 @@ proc Neuroarchiver_exporter_open {} {
 				"Set export directory to $Neuroarchiver_config(export_dir)."
 		}
 	}
-	pack $f.state $f.export $f.stop $f.dir -side left -expand yes
-	label $f.lformat -text "Format:" -anchor w -fg $info(label_color)
-	pack $f.lformat -side left -expand yes
-	foreach a "TXT BIN" {
-		set b [string tolower $a]
-		radiobutton $f.$b -variable Neuroarchiver_config(export_format) \
-			-text $a -value $a
-		pack $f.$b -side left -expand yes
-	}
+	pack $f.dir -side left -expand yes
+
 	button $f.help -text "Help" -command "LWDAQ_url_open $info(export_help_url)"
 	pack $f.help -side left -expand yes
 	
@@ -4629,24 +4638,29 @@ proc Neuroarchiver_exporter_open {} {
 	pack $f.ldata -side left -expand yes
 	
 	checkbutton $f.se -variable Neuroarchiver_config(export_signal) \
-		-text "Signal" -fg $info(label_color)
+		-text "Signal" 
 	pack $f.se -side left -expand yes
 
 	checkbutton $f.ve -variable Neuroarchiver_config(export_video) \
-		-text "Video" -fg $info(label_color)
+		-text "Video" 
 	pack $f.ve -side left -expand yes
 
 	checkbutton $f.te -variable Neuroarchiver_config(export_centroid) \
-		-text "Tracker Centroid" -fg $info(label_color)
+		-text "Centroid" 
 	pack $f.te -side left -expand yes
 
 	checkbutton $f.tp -variable Neuroarchiver_config(export_powers) \
-		-text "Tracker Powers" -fg $info(label_color)
+		-text "Powers" 
 	pack $f.tp -side left -expand yes
 
-	label $f.trl -text "Tracker Rate (SPS):" -fg $info(label_color)
-	entry $f.tre -textvariable Neuroarchiver_config(tracker_sample_rate) -width 4
-	pack $f.trl $f.tre -side left -expand yes
+	label $f.lsetup -text "Setup:" -anchor w -fg $info(label_color)
+	pack $f.lsetup -side left -expand yes
+	
+	button $f.ts -text "Tracker" -command "LWDAQ_post Neurotracker_open"
+	pack $f.ts -side left -expand yes
+
+	button $f.edfs -text "EDF" -command "LWDAQ_post Neuroarchiver_edf_setup"
+	pack $f.edfs -side left -expand yes
 
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
 	
@@ -4658,6 +4672,20 @@ proc Neuroarchiver_exporter_open {} {
 	LWDAQ_post {
 		set Neuroarchiver_config(export_start) \
 			$Neuroarchiver_info(datetime_start_time)
+	}
+	
+	# Suggest how export can be accelerated.
+	if {$config(enable_vt)} {
+		LWDAQ_print $info(export_text) "SUGGESTION: Disable Value vs. Time plot\
+			to accelerate export."
+	}
+	if {$config(enable_af)} {
+		LWDAQ_print $info(export_text) "SUGGESTION: Disable Amplitude vs. Frequency\
+			plot to accelerate export."
+	}
+	if {$config(play_interval) != $info(optimal_export_interval)} {
+		LWDAQ_print $info(export_text) "SUGGESTION: Use 8-s playback interval\
+			to accelerate export."
 	}
 }
 
@@ -4687,6 +4715,86 @@ proc Neuroarchiver_exporter_autofill {} {
 }
 
 #
+# Neurotracker_edf_setup is used by the exporter to set the various titles and names
+# that the EDF export file header provides for describing signals and defining their
+# ranges. 
+#
+proc Neuroarchiver_edf_setup {} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+	global EDF
+
+	# Open the EDF setup panel.
+	package require EDF 1.2
+	set w $info(edf_panel)
+	if {[winfo exists $w]} {destroy $w}
+	toplevel $w
+	scan [wm maxsize .] %d%d x y
+	wm maxsize $w [expr $x*2] [expr $y*2]
+	wm title $w "European Data Format Setup Panel, Neuroarchiver $info(version)"
+
+	set f [frame $w.controls]
+	pack $f -side top -fill x
+	
+	label $f.lchannels -text "Select (ID:SPS):" -anchor w -fg $info(label_color)
+	entry $f.echannels -textvariable Neuroarchiver_config(channel_selector) -width 80	
+	button $f.auto -text "Autofill" -command {
+		set Neuroarchiver_config(channel_selector) "*"
+		LWDAQ_post [list Neuroarchiver_play "Repeat"]
+		LWDAQ_post Neuroarchiver_exporter_autofill
+	}
+	pack $f.lchannels $f.echannels $f.auto -side left -expand yes
+
+	button $f.refresh -text "Refresh" -command Neuroarchiver_edf_setup
+	pack $f.refresh -side left -expand yes
+
+	set f [frame $w.header]
+	pack $f -side top -fill x
+	
+	foreach a {Patient Recording} {
+		set b [string tolower $a]
+		label $f.l$b -text "$a\:" -fg $info(label_color) 
+		entry $f.e$b -textvariable EDF($b) -width 50
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+	
+	foreach code $config(channel_selector) {
+		set code [split $code :]
+		set id [lindex $code 0]
+		if {![string is integer -strict $id]} {
+			Neuroarchiver_print "ERROR: Bad channel number \"$code\"\
+				in EDF setup, try Autofill."
+			if {$info(window) != ""} {raise $info(window)} {raise .}
+			break
+		}
+		set sps [lindex $code 1]
+		if {![string is integer -strict $sps]} {
+			Neuroarchiver_print "ERROR: Bad sample rate \"$sps\" for channel $id\
+				in EDF setup, try Autofill."
+			if {$info(window) != ""} {raise $info(window)} {raise .}
+			break
+		}
+		set f [frame $w.details_$id]
+		pack $f -side top -fill x
+		label $f.lid -text "ID:" -fg $info(label_color)
+		label $f.vid -text "$id" -width 4
+		set EDF(name_$id) "$id"
+		label $f.lsps -text "SPS:" -fg $info(label_color)
+		label $f.vsps -text "$sps" -width 5
+		pack $f.lid $f.vid $f.lsps $f.vsps -side left -expand yes
+		foreach {a len} {Name 8 Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 10} {
+			set b [string tolower $a]
+			if {![info exists EDF($b\_$id)]} {
+				set EDF($b\_$id) [set EDF($b)]
+			}
+			label $f.l$b -text "$a\:" -fg $info(label_color) 
+			entry $f.e$b -textvariable EDF($b\_$id) -width $len
+			pack $f.l$b $f.e$b -side left -expand yes
+		}
+	}
+}
+
+#
 # Neuroarchiver_export manages the exporting of recorded signals to files,
 # tracker signals to files, and the creation of simultaneous video to
 # concatinated video files. that match the export intervals.
@@ -4695,6 +4803,13 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 	
+	# Establish file extension, which is the file format in lower case.
+	set ext [string tolower $config(export_format)]
+	if {$config(export_format) == "EDF"} {
+		package require EDF 1.2
+	}	
+
+	# If the command is stop, abort all export processes.
 	if {$cmd == "Stop"} {
 		if {$info(export_state) != "Idle"} {
 			LWDAQ_print $info(export_text) "Aborting export at\
@@ -4709,7 +4824,9 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		return "SUCCESS"
 	}
 
+	# If the command is start, begin the export process.
 	if {$cmd == "Start"} {
+
 		# Check the current state of the exporter.
 		if {$info(export_state) != "Idle"} {
 			LWDAQ_print $info(export_text) "WARNING: Exporter already started,\
@@ -4717,7 +4834,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			return "ERROR"
 		}
 		set info(export_state) "Start"
-		set info(export_run_start) [clock seconds]			
+		set info(export_run_start) [clock seconds]	
 		
 		# Calculate Unix start and end times.
 		set info(export_start_s) [Neuroarchiver_datetime_convert $config(export_start)]
@@ -4735,10 +4852,12 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		
 		# Check the channel select string and clean up existing export files.
 		set config(channel_selector) [string trim $config(channel_selector)]
+		set signals [list]
 		foreach channel $config(channel_selector) {
 			if {$channel == "*"} {
 				LWDAQ_print $info(export_text) \
-					"ERROR: Cannot use wildcard channel select, aborting export."
+					"ERROR: Cannot use wildcard channel select, aborting export.\
+						Use Autofill or enter select string by hand."
 				LWDAQ_post "Neuroarchiver_export Stop"
 				return "FAIL"
 			}
@@ -4764,41 +4883,58 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				LWDAQ_post "Neuroarchiver_export Stop"
 				return "FAIL"
 			}
-			if {$config(export_format) == "TXT"} {
-				set ext "txt"
-			} elseif {$config(export_format) == "BIN"} {
-				set ext "bin"
-			} else {
-				LWDAQ_print $info(export_text) \
-					"ERROR: Invalid output format \"config(export_format)\",\
-						aborting export."
-				LWDAQ_post "Neuroarchiver_export Stop"
-				return "FAIL"
-			}
-			if {$config(export_signal)} {
-				set efn [file join $config(export_dir) "E$info(export_start_s)\_$id\.$ext"]
-				LWDAQ_print $info(export_text) "Exporting signal $id at $sps SPS to $efn."
-				if {[file exists $efn]} {
-					LWDAQ_print $info(export_text) "WARNING: Export file\
-						[file tail $efn] already exists, others may also exist."
-				}
-			}
-			if {$config(export_centroid) || $config(export_powers)} {
-				set efn [file join $config(export_dir) "T$info(export_start_s)\_$id\.$ext"]
-				LWDAQ_print -nonewline $info(export_text) "Exporting tracker "
-				foreach p {centroid powers} {
-					if {$config(export_$p)} {
-						LWDAQ_print -nonewline $info(export_text) "$p "
+			lappend signals $id $sps
+						
+			if {$config(export_single_file)} {
+				set efn [file join $config(export_dir) "E$info(export_start_s).$ext"]
+				LWDAQ_print -nonewline $info(export_text) "Exporting "
+				foreach a "signal centroid powers" {
+					if {[set config(export_$a)]} {
+						LWDAQ_print -nonewline $info(export_text) "$a "
 					}
 				}
-				LWDAQ_print $info(export_text) "for signal $id at\
-					$config(tracker_sample_rate) SPS to $efn."
+				LWDAQ_print $info(export_text) "for channel $id to \"$efn\"."
 				if {[file exists $efn]} {
-					LWDAQ_print $info(export_text) "WARNING: Export file\
-						[file tail $efn] already exists, others may also exist."
+					LWDAQ_print $info(export_text) "WARNING: Deleting existing\
+						export file [file tail $efn]."
 					file delete $efn
 				}
+			} {
+				if {$config(export_signal)} {
+					set efn [file join $config(export_dir) "E$info(export_start_s)\_$id\.$ext"]
+					LWDAQ_print $info(export_text) "Exporting signal $id at $sps SPS to $efn."
+					if {[file exists $efn]} {
+						LWDAQ_print $info(export_text) "WARNING: Export file\
+							[file tail $efn] already exists, others may also exist."
+					}
+				}
+				if {$config(export_centroid) || $config(export_powers)} {
+					set efn [file join $config(export_dir) "T$info(export_start_s)\_$id\.$ext"]
+					LWDAQ_print -nonewline $info(export_text) "Exporting tracker "
+					foreach p {centroid powers} {
+						if {$config(export_$p)} {
+							LWDAQ_print -nonewline $info(export_text) "$p "
+						}
+					}
+					LWDAQ_print $info(export_text) "for channel $id at\
+						$config(tracker_sample_rate) SPS to $efn."
+					if {[file exists $efn]} {
+						LWDAQ_print $info(export_text) "WARNING: Export file\
+							[file tail $efn] already exists, others may also exist."
+						file delete $efn
+					}
+				}
+				if {$config(export_format) == "EDF"} {
+					LWDAQ_print $info(export_text) "Creating EDF file [file tail $efn]."
+					EDF_create $efn $config(play_interval) "$id $sps" $info(export_start_s)
+				}
 			}
+		}
+		
+		# If we are exporting to one EDF file, create the header for all signals now.
+		if {$config(export_single_file) && ($config(export_format) == "EDF")} {
+			LWDAQ_print $info(export_text) "Creating EDF file [file tail $efn]."
+			EDF_create $efn $config(play_interval) $signals $info(export_start_s)
 		}
 		
 		# Stop stray left-over processes, then clear the process list and the
@@ -4885,24 +5021,12 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		if {$config(export_centroid) || $config(export_powers)} {
 			set config(alt_calculate) "1"
 			if {[winfo exists $info(tracker_window)]} {
-				LWDAQ_print $info(export_text) "SUGGESTION: Close the Neurotracker\
+				LWDAQ_print $info(export_text) "WARNING: Closing the Neurotracker\
 					panel to accelerate export."
+				destroy $info(tracker_window)
 			}
 		} 
 	
-		if {$config(enable_vt)} {
-			LWDAQ_print $info(export_text) "SUGGESTION: Disable Value vs. Time plot\
-				to accelerate export."
-		}
-		if {$config(enable_af)} {
-			LWDAQ_print $info(export_text) "SUGGESTION: Disable Amplitude vs. Frequency\
-				plot to accelerate export."
-		}
-		if {$config(play_interval) != $info(optimal_export_interval)} {
-			LWDAQ_print $info(export_text) "SUGGESTION: Use 8-s playback interval\
-				to accelerate export."
-		}
-		
 		set info(export_state) "Play"	
 		set config(play_time) $archive_start_time
 		Neuroarchiver_command play "Play"
@@ -4919,34 +5043,51 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		# Continue to export, provided that we are not yet done.
 		set interval_start_s [Neuroarchiver_datetime_convert $info(datetime_play_time)]
 		if {$interval_start_s < $info(export_end_s)} {
+
 			# Write the signal to disk.
 			if {$config(export_signal)} {
-				if {$config(export_format) == "TXT"} {
+				if {$config(export_single_file)} {
 					set fn [file join $config(export_dir) \
-						"E$info(export_start_s)\_$info(channel_num)\.txt"]
-					set export_string ""
-					foreach {timestamp value} $info(signal) {
-					  append export_string "$value\n"
-					}
+						"E$info(export_start_s).$ext"]
+				} {
+					set fn [file join $config(export_dir) \
+						"E$info(export_start_s)\_$info(channel_num)\.$ext"]
+				}
+				if {$config(export_format) == "TXT"} {
 					set f [open $fn a]
-					puts -nonewline $f $export_string
+					foreach value $info(values) {
+						puts $f $v
+					}
 					close $f
 				} elseif {$config(export_format) == "BIN"} {
-					set fn [file join $config(export_dir) \
-						"E$info(export_start_s)\_$info(channel_num)\.bin"]
 					set export_bytes ""
-					foreach {timestamp value} $info(signal) {
+					foreach value $info(values) {
 					  append export_bytes [binary format S $value]
 					}
 					set f [open $fn a]
 					fconfigure $f -translation binary
 					puts -nonewline $f $export_bytes
 					close $f
+				} elseif {$config(export_format) == "EDF"} {
+					if {!$config(export_single_file) || \
+							[string match "$info(channel_num):*" \
+								[lindex $config(channel_selector) 0]]} {
+						EDF_num_records_incr $fn
+					} 
+					EDF_append $fn $info(values)
 				}
 			}
 		
 			# Write tracker output to disk.
 			if {$config(export_centroid) || $config(export_powers)} {
+				if {$config(export_single_file)} {
+					set fn [file join $config(export_dir) \
+						"T$info(export_start_s).$ext"]
+				} {
+					set fn [file join $config(export_dir) \
+						"T$info(export_start_s)\_$info(channel_num)\.$ext"]
+				}
+				
 				if {$config(export_format) == "TXT"} {
 					set export_string ""
 					foreach slice $info(tracker_result) {
@@ -4958,14 +5099,10 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 							append export_string "[lrange $slice 2 end]\n"
 						}
 					}
-					set fn [file join $config(export_dir) \
-						"T$info(export_start_s)\_$info(channel_num)\.txt"]
 					set f [open $fn a]
 					puts $f [string trim $export_string]
 					close $f
 				} elseif {$config(export_format) == "BIN"} {
-					set fn [file join $config(export_dir) \
-						"T$info(export_start_s)\_$info(channel_num)\.bin"]
 					set export_bytes ""
 					foreach slice $info(tracker_result) {
 						if {$config(export_centroid)} {
@@ -4985,12 +5122,16 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					fconfigure $f -translation binary
 					puts -nonewline $f $export_bytes
 					close $f
+				} elseif {$config(export_format) == "EDF"} {
+					LWDAQ_print $info(export_text) "EDF tracker export not yet ready."				
 				}
 			}
 		}
 
-		# We are done if the end of this interval exceeds our export end time. 
-		if {$interval_start_s + $info(play_interval_copy) >= $info(export_end_s)} {
+		# We are done if the end of this interval exceeds our export end time, and we 
+		# have exported all channels already. 
+		if {[string match "$info(channel_num):*" [lindex $config(channel_selector) end]] \
+				&& ($interval_start_s + $info(play_interval_copy) >= $info(export_end_s))} {
 			Neuroarchiver_print "Stopping playback because export job is done."
 			LWDAQ_print $info(export_text) "Export of $config(export_duration) s\
 				of recorded signal complete."
@@ -7770,8 +7911,8 @@ proc Neuroarchiver_video_action {cmd datetime length} {
 # in which we create them in the code. Frames enclose rows of buttons, labels,
 # and entry boxes. The images are TK "photos" associated with label widgets. The
 # last thing to go into the Neuroarchiver panel is its text window. The display
-# is fully-enabled when info(mode) is "N" for Neuroarchiver. If the mode is
-# "P", we show only the player. If "R", we show only the recorder.
+# is fully-enabled when info(mode) is "Main" or "Combined". If the mode is
+# "Player", we show only the player. If "Recorder", we show only the recorder.
 #
 proc Neuroarchiver_open {} {
 	upvar #0 Neuroarchiver_config config

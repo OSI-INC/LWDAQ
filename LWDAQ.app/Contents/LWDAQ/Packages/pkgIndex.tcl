@@ -8,5 +8,5 @@
 # script is sourced, the variable $dir must contain the
 # full path name of this file's directory.
 
-package ifneeded EDF 1.1 [list source [file join $dir EDF.tcl]]
+package ifneeded EDF 1.2 [list source [file join $dir EDF.tcl]]
 package ifneeded NIKHEF 1.0 [list source [file join $dir NIKHEF.tcl]]
