@@ -4589,14 +4589,13 @@ proc Neuroarchiver_exporter_open {} {
 	pack $f.sl $f.slv -side left -expand yes 
 	
 	label $f.dl -text "Duration (s):" -anchor w -fg $info(label_color) 
-	entry $f.dlv -textvariable Neuroarchiver_config(export_duration) -width 6
+	entry $f.dlv -textvariable Neuroarchiver_config(export_duration) -width 14
 	pack $f.dl $f.dlv -side left -expand yes 
 	
 	label $f.ql -text "Repetitions:" -anchor w -fg $info(label_color)
 	entry $f.qlv -textvariable Neuroarchiver_config(export_reps) -width 3
 	pack $f.ql $f.qlv -side left -expand yes 
 	
-	label $f.stl -text "Set Start To:" -anchor w -fg $info(label_color)
 	button $f.ssi -text "Interval Beginning" -command {
 		set Neuroarchiver_config(export_start) [Neuroarchiver_datetime_convert \
 			[expr [Neuroarchiver_datetime_convert \
@@ -4618,9 +4617,9 @@ proc Neuroarchiver_exporter_open {} {
 				duration $Neuroarchiver_config(export_duration) s,\
 				repetions $Neuroarchiver_config(export_reps)."
 	}
-	pack $f.stl $f.ssi $f.ssa -side left -expand yes 
+	pack $f.ssi $f.ssa -side left -expand yes 
 
-	button $f.clock -text "Clock" -command "LWDAQ_post Neuroarchiver_datetime"
+	button $f.clock -text "Show Clock" -command "LWDAQ_post Neuroarchiver_datetime"
 	pack $f.clock -side left -expand yes
 
 	set f [frame $w.select]
@@ -4731,12 +4730,15 @@ proc Neuroarchiver_edf_read {} {
 	if {$fn == ""} {retuen "ABORT"}
 	set signals [EDF_header_read $fn]
 	set s [list]
-	foreach {id fq} $signals {lappend s "$id\:$fq"}
+	foreach {id fq} $signals {
+		if {[string is integer $id]} {
+			lappend s "$id\:$fq"
+		}
+	}
 	set config(channel_selector) $s
 	Neuroarchiver_edf_setup
 	return $fn
 }
-
 
 #
 # Neurotracker_edf_setup is used by the exporter to set the various titles and names
@@ -4863,10 +4865,13 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		set info(export_state) "Start"
 		set info(export_run_start) [clock seconds]	
 		
-		# Calculate Unix start and end times.
+		# Calculate Unix start and end times. The duration can be a mathematical
+		# expression, such as 24*60*60 for the number of seconds in a day.
 		set info(export_start_s) [Neuroarchiver_datetime_convert $config(export_start)]
-		set info(export_end_s) [expr $info(export_start_s) + $config(export_duration)]
-		LWDAQ_print $info(export_text) "\nStarting export of $config(export_duration) s\
+		set info(export_end_s) [expr $info(export_start_s) \
+			+ [expr $config(export_duration)]]
+		LWDAQ_print $info(export_text) "\nStarting export of\
+				[expr $config(export_duration)] s\
 			from time $config(export_start)." purple
 		LWDAQ_print $info(export_text) "Start absolute time $info(export_start_s) s,\
 			end absolute time $info(export_end_s) s."
@@ -5038,7 +5043,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		}
 	
 		LWDAQ_print $info(export_text) "Starting export of\
-			$config(export_duration) s from NDF archives."
+			[expr $config(export_duration)] s from NDF archives."
 		if {$config(video_enable)} {
 			LWDAQ_print $info(export_text) "WARNING: Disabling video playback to\
 				accelerate export."
@@ -5160,7 +5165,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		if {[string match "$info(channel_num):*" [lindex $config(channel_selector) end]] \
 				&& ($interval_start_s + $info(play_interval_copy) >= $info(export_end_s))} {
 			Neuroarchiver_print "Stopping playback because export job is done."
-			LWDAQ_print $info(export_text) "Export of $config(export_duration) s\
+			LWDAQ_print $info(export_text) "Export of [expr $config(export_duration)] s\
 				of recorded signal complete."
 			set info(play_control) "Stop"
 
