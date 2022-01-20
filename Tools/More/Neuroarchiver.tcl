@@ -458,27 +458,26 @@ proc Neuroarchiver_init {} {
 #
 	set config(ndf_prefix) "M"
 #
-# The metadata header is a string the we append to the metadata of a 
-# new archive. We can edit the header in the metadata header window.
+# The metadata header is a string the we append to the metadata of a new
+# archive. We can edit the header in the metadata header window.
 #
 	set info(metadata_header) ""
 	set info(metadata_header_window) "$info(window)\.metadataheader"
 #
-# When autocreate is greater than zero, it gives the number of seconds
-# after which we should stop using one archive and create another one.
-# We find the Neuroarchiver to be efficient with archives hundreds of
-# megabytes long, so autocreate can be set to 43200 seconds with no drop
-# in performance, leading to twelve hours of data in one file.
+# When autocreate is greater than zero, it gives the number of seconds after
+# which we should stop using one archive and create another one. We find the
+# Neuroarchiver to be efficient with archives hundreds of megabytes long, so
+# autocreate can be set to 43200 seconds with no drop in performance, leading to
+# twelve hours of data in one file.
 #
 	set config(autocreate) 3600
 # 
-# When we create a new archive, we wait until the system clock enters
-# a window of time after the start of a new second. During this time
-# we reset the data receiver and name the new recording archive after
-# the current time in seconds. The window must be wide enough that we
-# are certain to notice that we are in the window, but narrow enough
-# that it does not compromise synchronization of the recording with
-# the system clock.
+# When we create a new archive, we wait until the system clock enters a window
+# of time after the start of a new second. During this time we reset the data
+# receiver and name the new recording archive after the current time in seconds.
+# The window must be wide enough that we are certain to notice that we are in
+# the window, but narrow enough that it does not compromise synchronization of
+# the recording with the system clock.
 #
 	set info(sync_window_ms) 30
 #
@@ -487,13 +486,13 @@ proc Neuroarchiver_init {} {
 #
 	set config(synchronize) 1
 #
-# The channel list tells the play-back process which channels it should
-# extract from the message blocks for analysis. If we want reconstruction
-# of the signal, which eliminates bad messages and replaces missing messages,
-# we must specify the correct message frequency and the extent of the
-# transmission scatter implemented by the tranmsitter. The phrase "5:512:8"
-# specifies channel 5 with frequency 512 and scatter 8. We have default values
-# for frequency, which will be used if we do not specify values.
+# The channel list tells the play-back process which channels it should extract
+# from the message blocks for analysis. If we want reconstruction of the signal,
+# which eliminates bad messages and replaces missing messages, we must specify
+# the correct message frequency and the extent of the transmission scatter
+# implemented by the tranmsitter. The phrase "5:512:8" specifies channel 5 with
+# frequency 512 and scatter 8. We have default values for frequency, which will
+# be used if we do not specify values.
 #
 	set config(channel_selector) "*"
 	set config(default_frequency) "128 256 512 1024 2048 4096"
@@ -575,9 +574,9 @@ proc Neuroarchiver_init {} {
 	set config(log_frequency) 0
 	set config(log_amplitude) 0
 #
-# The Neuroarchiver deletes old lines from its text window. It keeps
-# the following number of most recent lines. The more lines we keep,
-# the slower the print-out of characteristics to the screen will be.
+# The Neuroarchiver deletes old lines from its text window. It keeps the
+# following number of most recent lines. The more lines we keep, the slower the
+# print-out of characteristics to the screen will be.
 #
 	set config(num_lines_keep) 200
 #
@@ -586,9 +585,9 @@ proc Neuroarchiver_init {} {
 	set info(label_color) "darkgreen"
 	set info(variable_bg) "lightgray"
 #
-# We apply a window function to the signal before we take the fourier 
-# transform. This function smooths the signal to its average value 
-# starting window_fraction*num_samples from the left and right edges.
+# We apply a window function to the signal before we take the fourier transform.
+# This function smooths the signal to its average value starting
+# window_fraction*num_samples from the left and right edges.
 #
 	set config(window_fraction) 0.1
 # 
@@ -597,14 +596,13 @@ proc Neuroarchiver_init {} {
 	set config(vt_view_zoom) 2
 	set config(af_view_zoom) 2
 #
-# When glitch_threshold is greater than zero, the glitch threshold
-# is enabled. A threshold equal to the baseline amplitude is a good
-# choice.
+# When glitch_threshold is greater than zero, the glitch threshold is enabled. A
+# threshold equal to the baseline amplitude is a good choice.
 #
 	set config(glitch_threshold) 200
 #
-# The glitch_count parameter is for counting how many glitches the 
-# glitch filter removes from the data.
+# The glitch_count parameter is for counting how many glitches the glitch filter
+# removes from the data.
 #
 	set config(glitch_count) 0
 # 
@@ -664,9 +662,9 @@ proc Neuroarchiver_init {} {
 # The Playback Clock default settings.
 #
 	set config(datetime_format) {%d-%b-%Y %H:%M:%S}
-	set info(datetime_play_time) [Neuroarchiver_datetime_convert [clock seconds]]
-	set config(datetime_jump_to) [Neuroarchiver_datetime_convert [clock seconds]]
-	set info(datetime_start_time) [Neuroarchiver_datetime_convert [clock seconds]]
+	set info(datetime_play_time) [Neuroarchiver_clock_convert [clock seconds]]
+	set config(datetime_jump_to) [Neuroarchiver_clock_convert [clock seconds]]
+	set info(datetime_start_time) [Neuroarchiver_clock_convert [clock seconds]]
 	set info(datetime_archive_name) "M0000000000.ndf"
 	set info(datetime_panel) $info(window)\.clock
 	set info(export_help_url) \
@@ -678,7 +676,7 @@ proc Neuroarchiver_init {} {
 	set info(edf_panel) $info(window)\.edf
 	set info(export_start_s) "0000000000"
 	set info(export_end_s) $info(export_start_s)
-	set config(export_start) [Neuroarchiver_datetime_convert $info(export_start_s)]
+	set config(export_start) [Neuroarchiver_clock_convert $info(export_start_s)]
 	set config(export_duration) 60
 	set config(export_dir) "~/Desktop"
 	set info(export_state) "Idle"
@@ -687,7 +685,7 @@ proc Neuroarchiver_init {} {
 	set config(export_video) "0"
 	set config(export_signal) "1"
 	set config(export_centroid) "0"
-	set config(export_single_file) "0" 
+	set config(export_combine) "0" 
 	set config(export_powers) "0"
 	set config(export_format) "TXT"
 	set info(export_run_start) [clock seconds]
@@ -802,7 +800,7 @@ proc Neuroarchiver_print {line {color "black"}} {
 	set info(previous_line) $line
 	
 	if {[regexp "^WARNING: " $line] || [regexp "^ERROR: " $line]} {
-		append line " ([Neuroarchiver_datetime_convert [clock seconds]]\)"
+		append line " ([Neuroarchiver_clock_convert [clock seconds]]\)"
 		if {[regexp -nocase [file tail $config(play_file)] $line]} {
 			set line [regsub "^WARNING: " $line "WARNING: $info(datetime_play_time) "]
 		} 
@@ -1051,16 +1049,16 @@ proc Neuroarchiver_metadata_view {fn} {
 
 #
 # Neuroarchvier_metadata_header returns a header string for a newly-created
-# archive. The header string contains one or two xml <c> fields, which we intend to
-# act as two comment fields. The first field is one we generate automatically.
-# It contains the time, host, and software version. The second field contains 
-# the contents of the metadata header string, with white space removed before 
-# and after. If there are no non-whitespace characters in the metadata header
-# string, we don't add the second comment, and this is the default when we open
-# the Neuroarchiver. We create a metadata header string by pressing the header
-# button and entering and saving the string. This string might contain a 
-# description of our experiment, and it will be added to all archives we create
-# as we record.
+# archive. The header string contains one or two xml <c> fields, which we intend
+# to act as two comment fields. The first field is one we generate
+# automatically. It contains the time, host, and software version. The second
+# field contains the contents of the metadata header string, with white space
+# removed before and after. If there are no non-whitespace characters in the
+# metadata header string, we don't add the second comment, and this is the
+# default when we open the Neuroarchiver. We create a metadata header string by
+# pressing the header button and entering and saving the string. This string
+# might contain a description of our experiment, and it will be added to all
+# archives we create as we record.
 #
 proc Neuroarchiver_metadata_header {} {
 	upvar #0 Neuroarchiver_info info
@@ -1069,9 +1067,12 @@ proc Neuroarchiver_metadata_header {} {
 	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info	
 
-	set header "<c>Created: [clock format [clock seconds] -format $config(datetime_format)].\
-			\nCreator: Neurorecorder $info(version), LWDAQ_$LWDAQ_Info(program_patchlevel).\
-			\nReceiver: Type $iinfo(receiver_type) with firmware $iinfo(receiver_firmware).\
+	set header "<c>Created: [clock format [clock seconds]\
+			-format $config(datetime_format)].\
+			\nCreator: Neurorecorder $info(version),\
+			LWDAQ_$LWDAQ_Info(program_patchlevel).\
+			\nReceiver: Type $iinfo(receiver_type) with\
+			firmware $iinfo(receiver_firmware).\
 			\nPlatform: $LWDAQ_Info(os).</c>\n\n"
 	append header "<payload>$iconfig(payload_length)</payload>\n\n"
 	if {[lsearch $info(alt_options) $iinfo(receiver_type)] >= 0} {
@@ -1085,10 +1086,9 @@ proc Neuroarchiver_metadata_header {} {
 }
 
 #
-# Neuroarchiver_metadata_header_edit displays the recording header in
-# a window. We can edit the header and change the codes. We save the 
-# new header string by pressing the save button. We cancel by closing 
-# the window.
+# Neuroarchiver_metadata_header_edit displays the recording header in a window.
+# We can edit the header and change the codes. We save the new header string by
+# pressing the save button. We cancel by closing the window.
 #
 proc Neuroarchiver_metadata_header_edit {} {
 	upvar #0 Neuroarchiver_info info
@@ -1135,45 +1135,43 @@ proc Neuroarchiver_metadata_header_save {} {
 }
 
 #
-# Neuroarchiver_seek_time determines the index of the clock message that
-# occurs just before seek_time and also just after seek time. If the seek
-# time lies exactly upon a clock message, the before and after clock 
-# messages will be the same. When the routine searches through an archive
-# for the correct clock messages, it starts at the beginning and proceeds in 
-# steps small enough to be less than one complete clock cycle (512 s for 
-# clock frequency 128 Hz). If the archive is uncorrupted, it will contain a
-# sequence of clock messages, each with value one greater than the last, 
-# with the exception of clock messages with value max_sample, which will 
-# be followed by one of value zero. The seek routine is able to find 
-# time points in the archive quickly because it does not have to look at
-# all the clock messages in the archive. If the archive is severely 
-# corrupted, with blocks of null messages and missing data, the seek 
-# routine can fail to notice jumps in the clock messages values and so fail to 
+# Neuroarchiver_seek_time determines the index of the clock message that occurs
+# just before seek_time and also just after seek time. If the seek time lies
+# exactly upon a clock message, the before and after clock messages will be the
+# same. When the routine searches through an archive for the correct clock
+# messages, it starts at the beginning and proceeds in steps small enough to be
+# less than one complete clock cycle (512 s for clock frequency 128 Hz). If the
+# archive is uncorrupted, it will contain a sequence of clock messages, each
+# with value one greater than the last, with the exception of clock messages
+# with value max_sample, which will be followed by one of value zero. The seek
+# routine is able to find time points in the archive quickly because it does not
+# have to look at all the clock messages in the archive. If the archive is
+# severely corrupted, with blocks of null messages and missing data, the seek
+# routine can fail to notice jumps in the clock messages values and so fail to
 # note that its time calculation is invalid. As an alternative to jumping
 # through the archive, the Neuroarchiver_sequential_time starts at the first
 # clock message and counts clock messages, adding one clock period to its
 # measurement of archive time for every clock message, irrespective of the
-# values of the messages. Both seek_time routines take the same parameters
-# and return four numbers: lo_time, lo_index, hi_time, and hi_index. The 
-# routines assume the archive contains a clock message immediately after the 
-# last message in the archive, which we call the "end clock". The routine 
-# will choose the end clock for hi_time and hi_index if the seek time is 
-# equal to or greater than the length of the archive. If the seek time is 
-# -1, the routine takes this to mean that it should find the end time of 
-# the archive, which will be the time and index of the end clock, even though
-# this end clock is not included in the archive. Note that the index of a 
-# message is its index in the archive's data block, when we divide the block
-# into messages. Messages are at least core_message_length long, and my have an
-# arbitrary payload attached to the end, as given by the payload parameter.
-# The byte address of a message is the byte number of the first byte of
-# the message within the archive's data block. The return string "0 2 0 2" 
-# means time zero occurs at message index 2 in the archive. The message with 
-# index 2 is the third message in the data block of the archive. We might obtain
-# such a result when we specify seek time of 0 and apply it to an archive
-# that, for some reason, does not start with a clock message. We can pass
-# in optional values for lo_time and lo_index, where the seek should start
-# from these values. The lo_time should be the play time that is correct
-# for message lo_index within the file.
+# values of the messages. Both seek_time routines take the same parameters and
+# return four numbers: lo_time, lo_index, hi_time, and hi_index. The routines
+# assume the archive contains a clock message immediately after the last message
+# in the archive, which we call the "end clock". The routine will choose the end
+# clock for hi_time and hi_index if the seek time is equal to or greater than
+# the length of the archive. If the seek time is -1, the routine takes this to
+# mean that it should find the end time of the archive, which will be the time
+# and index of the end clock, even though this end clock is not included in the
+# archive. Note that the index of a message is its index in the archive's data
+# block, when we divide the block into messages. Messages are at least
+# core_message_length long, and my have an arbitrary payload attached to the
+# end, as given by the payload parameter. The byte address of a message is the
+# byte number of the first byte of the message within the archive's data block.
+# The return string "0 2 0 2" means time zero occurs at message index 2 in the
+# archive. The message with index 2 is the third message in the data block of
+# the archive. We might obtain such a result when we specify seek time of 0 and
+# apply it to an archive that, for some reason, does not start with a clock
+# message. We can pass in optional values for lo_time and lo_index, where the
+# seek should start from these values. The lo_time should be the play time that
+# is correct for message lo_index within the file.
 #
 proc Neuroarchiver_seek_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 	upvar #0 Neuroarchiver_info info
@@ -1214,26 +1212,27 @@ proc Neuroarchiver_seek_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 		set timestamp [expr $timestamp & 0xff]
 		
 		if {($id == 0) & ($timestamp != 0)} {
-			# We have found a clock message. The id is zero and the timestamp is not
-			# zero. If the timestamp were zero, this would be either a null message 
-			# or a corrupted clock message. All clock messages have a non-zero firmware
-			# number in their timestamp field.			
+			# We have found a clock message. The id is zero and the timestamp is
+			# not zero. If the timestamp were zero, this would be either a null
+			# message or a corrupted clock message. All clock messages have a
+			# non-zero firmware number in their timestamp field.			
 			set num_consecutive_non_clocks 0
 			
 			# Check to see if this is the first clock message we have found.
 			if {$previous_clock_value < 0} {
-				# If this is the first clock message, as indicated by the negative
-				# previous_clock_value, we intialize our clock message tracking.
+				# If this is the first clock message, as indicated by the
+				# negative previous_clock_value, we intialize our clock message
+				# tracking.
 				set previous_clock_value $value
 				set previous_clock_time $lo_time
 				set clock_time $lo_time
 			} {
-				# If this is not our first clock message, we save the existing clock
-				# time and calculate the new clock time using the difference in the
-				# clock message values. We never jump more than max_message_value 
-				# messages through an archive, so we are certain that the difference
-				# in the values gives us an unambiguous measurement of the time 
-				# difference.
+				# If this is not our first clock message, we save the existing
+				# clock time and calculate the new clock time using the
+				# difference in the clock message values. We never jump more
+				# than max_message_value messages through an archive, so we are
+				# certain that the difference in the values gives us an
+				# unambiguous measurement of the time difference.
 				if {$previous_clock_value != $value} {
 					set previous_clock_time $clock_time
 					set clock_time [expr $clock_time \
@@ -1245,13 +1244,14 @@ proc Neuroarchiver_seek_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 			}
 			if {($clock_time > $seek_time) && ($seek_time > 0)} {
 				if {$jump_size == 1} {
-					# We moved one message at a time from the previous clock, which
-					# had time less than the seek time, and now we arrive at a clock
-					# with time greater than the seek time. So the previous and current
-					# clocks straddle the seek time. The two times should be separated
-					# by exactly one clock period, but their indices can be separated
-					# by many transmitter messages. If there are missing clock messages
-					# in the recording, the two times can be separated by many clock
+					# We moved one message at a time from the previous clock,
+					# which had time less than the seek time, and now we arrive
+					# at a clock with time greater than the seek time. So the
+					# previous and current clocks straddle the seek time. The
+					# two times should be separated by exactly one clock period,
+					# but their indices can be separated by many transmitter
+					# messages. If there are missing clock messages in the
+					# recording, the two times can be separated by many clock
 					# periods, as when there is missing data from a recording.
 					set lo_time $previous_clock_time
 					set lo_index $previous_clock_index
@@ -1259,48 +1259,52 @@ proc Neuroarchiver_seek_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 					set hi_index $index
 					set index [expr $end_index + 1]
 				} {
-					# We jumped past the clock that is just after the seek time, or
-					# there is no such clock just after the seek time. We don't know
-					# which yet, but to find out, we reduce the jump size and go back 
-					# to the previous clock. We must restore the clock time to the 
-					# previous clock time and the index to the previous clock index.
+					# We jumped past the clock that is just after the seek time,
+					# or there is no such clock just after the seek time. We
+					# don't know which yet, but to find out, we reduce the jump
+					# size and go back to the previous clock. We must restore
+					# the clock time to the previous clock time and the index to
+					# the previous clock index.
 					set jump_size [expr round($jump_scale*$jump_size)]
 					set clock_time $previous_clock_time
 					set index $previous_clock_index
 				}
 			} {
 				if {$clock_time == $seek_time} {
-					# This is the ideal case of seek time within the archive range
-					# and we find a clock that has exactly that time. Thus the lo and
-					# hi clocks are the same.
+					# This is the ideal case of seek time within the archive
+					# range and we find a clock that has exactly that time. Thus
+					# the lo and hi clocks are the same.
 					set lo_time $clock_time
 					set lo_index $index
 					set hi_time $lo_time
 					set hi_index $lo_index
 					set index [expr $end_index + 1]
 				} {
-					# The clock time is still less than the seek time, so we must keep
-					# going to find a higher clock time. We jump farther into the archive,
-					# after saving the current clock value and index.
+					# The clock time is still less than the seek time, so we
+					# must keep going to find a higher clock time. We jump
+					# farther into the archive, after saving the current clock
+					# value and index.
 					set previous_clock_value $value
 					set previous_clock_index $index
 					set index [expr $index + $jump_size]
 					if {$index > $end_index} {
 						if {$jump_size == 1} {
-							# Our previous clock message is the last message in the archive.
-							# The next clock message is the end clock, and our clock time
-							# is either less than the seek time or we are seeking the end
-							# time. So we use the index that is just past the end of the
-							# archive and we increment our clock time by one clock period
-							# to get both the lo and hi clocks.
+							# Our previous clock message is the last message in
+							# the archive. The next clock message is the end
+							# clock, and our clock time is either less than the
+							# seek time or we are seeking the end time. So we
+							# use the index that is just past the end of the
+							# archive and we increment our clock time by one
+							# clock period to get both the lo and hi clocks.
 							set lo_time [expr $clock_time + 1.0/$info(clocks_per_second)]
 							set lo_index $index
 							set hi_time $lo_time
 							set hi_index $lo_index
 						} {
-							# We jumped past the end of the archive, missing some messages
-							# between our current clock and the end. So reduce the jump
-							# size and go back to the previous clock.
+							# We jumped past the end of the archive, missing
+							# some messages between our current clock and the
+							# end. So reduce the jump size and go back to the
+							# previous clock.
 							set jump_size [expr round($jump_scale*$jump_size)]
 							set index $previous_clock_index
 						}
@@ -1308,18 +1312,18 @@ proc Neuroarchiver_seek_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 				}
 			}
 		} {
-			# This message is not a clock message. Either we have just jumped to this
-			# location in the archive, ready to search for the next clock message, or 
-			# we have been stepping through the archive one message at a time performing
-			# the search. We must step to the next message. The message may be a null 
-			# message or a corrupted clock message or a valid data message. In all 
-			# cases, we take a step forward.
+			# This message is not a clock message. Either we have just jumped to
+			# this location in the archive, ready to search for the next clock
+			# message, or we have been stepping through the archive one message
+			# at a time performing the search. We must step to the next message.
+			# The message may be a null message or a corrupted clock message or
+			# a valid data message. In all cases, we take a step forward.
 			incr index
 
-			# We keep track of the number of non-clocks. If we encounter more than is
-			# possible in valid data, we force another jump. If this jump takes us past
-			# the end of the archive, we set the time and index parameters as best
-			# we can.
+			# We keep track of the number of non-clocks. If we encounter more
+			# than is possible in valid data, we force another jump. If this
+			# jump takes us past the end of the archive, we set the time and
+			# index parameters as best we can.
 			incr num_consecutive_non_clocks
 			if {$num_consecutive_non_clocks >= $info(max_consecutive_non_clocks)} {
 				set num_consecutive_non_clocks 0
@@ -1334,22 +1338,25 @@ proc Neuroarchiver_seek_time {fn payload seek_time {lo_time 0.0} {lo_index 0}} {
 			}
 			
 			if {$index > $end_index} {
-				# Our index now points past the end of the archive, to the end clock.
+				# Our index now points past the end of the archive, to the end
+				# clock.
 				if {$jump_size <= 1} {
-					# The jump size is 1, which means we have examined every message 
-					# between the previous clock and the end clock. So we can determine
-					# the end clock time by adding a clock period to the previous clock
-					# time. We know that the previous clock time was either less than
-					# the seek time or we were seeking the end clock, so we will use
-					# the end clock for both our clocks.
+					# The jump size is 1, which means we have examined every
+					# message between the previous clock and the end clock. So
+					# we can determine the end clock time by adding a clock
+					# period to the previous clock time. We know that the
+					# previous clock time was either less than the seek time or
+					# we were seeking the end clock, so we will use the end
+					# clock for both our clocks.
 					set lo_time [expr $clock_time + 1.0/$info(clocks_per_second)]
 					set lo_index $index
 					set hi_time $lo_time
 					set hi_index $lo_index
 				} {
-					# The jump size is more than 1, so we may have jumped over a clock
-					# message that lies between the previous clock and the end clock. 
-					# We must go back to the previous clock and use a smaller jump size.
+					# The jump size is more than 1, so we may have jumped over a
+					# clock message that lies between the previous clock and the
+					# end clock. We must go back to the previous clock and use a
+					# smaller jump size.
 					set index $previous_clock_index
 					set jump_size [expr round($jump_scale*$jump_size)]
 				}
@@ -1425,18 +1432,21 @@ proc Neuroarchiver_sequential_time {fn payload seek_time {lo_time 0.0} {lo_index
 			-size [expr $data_size / $message_length] clocks $target_lo $target_hi -1"]
 		scan $clocks %d%d%d%d%d%d num_errors num_clocks num_messages \
 			local_lo_index local_hi_index last_index
-		set block_end_time [expr $clock_time + 1.0 * $num_clocks / $info(clocks_per_second)]
+		set block_end_time [expr $clock_time \
+			+ 1.0 * $num_clocks / $info(clocks_per_second)]
 
 		if {$seek_time >= 0} {
 			if {$block_end_time > $seek_time} {
 				set lo_index [expr $index + $local_lo_index]
-				set lo_time [expr $clock_time + 1.0 * $target_lo / $info(clocks_per_second)]
+				set lo_time [expr $clock_time \
+					+ 1.0 * $target_lo / $info(clocks_per_second)]
 				if {$lo_time == $seek_time} {
 					set hi_index $lo_index
 					set hi_time $lo_time
 				} {
 					set hi_index [expr $index + $local_hi_index]
-					set hi_time [expr $clock_time + 1.0 * $target_hi / $info(clocks_per_second)]
+					set hi_time [expr $clock_time \
+						+ 1.0 * $target_hi / $info(clocks_per_second)]
 				}
 				set done 1
 			} {
@@ -1815,7 +1825,8 @@ proc Neuroarchiver_command {target action} {
 	upvar #0 Neuroarchiver_info info
 	global LWDAQ_Info
 
-	set event_executing [string match "Neuroarchiver_$target\*" $LWDAQ_Info(current_event)]
+	set event_executing [string match "Neuroarchiver_$target\*"\
+		$LWDAQ_Info(current_event)]
 	set event_pending 0
 	foreach event $LWDAQ_Info(queue_events) {
 		if {[string match "Neuroarchiver_$target\*" $event]} {
@@ -2003,7 +2014,8 @@ proc Neuroarchiver_signal {{channel_code ""} {status_only 0}} {
 	
 	# Check the glitch threshold.
 	if {![string is double -strict $config(glitch_threshold)]} {
-		Neuroarchiver_print "WARNING: Invalid glitch threshold \"$config(glitch_threshold)\",\
+		Neuroarchiver_print "WARNING: Invalid glitch threshold\
+			\"$config(glitch_threshold)\",\
 			clearing to zero at $config(play_time) s [file tail $config(play_file)]."
 		set config(glitch_threshold) 0
 	}
@@ -2551,7 +2563,8 @@ proc Neuroarchiver_overview_plot {} {
 		lwdaq_config -fsd $info(overview_fsd)
 		for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
 			if {[info exists graph($id)]} {
-				set filtered_graph [lwdaq glitch_filter_y $config(glitch_threshold) $graph($id)]
+				set filtered_graph [lwdaq glitch_filter_y\
+					$config(glitch_threshold) $graph($id)]
 				if {![LWDAQ_is_error_result $filtered_graph]} {
 					set graph($id) $filtered_graph
 				}
@@ -2605,11 +2618,11 @@ proc Neuroarchiver_overview_plot {} {
 
 #
 # Neuroarchiver_overview_excerpt extracts the overview time interval and writes
-# it to disk as a newly-created NDF file, including all channels. This new archive
-# will be written to a file Ex.ndf in the same directory as the original archive,
-# where x is the UNIX time taken from the original archive name. The new archive's
-# metadata will include a comment giving the original file name and the time
-# period extracted.
+# it to disk as a newly-created NDF file, including all channels. This new
+# archive will be written to a file Xt.ndf in the same directory as the original
+# archive, where "X" is the letter X to begin the file name and "t" is the UNIX
+# time taken from the original archive name. The new archive's metadata will
+# include a comment giving the original file name and the time period extracted.
 #
 proc Neuroarchiver_overview_excerpt {} {
 	upvar #0 Neuroarchiver_info info
@@ -2640,14 +2653,14 @@ proc Neuroarchiver_overview_excerpt {} {
 	set addr_end [expr $data_start + $message_length * $index_max]
 
 	set excerpt_atime [expr round($ov_config(atime) + $ov_config(t_min))]
-	set excerpt_fn [file join [file dirname $ov_config(fn)] E$excerpt_atime\.ndf]
+	set excerpt_fn [file join [file dirname $ov_config(fn)] "X"$excerpt_atime\.ndf]
 	set metadata [LWDAQ_ndf_string_read $ov_config(fn)]
 	LWDAQ_ndf_create $excerpt_fn $config(ndf_metadata_size)
 	LWDAQ_ndf_string_write $excerpt_fn $metadata
 	LWDAQ_ndf_string_append $excerpt_fn \
 		"<c>Excerpt from $ov_config(fn_tail) spanning\
 		$ov_config(t_min)-$ov_config(t_max) s.\
-		[Neuroarchiver_datetime_convert [clock seconds]]</c>"
+		[Neuroarchiver_clock_convert [clock seconds]]</c>"
 	set f [open $ov_config(fn) r]
 	fconfigure $f -translation binary
 	seek $f [expr $data_start + ($message_length * $index_min)]
@@ -3095,9 +3108,11 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 	
 	set t $info(classifier_text)
 	$t insert end " "
-	$t tag bind event_$index <Button> [list LWDAQ_post [list Neuroclassifier_jump $event]]
+	$t tag bind event_$index <Button> [list LWDAQ_post \
+		[list Neuroclassifier_jump $event]]
 	$t insert end "<J>" "event_$index jumpbutton"
-	$t tag bind type_$index <Button> [list LWDAQ_post [list Neuroclassifier_change $event]]
+	$t tag bind type_$index <Button> [list LWDAQ_post \
+		[list Neuroclassifier_change $event]]
 	$t insert end "<C>" "type_$index changebutton"
 	$t insert end " $event\n"
 	$t see end
@@ -3453,7 +3468,8 @@ proc Neuroclassifier_processing {characteristics} {
 				set type [lindex $event [expr $info(sii) + $info(cto)]]
 			} {
 				set type "Normal"
-				set event [lreplace $event [expr $info(cbo)+1] [expr $info(cbo)+1] "Normal"]
+				set event [lreplace $event [expr $info(cbo)+1]\
+					[expr $info(cbo)+1] "Normal"]
 			}
 			
 			# And the match distance is of course zero, and the closest
@@ -3985,7 +4001,8 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 					set id [lindex $c 0]
 					if {![string is integer -strict $id]} {
 						LWDAQ_print $nbc(t) ""
-						LWDAQ_print $nbc(t) "ERROR: Invalid characteristics in \"[file tail $fn]\"."
+						LWDAQ_print $nbc(t) "ERROR: Invalid characteristics\
+							in \"[file tail $fn]\"."
 						close $of
 						set nbc(run) 0
 						return "FAIL"
@@ -3999,12 +4016,14 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 							set metrics [lrange $c $metrics_start $metrics_end]
 							set closest [Neuroclassifier_classify $metrics $nbc(setup)]
 							set nbc(setup) 0
-							if {$info(classifier_match) <= $config(classifier_match_limit)} {						
+							if {$info(classifier_match) <= \
+									$config(classifier_match_limit)} {						
 								set type [lindex $closest [expr $info(sii)+$info(cto)]]
 							} {
 								set type "Unknown"
 							}
-							set event "$archive $play_time $id $type $baseline_pwr $metrics"
+							set event "$archive $play_time $id $type\
+								$baseline_pwr $metrics"
 							if {[info exists nbc($type)] && $nbc($type)} {
 								puts $of $event
 								incr match_count
@@ -4389,7 +4408,8 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 			set y [lindex $point 1]
 			set w $config(tracker_mark_cm)
 			lwdaq_graph "[expr $x-$w] [expr $y-$w] [expr $x-$w] [expr $y+$w] \
-				[expr $x+$w] [expr $y+$w] [expr $x+$w] [expr $y-$w] [expr $x-$w] [expr $y-$w]" \
+				[expr $x+$w] [expr $y+$w] [expr $x+$w]\
+				[expr $y-$w] [expr $x-$w] [expr $y-$w]" \
 				$info(tracker_image) \
 				-y_min $y_min -y_max $y_max -x_min $x_min -x_max $x_max -color $color
 		} 
@@ -4492,10 +4512,10 @@ proc Neurotracker_clear {} {
 }
 
 #
-# Neuroarchiver_datetime creates the Playtime Clock panel, or raises it to the top 
+# Neuroarchiver_clock opens the Clock Panel, or raises it to the top 
 # for viewing if it already exists.
 #
-proc Neuroarchiver_datetime {} {
+proc Neuroarchiver_clock {} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 
@@ -4506,30 +4526,33 @@ proc Neuroarchiver_datetime {} {
 		return "ABORT"
 	}
 	toplevel $w
-	wm title $w "Player Date and Time"
+	wm title $w "Clock Panel, Neuroarchiver $info(version)"
 
 	label $w.pl -text "Archive Play Time" -fg blue -width 20
 	label $w.plc -textvariable Neuroarchiver_info(datetime_play_time)
 	button $w.pli -text "Insert" -command {
-		set Neuroarchiver_config(datetime_jump_to) $Neuroarchiver_info(datetime_play_time)
+		set Neuroarchiver_config(datetime_jump_to) \
+			$Neuroarchiver_info(datetime_play_time)
 	}
 	label $w.al -text "Archive Start Time" -fg blue
 	label $w.alc -textvariable Neuroarchiver_info(datetime_start_time)
 	button $w.ali -text "Insert" -command {
-		set Neuroarchiver_config(datetime_jump_to) $Neuroarchiver_info(datetime_start_time)
+		set Neuroarchiver_config(datetime_jump_to) \
+			$Neuroarchiver_info(datetime_start_time)
 	}
 	button $w.jl -text "Jump to Time" -command [list LWDAQ_post \
-		[list Neuroarchiver_datetime_jump]] -fg blue
+		[list Neuroarchiver_clock_jump]] -fg blue
 	entry $w.jlc -textvariable Neuroarchiver_config(datetime_jump_to) -width 20
 	button $w.jli -text "Now" -command {
-		set Neuroarchiver_config(datetime_jump_to) [Neuroarchiver_datetime_convert [clock seconds]]
+		set Neuroarchiver_config(datetime_jump_to) \
+			[Neuroarchiver_clock_convert [clock seconds]]
 	}
 	
 	grid $w.pl $w.plc $w.pli -sticky news
 	grid $w.al $w.alc $w.ali -sticky news
 	grid $w.jl $w.jlc $w.jli -sticky news
 
-	Neuroarchiver_datetime_update
+	Neuroarchiver_clock_update
 }
 
 #
@@ -4553,7 +4576,7 @@ proc Neuroarchiver_exporter_open {} {
 	pack $f -side top -fill x
 	label $f.state -textvariable Neuroarchiver_info(export_state) -fg blue -width 10
 	button $f.export -text "Start" -command "LWDAQ_post Neuroarchiver_export"
-	button $f.stop -text "Stop" -command {Neuroarchiver_export "Stop"}
+	button $f.stop -text "Abort" -command {Neuroarchiver_export "Stop"}
 	pack $f.state $f.export $f.stop -side left -expand yes
 	
 	label $f.lformat -text "File:" -anchor w -fg $info(label_color)
@@ -4564,8 +4587,8 @@ proc Neuroarchiver_exporter_open {} {
 			-text $a -value $a
 		pack $f.$b -side left -expand yes
 	}
-	checkbutton $f.sf -variable Neuroarchiver_config(export_single_file) \
-		-text "Single File"
+	checkbutton $f.sf -variable Neuroarchiver_config(export_combine) \
+		-text "Combine"
 	pack $f.sf -side left -expand yes	
 	
 	button $f.dir -text "PickDir" -command {
@@ -4597,8 +4620,8 @@ proc Neuroarchiver_exporter_open {} {
 	pack $f.ql $f.qlv -side left -expand yes 
 	
 	button $f.ssi -text "Interval Beginning" -command {
-		set Neuroarchiver_config(export_start) [Neuroarchiver_datetime_convert \
-			[expr [Neuroarchiver_datetime_convert \
+		set Neuroarchiver_config(export_start) [Neuroarchiver_clock_convert \
+			[expr [Neuroarchiver_clock_convert \
 				$Neuroarchiver_info(datetime_start_time)] \
 				+ round($Neuroarchiver_info(t_min)) ]]
 		LWDAQ_print $Neuroarchiver_info(export_text) \
@@ -4619,7 +4642,7 @@ proc Neuroarchiver_exporter_open {} {
 	}
 	pack $f.ssi $f.ssa -side left -expand yes 
 
-	button $f.clock -text "Show Clock" -command "LWDAQ_post Neuroarchiver_datetime"
+	button $f.clock -text "Show Clock" -command "LWDAQ_post Neuroarchiver_clock"
 	pack $f.clock -side left -expand yes
 
 	set f [frame $w.select]
@@ -4649,11 +4672,11 @@ proc Neuroarchiver_exporter_open {} {
 	pack $f.ve -side left -expand yes
 
 	checkbutton $f.te -variable Neuroarchiver_config(export_centroid) \
-		-text "Centroid" 
+		-text "Power Centroid" 
 	pack $f.te -side left -expand yes
 
 	checkbutton $f.tp -variable Neuroarchiver_config(export_powers) \
-		-text "Powers" 
+		-text "Power Values" 
 	pack $f.tp -side left -expand yes
 
 	label $f.lsetup -text "Setup:" -anchor w -fg $info(label_color)
@@ -4693,9 +4716,9 @@ proc Neuroarchiver_exporter_open {} {
 }
 
 #
-# Neuroarchiver_exporter_autofill fills the channel select field with the Neuroarchiver's
-# best guess as to all the channels that are active in the most recently-played 
-# interval.
+# Neuroarchiver_exporter_autofill fills the channel select field with the
+# Neuroarchiver's best guess as to all the channels that are active in the most
+# recently-played interval.
 #
 proc Neuroarchiver_exporter_autofill {} {
 	upvar #0 Neuroarchiver_info info
@@ -4837,7 +4860,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 	if {$config(export_format) == "EDF"} {
 		package require EDF 1.2
 	}	
-
+	
 	# If the command is stop, abort all export processes.
 	if {$cmd == "Stop"} {
 		if {$info(export_state) != "Idle"} {
@@ -4862,12 +4885,22 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				press stop before starting again."
 			return "ERROR"
 		}
+
+		# Check for incompatible optiosn.
+		if {$config(export_centroid) || $config(export_powers)} {
+			if {$config(export_format) == "EDF"} {
+				LWDAQ_print $info(export_text) "ERROR: Cannot store centroid\
+					position or coil powers in EDF format."
+				return "ERROR"
+			}
+		}	
+
+		# Start the exporter. Calculate Unix start and end times. The duration
+		# can be a mathematical expression, such as 24*60*60 for the number of
+		# seconds in a day.
 		set info(export_state) "Start"
 		set info(export_run_start) [clock seconds]	
-		
-		# Calculate Unix start and end times. The duration can be a mathematical
-		# expression, such as 24*60*60 for the number of seconds in a day.
-		set info(export_start_s) [Neuroarchiver_datetime_convert $config(export_start)]
+		set info(export_start_s) [Neuroarchiver_clock_convert $config(export_start)]
 		set info(export_end_s) [expr $info(export_start_s) \
 			+ [expr $config(export_duration)]]
 		LWDAQ_print $info(export_text) "\nStarting export of\
@@ -4877,7 +4910,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			end absolute time $info(export_end_s) s."
 		set archive_start_time [expr \
 			$info(export_start_s) \
-			- [Neuroarchiver_datetime_convert $info(datetime_start_time)]]
+			- [Neuroarchiver_clock_convert $info(datetime_start_time)]]
 		LWDAQ_print $info(export_text) \
 			"Start archive time $archive_start_time s in [file tail $config(play_file)]."
 		LWDAQ_print $info(export_text) "Export directory $config(export_dir)."
@@ -4917,8 +4950,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			}
 			lappend signals $id $sps
 						
-			if {$config(export_single_file)} {
-				set efn [file join $config(export_dir) "E$info(export_start_s).$ext"]
+			if {$config(export_combine)} {
+				set efn [file join $config(export_dir) "S$info(export_start_s).$ext"]
 				LWDAQ_print -nonewline $info(export_text) "Exporting "
 				foreach a "signal centroid powers" {
 					if {[set config(export_$a)]} {
@@ -4933,15 +4966,23 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				}
 			} {
 				if {$config(export_signal)} {
-					set efn [file join $config(export_dir) "E$info(export_start_s)\_$id\.$ext"]
-					LWDAQ_print $info(export_text) "Exporting signal $id at $sps SPS to $efn."
+					set efn [file join $config(export_dir) \
+						"S$info(export_start_s)\_$id\.$ext"]
+					LWDAQ_print $info(export_text) "Exporting signal\
+						$id at $sps SPS to $efn."
 					if {[file exists $efn]} {
 						LWDAQ_print $info(export_text) "WARNING: Export file\
 							[file tail $efn] already exists, others may also exist."
 					}
 				}
+				if {$config(export_format) == "EDF"} {
+					LWDAQ_print $info(export_text) "Creating EDF file [file tail $efn]."
+					EDF_create $efn $config(play_interval) "$id $sps" \
+						$info(export_start_s)
+				}
 				if {$config(export_centroid) || $config(export_powers)} {
-					set efn [file join $config(export_dir) "T$info(export_start_s)\_$id\.$ext"]
+					set efn [file join $config(export_dir) \
+						"T$info(export_start_s)\_$id\.$ext"]
 					LWDAQ_print -nonewline $info(export_text) "Exporting tracker "
 					foreach p {centroid powers} {
 						if {$config(export_$p)} {
@@ -4956,19 +4997,26 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 						file delete $efn
 					}
 				}
-				if {$config(export_format) == "EDF"} {
-					LWDAQ_print $info(export_text) "Creating EDF file [file tail $efn]."
-					EDF_create $efn $config(play_interval) "$id $sps" $info(export_start_s)
-				}
 			}
 		}
 		
 		# If we are exporting to one EDF file, create the header for all signals now.
-		if {$config(export_single_file) && ($config(export_format) == "EDF")} {
+		if {$config(export_combine) && ($config(export_format) == "EDF")} {
 			LWDAQ_print $info(export_text) "Creating EDF file [file tail $efn]."
 			EDF_create $efn $config(play_interval) $signals $info(export_start_s)
 		}
 		
+		# Enable position calculation if required, and close the tracker window
+		# if its open. 
+		if {$config(export_centroid) || $config(export_powers)} {
+			set config(alt_calculate) "1"
+			if {[winfo exists $info(tracker_window)]} {
+				LWDAQ_print $info(export_text) "WARNING: Closing the Neurotracker\
+					panel to accelerate export."
+				destroy $info(tracker_window)
+			}
+		} 
+	
 		# Stop stray left-over processes, then clear the process list and the
 		# video file list.
 		foreach pid $info(export_epl) {
@@ -5050,15 +5098,6 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			set config(video_enable) 0
 		}
 		
-		if {$config(export_centroid) || $config(export_powers)} {
-			set config(alt_calculate) "1"
-			if {[winfo exists $info(tracker_window)]} {
-				LWDAQ_print $info(export_text) "WARNING: Closing the Neurotracker\
-					panel to accelerate export."
-				destroy $info(tracker_window)
-			}
-		} 
-	
 		set info(export_state) "Play"	
 		set config(play_time) $archive_start_time
 		Neuroarchiver_command play "Play"
@@ -5073,22 +5112,22 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		}
 		
 		# Continue to export, provided that we are not yet done.
-		set interval_start_s [Neuroarchiver_datetime_convert $info(datetime_play_time)]
+		set interval_start_s [Neuroarchiver_clock_convert $info(datetime_play_time)]
 		if {$interval_start_s < $info(export_end_s)} {
 
 			# Write the signal to disk.
 			if {$config(export_signal)} {
-				if {$config(export_single_file)} {
+				if {$config(export_combine)} {
 					set fn [file join $config(export_dir) \
-						"E$info(export_start_s).$ext"]
+						"S$info(export_start_s).$ext"]
 				} {
 					set fn [file join $config(export_dir) \
-						"E$info(export_start_s)\_$info(channel_num)\.$ext"]
+						"S$info(export_start_s)\_$info(channel_num)\.$ext"]
 				}
 				if {$config(export_format) == "TXT"} {
 					set f [open $fn a]
 					foreach value $info(values) {
-						puts $f $v
+						puts $f $value
 					}
 					close $f
 				} elseif {$config(export_format) == "BIN"} {
@@ -5101,7 +5140,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					puts -nonewline $f $export_bytes
 					close $f
 				} elseif {$config(export_format) == "EDF"} {
-					if {!$config(export_single_file) || \
+					if {!$config(export_combine) || \
 							[string match "$info(channel_num):*" \
 								[lindex $config(channel_selector) 0]]} {
 						EDF_num_records_incr $fn
@@ -5112,7 +5151,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		
 			# Write tracker output to disk.
 			if {$config(export_centroid) || $config(export_powers)} {
-				if {$config(export_single_file)} {
+				if {$config(export_combine)} {
 					set fn [file join $config(export_dir) \
 						"T$info(export_start_s).$ext"]
 				} {
@@ -5155,7 +5194,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					puts -nonewline $f $export_bytes
 					close $f
 				} elseif {$config(export_format) == "EDF"} {
-					LWDAQ_print $info(export_text) "EDF tracker export not yet ready."				
+				# We provide no export for centroid or powers in EDF format. Before
+				# we ever get to this point, we should have generated an error.
 				}
 			}
 		}
@@ -5163,7 +5203,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		# We are done if the end of this interval exceeds our export end time, and we 
 		# have exported all channels already. 
 		if {[string match "$info(channel_num):*" [lindex $config(channel_selector) end]] \
-				&& ($interval_start_s + $info(play_interval_copy) >= $info(export_end_s))} {
+				&& ($interval_start_s + $info(play_interval_copy) \
+					>= $info(export_end_s))} {
 			Neuroarchiver_print "Stopping playback because export job is done."
 			LWDAQ_print $info(export_text) "Export of [expr $config(export_duration)] s\
 				of recorded signal complete."
@@ -5178,7 +5219,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			} {
 				set info(export_state) "Wait"
 				LWDAQ_post "Neuroarchiver_export Video"
-				LWDAQ_print $info(export_text) "Waiting for video extractions to complete."
+				LWDAQ_print $info(export_text) \
+					"Waiting for video extractions to complete."
 			}
 		}
 				
@@ -5280,8 +5322,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		if {$repeat} {
 			LWDAQ_print $info(export_text) "\nPreparing another export..." purple
 			set config(export_start) \
-				[Neuroarchiver_datetime_convert \
-				[expr [Neuroarchiver_datetime_convert $info(datetime_start_time)] \
+				[Neuroarchiver_clock_convert \
+				[expr [Neuroarchiver_clock_convert $info(datetime_start_time)] \
 				+ round($info(t_min)) ]]
 			set info(export_state) "Idle"
 			LWDAQ_post Neuroarchiver_export	"Start" 
@@ -5296,10 +5338,10 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 }
 
 #
-# Neuroarchiver_datetime_update always updates the playback datetime, and if necessary 
+# Neuroarchiver_clock_update always updates the playback datetime, and if necessary 
 # updates the archive start datetime.
 #
-proc Neuroarchiver_datetime_update {} {
+proc Neuroarchiver_clock_update {} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 
@@ -5309,26 +5351,26 @@ proc Neuroarchiver_datetime_update {} {
 		if {![regexp {([0-9]{10})\.ndf} $pfn match atime]} {
 			set atime 0
 		}
-		set info(datetime_start_time) [Neuroarchiver_datetime_convert $atime]
+		set info(datetime_start_time) [Neuroarchiver_clock_convert $atime]
 	}
-	set info(datetime_play_time) [Neuroarchiver_datetime_convert \
-		[expr [Neuroarchiver_datetime_convert $info(datetime_start_time)] \
+	set info(datetime_play_time) [Neuroarchiver_clock_convert \
+		[expr [Neuroarchiver_clock_convert $info(datetime_start_time)] \
 			+ round($config(play_time)) ] ]
 }
 
 #
-# Neuroarchiver_datetime_jump constructs a datetime event string and instructs 
+# Neuroarchiver_clock_jump constructs a datetime event string and instructs 
 # the Neuroarchiver to jump to an archive containing the datetime specified by the 
 # user in the datetime window. If such an archive does not exist, the jump routine 
 # will issue an error.
 #
-proc Neuroarchiver_datetime_jump {} {
+proc Neuroarchiver_clock_jump {} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 
-	set jump_time [Neuroarchiver_datetime_convert $config(datetime_jump_to)]
+	set jump_time [Neuroarchiver_clock_convert $config(datetime_jump_to)]
 	if {$jump_time > 0} {
-		set config(datetime_jump_to) [Neuroarchiver_datetime_convert $jump_time]
+		set config(datetime_jump_to) [Neuroarchiver_clock_convert $jump_time]
 		Neuroarchiver_jump "$jump_time 0.0 ? \"$config(datetime_jump_to)\"" 0
 	}
 }
@@ -5340,7 +5382,7 @@ proc Neuroarchiver_datetime_jump {} {
 # into integer seconds if possible. We issue an error in the Neuroarchiver
 # window if the format is incorrect, and return the value zero.
 #
-proc Neuroarchiver_datetime_convert {datetime} {
+proc Neuroarchiver_clock_convert {datetime} {
 	upvar #0 Neuroarchiver_config config
 	
 	if {[string is integer $datetime]} {
@@ -5537,11 +5579,11 @@ proc Neuroarchiver_baselines_set {} {
 }
 
 #
-# Neuroarchiver_baselines_write takes the existing baseline power values
-# and saves them as baseline power string in the metadata of the current
-# playback file, with the name specified in the config(bp_name) parameter.
-# The routine does not write baseline powers that meet or exceed the reset 
-# value, because these are not valid.
+# Neuroarchiver_baselines_write takes the existing baseline power values and
+# saves them as baseline power string in the metadata of the current playback
+# file, with the name specified in the config(bp_name) parameter. The routine
+# does not write baseline powers that meet or exceed the reset value, because
+# these are not valid.
 #
 proc Neuroarchiver_baselines_write {name} {
 	upvar #0 Neuroarchiver_config config
@@ -5580,7 +5622,8 @@ proc Neuroarchiver_baselines_write {name} {
 	
 	LWDAQ_ndf_string_write $config(play_file) [string trim $metadata]\n
 
-	Neuroarchiver_print "Wrote baselines \"$name\" to [file tail $config(play_file)]." verbose
+	Neuroarchiver_print "Wrote baselines \"$name\" to\
+		[file tail $config(play_file)]." verbose
 
 	return "SUCCESS"
 }
@@ -5618,10 +5661,12 @@ proc Neuroarchiver_baselines_read {name} {
 			}
 		}		
 	} {
-		Neuroarchiver_print "ERROR: No baselines \"$name\" in [file tail $config(play_file)]."
+		Neuroarchiver_print "ERROR: No baselines \"$name\" in\
+			[file tail $config(play_file)]."
 		return "FAIL"
 	}
-	Neuroarchiver_print "Read baselines \"$name\" from [file tail $config(play_file)]." verbose
+	Neuroarchiver_print "Read baselines \"$name\" from [file tail\
+		$config(play_file)]." verbose
 	return "SUCCESS"
 }
 
@@ -5769,8 +5814,8 @@ proc Neuroarchiver_color_swap {id w e x y} {
 }
 
 #
-# Neuroarchiver_frequency_reset sets all the frequency and frequency alerts
-# to zero and N.
+# Neuroarchiver_frequency_reset sets all the frequency and frequency alerts to
+# zero and N.
 #
 proc Neuroarchiver_frequency_reset {} {
 	upvar #0 Neuroarchiver_config config
@@ -5785,10 +5830,10 @@ proc Neuroarchiver_frequency_reset {} {
 }
 
 #
-# Neuroarchiver_fresh_graphs clears the graph images in memory. If you pass it
-# a "1" as a parameter, it will clear the graphs from the screen as well.
-# It calls lwdaq_graph to create an empty graph in the overlay area of the
-# graph images, and lwdaq_draw to draw the empty graph on the screen.
+# Neuroarchiver_fresh_graphs clears the graph images in memory. If you pass it a
+# "1" as a parameter, it will clear the graphs from the screen as well. It calls
+# lwdaq_graph to create an empty graph in the overlay area of the graph images,
+# and lwdaq_draw to draw the empty graph on the screen.
 #
 proc Neuroarchiver_fresh_graphs {{clear_screen 0}} {
 	upvar #0 Neuroarchiver_info info
@@ -5853,9 +5898,8 @@ proc Neuroarchiver_fresh_graphs {{clear_screen 0}} {
 }
 
 #
-# Neuroarchiver_draw_graphs draws the vt and af graphs in the two view
-# windows in the Neuroarchiver, and in the separate view windows, if they
-# exist.
+# Neuroarchiver_draw_graphs draws the vt and af graphs in the two view windows
+# in the Neuroarchiver, and in the separate view windows, if they exist.
 #
 proc Neuroarchiver_draw_graphs {} {
 	upvar #0 Neuroarchiver_info info
@@ -5881,9 +5925,9 @@ proc Neuroarchiver_draw_graphs {} {
 }
 
 #
-# Neuroarchiver_magnified_view opens a new window with a larger, or at lease separate, plot of
-# the voltage-time or amplitude-frequency graph. The size of the window is set by the
-# vt_view_zoom and af_view_zoom parameters.
+# Neuroarchiver_magnified_view opens a new window with a larger, or at lease
+# separate, plot of the voltage-time or amplitude-frequency graph. The size of
+# the window is set by the vt_view_zoom and af_view_zoom parameters.
 #
 proc Neuroarchiver_magnified_view {figure} {
 	upvar #0 Neuroarchiver_info info
@@ -6027,12 +6071,12 @@ proc Neuroarchiver_plot_signal {{color ""} {signal ""}} {
 }
 
 #
-# Neuroarchiver_plot_values takes a list of values and plots them in the
-# value versus time display as if they were evenly-spaced samples. The 
-# routine is identical to Neuroarchiver_plot_signal except that we don't
-# have to pass it a string of x-y values, only the y-values. We pass the
-# routine a color and a string of values. If the values are omitted, the
-# routine uses the current string of values in info(values).
+# Neuroarchiver_plot_values takes a list of values and plots them in the value
+# versus time display as if they were evenly-spaced samples. The routine is
+# identical to Neuroarchiver_plot_signal except that we don't have to pass it a
+# string of x-y values, only the y-values. We pass the routine a color and a
+# string of values. If the values are omitted, the routine uses the current
+# string of values in info(values).
 #
 proc Neuroarchiver_plot_values {{color ""} {values ""}} {
 	upvar #0 Neuroarchiver_info info
@@ -6063,14 +6107,13 @@ proc Neuroarchiver_plot_values {{color ""} {values ""}} {
 
 
 #
-# Neuroarchiver_plot_spectrum plots a spectrum in the af_image overlay, but 
-# does not display the plot on the screen. The actual display will take
-# place later, for all channels at once, to save time. If you don't
-# pass a spectrum to the routine, it will plot $info(spectrum). Each
-# spectrum point must be in the format "f a ", where f is frequency
-# in Hertz and a is amplitude in ADC counts. If we don't specify a color for
-# the plot, the routine uses the $info(channel_num). If we don't specify a spectrum,
-# it uses $info(spectrum).
+# Neuroarchiver_plot_spectrum plots a spectrum in the af_image overlay, but does
+# not display the plot on the screen. The actual display will take place later,
+# for all channels at once, to save time. If you don't pass a spectrum to the
+# routine, it will plot $info(spectrum). Each spectrum point must be in the
+# format "f a ", where f is frequency in Hertz and a is amplitude in ADC counts.
+# If we don't specify a color for the plot, the routine uses the channel number.
+# If we don't specify a spectrum, it uses $info(spectrum).
 #
 proc Neuroarchiver_plot_spectrum {{color ""} {spectrum ""}} {
 	upvar #0 Neuroarchiver_info info
@@ -6256,7 +6299,8 @@ proc Neuroarchiver_record {{command ""}} {
 	# value as the timestamp in the file name, and the ndf_prefix as the the beginning
 	# of the name.
 	if {($info(record_control) == "Start") || \
-		(($config(record_end_time) >= $config(autocreate)) && ($config(autocreate) > 0))} {
+		(($config(record_end_time) \
+			>= $config(autocreate)) && ($config(autocreate) > 0))} {
 
 		# Turn the recording label red,
 		LWDAQ_set_bg $info(record_control_label) red
@@ -6310,7 +6354,8 @@ proc Neuroarchiver_record {{command ""}} {
 		if {![file exists $config(record_dir)]} {
 			Neuroarchiver_print "ERROR: Recording directory \"$config(record_dir)\"\
 				does not exist."
-			Neuroarchiver_print "SUGGESTION: Press PickDir to specify a recording directory."
+			Neuroarchiver_print "SUGGESTION: Press PickDir to\
+				specify a recording directory."
 			set info(record_control) "Idle"
 			return "FAIL"
 		}
@@ -6335,13 +6380,13 @@ proc Neuroarchiver_record {{command ""}} {
 		set info(record_control) "Record"
 	}
 
-	# If Record, we download data from the data receiver and write it to
-	# the archive.
+	# If Record, we download data from the data receiver and write it to the
+	# archive.
 	if {$info(record_control) == "Record"} {
-		# If we have already caught up with our recording, we don't bother trying to
-		# acquire more data because we'll be occupying the LWDAQ process and the 
-		# LWDAQ driver as well, for no good reason. Instead, we post the recorder to
-		# the end of the event queue.
+		# If we have already caught up with our recording, we don't bother
+		# trying to acquire more data because we'll be occupying the LWDAQ
+		# process and the LWDAQ driver as well, for no good reason. Instead, we
+		# post the recorder to the end of the event queue.
 		if {$iinfo(acquire_end_ms) > [clock milliseconds] - 1000*$config(record_lag)} {		
 			LWDAQ_post Neuroarchiver_record end
 			return "SUCCESS"
@@ -6379,20 +6424,22 @@ proc Neuroarchiver_record {{command ""}} {
 		# If the Receiver Instrument happens to be looping, stop it.
 		if {$iinfo(control) == "Loop"} {set iinfo(control) "Stop"}
 
-		# Set the number of clocks we want to download using the Receiver Instrument.
-		# The Receiver Instrument will giveus exactly this number of clocks, unless there
-		# is an error.
+		# Set the number of clocks we want to download using the Receiver
+		# Instrument. The Receiver Instrument will giveus exactly this number of
+		# clocks, unless there is an error.
 		set iconfig(daq_num_clocks) \
 			[expr round($config(record_interval) * $info(clocks_per_second))]
 
-		# We are going to make single attempts to contact the data receiver and download
-		# a block of messages, regardless of the value of LWDAQ_Info(max_daq_attempts).
+		# We are going to make single attempts to contact the data receiver and
+		# download a block of messages, regardless of the value of
+		# LWDAQ_Info(max_daq_attempts).
 		set saved_max_daq_attempts $LWDAQ_Info(max_daq_attempts)
 		set LWDAQ_Info(max_daq_attempts) 1	
 	
-		# Download a block of messages from the data receiver into a LWDAQ image, the name
-		# of which is $iconfig(memory_name). The Receiver Instrument returns a string that
-		# describes the data block, or reports an error.
+		# Download a block of messages from the data receiver into a LWDAQ
+		# image, the name of which is $iconfig(memory_name). The Receiver
+		# Instrument returns a string that describes the data block, or reports
+		# an error.
 		set daq_result [LWDAQ_acquire Receiver]
 		
 		# We restore the global max_daq_attempts variable.
@@ -6441,7 +6488,8 @@ proc Neuroarchiver_record {{command ""}} {
 		# file system conflict will soon be resolved.
 		set message_length [expr $info(core_message_length) + $iconfig(payload_length)]
 		if {[catch {
-			set info(recorder_buffer) [lwdaq_image_contents $iconfig(memory_name) -truncate 1 \
+			set info(recorder_buffer) \
+				[lwdaq_image_contents $iconfig(memory_name) -truncate 1 \
 					-data_only 1 -record_size $message_length]
 			LWDAQ_ndf_data_append $config(record_file) $info(recorder_buffer)
 			set info(recorder_buffer) ""				
@@ -6464,7 +6512,8 @@ proc Neuroarchiver_record {{command ""}} {
 		# data acquisition, in which we lost data, this end time will be too
 		# low. If the data acquisition has been fragmented, so that we obtain
 		# fewer clock messages than we asked for, this end time will be too high.
-		set config(record_end_time) [expr $config(record_end_time) + $config(record_interval)]
+		set config(record_end_time) \
+			[expr $config(record_end_time) + $config(record_interval)]
 		
 		# We restore the record lable color.
 		LWDAQ_set_bg $info(record_control_label) white
@@ -6570,7 +6619,8 @@ proc Neuroarchiver_play {{command ""}} {
 		set config(saved_play_time) $config(play_time)
 		Neuroarchiver_fresh_graphs 1
 		if {![string match $config(play_dir)* $config(play_file)]} {
-			Neuroarchiver_print "WARNING: Directory tree changed to include new play file."
+			Neuroarchiver_print "WARNING: Directory tree changed\
+				to include new play file."
 			set config(play_dir) [file dirname $config(play_file)]
 		}
 	}
@@ -6653,7 +6703,8 @@ proc Neuroarchiver_play {{command ""}} {
 		if {$config(play_time) < 0.0} {
 			set config(play_time) 0.0
 		}
-		if {($config(play_time) > [expr $info(play_end_time) - $info(play_interval_copy)])} {
+		if {($config(play_time) \
+			> [expr $info(play_end_time) - $info(play_interval_copy)])} {
 			set config(play_time) [Neuroarchiver_play_time_format \
 				[expr $info(play_end_time) - \
 				$info(play_interval_copy) - \
@@ -6663,7 +6714,7 @@ proc Neuroarchiver_play {{command ""}} {
 			set config(play_time) 0.0
 		}
 		set info(saved_play_time) 0.0
-		Neuroarchiver_datetime_update
+		Neuroarchiver_clock_update
 		lwdaq_data_manipulate $info(buffer_image) clear
 		set info(buffer_size) 0
 		set config(standing_values) ""
@@ -6796,7 +6847,7 @@ proc Neuroarchiver_play {{command ""}} {
 		# Set the saved play time and clear the data buffer and reset the
 		# unaccepted value list.
 		set info(saved_play_time) $config(play_time)
-		Neuroarchiver_datetime_update	
+		Neuroarchiver_clock_update	
 		lwdaq_data_manipulate $info(buffer_image) clear
 		set info(buffer_size) 0
 		set config(standing_values) "" 
@@ -6856,14 +6907,15 @@ proc Neuroarchiver_play {{command ""}} {
 			set clocks [lwdaq_receiver $info(buffer_image) \
 				"-payload $info(player_payload) \
 					-size $info(buffer_size) clocks 0 $play_num_clocks"]
-			scan $clocks %d%d%d%d%d num_buff_errors num_clocks num_messages start_index end_index
+			scan $clocks %d%d%d%d%d num_buff_errors \
+				num_clocks num_messages start_index end_index
 		} {
 			set end_of_file 1
 		}
 	}
 	
-	# The file ends without supplying us with enough data for the playback interval. We try to 
-	# find the next file and continue. Otherwise we wait.
+	# The file ends without supplying us with enough data for the playback
+	# interval. We try to find the next file and continue. Otherwise we wait.
 	if {$end_of_file} {
 		# We are at the end of the file, so write baselines to metadata if
 		# instructed by the user.
@@ -6901,27 +6953,28 @@ proc Neuroarchiver_play {{command ""}} {
 			set config(play_file) $file_name
 			set info(play_file_tail) [file tail $file_name]
 			set config(play_time) 0.0
-			set old_end_time [Neuroarchiver_datetime_convert $info(datetime_play_time)]
-			Neuroarchiver_datetime_update
-			set new_start_time [Neuroarchiver_datetime_convert $info(datetime_start_time)]
+			set old_end_time [Neuroarchiver_clock_convert $info(datetime_play_time)]
+			Neuroarchiver_clock_update
+			set new_start_time [Neuroarchiver_clock_convert $info(datetime_start_time)]
 			set time_gap [expr $new_start_time - $old_end_time]
 			if {$time_gap > $info(play_interval_copy)} {
 				Neuroarchiver_print "WARNING: Jumping $time_gap s from\
-					[Neuroarchiver_datetime_convert $old_end_time] to\
-					[Neuroarchiver_datetime_convert $new_start_time]\
+					[Neuroarchiver_clock_convert $old_end_time] to\
+					[Neuroarchiver_clock_convert $new_start_time]\
 					when switching to [file tail $file_name]."
 			}
 			LWDAQ_set_bg $info(play_control_label) white
 			LWDAQ_post Neuroarchiver_play
 			return "SUCCESS"
 		} {
-			# This is the case where we have $num_clocks but need $play_num_clocks
-			# and we have no later file to switch to. This case arises during live 
-			# play-back, when the player is trying to read more data out of the file 
-			# that is being written to by the recorder. The screen will show you when 
-			# the Player is waiting. By checking the state of the play_control_label, 
-			# we make sure that we issue the following print statement only once. While
-			# the Player is waiting, the label remains yellow.
+			# This is the case where we have $num_clocks but need
+			# $play_num_clocks and we have no later file to switch to. This case
+			# arises during live play-back, when the player is trying to read
+			# more data out of the file that is being written to by the
+			# recorder. The screen will show you when the Player is waiting. By
+			# checking the state of the play_control_label, we make sure that we
+			# issue the following print statement only once. While the Player is
+			# waiting, the label remains yellow.
 			if {[LWDAQ_widget_exists $info(window)]} {
 				if {[$info(play_control_label) cget -bg] != "yellow"} {
 					Neuroarchiver_print "Have $num_clocks clocks, need $play_num_clocks.\
@@ -6935,9 +6988,9 @@ proc Neuroarchiver_play {{command ""}} {
 	}
 	
 	# By this point, the number of clocks in the buffer should be at least equal
-	# to the number required by the interval. If not, something has gone wrong that
-	# we did not anticipate. We issue a warning and hope that the Neuroarchiver can
-	# keep going without crashing.
+	# to the number required by the interval. If not, something has gone wrong
+	# that we did not anticipate. We issue a warning and hope that the
+	# Neuroarchiver can keep going without crashing.
 	if {$num_clocks < $play_num_clocks} {
 		Neuroarchiver_print "WARNING: Internal error, num_clocks < play_num_clocks."
 	}
@@ -6952,19 +7005,20 @@ proc Neuroarchiver_play {{command ""}} {
 		}
 	}
 	
-	# By this point, start_index and end_index should be the indices within the buffer
-	# image of the first clock message in the current playback interval and the first 
-	# clock message in the next playback interval. It is possible, however, for the 
-	# buffer to contain the current interval and no additional clock messages, so our
-	# end_index is now -1. If the index is -1, we set it to the number of messages.
+	# By this point, start_index and end_index should be the indices within the
+	# buffer image of the first clock message in the current playback interval
+	# and the first clock message in the next playback interval. It is possible,
+	# however, for the buffer to contain the current interval and no additional
+	# clock messages, so our end_index is now -1. If the index is -1, we set it
+	# to the number of messages.
 	if {$end_index < 0} {
 		set end_index $num_messages
 	}
 	
-	# We transfer this interval's data from the buffer image into our
-	# data image, which we will use for analysis and reconstruction.
-	# The transfer involves copying the interval data from the buffer
-	# image and deleting it from the buffer image.
+	# We transfer this interval's data from the buffer image into our data
+	# image, which we will use for analysis and reconstruction. The transfer
+	# involves copying the interval data from the buffer image and deleting it
+	# from the buffer image.
 	set start_addr [expr $start_index * $message_length]
 	set end_addr [expr $end_index * $message_length]
 	set data [lwdaq_data_manipulate $info(buffer_image) read \
@@ -7061,7 +7115,8 @@ proc Neuroarchiver_play {{command ""}} {
 			set lo_index [expr $index - $extent] 
 			if {$lo_index < 0} {set lo_index 0}
 			set hi_index [expr $index + $extent]
-			if {$hi_index < $lo_index + 2*$extent} {set hi_index [expr $lo_index + 2*$extent]}
+			if {$hi_index < $lo_index + 2*$extent} \
+				{set hi_index [expr $lo_index + 2*$extent]}
 			Neuroarchiver_print [lwdaq_receiver $info(data_image) \
 				"-payload $info(player_payload) \
 					-size $info(data_size) print $lo_index $hi_index"]
@@ -7136,11 +7191,12 @@ proc Neuroarchiver_play {{command ""}} {
 		}
 	}
 	
-	# We select all active channels or all channels specied by the channel selector
-	# string directly. The selected_channels elements either take the form of "id:sps"
-	# or just "id", where "sps" is the nominal sample rate of the channel, as specified
-	# by the use. The active_channels elements are "id:qty", where qty is the actual
-	# number of samples received, as opposed to the nominal sample rate.
+	# We select all active channels or all channels specied by the channel
+	# selector string directly. The selected_channels elements either take the
+	# form of "id:sps" or just "id", where "sps" is the nominal sample rate of
+	# the channel, as specified by the use. The active_channels elements are
+	# "id:qty", where qty is the actual number of samples received, as opposed
+	# to the nominal sample rate.
 	if {[string trim $config(channel_selector)] == "*"} {
 		set selected_channels ""
 		foreach code $info(active_channels) {
@@ -7151,10 +7207,10 @@ proc Neuroarchiver_play {{command ""}} {
 		set selected_channels $config(channel_selector)
 	}
 	
-	# Some active channels may be ignored by a user-specified channel list. We will
-	# determine quality of reception for these now, before moving on to processing
-	# the selected channels. We pass a status-only flag to the signal procedure, which
-	# causes it to return before performing any reconstruction.
+	# Some active channels may be ignored by a user-specified channel list. We
+	# will determine quality of reception for these now, before moving on to
+	# processing the selected channels. We pass a status-only flag to the signal
+	# procedure, which causes it to return before performing any reconstruction.
 	foreach code $info(active_channels) {
 		set id [lindex [split $code :] 0]
 		if {([lsearch $selected_channels "$id"] < 0) \
@@ -7177,10 +7233,10 @@ proc Neuroarchiver_play {{command ""}} {
 	}
 	
 	# We apply processing to each channel for this interval, plot the signal,
-	# and plot the spectrum, as enabled by the user. We set the force_vt flag
-	# to zero, which means the value versus time plot will be drawn only if
-	# enable_vt is set, or if the processor itself sets force_vt in one of
-	# its plotting routines.
+	# and plot the spectrum, as enabled by the user. We set the force_vt flag to
+	# zero, which means the value versus time plot will be drawn only if
+	# enable_vt is set, or if the processor itself sets force_vt in one of its
+	# plotting routines.
 	set info(force_vt) 0
 	foreach info(channel_code) $selected_channels {
 		set info(channel_num) [lindex [split $info(channel_code) :] 0]
@@ -7225,9 +7281,9 @@ proc Neuroarchiver_play {{command ""}} {
 	
 	# We check the processing result for errors, report to the screen, and write
 	# to characteristics file. We also hand control over to the Neuroclassifier
-	# if it's running. All the Neuroclassifier needs to plot and classify the most
-	# recent interval is the results of processing, which will, we assume, contain
-	# the metrics the Neuroarclassifier is expecting to receive.
+	# if it's running. All the Neuroclassifier needs to plot and classify the
+	# most recent interval is the results of processing, which will, we assume,
+	# contain the metrics the Neuroarclassifier is expecting to receive.
 	if {$result != ""} {
 		if {![LWDAQ_is_error_result $result]} {
 			set result "[file tail $config(play_file)] $config(play_time) $result"
@@ -7286,7 +7342,7 @@ proc Neuroarchiver_play {{command ""}} {
 	if {$config(video_enable)} {
 		Neuroarchiver_video_action \
 			"Play" \
-			[Neuroarchiver_datetime_convert $info(datetime_play_time)] \
+			[Neuroarchiver_clock_convert $info(datetime_play_time)] \
 			$info(play_interval_copy)		
 	} 
 	
@@ -7303,9 +7359,9 @@ proc Neuroarchiver_play {{command ""}} {
 		[expr $config(play_time) + $info(play_interval_copy)]]
 	set info(saved_play_time) $config(play_time)
 	
-	# We update the time values of the Player Date and Time window, and format
-	# the play time in the Player window.
-	Neuroarchiver_datetime_update
+	# We update the time values of the Clock Panel and format the play time in
+	# the Player window.
+	Neuroarchiver_clock_update
 		
 	# Post another execution of this routine to the queue, or terminate.
 	if {$info(play_control) == "Play"} {
@@ -7526,7 +7582,7 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 		}
 		if {$pf == ""} {
 			set error_message "ERROR: Cannot find\
-				\"[Neuroarchiver_datetime_convert $datetime]\"\
+				\"[Neuroarchiver_clock_convert $datetime]\"\
 				in $config(play_dir)."
 			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white	
@@ -7544,7 +7600,7 @@ proc Neuroarchiver_jump {{event ""} {verbose 1}} {
 		set alen [Neuroarchiver_end_time $pf $info(player_payload)]
 		if {$alen + $atime < $datetime + $offset + $info(play_interval_copy)} {
 			set error_message "ERROR: Cannot find\
-				\"[Neuroarchiver_datetime_convert $datetime]\"\
+				\"[Neuroarchiver_clock_convert $datetime]\"\
 				in $config(play_dir)."
 			Neuroarchiver_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white		
@@ -7656,9 +7712,9 @@ and Windows.
 }
 
 #
-# Neuroarchiver_video_duration calls ffmpeg to determine the duration of an existing video
-# file. If the file does not exist, the routine returns -1, otherwise it returns the length
-# of the video in seconds.
+# Neuroarchiver_video_duration calls ffmpeg to determine the duration of an
+# existing video file. If the file does not exist, the routine returns -1,
+# otherwise it returns the length of the video in seconds.
 #
 proc Neuroarchiver_video_duration {{fn ""}} {
 	upvar #0 Neuroarchiver_config config
@@ -7970,7 +8026,8 @@ proc Neuroarchiver_open {} {
 			wm maxsize . [expr $x*2] [expr $y*2]
 		}	
 		"Combined" {
-			wm title . "Neuroplayer with Neurorecorder $info(version), Running in Child Process"
+			wm title . "Neuroplayer with Neurorecorder\
+				$info(version), Running in Child Process"
 			wm maxsize . [expr $x*2] [expr $y*2]
 		}	
 	}
@@ -8004,7 +8061,8 @@ proc Neuroarchiver_open {} {
 		pack $f.conf -side left -expand yes
 		button $f.help -text "Help" -command "LWDAQ_tool_help Neuroarchiver"
 		pack $f.help -side left -expand yes
-		checkbutton $f.synch -variable Neuroarchiver_config(synchronize) -text "Synchronize"
+		checkbutton $f.synch -variable \
+			Neuroarchiver_config(synchronize) -text "Synchronize"
 		pack $f.synch -side left -expand yes
 		checkbutton $f.verbose -variable Neuroarchiver_config(verbose) -text "Verbose"
 		pack $f.verbose -side left -expand yes
@@ -8236,9 +8294,12 @@ proc Neuroarchiver_open {} {
 		label $f.f -textvariable Neuroarchiver_info(processor_file_tail) \
 			-width 16 -bg $info(variable_bg)
 		button $f.g -text "Pick" -command "Neuroarchiver_pick processor_file 1"
-		checkbutton $f.enable -variable Neuroarchiver_config(enable_processing) -text "Enable"
-		checkbutton $f.save -variable Neuroarchiver_config(save_processing) -text "Save"
-		checkbutton $f.quiet -variable Neuroarchiver_config(quiet_processing) -text "Quiet"
+		checkbutton $f.enable -variable \
+			Neuroarchiver_config(enable_processing) -text "Enable"
+		checkbutton $f.save -variable \
+			Neuroarchiver_config(save_processing) -text "Save"
+		checkbutton $f.quiet -variable \
+			Neuroarchiver_config(quiet_processing) -text "Quiet"
 		pack $f.f $f.g $f.enable $f.save $f.quiet -side left -expand yes
 		label $f.lchannels -text "Select:" -anchor e -fg $info(label_color)
 		switch $LWDAQ_Info(os) {
@@ -8284,7 +8345,7 @@ proc Neuroarchiver_open {} {
 		pack $f.baselines -side left -expand yes
 		button $f.cb -text "Classifier" -command "LWDAQ_post Neuroclassifier_open"
 		pack $f.cb -side left -expand yes
-		button $f.clock -text "Clock" -command "LWDAQ_post Neuroarchiver_datetime"
+		button $f.clock -text "Clock" -command "LWDAQ_post Neuroarchiver_clock"
 		pack $f.clock -side left -expand yes
 		button $f.export -text "Export" -command "LWDAQ_post Neuroarchiver_exporter_open"
 		pack $f.export -side left -expand yes
@@ -8311,9 +8372,12 @@ proc Neuroarchiver_open {} {
 		LWDAQ_bind_command_key $w Left {Neuroarchiver_command play Back}
 		LWDAQ_bind_command_key $w Right {Neuroarchiver_command play Step}
 		LWDAQ_bind_command_key $w greater {Neuroarchiver_command play Play}
-		LWDAQ_bind_command_key $w Down [list LWDAQ_post {Neuroarchiver_jump Next_NDF 0}]
-		LWDAQ_bind_command_key $w Up [list LWDAQ_post {Neuroarchiver_jump Previous_NDF 0}]
-		LWDAQ_bind_command_key $w less [list LWDAQ_post {Neuroarchiver_jump Current_NDF 0}]
+		LWDAQ_bind_command_key $w Down \
+			[list LWDAQ_post {Neuroarchiver_jump Next_NDF 0}]
+		LWDAQ_bind_command_key $w Up \
+			[list LWDAQ_post {Neuroarchiver_jump Previous_NDF 0}]
+		LWDAQ_bind_command_key $w less \
+			[list LWDAQ_post {Neuroarchiver_jump Current_NDF 0}]
 		$info(text) tag configure textbutton -background cyan
 		$info(text) tag bind textbutton <Enter> {%W configure -cursor arrow} 
 		$info(text) tag bind textbutton <Leave> {%W configure -cursor xterm} 
