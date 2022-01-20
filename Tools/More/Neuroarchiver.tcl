@@ -4603,8 +4603,9 @@ proc Neuroarchiver_exporter_open {} {
 				$Neuroarchiver_info(datetime_start_time)] \
 				+ round($Neuroarchiver_info(t_min)) ]]
 		LWDAQ_print $Neuroarchiver_info(export_text) \
-			"Export will start at $Neuroarchiver_info(t_min) s\
-				in archive [file tail $Neuroarchiver_config(play_file)],\
+			"Export starts $Neuroarchiver_config(export_start),\
+				time $Neuroarchiver_info(t_min) s\
+				in [file tail $Neuroarchiver_config(play_file)],\
 				duration $Neuroarchiver_config(export_duration) s,\
 				repetions $Neuroarchiver_config(export_reps)."
 	}
@@ -4612,13 +4613,16 @@ proc Neuroarchiver_exporter_open {} {
 		set Neuroarchiver_config(export_start) \
 			$Neuroarchiver_info(datetime_start_time)
 		LWDAQ_print $Neuroarchiver_info(export_text) \
-			"Export will start at 0.0 s in archive\
-				[file tail $Neuroarchiver_config(play_file)],\
+			"Export starts $Neuroarchiver_config(export_start),\
+				time 0.0 s in [file tail $Neuroarchiver_config(play_file)],\
 				duration $Neuroarchiver_config(export_duration) s,\
 				repetions $Neuroarchiver_config(export_reps)."
 	}
 	pack $f.stl $f.ssi $f.ssa -side left -expand yes 
-	
+
+	button $f.clock -text "Clock" -command "LWDAQ_post Neuroarchiver_datetime"
+	pack $f.clock -side left -expand yes
+
 	set f [frame $w.select]
 	pack $f -side top -fill x
 	
@@ -4715,6 +4719,26 @@ proc Neuroarchiver_exporter_autofill {} {
 }
 
 #
+# Neuroarchiver_edf_read reads the header of an EDF file and fills the EDF setup
+# array and composes a new channel selector string from the channels and sample
+# rates in the EDF file. It does not read any data from the file.
+#
+proc Neuroarchiver_edf_read {} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+
+	set fn [LWDAQ_get_file_name]
+	if {$fn == ""} {retuen "ABORT"}
+	set signals [EDF_header_read $fn]
+	set s [list]
+	foreach {id fq} $signals {lappend s "$id\:$fq"}
+	set config(channel_selector) $s
+	Neuroarchiver_edf_setup
+	return $fn
+}
+
+
+#
 # Neurotracker_edf_setup is used by the exporter to set the various titles and names
 # that the EDF export file header provides for describing signals and defining their
 # ranges. 
@@ -4744,6 +4768,9 @@ proc Neuroarchiver_edf_setup {} {
 		LWDAQ_post Neuroarchiver_exporter_autofill
 	}
 	pack $f.lchannels $f.echannels $f.auto -side left -expand yes
+	
+	button $f.read -text "Read" -command "LWDAQ_post Neuroarchiver_edf_read"
+	pack $f.read -side left -expand yes
 
 	button $f.refresh -text "Refresh" -command Neuroarchiver_edf_setup
 	pack $f.refresh -side left -expand yes
@@ -4776,13 +4803,13 @@ proc Neuroarchiver_edf_setup {} {
 		}
 		set f [frame $w.details_$id]
 		pack $f -side top -fill x
-		label $f.lid -text "ID:" -fg $info(label_color)
+		label $f.lid -text "Name:" -fg $info(label_color)
 		label $f.vid -text "$id" -width 4
 		set EDF(name_$id) "$id"
 		label $f.lsps -text "SPS:" -fg $info(label_color)
 		label $f.vsps -text "$sps" -width 5
 		pack $f.lid $f.vid $f.lsps $f.vsps -side left -expand yes
-		foreach {a len} {Name 8 Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 10} {
+		foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 10} {
 			set b [string tolower $a]
 			if {![info exists EDF($b\_$id)]} {
 				set EDF($b\_$id) [set EDF($b)]
