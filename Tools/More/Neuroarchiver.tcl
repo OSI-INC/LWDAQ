@@ -4699,20 +4699,6 @@ proc Neuroarchiver_exporter_open {} {
 		set Neuroarchiver_config(export_start) \
 			$Neuroarchiver_info(datetime_start_time)
 	}
-	
-	# Suggest how export can be accelerated.
-	if {$config(enable_vt)} {
-		LWDAQ_print $info(export_text) "SUGGESTION: Disable Value vs. Time plot\
-			to accelerate export."
-	}
-	if {$config(enable_af)} {
-		LWDAQ_print $info(export_text) "SUGGESTION: Disable Amplitude vs. Frequency\
-			plot to accelerate export."
-	}
-	if {$config(play_interval) != $info(optimal_export_interval)} {
-		LWDAQ_print $info(export_text) "SUGGESTION: Use 8-s playback interval\
-			to accelerate export."
-	}
 }
 
 #
@@ -4886,7 +4872,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			return "ERROR"
 		}
 
-		# Check for incompatible optiosn.
+		# Check for incompatible options.
 		if {$config(export_centroid) || $config(export_powers)} {
 			if {$config(export_format) == "EDF"} {
 				LWDAQ_print $info(export_text) "ERROR: Cannot store centroid\
@@ -4894,6 +4880,11 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				return "ERROR"
 			}
 		}	
+		if {round([expr $config(export_duration)]) \
+				% round($config(play_interval)) != 0} {
+			LWDAQ_print $info(export_text) "WARNING: Export duration is not an exact\
+				multiple of playback interval, actual duration will be longer."
+		}
 
 		# Start the exporter. Calculate Unix start and end times. The duration
 		# can be a mathematical expression, such as 24*60*60 for the number of
