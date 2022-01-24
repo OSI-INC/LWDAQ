@@ -634,17 +634,19 @@ proc Neuroarchiver_init {} {
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
-	set info(A3038_coordinates) "0 0 0 12 0 24 \
-		12 0 12 12 12 24 \
-		24 0 24 12 24 24 \
-		36 0 36 12 36 24 \
-		48 0 48 12 48 24 \
-		-1 -1"
-	set info(A3032_coordinates) "0 0 0 8 0 16 \
-		8 0 8 8 8 16 \
-		16 0 16 8 16 16 \
-		24 0 24 8 24 16 \
-		32 0 32 8 32 16"
+	set info(A3038_coordinates) "\
+		0  0 2 0  12 2  0 24 2 \
+		12 0 2 12 12 2 12 24 2 \
+		24 0 2 24 12 2 24 24 2 \
+		36 0 2 36 12 2 36 24 2 \
+		48 0 2 48 12 2 48 24 2 \
+		-1 -1 -1"
+	set info(A3032_coordinates) "\
+		0  0 2  0 8 2  0 16 2 \
+		8  0 2  8 8 2  8 16 2 \
+		16 0 2 16 8 2 16 16 2 \
+		24 0 2 24 8 2 24 16 2 \
+		32 0 2 32 8 2 32 16 2"
 	set info(A3032_payload) "16"
 	set info(A3038_payload) "16"
 	set config(tracker_coordinates) ""
@@ -1058,7 +1060,11 @@ proc Neuroarchiver_metadata_view {fn} {
 # default when we open the Neuroarchiver. We create a metadata header string by
 # pressing the header button and entering and saving the string. This string
 # might contain a description of our experiment, and it will be added to all
-# archives we create as we record.
+# archives we create as we record. If the receiver is an animal location
+# tracker, we write to the metadata the positions of its detector coils. For
+# backward compatibility with earlier versions of the Neuroarchiver, we write
+# these as two-dimensional coordinates in a "coordinates" field, and also as
+# three-dimensional coordinates in an "alt" field.
 #
 proc Neuroarchiver_metadata_header {} {
 	upvar #0 Neuroarchiver_info info
@@ -1076,7 +1082,12 @@ proc Neuroarchiver_metadata_header {} {
 			\nPlatform: $LWDAQ_Info(os).</c>\n\n"
 	append header "<payload>$iconfig(payload_length)</payload>\n\n"
 	if {[lsearch $info(alt_options) $iinfo(receiver_type)] >= 0} {
-		append header "\n<coordinates>$config(tracker_coordinates)</coordinates>\n\n"
+		append header "\n<coordinates>"
+		foreach {x y z} $congif(tracker_coordinates) {
+			append header "$x $y "
+		}
+		append header "</coordinates>\n\n"
+		append header "\n<alt>$config(tracker_coordinates)</alt>\n\n"
 	}
 	if {[string trim $info(metadata_header)] != ""} {
 		append header "<c>[string trim $info(metadata_header)]</c>\n\n"
@@ -2348,8 +2359,8 @@ proc Neuroarchiver_overview {{fn ""} } {
 # Neuroarchiver_overview_jump jumps to the point in the overview archive that
 # lies under the coordinates (x,y) in the overview graph. We call it after a
 # mouse double-click in the graph. We round the jump-to time to the nearest
-# second so that accompanying synchronous video will have a key frame to
-# show at the start of the interval.
+# second so that accompanying synchronous video will have a key frame to show at
+# the start of the interval.
 #
 proc Neuroarchiver_overview_jump {x y} {
 	upvar #0 Neuroarchiver_info info
@@ -4119,7 +4130,8 @@ proc Neuroclassifier_load {{name ""}} {
 
 #
 # Neurotracker_extract calculates the position of a transmitter over an array of
-# detector coils and returns the position as a sequency of x-y coordinates. The
+# detector coils and returns the position as a sequency of xyz coordinates
+# accompanied by the power measurement provided by each detector coil. The
 # routine relies upon a prior call to lwdaq_receiver filling a list of power
 # measurements that correspond to some device we want to locate. This list
 # exists in the lwdaq library global variable space, but not in the LWDAQ TclTk
@@ -4142,7 +4154,7 @@ proc Neurotracker_extract {} {
 	}
 	
 	# Determine the number of detectors.
-	set num_detectors [expr [llength $config(tracker_coordinates)]/2]
+	set num_detectors [expr [llength $config(tracker_coordinates)]/3]
 	
 	# If the playload length does not match the number of detector coils,
 	# we abort, because we are not playing a tracker archive. We full the
@@ -4151,7 +4163,7 @@ proc Neurotracker_extract {} {
 	if {($info(player_payload) < 1) || ($info(player_payload) < $num_detectors)} {
 		set info(tracker_result) [list]
 		for {set slice_num 0} {$slice_num < $num_slices} {incr slice_num} {
-			lappend info(tracker_result) "0.0 0.0"
+			lappend info(tracker_result) "0.0 0.0 0.0"
 		}
 		return "ABORT"
 	}
@@ -4186,7 +4198,7 @@ proc Neurotracker_extract {} {
 	# fake tracker measurement consisting of the same number of lines. We do the
 	# same in the case of an error.
 	if {($info(signal) == "0 0") || $lossy || $error_flag} {
-		set alt_slice "0.0 0.0"
+		set alt_slice "0.0 0.0 0.0"
 		for {set detector_num 1} {$detector_num <= $num_detectors} {incr detector_num} {
 			append alt_slice " 0.0"
 		}
@@ -4212,16 +4224,17 @@ proc Neurotracker_extract {} {
 	if {[info exists history]} {
 		set history [list [lindex $history end]]
 	} {
-		set history [list "0 0"]
+		set history [list "0 0 0"]
 	}
 	foreach slice $info(tracker_result) {
-		lappend history "[lindex $slice 0] [lindex $slice 1]"
+		lappend history "[lrange $slice 0 2]"
 	}
 	 
 	# We assign the global tracker x and y variables to the position we obtain
 	# in the final slice.
 	set info(tracker_x) [lindex $info(tracker_result) end 0]
 	set info(tracker_y) [lindex $info(tracker_result) end 1]
+	set info(tracker_z) [lindex $info(tracker_result) end 2]
 			
 	# In verbose mode, we print the first tracker slice.
 	Neuroarchiver_print "Tracker: [lindex $info(tracker_result) end]" verbose	
@@ -4327,7 +4340,7 @@ proc Neurotracker_fresh_graphs {} {
 	set x_max $x_min
 	set y_min [lindex $config(tracker_coordinates) 1]
 	set y_max $y_min
-	foreach {x y} $config(tracker_coordinates) {
+	foreach {x y z} $config(tracker_coordinates) {
 		if {$x > $x_max} {set x_max $x}
 		if {$x < $x_min} {set x_min $x}
 		if {$y > $y_max} {set y_max $y}
@@ -4353,7 +4366,7 @@ proc Neurotracker_fresh_graphs {} {
 	}
 
 	# Mark the coil locations.
-	foreach {x y} $config(tracker_coordinates) {
+	foreach {x y z} $config(tracker_coordinates) {
 		if {($x < 0) || ($y < 0)} {continue}
 		lwdaq_graph "$x $y_min $x $y_max" $info(tracker_image) \
 			-x_min $x_min -x_max $x_max -x_div 0 \
@@ -4421,7 +4434,7 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 
 	# Mark the coil powers.
 	if {$config(tracker_show_coils)} {
-		set num_detectors [expr [llength $config(tracker_coordinates)]/2]
+		set num_detectors [expr [llength $config(tracker_coordinates)]/3]
 		set min_p 255
 		set max_p 0
 		foreach p $info(tracker_powers) {
@@ -4429,8 +4442,8 @@ proc Neurotracker_plot {{color ""} {locations ""}} {
 			if {$p < $min_p} {set min_p $p}
 		}
 		for {set i 0} {$i < $num_detectors} {incr i} {
-			set coil_x [lindex $config(tracker_coordinates) [expr 2*$i]]
-			set coil_y [lindex $config(tracker_coordinates) [expr 2*$i+1]]
+			set coil_x [lindex $config(tracker_coordinates) [expr 3*$i]]
+			set coil_y [lindex $config(tracker_coordinates) [expr 3*$i+1]]
 			if {($coil_x < 0) || ($coil_y < 0)} {continue}
 			set coil_p [lindex $info(tracker_powers) [expr $i]]
 			set x [expr round(1.0*($coil_x-$x_min)*$info(tracker_width) \
@@ -6683,11 +6696,17 @@ proc Neuroarchiver_play {{command ""}} {
 		}
 		set coordinates [LWDAQ_xml_get_list $metadata "coordinates"]
 		if {[llength $coordinates] >= 1} {
-			set config(tracker_coordinates) [lindex $coordinates end]
+			set config(tracker_coordinates) ""
+			foreach {x y} [lindex $coordinates end] {
+				lappend config(tracker_coordinates) $x $y "2"
+			}
 		} {
 			set config(tracker_coordinates) $info(A3038_coordinates)
 		}
-
+		set alt [LWDAQ_xml_get_list $metadata "alt"]
+		if {[llength $alt] >= 1} {
+			set config(tracker_coordinates) [lindex $alt end]
+		}
 		set info(play_end_time) \
 			[Neuroarchiver_end_time $config(play_file) $info(player_payload)]
 		set info(play_previous_clock) -1

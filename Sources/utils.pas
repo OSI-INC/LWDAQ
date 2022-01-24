@@ -681,6 +681,7 @@ function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
 function read_x_graph(var s:string):x_graph_type;
 function read_xy_graph(var s:string):xy_graph_type;
+function read_xyz_graph(var s:string):xyz_graph_type;
 procedure read_matrix(var s:string;var M:matrix_type);
 function read_kinematic_mount(var s:string):kinematic_mount_type;
 procedure write_ij(var s:string;p:ij_point_type);
@@ -1794,7 +1795,7 @@ begin
 }
 		point_num:=0;
 		value_num:=0;
-		while (value_num<=length(gp1)-1) do begin
+		while (value_num<length(gp1)) do begin
 			gp2[point_num].x:=gp1[value_num];
 			gp2[point_num].y:=gp1[value_num+1];
 			inc(point_num);
@@ -1815,6 +1816,58 @@ begin
 	Return the xy-graph.
 }
 	read_xy_graph:=gp2;
+end;
+
+{
+	Reads a sequence of space-delimited numbers from a string into an
+	xyz_graph_type and returns this graph. Does not alter the original string.
+	Returns an error if there are an odd number of numbers in the string.
+}
+function read_xyz_graph(var s:string):xyz_graph_type;
+
+var 
+	value_num,point_num:integer;
+	gp1:x_graph_type;
+	gp3:xyz_graph_type;
+
+begin
+{
+	Read the numbers out of the string and into an x-graph.
+}
+	gp1:=read_x_graph(s);
+	if length(gp1)>2 then begin
+{
+	Create an xyz graph of the correct size.
+}
+		setlength(gp3,length(gp1) div 3);
+{
+	Go through the x-graph, reading pairs of x and y into the xy-graph.
+}
+		value_num:=0;
+		point_num:=0;
+		while (value_num<length(gp1)) do begin
+			gp3[point_num].x:=gp1[value_num];
+			gp3[point_num].y:=gp1[value_num+1];
+			gp3[point_num].z:=gp1[value_num+2];
+			point_num:=point_num+1;
+			value_num:=value_num+3;
+		end;
+		point_num:=value_num div 3;
+{
+	If there's an extra number on the end, we issue an error.
+}
+		if value_num<length(gp1)-1 then
+			report_error('Missing coordinate for final point in read_xyz_graph.');
+	end else begin
+		setlength(gp3,1);
+		gp3[0].x:=0;
+		gp3[0].y:=0;
+		gp3[0].z:=0;
+	end;
+{
+	Return the xyz-graph.
+}
+	read_xyz_graph:=gp3;
 end;
 
 {

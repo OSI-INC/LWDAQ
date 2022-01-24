@@ -3206,7 +3206,7 @@ end;
 
 <p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements.</p>
 
-<p>The second parameter is a list of x-y coordinates, one for each detector coil. When calculating the location of a transmitter, lwdaq_alt will center each detector on these coordinates. All coordinates are assumed to be greater than or equal to zero, so that (-1,-1) will be recognised as an invalid location. When we pass "-1 -1" as the coordinate of a coil, lwdaq_alt does not include the coil in its position calculation. We use position "-1 -1" for auxilliary antenna coils in animal location trackers. The A3038B, for example, provides fifteen tracker coils and a sixteenth auxilliary antenna input that may be used for reception of telemetry signals and for measuring background power.</p>
+<p>The second parameter is a list of locations of detector coils, given as a sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces. When calculating the location of a transmitter, lwdaq_alt will center each detector on these coordinates. All coordinates are assumed to be greater than or equal to zero, so that (-1,-1,-1) will be recognised as an invalid location. When we pass "-1 -1 -1" as the coordinate of a coil, lwdaq_alt does not include the coil in its position calculation. We use position "-1 -1 -1" for auxilliary antenna coils in animal location trackers. The A3038C, for example, provides fifteen tracker coils and a sixteenth auxilliary antenna input that may be used for reception of telemetry signals and for measuring background power. We use any position (-1,y,z) for coils we want to ignore. We might have sixteen detector antennas divided into two sets of eight for monitoring the location of animals in two habitats. When we calculate position in the first habitat, we ignore the coils arranged in the second habitat. We set the coordinates of the coils we want to ignore to "-1 y z", where <i>y</i> and <i>z</i> can be anything. In a two-dimensional tracker platform such as the A3028C, the value of the <i>z</i>-coordinate will be shared by all coils, but we don't set it to zero so that zero may be used by our software to indicate the absence of samples. For the A3028C we set the <i>z</i>-coordinage to 2.0, the approximate distance from the center of its detector coils to a transmitter sitting on the platform.</p>
 
 <p>The lwdaq_alt routine supports the following options:</p>
 
@@ -3220,7 +3220,7 @@ end;
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
 </table></center>
 
-<p>The output contains <i>x</i> and <i>y</i> position in whatever units we used to specify the coil centers, followed by  a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the positions and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period.</p>
+<p>The output contains <i>x</i>, <i>y</i>, and <i>z</i> position in whatever units we used to specify the coil centers, followed by  a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the positions and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period.</p>
 
 <p>The -background option allows us to specify background power levels for all detector coils, in anticipation of a need to calibrate detectors. By default, these background powers are all zero. The -extent value sets a maximum distance from the location of the transmitter to a coil used to calculate the transmitter location. The -payload value is the number of bytes added to the core four-byte message in order to accommodate the power values. A fifteen-coil tracker has payload sixteen and returns sixteen power values. The first fifteen are the powers from the coils, in the order defined by the tracker's geometry map. The sixteenth value is either zero or the power we obtain from an auxilliary detector module.</p>
 }
@@ -3255,18 +3255,19 @@ var
 {
 	Result variables.
 }
-	location,max_location:xy_point_type;
+	location,max_location:xyz_point_type;
 	detector_powers:x_graph_type;
 {
 	Variables for calculations.
 }
 	num_samples,num_detectors,sample_num,detector_num:integer;
-	calculation_num,slice_num,slice_size:integer;
+	slice_num,slice_size:integer;
 	max_power,min_power,scaled_power:real;
 	sum_power:real=-1;
 	sum_x:real=-1;
 	sum_y:real=-1;
-	detector_coordinates:xy_graph_type;
+	sum_z:real=-1;
+	detector_coordinates:xyz_graph_type;
 	detector_samples:x_graph_type;
 	detector_background:x_graph_type;
 
@@ -3325,7 +3326,7 @@ begin
 		detectors.
 	}
 	field:=Tcl_ObjString(argv[2]);
-	detector_coordinates:=read_xy_graph(field);
+	detector_coordinates:=read_xyz_graph(field);
 	num_detectors:=length(detector_coordinates);
 	if num_detectors=0 then begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -3441,34 +3442,39 @@ begin
 		}
 		sum_x:=0;
 		sum_y:=0;
+		sum_z:=0;
 		sum_power:=0;
 		for detector_num:=0 to num_detectors-1 do begin
 			if (detector_coordinates[detector_num].x <> -1)
-				and (xy_separation(
+				and (xyz_separation(
 					detector_coordinates[detector_num],max_location)
-					<extent) then begin
+					< extent) then begin
 				scaled_power:=xpy(10,
 					(detector_powers[detector_num]-min_power+scale)/scale);
 				sum_x:=sum_x
-					+scaled_power
-					*detector_coordinates[detector_num].x;
+					+scaled_power*detector_coordinates[detector_num].x;
 				sum_y:=sum_y
-					+scaled_power
-					*detector_coordinates[detector_num].y;
+					+scaled_power*detector_coordinates[detector_num].y;
+				sum_z:=sum_z
+					+scaled_power*detector_coordinates[detector_num].z;
 				sum_power:=sum_power
 					+scaled_power;
+				writestr(debug_string,slice_num,' ',detector_num,' ',sum_x:0:1,' ',
+					scaled_power:0:1,' ',detector_coordinates[detector_num].x:0:1);
 			end;
 		end;
 		if sum_power>0 then begin
 			location.x:=sum_x/sum_power;
 			location.y:=sum_y/sum_power;
+			location.z:=sum_z/sum_power;
 		end else begin
 			location.x:=error_value;
 			location.y:=error_value;
+			location.z:=error_value;
 		end;
 
 		field:='';
-		writestr(field,location.x:1:3,' ',location.y:1:3,' ');
+		writestr(field,location.x:1:3,' ',location.y:1:3,' ',location.z:1:3,' ');
 		for detector_num:=0 to num_detectors-1 do
 			writestr(field,field,detector_powers[detector_num]:1:1,' ');
 		insert(field,result,length(result)+1);			
