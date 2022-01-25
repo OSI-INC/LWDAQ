@@ -3220,7 +3220,7 @@ end;
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
 </table></center>
 
-<p>The output contains <i>x</i>, <i>y</i>, and <i>z</i> position in whatever units we used to specify the coil centers, followed by  a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the positions and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period.</p>
+<p>The output contains <i>x</i>, <i>y</i>, and <i>z</i> in whatever units we used to specify the coil centers, followed by a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the positions, activity and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period. The unit of activity is coil center units per slice interval. If we have break the interval into eight slices and specify coil positions in centimeters, the activity will be centimeters per eighth of a second.</p>
 
 <p>The -background option allows us to specify background power levels for all detector coils, in anticipation of a need to calibrate detectors. By default, these background powers are all zero. The -extent value sets a maximum distance from the location of the transmitter to a coil used to calculate the transmitter location. The -payload value is the number of bytes added to the core four-byte message in order to accommodate the power values. A fifteen-coil tracker has payload sixteen and returns sixteen power values. The first fifteen are the powers from the coils, in the order defined by the tracker's geometry map. The sixteenth value is either zero or the power we obtain from an auxilliary detector module.</p>
 }
@@ -3258,7 +3258,7 @@ var
 	location,max_location:xyz_point_type;
 	detector_powers:x_graph_type;
 {
-	Variables for calculations.
+	Variables for position calculations.
 }
 	num_samples,num_detectors,sample_num,detector_num:integer;
 	slice_num,slice_size:integer;
@@ -3351,8 +3351,8 @@ begin
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"image -payload -extent -scale -background -percentile -slices" in '
-				+'lwdaq_alt.');
+				+'"image -payload -extent -scale -background -percentile -slices'
+				+'-previous -filter" in lwdaq_alt.');
 			exit;
 		end;
 	end;
@@ -3459,8 +3459,6 @@ begin
 					+scaled_power*detector_coordinates[detector_num].z;
 				sum_power:=sum_power
 					+scaled_power;
-				writestr(debug_string,slice_num,' ',detector_num,' ',sum_x:0:1,' ',
-					scaled_power:0:1,' ',detector_coordinates[detector_num].x:0:1);
 			end;
 		end;
 		if sum_power>0 then begin
@@ -3472,9 +3470,9 @@ begin
 			location.y:=error_value;
 			location.z:=error_value;
 		end;
-
+		
 		field:='';
-		writestr(field,location.x:1:3,' ',location.y:1:3,' ',location.z:1:3,' ');
+		writestr(field,location.x:1:1,' ',location.y:1:1,' ',location.z:1:1,' ');
 		for detector_num:=0 to num_detectors-1 do
 			writestr(field,field,detector_powers[detector_num]:1:1,' ');
 		insert(field,result,length(result)+1);			
