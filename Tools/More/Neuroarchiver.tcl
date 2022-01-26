@@ -1,7 +1,7 @@
 # Neruoarchiver.tcl, A LWDAQ Tool to download, record, display, and analyze
 # telemetry signals from subcutanous transmitters./
 #
-# Copyright (C) 2007-2021 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2022 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -1083,7 +1083,7 @@ proc Neuroarchiver_metadata_header {} {
 	append header "<payload>$iconfig(payload_length)</payload>\n\n"
 	if {[lsearch $info(alt_options) $iinfo(receiver_type)] >= 0} {
 		append header "\n<coordinates>"
-		foreach {x y z} $congif(tracker_coordinates) {
+		foreach {x y z} $config(tracker_coordinates) {
 			append header "$x $y "
 		}
 		append header "</coordinates>\n\n"
