@@ -1109,6 +1109,7 @@ proc Neuroarchiver_metadata_header_edit {} {
 	set w $info(metadata_header_window)
 	if {[winfo exists $w]} {
 		raise $w
+		return "SUCCESS"
 	} {
 		toplevel $w
 		wm title $w "Recording Metadata Header"
@@ -8343,7 +8344,7 @@ proc Neuroarchiver_open {} {
 		pack $f.b -side left -expand yes
 		
 		button $f.metadata -text "Header" \
-			-command "LWDAQ_post Neuroarchiver_metadata_header_edit"
+			-command "LWDAQ_post Neuroarchiver_metadata_header_edit front"
 		pack $f.metadata -side left -expand yes
 		
 		label $f.lac -text "Length (s):" -fg $info(label_color) 
