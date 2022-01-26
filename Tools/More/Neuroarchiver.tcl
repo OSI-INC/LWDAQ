@@ -671,7 +671,7 @@ proc Neuroarchiver_init {} {
 # Export settings.
 #
 	set info(export_panel) $info(window)\.export
-	set info(edf_panel) $info(window)\.edf
+	set info(edf_panel) $info(export_panel)\.edf
 	set info(export_start_s) "0000000000"
 	set info(export_end_s) $info(export_start_s)
 	set config(export_start) [Neuroarchiver_clock_convert $info(export_start_s)]
@@ -689,7 +689,7 @@ proc Neuroarchiver_init {} {
 	set config(export_format) "TXT"
 	set info(export_run_start) [clock seconds]
 	set config(export_reps) "1"
-	set info(optimal_export_interval) "8"
+	set config(export_activity_max) "10000"
 #
 # Video playback parameters. We define executable names for ffmpeg and mplayer.
 #
@@ -4193,19 +4193,17 @@ proc Neurotracker_extract {} {
 		}
 	} 
 	
-	# If we don't have a signal, perhaps because of reception loss, we create a
-	# fake tracker measurement consisting of the same number of lines. We do the
-	# same in the case of an error.
+	# If we don't have a signal, perhaps because of reception loss, or we have encountered
+	# an error, we leave the existing tracker history in place by simply exiting this
+	# routine now. If we have no history, we make a fake one.
 	if {($info(signal) == "0 0") || $lossy || $error_flag} {
-		set null_slice "0.0 0.0 0.0"
-		for {set detector_num 1} {$detector_num <= $num_detectors} {incr detector_num} {
-			append null_slice " 0.0"
+		if {![info exists history]} {
+			set history [list]
+			for {set slice_num 0} {$slice_num <= $num_slices} {incr slice_num} {
+				lappend history "0.0 0.0 0.0 0.0 0.0 0.0 0.0"
+			}
 		}
-		append null_slice "\n"
-		set alt_result ""
-		for {set slice_num 0} {$slice_num < $num_slices} {incr slice_num} {
-			append alt_result $null_slice
-		}
+		return "ABORT"
 	}
 	
 	# Split up the tracker result into a list delimited by line breaks.
@@ -4224,25 +4222,36 @@ proc Neurotracker_extract {} {
 		set history [list "$first_position $first_position 0.000"]
 	}
 	
-	# The history contains the slice positions and the filtered slice positions,
-	# from which we will calculate activity, and it contains the activity also,
-	# in its seventh element. By the time we are done, we have a list with the
-	# last slice from the previous interval, followed by all the slices from
-	# this interval, as well as filtered x, y, and z and activity calculated
-	# from the filtered positions, and the coil powers.
+	# To start our filter, we need the values of raw and filtered centroid 
+	# position from the slice before the first slice of this interval, which
+	# would be the last slice of the previous interval.
 	scan [lindex $history 0] %f%f%f%f%f%f x1 y1 z1 xx1 yy1 zz1
-	set info(tracker_activity) [list]
+	
+	# We generate the filtered centroid position with a single-pole recursive
+	# low-pass filter governed by a single constant a0, from which we derive
+	# a second constant b0 = 1 - a0. We obtain a0 from a look-up table using
+	# the ratio of the sample rate to the cut-off frequency, which we present
+	# to the user as filter_divisor.
 	set index [lsearch -index 0 $info(tracker_filter_database) \
 		$config(tracker_filter_divisor)]
 	set a0 [lindex $info(tracker_filter_database) $index 1]
 	set b1 [expr 1.0 - $a0]
+	
+	# We create the history for this interval by filtering the raw centroid
+	# position and calculating acitivty. For each slice, we create a string with
+	# the raw position, filtered position, activity, and coil powers. The units
+	# of position are the same as those in the coil coordinate array. The units
+	# of activity are these same units divided by seconds. Activity for each
+	# slice is the absolute distance moved by the filtered position from the
+	# previous slice to the current slice, multiplied by the sample rate to
+	# produce a value for speed, which is our measurement of activity.
 	foreach slice $alt_result {
 		scan $slice %f%f%f x0 y0 z0
-		set xx0 [format %.3f [expr ($xx1 * $b1) + ($a0 * $x0)]]
-		set yy0 [format %.3f [expr ($yy1 * $b1) + ($a0 * $y0)]]
-		set zz0 [format %.3f [expr ($zz1 * $b1) + ($a0 * $z0)]]
-		set activity [format %.3f [expr sqrt(\
-			($xx1-$xx0)*($xx1-$xx0) \
+		set xx0 [format %.6f [expr ($xx1 * $b1) + ($a0 * $x0)]]
+		set yy0 [format %.6f [expr ($yy1 * $b1) + ($a0 * $y0)]]
+		set zz0 [format %.6f [expr ($zz1 * $b1) + ($a0 * $z0)]]
+		set activity [format %.2f [expr $config(tracker_sample_rate) * \
+			sqrt(($xx1-$xx0)*($xx1-$xx0) \
 			+ ($yy1-$yy0)*($yy1-$yy0) \
 			+ ($zz1-$zz0)*($zz1-$zz0))]]
 		lappend history "$x0 $y0 $z0\
@@ -4301,7 +4310,7 @@ proc Neurotracker_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	label $f.lsps -text "sample_rate"
-	tk_optionMenu $f.msps Neuroarchiver(tracker_sample_rate) \
+	tk_optionMenu $f.msps Neuroarchiver_config(tracker_sample_rate) \
 		1 2 4 8 16 32 64
 	$f.msps configure -width 3
 	pack $f.lsps $f.msps -side left -expand yes
@@ -4855,34 +4864,67 @@ proc Neuroarchiver_edf_setup {} {
 		set code [split $code :]
 		set id [lindex $code 0]
 		if {![string is integer -strict $id]} {
-			Neuroarchiver_print "ERROR: Bad channel number \"$code\"\
+			LWDAQ_print $info(export_text) "ERROR: Bad channel number \"$code\"\
 				in EDF setup, try Autofill."
-			if {$info(window) != ""} {raise $info(window)} {raise .}
+			raise $info(export_panel)
 			break
 		}
 		set sps [lindex $code 1]
 		if {![string is integer -strict $sps]} {
 			Neuroarchiver_print "ERROR: Bad sample rate \"$sps\" for channel $id\
 				in EDF setup, try Autofill."
-			if {$info(window) != ""} {raise $info(window)} {raise .}
+			raise $info(export_panel)
 			break
 		}
-		set f [frame $w.details_$id]
-		pack $f -side top -fill x
-		label $f.lid -text "Name:" -fg $info(label_color)
-		label $f.vid -text "$id" -width 4
-		set EDF(name_$id) "$id"
-		label $f.lsps -text "SPS:" -fg $info(label_color)
-		label $f.vsps -text "$sps" -width 5
-		pack $f.lid $f.vid $f.lsps $f.vsps -side left -expand yes
-		foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 10} {
-			set b [string tolower $a]
-			if {![info exists EDF($b\_$id)]} {
-				set EDF($b\_$id) [set EDF($b)]
+		if {$config(export_signal)} {
+			set f [frame $w.details_$id]
+			pack $f -side top -fill x
+			label $f.lid -text "Name:" -fg $info(label_color)
+			label $f.vid -text "$id" -width 4
+			set EDF(name_$id) "$id"
+			label $f.lsps -text "SPS:" -fg $info(label_color)
+			label $f.vsps -text "$sps" -width 5
+			pack $f.lid $f.vid $f.lsps $f.vsps -side left -expand yes
+			foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 16} {
+				set b [string tolower $a]
+				if {![info exists EDF($b\_$id)]} {
+					set EDF($b\_$id) [set EDF($b)]
+				}
+				label $f.l$b -text "$a\:" -fg $info(label_color) 
+				entry $f.e$b -textvariable EDF($b\_$id) -width $len
+				pack $f.l$b $f.e$b -side left -expand yes
 			}
-			label $f.l$b -text "$a\:" -fg $info(label_color) 
-			entry $f.e$b -textvariable EDF($b\_$id) -width $len
-			pack $f.l$b $f.e$b -side left -expand yes
+		}
+		if {$config(export_activity)} {
+			set id_a "$id\_A"
+			set sps $config(tracker_sample_rate)
+			set f [frame $w.details_$id_a]
+			pack $f -side top -fill x
+			label $f.lid -text "Name:" -fg $info(label_color)
+			label $f.vid -text "$id_a" -width 4
+			set EDF(name_$id_a) "$id_a"
+			label $f.lsps -text "SPS:" -fg $info(label_color)
+			label $f.vsps -text "$sps" -width 5
+			pack $f.lid $f.vid $f.lsps $f.vsps -side left -expand yes
+			foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 16} {
+				set b [string tolower $a]
+				label $f.l$b -text "$a\:" -fg $info(label_color) 
+				entry $f.e$b -textvariable EDF($b\_$id_a) -width $len
+				pack $f.l$b $f.e$b -side left -expand yes
+			}
+			set EDF(transducer_$id_a) "Tracker"
+			set EDF(unit_$id_a) "mm/s"
+			set EDF(min_$id_a) "0"
+			set EDF(max_$id_a) $config(export_activity_max)
+			set EDF(lo_$id_a) $EDF(lo)
+			set EDF(hi_$id_a) $EDF(hi)
+			if {$config(tracker_filter_divisor) == 1} {
+				set EDF(filter_$id_a) "None"
+			} {
+				set EDF(filter_$id_a) "0.0-[format %.3f \
+					[expr 1.0 * $config(tracker_sample_rate) \
+					/ $config(tracker_filter_divisor)]] Hz"
+			}
 		}
 	}
 }
@@ -4930,8 +4972,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		# Check for incompatible options.
 		if {$config(export_centroid) || $config(export_powers)} {
 			if {$config(export_format) == "EDF"} {
-				LWDAQ_print $info(export_text) "ERROR: Cannot store centroid\
-					position or coil powers in EDF format."
+				LWDAQ_print $info(export_text) \
+					"ERROR: Cannot store centroid or powers in EDF."
 				return "ERROR"
 			}
 		}	
@@ -4996,65 +5038,89 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			}
 			lappend signals $id $sps
 						
-			if {$config(export_combine)} {
-				set efn [file join $config(export_dir) "S$info(export_start_s).$ext"]
-				LWDAQ_print -nonewline $info(export_text) "Exporting "
-				foreach a "signal activity centroid powers" {
-					if {[set config(export_$a)]} {
-						LWDAQ_print -nonewline $info(export_text) "$a "
-					}
-				}
-				LWDAQ_print $info(export_text) "for channel $id to \"$efn\"."
-				if {[file exists $efn]} {
-					LWDAQ_print $info(export_text) "WARNING: Deleting existing\
-						export file [file tail $efn]."
-					file delete $efn
-				}
-			} {
-				if {$config(export_signal)} {
-					set efn [file join $config(export_dir) \
+			if {$config(export_signal)} {
+				if {$config(export_combine)} {
+					set sfn [file join $config(export_dir) \
+						"S$info(export_start_s).$ext"]
+				} {
+					set sfn [file join $config(export_dir) \
 						"S$info(export_start_s)\_$id\.$ext"]
-					LWDAQ_print $info(export_text) "Exporting signal\
-						$id at $sps SPS to $efn."
-					if {[file exists $efn]} {
-						LWDAQ_print $info(export_text) "WARNING: Export file\
-							[file tail $efn] already exists, others may also exist."
-					}
 				}
-				if {$config(export_format) == "EDF"} {
-					LWDAQ_print $info(export_text) "Creating EDF file [file tail $efn]."
-					EDF_create $efn $config(play_interval) "$id $sps" \
-						$info(export_start_s)
+				LWDAQ_print $info(export_text) "Exporting signal of channel\
+					$id at $sps SPS to $sfn."
+				if {[file exists $sfn]} {
+					LWDAQ_print $info(export_text) \
+						"WARNING: Deleting existing [file tail $sfn]."
+					file delete $sfn
 				}
-				if {$config(export_centroid) || $config(export_powers)} {
-					set efn [file join $config(export_dir) \
+				if {!$config(export_combine) && ($config(export_format) == "EDF")} {
+					LWDAQ_print $info(export_text) "Creating EDF file [file tail $sfn]."
+					EDF_create $sfn $config(play_interval) \
+						"$id $sps" $info(export_start_s)
+				}
+			}
+			
+			if {$config(export_centroid) || $config(export_powers)} {
+				if {$config(export_combine)} {
+					set tfn [file join $config(export_dir) \
+						"T$info(export_start_s).$ext"]
+				} {
+					set tfn [file join $config(export_dir) \
 						"T$info(export_start_s)\_$id\.$ext"]
-					LWDAQ_print -nonewline $info(export_text) "Exporting tracker "
-					foreach p {centroid powers} {
-						if {$config(export_$p)} {
-							LWDAQ_print -nonewline $info(export_text) "$p "
-						}
-					}
-					LWDAQ_print $info(export_text) "for channel $id at\
-						$config(tracker_sample_rate) SPS to $efn."
-					if {[file exists $efn]} {
-						LWDAQ_print $info(export_text) "WARNING: Export file\
-							[file tail $efn] already exists, others may also exist."
-						file delete $efn
-					}
+				}
+				LWDAQ_print $info(export_text) "Exporting tracker data of channel\
+					$id at $config(tracker_sample_rate) SPS to $tfn."
+				if {[file exists $tfn]} {
+					LWDAQ_print $info(export_text) \
+						"WARNING: Deleting existing [file tail $tfn]."
+					file delete $tfn
+				}
+			}		
+			
+			if {$config(export_activity)} {
+				if {$config(export_combine)} {
+					set afn [file join $config(export_dir) \
+						"A$info(export_start_s).$ext"]
+				} {
+					set afn [file join $config(export_dir) \
+						"A$info(export_start_s)\_$id\.$ext"]
+				}
+				LWDAQ_print $info(export_text) "Exporting activity of channel\
+					$id at $sps SPS to $afn."
+				if {[file exists $afn]} {
+					LWDAQ_print $info(export_text) \
+						"WARNING: Deleting existing [file tail $afn]."
+					file delete $afn
+				}
+				if {!$config(export_combine) && ($config(export_format) == "EDF")} {
+					LWDAQ_print $info(export_text) "Creating EDF file [file tail $afn]."
+					EDF_create $afn $config(play_interval) \
+						"$id\_A $config(tracker_sample_rate)" $info(export_start_s)
 				}
 			}
 		}
 		
 		# If we are exporting to one EDF file, create the header for all signals now.
 		if {$config(export_combine) && ($config(export_format) == "EDF")} {
-			LWDAQ_print $info(export_text) "Creating EDF file [file tail $efn]."
-			EDF_create $efn $config(play_interval) $signals $info(export_start_s)
+			if {$config(export_signal)} {
+				LWDAQ_print $info(export_text) "Creating EDF file [file tail $sfn]."
+				EDF_create $sfn $config(play_interval) $signals $info(export_start_s)
+			}
+			if {$config(export_activity)} {
+				LWDAQ_print $info(export_text) "Creating EDF file [file tail $afn]."
+				set headings ""
+				foreach {id sps} $signals {
+					append headings "$id\_A $config(tracker_sample_rate) "
+				}
+				EDF_create $afn $config(play_interval) $headings $info(export_start_s)
+			}
 		}
 		
 		# Enable position calculation if required, and close the tracker window
 		# if its open. 
-		if {$config(export_centroid) || $config(export_powers)} {
+		if {$config(export_activity) \
+				|| $config(export_centroid) \
+				|| $config(export_powers)} {
 			set config(alt_calculate) "1"
 			if {[winfo exists $info(tracker_window)]} {
 				LWDAQ_print $info(export_text) "WARNING: Closing the Neurotracker\
@@ -5161,17 +5227,20 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 		set interval_start_s [Neuroarchiver_clock_convert $info(datetime_play_time)]
 		if {$interval_start_s < $info(export_end_s)} {
 
-			# Write the signal to disk.
+			# Write the signal to disk. This is the reconstructed signal we
+			# receive from a transmitter. Each sample is a sixteen-bit unsigned
+			# integer and we save these in a manner suitable for each export
+			# format.
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
-					set fn [file join $config(export_dir) \
+					set sfn [file join $config(export_dir) \
 						"S$info(export_start_s).$ext"]
 				} {
-					set fn [file join $config(export_dir) \
+					set sfn [file join $config(export_dir) \
 						"S$info(export_start_s)\_$info(channel_num)\.$ext"]
 				}
 				if {$config(export_format) == "TXT"} {
-					set f [open $fn a]
+					set f [open $sfn a]
 					foreach value $info(values) {
 						puts $f $value
 					}
@@ -5181,7 +5250,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					foreach value $info(values) {
 					  append export_bytes [binary format S $value]
 					}
-					set f [open $fn a]
+					set f [open $sfn a]
 					fconfigure $f -translation binary
 					puts -nonewline $f $export_bytes
 					close $f
@@ -5189,20 +5258,41 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					if {!$config(export_combine) || \
 							[string match "$info(channel_num):*" \
 								[lindex $config(channel_selector) 0]]} {
-						EDF_num_records_incr $fn
+						EDF_num_records_incr $sfn
 					} 
-					EDF_append $fn $info(values)
+					EDF_append $sfn $info(values)
 				}
 			}
 		
-			# Write tracker output to disk.
+			# Write tracker centroid and powers to disk. The tracker values are
+			# stored in each channel's tracker history. The history is a list of
+			# tracker measurements, which we call "slices". The list begins with
+			# the last slice of the previous interval, so we will ignore that
+			# slice in the code below. There follow f_s * T_p slices for the
+			# current interval, where f_s is the tracker sample rate and T_p is
+			# the playback interval length. Each slice is a list of
+			# floating-point numbers. They begin with the unfiltered centroid
+			# position x, y, z in whatever units are used to provide the tracker
+			# coil coordinates. Then we have the filtered x, y, and z position,
+			# and the activity obtained from the filtered position, and finally
+			# the power measurements from all the detector coils. These coil
+			# powers are all in the range 0 to 255 so we round them in binary
+			# export and write them as single bytes. In the code below, we are
+			# writing the filtered centroid position to disk. If the
+			# filter_divisor in the Tracker Panel is 1, which is the default,
+			# the filtered position will be the same as the original position.
 			if {$config(export_centroid) || $config(export_powers)} {
 				upvar #0 Neuroarchiver_info(tracker_$info(channel_num)) history
+				if {![info exists history]} {
+					LWDAQ_print $info(export_text) "ERROR: No tracker history to export,\
+						make sure alt_calculate is set."
+					return "ERROR"
+				}
 				if {$config(export_combine)} {
-					set fn [file join $config(export_dir) \
+					set tfn [file join $config(export_dir) \
 						"T$info(export_start_s).$ext"]
 				} {
-					set fn [file join $config(export_dir) \
+					set tfn [file join $config(export_dir) \
 						"T$info(export_start_s)\_$info(channel_num)\.$ext"]
 				}
 				
@@ -5210,40 +5300,118 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					set export_string ""
 					foreach slice [lrange $history 1 end] {
 						if {$config(export_centroid)} {
-							append export_string "[lrange $slice 3 5] "
+							append export_string "[lrange $slice 3 5]"
+							if {$config(export_powers)} {
+								append export_string " "
+							}
 						}
 						if {$config(export_powers)} {
-							append export_string "[lrange $slice 8 end]"
+							append export_string "[lrange $slice 7 end]"
 						}
+						append export_string "\n"
 					}
-					set f [open $fn a]
+					set f [open $tfn a]
 					puts $f [string trim $export_string]
 					close $f
 				} elseif {$config(export_format) == "BIN"} {
 					set export_bytes ""
 					foreach slice [lrange $history 1 end] {
 						if {$config(export_centroid)} {
-							append export_bytes [binary format S \
-								[expr round([lindex $slice 3]*10.0)]]
-							append export_bytes [binary format S \
-								[expr round([lindex $slice 4]*10.0)]]
-							append export_bytes [binary format S \
-								[expr round([lindex $slice 5]*10.0)]]
+							foreach v [lrange $slice 3 5] {
+								if {![string is double -strict $v]} {set v 0.0}
+								append export_bytes \
+									[binary format S [expr round($v*10.0)]]
+							}
 						}
 						if {$config(export_powers)} {
-							foreach p [lrange $slice 8 end] {
-								append export_bytes [binary format c \
-									[expr round($p)]]
+							foreach p [lrange $slice 7 end] {
+								if {![string is double -strict $v]} {set v 0.0}
+								append export_bytes [binary format c [expr round($p)]]
 							}
 						}
 					}
-					set f [open $fn a]
+					set f [open $tfn a]
 					fconfigure $f -translation binary
 					puts -nonewline $f $export_bytes
 					close $f
 				} elseif {$config(export_format) == "EDF"} {
 				# We provide no export for centroid or powers in EDF format. Before
 				# we ever get to this point, we should have generated an error.
+				}
+			}
+
+			# Write activity to disk. We use the same tracker history we
+			# describe in the comment above. Its seventh element (number six) is
+			# the activity in centimeters per second. For text, we print the 
+			# real-valued activity in cm/s. For binary, we multiply by ten then
+			# round and write as a two-byte unsigned integer in big-endian format.
+			# For EDF, we fit the range min_activity to max_activity into the
+			# integer range 0-65535 before passing to our EDF append routine.
+			if {$config(export_activity)} {
+				upvar #0 Neuroarchiver_info(tracker_$info(channel_num)) history
+				if {![info exists history]} {
+					LWDAQ_print $info(export_text) "ERROR: No tracker history to export,\
+						make sure alt_calculate is set."
+					return "ERROR"
+				}
+				if {$config(export_combine)} {
+					set afn [file join $config(export_dir) \
+						"A$info(export_start_s).$ext"]
+				} {
+					set afn [file join $config(export_dir) \
+						"A$info(export_start_s)\_$info(channel_num)\.$ext"]
+				}
+				
+				if {$config(export_format) == "TXT"} {
+					set export_string ""
+					foreach slice [lrange $history 1 end] {
+						set v [lindex $slice 6]
+						if {![string is double -strict $v]} {
+							set v 0.0
+						}
+						append export_string "[format %.2f $v]\n"
+					}
+					set f [open $afn a]
+					puts $f [string trim $export_string]
+					close $f
+				} elseif {$config(export_format) == "BIN"} {
+					set export_bytes ""
+					foreach slice [lrange $history 1 end] {
+						set v [lindex $slice 6]
+						if {![string is double -strict $v]} {
+							set v 0.0
+						}
+						append export_bytes \
+							[binary format S [expr round($v*10.0)]]
+					}
+					set f [open $afn a]
+					fconfigure $f -translation binary
+					puts -nonewline $f $export_bytes
+					close $f
+				} elseif {$config(export_format) == "EDF"} {
+					if {!$config(export_combine) || \
+							[string match "$info(channel_num):*" \
+								[lindex $config(channel_selector) 0]]} {
+						EDF_num_records_incr $afn
+					} 
+					set values [list]
+					set test [list]
+					foreach slice [lrange $history 1 end] {
+						set v [lindex $slice 6]
+						lappend test $v
+						if {![string is double -strict $v]} {
+							set vv 0
+						} {
+							if {$v * 10.0 < $config(export_activity_max)} {
+								set vv [expr round( $v * 10.0 * 65535 \
+									/ $config(export_activity_max))]
+							} {
+								set vv 65535
+							}
+						}
+						lappend values $vv
+					}
+					EDF_append $afn $values
 				}
 			}
 		}
