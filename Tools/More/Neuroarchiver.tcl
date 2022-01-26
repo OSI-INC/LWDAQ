@@ -8344,7 +8344,7 @@ proc Neuroarchiver_open {} {
 		pack $f.b -side left -expand yes
 		
 		button $f.metadata -text "Header" \
-			-command "LWDAQ_post Neuroarchiver_metadata_header_edit front"
+			-command Neuroarchiver_metadata_header_edit
 		pack $f.metadata -side left -expand yes
 		
 		label $f.lac -text "Length (s):" -fg $info(label_color) 
