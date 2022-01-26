@@ -621,16 +621,20 @@ proc Neuroarchiver_init {} {
 	set info(handler_script) ""
 	set config(classifier_library) ""
 #
-# The Location Tracker settings.
+# Neurotracker panel configuration.
 #
 	set info(tracker_window) $info(window)\.tracker
 	set info(tracker_width) 640
 	set info(tracker_height) 320
 	set info(tracker_image_border_pixels) 10
-	set config(tracker_decade_scale) "60" 
-	set config(tracker_extent_radius) "100"
+#
+# Neurotracker calculation settings.
+#
 	set config(tracker_min_reception) "0.2"
+	set config(tracker_decade_scale) "30" 
+	set config(tracker_extent_radius) "100"
 	set config(tracker_sample_rate) "16"
+	set config(tracker_filter_divisor) "128"
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
@@ -655,7 +659,6 @@ proc Neuroarchiver_init {} {
 		"128 0.0470" "64 0.0900" \
 		"32 0.1800" "16 0.3100" \
 		"8 0.5200" "1 1.0000"]
-	set config(tracker_filter_divisor) "1"
 #
 # The Playback Clock default settings.
 #
@@ -4880,10 +4883,10 @@ proc Neuroarchiver_edf_setup {} {
 			set f [frame $w.details_$id]
 			pack $f -side top -fill x
 			label $f.lid -text "Name:" -fg $info(label_color)
-			label $f.vid -text "$id" -width 4
+			label $f.vid -text "$id"
 			set EDF(name_$id) "$id"
 			label $f.lsps -text "SPS:" -fg $info(label_color)
-			label $f.vsps -text "$sps" -width 5
+			label $f.vsps -text "$sps"
 			pack $f.lid $f.vid $f.lsps $f.vsps -side left -expand yes
 			foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 16} {
 				set b [string tolower $a]
@@ -4896,23 +4899,31 @@ proc Neuroarchiver_edf_setup {} {
 			}
 		}
 		if {$config(export_activity)} {
-			set id_a "$id\_A"
+			set id_a "[set id]a"
 			set sps $config(tracker_sample_rate)
 			set f [frame $w.details_$id_a]
 			pack $f -side top -fill x
-			label $f.lid -text "Name:" -fg $info(label_color)
-			label $f.vid -text "$id_a" -width 4
+			label $f.lid -text "Name:" -fg $info(label_color) 
+			label $f.vid -text "$id_a" 
 			set EDF(name_$id_a) "$id_a"
 			label $f.lsps -text "SPS:" -fg $info(label_color)
-			label $f.vsps -text "$sps" -width 5
+			label $f.vsps -text "$sps"
 			pack $f.lid $f.vid $f.lsps $f.vsps -side left -expand yes
-			foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 16} {
+			foreach {a len} {Transducer 30} {
 				set b [string tolower $a]
 				label $f.l$b -text "$a\:" -fg $info(label_color) 
 				entry $f.e$b -textvariable EDF($b\_$id_a) -width $len
 				pack $f.l$b $f.e$b -side left -expand yes
 			}
-			set EDF(transducer_$id_a) "Tracker"
+			if {[set EDF(transducer_$id_a)] == ""} {
+				set EDF(transducer_$id_a) "Tracker"
+			}
+			foreach {a len} {Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 16} {
+				set b [string tolower $a]
+				label $f.l$b -text "$a\:" -fg $info(label_color) 
+				label $f.e$b -textvariable EDF($b\_$id_a) -width $len
+				pack $f.l$b $f.e$b -side left -expand yes
+			}
 			set EDF(unit_$id_a) "mm/s"
 			set EDF(min_$id_a) "0"
 			set EDF(max_$id_a) $config(export_activity_max)
@@ -5041,10 +5052,10 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
 					set sfn [file join $config(export_dir) \
-						"S$info(export_start_s).$ext"]
+						"E$info(export_start_s).$ext"]
 				} {
 					set sfn [file join $config(export_dir) \
-						"S$info(export_start_s)\_$id\.$ext"]
+						"E$info(export_start_s)\_$id\.$ext"]
 				}
 				LWDAQ_print $info(export_text) "Exporting signal of channel\
 					$id at $sps SPS to $sfn."
@@ -5095,7 +5106,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				if {!$config(export_combine) && ($config(export_format) == "EDF")} {
 					LWDAQ_print $info(export_text) "Creating EDF file [file tail $afn]."
 					EDF_create $afn $config(play_interval) \
-						"$id\_A $config(tracker_sample_rate)" $info(export_start_s)
+						"[set id]a $config(tracker_sample_rate)" $info(export_start_s)
 				}
 			}
 		}
@@ -5110,7 +5121,7 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 				LWDAQ_print $info(export_text) "Creating EDF file [file tail $afn]."
 				set headings ""
 				foreach {id sps} $signals {
-					append headings "$id\_A $config(tracker_sample_rate) "
+					append headings "[set id]a $config(tracker_sample_rate) "
 				}
 				EDF_create $afn $config(play_interval) $headings $info(export_start_s)
 			}
@@ -5234,10 +5245,10 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
 					set sfn [file join $config(export_dir) \
-						"S$info(export_start_s).$ext"]
+						"E$info(export_start_s).$ext"]
 				} {
 					set sfn [file join $config(export_dir) \
-						"S$info(export_start_s)\_$info(channel_num)\.$ext"]
+						"E$info(export_start_s)\_$info(channel_num)\.$ext"]
 				}
 				if {$config(export_format) == "TXT"} {
 					set f [open $sfn a]
@@ -5300,14 +5311,14 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					set export_string ""
 					foreach slice [lrange $history 1 end] {
 						if {$config(export_centroid)} {
-							append export_string "[lrange $slice 3 5]"
-							if {$config(export_powers)} {
-								append export_string " "
+							foreach p [lrange $slice 3 5] {
+								append export_string "[format %.1f $p] "
 							}
 						}
 						if {$config(export_powers)} {
 							append export_string "[lrange $slice 7 end]"
 						}
+						set export_string [string trim $export_string]
 						append export_string "\n"
 					}
 					set f [open $tfn a]
