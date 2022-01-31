@@ -59,7 +59,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "154"
+	LWDAQ_tool_init "Neuroarchiver" "155"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -95,7 +95,7 @@ proc Neuroarchiver_init {} {
 #
 # Recording data acquisition parameters.
 #
-	set config(receiver_type) "A3027"
+	set config(receiver_type) "?"
 	set info(receiver_options) "A3018 A3027 A3032 A3038"
 	set info(alt_options) "A3032 A3038"
 #
@@ -464,6 +464,12 @@ proc Neuroarchiver_init {} {
 	set info(metadata_header) ""
 	set info(metadata_header_window) "$info(window)\.metadataheader"
 #
+# The recorder_customization string allows us to override default values for
+# data receiver parameters such as coil coordinates.
+#
+	set config(recorder_customization) ""
+	set info(customization_window) "$info(window)\.customization"
+#
 # When autocreate is greater than zero, it gives the number of seconds after
 # which we should stop using one archive and create another one. We find the
 # Neuroarchiver to be efficient with archives hundreds of megabytes long, so
@@ -638,13 +644,15 @@ proc Neuroarchiver_init {} {
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
-	set info(A3038_coordinates) "0  0 2 0  12 2  0 24 2 \
+	set info(A3038_coordinates) "\
+		0  0 2 0  12 2  0 24 2 \
 		12 0 2 12 12 2 12 24 2 \
 		24 0 2 24 12 2 24 24 2 \
 		36 0 2 36 12 2 36 24 2 \
 		48 0 2 48 12 2 48 24 2 \
 		-1 -1 -1"
-	set info(A3032_coordinates) "0  0 2  0 8 2  0 16 2 \
+	set info(A3032_coordinates) "\
+		0 0 2  0 8 2  0 16 2 \
 		8  0 2  8 8 2  8 16 2 \
 		16 0 2 16 8 2 16 16 2 \
 		24 0 2 24 8 2 24 16 2 \
@@ -1079,18 +1087,20 @@ proc Neuroarchiver_metadata_header {} {
 			LWDAQ_$LWDAQ_Info(program_patchlevel).\
 			\nReceiver: Type $iinfo(receiver_type) with\
 			firmware $iinfo(receiver_firmware).\
-			\nPlatform: $LWDAQ_Info(os).</c>\n\n"
-	append header "<payload>$iconfig(payload_length)</payload>\n\n"
+			\nPlatform: $LWDAQ_Info(os).</c>\n"
+	append header "<payload>$iconfig(payload_length)</payload>\n"
 	if {[lsearch $info(alt_options) $iinfo(receiver_type)] >= 0} {
-		append header "\n<coordinates>"
+		set xy ""
+		set xyz ""
 		foreach {x y z} $config(tracker_coordinates) {
-			append header "$x $y "
+			append xy "$x $y "
+			append xyz "$x $y $z "
 		}
-		append header "</coordinates>\n\n"
-		append header "\n<alt>$config(tracker_coordinates)</alt>\n\n"
+		append header "<coordinates>[string trim $xy]</coordinates>\n"
+		append header "<alt>[string trim $xyz]</alt>\n"
 	}
 	if {[string trim $info(metadata_header)] != ""} {
-		append header "<c>[string trim $info(metadata_header)]</c>\n\n"
+		append header "<c>[string trim $info(metadata_header)]</c>\n"
 	}
 
 	return $header
@@ -1144,6 +1154,55 @@ proc Neuroarchiver_metadata_header_save {} {
 		Neuroarchiver_print "ERROR: Cannot find metadata header edit window."
 	}
 	return $info(metadata_header)
+}
+
+#
+# Neuroarchiver_customization_edit displays the recording customization string,
+# allows us to edit, and to save. We cancel by closing the window.
+#
+proc Neuroarchiver_customization_edit {} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+	
+	# Create a new top-level text window
+	set w $info(customization_window)
+	if {[winfo exists $w]} {
+		raise $w
+		return "SUCCESS"
+	} {
+		toplevel $w
+		wm title $w "Recorder Customization String"
+		LWDAQ_text_widget $w 60 20
+		LWDAQ_enable_text_undo $w.text	
+	}
+
+	# Create the Save button.
+	frame $w.f
+	pack $w.f -side top
+	button $w.f.save -text "Save" -command Neuroarchiver_customization_save
+	pack $w.f.save -side left
+	
+	# Print the metadata to the text window.
+	LWDAQ_print $w.text $config(recorder_customization)
+
+	return "SUCCESS"
+}
+
+#
+# Neuroarchiver_customization_save takes the contents of the customization string
+# edit text window and saves it to the recorder customization string.
+#
+proc Neuroarchiver_customization_save {} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+
+	set w $info(customization_window)
+	if {[winfo exists $w]} {
+		set config(recorder_customization) [string trim [$w.text get 1.0 end]]
+	} {
+		Neuroarchiver_print "ERROR: Cannot find customization edit window."
+	}
+	return $config(recorder_customization)
 }
 
 #
@@ -6461,7 +6520,34 @@ proc Neuroarchiver_set_receiver {version} {
 			set config(tracker_coordinates) ""
 		}
 	}
-	
+
+	# Permit user to specify their own tracker coil coordinates in the recorder 
+	# customization string.
+	set alt [lindex [LWDAQ_xml_get_list $config(recorder_customization) "alt"] end]
+	if {$alt != ""} {
+		Neuroarchiver_print "Found coil coordinates in recorder customization string."
+		if {[catch {
+			set count 0
+			foreach {x y z} $alt {
+				foreach a {x y z} {
+					if {![string is double -strict [set $a]]} {
+						error "invalid coordinate \"[set $a]\""
+					}
+				}
+				incr count
+			}
+			if {$count != $iconfig(payload_length)} {
+				error "found $count coordinate, need $iconfig(payload_length)"
+			}		
+			Neuroarchiver_print "Writing custom coil coordinates to archive metadata."
+			set config(tracker_coordinates) $alt
+		} message]} {
+			Neuroarchiver_print "ERROR: $message, check customization string."
+			Neuroarchiver_print "WARNING: Writing default coordinates\
+				to archive metadata."
+		}
+	}
+
 	set config(receiver_type) $version
 
 	return $version
@@ -6536,8 +6622,9 @@ proc Neuroarchiver_record {{command ""}} {
 		# Clear the buffer.
 		set info(recorder_buffer) ""
 
-		# Wait until a new second begins, but only on a Reset command or if the
-		# synchronization flag set.
+		# If the synchronization flag is set, or if we are starting a new recording,
+		# we wait until a new second begins so as to make the file time match the 
+		# time we reset the data receiver.
 		set ms_start [clock milliseconds]
 		if {($info(record_control) == "Start") || $config(synchronize)} {
 			while {[expr [clock milliseconds] % 1000] > $info(sync_window_ms)} {
@@ -6556,8 +6643,8 @@ proc Neuroarchiver_record {{command ""}} {
 		# Set the timestamp for the new file, with resolution one second.
 		set config(record_start_clock) [clock seconds]
 		
-		# Reset the data receiver, but only if the comand is Reset or if
-		# the synchronize flag is set.
+		# If the synchronize flag is set, or if we are starting a new recording,
+		# reset the data receiver.
 		if {($info(record_control) == "Start") || $config(synchronize)} {
 			set info(recorder_error_time) 0
 			set info(recorder_message_interval) $info(initial_message_interval)
@@ -6567,11 +6654,9 @@ proc Neuroarchiver_record {{command ""}} {
 				set info(record_control) "Idle"
 				return "ERROR"
 			}
-			if {$iinfo(receiver_type) != $config(receiver_type)} {
-				Neuroarchiver_print "Detected $iinfo(receiver_type)\
-					data receiver, reconfiguring for the $iinfo(receiver_type)."
-				Neuroarchiver_set_receiver $iinfo(receiver_type)	
-			}
+			Neuroarchiver_print "Detected $iinfo(receiver_type)\
+				data receiver, reconfiguring for the $iinfo(receiver_type)."
+			Neuroarchiver_set_receiver $iinfo(receiver_type)	
 		}
 		set ms_reset [clock milliseconds]		
 
@@ -8306,15 +8391,8 @@ proc Neuroarchiver_open {} {
 		pack $f -side top -fill x
 
 		label $f.a -text "Receiver:" -anchor w -fg $info(label_color)
-		pack $f.a -side left
-
-		set m [tk_optionMenu $f.mr Neuroarchiver_config(receiver_type) "None"]
-		$m delete 0 end
-		foreach version $info(receiver_options) {
-			$m add command -label $version \
-				-command [list Neuroarchiver_set_receiver $version]
-		}	
-		pack $f.mr -side left -expand yes
+		label $f.rt -textvariable Neuroarchiver_config(receiver_type)
+		pack $f.a $f.rt -side left
 
 		label $f.ipl -text "ip_addr:" -fg $info(label_color)
 		entry $f.ipe -textvariable LWDAQ_config_Receiver(daq_ip_addr) -width 14
@@ -8342,6 +8420,10 @@ proc Neuroarchiver_open {} {
 		label $f.b -textvariable Neuroarchiver_info(record_file_tail) \
 			-width 20 -bg $info(variable_bg)
 		pack $f.b -side left -expand yes
+		
+		button $f.customize -text "Customize" \
+			-command Neuroarchiver_customization_edit
+		pack $f.customize -side left -expand yes 
 		
 		button $f.metadata -text "Header" \
 			-command Neuroarchiver_metadata_header_edit
