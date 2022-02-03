@@ -64,6 +64,7 @@ const
 var
 	gui_photo_name:string='none';
 	gui_zoom:real=1.0;
+	gui_display_zoom:real=1.0;
 	gui_intensify:string='exact';
 	gui_text_name:string='stdout';
 	gui_interp_ptr:pointer=nil;
@@ -221,36 +222,37 @@ begin
 end;
 
 {
-<p>lwdaq_config sets global variables that control the operation of the lwdaq analysis libraries. If you specify no options, lwdaq_config returns a string giving you the current values of all the options, <i>except</i> the -eol option. Each option requires a value, which will be assigned to the global variable names in the option. Here are the options and their expected value types. Boolean variables you specify with 0 for false and 1 for true.</p>
+<p>lwdaq_config sets global variables that control the operation of the lwdaq libraries. If you specify no options, lwdaq_config returns a string giving you the current values of all the options, <i>except</i> the -eol option. Each option requires a value, which will be assigned to the global variable names in the option. Here are the options and their expected value types. Boolean variables you specify with 0 for false and 1 for true.</p>
 
 <center><table cellspacing=1 border>
 <tr><th>Option</th><th>Type</th><th>Function</th></tr>
-<tr><td>-stdout_available</td><td>Boolean</td><td>standard output channel is available</td></tr>
-<tr><td>-stdin_available</td><td>Boolean</td><td>standard input channel is available</td></tr>
-<tr><td>-track_ptrs</td><td>Boolean</td><td>track memory allocation</td></tr>
-<tr><td>-text_name</td><td>String</td><td>text window, channel, or file in which to print messages</td></tr>
-<tr><td>-photo_name</td><td>String</td><td>photo in which to draw images and graphs</td></tr>
-<tr><td>-zoom</td><td>Real</td><td>display zoom for images</td></tr>
+<tr><td>-stdout_available</td><td>Boolean</td><td>standard output channel is available, default 1</td></tr>
+<tr><td>-stdin_available</td><td>Boolean</td><td>standard input channel is available, default 0</td></tr>
+<tr><td>-track_ptrs</td><td>Boolean</td><td>track memory allocation, default 0</td></tr>
+<tr><td>-text_name</td><td>String</td><td>text window, channel, or file in which to print messages, default stdout</td></tr>
+<tr><td>-photo_name</td><td>String</td><td>photo in which to draw images and graphs, default none</td></tr>
+<tr><td>-zoom</td><td>Real</td><td>display scaling for images draw by <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>, default 1.0</td></tr>
+<tr><td>-display_zoom</td><td>Real</td><td>display scaling for all images drawn by library routines, default 1.0</tr></tr>
 <tr><td>-intensify</td><td>String</td><td>intensification type for images,<br>
-	none, mild, strong, or exact.</td></tr>
-<tr><td>-wait_ms</td><td>Integer</td><td>milliseconds to pause during lwdaq_gui_wait</td></tr>
-<tr><td>-gamma_correction</td><td>Real</td><td>image drawing gamma correction</td></tr>
-<tr><td>-rggb_red_scale</td><td>Real</td><td>image drawing red brightness</td></tr>
-<tr><td>-rggb_blue_scale</td><td>Real</td><td>image drawing blue brightness</td></tr>
-<tr><td>-fsr</td><td>Integer</td><td>field size for real numbers returned in strings.</td></tr>
-<tr><td>-fsd</td><td>Integer</td><td>decimal places for real numbers returned in strings.</td></tr>
-<tr><td>-eol</td><td>String</td><td>end of line characters for text windows and files.</td>
+	none, mild, strong, or exact, default exact</td></tr>
+<tr><td>-wait_ms</td><td>Integer</td><td>milliseconds to pause during <a href="#lwdaq_gui_wait">lwdaq_gui_wait</a>, default -1</td></tr>
+<tr><td>-gamma_correction</td><td>Real</td><td>image drawing gamma correction, default 1.0</td></tr>
+<tr><td>-rggb_red_scale</td><td>Real</td><td>image drawing red brightness, default 1.0</td></tr>
+<tr><td>-rggb_blue_scale</td><td>Real</td><td>image drawing blue brightness, default 1.0</td></tr>
+<tr><td>-fsr</td><td>Integer</td><td>field size for real numbers returned in strings, default 1</td></tr>
+<tr><td>-fsd</td><td>Integer</td><td>decimal places for real numbers returned in strings, default 6</td></tr>
+<tr><td>-eol</td><td>String</td><td>end of line characters for text windows and files, default chr(10)</td>
 <tr><td>-append_errors</td><td>Boolean</td><td>Append errors to global error string, default 0</td>
-<tr><td>-log_name</td><td>String</td><td>Name of debugging log file.</td>
+<tr><td>-log_name</td><td>String</td><td>Name of debugging log file, default "lwdaq_log.txt"</td>
 <tr><td>-log_errors</td><td>Boolean</td><td>Write errors to log file, default 0</td>
 <tr><td>-show_details</td><td>Boolean</td><td>Write execution details to text window, default 0</td>
 </table></center>
 
-<p>The analysis routines can write to Tk text windows through -text_name and -photo_name. The -text_name should specify a Tk text widget (such as .text), <i>stdout</i>, or a file name. The default is <i>stdout</i>. If the -text_name does not begin with a period, indicating a text window, nor is it <i>stdou</i>, we assume it is the name of a file. File names cannot be numbers. If the file name contains a path, that path must exist. The -show_details option is used by some analysis routines to generate additional exectution details that will be printed to the text window specified by -text_name.</p>
+<p>The lwdaq library routines can write to Tk text windows through -text_name and -photo_name. The -text_name should specify a Tk text widget (such as .text), <i>stdout</i>, or a file name. The default is <i>stdout</i>. If the -text_name does not begin with a period, indicating a text window, nor is it <i>stdout</i>, we assume it is the name of a file. File names cannot be numbers. If the file name contains a path, that path must exist. The -show_details option is used by some library routines to generate additional exectution details that will be printed to the text window specified by -text_name.</p>
 
-<p>The analysis routines can draw an image in a Tk photo by calling <i>gui_draw</i> and specifying the name of the image. The photo that will receive the image is the one named by a global variable we set with the -photo_name option. The -photo_name must be an existing Tk photo (such as bcam_photo), and has default value "none", which disables the drawing. During execution, analysis routines can pause to allow us to view intermediate drarwing results by means of the -wait_ms option. If we set -wait_ms to 1000, the analysis routine will pause for one second. If we set -wait_ms to -1, Tk will open a window with a <i>Continue</i> button in it, which we click before the analysis proceeds.</p>
+<p>The library routines can draw an image in a Tk photo by calling <i>gui_draw</i> and specifying the name of the image. The photo that will receive the image is the one named by a global variable we set with the -photo_name option. The -photo_name must be an existing Tk photo (such as bcam_photo), and has default value "none", which disables the drawing. By default, <i>gui_draw</i> is set to <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>. The -zoom option allows us to set the global <i>gui_zoom</i> value, which lwdaq_gui_draw will use, and -intensify specifies <i>gui_intensification</i>, which lwdaq_gui_draw also uses. The -display_zoom option specifies <i>gui_display_zoom</i>, which applies an additional scaling to all images. The <a href=#lwdaq_draw">lwdaq_draw</a> routine multiplies its image-specific zoom value by the global display_zoom to obtain a total zoom value. The -display_zoom is designed to accommodate different computer display resolutions, which sometimes result in lwdaq images being too large or too small. The <a href="http://www.cgsd.com/papers/gamma.html">gamma correction</a></td> sets the gray scale image display gamma correction used by lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear relationship between the image pixel intensity and the display pixel intensity. The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we increase the brightness of the red and blue component of the display pixel with respect to the green component. By default, these are also 1.0.
 
-<p>The <a href="http://www.cgsd.com/papers/gamma.html">gamma correction</a></td> sets the gray scale image display gamma correction used by lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear relationship between the image pixel intensity and the display pixel intensity. The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we increase the brightness of the red and blue component of the display pixel with respect to the green component. By default, these are also 1.0.</p>
+<p>During execution, analysis routines can pause to allow us to view intermediate drarwing results by means of the -wait_ms option. If we set -wait_ms to 1000, the analysis routine will pause for one second. If we set -wait_ms to -1, Tk will open a window with a <i>Continue</i> button in it, which we click before the analysis proceeds.</p>
 
 <p>Many routines return real numbers in strings. These real numbers will have a fixed number of decimal places equal to the global Pascal variable <i>fsd</i> and a total field size equal to the global Pascal variable <i>fsr</i>.</p> 
 
@@ -287,6 +289,7 @@ begin
 			+' -show_details '+string_from_boolean(show_details)
 			+' -photo_name '+gui_photo_name
 			+' -zoom '+string_from_real(gui_zoom,1,2)
+			+' -display_zoom '+string_from_real(gui_display_zoom,1,2)
 			+' -intensify '+gui_intensify
 			+' -wait_ms '+string_from_integer(gui_wait_ms,0)
 			+' -gamma_correction '+string_from_real(gamma_correction,0,1)
@@ -310,6 +313,7 @@ begin
 			else if (option='-show_details') then show_details:=Tcl_ObjBoolean(vp)
 			else if (option='-photo_name') then gui_photo_name:=Tcl_ObjString(vp)
 			else if (option='-zoom') then gui_zoom:=Tcl_ObjReal(vp)
+			else if (option='-display_zoom') then gui_display_zoom:=Tcl_ObjReal(vp)
 			else if (option='-intensify') then gui_intensify:=Tcl_ObjString(vp)
 			else if (option='-wait_ms') then gui_wait_ms:=Tcl_ObjInteger(vp)
 			else if (option='-gamma_correction') then gamma_correction:=Tcl_ObjReal(vp)
@@ -323,10 +327,10 @@ begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Bad option "'+option+'", must be one of '
 					+'"-stdout_available ? -stdin_available ? -append_errors ?'
-					+' -track_ptrs ? -text_name ? -show_details ? -photo_name ? -wait_ms ?'
-					+' -gamma_correction ? -rggb_red_scale ? -rggb_blue_scale ?'
-					+' -fsr ? -fsd ? -eol ? -zoom ? -intensify ? -log_name ?'
-					+' -log_errors ?".'); 
+					+' -track_ptrs ? -text_name ? -show_details ? -photo_name ?'
+					+' -wait_ms ? -gamma_correction ? -rggb_red_scale ?'
+					+'-rggb_blue_scale ? -fsr ? -fsd ? -eol ? -zoom ? -display_zoom ?'
+					+'-intensify ? -log_name ? -log_errors ?".'); 
 				exit;
 			end;
 		end;
@@ -533,7 +537,7 @@ end;
 
 <p>The -intensify option can take four values: mild, strong, exact, and none. Mild intensification displays anything darker than four standard deviations below the mean intensity as black, and anything brighter than four standard deviations above the mean intensity as white. In between black and white the display is linear with pixel brightness. Strong intensification does the same thing, but for a range of two standard deviations from the mean. Exact displays the darkest spot in the image as black and the brightest as white. In all three cases, we calculate the mean, standard deviation, minimum, and maximum intensity of the image within the <i>analysis bounds</i>, not across the entire image.</p>
 
-<p>The -zoom option scales the image as we draw it in the TK photo. If the TK photo is initially smaller than the size required by the zoomed image, the TK photo will expand to accommodate the zoomed image. But if the TK photo is initially larger than required, the TK photo will not contract to the smaller size of the zoomed image. The -zoom option can take any value between 0.1 and 10. But the effective value of -zoom is dicated by the requirements of sub-sampling. If -zoom is greater than 1, we round it to the nearest integer, <i>e</i>, and draw each image pixel on the screen as a block of <i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we round its inverse to the nearest integer, <i>c</i>. We draw only one pixel out of every <i>c</i> pixels in the TK photo. If -zoom = 0.3, we draw every third pixel. If -zoom = 0.4, we draw every third pixel if your computer rounds 1/0.4 to 3, or every second pixel if your computer rounds 1/0.4 to 2. With -zoom = 0.0, we draw every tenth pixel.</p>
+<p>The -zoom option scales the image as we draw it in the TK photo. This scaling is in addition to the scaling called for by the global <i>gui_display_zoom</i> parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. If the TK photo is initially smaller than the size required by the zoomed image, the TK photo will expand to accommodate the zoomed image. But if the TK photo is initially larger than required, the TK photo will not contract to the smaller size of the zoomed image. The product of the zoom value and the global <i>gui_display_zoom</i> can take any value between 0.1 and 10. But the effective value of the scaling factor is dicated by the requirements of sub-sampling. If the scaling factor is greater than 1, we round it to the nearest integer, <i>e</i>, and draw each image pixel on the screen as a block of <i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we round its inverse to the nearest integer, <i>c</i>. We draw only one pixel out of every <i>c</i> pixels in the TK photo. If the scaling factor is 0.3, we draw every third pixel. If 0.4, we draw every third pixel if your computer rounds 1/0.4 to 3, or every second pixel if your computer rounds 1/0.4 to 2. With scaling factor 0.0, we draw every tenth pixel.</p>
 
 <p>With -clear set to 1, lwdaq_draw clears the overlay in the lwdaq image before drawing in the TK photo. The overlay may contain a graph or oscilloscope display, or analysis indicator lines. If you don't want these to be displayed, set -clear to 1. But note that whatever was in the overlay will be lost.</p>
 
@@ -562,6 +566,7 @@ var
 	rggb:boolean=false;
 	gbrg:boolean=false;
 	show_bounds:boolean=true;
+	scale:real;
 
 begin
 	error_string:='';
@@ -639,10 +644,11 @@ begin
 		exit;
 	end;
 	
+	scale:=zoom*gui_display_zoom;
 	if clear then clear_overlay(ip);
 	if show_bounds then
 		draw_overlay_rectangle(ip,ip^.analysis_bounds,blue_color);
-	if (zoom>0) and (zoom<>1) then spread_overlay(ip,round(1/zoom));
+	if (scale>0) and (scale<>1) then spread_overlay(ip,round(1/scale));
 	if rggb then draw_rggb_image(ip)
 	else if gbrg then draw_gbrg_image(ip)
 	else draw_image(ip);
@@ -657,18 +663,18 @@ begin
 		offset[blue]:=offset[green]+sizeof(byte);
 		offset[alpha]:=offset[blue]+sizeof(byte);
 	end;
-	if zoom<min_zoom then zoom:=min_zoom;
-	if zoom>max_zoom then zoom:=max_zoom;
-	if zoom>=1 then begin
+	if scale<min_zoom then scale:=min_zoom;
+	if scale>max_zoom then scale:=max_zoom;
+	if scale>=1 then begin
 		subsampleX:=1;
 		subsampleY:=1;
-		zoomX:=round(zoom);
-		zoomY:=round(zoom);
+		zoomX:=round(scale);
+		zoomY:=round(scale);
 		draw_width:=pib.width*zoomX;
 		draw_height:=pib.height*zoomY;
 	end else begin
-		subsampleX:=round(1/zoom);
-		subsampleY:=round(1/zoom);
+		subsampleX:=round(1/scale);
+		subsampleY:=round(1/scale);
 		zoomX:=1;
 		zoomY:=1;
 		draw_width:=round(pib.width/subsampleX);

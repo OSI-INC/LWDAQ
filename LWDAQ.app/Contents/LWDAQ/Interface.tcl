@@ -228,20 +228,35 @@ proc LWDAQ_preferences {} {
 	upvar #0 LWDAQ_Info info
 	set num_columns 3
 	
+	# Raise the window if it already exists.
 	set w .preferences
-	set cf $w.cutsom
-	
+	set cf $w.custom
 	if {[winfo exists $w]} {
 		raise $w
-		return $w.custom
+		return $cf
 	
 	}
 	
+	# Create the window.
 	toplevel $w
 	wm title $w "LWDAQ Preferences"
+	
+	# Create the custom frame.
 	frame $cf
 	pack $cf -side top -fill x
 	
+	# Create the display zoom frame.
+	set f [frame $w.zoom]
+	pack $f -side top -fill x
+	button $f.zb -text "Set Display Zoom" -command {
+		lwdaq_config -display_zoom $LWDAQ_Info(display_zoom)
+		LWDAQ_print [file join $LWDAQ_Info(startup_dir) "Zoom.tcl"] \
+			"lwdaq_config -display_zoom $LWDAQ_Info(display_zoom)"
+	}
+	entry $f.ze -textvariable LWDAQ_Info(display_zoom)
+	pack $f.zb $f.ze -side left -expand yes
+	
+	# Create the frames for the LWDAQ_Info array.
 	for {set i 1} {$i <= $num_columns} {incr i} {
 		frame $w.f$i
 		pack $w.f$i -side left -fill y

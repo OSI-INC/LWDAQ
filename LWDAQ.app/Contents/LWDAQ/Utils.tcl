@@ -67,6 +67,8 @@ proc LWDAQ_utils_init {} {
 	set info(lwdaq_long_string_capacity) 300000
 	
 	set info(debug_log) "debug_log.txt"
+	
+	set info(display_zoom) "1.0"
 }
 
 #

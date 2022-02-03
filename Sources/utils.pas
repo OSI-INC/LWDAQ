@@ -66,7 +66,7 @@ unit utils;
 	crash a program if the standard input channel is not available. If the
 	standard output channel is not available, writeln output will be lost, or
 	will cause the program to crash. Utils provides two global variables, 
-	stdout_available and stdin_available to indicate whether these channels are 
+	<p id="">[--]  and stdin_available to indicate whether these channels are 
 	available or not. Utils routines will not attempt to use a channel if its 
 	global availability variable is false.
 
