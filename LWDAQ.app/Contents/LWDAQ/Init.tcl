@@ -264,14 +264,6 @@ if {[pwd] == "/"} {
 	cd $LWDAQ_Info(program_dir)
 }
 
-# Load start-up settings script, if it exists.
-if {[file exists $LWDAQ_Info(settings)]} {
-	if {[catch {LWDAQ_load_settings $LWDAQ_Info(settings)} error_message]} {
-		puts "ERROR: in LWDAQ_load_settings $error_message"
-		incr num_errors
-	}
-}
-
 # Run startup scripts. Let them know that they are operating as startup scripts,
 # and which one they are in the order of execution, too. They will execute in
 # alphabetical order.

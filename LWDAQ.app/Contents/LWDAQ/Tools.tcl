@@ -306,6 +306,20 @@ proc LWDAQ_tool_save {name} {
 }
 
 #
+# LWDAQ_tool_unsave deletes a tool's saved configuration array.
+#
+proc LWDAQ_tool_unsave {name} {
+	upvar #0 $name\_info info
+	set fn $info(settings_file_name)
+	if {[file exists $fn]} {
+		file delete $fn
+		return $fn
+	} {
+		return ""
+	}
+}
+
+#
 # LWDAQ_tool_help extracts help lines from the tool script. If the help
 # consists only of an http reference, the routine attempts to open the
 # link and display the help web page. Otherwise, the routine prints
@@ -418,16 +432,24 @@ proc LWDAQ_tool_configure {name {num_columns 2}} {
 	wm title $w "$info(name) Configuration Array"
 	scan [wm maxsize .] %d%d x y
 	wm maxsize $w [expr $x*4] [expr $y*1]
+	
+	set ff [frame $w.save]
+	pack $ff -side top -fill x 
 
-	button $w.save -text "Save" -command "LWDAQ_tool_save $name"
-	pack $w.save
+	button $ff.save -text "Save Configuration" -command "LWDAQ_tool_save $name"
+	pack $ff.save -side left -expand 1
+	
+	button $ff.unsave -text "Unsave Configuration" -command "LWDAQ_tool_unsave $name"
+	pack $ff.unsave -side left -expand 1
+
 	set custom_frame [frame $w.custom]
-	pack $custom_frame -side top -fill x -expand 1
+	pack $custom_frame -side top -fill x 
+	
 	set ff [frame $w.config]
 	pack $ff -side top -fill x -expand 1
 	for {set i 1} {$i <= $num_columns} {incr i} {
 		frame $ff.f$i
-		pack $ff.f$i -side left -fill y -expand 1
+		pack $ff.f$i -side left -fill y 
 	}
 
 	set config_list [lsort -dictionary [array names config]]

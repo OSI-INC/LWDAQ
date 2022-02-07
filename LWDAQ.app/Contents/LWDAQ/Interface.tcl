@@ -139,9 +139,6 @@ proc LWDAQ_init_main_window {} {
 		$info(file_menu) add command -label "Hide Console" -command "console hide"	
 		$info(file_menu) add separator
 	}
-	$info(file_menu) add command -label "Save Settings" -command LWDAQ_save_settings
-	$info(file_menu) add command -label "Load Settings" -command LWDAQ_load_settings
-	$info(file_menu) add separator
 	$info(file_menu) add command -label "System Server" -command LWDAQ_server_open
 	$info(file_menu) add command -label "System Monitor" -command LWDAQ_monitor_open
 	$info(file_menu) add command -label "System Reset" -command LWDAQ_reset
@@ -244,17 +241,6 @@ proc LWDAQ_preferences {} {
 	# Create the custom frame.
 	frame $cf
 	pack $cf -side top -fill x
-	
-	# Create the display zoom frame.
-	set f [frame $w.zoom]
-	pack $f -side top -fill x
-	button $f.zb -text "Set Display Zoom" -command {
-		lwdaq_config -display_zoom $LWDAQ_Info(display_zoom)
-		LWDAQ_print [file join $LWDAQ_Info(startup_dir) "Zoom.tcl"] \
-			"lwdaq_config -display_zoom $LWDAQ_Info(display_zoom)"
-	}
-	entry $f.ze -textvariable LWDAQ_Info(display_zoom)
-	pack $f.zb $f.ze -side left -expand yes
 	
 	# Create the frames for the LWDAQ_Info array.
 	for {set i 1} {$i <= $num_columns} {incr i} {
@@ -392,6 +378,8 @@ proc LWDAQ_make_instrument_menu {} {
 # Add entry to stop all instruments from looping.
 	$m add separator
 	$m add command -label "Reset Counters" -command LWDAQ_reset_instrument_counters
+	$m add command -label "Save Settings" -command {LWDAQ_post LWDAQ_instrument_save}
+	$m add command -label "Unsave Settings" -command {LWDAQ_post LWDAQ_instrument_unsave}
 # Done.
 	return 1
 }
@@ -1013,33 +1001,61 @@ proc LWDAQ_monitor_open {} {
 	pack $w.v -side top -fill x
 	set f [frame $w.v.left]
 	pack $f -side left -fill y
-	set info_list "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms"
-	foreach i $info_list {
+	foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms" {
+		label $f.l$i -text "$i" -anchor w -width 15
+		entry $f.e$i -textvariable LWDAQ_Info($i) -relief sunken -bd 1 -width 10
+		grid $f.l$i $f.e$i -sticky news
+	}
+	set f [frame $w.v.center]
+	pack $f -side left -fill y
+	foreach i "blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms" {
 		label $f.l$i -text "$i" -anchor w -width 15
 		entry $f.e$i -textvariable LWDAQ_Info($i) -relief sunken -bd 1 -width 10
 		grid $f.l$i $f.e$i -sticky news
 	}
 	set f [frame $w.v.right]
-	pack $f -side right -fill y
-	set info_list "blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms"
-	foreach i $info_list {
-		label $f.l$i -text "$i" -anchor w -width 15
+	pack $f -side left -fill y
+	foreach i "lwdaq_client_port default_to_stdout server_address_filter\
+			server_listening_port close_delay_ms" {
+		label $f.l$i -text "$i" -anchor w -width 20
 		entry $f.e$i -textvariable LWDAQ_Info($i) -relief sunken -bd 1 -width 10
 		grid $f.l$i $f.e$i -sticky news
 	}
 
+	set f [frame $w.save]
+	pack $f -side top -fill x
+	button $f.ssf -text "Save Core Settings" -command {
+		set f [open [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"] w]
+		foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms" {
+			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
+		}
+		foreach i "blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms" {
+			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
+		}
+		foreach i "lwdaq_client_port default_to_stdout server_address_filter\
+				server_listening_port close_delay_ms" {
+			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
+		}
+		close $f
+	}
+	button $f.csf -text "Unsave Core Settings" -command {
+		set fn [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"]
+		if {[file exists $fn]} {file delete $fn}
+	}
+	pack $f.ssf $f.csf -side left -expand yes
+	
 	frame $w.current
 	pack $w.current
-	LWDAQ_text_widget $w.current 60 2 0
+	LWDAQ_text_widget $w.current 80 2 0
 	frame $w.queue
 	pack $w.queue
-	LWDAQ_text_widget $w.queue 60 8 0
+	LWDAQ_text_widget $w.queue 80 8 0
 	frame $w.vwaits
 	pack $w.vwaits
-	LWDAQ_text_widget $w.vwaits 60 4 0
+	LWDAQ_text_widget $w.vwaits 80 4 0
 	frame $w.sockets
 	pack $w.sockets
-	LWDAQ_text_widget $w.sockets 60 6 0
+	LWDAQ_text_widget $w.sockets 80 6 0
 		
 	after $LWDAQ_Info(monitor_ms) LWDAQ_monitor_refresh
 	return 1

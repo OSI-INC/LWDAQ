@@ -1564,50 +1564,6 @@ proc LWDAQ_random_wait_ms {{min 0} {max 1000}} {
 }
 
 #
-# LWDAQ_load_settings reads settings out of the specified settings
-# file. If you do not specify a setting file name, the routine
-# opens a file browser window so the user can choose a settings file.
-#
-proc LWDAQ_load_settings {{file_name ""}} {
-	LWDAQ_run_tool $file_name
-	return 1
-}
-
-#
-# LWDAQ_save_settings saves instrument settings to a settings file, as
-# well as a few elements from the Info array. If you do not specify a 
-# settings file name, the routine opens a file browser so the user can 
-# choose a file name.
-#
-proc LWDAQ_save_settings {{file_name ""}} {
-	global LWDAQ_Info LWDAQ_Driver
-	if {$file_name == ""} {set file_name [LWDAQ_put_file_name Settings.tcl]}
-	if {$file_name == ""} {return 0}
-	set f [open $file_name w]
-	foreach i $LWDAQ_Info(instruments) {
-		upvar LWDAQ_info_$i info
-		set vlist [array names info]
-		foreach v $vlist {
-			puts $f "set LWDAQ_info_$i\($v) \"$info($v)\""
-		}
-		upvar LWDAQ_config_$i config
-		set vlist [array names config]
-		foreach v $vlist {
-			puts $f "set LWDAQ_config_$i\($v) \"$config($v)\""
-		}
-	}
-	foreach i "quiet_update queue_ms support_ms basic_client_port \
-		default_to_stdout server_address_filter lwdaq_close_string server_listening_port \
-		lwdaq_client_port max_daq_attempts basic_server_port working_dir tcp_timeout_ms \
-		lazy_flush daq_wait_ms tcp_timeout_ms monitor_ms update_ms close_delay_ms \
-		default_lwdaq_addr" {
-		puts $f "set LWDAQ_Info($i) \"$LWDAQ_Info($i)\""
-	}
-	close $f
-	return 1
-}
-
-#
 # LWDAQ_debug_log opens a file named by the debug_log value, in the
 # program directory, and appends a string to the end of it, then
 # closes the file.

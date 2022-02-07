@@ -15,32 +15,34 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# Version 20: Add calibration constant entries in the panel and now
-# convert frequency lines into dac counts automatically. Control buttons
-# are Scan and Repeat so we can scan a fequency band or monitor a
-# particular frequency. We provide calibration constants in the Help
-# screen, but direct the user to the A3008 manual for instructions.
-#
+# Version 20: Add calibration constant entries in the panel and now convert
+# frequency lines into dac counts automatically. Control buttons are Scan and
+# Repeat so we can scan a fequency band or monitor a particular frequency. We
+# provide calibration constants in the Help screen, but direct the user to the
+# A3008 manual for instructions.
+
 # Version 21: Add another decimal place for power measurement.
-#
-# Version 22: Add support for SCT power measurements, and change calibration of power
-# to a dB offset.
-#
+
+# Version 22: Add support for SCT power measurements, and change calibration of
+# power to a dB offset.
+
 # Version 23: Remove explanatory words from output text. Add the Spectrometer
-# sample routine to return the output string from other scripts. Update calibration
-# parameters for A3008D assemblies.
+# sample routine to return the output string from other scripts. Update
+# calibration parameters for A3008D assemblies.
 # 
 # Version 24: Add more plot names.
-#
-# Version 25: Change plot names from letters to numbers that give them the same colors
-# as SCT channels of the same number.
-#
+
+# Version 25: Change plot names from letters to numbers that give them the same
+# colors as SCT channels of the same number.
+
 # Version 26: Support loading multiple spectra.
-#
+
 # Version 27: Limit significant figures in file saving.
-#
-# Version 28: Switch active graph selection from menu button to entry box and allow
-# graphs from 0 to 255.
+
+# Version 28: Switch active graph selection from menu button to entry box and
+# allow graphs from 0 to 255.
+
+# Version 28: Add increment button.
 #
 
 proc Spectrometer_init {} {
@@ -54,8 +56,8 @@ proc Spectrometer_init {} {
 	# Software constants for the Spectrometer Tool.
 	set info(control) "Idle"
 	set info(instrument) "RFPM"
-	set info(graph_width) "900"
-	set info(graph_height) "300"
+	set info(graph_width) 900
+	set info(graph_height) 300
 	set info(measurement_names) "SCT Peak Average"
 	set info(cursor_y) "0"
 	set info(image_name) spectrometer
@@ -364,6 +366,11 @@ proc Spectrometer_open {} {
 	entry $f.ag -textvariable Spectrometer_config(active_graph) -width 4
 	set config(active_graph) "0"
 	pack $f.lgraph $f.ag -side left -expand 1
+	
+	button $f.increment -text "Increment" -command {
+		incr Spectrometer_config(active_graph)
+	}
+	pack $f.increment -side left -expand 1
 	
 	button $f.clear -text "Clear" -command Spectrometer_clear
 	pack $f.clear -side left -expand 1

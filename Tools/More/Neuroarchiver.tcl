@@ -630,8 +630,8 @@ proc Neuroarchiver_init {} {
 # Neurotracker panel configuration.
 #
 	set info(tracker_window) $info(window)\.tracker
-	set info(tracker_width) 640
-	set info(tracker_height) 320
+	set info(tracker_width) [expr round(640 * $LWDAQ_Info(display_zoom))]
+	set info(tracker_height) [expr round(320 * $LWDAQ_Info(display_zoom))]
 	set info(tracker_image_border_pixels) 10
 #
 # Neurotracker calculation settings.

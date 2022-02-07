@@ -562,3 +562,45 @@ proc LWDAQ_close {name} {
 	upvar #0 LWDAQ_info_$name info
 	catch {destroy $info(window)}
 }
+
+#
+# LWDAQ_instrument_save saves instrument settings to a settings file in the
+# LWDAQ startup directory, so they will be loaded automatically when LWDAQ is
+# next launched, or when a new LWDAQ is spawned.
+#
+proc LWDAQ_instrument_save {} {
+	global LWDAQ_Info 
+
+	set fn [file join $LWDAQ_Info(startup_dir) "Instrument_Settings.tcl"]
+	set f [open $fn w]
+	foreach i $LWDAQ_Info(instruments) {
+		upvar LWDAQ_info_$i info
+		set vlist [array names info]
+		foreach v $vlist {
+			puts $f "set LWDAQ_info_$i\($v) \"$info($v)\""
+		}
+		upvar LWDAQ_config_$i config
+		set vlist [array names config]
+		foreach v $vlist {
+			puts $f "set LWDAQ_config_$i\($v) \"$config($v)\""
+		}
+	}
+	close $f
+	return $fn
+}
+
+#
+# LWDAQ_instrument_unsave deletes a perviously-saved instrument settings file, if one
+# exists.
+#
+proc LWDAQ_instrument_unsave {} {
+	global LWDAQ_Info 
+
+	set fn [file join $LWDAQ_Info(startup_dir) "Instrument_Settings.tcl"]
+	if {[file exists $fn]} {
+		file delete $fn
+		return $fn
+	} {
+		return ""
+	}
+}
