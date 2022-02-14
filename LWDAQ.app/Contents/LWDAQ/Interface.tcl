@@ -984,19 +984,36 @@ proc LWDAQ_monitor_open {} {
 	toplevel $w
 	wm title $w "LWDAQ System Monitor"
 	
-	frame $w.b
-	pack $w.b -side top -fill x
+	set f [frame $w.b]
+	pack $f -side top -fill x
 	
 	foreach n "Queue_Start Queue_Stop Queue_Clear Reset" {
 		set m [string tolower $n]
 		set p [string map {_ \ } $n]
-		button $w.b.$m -text $p -command LWDAQ_$m
-		pack $w.b.$m -side left -expand 1
+		button $f.$m -text $p -command LWDAQ_$m
+		pack $f.$m -side left -expand 1
 	}
 	
-	button $w.b.info -text Info -command [list LWDAQ_view_array LWDAQ_Info]
-	pack $w.b.info -side left -expand 1
-
+	button $f.ssf -text "Save Settings" -command {
+		set f [open [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"] w]
+		foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms" {
+			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
+		}
+		foreach i "blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms" {
+			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
+		}
+		foreach i "lwdaq_client_port default_to_stdout server_address_filter\
+				server_listening_port close_delay_ms" {
+			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
+		}
+		close $f
+	}
+	button $f.csf -text "Unsave Settings" -command {
+		set fn [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"]
+		if {[file exists $fn]} {file delete $fn}
+	}
+	pack $f.ssf $f.csf -side left -expand yes
+	
 	frame $w.v
 	pack $w.v -side top -fill x
 	set f [frame $w.v.left]
@@ -1022,40 +1039,18 @@ proc LWDAQ_monitor_open {} {
 		grid $f.l$i $f.e$i -sticky news
 	}
 
-	set f [frame $w.save]
-	pack $f -side top -fill x
-	button $f.ssf -text "Save Core Settings" -command {
-		set f [open [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"] w]
-		foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms" {
-			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
-		}
-		foreach i "blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms" {
-			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
-		}
-		foreach i "lwdaq_client_port default_to_stdout server_address_filter\
-				server_listening_port close_delay_ms" {
-			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
-		}
-		close $f
-	}
-	button $f.csf -text "Unsave Core Settings" -command {
-		set fn [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"]
-		if {[file exists $fn]} {file delete $fn}
-	}
-	pack $f.ssf $f.csf -side left -expand yes
-	
 	frame $w.current
 	pack $w.current
-	LWDAQ_text_widget $w.current 80 2 0
+	LWDAQ_text_widget $w.current 90 2 0
 	frame $w.queue
 	pack $w.queue
-	LWDAQ_text_widget $w.queue 80 8 0
+	LWDAQ_text_widget $w.queue 90 8 0
 	frame $w.vwaits
 	pack $w.vwaits
-	LWDAQ_text_widget $w.vwaits 80 4 0
+	LWDAQ_text_widget $w.vwaits 90 4 0
 	frame $w.sockets
 	pack $w.sockets
-	LWDAQ_text_widget $w.sockets 80 6 0
+	LWDAQ_text_widget $w.sockets 90 6 0
 		
 	after $LWDAQ_Info(monitor_ms) LWDAQ_monitor_refresh
 	return 1

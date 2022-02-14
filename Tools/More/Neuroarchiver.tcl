@@ -130,12 +130,14 @@ proc Neuroarchiver_init {} {
 #
 	set info(vt_plot_width) 600
 	set info(vt_plot_height) 250
-	lwdaq_image_create -width $info(vt_plot_width) \
-		-height $info(vt_plot_height) -name $info(vt_image)
+	lwdaq_image_create -name $info(vt_image) \
+		-width $info(vt_plot_width) \
+		-height $info(vt_plot_height) 
 	set info(af_plot_width) 400
 	set info(af_plot_height) 250
-	lwdaq_image_create -width $info(af_plot_width) \
-		-height $info(af_plot_height) -name $info(af_image)
+	lwdaq_image_create -name $info(af_image) \
+		-width $info(af_plot_width) \
+		-height $info(af_plot_height) 
 #
 # Here we specify names for the windows that open up when we click on the
 # voltage-time or amplitude-frequency plots.
@@ -640,7 +642,7 @@ proc Neuroarchiver_init {} {
 	set config(tracker_decade_scale) "30" 
 	set config(tracker_extent_radius) "100"
 	set config(tracker_sample_rate) "16"
-	set config(tracker_filter_divisor) "128"
+	set config(tracker_filter_divisor) "1"
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
@@ -683,6 +685,8 @@ proc Neuroarchiver_init {} {
 #
 	set info(export_panel) $info(window)\.export
 	set info(edf_panel) $info(export_panel)\.edf
+	set info(text_panel) $info(export_panel)\.header
+	set config(export_txt_header) ""
 	set info(export_start_s) "0000000000"
 	set info(export_end_s) $info(export_start_s)
 	set config(export_start) [Neuroarchiver_clock_convert $info(export_start_s)]
@@ -996,6 +1000,7 @@ proc Neuroarchiver_list {{index 0} {fl ""}} {
 		LWDAQ_support
 	}
 	
+	# Returnn successful.
 	return "SUCCESS"
 }
 
@@ -1006,6 +1011,7 @@ proc Neuroarchiver_list {{index 0} {fl ""}} {
 #
 proc Neuroarchiver_metadata_write {w fn} {
 	LWDAQ_ndf_string_write $fn [string trim [$w.text get 1.0 end]]\n
+	return "SUCCESS"
 }
 
 #
@@ -2281,8 +2287,7 @@ proc Neuroarchiver_overview {{fn ""} } {
 
 	if {!$existing_window} {	
 		# Create a new photo in which to plot our graph.
-		set ov_config(photo) [image create photo "_neuroarchiver_ov_photo_" \
-			-width $info(overview_width) -height $info(overview_height)]
+		set ov_config(photo) [image create photo "_neuroarchiver_ov_photo_"]
 
 		# Initialize the display parameters.
 		set ov_config(t_min) 0
@@ -4408,9 +4413,7 @@ proc Neurotracker_open {} {
 	
 	# Create the map photo and canvass widget.
 	set bd $info(tracker_image_border_pixels)
-   	set info(tracker_photo) [image create photo "_neurotracker_photo_" \
-   		-width $info(tracker_width) \
-   		-height $info(tracker_height)]
+   	set info(tracker_photo) [image create photo "_neurotracker_photo_"]
 	set f [frame $w.graph -relief groove -border 4]
 	pack $f -side top -fill x
 	set info(tracker_plot) [canvas $f.track \
@@ -4815,6 +4818,9 @@ proc Neuroarchiver_exporter_open {} {
 	button $f.edfs -text "EDF" -command "LWDAQ_post Neuroarchiver_edf_setup"
 	pack $f.edfs -side left -expand yes
 
+	button $f.texts -text "TXT" -command "LWDAQ_post Neuroarchiver_txt_setup"
+	pack $f.texts -side left -expand yes
+
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
 	
 	# Initialize the export start time to the start of the current playback
@@ -4893,7 +4899,7 @@ proc Neuroarchiver_edf_setup {} {
 	toplevel $w
 	scan [wm maxsize .] %d%d x y
 	wm maxsize $w [expr $x*2] [expr $y*2]
-	wm title $w "European Data Format Setup Panel, Neuroarchiver $info(version)"
+	wm title $w "European Data Format Setup, Neuroarchiver $info(version)"
 
 	set f [frame $w.controls]
 	pack $f -side top -fill x
@@ -4998,6 +5004,59 @@ proc Neuroarchiver_edf_setup {} {
 			}
 		}
 	}
+}
+
+#
+# Neurotracker_txt_setup opens a panel in which we can create a text header
+# that will be written to the start of a text export file.
+#
+proc Neuroarchiver_txt_setup {} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+
+	# Raise the setup panel if it already exists.
+	set w $info(text_panel)
+	if {[winfo exists $w]} {
+		raise $w
+		return "ABORT"
+	}
+	
+	# Create the text setup panel.	
+	toplevel $w
+	wm title $w "TXT Setup Panel, Neuroarchiver $info(version)"
+	LWDAQ_text_widget $w 40 10
+	LWDAQ_enable_text_undo $w.text
+	LWDAQ_bind_command_key $w s [list Neuroarchiver_txt_save $w]
+	
+	# Create the Save button.
+	frame $w.f
+	pack $w.f -side top
+	button $w.f.save -text "Save" -command [list Neuroarchiver_txt_save $w]
+	pack $w.f.save -side left
+	
+	# Print the metadata to the text window.
+	if {$config(export_txt_header) != ""} {
+		LWDAQ_print $w.text $config(export_txt_header)
+	}
+	
+	# Return successful.
+	return "SUCCESS"
+}
+
+
+#
+# Neuroarchiver_txt_save transfers the contents of the exporter's TXT setup
+# window into the TXT header variable. White space is removed by the routine
+# before storing in the variable. The header will be written to to export files
+# only if it is not empty. If it is written, it will be written with a carriage
+# return at the end.
+#
+proc Neuroarchiver_txt_save {w} {
+	upvar #0 Neuroarchiver_info info
+	upvar #0 Neuroarchiver_config config
+
+	set config(export_txt_header) [string trim [$w.text get 1.0 end]]
+	return "SUCCESS"
 }
 
 #
@@ -5129,6 +5188,12 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					EDF_create $sfn $config(play_interval) \
 						"$id $sps" $info(export_start_s)
 				}
+				if {!$config(export_combine) \
+					&& ($config(export_format) == "TXT") \
+					&& ($config(export_txt_header) != "")} {
+					LWDAQ_print $info(export_text) "Creating TXT file [file tail $sfn]."
+					LWDAQ_print $sfn $config(export_txt_header)
+				}
 			}
 			
 			if {$config(export_centroid) || $config(export_powers)} {
@@ -5145,6 +5210,12 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					LWDAQ_print $info(export_text) \
 						"WARNING: Deleting existing [file tail $tfn]."
 					file delete $tfn
+				}
+				if {!$config(export_combine) \
+					&& ($config(export_format) == "TXT") \
+					&& ($config(export_txt_header) != "")} {
+					LWDAQ_print $info(export_text) "Creating TXT file [file tail $tfn]."
+					LWDAQ_print $tfn $config(export_txt_header)
 				}
 			}		
 			
@@ -5168,6 +5239,12 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					EDF_create $afn $config(play_interval) \
 						"[set id]a $config(tracker_sample_rate)" $info(export_start_s)
 				}
+				if {!$config(export_combine) \
+					&& ($config(export_format) == "TXT") \
+					&& ($config(export_txt_header) != "")} {
+					LWDAQ_print $info(export_text) "Creating TXT file [file tail $afn]."
+					LWDAQ_print $afn $config(export_txt_header)
+				}
 			}
 		}
 		
@@ -5184,6 +5261,24 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					append headings "[set id]a $config(tracker_sample_rate) "
 				}
 				EDF_create $afn $config(play_interval) $headings $info(export_start_s)
+			}
+		}
+
+		# If we are exporting to one TXT file, create the header for all signals now.
+		if {$config(export_combine) \
+				&& ($config(export_format) == "TXT") \
+				&& ($config(export_txt_header) != "")} {
+			if {$config(export_signal)} {
+				LWDAQ_print $info(export_text) "Creating TXT file [file tail $sfn]."
+				LWDAQ_print $sfn $config(export_txt_header)
+			}
+			if {$config(export_activity)} {
+				LWDAQ_print $info(export_text) "Creating TXT file [file tail $afn]."
+				LWDAQ_print $afn $config(export_txt_header)
+			}
+			if {$config(export_centroid) || $config(export_powers)} {
+				LWDAQ_print $info(export_text) "Creating TXT file [file tail $tfn]."
+				LWDAQ_print $tfn $config(export_txt_header)
 			}
 		}
 		
@@ -5243,8 +5338,8 @@ proc Neuroarchiver_export {{cmd "Start"}} {
 					cd $config(export_dir)
 					set nvfn [file join $config(export_dir) V$vt\.mp4]
 					if {[file exists $nvfn]} {
-						LWDAQ_print $info(export_text) "Deleting existing file\
-							[file tail $nvfn] in export directory."				
+						LWDAQ_print $info(export_text) \
+							"Deleting existing [file tail $nvfn]."				
 						file delete $nvfn
 					}
 					if {$vsk > 0} {
@@ -8466,9 +8561,7 @@ proc Neuroarchiver_open {} {
 		}
 
 		set f $w.displays.signal
-		set info(vt_photo) [image create photo "_neuroarchiver_vt_photo_" \
-			-width $info(vt_plot_width) \
-			-height $info(vt_plot_height)]
+		set info(vt_photo) [image create photo "_neuroarchiver_vt_photo_"]
 		label $f.graph -image $info(vt_photo)
 		bind $f.graph <Double-Button-1> {Neuroarchiver_magnified_view vt}
 		pack $f.graph -side top -expand yes
@@ -8504,9 +8597,7 @@ proc Neuroarchiver_open {} {
 		pack $f.la $f.title $f.lf $f.enable -side left -expand yes
 	
 		set f $w.displays.spectrum
-		set info(af_photo) [image create photo "_neuroarchiver_af_photo_" \
-			-width $info(af_plot_width) \
-			-height $info(af_plot_height)]
+		set info(af_photo) [image create photo "_neuroarchiver_af_photo_"]
 		label $f.graph -image $info(af_photo) 
 		bind $f.graph <Double-Button-1> {Neuroarchiver_magnified_view af}
 		pack $f.graph -side top -expand yes
