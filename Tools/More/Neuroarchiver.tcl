@@ -59,7 +59,7 @@ proc Neuroarchiver_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroarchiver" "155"
+	LWDAQ_tool_init "Neuroarchiver" "156"
 #
 # We check the global Neuroarchiver_mode variable, which is the means by which
 # we can direct the Neuroarchiver to open itself in a new window or the LWDAQ
@@ -646,6 +646,8 @@ proc Neuroarchiver_init {} {
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
+	set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+	set info(A3038_payload) "16"
 	set info(A3038_coordinates) "\
 		0  0 2 0  12 2  0 24 2 \
 		12 0 2 12 12 2 12 24 2 \
@@ -653,14 +655,13 @@ proc Neuroarchiver_init {} {
 		36 0 2 36 12 2 36 24 2 \
 		48 0 2 48 12 2 48 24 2 \
 		-1 -1 -1"
+	set info(A3032_payload) "16"
 	set info(A3032_coordinates) "\
 		0 0 2  0 8 2  0 16 2 \
 		8  0 2  8 8 2  8 16 2 \
 		16 0 2 16 8 2 16 16 2 \
 		24 0 2 24 8 2 24 16 2 \
 		32 0 2 32 8 2 32 16 2"
-	set info(A3032_payload) "16"
-	set info(A3038_payload) "16"
 	set config(tracker_coordinates) ""
 	set info(tracker_range_border) "1.0"
 	set info(tracker_range) "-1.0 -1.0 +49.0 +25.0"
@@ -4254,7 +4255,8 @@ proc Neurotracker_extract {} {
 				-payload $info(player_payload) \
 				-scale $config(tracker_decade_scale) \
 				-extent $config(tracker_extent_radius) \
-				-slices $num_slices]
+				-slices $num_slices \
+				-background $config(tracker_background)]
 			} error_result]} {
 			Neuroarchiver_print $error_result
 			set error_flag 1
@@ -6643,6 +6645,31 @@ proc Neuroarchiver_set_receiver {version} {
 		}
 	}
 
+	# Permit user to specify their own background power values for their tracker
+	# in the customization string.
+	set alt_bg [lindex [LWDAQ_xml_get_list $config(recorder_customization) "alt_bg"] end]
+	if {$alt_bg != ""} {
+		Neuroarchiver_print "Found background powers in recorder customization string."
+		if {[catch {
+			set count 0
+			foreach p $alt_bg {
+				if {![string is double -strict $p]} {
+					error "invalid background power \"$p\""
+				}
+				incr count
+			}
+			if {$count != $iconfig(payload_length)} {
+				error "found $count background powers, need $iconfig(payload_length)"
+			}		
+			Neuroarchiver_print "Writing background powers to archive metadata."
+			set config(tracker_background) $alt_bg
+		} message]} {
+			Neuroarchiver_print "ERROR: $message, check customization string."
+			Neuroarchiver_print "WARNING: Writing default background powers to metadata."
+		}
+	}
+	
+	# Set the receiver_type parameter.
 	set config(receiver_type) $version
 
 	return $version
@@ -7110,6 +7137,10 @@ proc Neuroarchiver_play {{command ""}} {
 		set alt [LWDAQ_xml_get_list $metadata "alt"]
 		if {[llength $alt] >= 1} {
 			set config(tracker_coordinates) [lindex $alt end]
+		}
+		set alt_bg [LWDAQ_xml_get_list $metadata "alt_bg"]
+		if {[llength $alt] >= 1} {
+			set config(tracker_background) [lindex $alt end]
 		}
 		set info(play_end_time) \
 			[Neuroarchiver_end_time $config(play_file) $info(player_payload)]
