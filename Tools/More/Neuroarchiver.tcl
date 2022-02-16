@@ -1105,6 +1105,7 @@ proc Neuroarchiver_metadata_header {} {
 		}
 		append header "<coordinates>[string trim $xy]</coordinates>\n"
 		append header "<alt>[string trim $xyz]</alt>\n"
+		append header "<alt_bg>[string trim $config(tracker_background)]</alt_bg>\n"
 	}
 	if {[string trim $info(metadata_header)] != ""} {
 		append header "<c>[string trim $info(metadata_header)]</c>\n"
@@ -7140,7 +7141,7 @@ proc Neuroarchiver_play {{command ""}} {
 		}
 		set alt_bg [LWDAQ_xml_get_list $metadata "alt_bg"]
 		if {[llength $alt] >= 1} {
-			set config(tracker_background) [lindex $alt end]
+			set config(tracker_background) [lindex $alt_bg end]
 		}
 		set info(play_end_time) \
 			[Neuroarchiver_end_time $config(play_file) $info(player_payload)]
