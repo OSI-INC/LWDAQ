@@ -1017,8 +1017,8 @@ proc Neuroarchiver_metadata_write {w fn} {
 
 #
 # Neuroarchiver_metadata_view reads the metadata from an NDF file called $fn and
-# displays the metadata string in a text window. You can edit the string and
-# save it to the same file with a Save button.
+# displays the metadata string in a metadata viewing panel. You can edit the
+# string and save it to the same file with a Save button.
 #
 proc Neuroarchiver_metadata_view {fn} {
 	upvar #0 Neuroarchiver_info info
@@ -1042,12 +1042,15 @@ proc Neuroarchiver_metadata_view {fn} {
 		return "FAIL"
 	}
 	
+	# If the metadata viewing panel exists, destroy it. We are going to make a
+	# new one.
+	set w $info(window)\.metadata
+	if {[winfo exists $w]} {destroy $w}
+	
 	# Create a new top-level text window that is a child of the Neuroarchiver
 	# window. Bind the Command-S key to save the metadata.
-	set i 1
-	while {[winfo exists [set w $info(window)\.metadata_$i]]} {incr i}
 	toplevel $w
-	wm title $w "[file tail $fn] Metadata"
+	wm title $w "[file tail $fn] Metadata, Neuroarchiver $info(version)"
 	LWDAQ_text_widget $w 60 20
 	LWDAQ_enable_text_undo $w.text
 	LWDAQ_bind_command_key $w s [list Neuroarchiver_metadata_write $w $fn]
