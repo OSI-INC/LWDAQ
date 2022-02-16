@@ -1016,9 +1016,9 @@ proc Neuroarchiver_metadata_write {w fn} {
 }
 
 #
-# Neuroarchiver_metadata_view reads the metadata from an NDF file called
-# $fn and displays the metadata string in a new text window. You 
-# can edit the string and save it to the same file with a Save button.
+# Neuroarchiver_metadata_view reads the metadata from an NDF file called $fn and
+# displays the metadata string in a text window. You can edit the string and
+# save it to the same file with a Save button.
 #
 proc Neuroarchiver_metadata_view {fn} {
 	upvar #0 Neuroarchiver_info info
@@ -6982,11 +6982,12 @@ proc Neuroarchiver_record {{command ""}} {
 # list of channels we want to process. For each of these channels, in the order
 # they appear in the channels string, we apply extraction, reconstruction,
 # transformation, and processing to the data image. If requested by the user, we
-# read their processor_file off disk and apply it in turn to the signal and
+# read a processor_file off disk and apply it in turn to the signal and
 # spectrum we obtained for each channel. We store the results of processing to
 # disk in a text file and print them to the text window also. If we don't specify
 # a command, the Neuroarchiver continues with the action indicated by its control
-# variable.
+# variable. But we can specify any of the following commands: Play, Step, Repeat,
+# Back, Pick, PickDir, First, and Reload.
 #
 proc Neuroarchiver_play {{command ""}} {
 	upvar #0 Neuroarchiver_info info
@@ -7052,7 +7053,7 @@ proc Neuroarchiver_play {{command ""}} {
 	if {$info(play_control) == "Pick"} {
 		Neuroarchiver_pick play_file
 		set config(play_time) 0.0
-		set config(saved_play_time) $config(play_time)
+		set info(saved_play_time) $config(play_time)
 		Neuroarchiver_fresh_graphs 1
 		if {![string match $config(play_dir)* $config(play_file)]} {
 			Neuroarchiver_print "WARNING: Directory tree changed\
@@ -7067,6 +7068,16 @@ proc Neuroarchiver_play {{command ""}} {
 		Neuroarchiver_pick play_dir
 		Neuroarchiver_fresh_graphs 1
 		set info(play_control) "First"
+	}
+	
+	# If Reload, we clear the saved play file name and change the play control to 
+	# Repeat.
+	if {$info(play_control) == "Reload"} {
+		set info(saved_play_file) "none"
+		set config(play_time) 0.0
+		set info(saved_play_time) 0.0
+		Neuroarchiver_fresh_graphs 1
+		set info(play_control) "Repeat"
 	}
 
 	# If First we find the first file in the playback directory tree.
@@ -7105,7 +7116,8 @@ proc Neuroarchiver_play {{command ""}} {
 	
 	# If we have changed files, get the new end time for this file, set the
 	# play time to the start of the file, read the payload length from the
-	# new file metadata, update the clock, and reset tracking variables.
+	# new file metadata, read tracker coordinates and background powers if
+	# they exist, and update the clock.
 	if {$config(play_file) != $info(saved_play_file)} {
 		set config(play_index) 0
 		set info(play_file_tail) [file tail $config(play_file)]
@@ -7140,7 +7152,7 @@ proc Neuroarchiver_play {{command ""}} {
 			set config(tracker_coordinates) [lindex $alt end]
 		}
 		set alt_bg [LWDAQ_xml_get_list $metadata "alt_bg"]
-		if {[llength $alt] >= 1} {
+		if {[llength $alt_bg] >= 1} {
 			set config(tracker_background) [lindex $alt_bg end]
 		}
 		set info(play_end_time) \
@@ -8705,10 +8717,11 @@ proc Neuroarchiver_open {} {
 		button $f.pick -text "Pick" -command "Neuroarchiver_command play Pick"
 		button $f.pickd -text "PickDir" -command "Neuroarchiver_command play PickDir"
 		button $f.first -text "First" -command "Neuroarchiver_command play First"
+		button $f.reload -text "Reload" -command  "Neuroarchiver_command play Reload"
 		button $f.clist -text "List" -command {
 			LWDAQ_post [list Neuroarchiver_list 0 ""]
 		}
-		pack $f.b $f.pick $f.pickd $f.first $f.clist -side left -expand yes
+		pack $f.b $f.pick $f.pickd $f.first $f.reload $f.clist -side left -expand yes
 		button $f.metadata -text "Metadata" -command {
 			LWDAQ_post [list Neuroarchiver_metadata_view play]
 		}
