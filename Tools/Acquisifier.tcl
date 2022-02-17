@@ -3,6 +3,7 @@
 # Polite LWDAQ Tool.
 #
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+# Copyright (C) 2022 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -100,7 +101,7 @@
 # "forgetful" flag to make forgetting previously-defined default parameter
 # values optional, and set the default to "not forgetful". This follows revelation
 # at CERN that they run one script to set up the default parameters, and then
-# run their successive acquisition scripts afterwards.
+# run their successive acquisition scripts afterwards. [16-FEB-22]
 
 proc Acquisifier_init {} {
 	upvar #0 Acquisifier_info info
