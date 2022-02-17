@@ -96,14 +96,18 @@
 # we load a new script, we delete all default parameter values and all default
 # post-processing.
 
-# Version 58: Fixed failure to preserve parameter values containing spaces.
+# Version 58: Fixed failure to preserve parameter values containing spaces. Add
+# "forgetful" flag to make forgetting previously-defined default parameter
+# values optional, and set the default to "not forgetful". This follows revelation
+# at CERN that they run one script to set up the default parameters, and then
+# run their successive acquisition scripts afterwards.
 
 proc Acquisifier_init {} {
 	upvar #0 Acquisifier_info info
 	upvar #0 Acquisifier_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Acquisifier" 57
+	LWDAQ_tool_init "Acquisifier" 58
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -121,6 +125,7 @@ proc Acquisifier_init {} {
 	set config(auto_run) 0
 	set config(auto_repeat) 0
 	set config(auto_quit) 0
+	set config(forgetful) 0
 	set config(title_color) purple
 	set config(analysis_color) brown
 	set config(result_color) darkgreen
@@ -345,11 +350,10 @@ proc Acquisifier_step_list_print {text_widget num_lines} {
 }
 
 #
-# Acquisifier_load_script loads a script into memory from a
-# file. If we specify no file, the routine uses the file name
-# given in config(daq_script). The routine deletes all default
-# post-processing and parameter values that may be in place
-# from previous scripts.
+# Acquisifier_load_script loads a script into memory from a file. If we specify
+# no file, the routine uses the file name given in config(daq_script). If the
+# "forgetful" flag is set, the routine deletes all default post-processing and
+# parameter values that may be in place from previous scripts.
 #
 proc Acquisifier_load_script {{fn ""}} {
 	upvar #0 Acquisifier_info info
@@ -363,13 +367,15 @@ proc Acquisifier_load_script {{fn ""}} {
 	set info(step) 0
 	LWDAQ_update
 	
-	# Unset previously-defined post-processing and defaults.
-	foreach n [array names info] {
-		if {[string match *_defaults $n]} {
-			unset info($n)
-		}
-		if {[string match *_post_processing $n]} {
-			unset info($n)
+	# If forgetful, unset previously-defined post-processing and defaults.
+	if {$config(forgetful)} {
+		foreach n [array names info] {
+			if {[string match *_defaults $n]} {
+				unset info($n)
+			}
+			if {[string match *_post_processing $n]} {
+				unset info($n)
+			}
 		}
 	}
 
@@ -992,7 +998,8 @@ proc Acquisifier_open {} {
 	set f $w.checkbuttons
 	frame $f
 	pack $f -side top -fill x
-	foreach a {Extended_Acquisition Analyze Upload_Step_Result Restore_Instruments} {
+	foreach a {Extended_Acquisition Analyze Upload_Step_Result \
+			Restore_Instruments Forgetful} {
 		set b [string tolower $a]
 		checkbutton $f.c$b -text $a -variable Acquisifier_config($b)
 		pack $f.c$b -side left -expand 1
