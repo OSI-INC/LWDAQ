@@ -23,7 +23,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.0"
+	LWDAQ_tool_init "Fiber_Positioner" "1.1"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -32,6 +32,20 @@ proc Fiber_Positioner_init {} {
 	set config(image_height) 300
 	set config(plot_width) 300
 	set config(plot_height) 300
+	
+	set config(dac_min) 0
+	set config(dac_zero) 128
+	set config(dac_max) 255
+	
+	set config(dac_ip) "10.0.0.37"
+	set config(ns_sock) 1
+	set config(n_dac) 1
+	set config(s_dac) 2
+	set config(ew_sock) 2
+	set config(e_dac) 1
+	set config(w_dac) 2
+	
+	set config(offline) 1
 		
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -49,7 +63,15 @@ proc Fiber_Positioner_init {} {
 # set one of its DAC outputs.
 #
 proc A2057_set_dac {ip dsock msock dac value} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
 
+	# Offline for debugging at home.
+	if {$config(offline)} {
+		LWDAQ_print $info(text) "Set dac $ip $dsock $msock $dac to $value."
+		return "ABORT"
+	}
+	
 	# Construct the sixteen bit value we must send to the DAC.
 	if {![string is integer -strict $value]} {
 		error "value \"$value\" not an integer."
@@ -118,8 +140,12 @@ proc Fiber_Positioner_zero {} {
 		return "ERROR"
 	}
 	set info(control) "Zero"
-	
-	LWDAQ_print $info(text) "The zero procedure."
+
+	LWDAQ_print $info(text) "Zeroring all dacs (setting them to $config(dac_zero)."
+	A2057_set_dac $config(dac_ip) $config(ns_sock) 1 $config(n_dac) $config(dac_zero)
+	A2057_set_dac $config(dac_ip) $config(ns_sock) 1 $config(s_dac) $config(dac_zero)
+	A2057_set_dac $config(dac_ip) $config(ew_sock) 1 $config(e_dac) $config(dac_zero)
+	A2057_set_dac $config(dac_ip) $config(ew_sock) 1 $config(w_dac) $config(dac_zero)
 	
 	set info(control) "Idle"
 	return "SUCCESS"
@@ -136,7 +162,6 @@ proc Fiber_Positioner_measure {} {
 	}
 	set info(control) "Measure"
 	
-	LWDAQ_print $info(text) "The measure procedure."
 	set result [LWDAQ_acquire BCAM]
 	lwdaq_draw $iconfig(memory_name) $info(photo)
 	LWDAQ_print $info(text) $result
@@ -185,13 +210,22 @@ proc Fiber_Positioner_open {} {
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
 	}
+	
+	set f [frame $w.ns]
+	pack $f -side top -fill x
+	label $f.ns
 
-	set f $w.image_line
-	frame $f 
+	foreach a {dac_ip ns_sock n_dac s_dac ew_sock e_dac w_dac} {
+		label $f.l$a -text $a
+		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
+			-width [expr [string length $config($a)] + 2]
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	set f [frame $w.image_line]
 	pack $f -side top -fill x
 	
-	set f1 $f.image_frame
-	frame $f1 
+	set f1 [frame $f.image_frame]
 	pack $f1 -side left -fill y
 	
 	set info(photo) [image create photo \
