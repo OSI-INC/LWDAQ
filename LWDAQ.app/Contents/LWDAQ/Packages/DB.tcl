@@ -1,5 +1,6 @@
 # XML Database Management Software
-# Copyright (C) 2005-2017 Kevan Hashemi, Brandeis University
+#
+# Copyright (C) 2005-2012 Kevan Hashemi, Brandeis University
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -19,6 +20,9 @@
 # Database.tcl defines XML database management routines, and opens up a
 # management window.
 #
+
+# Load this package or routines into LWDAQ with "package require Database".
+package provide DB 1.2
 
 #
 # DB_init sets the database manager's global array, assuming it has not
@@ -668,9 +672,4 @@ proc DB_number {s} {
 	} {
 		return 0
 	}
-
 }
-
-
-DB_init
-DB_open

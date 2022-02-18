@@ -1,12 +1,12 @@
-# Open-Source Reconfigurable Eight-Bit Central Porocessing Unit 
-# Assembler and Dis-Assembler, a LWDAQ Tool.
+# Open-Source Reconfigurable Eight-Bit Central Porocessing Unit Assembler and
+# Dis-Assembler, a LWDAQ Tool.
+#
+# Copyright (C) 2020-2022 Kevan Hashemi, Open Source Instruments Inc.
 #
 # A LWDAQ Tool that converts text Open-Source, Reconfigurable,
 # Eight-Bit Central Processing Unit (OSR8 CPU) assembler source code
 # into text hexadecimal machine code for use by a firmware compiler such
 # as the Lattice Diamond VHDL compiler.
-#
-# Copyright (C) 2020 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

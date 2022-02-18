@@ -1,4 +1,5 @@
 # Sudoku.tcl, Solves Sudoku Puzzles
+#
 # Copyright (C) 2006 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or

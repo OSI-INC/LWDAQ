@@ -1,5 +1,7 @@
 # Template, a Standard and Polite LWDAQ Tool
-# Copyright (C) 2004-2012 Kevan Hashemi, Brandeis University
+#
+# Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+# Copyright (C) 2022 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

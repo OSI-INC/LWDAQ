@@ -1,4 +1,5 @@
 # Lamp_Controller, a Standard and Polite LWDAQ Tool
+#
 # Copyright (C) 2012 Kevan Hashemi, Open Source Instruments
 #
 # This program is free software; you can redistribute it and/or

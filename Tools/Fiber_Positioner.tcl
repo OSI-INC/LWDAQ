@@ -1,5 +1,6 @@
 # Direct Fiber Positioning System, a LWDAQ Tool
-# Copyright (C) 2021 Kevan Hashemi, Brandeis University
+#
+# Copyright (C) 2021-2022 Kevan Hashemi, Brandeis University
 # Copyright (C) 2021 Kimika Arai, Brandeis University
 #
 # This program is free software; you can redistribute it and/or
@@ -17,12 +18,12 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
-proc DFPS_init {} {
-	upvar #0 DFPS_info info
-	upvar #0 DFPS_config config
+proc Fiber_Positioner_init {} {
+	upvar #0 Fiber_Positioner_info info
+	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS" "1.0"
+	LWDAQ_tool_init "Fiber_Positioner" "1.0"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -92,10 +93,9 @@ proc A2057_set_dac {ip dsock msock dac value} {
 }
 
 
-# DFPS_move takes two DAC values x and y and 
-proc DFPS_move {} {
-	upvar #0 DFPS_config config
-	upvar #0 DFPS_info info
+proc Fiber_Positioner_move {} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
 
 	if {$info(control) != "Idle"} {
 		LWDAQ_print $info(text) "ERROR: Cannot move while $info(control)."
@@ -109,9 +109,9 @@ proc DFPS_move {} {
 	return "SUCCESS"
 }
 
-proc DFPS_zero {} {
-	upvar #0 DFPS_config config
-	upvar #0 DFPS_info info
+proc Fiber_Positioner_zero {} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
 	
 	if {$info(control) != "Idle"} {
 		LWDAQ_print $info(text) "ERROR: Cannot zero while $info(control)."
@@ -125,9 +125,9 @@ proc DFPS_zero {} {
 	return "SUCCESS"
 }
 
-proc DFPS_measure {} {
-	upvar #0 DFPS_config config
-	upvar #0 DFPS_info info
+proc Fiber_Positioner_measure {} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
 	
 	if {$info(control) != "Idle"} {
@@ -146,9 +146,9 @@ proc DFPS_measure {} {
 }
 
 
-proc DFPS_stop {} {
-	upvar #0 DFPS_config config
-	upvar #0 DFPS_info info
+proc Fiber_Positioner_stop {} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
 	
 	if {$info(control) == "Idle"} {
 		LWDAQ_print $info(text) "ERROR: No need to stop while Idle."
@@ -161,9 +161,9 @@ proc DFPS_stop {} {
 	return "SUCCESS"
 }
 
-proc DFPS_open {} {
-	upvar #0 DFPS_config config
-	upvar #0 DFPS_info info
+proc Fiber_Positioner_open {} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
 
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return 0}
@@ -172,11 +172,11 @@ proc DFPS_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
-	label $f.state -textvariable DFPS_info(control) -width 20 -fg blue
+	label $f.state -textvariable Fiber_Positioner_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
 	foreach a {Move Zero Measure Stop} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command DFPS_$b
+		button $f.$b -text $a -command Fiber_Positioner_$b
 		pack $f.$b -side left -expand 1
 	}
 
@@ -214,16 +214,15 @@ proc DFPS_open {} {
 	return 1
 }
 
-DFPS_init
-DFPS_open
+Fiber_Positioner_init
+Fiber_Positioner_open
 	
 return 1
 
 ----------Begin Help----------
 
-The DFPS Tool operates and monitors our prototype direct fiber positioning system.
+http://www.opensourceinstruments.com/Fiber_Positioner/Development.html#Software
 
-Kevan Hashemi hashemi@brandeis.edu
 ----------End Help----------
 
 ----------Begin Data----------
