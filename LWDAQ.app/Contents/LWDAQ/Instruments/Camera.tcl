@@ -277,20 +277,19 @@ proc LWDAQ_daq_Camera {} {
 } 
 
 #
-# LWDAQ_set_image_sensor takes a LWDAQ device type name and an 
-# instrument name as parameters. It sets up the named instrument
-# to use the named device type for image capture. The routine sets 
-# the image height and width, the device type number, and the 
-# analysis boundaries to suit the new image sensor. Some instruments 
-# have the daq device type in the config array, and other in the 
-# info array. This routine handles both contingencies by looking for
-# the parameters in both places. The list of supported image sensors
-# is stored in the LWDAQ_Driver(image_sensors) global list. The following
-# sensor names are included: TC255 TC237 KAF0400 KAF0261 ICX424 ICX424Q.
-# To get the complete and up-to-date list, consult the image_sensors
-# list with the help of the LWDAQ console.
+# LWDAQ_set_image_sensor takes a LWDAQ device type name and an instrument name
+# as parameters. It sets up the named instrument to use the named device type
+# for image capture. The routine sets the image height and width, the device
+# type number, and the analysis boundaries to suit the new image sensor. Some
+# instruments have the daq device type in the config array, and other in the
+# info array. This routine handles both contingencies by looking for the
+# parameters in both places. The list of supported image sensors is stored in
+# the LWDAQ_Driver(image_sensors) global list. The following sensor names are
+# included: TC255 TC237 KAF0400 KAF0261 ICX424 ICX424Q. To get the complete and
+# up-to-date list, consult the image_sensors list with the help of the LWDAQ
+# console.
 #
-proc LWDAQ_set_image_sensor {{name "TC255"} {instrument "Camera"}} {
+proc LWDAQ_set_image_sensor {name instrument} {
 	global LWDAQ_Driver
 	upvar #0 LWDAQ_config_$instrument config
 	upvar #0 LWDAQ_info_$instrument info
