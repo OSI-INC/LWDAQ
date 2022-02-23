@@ -4227,9 +4227,9 @@ proc Neurotracker_extract {} {
 	set num_detectors [expr [llength $config(tracker_coordinates)]/3]
 	
 	# If the playload length does not match the number of detector coils, we
-	# abort, because we are not playing a tracker archive. We full the tracker
+	# abort, because we are not playing a tracker archive. We fill the tracker
 	# history with zeros for raw x, y, and z, filtered x, y, and z and activity,
-	# but no entries for coil powers. The fake history contains num_clices + 1
+	# but no entries for coil powers. The fake history contains num_slices + 1
 	# entries, because the history usually contains the final slice from the
 	# previous interval as the first entry.
 	if {($info(player_payload) < 1) || ($info(player_payload) < $num_detectors)} {
@@ -4267,9 +4267,11 @@ proc Neurotracker_extract {} {
 		}
 	} 
 	
-	# If we don't have a signal, perhaps because of reception loss, or we have encountered
-	# an error, we leave the existing tracker history in place by simply exiting this
-	# routine now. If we have no history, we make a fake one.
+	# If we don't have a signal, perhaps because of reception loss, or we have
+	# encountered an error, we leave the existing tracker history in place by
+	# simply exiting this routine now. If we have no history, we make a fake
+	# one. Each history entry contains raw x, y, and z, filtered x, y, and z and
+	# activity.
 	if {($info(signal) == "0 0") || $lossy || $error_flag} {
 		if {![info exists history]} {
 			set history [list]

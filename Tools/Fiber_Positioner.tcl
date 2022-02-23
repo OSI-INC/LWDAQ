@@ -23,7 +23,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.2"
+	LWDAQ_tool_init "Fiber_Positioner" "1.3"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -55,6 +55,8 @@ proc Fiber_Positioner_init {} {
 	set config(south) $config(dac_zero) 
 	set config(east) $config(dac_zero) 
 	set config(west) $config(dac_zero) 
+	set config(history) [list]
+	set config(trace) "0"
 	set config(repeat) "0"
 	
 	set config(travel_list) "\
@@ -100,47 +102,55 @@ proc A2057_set_dac {ip dsock msock dac value} {
 	}
 	set bits 0000[LWDAQ_decimal_to_binary $value 8]0000
 
-	# Open a socket to the driver and select the A2057.
-	set sock [LWDAQ_socket_open $ip]
-	LWDAQ_set_driver_mux $sock $dsock $msock
+	if {[catch {
+		# Open a socket to the driver and select the A2057.
+		set sock [LWDAQ_socket_open $ip]
+		LWDAQ_set_driver_mux $sock $dsock $msock
 
-	# Assert the frame sync bit.
-	LWDAQ_transmit_command_hex $sock "6C80"
+		# Assert the frame sync bit.
+		LWDAQ_transmit_command_hex $sock "6C80"
 
-	# Select DAC1 or DAC2.
-	if {$dac == 1} {set c "480"} else {set c "880"}
-	LWDAQ_transmit_command_hex $sock "6$c"
+		# Select DAC1 or DAC2.
+		if {$dac == 1} {set c "480"} else {set c "880"}
+		LWDAQ_transmit_command_hex $sock "6$c"
 
-	# Transmit sixteen bits. Each bit requires two command words, one
-	# to present the bit value and raise the clock, another to continue
-	# the bit value while dropping the clock.
-	for {set i 0} {$i < [string length $bits]} {incr i} {
-		set b [string index $bits $i]
-		if {$b} {
-			LWDAQ_transmit_command_hex $sock "C$c"
-			LWDAQ_transmit_command_hex $sock "8$c"
-		} else {
-			LWDAQ_transmit_command_hex $sock "4$c"
-			LWDAQ_transmit_command_hex $sock "0$c"
+		# Transmit sixteen bits. Each bit requires two command words, one
+		# to present the bit value and raise the clock, another to continue
+		# the bit value while dropping the clock.
+		for {set i 0} {$i < [string length $bits]} {incr i} {
+			set b [string index $bits $i]
+			if {$b} {
+				LWDAQ_transmit_command_hex $sock "C$c"
+				LWDAQ_transmit_command_hex $sock "8$c"
+			} else {
+				LWDAQ_transmit_command_hex $sock "4$c"
+				LWDAQ_transmit_command_hex $sock "0$c"
+			}
 		}
+
+		# End the transmission by deselecting both DACs.
+		LWDAQ_transmit_command_hex $sock "4080"
+
+		# Close the socket to the driver, freeing it for other activity.
+		LWDAQ_wait_for_driver $sock
+		LWDAQ_socket_close $sock
+	} error_result]} {
+		catch {LWDAQ_socket_close $sock}
+		LWDAQ_print $info(text) "$error_result" green
+		error $error_result
 	}
-
-	# End the transmission by deselecting both DACs.
-	LWDAQ_transmit_command_hex $sock "4080"
-
-	# Close the socket to the driver, freeing it for other activity.
-	LWDAQ_wait_for_driver $sock
-	LWDAQ_socket_close $sock
+	
+	return "SUCCESS"
 }
 
-proc Fiber_Positioner_move {} {
+proc Fiber_Positioner_set_nsew {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
 
 	A2057_set_dac $config(dac_ip) $config(ns_sock) 1 $config(n_dac) $config(north)
 	A2057_set_dac $config(dac_ip) $config(ns_sock) 1 $config(s_dac) $config(south)
 	A2057_set_dac $config(dac_ip) $config(ew_sock) 1 $config(e_dac) $config(east)
-	A2057_set_dac $config(dac_ip) $config(ew_sock) 1 $config(w_dac) $config(west)	
+	A2057_set_dac $config(dac_ip) $config(ew_sock) 1 $config(w_dac) $config(west)
 }
 
 proc Fiber_Positioner_step {} {
@@ -157,9 +167,20 @@ proc Fiber_Positioner_step {} {
 	}
 	
 	set info(control) "Step"
-	Fiber_Positioner_move
+	
+	if {[catch {
+		Fiber_Positioner_set_nsew
+	} error_result]} {
+		LWDAQ_print $info(text) "ERROR: $error_result"
+		set info(control) "Idle"
+		return "ERROR"
+	}
 	LWDAQ_wait_ms $config(step_delay_ms)	
 	set result [Fiber_Positioner_daq]
+	if {[LWDAQ_is_error_result $result]} {
+		set info(control) "Idle"
+		return "ERROR"
+	}
 	LWDAQ_print $info(text) "$config(north) $config(east) [lrange $result 1 2]"
 	set info(control) "Idle"
 	return "SUCCESS"
@@ -168,6 +189,8 @@ proc Fiber_Positioner_step {} {
 proc Fiber_Positioner_travel {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
+	upvar #0 LWDAQ_config_BCAM iconfig
+	upvar #0 LWDAQ_info_BCAM iinfo
 
 	if {$info(control) != "Idle"} {
 		LWDAQ_print $info(text) "ERROR: Cannot travel while $info(control)."
@@ -185,10 +208,34 @@ proc Fiber_Positioner_travel {} {
 		set config(south) [expr 255 - $n]
 		set config(east) $e
 		set config(west) [expr 255 - $e]
-		Fiber_Positioner_move
+		if {[catch {
+			Fiber_Positioner_set_nsew
+		} error_result]} {
+			LWDAQ_print $info(text) "ERROR: $error_result"
+			set info(control) "Idle"
+			return "ERROR"
+		}
 		LWDAQ_wait_ms $config(step_delay_ms)	
 		set result [Fiber_Positioner_daq]
-		LWDAQ_print $info(text) "$n $e [lrange $result 1 2]"
+		if {[LWDAQ_is_error_result $result]} {
+			set info(control) "Idle"
+			return "ERROR"
+		}
+		set config(spot_x) [lindex $result 1]
+		set config(spot_y) [lindex $result 2]
+		LWDAQ_print $info(text) "$config(north) $config(east) \
+			config(spot_x) config(spot_y)"
+		if {$config(trace)} {
+			set y_max $iinfo
+			lappend config(history) \
+				$config(spot_x) \
+				[expr $y_max - $config(spot_y)]
+			lwdaq_graph $config(history) $iconfig(memory_name) \
+				-x_max $x_max -y_max $y_max -color 5
+			lwdaq_draw $iconfig(memory_name) $info(photo)
+		} {
+			set config(history) [list]
+		}
 		if {$info(control) == "Stop"} {break}
 	}
 	
@@ -202,6 +249,8 @@ proc Fiber_Positioner_travel {} {
 proc Fiber_Positioner_zero {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
+	upvar #0 LWDAQ_config_BCAM iconfig
+	upvar #0 LWDAQ_info_BCAM iinfo
 	
 	if {$info(control) != "Idle"} {
 		LWDAQ_print $info(text) "ERROR: Cannot zero while $info(control)."
@@ -212,8 +261,18 @@ proc Fiber_Positioner_zero {} {
 	foreach d {north south east west} {
 		set config($d) $config(dac_zero)
 	}
-	Fiber_Positioner_move
+	if {[catch {
+		Fiber_Positioner_set_nsew
+	} error_result]} {
+		LWDAQ_print $info(text) "ERROR: $error_result"
+		set info(control) "Idle"
+		return "ERROR"
+	}
 	set result [Fiber_Positioner_daq]
+	if {[LWDAQ_is_error_result $result]} {
+		set info(control) "Idle"
+		return "ERROR"
+	}
 	LWDAQ_print $info(text) "$config(north) $config(east) [lrange $result 1 2]"
 		
 	set info(control) "Idle"
@@ -233,7 +292,23 @@ proc Fiber_Positioner_measure {} {
 	set info(control) "Measure"
 	
 	set result [Fiber_Positioner_daq]
-	LWDAQ_print $info(text) "$config(north) $config(east) [lrange $result 1 2]"
+	if {[LWDAQ_is_error_result $result]} {
+		set info(control) "Idle"
+		return "ERROR"
+	}
+	set x [lindex $result 1]
+	set y [lindex $result 2]
+	if {$config(trace)} {
+		LWDAQ_print $info(text) "Hi from tracing routine." cyan
+		lwdaq_graph "$config(spot_x) $config(spot_y) $x $y" $iconfig(memory_name)\
+			-x_max [expr $iinfo(daq_image_width) * $iinfo(analysis_pixel_size_um)] \
+			-y_max [expr $iinfo(daq_image_height) * $iinfo(analysis_pixel_size_um)] \
+			-color 5
+		lwdaq_draw $iconfig(memory_name) $info(photo)
+	}
+	set config(spot_x) $x
+	set config(spot_y) $y
+	LWDAQ_print $info(text) "$config(north) $config(east) $x $y"
 
 	set info(control) "Idle"
 	return "SUCCESS"
@@ -291,26 +366,17 @@ proc Fiber_Positioner_open {} {
 		button $f.$b -text $a -command Fiber_Positioner_$b
 		pack $f.$b -side left -expand 1
 	}
-
 	foreach a {Help Configure} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
 	}
 	
-	set f [frame $w.pz]
-	pack $f -side top -fill x
-
-	foreach a {dac_ip ns_sock n_dac s_dac ew_sock e_dac w_dac} {
-		label $f.l$a -text $a
-		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
-			-width [expr [string length $config($a)] + 2]
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-
 	set f [frame $w.fiber]
 	pack $f -side top -fill x
 
+	label $f.le -text "Image:" -fg green
+	pack $f.le -side left -expand yes
 	foreach a {fiber_ip fiber_sock fiber_element flash_seconds camera_sock} {
 		label $f.l$a -text $a
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
@@ -318,29 +384,44 @@ proc Fiber_Positioner_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
+	set f [frame $w.pz]
+	pack $f -side top -fill x
+
+	label $f.le -text "Actuator:" -fg green
+	pack $f.le -side left -expand yes
+	foreach a {dac_ip ns_sock n_dac s_dac ew_sock e_dac w_dac} {
+		label $f.l$a -text $a
+		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
+			-width [expr [string length $config($a)] + 2]
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+
 	set f [frame $w.travel]
 	pack $f -side top -fill x
 
-	label $f.ml -text "Travel:"
+	label $f.le -text "Travel List:" -fg green
 	entry $f.me -textvariable Fiber_Positioner_config(travel_list) -width 90
 	checkbutton $f.repeat -text "Repeat" -variable Fiber_Positioner_config(repeat) 
-	pack $f.ml $f.me $f.repeat -side left -expand yes
+	pack $f.le $f.me $f.repeat -side left -expand yes
 	
 	set f [frame $w.dacs]
 	pack $f -side top -fill x
 	
-	foreach d {North South East West} {
+	label $f.le -text "Step Values:" -fg green
+	pack $f.le -side left -expand yes
+	foreach d {north south east west} {
 		set a [string tolower $d]
 		label $f.l$a -text $d
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 4
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
+	checkbutton $f.trace -text "Trace" -variable Fiber_Positioner_config(trace)
+	pack $f.trace -side left -expand yes
 
 	set f [frame $w.image_frame]
 	pack $f -side top -fill x
 	
-	set info(photo) [image create photo \
-		-width $config(image_width) -height $config(image_height)]
+	set info(photo) [image create photo -width 700 -height 520]
 	label $f.image -image $info(photo) 
 	pack $f.image -side left -expand yes
 
