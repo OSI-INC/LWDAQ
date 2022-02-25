@@ -565,7 +565,7 @@ proc LWDAQ_print {args} {
 # to the file named in the editor window's title. The "SaveAs" command also
 # takes a window as its source but opens a browser for the user to choose a
 # destination file. The "New" command opens a new editor window with a default
-# file name. it ignores the source parameter. In the text editor window, we use
+# file name. It ignores the source parameter. In the text editor window, we use
 # command-z to undo, command-s to save the text to the title file. The New
 # button in the text editor opens a file called Untitled.txt, which we assume
 # does not exist.
@@ -634,7 +634,6 @@ proc LWDAQ_edit_script {{cmd "Open"} {src ""}} {
 		} elseif {[file dirname $fn] == "."} {
 			set fn [file join $LWDAQ_Info(working_dir) $fn]
 		}
-		
 		
 		# Set the window title to the file name and return the window name.
 		wm title $w $fn
