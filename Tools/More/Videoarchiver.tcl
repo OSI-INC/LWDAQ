@@ -172,7 +172,7 @@ echo "SUCCESS"
 	
 	# Monitor parameters
 	set config(monitor_speed) "1.0"
-	set config(display_zoom) "0.5"
+	set config(display_zoom) "1.0"
 	set info(monitor_process) "0"
 	set info(monitor_channel) "none"
 	set info(monitor_cam) "0"

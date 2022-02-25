@@ -23,7 +23,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.5"
+	LWDAQ_tool_init "Fiber_Positioner" "1.6"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -31,9 +31,9 @@ proc Fiber_Positioner_init {} {
 	set config(image_width) 700
 	set config(image_height) 520
 	
-	set config(dac_min) 0
-	set config(dac_zero) 128
-	set config(dac_max) 255
+	set config(dac_min) "0"
+	set config(dac_zero) "133"
+	set config(dac_max) "255"
 	
 	set config(daq_ip_addr) "10.0.0.40"
 	
@@ -55,7 +55,7 @@ proc Fiber_Positioner_init {} {
 	set config(fiber_element) "A1"
 	set config(camera_sock) "4"
 	set config(ccd_type) "ICX424"
-	set config(flash_seconds) "0.0010"
+	set config(flash_seconds) "0.0003"
 	set config(num_spots) "1"
 	
 	set config(n_out) $config(dac_zero) 
@@ -74,9 +74,8 @@ proc Fiber_Positioner_init {} {
 	
 	set info(travel_window) "$info(window)\.travel_edit"
 	set config(travel_file) [file normalize ~/Desktop/Travel_List.txt]
-	set config(default_travel) "0 0 255 0 255 255 0 255"
 	
-	set config(settling_ms) "1000"
+	set config(settling_ms) "100"
 	
 	set config(offline) 0
 		
@@ -331,12 +330,15 @@ proc Fiber_Positioner_travel {{index 0}} {
 	regsub -all {\n[ \t]*#[^\n]*} $as "" travel_list
 
 	# Get the new north and east dac values from the list.
-	set n [lindex $travel_list [expr $index * 2]]
-	set e [lindex $travel_list [expr ($index * 2) + 1]]
-	set config(n_out) $n
-	set config(s_out) [expr 255 - $n]
-	set config(e_out) $e
-	set config(w_out) [expr 255 - $e]
+	set values [lrange $travel_list [expr $index * 4] [expr ($index * 4) + 3]]
+	if {[catch {
+		scan $values %d%d%d%d config(n_out) config(s_out) config(e_out) config(w_out)
+	} error_report]} {
+		LWDAQ_print $info(text) "ERROR: $error_result"
+		LWDAQ_print $info(text) "SUGGESTION: Check travel file format."
+		set info(control) "Idle"
+		return "ERROR"
+	}
 	
 	# Apply the new dac values to all four electrodes.
 	if {[catch {
@@ -359,7 +361,7 @@ proc Fiber_Positioner_travel {{index 0}} {
 	if {$info(control) == "Stop"} {
 		set info(control) "Idle"
 		return "ABORT"
-	} elseif {[expr ($index + 1) * 2] < [llength $travel_list]} {	
+	} elseif {[expr ($index + 1) * 4] < [llength $travel_list]} {	
 		incr index
 		LWDAQ_post "Fiber_Positioner_travel $index"
 		return "SUCCESS"
