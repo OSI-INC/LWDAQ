@@ -1,7 +1,6 @@
 # Direct Fiber Positioning System, a LWDAQ Tool
 #
-# Copyright (C) 2021-2022 Kevan Hashemi, Brandeis University
-# Copyright (C) 2021 Kimika Arai, Brandeis University
+# Copyright (C) 2022 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,6 +17,14 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
+#
+# Fiber_Positioner_init creates and initializes the tools' configuration
+# (config) and information (info) arrays. It reads saved configuration (but not
+# information) parameters from disk if we have previously saved our
+# configuration to disk. All the configuration parameters are visible in the
+# tool's configuration array, where there are save and unsave buttons to create
+# and delete a default configuration file.
+#
 proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_info info
 	upvar #0 Fiber_Positioner_config config
@@ -26,17 +33,23 @@ proc Fiber_Positioner_init {} {
 	LWDAQ_tool_init "Fiber_Positioner" "1.6"
 	if {[winfo exists $info(window)]} {return 0}
 
+	# The Fiber Positioner control variable tells us its current state. We can stop
+	# a Fiber Positioner process by setting the control variable to "Stop", after
+	# which the state will return to "Idle".
 	set info(control) "Idle"
 	
+	# These numbers are used only when we open the Fiber Positioner panel for the 
+	# first time, and need to allocate space for the fiber image.
 	set config(image_width) 700
 	set config(image_height) 520
 	
-	set config(dac_min) "0"
+	# The control value for which the control voltages are closest to zero.
 	set config(dac_zero) "133"
-	set config(dac_max) "255"
 	
+	# We assume only one driver in the test stand.
 	set config(daq_ip_addr) "10.0.0.40"
 	
+	# The driver sockets and device elements for the analog outputs and inputs.
 	set config(ns_sock) 1
 	set config(n_out_ch) 1
 	set config(n_in_ch) 1
@@ -48,8 +61,11 @@ proc Fiber_Positioner_init {} {
 	set config(w_out_ch) 2
 	set config(w_in_ch) 2
 	
+	# The factor by which the analog inputs are divided on their way from the 
+	# connector to the input amplifier.
 	set config(input_divisor) "32.0"
-		
+	
+	# Parameters that set up the fiber image capture and analysis.
 	set config(fiber_type) "9"
 	set config(fiber_sock) "3"
 	set config(fiber_element) "A1"
@@ -58,27 +74,33 @@ proc Fiber_Positioner_init {} {
 	set config(flash_seconds) "0.0003"
 	set config(num_spots) "1"
 	
+	# The north, south, east, and west control values. Set them to produce zero
+	# control voltages.
 	set config(n_out) $config(dac_zero) 
 	set config(s_out) $config(dac_zero) 
 	set config(e_out) $config(dac_zero) 
 	set config(w_out) $config(dac_zero) 
 	
+	# The measurements we make of the electrode voltages, have to set them to 
+	# something, assume zero.
 	set config(n_in) "0"
 	set config(s_in) "0"
 	set config(e_in) "0"
 	set config(w_in) "0"
 	
+	# The history of spot positions for the tracing.
 	set config(history) [list]
 	set config(trace) "0"
 	set config(repeat) "0"
 	
+	# Travel configuration.
 	set info(travel_window) "$info(window)\.travel_edit"
 	set config(travel_file) [file normalize ~/Desktop/Travel_List.txt]
 	
+	# Waiting time after setting control voltages before we make measurements.
 	set config(settling_ms) "100"
 	
-	set config(offline) 0
-		
+	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
@@ -98,12 +120,6 @@ proc A2057_set_out {ip dsock msock dac value} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
 
-	# Offline for debugging at home.
-	if {$config(offline)} {
-		LWDAQ_print $info(text) "Set dac $ip $dsock $msock $dac to $value."
-		return "ABORT"
-	}
-	
 	# Construct the sixteen bit value we must send to the DAC.
 	if {![string is integer -strict $value]} {
 		error "value \"$value\" not an integer."
@@ -153,6 +169,11 @@ proc A2057_set_out {ip dsock msock dac value} {
 	return "SUCCESS"
 }
 
+#
+# Fiber_Positioner_set_nsew takes the north, south, east and west control values and
+# writes them to their digital to analog converters. One after the other. The routine
+# does not catch errors, so if something goes wrong, the routine aborts with an error.
+#
 proc Fiber_Positioner_set_nsew {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
@@ -163,6 +184,13 @@ proc Fiber_Positioner_set_nsew {} {
 	A2057_set_out $config(daq_ip_addr) $config(ew_sock) 1 $config(w_out_ch) $config(w_out)
 }
 
+#
+# Fiber_Positioner_spot_position captures an image from the camera and finds the fiber
+# tip image using the BCAM Instrument. If we have tracing enabled, it draws the entire
+# history of spot positions as a locus on the image. The routine checks for errors in
+# data acquisition and instructs the Fiber Positioner to stop any long-term operation
+# if it does encounter an error.
+#
 proc Fiber_Positioner_spot_position {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
@@ -208,6 +236,12 @@ proc Fiber_Positioner_spot_position {} {
 	return "SUCCESS"
 }
 
+#
+# Fiber_Positioner_Voltages uses the Voltmeter to read the four electrode
+# voltages from two Input-Output Heads (A2057H). The routine checks for errors
+# in data acquisition and instructs the Fiber Positioner to stop any long-term
+# operation if it does encounter an error
+#
 proc Fiber_Positioner_voltages {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
@@ -218,23 +252,65 @@ proc Fiber_Positioner_voltages {} {
 	set iconfig(daq_no_sleep) 1
 	set iconfig(daq_ip_addr) $config(daq_ip_addr)
 	
+	# Read the North electrode voltage.
 	set iconfig(daq_driver_socket) $config(ns_sock)
 	set iconfig(daq_device_element) $config(n_in_ch)
 	set result [LWDAQ_acquire Voltmeter]
+	if {[LWDAQ_is_error_result $result]} {
+		LWDAQ_print $info(text) $result
+		set info(control) "Stop"
+		return "ERROR"
+	}
 	set config(n_in) [format %.1f [expr $config(input_divisor) * [lindex $result 1]]]
+
+	# Read the South electrode voltage.
 	set iconfig(daq_device_element) $config(s_in_ch)
 	set result [LWDAQ_acquire Voltmeter]
+	if {[LWDAQ_is_error_result $result]} {
+		LWDAQ_print $info(text) $result
+		set info(control) "Stop"
+		return "ERROR"
+	}
 	set config(s_in) [format %.1f [expr $config(input_divisor) * [lindex $result 1]]]
 
+	# Read the East electrode voltage.
 	set iconfig(daq_driver_socket) $config(ew_sock)
 	set iconfig(daq_device_element) $config(e_in_ch)
 	set result [LWDAQ_acquire Voltmeter]
+	if {[LWDAQ_is_error_result $result]} {
+		LWDAQ_print $info(text) $result
+		set info(control) "Stop"
+		return "ERROR"
+	}
 	set config(e_in) [format %.1f [expr $config(input_divisor) * [lindex $result 1]]]
+	
+	# Read the West electrode voltage.
 	set iconfig(daq_device_element) $config(w_in_ch)
 	set result [LWDAQ_acquire Voltmeter]
+	if {[LWDAQ_is_error_result $result]} {
+		LWDAQ_print $info(text) $result
+		set info(control) "Stop"
+		return "ERROR"
+	}
 	set config(w_in) [format %.1f [expr $config(input_divisor) * [lindex $result 1]]]
+	
+	return "SUCCESS"
 }
 
+#
+# Fiber_Positioner_cmd takes a command, such as Step, Stop, Check, Travel, or
+# Zero, and decides what to do about it. This routine does not execute the Fiber
+# Positioner operation itself, but instead posts the execution of the operation
+# to the LWDAQ event queue, and then returns. We use this routine from buttons,
+# or from other programs that want to manipulate the Fiber Positioner because the
+# routine does not stop or deley the graphical user interface or the program that
+# wants to instruct the Fiber Positioner. A master program instructing the Fiber
+# Positioner should use this routine to, for example, initiate a "Step", after which
+# the master program should check the Fiber_Positioner_info(control) parameter
+# until it returns to "Idle". But note that the master program itself must be 
+# posting itself to the LWDAQ event queue, or else the master program will take
+# over the TCL interpreter and prevent the Fiber Positioner from doing anything.
+#
 proc Fiber_Positioner_cmd {cmd} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
@@ -256,6 +332,11 @@ proc Fiber_Positioner_cmd {cmd} {
 	return $info(control)
 }
 
+#
+# Fiber_Positioner_report writes a report of the latest measurement to the text
+# window. The report is a list of numbers, with some color coding and formatting
+# to make it easy to read.
+#
 proc Fiber_Positioner_report {{t ""}} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
@@ -274,6 +355,11 @@ proc Fiber_Positioner_report {{t ""}} {
 	return "SUCCESS"
 }
 
+#
+# Fiber_Positioner_step asserts the latest control values, waits for the
+# settling time, measures the electrode voltages, measures the spot position,
+# and reports.
+#
 proc Fiber_Positioner_step {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
@@ -301,16 +387,25 @@ proc Fiber_Positioner_step {} {
 	return "SUCCESS"
 }
 
+#
+# Fiber_Positioner_travel allows us to step through a list of control values of 
+# arbitrary length. A travel file consists of north, south, east, west control values
+# separated by spaces, each set of values on a separate line. We can include comments
+# in the travel file with hash characters. 
+#
 proc Fiber_Positioner_travel {{index 0}} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
+	# Because the travel operation can go on for some time, we must handle the 
+	# closing of the window gracefully: we abort if the window is no longer open.
 	if {![winfo exists $info(window)]} {
 		return "ABORT"
 	}
 
+	# Read the travel file, if we can find it.
 	if {[catch {
 		set f [open $config(travel_file) r]
 		set travel_list [string trim [read $f]]
@@ -322,23 +417,29 @@ proc Fiber_Positioner_travel {{index 0}} {
 		return "ERROR"
 	}
 	
+	# Make sure the control variable is set to Travel, which it may be already, but
+	# certainly should be at this point.
 	set info(control) "Travel"
 
-	# Remove comment lines from travel list.
+	# Remove comment lines from travel list and split the travel list using line
+	# breaks.
 	set as "\n"
 	append as $travel_list
 	regsub -all {\n[ \t]*#[^\n]*} $as "" travel_list
+	set travel_list [split [string trim $travel_list] \n]
 
-	# Get the new north and east dac values from the list.
-	set values [lrange $travel_list [expr $index * 4] [expr ($index * 4) + 3]]
-	if {[catch {
-		scan $values %d%d%d%d config(n_out) config(s_out) config(e_out) config(w_out)
-	} error_report]} {
-		LWDAQ_print $info(text) "ERROR: $error_result"
-		LWDAQ_print $info(text) "SUGGESTION: Check travel file format."
-		set info(control) "Idle"
-		return "ERROR"
+	# Get the index'th set of north, south, east, and west control values from
+	# the list contained in the file. We check to make sure we have four integer
+	# values between 0 and 255 before we proceed.
+	set values [lindex $travel_list $index]
+	for {set i 0} {$i < 4} {incr i} {
+		if {![string is integer -strict [lindex $values $i]]} {
+			LWDAQ_print $info(text) "ERROR: Invalid line \"$values\" in travel file."
+			set info(control) "Idle"
+			return "ERROR"
+		}
 	}
+	scan $values %d%d%d%d config(n_out) config(s_out) config(e_out) config(w_out)
 	
 	# Apply the new dac values to all four electrodes.
 	if {[catch {
@@ -361,7 +462,7 @@ proc Fiber_Positioner_travel {{index 0}} {
 	if {$info(control) == "Stop"} {
 		set info(control) "Idle"
 		return "ABORT"
-	} elseif {[expr ($index + 1) * 4] < [llength $travel_list]} {	
+	} elseif {[expr $index + 1] < [llength $travel_list]} {	
 		incr index
 		LWDAQ_post "Fiber_Positioner_travel $index"
 		return "SUCCESS"
@@ -375,6 +476,10 @@ proc Fiber_Positioner_travel {{index 0}} {
 	}
 }
 
+#
+# Fiber_Positioner_zero sets all control values to their zero value, waits for the
+# settling time, measures voltages, measures spot position, and reports.
+#
 proc Fiber_Positioner_zero {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
@@ -404,6 +509,10 @@ proc Fiber_Positioner_zero {} {
 	return "SUCCESS"
 }
 
+#
+# Fiber_Positioner_check does nothing to the voltages, just measures them,
+# measures spot position, and reports. It does not wait for the settling time.
+#
 proc Fiber_Positioner_check {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
@@ -449,6 +558,9 @@ proc Fiber_Positioner_travel_browse {} {
 	return $config(travel_file)
 }
 
+#
+# Fiber_Positioner_open creates the Fiber Positioner window.
+#
 proc Fiber_Positioner_open {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
