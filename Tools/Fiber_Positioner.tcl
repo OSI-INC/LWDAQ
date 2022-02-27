@@ -30,7 +30,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.6"
+	LWDAQ_tool_init "Fiber_Positioner" "1.7"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -89,13 +89,15 @@ proc Fiber_Positioner_init {} {
 	set config(w_in) "0"
 	
 	# The history of spot positions for the tracing.
-	set config(history) [list]
-	set config(trace) "0"
+	set config(trace_history) [list]
+	set config(trace_enable) "0"
+	set config(trace_persistence) "1000"
 	set config(repeat) "0"
 	
 	# Travel configuration.
 	set info(travel_window) "$info(window)\.travel_edit"
-	set config(travel_file) [file normalize ~/Desktop/Travel_List.txt]
+	set config(travel_file) [file normalize ~/Desktop/Travel.txt]
+	set config(travel_index) "0"
 	
 	# Waiting time after setting control voltages before we make measurements.
 	set config(settling_ms) "100"
@@ -219,18 +221,21 @@ proc Fiber_Positioner_spot_position {} {
 	set config(spot_x) [lindex $result 1]
 	set config(spot_y) [lindex $result 2]
 		
-	if {$config(trace)} {
+	if {$config(trace_enable)} {
 		set x_min [expr $iinfo(daq_image_left) * $iinfo(analysis_pixel_size_um)]
 		set y_min [expr $iinfo(daq_image_top) * $iinfo(analysis_pixel_size_um)]
 		set x_max [expr $iinfo(daq_image_right) * $iinfo(analysis_pixel_size_um)]
 		set y_max [expr $iinfo(daq_image_bottom) * $iinfo(analysis_pixel_size_um)]
-		lappend config(history) \
+		lappend config(trace_history) \
 			"$config(spot_x) [expr $y_max - $config(spot_y) + $y_min]"
-		lwdaq_graph [join $config(history)] $iconfig(memory_name) \
+		if {[llength $config(trace_history)] > $config(trace_persistence)} {
+			set config(trace_history) [lrange $config(trace_history) 1 end]
+		}
+		lwdaq_graph [join $config(trace_history)] $iconfig(memory_name) \
 			-x_max $x_max -y_max $y_max -y_min $y_min -x_min $x_min -color 5
 		lwdaq_draw $iconfig(memory_name) $info(photo)
 	} {
-		set config(history) [list]
+		set config(trace_history) [list]
 	}
 	
 	return "SUCCESS"
@@ -302,14 +307,15 @@ proc Fiber_Positioner_voltages {} {
 # Zero, and decides what to do about it. This routine does not execute the Fiber
 # Positioner operation itself, but instead posts the execution of the operation
 # to the LWDAQ event queue, and then returns. We use this routine from buttons,
-# or from other programs that want to manipulate the Fiber Positioner because the
-# routine does not stop or deley the graphical user interface or the program that
-# wants to instruct the Fiber Positioner. A master program instructing the Fiber
-# Positioner should use this routine to, for example, initiate a "Step", after which
-# the master program should check the Fiber_Positioner_info(control) parameter
-# until it returns to "Idle". But note that the master program itself must be 
-# posting itself to the LWDAQ event queue, or else the master program will take
-# over the TCL interpreter and prevent the Fiber Positioner from doing anything.
+# or from other programs that want to manipulate the Fiber Positioner because
+# the routine does not stop or deley the graphical user interface or the program
+# that wants to instruct the Fiber Positioner. A master program instructing the
+# Fiber Positioner should use this routine to, for example, initiate a "Step",
+# after which the master program should check the Fiber_Positioner_info(control)
+# parameter until it returns to "Idle". But note that the master program itself
+# must be posting itself to the LWDAQ event queue, or else the master program
+# will take over the TCL interpreter and prevent the Fiber Positioner from doing
+# anything.
 #
 proc Fiber_Positioner_cmd {cmd} {
 	upvar #0 Fiber_Positioner_config config
@@ -323,8 +329,12 @@ proc Fiber_Positioner_cmd {cmd} {
 		}
 	} else {
 		if {$cmd == "Stop"} {
+			# The stop command does not do anything when we are already stopped.
 			LWDAQ_print $info(text) "ERROR: Cannot stop while idle."
 		} else {
+			# Here we construct the Fiber Positioner procedure name we want to
+			# call by converting the command to lower case, and trusting that
+			# such a procedure exists. We post its execution to the event queue.
 			LWDAQ_post Fiber_Positioner_[string tolower $cmd]
 		}
 	}
@@ -393,7 +403,7 @@ proc Fiber_Positioner_step {} {
 # separated by spaces, each set of values on a separate line. We can include comments
 # in the travel file with hash characters. 
 #
-proc Fiber_Positioner_travel {{index 0}} {
+proc Fiber_Positioner_travel {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
@@ -405,7 +415,12 @@ proc Fiber_Positioner_travel {{index 0}} {
 		return "ABORT"
 	}
 
-	# Read the travel file, if we can find it.
+	# Set the control variable to indicate Travel. The control variable will be Idle
+	# except when we start a new operation or continue an existing operation that we
+	# have paused with the Stop button.
+	set info(control) "Travel"
+
+	# Read the travel file, if we can find it. If not, abort and report an error.
 	if {[catch {
 		set f [open $config(travel_file) r]
 		set travel_list [string trim [read $f]]
@@ -417,60 +432,95 @@ proc Fiber_Positioner_travel {{index 0}} {
 		return "ERROR"
 	}
 	
-	# Make sure the control variable is set to Travel, which it may be already, but
-	# certainly should be at this point.
-	set info(control) "Travel"
-
 	# Remove comment lines from travel list and split the travel list using line
 	# breaks.
 	set as "\n"
 	append as $travel_list
 	regsub -all {\n[ \t]*#[^\n]*} $as "" travel_list
 	set travel_list [split [string trim $travel_list] \n]
-
-	# Get the index'th set of north, south, east, and west control values from
-	# the list contained in the file. We check to make sure we have four integer
-	# values between 0 and 255 before we proceed.
-	set values [lindex $travel_list $index]
-	for {set i 0} {$i < 4} {incr i} {
-		if {![string is integer -strict [lindex $values $i]]} {
-			LWDAQ_print $info(text) "ERROR: Invalid line \"$values\" in travel file."
-			set info(control) "Idle"
-			return "ERROR"
-		}
-	}
-	scan $values %d%d%d%d config(n_out) config(s_out) config(e_out) config(w_out)
 	
-	# Apply the new dac values to all four electrodes.
-	if {[catch {
-		Fiber_Positioner_set_nsew
-	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: $error_result"
+	# Check the travel index is valid. It must be an integer and it must point
+	# to an element in our list of lines.
+	if {![string is integer -strict $config(travel_index)] \
+		|| ($config(travel_index) < 0) \
+		|| ($config(travel_index) >= [llength $travel_list])} {
+		LWDAQ_print $info(text) "ERROR: Invalid index \"$config(travel_index)\",\
+			must be integer 0 to [llength $travel_list]."
 		set info(control) "Idle"
 		return "ERROR"
 	}
 	
-	# Wait for the fiber to settle, then measure voltages, spot position, and
-	# report to text window.
-	LWDAQ_wait_ms $config(settling_ms)
-	Fiber_Positioner_voltages	
-	Fiber_Positioner_spot_position
-	Fiber_Positioner_report
+	
+	# Get the travel_index'th line and check to see if it contains one of the travel
+	# instructions.
+	set line [lindex $travel_list $config(travel_index)]
+	set first_word [lindex $line 0]
+	set done 0
+	switch $first_word {
+		"TCL:" {
+		# The TCL: instruction specifies that the rest of the line should be
+		# executed as a TCL command.
+			if {[catch {
+				eval [join [lrange $line 1 end]]
+			} error_result]} {
+				LWDAQ_print $info(text) "ERROR: $error_result"
+				LWDAQ_print $info(text) "While executing \"$line\"."
+				set info(control) "Idle"
+				return "ERROR"
+			}
+		}
+		
+		default {
+		# At this point, the only valid option for the line is that it contain four
+		# control values. We check to make sure we have four integer
+		# values between 0 and 255. 
+			set control_values 1
+			for {set i 0} {$i < 4} {incr i} {
+				if {![string is integer -strict [lindex $line $i]] \
+					|| ([lindex $line $i] < 0) \
+					|| ([lindex $line $i] > 255)} {
+					LWDAQ_print $info(text) "ERROR: Invalid control value \"$line\"."
+					set info(control) "Idle"
+					return "ERROR"
+				}
+			}
+
+			# Extract the four integers from the line.	
+			scan $line %d%d%d%d config(n_out) config(s_out) config(e_out) config(w_out)
+	
+			# Apply the new control values to all four electrodes.
+			if {[catch {
+				Fiber_Positioner_set_nsew
+			} error_result]} {
+				LWDAQ_print $info(text) "ERROR: $error_result"
+				set info(control) "Idle"
+				return "ERROR"
+			}
+	
+			# Wait for the fiber to settle, then measure voltages, spot position, and
+			# report to text window.
+			LWDAQ_wait_ms $config(settling_ms)
+			Fiber_Positioner_voltages	
+			Fiber_Positioner_spot_position
+			Fiber_Positioner_report
+		}
+	}
 	
 	# Decide what to do next: continue through list, start at beginning again or
 	# finish.
 	if {$info(control) == "Stop"} {
 		set info(control) "Idle"
 		return "ABORT"
-	} elseif {[expr $index + 1] < [llength $travel_list]} {	
-		incr index
-		LWDAQ_post "Fiber_Positioner_travel $index"
+	} elseif {[expr $config(travel_index) + 1] < [llength $travel_list]} {	
+		incr config(travel_index)
+		LWDAQ_post "Fiber_Positioner_travel"
 		return "SUCCESS"
 	} elseif {$config(repeat)} {
-		set index 0
-		LWDAQ_post "Fiber_Positioner_travel $index"
+		set config(travel_index) 0
+		LWDAQ_post "Fiber_Positioner_travel"
 		return "SUCCESS"
 	} else {
+		set config(travel_index) 0
 		set info(control) "Idle"
 		return "SUCCESS"
 	}
@@ -619,15 +669,18 @@ proc Fiber_Positioner_open {} {
 	set f [frame $w.travel]
 	pack $f -side top -fill x
 
-	label $f.tl -text "Travel List:" 
-	entry $f.tlf -textvariable Fiber_Positioner_config(travel_file) -width 60
+	label $f.til -text "travel_index"
+	entry $f.tie -textvariable Fiber_Positioner_config(travel_index) -width 4
+	pack $f.til $f.tie -side left -expand yes
+	label $f.tl -text "travel_file" 
+	entry $f.tlf -textvariable Fiber_Positioner_config(travel_file) -width 40
 	pack $f.tl $f.tlf -side left -expand yes
 	button $f.browse -text "Browse" -command Fiber_Positioner_travel_browse
 	button $f.edit -text "Edit" -command Fiber_Positioner_travel_edit
 	pack $f.browse $f.edit -side left -expand yes
 	checkbutton $f.repeat -text "Repeat" -variable Fiber_Positioner_config(repeat) 
 	pack $f.repeat -side left -expand yes
-	checkbutton $f.trace -text "Trace" -variable Fiber_Positioner_config(trace)
+	checkbutton $f.trace -text "Trace" -variable Fiber_Positioner_config(trace_enable)
 	pack $f.trace -side left -expand yes
 	
 	set f [frame $w.image_frame]
