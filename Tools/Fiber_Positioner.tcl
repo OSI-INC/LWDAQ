@@ -675,7 +675,7 @@ proc Fiber_Positioner_open {} {
 	if {$w == ""} {return 0}
 	
 	set ff [frame $w.parameters]
-	pack $ff -side left -fill y
+	pack $ff -side top -fill x
 	
 	set f [frame $ff.controls]
 	pack $f -side top -fill x
@@ -753,14 +753,14 @@ proc Fiber_Positioner_open {} {
 	checkbutton $f.trace -text "Trace" -variable Fiber_Positioner_config(trace_enable)
 	pack $f.trace -side left -expand yes
 	
-	set f [frame $ff.image_frame]
-	pack $f -side top -fill x
+	set f [frame $w.image_frame]
+	pack $f -side left -fill y 
 	
 	set info(photo) [image create photo -width 700 -height 520]
 	label $f.image -image $info(photo) 
-	pack $f.image -side left -expand yes
+	pack $f.image -side top -expand yes
 
-	set info(data) [LWDAQ_text_widget $ff 60 15 1 1]
+	set info(data) [LWDAQ_text_widget $f 60 15 1 1]
 	LWDAQ_print $info(data) "Fiber Positioner Data" purple
 
 	set f [frame $w.log]
