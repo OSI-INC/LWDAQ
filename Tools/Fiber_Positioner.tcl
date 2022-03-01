@@ -78,7 +78,6 @@ proc Fiber_Positioner_init {} {
 	set config(fiber_sock) "3"
 	set config(fiber_element) "A1"
 	set config(camera_sock) "4"
-	set config(ccd_type) "ICX424"
 	set config(flash_seconds) "0.0003"
 	set config(num_spots) "1"
 	
@@ -219,7 +218,7 @@ proc Fiber_Positioner_spot_position {} {
 	set iconfig(daq_driver_socket) $config(camera_sock)
 	set iconfig(daq_flash_seconds) $config(flash_seconds)
 	set iconfig(analysis_num_spots) $config(num_spots)
-	LWDAQ_set_image_sensor ICX424 BCAM
+	LWDAQ_set_image_sensor $config(image_sensor) BCAM
 	
 	set result [LWDAQ_acquire BCAM]
 	
@@ -501,7 +500,7 @@ proc Fiber_Positioner_travel {} {
 	
 	# Our travel output file name we construct from the travel file name by
 	# appending a suffix "_Out".
-	set outfile [regsub {\.txt} $config(travel_file) "_Out.txt"]
+	set outfile [file root $config(travel_file)]_Out.txt
 	
 	# Split the travel list using line breaks.
 	set travel_list [split $travel_list \n]
