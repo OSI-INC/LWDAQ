@@ -35,6 +35,10 @@ proc LWDAQ_utils_init {} {
 	set info(queue_events) [list]
 	set info(current_event) "Stopped"
 	
+	set info(schedule_tasks) [list]
+	set info(schedule_interval) "10"
+	set info(schedule_control) "Stop"
+	
 	set info(reset) 0
 
 	set info(vwait_var_names) [list]
@@ -639,6 +643,51 @@ proc LWDAQ_queue_error {event error_result} {
 			puts stdout "No error information available."
 		}
 	}
+}
+
+#
+# LWDAQ_schedule_manager defines the LWDAQ scheduled task manager. The schedule
+# manager accepts schedules defined in the same format at crontab files. We have
+# five constraints to specify a schedule: minute (0-59), hour (0-23), day of
+# month (1-31), month (1-12), and day of week (0-6, Sunday is 0). A wildcard
+# character, "*", for a constraint means the constraint will be ignored. We have
+# "0 23 * * *" schedules Daily at 11 PM, "30 22 * * *" schedules Daily at 22:30,
+# "0 23 1 * *" schedules every first day of the month at 23:00, "0 23 * * 0"
+# schedules every Sunday at 23:00. Along with the schedule definition, we
+# provide a Tcl script that the manager will run when the specified minute
+# begins. The scheduled tasks are stored in a list, one task per list, in the
+# global LWDAQ_Info(schedule_tasks) variable. Each list entry consists of two
+# elements. The first element is the schedule string, the second element is a
+# TCL command, which the manager will run at the global scope. The manager routine
+# takes an optional parameter t_next, which specifies the next aboslute time
+# at which the manager should go through the list and check for possible actions.
+# When we pass zero, the manager starts up. When we pass -1, the manager shuts
+# down.
+#
+proc LWDAQ_schedule_manager {{t_next "0"}} {
+	global LWDAQ_Info
+	
+	if {$t_next < 0} {
+		set LWDAQ_Info(schedule_control) "Stop"
+		return "Stop"
+	} elseif {$t_next == 0} {
+		if {$LWDAQ_Info(schedule_control) == "Stop"} {
+			set LWDAQ_Info(schedule_control) "Run"
+		} else {
+			return "Run"
+		}
+	} elseif {$LWDAQ_Info(schedule_control) == "Stop"} {
+		return "Stop"
+	} elseif {[clock seconds] < $t_next} {
+		LWDAQ_post [list LWDAQ_schedule_manager $t_next]
+		return "Run"
+	}
+
+	puts "Hi!"	
+
+	set t_next [expr [clock seconds] + $LWDAQ_Info(schedule_interval)]
+	LWDAQ_post "LWDAQ_schedule_manager $t_next"
+	return "Run"
 }
 
 #
