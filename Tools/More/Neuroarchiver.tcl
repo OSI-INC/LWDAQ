@@ -6780,6 +6780,7 @@ proc Neuroarchiver_record {{command ""}} {
 			if {[LWDAQ_is_error_result $result]} {
 				Neuroarchiver_print "$result"
 				set info(record_control) "Idle"
+				LWDAQ_set_bg $info(record_control_label) white
 				return "ERROR"
 			}
 			Neuroarchiver_print "Detected $iinfo(receiver_type)\
