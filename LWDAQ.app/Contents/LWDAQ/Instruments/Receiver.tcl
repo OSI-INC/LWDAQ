@@ -154,7 +154,8 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			"-payload $config(payload_length) clocks 0"] %d%d%d%d \
 			num_errors num_clocks num_messages first_index
 		if {$num_errors > 0} {
-			LWDAQ_print $info(text) "WARNING: Encountered $num_errors errors in data interval."
+			LWDAQ_print $info(text) "WARNING: Encountered $num_errors errors\
+				in data interval."
 		}
 		
 		# We determine the display scale boundaries depending upon whether we have simple
@@ -356,30 +357,35 @@ proc LWDAQ_reset_Receiver {} {
 						set config(payload_length) 0
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
+						set send_all_sets_cmd 0
 					}
 					1 {
 						set info(receiver_type) "A3027"
 						set config(payload_length) 0
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
+						set send_all_sets_cmd 1
 					}
 					2 {
 						set info(receiver_type) "A3032"
 						set config(payload_length) 16
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
+						set send_all_sets_cmd 0
 					}
 					3 {
 						set info(receiver_type) "A3038"
 						set config(payload_length) 16
 						set info(daq_fifo_av) 1
 						set channel_select_available 1
+						set send_all_sets_cmd 0
 					}
 					default {
 						set info(receiver_type) "?"
 						set config(payload_length) 0
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
+						set send_all_sets_cmd 0
 					}					
 				}
 				break
@@ -392,9 +398,9 @@ proc LWDAQ_reset_Receiver {} {
 		
 		# For backward-compatibility with Octal Data Receivers (ODR, assembly
 		# number A3027) with firmware versions 10, 11, and 12, we include this
-		# command that configures an ODR to receive from all channels rather
+		# command that configures an A3027 to receive from all channels rather
 		# than only channels 1-14.
-		if {$info(receiver_type) == "A3027"} {
+		if {$send_all_sets_cmd} {
 			LWDAQ_transmit_command_hex $sock $info(all_sets_cmd)
 		}
 	
@@ -732,12 +738,12 @@ proc LWDAQ_daq_Receiver {} {
 				
 				if {$ne == 0} {
 					LWDAQ_print $info(text) \
-						"WARNING: Suspect payload length $config(payload_length) is wrong.\
-							Resetting data receiver and trying again."
+						"WARNING: Suspect payload length $config(payload_length)\
+							is wrong. Resetting data receiver and trying again."
 				} {
 					LWDAQ_print $info(text) \
-						"WARNING: Received corrupted data.\
-							Resetting data receiver and trying again."
+						"WARNING: Received corrupted data. Resetting data receiver\
+							and trying again."
 				}
 
 				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
