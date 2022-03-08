@@ -6918,22 +6918,13 @@ proc Neuroarchiver_record {{command ""}} {
 			set info(recorder_message_interval) $info(initial_message_interval)
 		}
 		
-		# Check the block of data for errors. We want to make sure that problems are 
-		# reported to the user by the Recorder. If the Receiver Panel is open, the 
-		# warnings will be shown. If not, we issue a warning in the Recorder and 
-		# open the Receiver Panel to show future warnings.
+		# Check the block of data for errors. If there are errors, we 
 		scan [lwdaq_receiver $iconfig(memory_name) \
 			"-payload $iconfig(payload_length) clocks 0"] %d%d%d%d \
 			num_errors num_clocks num_messages first_index
-		if {($num_errors > 0) && ![winfo exists $iinfo(window)]} {
-			Neuroarchiver_print "ERROR: Received corrupted data,\
-				watch Receiver Panel for further warnings."
-			LWDAQ_open Receiver
-			if {$info(window) == ""} {
-				LWDAQ_post [list raise "."]
-			} {
-				LWDAQ_post [list raise $info(window)]
-			}
+		if {$num_errors > 0} {
+			Neuroarchiver_print "WARNING: Encountered $num_errors errors\
+				in received interval."
 		}
 
 		# Append the new data to our NDF file. If the data write fails, we print
