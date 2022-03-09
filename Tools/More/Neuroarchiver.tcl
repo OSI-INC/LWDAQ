@@ -582,12 +582,6 @@ proc Neuroarchiver_init {} {
 	set config(log_frequency) 0
 	set config(log_amplitude) 0
 #
-# The Neuroarchiver deletes old lines from its text window. It keeps the
-# following number of most recent lines. The more lines we keep, the slower the
-# print-out of characteristics to the screen will be.
-#
-	set config(num_lines_keep) 200
-#
 # Colors for windows.
 #
 	set info(label_color) "darkgreen"
@@ -6780,6 +6774,7 @@ proc Neuroarchiver_record {{command ""}} {
 			if {[LWDAQ_is_error_result $result]} {
 				Neuroarchiver_print "$result"
 				set info(record_control) "Idle"
+				LWDAQ_set_bg $info(record_control_label) white
 				return "ERROR"
 			}
 			Neuroarchiver_print "Detected $iinfo(receiver_type)\
@@ -6887,9 +6882,9 @@ proc Neuroarchiver_record {{command ""}} {
 		set LWDAQ_Info(max_daq_attempts) $saved_max_daq_attempts
 		
 		# If the attempt to download encountered an error, report it to the
-		# Neuroarchvier text window with the current date and time. When it
-		# encounters an error, the Receiver Instrument will try to reset the
-		# data receiver, which will clear its data memory. The Receiver
+		# Neuroarchvier text window with the current date and time. The Receiver
+		# Instrument will have tried to reset the data receiver. If successful,
+		# the reset will clear the data receiver's memory. The Receiver
 		# Instrument will set its acquire_end_ms parameter accordingly. We post
 		# the Neuroarchiver_record command again, so we can make another
 		# attempt. The Neuroarchiver will never give up trying to download data
@@ -6911,16 +6906,27 @@ proc Neuroarchiver_record {{command ""}} {
 			}
 			LWDAQ_post Neuroarchiver_record end
 			return "FAIL"
-		} {
-			if {$info(recorder_error_time) != 0} {
-				LWDAQ_set_bg $info(record_control_label) yellow
-				Neuroarchiver_print "WARNING: Recording resumed after interruption of\
-					[expr [clock seconds] - $info(recorder_error_time)] s."
-				set info(recorder_error_time) 0
-				set info(recorder_message_interval) $info(initial_message_interval)
-			}
+		} 
+		
+		# If we encountered an error earlier during disk access, we notify the user
+		# that recording has been resumed.
+		if {$info(recorder_error_time) != 0} {
+			LWDAQ_set_bg $info(record_control_label) yellow
+			Neuroarchiver_print "WARNING: Recording resumed after interruption of\
+				[expr [clock seconds] - $info(recorder_error_time)] s."
+			set info(recorder_error_time) 0
+			set info(recorder_message_interval) $info(initial_message_interval)
 		}
 		
+		# Check the block of data for errors. If there are errors, we 
+		scan [lwdaq_receiver $iconfig(memory_name) \
+			"-payload $iconfig(payload_length) clocks 0"] %d%d%d%d \
+			num_errors num_clocks num_messages first_index
+		if {$num_errors > 0} {
+			Neuroarchiver_print "WARNING: Encountered $num_errors errors\
+				in received interval."
+		}
+
 		# Append the new data to our NDF file. If the data write fails, we print
 		# an error message warning of the loss of data. An error writing to the
 		# file will occur on Windows if another process is reading the file. If
@@ -6949,6 +6955,13 @@ proc Neuroarchiver_record {{command ""}} {
 			return "FAIL"
 		}
 		
+		# Trim the text window to a maximum number of lines.
+		if {[winfo exists $info(text)]} {
+			if {[$info(text) index end] > 1.2 * $LWDAQ_Info(num_lines_keep)} {
+				$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
+			}
+		}
+
 		# Increment the record time. If there has been interruption in the
 		# data acquisition, in which we lost data, this end time will be too
 		# low. If the data acquisition has been fragmented, so that we obtain
@@ -6972,6 +6985,7 @@ proc Neuroarchiver_record {{command ""}} {
 		}
 	}
 
+	# We are done and Idle.
 	set info(record_control) "Idle"
 	return "SUCCESS"
 }
@@ -7258,8 +7272,8 @@ proc Neuroarchiver_play {{command ""}} {
 	
 	# We trim the text window to a maximum number of lines.
 	if {[winfo exists $info(text)]} {
-		if {[$info(text) index end] > 1.2 * $config(num_lines_keep)} {
-			$info(text) delete 1.0 "end [expr 0 - $config(num_lines_keep)] lines"
+		if {[$info(text) index end] > 1.2 * $LWDAQ_Info(num_lines_keep)} {
+			$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
 		}
 	}
 

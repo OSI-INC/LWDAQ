@@ -154,7 +154,8 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			"-payload $config(payload_length) clocks 0"] %d%d%d%d \
 			num_errors num_clocks num_messages first_index
 		if {$num_errors > 0} {
-			LWDAQ_print $info(text) "WARNING: Encountered $num_errors errors in data interval."
+			LWDAQ_print $info(text) "WARNING: Encountered $num_errors errors\
+				in data interval."
 		}
 		
 		# We determine the display scale boundaries depending upon whether we have simple
@@ -355,63 +356,80 @@ proc LWDAQ_reset_Receiver {} {
 						set info(receiver_type) "A3018"
 						set config(payload_length) 0
 						set info(daq_fifo_av) 0
+						set channel_select_available 0
+						set send_all_sets_cmd 0
 					}
 					1 {
 						set info(receiver_type) "A3027"
 						set config(payload_length) 0
 						set info(daq_fifo_av) 0
+						set channel_select_available 0
+						set send_all_sets_cmd 1
 					}
 					2 {
 						set info(receiver_type) "A3032"
 						set config(payload_length) 16
 						set info(daq_fifo_av) 0
+						set channel_select_available 0
+						set send_all_sets_cmd 0
 					}
 					3 {
 						set info(receiver_type) "A3038"
 						set config(payload_length) 16
 						set info(daq_fifo_av) 1
+						set channel_select_available 1
+						set send_all_sets_cmd 0
 					}
-					default {set info(receiver_type) "?"}					
+					default {
+						set info(receiver_type) "?"
+						set config(payload_length) 0
+						set info(daq_fifo_av) 0
+						set channel_select_available 0
+						set send_all_sets_cmd 0
+					}					
 				}
 				break
 			}
 		}
 		lwdaq_image_destroy $img
 		if {$info(receiver_type) == "?"} {
-			LWDAQ_print $info(text) "\nERROR: Failed to identify data receiver."
+			error "Failed to identify data receiver."
 		}
 		
 		# For backward-compatibility with Octal Data Receivers (ODR, assembly
 		# number A3027) with firmware versions 10, 11, and 12, we include this
-		# command that configures an ODR to receive from all channels rather
+		# command that configures an A3027 to receive from all channels rather
 		# than only channels 1-14.
-		LWDAQ_transmit_command_hex $sock $info(all_sets_cmd)
+		if {$send_all_sets_cmd} {
+			LWDAQ_transmit_command_hex $sock $info(all_sets_cmd)
+		}
 	
-		# Send a list of channels to select for recording. If the list is simply a
-		# wildcard, we configure the receiver to record all channels. If the list
-		# contains only integers, we first instruct the receiver to accept no
-		# channels, then to accept the channels listed. 
-		if {[string trim $config(daq_channels)] == "*"} {
-			LWDAQ_print -nonewline $info(text) "selecting all channels, "
-			LWDAQ_transmit_command_hex $sock $info(sel_all_cmd)
-		} {
-			set cmd_list [list $info(sel_none_cmd)]
-			set ch_list [list]
-			foreach ch $config(daq_channels) {
-				if {[string is integer -strict $ch] && ($ch > 0) && ($ch < 255)} {
-					lappend cmd_list "[format %02X $ch]$info(sel_ch_cmd)"
-					lappend ch_list $ch
-				} {
-					LWDAQ_print $info(text) "\nERROR: Invalid channel number \"$ch\". "
-					set ch_list [list]
-					break
+		# Provided that channel selection is available with this data receiver,
+		# Send a list of channels to select for recording. If the list is simply
+		# a wildcard, we configure the receiver to record all channels. If the
+		# list contains only integers, we first instruct the receiver to accept
+		# no channels, then to accept the channels listed. 
+		if {$channel_select_available} {
+			if {[string trim $config(daq_channels)] == "*"} {
+				LWDAQ_print -nonewline $info(text) "selecting all channels, "
+				LWDAQ_transmit_command_hex $sock $info(sel_all_cmd)
+			} {
+				set cmd_list [list $info(sel_none_cmd)]
+				set ch_list [list]
+				foreach ch $config(daq_channels) {
+					if {[string is integer -strict $ch] && ($ch > 0) && ($ch < 255)} {
+						lappend cmd_list "[format %02X $ch]$info(sel_ch_cmd)"
+						lappend ch_list $ch
+					} {
+						error "Invalid channel \"$ch\". "
+					}
 				}
-			}
-			if {[llength $ch_list] > 0} {
-				LWDAQ_print -nonewline $info(text) "selecting channels $ch_list, "
-				LWDAQ_transmit_command_hex $sock $info(sel_none_cmd)
-				foreach cmd $cmd_list {
-					LWDAQ_transmit_command_hex $sock $cmd
+				if {[llength $ch_list] > 0} {
+					LWDAQ_print -nonewline $info(text) "selecting channels $ch_list, "
+					LWDAQ_transmit_command_hex $sock $info(sel_none_cmd)
+					foreach cmd $cmd_list {
+						LWDAQ_transmit_command_hex $sock $cmd
+					}
 				}
 			}
 		}
@@ -720,12 +738,12 @@ proc LWDAQ_daq_Receiver {} {
 				
 				if {$ne == 0} {
 					LWDAQ_print $info(text) \
-						"WARNING: Suspect payload length $config(payload_length) is wrong.\
-							Resetting data receiver and trying again."
+						"WARNING: Suspect payload length $config(payload_length)\
+							is wrong. Resetting data receiver and trying again."
 				} {
 					LWDAQ_print $info(text) \
-						"WARNING: Received corrupted data.\
-							Resetting data receiver and trying again."
+						"WARNING: Received corrupted data. Resetting data receiver\
+							and trying again."
 				}
 
 				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
