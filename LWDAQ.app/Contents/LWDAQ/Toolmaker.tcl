@@ -193,3 +193,51 @@ LWDAQ_schedule_task "well" "23 * 9 * *" {puts "well well"}
 foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
 </script>
 
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white1 "16 * * * *" "Videoarchiver_set_lamps white 2"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white1 "18 * * * *" "Videoarchiver_set_lamps white 1"
+LWDAQ_schedule_task white2 "19 * * * *" "Videoarchiver_set_lamps white 2"
+LWDAQ_schedule_task white3 "20 * * * *" "Videoarchiver_set_lamps white 3"
+LWDAQ_schedule_task white4 "21 * * * *" "Videoarchiver_set_lamps white 4"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white1 "18 * * * *" "Videoarchiver_lamps_set white 1"
+LWDAQ_schedule_task white2 "19 * * * *" "Videoarchiver_lamps_set white 2"
+LWDAQ_schedule_task white3 "20 * * * *" "Videoarchiver_lamps_set white 3"
+LWDAQ_schedule_task white4 "21 * * * *" "Videoarchiver_lamps_set white 4"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white0 "25 * * * *" "Videoarchiver_lamps_set white 1"
+LWDAQ_schedule_task white1 "24 * * * *" "Videoarchiver_lamps_set white 1"
+LWDAQ_schedule_task white2 "23 * * * *" "Videoarchiver_lamps_set white 2"
+LWDAQ_schedule_task white3 "22 * * * *" "Videoarchiver_lamps_set white 3"
+LWDAQ_schedule_task white4 "21 * * * *" "Videoarchiver_lamps_set white 4"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white_on "54 * * * *" "Videoarchiver_lamps_set white 15 2"
+LWDAQ_schedule_task white_off "55 * * * *" "Videoarchiver_lamps_set white 0 2"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white_on "04 * * * *" "Videoarchiver_lamps_set white 15 2"
+LWDAQ_schedule_task white_off "05 * * * *" "Videoarchiver_lamps_set white 0 2"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+

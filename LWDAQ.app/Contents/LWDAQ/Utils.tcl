@@ -22,6 +22,8 @@
 # routines. The LWDAQ Event Queue is an event scheduler that allows us
 # to perform simultaneous live data acquisition from multiple instruments 
 # by scheduling the acquision actions so they do not overlap with one another.
+# The LWDAQ Scheduler, controlled by the schedule routines, allows us to
+# schedule tasks in a manner similar to that of the Unix "cron" utility.
 #
 
 #
@@ -40,6 +42,7 @@ proc LWDAQ_utils_init {} {
 	set info(scheduler_increment) "5"
 	set info(scheduler_window) "60"
 	set info(scheduler_log) ""
+	set info(scheduler_format) {%d-%b-%Y %H:%M:%S}
 	
 	set info(reset) 0
 
@@ -658,23 +661,24 @@ proc LWDAQ_queue_error {event error_result} {
 # Sunday is 0). A wildcard character, "*", for a constraint means the constraint
 # will be ignored. We have "0 23 * * *" schedules Daily at 11 PM, "30 22 * * *"
 # schedules Daily at 22:30, "0 23 1 * *" schedules every first day of the month
-# at 23:00, "0 23 * * 0" schedules every Sunday at 23:00. The third element is
-# the Tcl script that the scheduler will run when the specified minute arrives,
-# or soon after it arrives. The fourth element is the most recent time the task
-# was executed, in Unix seconds. If the scheduler misses the scheduled time by
-# less than "scheduler_window" seconds, the scheduler will execute the task,
-# otherwise it will skip the task. The scheduler accepts an optional parameter
-# "next_check" that specifies the next second in which the scheduler should
-# check for tasks that need to be started. We start the scheduler by calling it
-# with not parameters, or with a zero argument. We stop it with a negative
-# argument. If the scheduler's log name is not an empty string, we use it as the
-# name of a channel or file to which we append notifications of tasks run by the
-# scheduler. To add and subtract tasks from the scheduler's list, we use the
-# schedule_task and unschedule_task routines defined below. The schedule routine
-# starts the scheduler if it is not running already. The unschedule routine
-# stops the scheduler if there are no tasks in the list. Thus we interact with
-# the scheduler through these schedule and unschedule routines, rather than by
-# calling the scheduler routine itself.
+# at 23:00, "0 23 * * 0" schedules every Sunday at 23:00. If the string is all
+# stars, the scheduler never executes the task, so "* * * * *" means "never".
+# The third element is the Tcl script that the scheduler will run when the
+# specified minute arrives, or soon after it arrives. The fourth element is the
+# most recent time the task was executed, in Unix seconds. If the scheduler
+# misses the scheduled time by less than "scheduler_window" seconds, the
+# scheduler will execute the task, otherwise it will skip the task. The
+# scheduler accepts an optional parameter "next_check" that specifies the next
+# second in which the scheduler should check for tasks that need to be started.
+# We start the scheduler by calling it with not parameters, or with a zero
+# argument. We stop it with a negative argument. If the scheduler's log name is
+# not an empty string, we use it as the name of a channel or file to which we
+# append notifications of tasks run by the scheduler. To add and subtract tasks
+# from the scheduler's list, we use the schedule_task and unschedule_task
+# routines defined below. The schedule routine starts the scheduler if it is not
+# running already. The unschedule routine stops the scheduler if there are no
+# tasks in the list. Thus we interact with the scheduler through these schedule
+# and unschedule routines, rather than by calling the scheduler routine itself.
 #
 proc LWDAQ_scheduler {{next_check "0"}} {
 	global LWDAQ_Info
@@ -688,7 +692,9 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 		if {$LWDAQ_Info(scheduler_control) == "Stop"} {
 			set next_check $now
 			if {$LWDAQ_Info(scheduler_log) != ""} {
-				LWDAQ_print $LWDAQ_Info(scheduler_log) "Run [LWDAQ_time_stamp $now]"
+				LWDAQ_print $LWDAQ_Info(scheduler_log) "Started scheduler at\
+					[clock format [clock seconds] \
+					-format $LWDAQ_Info(scheduler_format)]."
 			}
 			set LWDAQ_Info(scheduler_control) "Run"
 		} else {
@@ -696,7 +702,9 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 		}
 	} elseif {$LWDAQ_Info(scheduler_control) == "Stop"} {
 		if {$LWDAQ_Info(scheduler_log) != ""} {
-			LWDAQ_print $LWDAQ_Info(scheduler_log) "Stop [LWDAQ_time_stamp $now]"
+			LWDAQ_print $LWDAQ_Info(scheduler_log) "Stopped scheduler at\
+					[clock format [clock seconds] \
+					-format $LWDAQ_Info(scheduler_format)]."
 		}
 		return "Stop"
 	} elseif {$now < $next_check} {
@@ -714,6 +722,10 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 			incr index
 			set name [lindex $task 0]
 			scan [lindex $task 1] %s%s%s%s%s schmin schhr schdymo schmo schdywk
+			if {($schmin == "*") && ($schhr == "*") && ($schdymo == "*") \
+				&& ($schmo == "*") && ($schdywk == "*")} {
+				continue	
+			}
 			set cmd [lindex $task 2]
 			set previous [lindex $task 3]
 			if {($schmo != "*") && ($schmo != $mo)} {continue}
@@ -728,8 +740,9 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 				&& (($scheduled_time - $previous) > $LWDAQ_Info(scheduler_window))} {
 				lset LWDAQ_Info(scheduled_tasks) $index 3 $now
 				if {$LWDAQ_Info(scheduler_log) != ""} {
-					LWDAQ_print $LWDAQ_Info(scheduler_log) \
-						"$name [LWDAQ_time_stamp $now]"
+					LWDAQ_print $LWDAQ_Info(scheduler_log) "Running task $name at\
+						[clock format [clock seconds] \
+						-format $LWDAQ_Info(scheduler_format)]."
 					LWDAQ_post $cmd
 				}
 			}
@@ -754,10 +767,21 @@ proc LWDAQ_schedule_task {name schedule command} {
 	} {
 		lset LWDAQ_Info(scheduled_tasks) $index [list $name $schedule $command 0]
 	}
-	if {$LWDAQ_Info(scheduler_control) == "Stop"} {
-		LWDAQ_scheduler 0
+	if {$LWDAQ_Info(scheduler_log) != ""} {
+		if {$index < 0} {
+			LWDAQ_print $LWDAQ_Info(scheduler_log) "Added task $name with schedule\
+				\"$schedule\" at [clock format [clock seconds] \
+				-format $LWDAQ_Info(scheduler_format)]."
+		} {
+			LWDAQ_print $LWDAQ_Info(scheduler_log) "Replaced task $name with schedule\
+				\"$schedule\" at [clock format [clock seconds] \
+				-format $LWDAQ_Info(scheduler_format)]."
+		}
 	}
-	return $name
+	if {$LWDAQ_Info(scheduler_control) == "Stop"} {
+		LWDAQ_post [list LWDAQ_scheduler 0]
+	}
+	return "SUCCESS"
 }
 
 #
@@ -775,7 +799,16 @@ proc LWDAQ_unschedule_task {name} {
 	if {[llength $LWDAQ_Info(scheduled_tasks)] == 0} {
 		LWDAQ_scheduler -1
 	}
-	return $name
+	if {$LWDAQ_Info(scheduler_log) != ""} {
+		if {$index < 0} {
+			LWDAQ_print $LWDAQ_Info(scheduler_log) "Unknown task \"$name\" at \
+				[clock format [clock seconds] -format $LWDAQ_Info(scheduler_format)]."
+		} {
+			LWDAQ_print $LWDAQ_Info(scheduler_log) "Deleted task \"$name\" at \
+				[clock format [clock seconds] -format $LWDAQ_Info(scheduler_format)]."
+		}
+	}
+	return "SUCCESS"
 }
 
 #
