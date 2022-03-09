@@ -994,15 +994,12 @@ proc LWDAQ_monitor_open {} {
 	
 	button $f.ssf -text "Save Settings" -command {
 		set f [open [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"] w]
-		foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms" {
-			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
-		}
-		foreach i "blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms" {
-			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
-		}
-		foreach i "lwdaq_client_port default_to_stdout server_address_filter\
-				server_listening_port close_delay_ms" {
-			puts $f "set LWDAQ_Info($i) [set LWDAQ_Info($i)]"
+		foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms \
+				blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms \
+				lwdaq_client_port default_to_stdout server_address_filter \
+				server_listening_port close_delay_ms scheduler_increment \
+				scheduler_log scheduler_window" {
+			puts $f "set LWDAQ_Info($i) \"[set LWDAQ_Info($i)]\""
 		}
 		close $f
 	}
@@ -1016,14 +1013,16 @@ proc LWDAQ_monitor_open {} {
 	pack $w.v -side top -fill x
 	set f [frame $w.v.left]
 	pack $f -side left -fill y
-	foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms" {
+	foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms \
+			daq_wait_ms scheduler_log" {
 		label $f.l$i -text "$i" -anchor w -width 15
 		entry $f.e$i -textvariable LWDAQ_Info($i) -relief sunken -bd 1 -width 10
 		grid $f.l$i $f.e$i -sticky news
 	}
 	set f [frame $w.v.center]
 	pack $f -side left -fill y
-	foreach i "blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms" {
+	foreach i "blocking_sockets lazy_flush tcp_timeout_ms support_ms \
+			update_ms scheduler_window" {
 		label $f.l$i -text "$i" -anchor w -width 15
 		entry $f.e$i -textvariable LWDAQ_Info($i) -relief sunken -bd 1 -width 10
 		grid $f.l$i $f.e$i -sticky news
@@ -1031,7 +1030,7 @@ proc LWDAQ_monitor_open {} {
 	set f [frame $w.v.right]
 	pack $f -side left -fill y
 	foreach i "lwdaq_client_port default_to_stdout server_address_filter\
-			server_listening_port close_delay_ms" {
+			server_listening_port close_delay_ms scheduler_increment" {
 		label $f.l$i -text "$i" -anchor w -width 20
 		entry $f.e$i -textvariable LWDAQ_Info($i) -relief sunken -bd 1 -width 10
 		grid $f.l$i $f.e$i -sticky news

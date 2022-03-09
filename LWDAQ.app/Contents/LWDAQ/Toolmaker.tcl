@@ -1,243 +1,243 @@
 <script>
-
+for {set start 0} {$start < [expr 24 * 60 * 60]} {incr start 60} {
+	LWDAQ_print ~/Desktop/Minutes.txt [LWDAQ_minute_of_day $start]
+}
 </script>
 
 <script>
-set f [open ~/ramp.txt w]
-for {set i 0} {$i < 256} {incr i} {
-	puts $f "$i $i $i $i"
+set offset [clock seconds]
+for {set offset 0} {$offset < [expr 24 * 60 * 60]} {incr offset 60} {
+	LWDAQ_print ~/Desktop/Minutes.txt [LWDAQ_minute_of_day [expr $start + $offset]]
 }
-close $f
 </script>
 
 <script>
-set f [open ~/ramp.txt w]
-for {set i 0} {$i < 256} {incr i 2} {
-	puts $f "$i $i $i $i"
+set offset [clock seconds]
+for {set offset 0} {$offset < [expr 24 * 60 * 60]} {incr offset 60} {
+	LWDAQ_minute_of_day [expr $start + $offset]
 }
-close $f
 </script>
 
 <script>
-set f [open ~/ramp.txt w]
-for {set i 0} {$i < 256} {incr i 2} {
-	puts $f "$i $i $i $i"
+set start [clock seconds]
+for {set offset 0} {$offset < [expr 24 * 60 * 60]} {incr offset 60} {
+	LWDAQ_minute_of_day [expr $start + $offset]
 }
-close $f
 </script>
 
 <script>
-set f [open ~/ramp.txt w]
-for {set i 0} {$i < 256} {incr i 1} {
-	puts $f "$i $i $i $i"
+set start [clock seconds]
+for {set offset 0} {$offset < [expr 24 * 60 * 60]} {incr offset 60} {
+	LWDAQ_minute_of_day [expr $start + $offset]
 }
-close $f
 </script>
 
 <script>
-set f [open ~/Desktop/ramp.txt w]
-for {set i 0} {$i < 256} {incr i 1} {
-	puts $f "$i [expr 255 - $i]"
-}
-close $f
+set LWDAQ_Info(scheduled_tasks) [list "10 * * * *" "puts hi"]
+LWDAQ_scheduler 0
 </script>
 
 <script>
-set f [open ~/Desktop/ramp.txt w]
-for {set i 64} {$i < 192} {incr i 2} {
-	puts $f "$i [expr 255 - $i]"
-}
-close $f
+set LWDAQ_Info(scheduled_tasks) [list "10 * * * *" "puts hi"]
+LWDAQ_scheduler 0
 </script>
 
 <script>
-set f [open ~/Desktop/ramp.txt w]
-for {set i 0} {$i < 255} {incr i 4} {
-	puts $f "$i [expr 255 - $i] $i [expr 255 - $i]"
-}
-close $f
+set LWDAQ_Info(scheduled_tasks) [list "10 * * * *" "puts hi"]
+LWDAQ_scheduler 0
 </script>
 
 <script>
-set f [open ~/Desktop/Perimiter.txt w]
-foreach i {0 32 64 96 128 160 192 224 255} {
-	puts $f "$i [expr 255 - $i] 0 255"
-}
-foreach i {0 32 64 96 128 160 192 224 255} {
-	puts $f "255 0 $i [expr 255 - $i]"
-}
-foreach i {255 224 192 160 128 96 64 32 0} {
-	puts $f "$i [expr 255 - $i] 255 0"
-}
-foreach i {255 224 192 160 128 96 64 32 0} {
-	puts $f "0 255	$i [expr 255 - $i]"
-}
-close $f
+set LWDAQ_Info(scheduled_tasks) [list "10 * * * *" "puts hi"]
+		foreach task $LWDAQ_Info(scheduled_tasks) {
+			LWDAQ_print $t $task
+			LWDAQ_print $t [lindex $task 0]
+			scan [lindex $task 0] %s%s%s%s%s min hr dymo mo dywk
+			set command [lindex $task 1]
+			LWDAQ_print $t "$min $hr $dymo $mo $dywk $command"	
+		}
 </script>
 
 <script>
-set f [open ~/Desktop/Hysteresis_NS.txt w]
-foreach i {0 32 64 96 128 160 192 224 255} {
-	puts $f "$i [expr 255 - $i] 133 133"
-}
-foreach i {255 224 192 160 128 96 64 32 0} {
-	puts $f "$i [expr 255 - $i] 133 133"
-}
-close $f
+set LWDAQ_Info(scheduled_tasks) [list "10 * * * *" "puts hi"]
+		foreach task $LWDAQ_Info(scheduled_tasks) {
+			LWDAQ_print $t $task
+			LWDAQ_print $t [lindex $task 0]
+			scan [lindex $task 0] %s%s%s%s%s min hr dymo mo dywk
+			set command [lindex $task 1]
+			LWDAQ_print $t "$min $hr $dymo $mo $dywk $command"	
+		}
 </script>
 
 <script>
-set f [open ~/Desktop/Hysteresis_EW.txt w]
-foreach i {0 32 64 96 128 160 192 224 255} {
-	puts $f "133 133 $i [expr 255 - $i]"
-}
-foreach i {255 224 192 160 128 96 64 32 0} {
-	puts $f "133 133 $i [expr 255 - $i]"
-}
-close $f
+set LWDAQ_Info(scheduled_tasks) [list [list "10 * * * *" "puts hi"]]
+		foreach task $LWDAQ_Info(scheduled_tasks) {
+			LWDAQ_print $t $task
+			LWDAQ_print $t [lindex $task 0]
+			scan [lindex $task 0] %s%s%s%s%s min hr dymo mo dywk
+			set command [lindex $task 1]
+			LWDAQ_print $t "$min $hr $dymo $mo $dywk $command"	
+		}
 </script>
 
 <script>
-set f [open ~/Desktop/Hysteresis_NS.txt w]
-for {set i 0} {$i < 256} {incr 4} {
-	puts $f "$i [expr 255 - $i] 133 133"
-}
-for {set i 0} {$i < 256} {incr 4} {
-	puts $f "[expr 255 - $i] $i 133 133"
-}
-close $f
+set LWDAQ_Info(scheduled_tasks) [list [list "13 * * * *" "puts hi"]]
+LWDAQ_scheduler 0
 </script>
 
 <script>
-set f [open ~/Desktop/Hysteresis_NS.txt w]
-for {set i 0} {$i < 256} {incr i 4} {
-	puts $f "$i [expr 255 - $i] 133 133"
-}
-for {set i 0} {$i < 256} {incr i 4} {
-	puts $f "[expr 255 - $i] $i 133 133"
-}
-close $f
+LWDAQ_scheduler 0
 </script>
 
 <script>
-set f [open ~/Desktop/Hysteresis_EW.txt w]
-for {set i 0} {$i < 256} {incr i 4} {
-	puts $f "133 133 $i [expr 255 - $i]"
-}
-for {set i 0} {$i < 256} {incr i 4} {
-	puts $f "133 133 [expr 255 - $i] $i"
-}
-close $f
+LWDAQ_scheduler 0
+LWDAQ_schedule_task "hello" "33 * * * *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "35 * * * *" {puts "well well"}
 </script>
 
 <script>
-set f [open ~/Desktop/Spiral.txt w]
-set angle 0
-set radius 120.0
-set pi 3.14159
-while {$radius >= 0} {
-	set n [expr round($radius * cos($angle)) + 133]
-	set s [expr 255 - $n]
-	set e [expr round($radius * sin($angle)) + 133]
-	set w [expr 255 - $e]
-	puts $f "$n $s $e $w"
-	set radius [expr $radius - 10]
-}
-
-
-close $f
+LWDAQ_scheduler 0
+LWDAQ_schedule_task "hello" "41 * * * *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "42 * * * *" {puts "well well"}
 </script>
 
 <script>
-set f [open ~/Desktop/Spiral_Reset.txt w]
-set angle 0
-set radius 120.0
-set pi 3.14159
-while {$radius >= 0} {
-	set n [expr round($radius * cos($angle)) + 133]
-	set s [expr 255 - $n]
-	set e [expr round($radius * sin($angle)) + 133]
-	set w [expr 255 - $e]
-	puts $f "$n $s $e $w"
-	set radius [expr $radius - 5]
-}
+LWDAQ_schedule_task "hello" "41 * * * *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "42 * * * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
 
-
-close $f
+LWDAQ_schedule_task "hello" "46 * * * *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "49 * * * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
 </script>
 
 <script>
-set f [open ~/Desktop/Spiral_Reset.txt w]
-set angle 0
-set radius 120.0
-set pi 3.14159
-while {$radius >= 0} {
-	set n [expr 133 + round($radius * cos($angle))]
-	set s [expr 133 - round($radius * cos($angle))]
-	set e [expr 133 + round($radius * sin($angle))]
-	set w [expr 133 - round($radius * sin($angle))]
-	puts $f "$n $s $e $w"
-	set radius [expr $radius - 5]
-}
+LWDAQ_schedule_task "hello" "41 * * * *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "42 * * * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
 
-
-close $f
+LWDAQ_schedule_task "hello" "50 * * * *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "51 * * * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
 </script>
 
 <script>
-set f [open ~/Desktop/Spiral_Reset.txt w]
-set angle 0
-set radius 120.0
-set pi 3.14159
-while {$radius >= 0} {
-	set n [expr 133 + round($radius * cos($angle))]
-	set s [expr 133 - round($radius * cos($angle))]
-	set e [expr 133 + round($radius * sin($angle))]
-	set w [expr 133 - round($radius * sin($angle))]
-	puts $f "$n $s $e $w"
-	set radius [expr $radius - 5]
-	set angle [expr $angle + ($pi / 8)
-}
+LWDAQ_schedule_task "hello" "41 * * * *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "42 * * * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
 
-
-close $f
+LWDAQ_schedule_task "hello" "50 * * * *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "51 * * * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+LWDAQ_scheduler
 </script>
 
 <script>
-set f [open ~/Desktop/Spiral_Reset.txt w]
-set angle 0
-set radius 120.0
-set pi 3.14159
-while {$radius >= 0} {
-	set n [expr 133 + round($radius * cos($angle))]
-	set s [expr 133 - round($radius * cos($angle))]
-	set e [expr 133 + round($radius * sin($angle))]
-	set w [expr 133 - round($radius * sin($angle))]
-	puts $f "$n $s $e $w"
-	set radius [expr $radius - 5]
-	set angle [expr $angle + ($pi / 8)]
-}
-
-
-close $f
+LWDAQ_schedule_task "hello" "54 11 9 3 *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "55 * * * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+LWDAQ_scheduler
 </script>
 
 <script>
-set f [open ~/Desktop/Spiral_Reset.txt w]
-set angle 0
-set radius 120.0
-set pi 3.14159
-while {$radius >= 0} {
-	set n [expr 133 + round($radius * cos($angle))]
-	set s [expr 133 - round($radius * cos($angle))]
-	set e [expr 133 + round($radius * sin($angle))]
-	set w [expr 133 - round($radius * sin($angle))]
-	puts $f "$n $s $e $w"
-	set radius [expr $radius - 5]
-	set angle [expr $angle + ($pi / 4)]
-}
+LWDAQ_schedule_task "hello" "54 11 9 3 *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "55 * * * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+LWDAQ_scheduler
+</script>
 
+<script>
+LWDAQ_schedule_task "hello" "57 11 9 3 *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "58 * * * 3" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
 
-close $f
+<script>
+LWDAQ_schedule_task "hello" "57 11 9 3 *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "58 * * * 3" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_scheduler
+</script>
+
+<script>
+LWDAQ_schedule_task "hello" "05 12 9 3 *" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "05 12 * * 3" {puts "well well"}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task "hello" "13 12 * * 3" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "12 * * * 3" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task "hello" "19 12 * * 3" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "20 * 9 * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task "hello" "20 12 * * 3" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "21 * 9 * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task "hello" "22 12 * * 3" {puts "hello [clock seconds]"} 
+LWDAQ_schedule_task "well" "23 * 9 * *" {puts "well well"}
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white1 "16 * * * *" "Videoarchiver_set_lamps white 2"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white1 "18 * * * *" "Videoarchiver_set_lamps white 1"
+LWDAQ_schedule_task white2 "19 * * * *" "Videoarchiver_set_lamps white 2"
+LWDAQ_schedule_task white3 "20 * * * *" "Videoarchiver_set_lamps white 3"
+LWDAQ_schedule_task white4 "21 * * * *" "Videoarchiver_set_lamps white 4"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white1 "18 * * * *" "Videoarchiver_lamps_set white 1"
+LWDAQ_schedule_task white2 "19 * * * *" "Videoarchiver_lamps_set white 2"
+LWDAQ_schedule_task white3 "20 * * * *" "Videoarchiver_lamps_set white 3"
+LWDAQ_schedule_task white4 "21 * * * *" "Videoarchiver_lamps_set white 4"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white0 "25 * * * *" "Videoarchiver_lamps_set white 1"
+LWDAQ_schedule_task white1 "24 * * * *" "Videoarchiver_lamps_set white 1"
+LWDAQ_schedule_task white2 "23 * * * *" "Videoarchiver_lamps_set white 2"
+LWDAQ_schedule_task white3 "22 * * * *" "Videoarchiver_lamps_set white 3"
+LWDAQ_schedule_task white4 "21 * * * *" "Videoarchiver_lamps_set white 4"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white_on "54 * * * *" "Videoarchiver_lamps_set white 15 2"
+LWDAQ_schedule_task white_off "55 * * * *" "Videoarchiver_lamps_set white 0 2"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
+</script>
+
+<script>
+set LWDAQ_Info(scheduler_log) $t
+LWDAQ_schedule_task white_on "04 * * * *" "Videoarchiver_lamps_set white 15 2"
+LWDAQ_schedule_task white_off "05 * * * *" "Videoarchiver_lamps_set white 0 2"
+foreach task $LWDAQ_Info(scheduled_tasks) {LWDAQ_print $t $task}
 </script>
 

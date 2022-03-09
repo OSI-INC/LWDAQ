@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "21"
+	LWDAQ_tool_init "Videoarchiver" "22"
 
 	# We check the global Videoarchiver_mode variable, which is the means by
 	# which we can direct the Videoarchiver to use the LWDAQ main window or
@@ -191,10 +191,10 @@ echo "SUCCESS"
 	# Text window number of lines to keep.
 	set info(num_lines_keep) "200"
 	
-	# The following parameter gives the five-bit DAC values that correspond to the 
+	# The following parameter gives the four-bit DAC values that correspond to the 
 	# six power settings 0-4 presented to the use and programmer for controlling
 	# the intensity of the LEDs, both white and infrared.
-	set info(lamp_dac_values) "0 3 5 9 15"	
+	set info(lamp_dac_values) "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"	
 	
 	# Camera login details. We don't use the camera password, but we record it here for 
 	# manual ssh access.
@@ -214,6 +214,20 @@ echo "SUCCESS"
 	# By default, we create these folders on the desktop. Even if this is the wrong place,
 	# at least our user will see them appearing.
 	set config(recording_dir) [file normalize "~/Desktop"]
+	
+	# Variables that control the scheduler.
+	set info(scheduler_panel) $info(window)\.scheduler
+	set info(scheduler_state) "Stop"
+	foreach a {white_on white_off infrared_on infrared_off} {
+		set info($a\_min) "*"
+		set info($a\_hr) "*"
+		set info($a\_dymo) "*"
+		set info($a\_mo) "*"
+		set info($a\_dywk) "*"
+		set info($a\_int) "0"
+		set info($a\_step) "10"
+	}
+	set config(datetime_format) {%d-%b-%Y %H:%M:%S}
 	
 	# Read in a settings file and apply if it exists.
 	if {[file exists $info(settings_file_name)]} {
@@ -472,17 +486,9 @@ proc Videoarchiver_reboot {n} {
 }
 
 #
-# Videoarchiver_setlamp sets lamps to a specified intensity, which
-# should lie within the range 0 (off) to MAX (full power), where 
-# MAX is the length of the lamp_dac_values parameter minus one. The 
-# routine maps intensities passed into the routine to four-bit DAC 
-# values using this same lamp_dac_values list. The lamp_dac_values
-# is not a parameter that the user can change in the configuration
-# panel, because changing its value does not cause a change in 
-# the graphical user interface where the lamp-set buttons are 
-# presented. The list takes effect only when we add a new camera
-# to the list. The routine works on white or infrared lamps, as
-# specified by "color".
+# Videoarchiver_setlamp sets lamps to a specified intensity in the
+# range defined by the first and last elements in lamp_dac_values. The routine
+# works on white or infrared lamps, as specified by "color".
 #
 proc Videoarchiver_setlamp {n color intensity} {
 	upvar #0 Videoarchiver_config config
@@ -491,13 +497,11 @@ proc Videoarchiver_setlamp {n color intensity} {
 	if {[catch {
 		# Convert the intensity into a four-bit DAC value for the camera's
 		# lamp control circuit.
-		set max [expr [string length $info(lamp_dac_values)] - 1]
 		if {![string is integer -strict $intensity] \
-				|| ($intensity < 0) \
-				|| ($intensity > $max)} {
+				|| ($intensity < [lindex $info(lamp_dac_values) 0]) \
+				|| ($intensity > [lindex $info(lamp_dac_values) end])} {
 			LWDAQ_print $info(text) "ERROR: Invalid lamp intensity \"$intensity\"."
 		}
-		set dac_value [lindex $info(lamp_dac_values) $intensity]
 		
 		# Get IP address and open an interface socket.
 		set ip [Videoarchiver_ip $n]
@@ -512,9 +516,9 @@ proc Videoarchiver_setlamp {n color intensity} {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 		
 		# Send setlamp command.
-		LWDAQ_socket_write $sock "setlamp $color $dac_value\n"
+		LWDAQ_socket_write $sock "setlamp $color $intensity\n"
 		set result [LWDAQ_socket_read $sock line]
-		if {$result != $dac_value} {
+		if {$result != $intensity} {
 			set message [regsub "ERROR: " $result ""]
 			error $message
 		}
@@ -522,28 +526,17 @@ proc Videoarchiver_setlamp {n color intensity} {
 		# Close the socket.
 		LWDAQ_socket_close $sock
 	
-		LWDAQ_print $info(text) "$info(cam$n\_id) Set $color lamps to\
-			intensity $intensity, $ip." 
+		# Report the change, provided verbose flag is set. Set the menubutton value.
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "$info(cam$n\_id) Set $color lamps to\
+				intensity $intensity, $ip." 
+		}
 		set info(cam$n\_$color) $intensity
 	} message]} {
 		catch {LWDAQ_socket_close $sock}
 		LWDAQ_print $info(text) "ERROR: $message"
 	}
 	return "SUCCESS"
-}
-
-#
-# Videoarchiver_lamps_off turns off all the white and infrared lamps of the
-# cameras in the camera list.
-#
-proc Videoarchiver_lamps_off {} {
-	upvar #0 Videoarchiver_config config
-	upvar #0 Videoarchiver_info info
-
-	foreach n $info(cam_list) {
-		Videoarchiver_setlamp $n white 0
-		Videoarchiver_setlamp $n infrared 0
-	}		
 }
 
 #
@@ -1972,7 +1965,6 @@ proc Videoarchiver_undraw_list {} {
 		set ff $info(window).cam_list.cam$n
 		catch {destroy $ff}
 	}
-	
 }
 
 #
@@ -2068,7 +2060,7 @@ proc Videoarchiver_draw_list {} {
 		pack $ff.wl -side left -expand 0
 		set m [tk_optionMenu $ff.wm Videoarchiver_info(cam$n\_white) none]
 		$m delete 0 end
-		for {set a 0} {$a < [llength $info(lamp_dac_values)]} {incr a} {
+		foreach a $info(lamp_dac_values) {
 			$m add command -label "$a" \
 				-command [list LWDAQ_post "Videoarchiver_setlamp $n white $a" front]
 		}
@@ -2078,7 +2070,7 @@ proc Videoarchiver_draw_list {} {
 		pack $ff.irl -side left -expand 0
 		set m [tk_optionMenu $ff.irm Videoarchiver_info(cam$n\_infrared) none]
 		$m delete 0 end
-		for {set a 0} {$a < [llength $info(lamp_dac_values)]} {incr a} {
+		foreach a $info(lamp_dac_values) {
 			$m add command -label "$a" \
 				-command [list LWDAQ_post "Videoarchiver_setlamp $n infrared $a" front]
 		}
@@ -2180,6 +2172,7 @@ proc Videoarchiver_remove {n} {
 	unset info(cam$n\_white)
 	unset info(cam$n\_infrared)
 	unset info(cam$n\_lag)
+	unset info(cam$n\_laglabel)
 	
 	return "SUCCESS"
 }
@@ -2247,6 +2240,11 @@ proc Videoarchiver_save_list {{fn ""}} {
 	foreach p [lsort -dictionary [array names info]] {
 		if {[regexp {cam[0-9]+_} $p]} {
 			puts $f "set Videoarchiver_info($p) \"[set info($p)]\"" 
+		}
+		foreach a {white_on white_off infrared_on infrared_off} {
+			if {[regexp $a $p]} {
+				puts $f "set Videoarchiver_info($p) \"[set info($p)]\"" 
+			}
 		}
 	}
 	close $f
@@ -2329,6 +2327,212 @@ proc Videoarchiver_configure {} {
 }
 
 #
+# Videoarchiver_lamps_adjust sets all lamps of a particular color to a specified intensity, 
+# but does so taking "step" seconds per change in intensity. It uses the intensity value
+# stored in the camera info arrays to find the current intensity.
+#
+proc Videoarchiver_lamps_adjust {color intensity {step "1"} {previous "0"}} {
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
+	
+	if {$previous == 0} {
+		LWDAQ_print $info(text) "Started adjustment of $color lamps to intensity\
+			$intensity with step $step s at\
+			[clock format [clock seconds] -format $config(datetime_format)]."
+	}
+	
+	if {[clock seconds] - $previous < $step} {
+		LWDAQ_post [list Videoarchiver_lamps_adjust $color $intensity $step $previous]
+		return "WAIT"
+	} else {
+		set done 1
+		foreach n $info(cam_list) {
+			set current_intensity [set info(cam$n\_$color)]
+			if {$intensity > $current_intensity} {
+				Videoarchiver_setlamp $n $color [expr $current_intensity + 1]
+				set done 0
+			} elseif {$intensity < $current_intensity}  {
+				Videoarchiver_setlamp $n $color [expr $current_intensity - 1]
+				set done 0
+			}
+		}
+		if {!$done} {
+			LWDAQ_post [list Videoarchiver_lamps_adjust \
+				$color $intensity $step [clock seconds]]
+			return "ADJUSTED"
+		} else {
+			LWDAQ_print $info(text) "Completed adjustment of $color lamps to intensity\
+				$intensity at [clock format [clock seconds] \
+				-format $config(datetime_format)]."
+			return "DONE"
+		}
+	}		
+}
+
+#
+# Videoarchiver_lamps_off turns off all the white and infrared lamps of the
+# cameras in the camera list.
+#
+proc Videoarchiver_lamps_off {} {
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
+
+	foreach n $info(cam_list) {
+		Videoarchiver_setlamp $n white [lindex $info(lamp_dac_values) 0]
+		Videoarchiver_setlamp $n infrared [lindex $info(lamp_dac_values) 0]
+	}		
+}
+
+#
+# Videoarchiver_scheduler opens a panel that allows the user to define, start,
+# and stop a twenty-four lamp fade schedule. The panel does not perform the
+# scheduling itself, but instead uses the LWDAQ built-in scheduler defined by
+# the LWDAQ_scheduler routine.
+#
+proc Videoarchiver_scheduler {} {
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
+	global LWDAQ_Info
+
+
+	# Open the scheduler panel.
+	set w $info(scheduler_panel)
+	if {[winfo exists $w]} {
+		raise $w
+		return "ABORT"
+	}
+	toplevel $w
+	wm title $w "Scheduler Panel for Videoarchiver $info(version)"
+
+	# Create the start and stop controls.
+	set f [frame $w.control]
+	pack $f -side top -fill x
+	label $f.state -textvariable Videoarchiver_info(scheduler_state) -fg blue -width 10
+	button $f.start -text "Start" -command "LWDAQ_post Videoarchiver_schedule_start"
+	button $f.stop -text "Stop" -command "LWDAQ_post Videoarchiver_schedule_stop"
+	pack $f.state $f.start $f.stop -side left -expand yes
+	
+	# Create the schedule definition entries.
+	foreach a {white_on white_off infrared_on infrared_off} {
+		set f [frame $w.$a -relief sunken -bd 2] 
+		pack $f -side top -fill x
+		label $f.l$a -text "Task:" -fg brown -width 6 -justify right
+		pack $f.l$a -side left -expand yes
+		label $f.$a -text $a -justify left -width 15
+		pack $f.$a -side left -expand yes
+
+		label $f.lmin -text "Minute:" -fg brown -justify right
+		pack $f.lmin -side left -expand 0
+		set m [tk_optionMenu $f.mmin Videoarchiver_info($a\_min) "*"]
+		$m delete 0 end
+		foreach value {* 0 5 10 15 20 25 30 35 40 45 50 55} {
+			$m add command -label "$value" \
+				-command [list set Videoarchiver_info($a\_min) $value]
+		}	
+		pack $f.mmin -side left -expand 1
+
+		label $f.lhr -text "Hour:" -fg brown -justify right
+		pack $f.lhr -side left -expand 0
+		set m [tk_optionMenu $f.mhr Videoarchiver_info($a\_hr) "*"]
+		$m delete 0 end
+		foreach value {* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23} {
+			$m add command -label "$value" \
+				-command [list set Videoarchiver_info($a\_hr) $value]
+		}	
+		pack $f.mhr -side left -expand 1
+
+		label $f.ldymo -text "Day_of_Month:" -fg brown -justify right
+		pack $f.ldymo -side left -expand 0
+		set m [tk_optionMenu $f.mdymo Videoarchiver_info($a\_dymo) "*"]
+		$m delete 0 end
+		foreach value {* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 \
+				15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31} {
+			$m add command -label "$value" \
+				-command [list set Videoarchiver_info($a\_dymo) $value]
+		}	
+		pack $f.mdymo -side left -expand 1
+
+		label $f.lmo -text "Month:" -fg brown -justify right
+		pack $f.lmo -side left -expand 0
+		set m [tk_optionMenu $f.mmo Videoarchiver_info($a\_mo) "*"]
+		$m delete 0 end
+		foreach value {* 0 1 2 3 4 5 6 7 8 9 10 11 12} {
+			$m add command -label "$value" \
+				-command [list set Videoarchiver_info($a\_mo) $value]
+		}	
+		pack $f.mmo -side left -expand 1
+
+		label $f.ldywk -text "Day_of_Week:" -fg brown -justify right
+		pack $f.ldywk -side left -expand 0
+		set m [tk_optionMenu $f.mdywk Videoarchiver_info($a\_dywk) "*"]
+		$m delete 0 end
+		$m add command -label "*" -command [list set Videoarchiver_info($a\_dywk) "*"]
+		set index 0
+		foreach value {Sunday Monday Tuesday Wednesday Thursday Friday Saturday} {
+			$m add command -label "$value" \
+				-command [list set Videoarchiver_info($a\_dywk) $index]
+			incr index
+		}	
+		pack $f.mdywk -side left -expand 1
+
+		label $f.lint -text "Intensity:" -fg brown -justify right
+		pack $f.lint -side left -expand 0
+		set m [tk_optionMenu $f.mint Videoarchiver_info($a\_int) "0"]
+		$m delete 0 end
+		foreach value {0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15} {
+			$m add command -label "$value" \
+				-command [list set Videoarchiver_info($a\_int) $value]
+		}	
+		pack $f.mint -side left -expand 1
+
+		label $f.lstep -text "Step_Seconds:" -fg brown -justify right
+		pack $f.lstep -side left -expand 0
+		entry $f.estep -textvariable Videoarchiver_info($a\_step) -width 5
+		pack $f.estep -side left -expand 1
+	}
+	
+	return "SUCCESS"
+}
+
+#
+# Videoarchiver_schedule_start schedules all Videoarchiver scheduled tasks.
+#
+proc Videoarchiver_schedule_start {} {
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
+
+	foreach a {white_on white_off infrared_on infrared_off} {
+		set schedule "$info($a\_min) $info($a\_hr) $info($a\_dymo)\
+			$info($a\_mo) $info($a\_dywk)"
+		LWDAQ_print $info(text) "Scheduled task $a\
+			with schedule \"$schedule\"\
+			intensity $info($a\_int)\
+			and step interval $info($a\_step) s."
+		LWDAQ_schedule_task $a $schedule \
+			"Videoarchiver_lamps_adjust [regsub {_.*} $a ""] $info($a\_int) $info($a\_step)"
+	}
+	set info(scheduler_state) "Run"
+}
+
+#
+# Videoarchiver_schedule_stop deletes all Videoarchiver tasks from the LWDAQ schedule
+# list.
+#
+proc Videoarchiver_schedule_stop {} {
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
+
+	LWDAQ_unschedule_task "white_on"
+	LWDAQ_unschedule_task "white_off"
+	LWDAQ_unschedule_task "infrared_on"
+	LWDAQ_unschedule_task "infrared_off"
+	LWDAQ_queue_clear "Videoarchiver*"
+	set info(scheduler_state) "Stop"
+	LWDAQ_print $info(text) "Unscheduled all tasks, aborted all tasks,\
+		aborted tasks remain incomplete."
+}
+
+#
 # Videoarchiver_open creates the Videoarchiver's user interface.
 #
 proc Videoarchiver_open {} {
@@ -2356,7 +2560,7 @@ proc Videoarchiver_open {} {
 	frame $f -pady $padx -padx $padx
 	pack $f -side top -fill x
 	
-	foreach a {Record_All Stop_All Lamps_Off Directory} {
+	foreach a {Record_All Stop_All Lamps_Off Scheduler Directory} {
 		set b [string tolower $a]
 		button $f.$b -text $a -padx $padx \
 			-command [list LWDAQ_post "Videoarchiver_$b" front]
