@@ -586,14 +586,12 @@ proc LWDAQ_queue_clear { {pattern "*"} } {
 }
 
 #
-# LWDAQ_post adds the $event script to the LWDAQ Manager
-# event list. If you set the optional parameter "place" to
-# "front" or "1", the the event gets added to the front of the 
-# queue, in first place. If "place" is "end" or "0", the event 
-# is added to the end of the queue. If "place" is any other
-# positive integer greater than zero, the event is inserted 
-# into the queue in the position given by the integer, or the
-# end of the queue if no such position exists. 
+# LWDAQ_post adds the $event script to the LWDAQ Manager event list. If you set
+# the optional parameter "place" to "front" or "1", the the event gets added to
+# the front of the queue, in first place. If "place" is "end" or "0", the event
+# is added to the end of the queue. If "place" is any other positive integer
+# greater than zero, the event is inserted into the queue in the position given
+# by the integer, or the end of the queue if no such position exists. 
 #
 proc LWDAQ_post {event {place "end"}} {
 	global LWDAQ_Info

@@ -520,7 +520,6 @@ proc Neuroarchiver_init {} {
 	set config(enable_processing) 0
 	set config(save_processing) 0
 	set config(enable_vt) 1
-	set info(force_vt) 0
 	if {$info(gui)} {
 		set config(enable_af) 1
 	} {
@@ -673,12 +672,13 @@ proc Neuroarchiver_init {} {
 	set info(datetime_start_time) [Neuroarchiver_clock_convert [clock seconds]]
 	set info(datetime_archive_name) "M0000000000.ndf"
 	set info(datetime_panel) $info(window)\.clock
-	set info(export_help_url) \
-		"http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html#Exporting%20Data"
 #
 # Export settings.
 #
+	set info(export_help_url) \
+		"http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html#Exporting%20Data"
 	set info(export_panel) $info(window)\.export
+	set info(export_text) $info(export_panel)\.text
 	set info(edf_panel) $info(export_panel)\.edf
 	set info(text_panel) $info(export_panel)\.header
 	set config(export_txt_header) ""
@@ -788,15 +788,16 @@ proc Neuroarchiver_configure {} {
 }
 
 #
-# Neuroarchiver_print writes a line to the text window. If the color
-# specified is "verbose", the message prints only when the verbose flag
-# is set, and in black. Warnings and errors are always printed in the warning
-# and error colors. In addition, if the log_warnings is set, the routine
-# writes all warnings and errors to the Neuroarchiver log file. The print
-# routine will refrainn from writing the same error message to the text 
-# window repeatedly when we set the color to the key word "norepeat". The 
-# routine always stores the previous line it writes, so as to compare in 
-# the case of a norepeat requirement.
+# Neuroarchiver_print writes a line to the text window. If the color specified
+# is "verbose", the message prints only when the verbose flag is set, and in
+# black. Warnings and errors are always printed in the warning and error colors.
+# In addition, if the log_warnings is set, the routine writes all warnings and
+# errors to the Neuroarchiver log file. The print routine will refrainn from
+# writing the same error message to the text window repeatedly when we set the
+# color to the key word "norepeat". The routine always stores the previous line
+# it writes, so as to compare in the case of a norepeat requirement. Note that
+# the final print to a text window uses LWDAQ_print, which will not try to print
+# to a target with a widget-style name when graphics are disabled.
 #
 proc Neuroarchiver_print {line {color "black"}} {
 	upvar #0 Neuroarchiver_config config
@@ -1646,20 +1647,16 @@ proc Neuroarchiver_filter {band_lo_end band_lo_center \
 		set f [expr $f + $info(f_step)]
 	}
 
-	# If show or replace, take the inverse transform. The filtered
-	# values will be available to the calling procedure in a variable
-	# of the same name.
+	# If show or replace, take the inverse transform. The filtered values will
+	# be available to the calling procedure in a variable of the same name.
 	if {$show || $replace} {
 		set filtered_values [lwdaq_fft $filtered_spectrum -inverse 1]
 	}
 	
-	# If show, plot the filtered signal to the screen. If our  
-	# frequency band does not include zero, we add the zero-frequency
-	# component to every sample value so that the filtered signal 
-	# will be super-imposed upon the unfiltered signal in the display.
-	# If the usual display of the value versus time is disabled, this
-	# inverse-transform will still be shown because we assert the
-	# force_vt flag.
+	# If show, plot the filtered signal to the screen. If our frequency band
+	# does not include zero, we add the zero-frequency component to every sample
+	# value so that the filtered signal will be super-imposed upon the
+	# unfiltered signal in the display.
 	if {$show} {
 		if {$band_lo_center > 0} {
 			set offset [lindex $info(spectrum) 0]
@@ -1673,7 +1670,6 @@ proc Neuroarchiver_filter {band_lo_end band_lo_center \
 			incr timestamp
 		}
 		Neuroarchiver_plot_signal [expr $info(channel_num) + 32] $filtered_signal
-		set info(force_vt) 1
 	}
 	
 	# If replace, replace the existing info(values) string with the new
@@ -4614,7 +4610,8 @@ proc Neurotracker_draw_graphs {} {
 	# Abort if running in no-gui mode.
 	if {!$info(gui)} {return "ABORT"}
 	if {![winfo exists $info(tracker_window)]} {return "ABORT"}
-	
+
+	# Draw the tracker picture.
 	lwdaq_draw $info(tracker_image) $info(tracker_photo)
 	return "SUCCESS"
 }
@@ -4781,7 +4778,7 @@ proc Neuroarchiver_exporter_open {} {
 	button $f.auto -text "Autofill" -command {
 		set Neuroarchiver_config(channel_selector) "*"
 		LWDAQ_post [list Neuroarchiver_play "Repeat"]
-		LWDAQ_post Neuroarchiver_exporter_autofill
+		LWDAQ_post Neuroarchiver_autofill
 	}
 	pack $f.lchannels $f.echannels $f.auto -side left -expand yes
 
@@ -4837,11 +4834,12 @@ proc Neuroarchiver_exporter_open {} {
 }
 
 #
-# Neuroarchiver_exporter_autofill fills the channel select field with the
-# Neuroarchiver's best guess as to all the channels that are active in the most
-# recently-played interval.
+# Neuroarchiver_autofill fills the channel select field with the Neuroarchiver's
+# best guess as to all the channels that are active in the most recently-played
+# interval. We report the outcome of the autofill to the export panel and the
+# main Neuroarchiver window.
 #
-proc Neuroarchiver_exporter_autofill {} {
+proc Neuroarchiver_autofill {} {
 	upvar #0 Neuroarchiver_info info
 	upvar #0 Neuroarchiver_config config
 
@@ -4853,6 +4851,8 @@ proc Neuroarchiver_exporter_autofill {} {
 	}
 	if {$autofill == ""} {
 		LWDAQ_print $info(export_text) "Autofill found no active channels.\
+			Setting channel select to \"*\". Play one interval and try again."
+		Neuroarchiver_print "Autofill found no active channels.\
 			Setting channel select to \"*\". Play one interval and try again."
 		set config(channel_selector) "*"
 		return "FAIL"
@@ -4911,7 +4911,7 @@ proc Neuroarchiver_edf_setup {} {
 	button $f.auto -text "Autofill" -command {
 		set Neuroarchiver_config(channel_selector) "*"
 		LWDAQ_post [list Neuroarchiver_play "Repeat"]
-		LWDAQ_post Neuroarchiver_exporter_autofill
+		LWDAQ_post Neuroarchiver_autofill
 	}
 	pack $f.lchannels $f.echannels $f.auto -side left -expand yes
 	
@@ -6292,17 +6292,13 @@ proc Neuroarchiver_draw_graphs {} {
 
 	if {!$LWDAQ_Info(gui_enabled)} {return "ABORT"}
 
-	if {$config(enable_vt) || $info(force_vt)} {
-		lwdaq_draw $info(vt_image) $info(vt_photo)
-		if {[winfo exists $info(vt_view)]} {
-			lwdaq_draw $info(vt_image) $info(vt_view_photo) -zoom $config(vt_view_zoom)
-		}
+	lwdaq_draw $info(vt_image) $info(vt_photo)
+	if {[winfo exists $info(vt_view)]} {
+		lwdaq_draw $info(vt_image) $info(vt_view_photo) -zoom $config(vt_view_zoom)
 	}
-	if {$config(enable_af)} {	
-		lwdaq_draw $info(af_image) $info(af_photo)
-		if {[winfo exists $info(af_view)]} {
-			lwdaq_draw $info(af_image) $info(af_view_photo) -zoom $config(af_view_zoom)
-		}
+	lwdaq_draw $info(af_image) $info(af_photo)
+	if {[winfo exists $info(af_view)]} {
+		lwdaq_draw $info(af_image) $info(af_view_photo) -zoom $config(af_view_zoom)
 	}
 	
 	return "SUCCESS"
@@ -6390,15 +6386,15 @@ proc Neuroarchiver_magnified_view {figure} {
 
 
 #
-# Neuroarchiver_plot_signal plots the a signal on the screen. It uses 
-# lwdaq_graph to plot data in the vt_image overlay. The procedure does not 
-# draw the graph on the screen. We leave the drawing until all the signals have 
-# been plotted in the vt_image overlay by successive calls to this procedure.
-# For more information about lwdaw_graph, see the LWDAQ Command Reference.
-# If we don't pass a signal to the routine, it uses $info(signal). The signal
-# string must be a list of time and sample values "t v ". If we don't specify
-# a color, the routine uses the info(channel_num) as the color code. If we don't 
-# specify a signal, the routine uses the $info(signal).
+# Neuroarchiver_plot_signal plots the a signal on the screen. It uses
+# lwdaq_graph to plot data in the vt_image overlay. The procedure does not draw
+# the graph on the screen. We leave the drawing until all the signals have been
+# plotted in the vt_image overlay by successive calls to this procedure. For
+# more information about lwdaw_graph, see the LWDAQ Command Reference. If we
+# don't pass a signal to the routine, it uses $info(signal). The signal string
+# must be a list of time and sample values "t v ". If we don't specify a color,
+# the routine uses the info(channel_num) as the color code. If we don't specify
+# a signal, the routine uses the $info(signal).
 #
 proc Neuroarchiver_plot_signal {{color ""} {signal ""}} {
 	upvar #0 Neuroarchiver_info info
@@ -7001,12 +6997,12 @@ proc Neuroarchiver_record {{command ""}} {
 # list of channels we want to process. For each of these channels, in the order
 # they appear in the channels string, we apply extraction, reconstruction,
 # transformation, and processing to the data image. If requested by the user, we
-# read a processor_file off disk and apply it in turn to the signal and
-# spectrum we obtained for each channel. We store the results of processing to
-# disk in a text file and print them to the text window also. If we don't specify
-# a command, the Neuroarchiver continues with the action indicated by its control
-# variable. But we can specify any of the following commands: Play, Step, Repeat,
-# Back, Pick, PickDir, First, and Reload.
+# read a processor_file off disk and apply it in turn to the signal and spectrum
+# we obtained for each channel. We store the results of processing to disk in a
+# text file and print them to the text window also. If we don't specify a
+# command, the Neuroarchiver continues with the action indicated by its control
+# variable. But we can specify any of the following commands: Play, Step,
+# Repeat, Back, Pick, PickDir, First, and Reload.
 #
 proc Neuroarchiver_play {{command ""}} {
 	upvar #0 Neuroarchiver_info info
@@ -7266,7 +7262,7 @@ proc Neuroarchiver_play {{command ""}} {
 			set config(play_time) 0.0
 		}
 		set info(play_control) "Step"
-		LWDAQ_post Neuroarchiver_play
+		LWDAQ_post Neuroarchiver_play front
 		return "SUCCESS"
 	}
 	
@@ -7710,11 +7706,7 @@ proc Neuroarchiver_play {{command ""}} {
 	}
 	
 	# We apply processing to each channel for this interval, plot the signal,
-	# and plot the spectrum, as enabled by the user. We set the force_vt flag to
-	# zero, which means the value versus time plot will be drawn only if
-	# enable_vt is set, or if the processor itself sets force_vt in one of its
-	# plotting routines.
-	set info(force_vt) 0
+	# and plot the spectrum, as enabled by the user.
 	foreach info(channel_code) $selected_channels {
 		set info(channel_num) [lindex [split $info(channel_code) :] 0]
 		if {![string is integer -strict $info(channel_num)] \
@@ -7724,14 +7716,21 @@ proc Neuroarchiver_play {{command ""}} {
 			set info(play_control) "Stop"
 			break
 		}
+		
 		set info(signal) [Neuroarchiver_signal]
 		set info(values) [Neuroarchiver_values]
+		if {$config(enable_vt)} {
+			Neuroarchiver_plot_signal
+		}
+		set info(t_min) $config(play_time)
+		
 		if {$config(enable_af) || $config(af_calculate)} {
 			set info(spectrum) [Neuroarchiver_spectrum]
 		}
-		if {$config(enable_vt)} {Neuroarchiver_plot_signal}
-		set info(t_min) $config(play_time)
-		if {$config(enable_af)} {Neuroarchiver_plot_spectrum}
+		if {$config(enable_af)} {
+			Neuroarchiver_plot_spectrum
+		} 
+		
 		if {$config(alt_calculate) || [winfo exists $info(tracker_window)]} {
 			Neurotracker_extract
 		} 
@@ -7809,7 +7808,7 @@ proc Neuroarchiver_play {{command ""}} {
 	# label a better flash behavior during rapid playback.
 	LWDAQ_set_bg $info(play_control_label) white
 
-	# Draw the graphs on the screen if the graphics are enabled.
+	# Draw the graphs on the screen.
 	Neuroarchiver_draw_graphs
 	Neurotracker_draw_graphs
 	Neuroarchiver_overview_cursor
@@ -8782,6 +8781,12 @@ proc Neuroarchiver_open {} {
 		entry $f.echannels -textvariable Neuroarchiver_config(channel_selector) \
 			-width $width
 		pack $f.lchannels $f.echannels -side left -expand yes
+		button $f.autofill -text "Autofill" -command {
+			set Neuroarchiver_config(channel_selector) "*"
+			LWDAQ_post [list Neuroarchiver_play "Repeat"]
+			LWDAQ_post Neuroarchiver_autofill
+		}
+		pack $f.autofill -side left -expand yes
 	
 		set f $w.play.d
 		frame $f -bd 1
