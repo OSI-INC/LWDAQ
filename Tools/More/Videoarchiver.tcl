@@ -2394,7 +2394,6 @@ proc Videoarchiver_scheduler {} {
 	upvar #0 Videoarchiver_info info
 	global LWDAQ_Info
 
-
 	# Open the scheduler panel.
 	set w $info(scheduler_panel)
 	if {[winfo exists $w]} {
