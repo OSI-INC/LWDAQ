@@ -2440,7 +2440,7 @@ proc Videoarchiver_scheduler {} {
 		}	
 		pack $f.mhr -side left -expand 1
 
-		label $f.ldymo -text "Day_of_Month:" -fg brown -justify right
+		label $f.ldymo -text "Day of Month:" -fg brown -justify right
 		pack $f.ldymo -side left -expand 0
 		set m [tk_optionMenu $f.mdymo Videoarchiver_info($a\_dymo) "*"]
 		$m delete 0 end
@@ -2461,7 +2461,7 @@ proc Videoarchiver_scheduler {} {
 		}	
 		pack $f.mmo -side left -expand 1
 
-		label $f.ldywk -text "Day_of_Week:" -fg brown -justify right
+		label $f.ldywk -text "Day of Week:" -fg brown -justify right
 		pack $f.ldywk -side left -expand 0
 		set m [tk_optionMenu $f.mdywk Videoarchiver_info($a\_dywk) "*"]
 		$m delete 0 end
@@ -2484,7 +2484,7 @@ proc Videoarchiver_scheduler {} {
 		}	
 		pack $f.mint -side left -expand 1
 
-		label $f.lstep -text "Step_Seconds:" -fg brown -justify right
+		label $f.lstep -text "Step (s):" -fg brown -justify right
 		pack $f.lstep -side left -expand 0
 		entry $f.estep -textvariable Videoarchiver_info($a\_step) -width 5
 		pack $f.estep -side left -expand 1
