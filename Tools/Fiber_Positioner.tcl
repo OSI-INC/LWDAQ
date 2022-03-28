@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
+#
 
 #
 # Fiber_Positioner_init creates and initializes the tools' configuration
@@ -30,7 +30,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.7"
+	LWDAQ_tool_init "Fiber_Positioner" "2.1"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -109,6 +109,8 @@ proc Fiber_Positioner_init {} {
 	# Travel configuration.
 	set info(travel_window) "$info(window)\.travel_edit"
 	set config(travel_index) "0"
+	set config(loop_counter) "0"
+	set config(pass_counter) "0"
 	set config(travel_file) [file normalize ~/Desktop/Travel.txt]
 	
 	# Waiting time after setting control voltages before we make measurements.
@@ -459,12 +461,71 @@ proc Fiber_Positioner_check {} {
 }
 
 #
+# Fiber_Positioner_reset resets the travel index, pass counter, and loop 
+# counters all to zero.
+#
+proc Fiber_Positioner_reset {} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
+
+	set config(travel_index) 0
+	set config(pass_counter) 0
+	set config(loop_counter) 0
+	if {$info(control) == "Reset"} {
+		set info(control) "Idle"
+	}
+	
+	return "SUCCESS"
+}
+
+
+
+#
 # Fiber_Positioner_step just calls the travel routine. We assume the control 
 # variable has been set to "Step", so the travel routine will know to stop
 # after one step.
 #
 proc Fiber_Positioner_step {} {
 	Fiber_Positioner_travel 
+}
+
+#
+# Fiber_Positioner_goto is designed for use in travel scripts that are executed
+# within the Fiber_Positioner_travel routine. The routine arranges for the
+# travel index to be equal to the index of a labelled line number at the end of
+# a travel step. To accomplish this result, the routine refers to the
+# travel_list available in Fiber_Positioner_travel, finds the index of the
+# labelled line in the list, and sets the global travel index equal to the
+# labelled line's index minus one. The travel routine will subsequently
+# increment the index, thus leaving it equal to the labelled line's index at the
+# end fo the step. If the label does not exist in the travel file, we generate
+# an error.  
+#
+proc Fiber_Positioner_goto {name} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
+	upvar travel_list travel_list
+
+	# Go through the list until we find "label name".
+	set goto_index -1
+	for {set index 0} {$index < [llength $travel_list]} {incr index} {
+		set line [string trim [lindex $travel_list $index]]
+		if {([lindex $line 0] == "label") && ([lindex $line 1] == $name)} {
+			set goto_index $index
+			break
+		}
+	}
+	
+	# If we did not find the label, generate and error.
+	if {$goto_index < 0} {
+		error "cannot find label \"$name\"."
+	}
+	
+	# Otherwise, set the travel index to the goto_index minus one.
+	set config(travel_index) [expr $goto_index - 1]
+	
+	# Return the index.
+	return $goto_index
 }
 
 #
@@ -476,8 +537,6 @@ proc Fiber_Positioner_step {} {
 proc Fiber_Positioner_travel {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
-	upvar #0 LWDAQ_config_BCAM iconfig
-	upvar #0 LWDAQ_info_BCAM iinfo
 	global LWDAQ_Info
 	
 	# Because the travel operation can go on for some time, we must handle the 
@@ -489,7 +548,7 @@ proc Fiber_Positioner_travel {} {
 	# Read the travel file, if we can find it. If not, abort and report an error.
 	if {[catch {
 		set f [open $config(travel_file) r]
-		set travel_list [read $f]
+		set travel_list [string trim [read $f]]
 		close $f
 	} error_result]} {
 		catch {close $f}
@@ -513,11 +572,15 @@ proc Fiber_Positioner_travel {} {
 		set config(travel_index) 0
 	}
 	
-	# If this is the first step, clear excess lines from the data and log windows.
+	# If this is the first step, clear excess lines from the data and log windows and
+	# increment the travel counter.
 	if {$config(travel_index) == 0} {
-		LWDAQ_print $info(log) "\nStarting [file tail $config(travel_file)]" purple
+		incr config(pass_counter)
+		LWDAQ_print $info(log) "\nStarting [file tail $config(travel_file)],\
+			Pass $config(pass_counter)." purple
 		$info(log) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
 		$info(data) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
+		
 	}
 		
 	# Get the travel_index'th line and extract the first word, which may be a command.
@@ -534,14 +597,31 @@ proc Fiber_Positioner_travel {} {
 	# integer control values.
 	switch $first_word {
 		"" {
+		# We do nothing for empty lines, but we increment the index later, so as
+		# to make sure the index matches the line number in the travel file.
 		
 		}
 		
 		"#" {
-		# We do nothing for empty lines or comment lines, but we increment
-		# the index later, so as to make sure the index matches the line 
-		# number in the travel file.
+		# We do nothing for comment lines, but we increment the index later, so
+		# as to make sure the index matches the line number in the travel file.
 		
+		}
+		
+		"label" {
+		# A label instruction does not itself do anything, but must specify a
+		# name. The Fiber_Positioner_goto command takes a a label name as its
+		# argument, searches the travel file for "label name" and returns the
+		# index of the labeled line. This allows tcl code to jump to the
+		# labelled line, so we can build conditional branches or incrementing
+		# loops into our travel scripts.
+			set label [regsub {label[ \t]*} $line ""]
+			if {![string is wordchar $label]} {
+				LWDAQ_print $info(log) "ERROR: Bad label name \"$label\"."
+				LWDAQ_print $info(log) "At line $config(travel_index): \"$line\"."
+				set info(control) "Idle"
+				return "ERROR"
+			}
 		}
 		
 		"tcl" {
@@ -623,13 +703,18 @@ proc Fiber_Positioner_travel {} {
 	if {($info(control) == "Stop") || ($info(control) == "Step")} {
 		set info(control) "Idle"
 		return "ABORT"
-	} elseif {($config(travel_index) < [llength $travel_list]) \
-		|| $config(repeat)} {
+	} elseif {($config(travel_index) < [llength $travel_list])} {
 		LWDAQ_post "Fiber_Positioner_travel"
 		return "SUCCESS"
 	} else {
-		set info(control) "Idle"
-		return "SUCCESS"
+		LWDAQ_print $info(log) "Travel Complete, Pass $config(pass_counter)." purple
+		if {$config(repeat)} {
+			LWDAQ_post "Fiber_Positioner_travel"
+			return "SUCCESS"
+		} else {
+			set info(control) "Idle"
+			return "SUCCESS"
+		}
 	}
 }
 
@@ -682,7 +767,7 @@ proc Fiber_Positioner_open {} {
 	
 	label $f.state -textvariable Fiber_Positioner_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
-	foreach a {Zero Move Check Travel Step Stop} {
+	foreach a {Zero Move Check Travel Step Stop Reset} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Fiber_Positioner_cmd $a"
 		pack $f.$b -side left -expand 1
@@ -752,6 +837,12 @@ proc Fiber_Positioner_open {} {
 	pack $f.repeat -side left -expand yes
 	checkbutton $f.trace -text "Trace" -variable Fiber_Positioner_config(trace_enable)
 	pack $f.trace -side left -expand yes
+	label $f.tpl -text "pass" -fg green
+	entry $f.tpe -textvariable Fiber_Positioner_config(pass_counter) -width 4
+	pack $f.tpl $f.tpe -side left -expand yes
+	label $f.tll -text "loop" -fg green
+	entry $f.tle -textvariable Fiber_Positioner_config(loop_counter) -width 4
+	pack $f.tll $f.tle -side left -expand yes
 	
 	set f [frame $w.image_frame]
 	pack $f -side left -fill y 
