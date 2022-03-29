@@ -242,7 +242,7 @@ proc DB_append {xml {file_name ""}} {
 # that matches the tag you specify. If your database contains one thousand
 # entries of type <donor>, and hundreds of entries of other types, DB_get_list
 # returns a TCL list of the contents of all the <donor> entries when you
-# pass it the xml string and the tag "donar". You don't pass it the brackets
+# pass it the xml string and the tag "donor". You don't pass it the brackets
 # on either side of the tag, even though these brackets always appear in the
 # xml string. Each element in the list the routine returns will be the contents
 # of a single record, with its start and end tags removed. You can now apply

@@ -30,7 +30,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "2.1"
+	LWDAQ_tool_init "Fiber_Positioner" "1.8"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -618,7 +618,6 @@ proc Fiber_Positioner_travel {} {
 			set label [regsub {label[ \t]*} $line ""]
 			if {![string is wordchar $label]} {
 				LWDAQ_print $info(log) "ERROR: Bad label name \"$label\"."
-				LWDAQ_print $info(log) "At line $config(travel_index): \"$line\"."
 				set info(control) "Idle"
 				return "ERROR"
 			}
@@ -632,7 +631,27 @@ proc Fiber_Positioner_travel {} {
 				eval [regsub {tcl[ \t]*} $line ""]
 			} error_result]} {
 				LWDAQ_print $info(log) "ERROR: $error_result"
-				LWDAQ_print $info(log) "At line $config(travel_index): \"$line\"."
+				set info(control) "Idle"
+				return "ERROR"
+			}
+		}
+		
+		"tcl_source" {
+		# The tcl_source instruction specifies that the next entry in the line
+		# is the name of a file in the same directory as the travel script, and
+		# this file should be executed as a tcl script using the TCL "source"
+		# command.
+			set sft [lindex $line 1]
+			set sfn [file join [file dirname $config(travel_file)] $sft]
+			if {![file exists $sfn]} {
+				LWDAQ_print $info(log) "ERROR: No such file \"$sfn\"."
+				set info(control) "Idle"
+				return "ERROR"				
+			}
+			if {[catch {
+				source $sfn
+			} error_result]} {
+				LWDAQ_print $info(log) "ERROR: $error_result"
 				set info(control) "Idle"
 				return "ERROR"
 			}
@@ -645,7 +664,6 @@ proc Fiber_Positioner_travel {} {
 			set wait_seconds [lindex $line 1]
 			if {![string is integer -strict $wait_seconds]} {
 				LWDAQ_print $info(log) "ERROR: Invalid wait time \"$wait_seconds\"."
-				LWDAQ_print $info(log) "At line $config(travel_index): \"$line\"."
 				set info(control) "Idle"
 				return "ERROR"
 			}
