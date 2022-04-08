@@ -30,7 +30,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.8"
+	LWDAQ_tool_init "Fiber_Positioner" "1.9"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -38,18 +38,19 @@ proc Fiber_Positioner_init {} {
 	# which the state will return to "Idle".
 	set info(control) "Idle"
 
-	# A zoom value for the display.
-	set config(display_zoom) 1.0
+	# A zoom value for the display, and a choice of intensification.
+	set config(zoom) 1.0
+	set config(intensify) "exact"
 		
 	# These numbers are used only when we open the Fiber Positioner panel for the 
 	# first time, and need to allocate space for the fiber image.
 	set config(image_sensor) "ICX424"
 	set config(image_width) [expr \
 		[lindex $LWDAQ_Driver($config(image_sensor)\_details) 2] \
-		* $config(display_zoom)]
+		* $config(zoom)]
 	set config(image_height) [expr \
 		[lindex $LWDAQ_Driver($config(image_sensor)_details) 1] \
-		* $config(display_zoom)]
+		* $config(zoom)]
 	
 	# The control value for which the control voltages are closest to zero.
 	set config(dac_zero) "133"
@@ -76,10 +77,10 @@ proc Fiber_Positioner_init {} {
 	# Parameters that set up the fiber image capture and analysis.
 	set config(fiber_type) "9"
 	set config(fiber_sock) "3"
-	set config(fiber_element) "A1"
+	set config(fiber_elements) "A1 A2 A3"
 	set config(camera_sock) "4"
 	set config(flash_seconds) "0.0003"
-	set config(num_spots) "1"
+	set config(sort_code) "8"
 	
 	# The north, south, east, and west control values. Set them to produce zero
 	# control voltages.
@@ -94,10 +95,6 @@ proc Fiber_Positioner_init {} {
 	set info(s_in) "0"
 	set info(e_in) "0"
 	set info(w_in) "0"
-	
-	# The spot position on the image sensor.
-	set info(spot_x) "0"
-	set info(spot_y) "0"
 	
 	# The history of spot positions for the tracing.
 	set info(trace_history) [list]
@@ -215,42 +212,51 @@ proc Fiber_Positioner_spot_position {} {
 	
 	set iconfig(daq_ip_addr) $config(daq_ip_addr)
 	set iconfig(daq_source_driver_socket) $config(fiber_sock)
-	set iconfig(daq_source_device_element) $config(fiber_element)
+	set iconfig(daq_source_device_element) $config(fiber_elements)
 	set iinfo(daq_source_device_type) $config(fiber_type)
 	set iconfig(daq_driver_socket) $config(camera_sock)
 	set iconfig(daq_flash_seconds) $config(flash_seconds)
-	set iconfig(analysis_num_spots) $config(num_spots)
+	set iconfig(analysis_num_spots) \
+		"[llength $config(fiber_elements)] $config(sort_code)"
 	LWDAQ_set_image_sensor $config(image_sensor) BCAM
 	
 	set result [LWDAQ_acquire BCAM]
 	
-	if {![LWDAQ_is_error_result $result]} {
-		lwdaq_draw $iconfig(memory_name) $info(photo) -zoom $config(display_zoom)
-	} else {
+	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(log) $result
 		set info(control) "Stop"
 		return "ERROR"
 	}
 	
-	set info(spot_x) [lindex $result 1]
-	set info(spot_y) [lindex $result 2]
-		
-	if {$config(trace_enable)} {
-		set x_min [expr $iinfo(daq_image_left) * $iinfo(analysis_pixel_size_um)]
-		set y_min [expr $iinfo(daq_image_top) * $iinfo(analysis_pixel_size_um)]
-		set x_max [expr $iinfo(daq_image_right) * $iinfo(analysis_pixel_size_um)]
-		set y_max [expr $iinfo(daq_image_bottom) * $iinfo(analysis_pixel_size_um)]
-		lappend info(trace_history) \
-			"$info(spot_x) [expr $y_max - $info(spot_y) + $y_min]"
-		if {[llength $info(trace_history)] > $config(trace_persistence)} {
-			set info(trace_history) [lrange $info(trace_history) 1 end]
+	set result [lreplace $result 0 0]	
+	set info(spot_positions) ""
+	set index 0
+	foreach fiber $config(fiber_elements) {
+		incr index
+		set x [format %.1f [lindex $result 0]]
+		set y [format %.1f [lindex $result 1]]
+		append info(spot_positions) "$x $y "
+		set result [lrange $result 6 end]
+		if {$config(trace_enable)} {
+			set x_min [expr $iinfo(daq_image_left) * $iinfo(analysis_pixel_size_um)]
+			set y_min [expr $iinfo(daq_image_top) * $iinfo(analysis_pixel_size_um)]
+			set x_max [expr $iinfo(daq_image_right) * $iinfo(analysis_pixel_size_um)]
+			set y_max [expr $iinfo(daq_image_bottom) * $iinfo(analysis_pixel_size_um)]
+			lappend info(trace_history_$index) "$x [expr $y_max - $y + $y_min]"
+			if {[llength $info(trace_history_$index)] > $config(trace_persistence)} {
+				set info(trace_history_$index) \
+					[lrange $info(trace_history_$index) 1 end]
+			}
+			lwdaq_graph [join $info(trace_history_$index)] $iconfig(memory_name) \
+				-x_max $x_max -y_max $y_max -y_min $y_min -x_min $x_min -color 5
+		} {
+			set info(trace_history_$index) [list]
 		}
-		lwdaq_graph [join $info(trace_history)] $iconfig(memory_name) \
-			-x_max $x_max -y_max $y_max -y_min $y_min -x_min $x_min -color 5
-		lwdaq_draw $iconfig(memory_name) $info(photo) -zoom $config(display_zoom)
-	} {
-		set info(trace_history) [list]
 	}
+
+	lwdaq_draw $iconfig(memory_name) $info(photo) \
+		-zoom $config(zoom) \
+		-intensify $config(intensify)
 	
 	return "SUCCESS"
 }
@@ -364,16 +370,15 @@ proc Fiber_Positioner_report {{t ""}} {
 	upvar #0 Fiber_Positioner_info info
 
 	if {$t == ""} {set t $info(data)}
-	LWDAQ_print -nonewline $t "[format %4.0f $config(n_out)]\
-		[format %4.0f $config(s_out)]\
-		[format %4.0f $config(e_out)]\
-		[format %4.0f $config(w_out)] " green
-	LWDAQ_print -nonewline $t "[format %6.1f $info(spot_x)]\
-		[format %6.1f $info(spot_y)] " black
-	LWDAQ_print $t "[format %6.1f $info(n_in)]\
-		[format %6.1f $info(s_in)]\
-		[format %6.1f $info(e_in)]\
-		[format %6.1f $info(w_in)]" brown
+	LWDAQ_print -nonewline $t "[format %.0f $config(n_out)]\
+		[format %.0f $config(s_out)]\
+		[format %.0f $config(e_out)]\
+		[format %.0f $config(w_out)] " green
+	LWDAQ_print -nonewline $t "[format %6.1f $info(n_in)]\
+		[format %.1f $info(s_in)]\
+		[format %.1f $info(e_in)]\
+		[format %.1f $info(w_in)] " brown
+	LWDAQ_print $t "$info(spot_positions)" black
 	return "SUCCESS"
 }
 
@@ -799,7 +804,7 @@ proc Fiber_Positioner_open {} {
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
 
-	foreach a {daq_ip_addr fiber_sock fiber_element \
+	foreach a {daq_ip_addr fiber_sock fiber_elements \
 			flash_seconds camera_sock settling_ms} {
 		label $f.l$a -text $a -fg green
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
@@ -830,12 +835,6 @@ proc Fiber_Positioner_open {} {
 		set a [string tolower $d]
 		label $f.l$a -text $d -fg green
 		label $f.e$a -textvariable Fiber_Positioner_info($a) -width 5
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-	foreach d {spot_x spot_y} {
-		set a [string tolower $d]
-		label $f.l$a -text $d -fg green
-		label $f.e$a -textvariable Fiber_Positioner_info($a) -width 7
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
