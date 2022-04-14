@@ -664,7 +664,7 @@ proc Acquisifier_execute {} {
 				set iconfig($p) $v
 				LWDAQ_print $info(text) "$p = \"$v\""
 			} elseif {![LWDAQ_is_error_result $result]} {
-				set result "ERROR: no parameter \"$p\" to assigne value \"$v\"."
+				set result "ERROR: no parameter \"$p\" to assign value \"$v\"."
 			}
 		}
 
