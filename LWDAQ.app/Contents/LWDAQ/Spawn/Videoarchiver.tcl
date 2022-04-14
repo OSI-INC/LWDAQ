@@ -1,13 +1,7 @@
 set Videoarchiver_mode "Child"
 LWDAQ_run_tool Videoarchiver.tcl
 switch $LWDAQ_Info(os) {
-	"MacOS" {
-		.menubar delete 1 2
-	}
-	"Windows" {
-		.menubar delete 3 4
-	}
-	"Linux" {
-		.menubar delete 3 4
-	}
+	"MacOS" {.menubar delete 1 2}
+	"Windows" {.menubar delete 3 4}
+	"Linux" {.menubar delete 3 4}
 }

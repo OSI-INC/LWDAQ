@@ -5,103 +5,99 @@
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 # Copyright (C) 2022 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
 
-# Version 30: requires LWDAQ 6.8 or higher. You can now run the
-# Acquisifier from tclsh or any other TCL-only shell, with no 
-# graphical user interface. Before we delete anything
-# from a text window, or perform any other graphics-related tasks, we 
-# check to see if the window exists, using the winfo procedure. LWDAQ
-# defines a dummy version of winfo when it runs in TCL. The dummy
-# version returns zero always. We also provide the Acquisifier_close
-# procedure, which shuts down the Acquisifier.
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
 
-# Version 34: Gets rid of the daq_results file, in which the Acquisifier
-# stored all instrument results as a backup of data acquisition. All data-
-# recording to disk must now be performed explicitly by post-processing in
-# acquisifier scripts. See Acquisifier_Script.txt for an example.
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# Version 35: Improves handling of Wait state so that Acquisifier starts
-# at step 1 after we abort a Wait. Allows you to switch between Run and
-# other active states by pressing the command buttons.
+# Version 30: requires LWDAQ 6.8 or higher. You can now run the Acquisifier from
+# tclsh or any other TCL-only shell, with no graphical user interface. Before we
+# delete anything from a text window, or perform any other graphics-related
+# tasks, we check to see if the window exists, using the winfo procedure. LWDAQ
+# defines a dummy version of winfo when it runs in TCL. The dummy version
+# returns zero always. We also provide the Acquisifier_close procedure, which
+# shuts down the Acquisifier.
 
-# Version 38: Allows Acquisifier_store_script to be called from the 
-# console with a specified file name. Also fixes bug whereby you could
-# not store the Acquisifier script in a new file.
+# Version 34: Gets rid of the daq_results file, in which the Acquisifier stored
+# all instrument results as a backup of data acquisition. All data- recording to
+# disk must now be performed explicitly by post-processing in acquisifier
+# scripts. See Acquisifier_Script.txt for an example.
 
-# Version 41: We greatly improve the error-handling of the acquisifier
-# steps, as we document in the manual for LWDAQ 7.0.19. Each step now
-# returns a result string, which is either a completion result or an
-# error result. All steps can now have names, and these names appear in
-# the step's completion result. If the script does not specify a name,
-# the Acquisifier creats a default name that includes the step number.
-# We also improve the display of script execution in the Acquisifier
-# window, and re-format the script summary after Load Script.
+# Version 35: Improves handling of Wait state so that Acquisifier starts at step
+# 1 after we abort a Wait. Allows you to switch between Run and other active
+# states by pressing the command buttons.
 
-# Version 42: We add warning of extended acquisition during acquire
-# steps.
+# Version 38: Allows Acquisifier_store_script to be called from the console with
+# a specified file name. Also fixes bug whereby you could not store the
+# Acquisifier script in a new file.
 
-# Version 43: We add support for the disable: field. We add the 
-# Acquisifier_put_field and Acquisifier_get_field routines so we can
-# name fields without adding the colon.
+# Version 41: We greatly improve the error-handling of the acquisifier steps, as
+# we document in the manual for LWDAQ 7.0.19. Each step now returns a result
+# string, which is either a completion result or an error result. All steps can
+# now have names, and these names appear in the step's completion result. If the
+# script does not specify a name, the Acquisifier creats a default name that
+# includes the step number. We also improve the display of script execution in
+# the Acquisifier window, and re-format the script summary after Load Script.
 
-# Version 44: We adjust the call to LWDAQ_socket_close in the result
-# upload so it no longer specifies an empty termination string.
+# Version 42: We add warning of extended acquisition during acquire steps.
 
-# Version 45: Default is now upload_step_result 1 with target stdout.
-# We modified response to auto_quit so that LWDAQ quits when the we
-# enter the Idle state after executing one or more steps.
+# Version 43: We add support for the disable: field. We add the
+# Acquisifier_put_field and Acquisifier_get_field routines so we can name fields
+# without adding the colon.
+
+# Version 44: We adjust the call to LWDAQ_socket_close in the result upload so
+# it no longer specifies an empty termination string.
+
+# Version 45: Default is now upload_step_result 1 with target stdout. We
+# modified response to auto_quit so that LWDAQ quits when the we enter the Idle
+# state after executing one or more steps.
 
 # Version 46: Fix error generated when close window during operation.
 
-# Version 47: Add device analysis option with analyze checkbutton. 
-# Add script List button. Expand step entry box and allow entry of
-# step names as well as step numbers.
+# Version 47: Add device analysis option with analyze checkbutton. Add script
+# List button. Expand step entry box and allow entry of step names as well as
+# step numbers.
 
 # Version 48: Stopped double-printing of error messages.
 
 # Version 49: Switched to global num_lines_keep.
 
-# Version 50: Text window now includes horizontal scroll bar and does
-# not wrap.
+# Version 50: Text window now includes horizontal scroll bar and does not wrap.
 
 # Version 51: Disabled steps do not upload their step results.
 
 # Version 52: Allow colons in post-processing.
 
-# Version 53: Corrected some problems with error-handling during acquire
-# steps. Previous behavior passed error string in the result variable to
-# post processing, which would lead to a post-processing error, and it would
-# be this post-processing error that was reported. Now the post-processing
-# error, and other errors consequent to the original error, are not reported.
-# Only the original error is reported.
+# Version 53: Corrected some problems with error-handling during acquire steps.
+# Previous behavior passed error string in the result variable to post
+# processing, which would lead to a post-processing error, and it would be this
+# post-processing error that was reported. Now the post-processing error, and
+# other errors consequent to the original error, are not reported. Only the
+# original error is reported.
 
 # Version 54: Change the print-out colors.
 
 # Version 55: Handle missing step types, malformed or missing step types.
 
-# Version 57: Default step parameter values are re-applied on each acquire
-# step, instead of being applied at the time of the default step only. When
-# we load a new script, we delete all default parameter values and all default
+# Version 57: Default step parameter values are re-applied on each acquire step,
+# instead of being applied at the time of the default step only. When we load a
+# new script, we delete all default parameter values and all default
 # post-processing.
 
 # Version 58: Fixed failure to preserve parameter values containing spaces. Add
 # "forgetful" flag to make forgetting previously-defined default parameter
-# values optional, and set the default to "not forgetful". This follows revelation
-# at CERN that they run one script to set up the default parameters, and then
-# run their successive acquisition scripts afterwards. [16-FEB-22]
+# values optional, and set the default to "not forgetful". This follows
+# revelation at CERN that they run one script to set up the default parameters,
+# and then run their successive acquisition scripts afterwards. [16-FEB-22]
 
 proc Acquisifier_init {} {
 	upvar #0 Acquisifier_info info

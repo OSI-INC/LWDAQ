@@ -38,6 +38,7 @@ proc Tool_Starter_init {} {
 	set config(auto_load) 0
 	set config(auto_run) 0
 	set config(auto_quit) 0
+	set config(cleanup) 1
 	set config(title_color) purple
 	set config(analysis_color) brown
 	set config(result_color) darkgreen
@@ -480,7 +481,9 @@ proc Tool_Starter_execute {} {
 		set f [open $sfn r]
 		set commands [read $f]
 		close $f
-		append commands "\n"
+		
+		# Compose the spawned process configuration file name.
+		set cfn [file join [file dirname $config(daq_script)] $tool\_start.tcl]
 
 		# Generate commands to adjust the tool's configuration parameters.
 		foreach {p v} [Tool_Starter_get_config $info(step)] {
@@ -491,8 +494,11 @@ proc Tool_Starter_execute {} {
 		# Append the configuration commands.
 		append commands [Tool_Starter_get_field $info(step) "commands"]
 		
+		# If "cleanup" is checked, we add a command that deletes the 
+		# configuration file.
+		if {$config(cleanup)} {append commands "file delete \"$cfn\"\n"}
+		
 		# Create configuration file
-		set cfn [file join [file dirname $config(daq_script)] $tool\_start.tcl]
 		set f [open $cfn w]
 		puts $f $commands
 		close $f
@@ -502,21 +508,15 @@ proc Tool_Starter_execute {} {
 		# Spawn the tool with configuration file.
 		cd $LWDAQ_Info(program_dir)
 		switch $LWDAQ_Info(os) {
-			"MacOS" {
-				exec ./lwdaq --child $cfn &
-			}
-			"Windows" {
-				exec ./LWDAQ.bat --child $cfn &
-			}
-			"Linux" {
-				exec ./lwdaq --child $cfn &
-			}
+			"MacOS" {exec ./lwdaq --child $cfn &}
+			"Windows" {exec ./LWDAQ.bat --child $cfn &}
+			"Linux" {exec ./lwdaq --child $cfn &}
 		}
 	}
 	
 	if {$step_type == "starter"} {
-		set pp [Tool_Starter_get_field $info(step) "commands"]
-		if {[catch {eval $pp} error_result]} {
+		set commands [Tool_Starter_get_field $info(step) "commands"]
+		if {[catch {eval $commands} error_result]} {
 			if {![LWDAQ_is_error_result $result]} {
 				set result "ERROR: $error_result"
 			}
@@ -546,12 +546,10 @@ proc Tool_Starter_execute {} {
 	}
 	if {($info(control) == "Run") && ($info(step) == $info(num_steps))} {
 		LWDAQ_print $info(text) "\nEnd" $config(title_color)
+		if {$config(auto_quit)} {exit}
 	}
 	
 	set info(control) "Idle"
-	
-	if {$config(auto_quit)} {exit}
-	
 	return $result
 }
 
@@ -568,7 +566,7 @@ proc Tool_Starter_open {} {
 	
 	label $f.l1 -textvariable Tool_Starter_info(control) -width 16 -fg blue
 	label $f.l2 -text "Step" -width 4
-	entry $f.l3 -textvariable Tool_Starter_info(step) -width 25
+	entry $f.l3 -textvariable Tool_Starter_info(step) -width 10
 	label $f.l4 -text "of" -width 2
 	label $f.l5 -textvariable Tool_Starter_info(num_steps) -width 5
 	pack $f.l1 $f.l2 $f.l3 $f.l4 $f.l5 -side left -expand 1
@@ -581,7 +579,7 @@ proc Tool_Starter_open {} {
 	set f $w.controls
 	frame $f
 	pack $f -side top -fill x
-	foreach a {Stop Step Previous Repeat_Previous Run Repeat_Run Reset} {
+	foreach a {Stop Step Previous Repeat_Previous Run Reset} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Tool_Starter_command $a"
 		pack $f.$b -side left -expand 1
@@ -601,13 +599,11 @@ proc Tool_Starter_open {} {
 		button $f.$b -text $a -command "LWDAQ_post Tool_Starter_$b\_script"
 		pack $f.$b -side left -expand 1
 	}
-
-
+	
 	set f $w.checkbuttons
 	frame $f
 	pack $f -side top -fill x
-	foreach a {Extended_Acquisition Analyze Upload_Step_Result \
-			Restore_Instruments Forgetful} {
+	foreach a {Auto_Quit Auto_Run Auto_Load Cleanup} {
 		set b [string tolower $a]
 		checkbutton $f.c$b -text $a -variable Tool_Starter_config($b)
 		pack $f.c$b -side left -expand 1
@@ -626,7 +622,7 @@ if {$Tool_Starter_config(auto_load)} {
 }
 
 if {$Tool_Starter_config(auto_run)} {
-		Tool_Starter_command Run
+	Tool_Starter_command Run
 }
 
 # This is the final return. There must be no tab or space in
