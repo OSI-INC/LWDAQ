@@ -211,7 +211,7 @@ proc Neurorecorder_init {} {
 #
 # The Save button in the Configuration Panel allows you to save your own
 # configuration parameters to disk a file called settings_file_name. This
-# file was declared earlier in LWDAQ_tool_startup. Now we check to see
+# file was declared earlier in LWDAQ_tool_init. Now we check to see
 # if there is such a file, and if so we read it in and execute the TCL
 # commands it contains. Each of the commands sets an element in the 
 # configuration array. Try pressing the Save button and look for the

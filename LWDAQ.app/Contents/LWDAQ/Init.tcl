@@ -166,11 +166,12 @@ if {[catch {
 	set LWDAQ_Info(program_dir) [file normalize [file join $LWDAQ_Info(contents_dir) .. ..]]
 	set LWDAQ_Info(lib_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
 	set LWDAQ_Info(package_dir) [file join $LWDAQ_Info(lib_dir) Packages]
-	set LWDAQ_Info(spawn_dir) [file join $LWDAQ_Info(lib_dir) Spawn]
 	set LWDAQ_Info(scripts_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
 	set LWDAQ_Info(tools_dir) [file join $LWDAQ_Info(program_dir) Tools]
+	set LWDAQ_Info(spawn_dir) [file join $LWDAQ_Info(tools_dir) Spawn]
 	set LWDAQ_Info(sources_dir)  [file join $LWDAQ_Info(program_dir) Sources]
 	set LWDAQ_Info(instruments_dir) [file join $LWDAQ_Info(scripts_dir) Instruments]
+	set LWDAQ_Info(temporary_dir) [file join $LWDAQ_Info(scripts_dir) Temporary]
 	set LWDAQ_Info(startup_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Startup]
 	set LWDAQ_Info(working_dir) $LWDAQ_Info(program_dir)
 	

@@ -1,8 +1,8 @@
-# Format Traxmaker or Kicad Netlist and Create Updated Drill File. [30-OCT-20]
+# Format Traxmaker or Kicad Netlist and Create Updated Drill File. [14-APR-22]
 
 # Get the file name of the netlist created by Traxmaker. Read its contents.
 set fn [LWDAQ_get_file_name]
-if {$fn == ""} {exit}
+if {$fn == ""} {return}
 set f [open $fn]
 set contents [read $f]
 close $f

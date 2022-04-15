@@ -101,7 +101,6 @@ proc Videoarchiver_init {} {
 	set info(tcp_port) "2222"
 	set info(tcl_port) "2223"
 	set info(library_archive) "http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
-	
 	# These are the camera versions and their resolutions and framerates.
 	set config(versions) [list {A3034B-HR 820 616 20 23} {A3034B-LR 410 308 30 15}]
 	
@@ -169,7 +168,7 @@ echo "SUCCESS"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
 	set config(restart_wait_s) "30"
-	
+
 	# Monitor parameters
 	set config(monitor_speed) "1.0"
 	set config(display_zoom) "1.0"

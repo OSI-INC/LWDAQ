@@ -1,4 +1,4 @@
-# Tool Starter is a LWDAQ Tool that opens, configures, and launches
+# Startup_Manager is a LWDAQ Tool that opens, configures, and launches
 # multiple LWDAQ tools so as to simplify re-starting an experiment.
 # The program is similar to the Acquisifier in the way it reads in 
 # a script in a custom format to perform its functions.
@@ -20,12 +20,12 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
-proc Tool_Starter_init {} {
-	upvar #0 Tool_Starter_info info
-	upvar #0 Tool_Starter_config config
+proc Startup_Manager_init {} {
+	upvar #0 Startup_Manager_info info
+	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tool_Starter" 1.0
+	LWDAQ_tool_init "Startup_Manager" 1.0
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -52,11 +52,11 @@ proc Tool_Starter_init {} {
 }
 
 #
-# Tool_Starter_command handles a button press requesting the execution of a command.
-# If appropriate, the routine sets the Tool_Starter in motion.
+# Startup_Manager_command handles a button press requesting the execution of a command.
+# If appropriate, the routine sets the Startup_Manager in motion.
 #
-proc Tool_Starter_command {command} {
-	upvar #0 Tool_Starter_info info
+proc Startup_Manager_command {command} {
+	upvar #0 Startup_Manager_info info
 	global LWDAQ_Info
 	
 	if {$command == $info(control)} {
@@ -74,9 +74,9 @@ proc Tool_Starter_command {command} {
 			return 1
 		}
 		set info(control) "Stop"
-		set event_pending [string match "Tool_Starter*" $LWDAQ_Info(current_event)]
+		set event_pending [string match "Startup_Manager*" $LWDAQ_Info(current_event)]
 		foreach event $LWDAQ_Info(queue_events) {
-			if {[string match "Tool_Starter*" $event]} {
+			if {[string match "Startup_Manager*" $event]} {
 				set event_pending 1
 	 		}
 		}
@@ -88,7 +88,7 @@ proc Tool_Starter_command {command} {
 	
 	if {$info(control) == "Idle"} {
 		set info(control) $command
-		LWDAQ_post Tool_Starter_execute
+		LWDAQ_post Startup_Manager_execute
 		return 1
 	} 
 	
@@ -99,75 +99,75 @@ proc Tool_Starter_command {command} {
 #
 # Find and remember the data acquisition script.
 #
-proc Tool_Starter_browse_daq_script {} {
-	upvar #0 Tool_Starter_config config
+proc Startup_Manager_browse_daq_script {} {
+	upvar #0 Startup_Manager_config config
 	set f [LWDAQ_get_file_name]
 	if {$f != ""} {set config(daq_script) $f}
 }
 
 #
-# Tool_Starter_get_param_index returns the list-style index of the value of the
+# Startup_Manager_get_param_index returns the list-style index of the value of the
 # parameter named $param_name in step number $step_num in the current
 # starter script. This script is stored in info(steps). Thus the value of
 # parameter $param_name in step number $step_num is the N'th list element in the
 # string that defines step number $step_num, where N is the value returned by
 # this routine. If N=0, there is no such parameter named in the script.
 #
-proc Tool_Starter_get_param_index {step_num param_name} {
-	upvar #0 Tool_Starter_info info
+proc Startup_Manager_get_param_index {step_num param_name} {
+	upvar #0 Startup_Manager_info info
 	set e [lindex $info(steps) $step_num]
 	set index [expr [lsearch $e "$param_name"] + 1]
 	return $index
 }
 
 #
-# Tool_Starter_get_param returns the value of the parameter named param_name in step
+# Startup_Manager_get_param returns the value of the parameter named param_name in step
 # step_num of the current starter script. If there is no such parameter,
 # the routine returns and empty string.
 #
-proc Tool_Starter_get_param {step_num param_name} {
-	upvar #0 Tool_Starter_info info
-	set index [Tool_Starter_get_param_index $step_num $param_name]
+proc Startup_Manager_get_param {step_num param_name} {
+	upvar #0 Startup_Manager_info info
+	set index [Startup_Manager_get_param_index $step_num $param_name]
 	if {$index == 0} {return ""}
 	return [lindex $info(steps) $step_num $index]
 }
 
 #
-# Tool_Starter_put_param sets the value of the parameter named param_name in step
+# Startup_Manager_put_param sets the value of the parameter named param_name in step
 # step_num of the currrent Acqusifier script. If there is no such parameter,
 # the routine does nothing.
 #
-proc Tool_Starter_put_param {step_num param_name value} {
-	upvar #0 Tool_Starter_info info
-	set index [Tool_Starter_get_param_index $step_num $param_name]
+proc Startup_Manager_put_param {step_num param_name value} {
+	upvar #0 Startup_Manager_info info
+	set index [Startup_Manager_get_param_index $step_num $param_name]
 	if {$index == 0} {return 0}
 	lset info(steps) $step_num $index $value
 	return 1
 }
 
 #
-# Tool_Starter_get_field returns the value of the field named field_name in step
+# Startup_Manager_get_field returns the value of the field named field_name in step
 # step_num of the current starter script. If there is no such field, the
 # routine returns and empty string.
 #
-proc Tool_Starter_get_field {step_num field_name} {
-	return [Tool_Starter_get_param $step_num "$field_name\:"]
+proc Startup_Manager_get_field {step_num field_name} {
+	return [Startup_Manager_get_param $step_num "$field_name\:"]
 }
 
 #
-# Tool_Starter_put_field sets the value of the field named field_name in step
+# Startup_Manager_put_field sets the value of the field named field_name in step
 # step_num of the currrent Acqusifier script. If there is no such field, the
 # routine does nothing.
 #
-proc Tool_Starter_put_field {step_num field_name value} {
-	return [Tool_Starter_put_param $step_num "$field_name\:" $value]
+proc Startup_Manager_put_field {step_num field_name value} {
+	return [Startup_Manager_put_param $step_num "$field_name\:" $value]
 }
 
 #
-# Tool_Starter_get_config returns the configuration field of a step.
+# Startup_Manager_get_config returns the configuration field of a step.
 #
-proc Tool_Starter_get_config {step_num} {
-	upvar #0 Tool_Starter_info info
+proc Startup_Manager_get_config {step_num} {
+	upvar #0 Startup_Manager_info info
 	
 	set step [lindex $info(steps) $step_num]
 	set i_start [string first "config:" $step]
@@ -182,13 +182,13 @@ proc Tool_Starter_get_config {step_num} {
 }
 
 #
-# Tool_Starter_step_list_print prints a list of steps to a text widget. It is
+# Startup_Manager_step_list_print prints a list of steps to a text widget. It is
 # used by the list_script and load_script routines. If num_lines > 0, the
 # routine prints the first num_lines steps and the last num_lines steps.
 #
-proc Tool_Starter_step_list_print {text_widget num_lines} {
-	upvar #0 Tool_Starter_info info
-	upvar #0 Tool_Starter_config config
+proc Startup_Manager_step_list_print {text_widget num_lines} {
+	upvar #0 Startup_Manager_info info
+	upvar #0 Startup_Manager_config config
 
 	LWDAQ_print $text_widget "[format {%6s} Step] \
 			[format {%-12s} Type] \
@@ -199,9 +199,9 @@ proc Tool_Starter_step_list_print {text_widget num_lines} {
 		if {[lsearch {run spawn starter} $type] < 0} {
 			set type "UNKNOWN"
 		}
-		set name [Tool_Starter_get_field $step_num "name"]
+		set name [Startup_Manager_get_field $step_num "name"]
 		if {$name == ""} {set name "None"}
-		set instrument [Tool_Starter_get_field $step_num "tool"]
+		set instrument [Startup_Manager_get_field $step_num "tool"]
 		if {$instrument == ""} {set instrument "None"}
 		LWDAQ_print $text_widget \
 			"[format {%6d} $step_num] \
@@ -221,12 +221,12 @@ proc Tool_Starter_step_list_print {text_widget num_lines} {
 }
 
 #
-# Tool_Starter_load_script loads a script into memory from a file. If we specify no
+# Startup_Manager_load_script loads a script into memory from a file. If we specify no
 # file, the routine uses the file name given in config(daq_script).
 #
-proc Tool_Starter_load_script {{fn ""}} {
-	upvar #0 Tool_Starter_info info
-	upvar #0 Tool_Starter_config config
+proc Startup_Manager_load_script {{fn ""}} {
+	upvar #0 Startup_Manager_info info
+	upvar #0 Startup_Manager_config config
 	
 	if {$info(control) == "Load_Script"} {return}
 	if {$info(control) != "Idle"} {
@@ -267,7 +267,7 @@ proc Tool_Starter_load_script {{fn ""}} {
 	}
 
 	# Print a summary of the script to the screen.
-	Tool_Starter_step_list_print $info(text) $config(num_steps_show)	
+	Startup_Manager_step_list_print $info(text) $config(num_steps_show)	
 	LWDAQ_print $info(text) "Load okay." $config(result_color)
 	
 	set info(control) "Idle"
@@ -275,11 +275,11 @@ proc Tool_Starter_load_script {{fn ""}} {
 }
 
 #
-# Tool_Starter_list_script prints an entire script to a separate window.
+# Startup_Manager_list_script prints an entire script to a separate window.
 #
-proc Tool_Starter_list_script {} {
-	upvar #0 Tool_Starter_info info
-	upvar #0 Tool_Starter_config config
+proc Startup_Manager_list_script {} {
+	upvar #0 Startup_Manager_info info
+	upvar #0 Startup_Manager_config config
 
 	set w $info(window)\.list
 	if {[winfo exists $w]} {destroy $w}
@@ -287,17 +287,17 @@ proc Tool_Starter_list_script {} {
 	wm title $w "Step List"
 	set step_list ""
 	set t [LWDAQ_text_widget $w 80 20]
-	Tool_Starter_step_list_print $t 0
+	Startup_Manager_step_list_print $t 0
 
 	return 1
 }
 
 #
-# Tool_Starter_script_string returns a string version of the current script.
+# Startup_Manager_script_string returns a string version of the current script.
 #
-proc Tool_Starter_script_string {} {
-	upvar #0 Tool_Starter_info info
-	upvar #0 Tool_Starter_config config
+proc Startup_Manager_script_string {} {
+	upvar #0 Startup_Manager_info info
+	upvar #0 Startup_Manager_config config
 
 	set s ""
 	
@@ -345,13 +345,13 @@ proc Tool_Starter_script_string {} {
 }
 
 #
-# Tool_Starter_execute performs a step, run, or stop. We control the routine through
+# Startup_Manager_execute performs a step, run, or stop. We control the routine through
 # the control parameter in the info array, which we also display in the graphical 
 # window, should such a window exist.
 #
-proc Tool_Starter_execute {} {
-	upvar #0 Tool_Starter_info info
-	upvar #0 Tool_Starter_config config
+proc Startup_Manager_execute {} {
+	upvar #0 Startup_Manager_info info
+	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info
 
 	# If the info array has been destroyed, abort.	
@@ -363,7 +363,7 @@ proc Tool_Starter_execute {} {
 		return 1
 	}
 	
-	# If the window is closed, quit the Tool_Starter.
+	# If the window is closed, quit the Startup_Manager.
 	if {$LWDAQ_Info(gui_enabled) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
@@ -375,7 +375,7 @@ proc Tool_Starter_execute {} {
 		LWDAQ_print $info(text) "\nSearching for step \"$info(step)\"..." \
 			$config(title_color)
 		for {set i 1} {$i <= $info(num_steps)} {incr i} {
-			set name [Tool_Starter_get_field $i "name"]
+			set name [Startup_Manager_get_field $i "name"]
 			if {$name == $info(step)} {
 				set info(step) $i
 				LWDAQ_print $info(text) "Done." $config(title_color)
@@ -411,11 +411,11 @@ proc Tool_Starter_execute {} {
 
 	# Obtain the name of the step. Some steps may have no specific name, in
 	# which case we assign a default name which is the step type.
-	set name [Tool_Starter_get_field $info(step) "name"]
+	set name [Startup_Manager_get_field $info(step) "name"]
 	if {$name == ""} {set name $step_type\_$info(step)}
 	
 	# Determine the tool name, if any.
-	set tool [Tool_Starter_get_field $info(step) "tool"]
+	set tool [Startup_Manager_get_field $info(step) "tool"]
 	if {$tool == ""} {set tool "None"}
 	
 	# Print a title line to the screen.
@@ -428,11 +428,11 @@ proc Tool_Starter_execute {} {
 	}
 
 	# Read this step's metadata out of the script.
-	set metadata [Tool_Starter_get_field $info(step) "metadata"]
+	set metadata [Startup_Manager_get_field $info(step) "metadata"]
 	
 	# Read this step's disable value. If it's defined as non-zero, 
 	# we set the step type to "disabled".
-	set disable [Tool_Starter_get_field $info(step) "disable"]
+	set disable [Startup_Manager_get_field $info(step) "disable"]
 	if {($disable != "") && ($disable != "0")} {set step_type "disabled"}
 		
 	# Set the default result string.
@@ -452,7 +452,7 @@ proc Tool_Starter_execute {} {
 		upvar #0 $tool\_config tconfig
 		
 		# Adjust the tool's configuration parameters.
-		foreach {p v} [Tool_Starter_get_config $info(step)] {
+		foreach {p v} [Startup_Manager_get_config $info(step)] {
 			if {[info exists tconfig($p)]} {
 				set tconfig($p) $v
 				LWDAQ_print $info(text) "$p = \"$v\""
@@ -462,7 +462,7 @@ proc Tool_Starter_execute {} {
 		}
 		
 		# Execute the startup commands.
-		set pp [Tool_Starter_get_field $info(step) "commands"]
+		set pp [Startup_Manager_get_field $info(step) "commands"]
 		if {[catch {eval $pp} error_result]} {
 			if {![LWDAQ_is_error_result $result]} {
 				set result "ERROR: $error_result"
@@ -478,21 +478,30 @@ proc Tool_Starter_execute {} {
 		if {![file exists $sfn]} {
 			set result "ERROR: Cannot find \"$tool\" in spawn directory."
 		}
-		set f [open $sfn r]
-		set commands [read $f]
-		close $f
 		
-		# Compose the spawned process configuration file name.
-		set cfn [file join [file dirname $config(daq_script)] $tool\_start.tcl]
+		# Compose the spawned process configuration file name and initialized the
+		# command string.
+		set cfn [file join $LWDAQ_Info(temporary_dir) $tool\_$info(step).tcl]
+		set commands ""
 
+		# Generate commands to spawn the tool.
+		append commands "set $tool\_mode Child\n"
+		append commands "LWDAQ_run_tool $tool\.tcl\n"
+		append commands {
+switch $LWDAQ_Info(os) {
+	"MacOS" {.menubar delete 1 2}
+	"Windows" {.menubar delete 3 4}
+	"Linux" {.menubar delete 3 4}
+}
+}
 		# Generate commands to adjust the tool's configuration parameters.
-		foreach {p v} [Tool_Starter_get_config $info(step)] {
+		foreach {p v} [Startup_Manager_get_config $info(step)] {
 			append commands "set $tool\_config($p) \"$v\"\n"				
 			LWDAQ_print $info(text) "$p = \"$v\""
 		}
 		
 		# Append the configuration commands.
-		append commands [Tool_Starter_get_field $info(step) "commands"]
+		append commands [Startup_Manager_get_field $info(step) "commands"]
 		
 		# If "cleanup" is checked, we add a command that deletes the 
 		# configuration file.
@@ -515,7 +524,7 @@ proc Tool_Starter_execute {} {
 	}
 	
 	if {$step_type == "starter"} {
-		set commands [Tool_Starter_get_field $info(step) "commands"]
+		set commands [Startup_Manager_get_field $info(step) "commands"]
 		if {[catch {eval $commands} error_result]} {
 			if {![LWDAQ_is_error_result $result]} {
 				set result "ERROR: $error_result"
@@ -541,7 +550,7 @@ proc Tool_Starter_execute {} {
 	# Adjust the step number and decide whether to post another step
 	# execution now.
 	if {($info(control) == "Run") && ($info(step) < $info(num_steps))} {
-		LWDAQ_post Tool_Starter_execute
+		LWDAQ_post Startup_Manager_execute
 		return $result
 	}
 	if {($info(control) == "Run") && ($info(step) == $info(num_steps))} {
@@ -553,27 +562,27 @@ proc Tool_Starter_execute {} {
 	return $result
 }
 
-proc Tool_Starter_open {} {
-	upvar #0 Tool_Starter_config config
-	upvar #0 Tool_Starter_info info
+proc Startup_Manager_open {} {
+	upvar #0 Startup_Manager_config config
+	upvar #0 Startup_Manager_info info
 	
-	set w [LWDAQ_tool_open Tool_Starter]
+	set w [LWDAQ_tool_open Startup_Manager]
 	if {$w == ""} {return 0}
 	
 	set f $w.setup
 	frame $f
 	pack $f -side top -fill x
 	
-	label $f.l1 -textvariable Tool_Starter_info(control) -width 16 -fg blue
+	label $f.l1 -textvariable Startup_Manager_info(control) -width 16 -fg blue
 	label $f.l2 -text "Step" -width 4
-	entry $f.l3 -textvariable Tool_Starter_info(step) -width 10
+	entry $f.l3 -textvariable Startup_Manager_info(step) -width 10
 	label $f.l4 -text "of" -width 2
-	label $f.l5 -textvariable Tool_Starter_info(num_steps) -width 5
+	label $f.l5 -textvariable Startup_Manager_info(num_steps) -width 5
 	pack $f.l1 $f.l2 $f.l3 $f.l4 $f.l5 -side left -expand 1
 
-	button $f.configure -text Configure -command "LWDAQ_tool_configure Tool_Starter"
+	button $f.configure -text Configure -command "LWDAQ_tool_configure Startup_Manager"
 	pack $f.configure -side left -expand 1
-	button $f.help -text Help -command "LWDAQ_tool_help Tool_Starter"
+	button $f.help -text Help -command "LWDAQ_tool_help Startup_Manager"
 	pack $f.help -side left -expand 1
 
 	set f $w.controls
@@ -581,7 +590,7 @@ proc Tool_Starter_open {} {
 	pack $f -side top -fill x
 	foreach a {Stop Step Previous Repeat_Previous Run Reset} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "Tool_Starter_command $a"
+		button $f.$b -text $a -command "Startup_Manager_command $a"
 		pack $f.$b -side left -expand 1
 	}
 
@@ -590,13 +599,13 @@ proc Tool_Starter_open {} {
 	pack $f -side top -fill x
 
 	label $f.title -text "Script:"
-	entry $f.entry -textvariable Tool_Starter_config(daq_script) -width 45
-	button $f.browse -text Browse -command [list LWDAQ_post Tool_Starter_browse_daq_script]
+	entry $f.entry -textvariable Startup_Manager_config(daq_script) -width 45
+	button $f.browse -text Browse -command [list LWDAQ_post Startup_Manager_browse_daq_script]
 	pack $f.title $f.entry $f.browse -side left -expand 1
 
 	foreach a {Load Store List} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post Tool_Starter_$b\_script"
+		button $f.$b -text $a -command "LWDAQ_post Startup_Manager_$b\_script"
 		pack $f.$b -side left -expand 1
 	}
 	
@@ -605,7 +614,7 @@ proc Tool_Starter_open {} {
 	pack $f -side top -fill x
 	foreach a {Auto_Quit Auto_Run Auto_Load Cleanup} {
 		set b [string tolower $a]
-		checkbutton $f.c$b -text $a -variable Tool_Starter_config($b)
+		checkbutton $f.c$b -text $a -variable Startup_Manager_config($b)
 		pack $f.c$b -side left -expand 1
 	}
 	
@@ -614,15 +623,15 @@ proc Tool_Starter_open {} {
 	return 1
 }
 
-Tool_Starter_init
-Tool_Starter_open
+Startup_Manager_init
+Startup_Manager_open
 
-if {$Tool_Starter_config(auto_load)} {
-	Tool_Starter_load_script
+if {$Startup_Manager_config(auto_load)} {
+	Startup_Manager_load_script
 }
 
-if {$Tool_Starter_config(auto_run)} {
-	Tool_Starter_command Run
+if {$Startup_Manager_config(auto_run)} {
+	Startup_Manager_command Run
 }
 
 # This is the final return. There must be no tab or space in
@@ -632,6 +641,6 @@ return 1
 
 ----------Begin Help----------
 
-The Tool_Starter tool uses a starter script on disk to open and start the operation of LWDAQ tools.
+The Startup_Manager tool uses a starter script on disk to open and start the operation of LWDAQ tools.
 
 ----------End Help----------

@@ -330,7 +330,8 @@ proc LWDAQ_make_tool_menu {} {
 	if {[llength $allsubdirs] != 0} {
 		foreach d $allsubdirs {
 			if {[llength [glob -nocomplain [file join $d *.tcl]]] != 0} {
-				if {$d != [file join $info(tools_dir) Data]} {lappend toolsubdirs $d}
+				if {($d != [file join $info(tools_dir) Data]) \
+					&& ($d != [file join $info(tools_dir) Spawn])} {lappend toolsubdirs $d}
 			}
 		}
 	}

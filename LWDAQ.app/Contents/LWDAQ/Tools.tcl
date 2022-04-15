@@ -141,7 +141,10 @@ proc LWDAQ_run_tool {{file_name ""}} {
 			if {![file exists $fn]} {
 				set fn [file join $LWDAQ_Info(tools_dir) More $file_name]
 				if {![file exists $fn]} {
-					error "Cannot find tool file \"$file_name\""
+					set fn [file join $LWDAQ_Info(tools_dir) Spawn $file_name]
+					if {![file exists $fn]} {
+						error "Cannot find tool file \"$file_name\""
+					}
 				}
 			}
 		}
@@ -157,10 +160,21 @@ proc LWDAQ_run_tool {{file_name ""}} {
 # but instead presents the Tool window. 
 #
 proc LWDAQ_spawn_tool {tool} {
-	upvar LWDAQ_Info info
-	cd $info(program_dir)
-	set fn [file join $info(spawn_dir) $tool\.tcl]
-	switch $info(os) {
+	global LWDAQ_Info
+	cd $LWDAQ_Info(program_dir)
+	set fn [file join $LWDAQ_Info(temporary_dir) $tool\.tcl]
+	set f [open $fn w]
+	puts $f "set $tool\_mode Child"
+	puts $f "LWDAQ_run_tool $tool\.tcl"
+	puts $f {
+switch $LWDAQ_Info(os) {
+	"MacOS" {.menubar delete 1 2}
+	"Windows" {.menubar delete 3 4}
+	"Linux" {.menubar delete 3 4}
+}
+	}
+	close $f
+	switch $LWDAQ_Info(os) {
 		"MacOS" {
 			exec ./lwdaq --child $fn &
 		}
@@ -175,38 +189,12 @@ proc LWDAQ_spawn_tool {tool} {
 }
 
 #
-# LWDAQ_tool_startup initializes the tool directory and file variables.
-# We are retiring this routine, but keep in for backward-compatibility
-# with older versions of LWDAQ. Before LWDAQ 7.1.10, a solitary too
-# script in the Startup directory would use the main TK window, which
-# is the one called ".". But we dropped this feature in 7.1.10.
-#
-proc LWDAQ_tool_startup {name} {
-	upvar #0 $name\_info info
-	upvar #0 $name\_config config
-	global LWDAQ_Info
-	set info(name) $name
-	set info(window) [string tolower .$name]
-	set info(text) $info(window).text
-	set info(settings_file_name) \
-		[file join $LWDAQ_Info(tools_dir) Data $name\_Settings.tcl]
-	set info(tool_file_name) \
-		[file join $LWDAQ_Info(tools_dir) $name\.tcl]
-	if {![file exists $info(tool_file_name)]} {
-		set info(tool_file_name) \
-			[file join $LWDAQ_Info(tools_dir) More $name\.tcl]
-	}
-	set info(data_dir) [file join $LWDAQ_Info(tools_dir) Data]
-}
-
-#
-# LWDAQ_tool_init replaces LWDAQ_tool_startup in newer tools. It provides
-# more functionality, and requires that the calling routine, which we assume
-# is a tool initializer, checks to see if the tool window exists. If so, the
-# calling routine should abort. This routine drops support for the embedding
-# of tools in the main window when they are alone in the startup directory. 
-# This routine provides full support for tool Help and Data, so long as the 
-# tool script is in the Tools or Tools/More directory.
+# LWDAQ_tool_init provides more functionality, and requires that the calling
+# routine, which we assume is a tool initializer, checks to see if the tool
+# window exists. If so, the calling routine should abort. This routine drops
+# support for the embedding of tools in the main window when they are alone in
+# the startup directory. This routine provides full support for tool Help and
+# Data, so long as the tool script is in the Tools or Tools/More directory.
 #
 proc LWDAQ_tool_init {name version} {
 	upvar #0 $name\_info info
@@ -239,9 +227,15 @@ proc LWDAQ_tool_init {name version} {
 	if {![file exists $fn]} {
 		set fn [file join $LWDAQ_Info(tools_dir) More $name\.tcl]
 		if {![file exists $fn]} {
-			set fn [file join $LWDAQ_Info(working_dir) $name\.tcl]
+			set fn [file join $LWDAQ_Info(tools_dir) Spawn $name\.tcl]
 			if {![file exists $fn]} {
-				set fn $name\.tcl
+				set fn [file join $LWDAQ_Info(working_dir) $name\.tcl]
+				if {![file exists $fn]} {
+					set fn $name\.tcl
+					if {![file exists $fn]} {
+						error "Cannot find tool file \"$fn\"."
+					}
+				}
 			}
 		}
 	}
