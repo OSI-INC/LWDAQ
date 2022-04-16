@@ -38,7 +38,7 @@ proc Startup_Manager_init {} {
 	set config(auto_load) 0
 	set config(auto_run) 0
 	set config(auto_quit) 0
-	set config(cleanup) 1
+	set config(forgetful) 0
 	set config(title_color) purple
 	set config(analysis_color) brown
 	set config(result_color) darkgreen
@@ -196,7 +196,7 @@ proc Startup_Manager_step_list_print {text_widget num_lines} {
 			[format {%-12s} Tool]" $config(title_color)
 	for {set step_num 1} {$step_num <= $info(num_steps)} {incr step_num} {
 		set type [string replace [lindex $info(steps) $step_num 0] end end ""]
-		if {[lsearch {run spawn starter} $type] < 0} {
+		if {[lsearch {starter default run spawn} $type] < 0} {
 			set type "UNKNOWN"
 		}
 		set name [Startup_Manager_get_field $step_num "name"]
@@ -236,6 +236,18 @@ proc Startup_Manager_load_script {{fn ""}} {
 	set info(step) 0
 	LWDAQ_update
 	
+	# If forgetful, unset previously-defined defaults and commands
+	if {$config(forgetful)} {
+		foreach n [array names info] {
+			if {[string match *_defaults $n]} {
+				unset info($n)
+			}
+			if {[string match *_commands $n]} {
+				unset info($n)
+			}
+		}
+	}
+
 	if {$fn == ""} {set fn $config(daq_script)}
 	LWDAQ_print $info(text) "\nLoad: $fn" $config(title_color)
 
@@ -401,11 +413,21 @@ proc Startup_Manager_execute {} {
 		incr info(step)
 		if {$info(step) > $info(num_steps)} {set info(step) 1}
 	}
+	if {$info(control) == "Repeat"} {
+	
+	}
+	if {$info(control) == "Back"} {
+		if {$info(step) == 0} {
+			LWDAQ_print $info(text) "ERROR: Cannot go back past script start."
+		} {
+			incr info(step) -1
+		}
+	}
 	
 	# Obtain the step type from the script. We take some trouble to remove the 
 	# trailing colon from the first word in the step script.
 	set step_type [string replace [lindex $info(steps) $info(step) 0] end end ""]
-	if {[lsearch {spawn run starter} $step_type] < 0} {
+	if {[lsearch {default spawn run starter} $step_type] < 0} {
 		set step_type "UNKNOWN"
 	}
 
@@ -438,6 +460,30 @@ proc Startup_Manager_execute {} {
 	# Set the default result string.
 	set result "$name okay."
 	
+	# A default step defines default commands and configuration for a tool.
+	if {$step_type == "default"} {
+		# Declare the tool configuration array for local use.
+		upvar #0 $tool\_config tconfig
+		
+		# Make a list of parameter names and their default settings, which we
+		# will apply at the start of each acquire step for this tool. 
+		set info($tool\_defaults) [list]
+		foreach {p v} [Startup_Manager_get_config $info(step)] {
+			lappend info($tool\_defaults) $p $v
+			LWDAQ_print $info(text) "$p = \"$v\""
+		}
+		
+		# Extract the default command script. If there is no such script, we
+		# obtain an empty string.
+		set cmd [Startup_Manager_get_field $info(step) "commands"]
+		set info($tool\_commands) $cmd
+		
+		# Print the default commands.
+		foreach line [split [string trim [set info($tool\_commands)]] \n] {
+			LWDAQ_print $info(text) [string trim $line]
+		}
+	}
+
 	# A run step runs a tool within the same LWDAQ process as the Tool Starter,
 	# configures the tool, and executes the step's commands in the TCL interpreter.
 	# These commands may start the tool doing something, or just complete its
@@ -451,7 +497,19 @@ proc Startup_Manager_execute {} {
 		# Declare the tool config array for local access as tconfig.
 		upvar #0 $tool\_config tconfig
 		
-		# Adjust the tool's configuration parameters.
+		# Apply the tool's default configuration parameters.
+		if {[info exists info($tool\_defaults)]} {
+			foreach {p v} [set info($tool\_defaults)] {
+				if {[info exists tconfig($p)]} {
+					set tconfig($p) $v
+					LWDAQ_print $info(text) "$p = \"$v\""
+				} elseif {![LWDAQ_is_error_result $result]} {
+					set result "ERROR: No parameter \"$p\" to assign value \"$v\"."
+				}
+			}
+		}
+		
+		# Apply the tool's configuration parameters according to this step.
 		foreach {p v} [Startup_Manager_get_config $info(step)] {
 			if {[info exists tconfig($p)]} {
 				set tconfig($p) $v
@@ -461,9 +519,18 @@ proc Startup_Manager_execute {} {
 			}
 		}
 		
-		# Execute the startup commands.
-		set pp [Startup_Manager_get_field $info(step) "commands"]
-		if {[catch {eval $pp} error_result]} {
+		# Execute default startup commands.
+		if {[info exists info($tool\_commands)]} {
+			if {[catch {eval [set info($tool\_commands)]} error_result]} {
+				if {![LWDAQ_is_error_result $result]} {
+					set result "ERROR: $error_result"
+				}
+			}		
+		}
+				
+		# Execute the startup commands defined by this step.
+		set cmd [Startup_Manager_get_field $info(step) "commands"]
+		if {[catch {eval $cmd} error_result]} {
 			if {![LWDAQ_is_error_result $result]} {
 				set result "ERROR: $error_result"
 			}
@@ -484,43 +551,42 @@ proc Startup_Manager_execute {} {
 		set cfn [file join $LWDAQ_Info(temporary_dir) $tool\_$info(step).tcl]
 		set commands ""
 
-		# Generate commands to spawn the tool.
-		append commands "set $tool\_mode Child\n"
-		append commands "LWDAQ_run_tool $tool\.tcl\n"
-		append commands {
-switch $LWDAQ_Info(os) {
-	"MacOS" {.menubar delete 1 2}
-	"Windows" {.menubar delete 3 4}
-	"Linux" {.menubar delete 3 4}
-}
-}
-		# Generate commands to adjust the tool's configuration parameters.
+		# Generate commands to apply the tool's default configuration parameters.
+		if {[info exists info($tool\_defaults)]} {
+			foreach {p v} [set info($tool\_defaults)] {
+				append commands "set $tool\_config($p) \"$v\"\n"				
+			}
+		}
+		
+		# Generate commands to adjust the tool's configuration parameters in 
+		# accordance with this steps configuration field.
 		foreach {p v} [Startup_Manager_get_config $info(step)] {
 			append commands "set $tool\_config($p) \"$v\"\n"				
-			LWDAQ_print $info(text) "$p = \"$v\""
 		}
 		
-		# Append the configuration commands.
-		append commands [Startup_Manager_get_field $info(step) "commands"]
+		# Append default startup commands.
+		if {[info exists info($tool\_commands)]} {
+			append commands [string trim [set info($tool\_commands)]]
+			append commands "\n"
+		}
+				
+		# Append the startup commands defined by this step.
+		set cmd [Startup_Manager_get_field $info(step) "commands"]
+		if {$cmd != ""} {
+			append commands [string trim $cmd]
+			append commands "\n"
+		}
 		
-		# If "cleanup" is checked, we add a command that deletes the 
-		# configuration file.
-		if {$config(cleanup)} {append commands "file delete \"$cfn\"\n"}
+		# Show the commands.
+		foreach line [split [string trim $commands] \n] {
+			LWDAQ_print $info(text) [string trim $line]
+		}
 		
-		# Create configuration file
-		set f [open $cfn w]
-		puts $f $commands
-		close $f
-		LWDAQ_print $info(text) $cfn brown
-		LWDAQ_print $info(text) $commands green
-		 
 		# Spawn the tool with configuration file.
-		cd $LWDAQ_Info(program_dir)
-		switch $LWDAQ_Info(os) {
-			"MacOS" {exec ./lwdaq --child $cfn &}
-			"Windows" {exec ./LWDAQ.bat --child $cfn &}
-			"Linux" {exec ./lwdaq --child $cfn &}
-		}
+		LWDAQ_spawn_tool $tool $commands $cfn
+		
+		# Report configuration file and process number.
+		LWDAQ_print $info(text) "Configuration file: \"$cfn\"."
 	}
 	
 	if {$step_type == "starter"} {
@@ -533,6 +599,7 @@ switch $LWDAQ_Info(os) {
 	}
 	
 	if {$step_type == "disabled"} {
+		set result "$name disabled."
 	}
 	
 	# Here we append the step name to error results so we'll know where
@@ -588,7 +655,7 @@ proc Startup_Manager_open {} {
 	set f $w.controls
 	frame $f
 	pack $f -side top -fill x
-	foreach a {Stop Step Previous Repeat_Previous Run Reset} {
+	foreach a {Stop Step Repeat Back Run Reset} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Startup_Manager_command $a"
 		pack $f.$b -side left -expand 1
@@ -612,7 +679,7 @@ proc Startup_Manager_open {} {
 	set f $w.checkbuttons
 	frame $f
 	pack $f -side top -fill x
-	foreach a {Auto_Quit Auto_Run Auto_Load Cleanup} {
+	foreach a {Auto_Quit Auto_Run Auto_Load Forgetful} {
 		set b [string tolower $a]
 		checkbutton $f.c$b -text $a -variable Startup_Manager_config($b)
 		pack $f.c$b -side left -expand 1

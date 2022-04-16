@@ -155,35 +155,45 @@ proc LWDAQ_run_tool {{file_name ""}} {
 }
 
 #
-# LWDAQ_spawn_tool runs a tool in a new and independent LWDAQ process. 
-# In the spawned LWDAQ, the main window does not contain the Quit button,
-# but instead presents the Tool window. 
+# LWDAQ_spawn_tool runs a tool in a new and independent LWDAQ process. In the
+# spawned LWDAQ, the root window does not contain the Quit button, but instead
+# presents the Tool window. When the new LWDAQ process starts up, it uses a
+# configuration file to launch the specified tool and take over the root window.
+# The tool must be designed for spawning, in that we can set a variable
+# Toolname_mode to "Child" and the tool will know it's running in a separate
+# process and will take over the main window. Otherwise the tool will open its
+# own window, and the child process will have a root window as well as the tool
+# window. We can pass in our own configuration commands into the routine through
+# the commands string, and these will be appended to the spawning commands in
+# the configuration file. We can pass a configuration file name in for the spawn
+# routine to use, in cases where we are spawning many processes consecutively,
+# each with their own custom configuration, we don't want to over-write one file
+# before it has been used. If we don't provide a file name, the spawn routine
+# generates a file in the temporary directory.
 #
-proc LWDAQ_spawn_tool {tool} {
+proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 	global LWDAQ_Info
 	cd $LWDAQ_Info(program_dir)
-	set fn [file join $LWDAQ_Info(temporary_dir) $tool\.tcl]
-	set f [open $fn w]
+	if {$cfn == ""} {
+		set cfn [file join $LWDAQ_Info(temporary_dir) $tool\.tcl]
+	}
+	set f [open $cfn w]
 	puts $f "set $tool\_mode Child"
 	puts $f "LWDAQ_run_tool $tool\.tcl"
 	puts $f {
-switch $LWDAQ_Info(os) {
-	"MacOS" {.menubar delete 1 2}
-	"Windows" {.menubar delete 3 4}
-	"Linux" {.menubar delete 3 4}
-}
+		switch $LWDAQ_Info(os) {
+			"MacOS" {.menubar delete 1 2}
+			"Windows" {.menubar delete 3 4}
+			"Linux" {.menubar delete 3 4}
+		}
 	}
+	if {$commands != ""} {puts $f $commands}
 	close $f
 	switch $LWDAQ_Info(os) {
-		"MacOS" {
-			exec ./lwdaq --child $fn &
-		}
-		"Windows" {
-			exec ./LWDAQ.bat --child $fn &
-		}
-		"Linux" {
-			exec ./lwdaq --child $fn &
-		}
+		"MacOS" {exec ./lwdaq --child $cfn &}
+		"Windows" {exec ./LWDAQ.bat --child $cfn &}
+		"Linux" {exec ./lwdaq --child $cfn &}
+		default {exec ./lwdaq --child $cfn &}
 	}
  	return $tool
 }
@@ -192,7 +202,7 @@ switch $LWDAQ_Info(os) {
 # LWDAQ_tool_init provides more functionality, and requires that the calling
 # routine, which we assume is a tool initializer, checks to see if the tool
 # window exists. If so, the calling routine should abort. This routine drops
-# support for the embedding of tools in the main window when they are alone in
+# support for the embedding of tools in the root window when they are alone in
 # the startup directory. This routine provides full support for tool Help and
 # Data, so long as the tool script is in the Tools or Tools/More directory.
 #

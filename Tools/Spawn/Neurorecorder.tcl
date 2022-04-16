@@ -87,9 +87,28 @@ proc Neurorecorder_init {} {
 #
 # Recording data acquisition parameters.
 #
-	set config(receiver_type) "?"
 	set info(receiver_options) "A3018 A3027 A3032 A3038"
 	set info(alt_options) "A3032 A3038"
+#
+# Payload lengths for various receivers.
+#
+	set info(A3032_payload) "16"
+	set info(A3038_payload) "16"
+	set info(A3038_coordinates) "\
+		0  0 2 0  12 2  0 24 2 \
+		12 0 2 12 12 2 12 24 2 \
+		24 0 2 24 12 2 24 24 2 \
+		36 0 2 36 12 2 36 24 2 \
+		48 0 2 48 12 2 48 24 2 \
+		-1 -1 -1"
+	set info(A3032_coordinates) "\
+		0 0 2  0 8 2  0 16 2 \
+		8  0 2  8 8 2  8 16 2 \
+		16 0 2 16 8 2 16 16 2 \
+		24 0 2 24 8 2 24 16 2 \
+		32 0 2 32 8 2 32 16 2"
+	set config(tracker_coordinates) ""
+	set config(tracker_background) ""
 #
 # A flag to tell us if the Neurorecorder is running with graphics.
 #
@@ -344,7 +363,7 @@ proc Neurorecorder_pick {name {post 0}} {
 }
 
 #
-# Neuroarchvier_metadata_header returns a header string for a newly-created
+# Neurorecorder_metadata_header returns a header string for a newly-created
 # archive. The header string contains one or two xml <c> fields, which we intend
 # to act as two comment fields. The first field is one we generate
 # automatically. It contains the time, host, and software version. The second
@@ -547,10 +566,12 @@ proc Neurorecorder_set_receiver {version} {
 	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info
 
+	# Set data acquisition parameters based upon receiver type.
 	switch $version {
 		"A3018" {
 			set iconfig(payload_length) 0
 			set config(tracker_coordinates) ""
+			set config(tracker_background) ""
 			Neurorecorder_print "Receiver $version\:\
 				Specify driver socket, channel select not supported."
 		}
@@ -559,26 +580,30 @@ proc Neurorecorder_set_receiver {version} {
 			set config(tracker_coordinates) ""
 			Neurorecorder_print "Receiver $version\:\
 				Specify driver socket, channel select not supported."
+			set config(tracker_background) ""
 		}
 		"A3032" {
 			set iconfig(payload_length) $info(A3032_payload)
 			set config(tracker_coordinates) $info(A3032_coordinates)
 			Neurorecorder_print "Receiver $version\:\
 				Specify driver socket, channel select not supported."
+			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
 		"A3038" {
 			set iconfig(payload_length) $info(A3038_payload)
 			set config(tracker_coordinates) $info(A3038_coordinates)
 			Neurorecorder_print "Receiver $version\:\
 				No need to specify driver socket, channel selection supported."
+			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
 		default {
 			set iconfig(payload_length) 0
 			set config(tracker_coordinates) ""
+			set config(tracker_background) ""
 		}
 	}
 
-	# Permit user to specify their own tracker coil coordinates in the recorder 
+	# User can specify their own tracker coil coordinates in the recorder
 	# customization string.
 	set alt [lindex [LWDAQ_xml_get_list $config(recorder_customization) "alt"] end]
 	if {$alt != ""} {
@@ -596,17 +621,16 @@ proc Neurorecorder_set_receiver {version} {
 			if {$count != $iconfig(payload_length)} {
 				error "found $count coordinate, need $iconfig(payload_length)"
 			}		
-			Neurorecorder_print "Writing custom coil coordinates to archive metadata."
+			Neurorecorder_print "Will write custom coil coordinates to metadata."
 			set config(tracker_coordinates) $alt
 		} message]} {
 			Neurorecorder_print "ERROR: $message, check customization string."
-			Neurorecorder_print "WARNING: Writing default coordinates\
-				to archive metadata."
+			Neurorecorder_print "WARNING: Will write default coordinates to metadata."
 		}
 	}
 
-	# Permit user to specify their own background power values for their tracker
-	# in the customization string.
+	# User can specify their own background power values for their tracker in
+	# the customization string.
 	set alt_bg [lindex [LWDAQ_xml_get_list $config(recorder_customization) "alt_bg"] end]
 	if {$alt_bg != ""} {
 		Neurorecorder_print "Found background powers in recorder customization string."
@@ -621,18 +645,15 @@ proc Neurorecorder_set_receiver {version} {
 			if {$count != $iconfig(payload_length)} {
 				error "found $count background powers, need $iconfig(payload_length)"
 			}		
-			Neurorecorder_print "Writing background powers to archive metadata."
+			Neurorecorder_print "Will write custom background powers to metadata."
 			set config(tracker_background) $alt_bg
 		} message]} {
 			Neurorecorder_print "ERROR: $message, check customization string."
-			Neurorecorder_print "WARNING: Writing default background powers to metadata."
+			Neurorecorder_print "WARNING: Will write default background to metadata."
 		}
 	}
 	
-	# Set the receiver_type parameter.
-	set config(receiver_type) $version
-
-	return $version
+	return "SUCCESS"
 }
 
 #
@@ -842,7 +863,7 @@ proc Neurorecorder_record {{command ""}} {
 		set LWDAQ_Info(max_daq_attempts) $saved_max_daq_attempts
 		
 		# If the attempt to download encountered an error, report it to the
-		# Neuroarchvier text window with the current date and time. The Receiver
+		# Neurorecorder text window with the current date and time. The Receiver
 		# Instrument will have tried to reset the data receiver. If successful,
 		# the reset will clear the data receiver's memory. The Receiver
 		# Instrument will set its acquire_end_ms parameter accordingly. We post
@@ -1013,7 +1034,7 @@ proc Neurorecorder_open {} {
 	pack $f -side top -fill x
 
 	label $f.a -text "Receiver:" -anchor w -fg $info(label_color)
-	label $f.rt -textvariable Neurorecorder_config(receiver_type)
+	label $f.rt -textvariable LWDAQ_info_Receiver(receiver_type)
 	pack $f.a $f.rt -side left
 
 	label $f.ipl -text "ip_addr:" -fg $info(label_color)

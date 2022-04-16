@@ -81,7 +81,7 @@ proc LWDAQ_utils_init {} {
 }
 
 #
-# LWDAQ_quit sends quit commands to all child processes, then exits.
+# LWDAQ_quit sends quit commands to all queued processes, then exits.
 #
 proc LWDAQ_quit {} {
 	upvar #0 LWDAQ_Info info

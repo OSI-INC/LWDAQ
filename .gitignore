@@ -3,6 +3,7 @@
 /LWDAQ.app/Contents/LWDAQ/Toolmaker.tcl
 /LWDAQ.app/Contents/LWDAQ/Packages/pkgIndex.tcl
 /LWDAQ.app/Contents/LWDAQ/Startup/*.tcl
+/LWDAQ.app/Contents/LWDAQ/Temporary/*.tcl
 /Build/*.o
 /Build/*.so
 /Build/*.dylib
