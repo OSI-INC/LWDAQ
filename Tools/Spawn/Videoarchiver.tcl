@@ -44,7 +44,7 @@ proc Videoarchiver_init {} {
 	# that window already exists. If it does exist, we abort. When we are taking
 	# over the main window, we proceed anyway.
 	switch $info(mode) {
-		"Child" {set info(window) ""}
+		"Standalone" {set info(window) ""}
 		default {
 			if {[LWDAQ_widget_exists $info(window)]} {return "ABORT"}
 		}
@@ -2543,13 +2543,13 @@ proc Videoarchiver_open {} {
 	scan [wm maxsize .] %d%d x y
 	
 	switch $info(mode) {
-		"Main" {
-			wm title $w "Videoarchiver $info(version), Running in Main Process"
-			wm maxsize $w [expr $x*2] [expr $y*2]
-		}	
-		"Child" {
-			wm title . "Videoarchiver $info(version), Running in Child Process"
+		"Standalone" {
+			wm title . "Standalone Videoarchiver $info(version)"
 			wm maxsize . [expr $x*2] [expr $y*2]
+		}	
+		default {
+			wm title $w "Videoarchiver $info(version)"
+			wm maxsize $w [expr $x*2] [expr $y*2]
 		}	
 	}
 	

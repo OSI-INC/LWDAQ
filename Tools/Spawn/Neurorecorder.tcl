@@ -31,7 +31,7 @@
 # which the Neuroplayer should operate by means of the global Neurorecorder_mode
 # variable. If this is not set, or if it is set to "Main", we create a new
 # toplevel window and construct the Neurorecorder interface in this new window.
-# If the mode is set to "Child" we take over the LWDAQ main window and construct
+# If the mode is set to "Standalone" we take over the root window and construct
 # in it the Neurorecorder interface.
 #
 proc Neurorecorder_init {} {
@@ -74,7 +74,7 @@ proc Neurorecorder_init {} {
 # the main window, we proceed anyway.
 #
 	switch $info(mode) {
-		"Child" {set info(window) ""}
+		"Standalone" {set info(window) ""}
 		default {
 			if {[LWDAQ_widget_exists $info(window)]} {return "ABORT"}
 		}
@@ -132,12 +132,16 @@ proc Neurorecorder_init {} {
 	set info(clock_id) 0
 	set info(clock_period) 256
 #
-# We now define the configuration variables that the user can look at and modify
-# in the configuration panel. We begin with the files the Neurorecorder uses to
-# record, play back, process, and report.
+# Files the Neurorecorder uses to record.
 #
 	set config(record_dir) "NONE"
-	set config(record_file) "Archive.ndf"
+	set config(record_file) "M0000000000.ndf"
+#
+# Parameters we will copy to the Receiver Instrument when we start recording.
+#
+	set config(daq_ip_addr) "10.0.0.37"
+	set config(daq_channels) "*"
+	set config(daq_driver_socket) "1"
 #
 # The verbose flag tells the Neurorecorder to print more process information in
 # its text window.
@@ -689,7 +693,6 @@ proc Neurorecorder_record {{command ""}} {
 	# If we have closed the Neurorecorder window when we are running with graphics,
 	# this indicates that the user wants all recording to stop and the Neurorecorder
 	# to close and reset.
-
 	if {$info(gui) && ![LWDAQ_widget_exists $info(window)]} {
 		array unset info
 		array unset config
@@ -711,6 +714,16 @@ proc Neurorecorder_record {{command ""}} {
 		LWDAQ_set_bg $info(record_control_label) white
 		LWDAQ_update
 	}
+	
+	# If we are going to interact with the data receiver at all, apply the
+	# Neurorecorder's receiver settings.
+	if {($info(record_control) == "Start") \
+		|| ($info(record_control) == "Record")} {
+		set iconfig(daq_ip_addr) $config(daq_ip_addr)
+		set iconfig(daq_channels) $config(daq_channels)
+		set iconfig(daq_driver_socket) $config(daq_driver_socket)
+	}
+
 
 	# If reset or autocreate, we create a new archive using the record start clock
 	# value as the timestamp in the file name, and the ndf_prefix as the the beginning
@@ -989,13 +1002,13 @@ proc Neurorecorder_open {} {
 	scan [wm maxsize .] %d%d x y
 	
 	switch $info(mode) {
-		"Main" {
-			wm title $w "Neurorecorder $info(version), Running in Main Process"
-			wm maxsize $w [expr $x*2] [expr $y*2]
+		"Standalone" {
+			wm title . "Standalone Neurorecorder $info(version)"
+			wm maxsize . [expr $x*2] [expr $y*2]
 		}	
 		default {
-			wm title . "Neurorecorder $info(version), Running in Child Process"
-			wm maxsize . [expr $x*2] [expr $y*2]
+			wm title $w "Neurorecorder $info(version)"
+			wm maxsize $w [expr $x*2] [expr $y*2]
 		}	
 	}
 	
@@ -1038,15 +1051,15 @@ proc Neurorecorder_open {} {
 	pack $f.a $f.rt -side left
 
 	label $f.ipl -text "ip_addr:" -fg $info(label_color)
-	entry $f.ipe -textvariable LWDAQ_config_Receiver(daq_ip_addr) -width 14
+	entry $f.ipe -textvariable Neurorecorder_config(daq_ip_addr) -width 14
 	pack $f.ipl $f.ipe -side left -expand yes
 
 	label $f.sl -text "driver_sckt:" -fg $info(label_color)
-	entry $f.se -textvariable LWDAQ_config_Receiver(daq_driver_socket) -width 2
+	entry $f.se -textvariable Neurorecorder_config(daq_driver_socket) -width 2
 	pack $f.sl $f.se -side left -expand yes
 
 	label $f.lchannels -text "Select:" -anchor e -fg $info(label_color)
-	entry $f.echannels -textvariable LWDAQ_config_Receiver(daq_channels) -width 20
+	entry $f.echannels -textvariable Neurorecorder_config(daq_channels) -width 20
 	pack $f.lchannels $f.echannels -side left -expand yes
 
 	label $f.fvl -text "firmware:" -fg $info(label_color)

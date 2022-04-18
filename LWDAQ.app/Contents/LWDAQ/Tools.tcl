@@ -160,16 +160,16 @@ proc LWDAQ_run_tool {{file_name ""}} {
 # presents the Tool window. When the new LWDAQ process starts up, it uses a
 # configuration file to launch the specified tool and take over the root window.
 # The tool must be designed for spawning, in that we can set a variable
-# Toolname_mode to "Child" and the tool will know it's running in a separate
-# process and will take over the main window. Otherwise the tool will open its
-# own window, and the child process will have a root window as well as the tool
-# window. We can pass in our own configuration commands into the routine through
-# the commands string, and these will be appended to the spawning commands in
-# the configuration file. We can pass a configuration file name in for the spawn
-# routine to use, in cases where we are spawning many processes consecutively,
-# each with their own custom configuration, we don't want to over-write one file
-# before it has been used. If we don't provide a file name, the spawn routine
-# generates a file in the temporary directory.
+# Toolname_mode to "Standalone" and the tool will know it's running in a
+# separate process and will take over the main window. Otherwise the tool will
+# open its own window, and the standalone process will have a root window as
+# well as the tool window. We can pass in our own configuration commands into
+# the routine through the commands string, and these will be appended to the
+# spawning commands in the configuration file. We can pass a configuration file
+# name in for the spawn routine to use, in cases where we are spawning many
+# processes consecutively, each with their own custom configuration, we don't
+# want to over-write one file before it has been used. If we don't provide a
+# file name, the spawn routine generates a file in the temporary directory.
 #
 proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 	global LWDAQ_Info
@@ -178,7 +178,7 @@ proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 		set cfn [file join $LWDAQ_Info(temporary_dir) $tool\.tcl]
 	}
 	set f [open $cfn w]
-	puts $f "set $tool\_mode Child"
+	puts $f "set $tool\_mode Standalone"
 	puts $f "LWDAQ_run_tool $tool\.tcl"
 	puts $f {
 		switch $LWDAQ_Info(os) {

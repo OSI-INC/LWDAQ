@@ -60,18 +60,18 @@ proc Startup_Manager_command {command} {
 	global LWDAQ_Info
 	
 	if {$command == $info(control)} {
-		return 1
+		return "IGNORE"
 	}
 
 	if {$command == "Reset"} {
 		if {$info(control) != "Idle"} {set info(control) "Stop"}
 		LWDAQ_reset
-		return 1
+		return "ABORT"
 	}
 	
 	if {$command == "Stop"} {
 		if {$info(control) == "Idle"} {
-			return 1
+			return "ABORT"
 		}
 		set info(control) "Stop"
 		set event_pending [string match "Startup_Manager*" $LWDAQ_Info(current_event)]
@@ -83,17 +83,17 @@ proc Startup_Manager_command {command} {
 		if {!$event_pending} {
 			set info(control) "Idle"
 		}
-		return 1
+		return "SUCCESS"
 	}
 	
 	if {$info(control) == "Idle"} {
 		set info(control) $command
 		LWDAQ_post Startup_Manager_execute
-		return 1
+		return "SUCCESS"
 	} 
 	
 	set info(control) $command
-	return 1	
+	return "SUCCESS"
 }
 
 #
@@ -228,10 +228,8 @@ proc Startup_Manager_load_script {{fn ""}} {
 	upvar #0 Startup_Manager_info info
 	upvar #0 Startup_Manager_config config
 	
-	if {$info(control) == "Load_Script"} {return}
-	if {$info(control) != "Idle"} {
-		return 0
-	}
+	if {$info(control) == "Load_Script"} {return "IGNORE"}
+	if {$info(control) != "Idle"} {return "IGNORE"}
 	set info(control) "Load_Script"
 	set info(step) 0
 	LWDAQ_update
@@ -255,14 +253,20 @@ proc Startup_Manager_load_script {{fn ""}} {
 		LWDAQ_print $info(text) "ERROR: Can't find starter script."
 		LWDAQ_print $info(text) "SUGGESTION: Press \"Browse\" and choose a script."
 		set info(control) "Idle"
-		return 0
+		return "ERROR"
 	}
 	
 	# Read file contents and remove comment lines.
 	set as "\n"
-	append as [LWDAQ_read_script $fn]
+	if {[catch {
+		append as [LWDAQ_read_script $fn]
+	} error_message]} {
+		LWDAQ_print $info(text) "ERROR: $error_message\."
+		set info(control) "Idle"
+		return "ERROR"
+	}
 	regsub -all {\n[ \t]*#[^\n]*} $as "" as
-
+	
 	# Parse steps.
 	set info(num_steps) 0
 	set index 0
@@ -283,7 +287,7 @@ proc Startup_Manager_load_script {{fn ""}} {
 	LWDAQ_print $info(text) "Load okay." $config(result_color)
 	
 	set info(control) "Idle"
-	return 1
+	return "SUCCESS"
 }
 
 #
@@ -301,7 +305,7 @@ proc Startup_Manager_list_script {} {
 	set t [LWDAQ_text_widget $w 80 20]
 	Startup_Manager_step_list_print $t 0
 
-	return 1
+	return "SUCCESS"
 }
 
 #
@@ -372,17 +376,17 @@ proc Startup_Manager_execute {} {
 	# Detect global LWDAQ reset.
 	if {$LWDAQ_Info(reset)} {
 		set info(control) "Idle"
-		return 1
+		return "ABORT"
 	}
 	
 	# If the window is closed, quit the Startup_Manager.
 	if {$LWDAQ_Info(gui_enabled) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
-		return 0
+		return "ABORT"
 	}
 	
-	# Interpret the step name, if it's not an integer
+	# Interpret the step number, in case it's a step name rather than a number.
 	if {![string is integer -strict $info(step)]} {
 		LWDAQ_print $info(text) "\nSearching for step \"$info(step)\"..." \
 			$config(title_color)
@@ -403,7 +407,7 @@ proc Startup_Manager_execute {} {
 	# Interpret the control variable.
 	if {$info(control) == "Stop"} {
 		set info(control) "Idle"
-		return 1
+		return "ABORT"
 	}
 	if {$info(control) == "Step"} {
 		incr info(step)
@@ -438,7 +442,7 @@ proc Startup_Manager_execute {} {
 	
 	# Determine the tool name, if any.
 	set tool [Startup_Manager_get_field $info(step) "tool"]
-	if {$tool == ""} {set tool "None"}
+	if {$tool == ""} {set tool "NONE"}
 	
 	# Print a title line to the screen.
 	LWDAQ_print $info(text) "\nStep $info(step), $step_type, $name, $tool" \
@@ -494,9 +498,14 @@ proc Startup_Manager_execute {} {
 			set result "ERROR: $error_result"
 		}
 
-		# Declare the tool config array for local access as tconfig.
+		# Declare the tool config and info arrays for local access as tconfig
+		# and tinfo.
 		upvar #0 $tool\_config tconfig
+		upvar #0 $tool\_info tinfo
 		
+		# Set the tool window title.
+		wm title $tinfo(window) "$tool $tinfo(version)\: $name"
+
 		# Apply the tool's default configuration parameters.
 		if {[info exists info($tool\_defaults)]} {
 			foreach {p v} [set info($tool\_defaults)] {
@@ -519,16 +528,19 @@ proc Startup_Manager_execute {} {
 			}
 		}
 		
-		# Execute default startup commands.
+		# Execute default startup commands. We perform percent substitution
+		# for the name of the step.
 		if {[info exists info($tool\_commands)]} {
-			if {[catch {eval [set info($tool\_commands)]} error_result]} {
+			set cmd [set info($tool\_commands)]
+			if {[catch {eval $cmd} error_result]} {
 				if {![LWDAQ_is_error_result $result]} {
 					set result "ERROR: $error_result"
 				}
 			}		
 		}
 				
-		# Execute the startup commands defined by this step.
+		# Execute the startup commands defined by this step. We perform percent substitution
+		# for the name of the step.
 		set cmd [Startup_Manager_get_field $info(step) "commands"]
 		if {[catch {eval $cmd} error_result]} {
 			if {![LWDAQ_is_error_result $result]} {
@@ -546,22 +558,30 @@ proc Startup_Manager_execute {} {
 			set result "ERROR: Cannot find \"$tool\" in spawn directory."
 		}
 		
-		# Compose the spawned process configuration file name and initialized the
-		# command string.
+		# Compose the spawned process configuration file name.		
 		set cfn [file join $LWDAQ_Info(temporary_dir) $tool\_$info(step).tcl]
-		set commands ""
+		
+		# Initialized the command string. We want the spawned process to have 
+		# access to the tool configuration and information arrays through 
+		# variables tconfig and tinfo, for consistency with command execution
+		# in run steps. 
+		set commands "upvar #0 $tool\_config tconfig\n"
+		append commands "upvar #0 $tool\_info tinfo\n"
+		
+		# Set the window title to include the step name.
+		append commands "wm title . \"\[wm title .]: $name\"\n"
 
 		# Generate commands to apply the tool's default configuration parameters.
 		if {[info exists info($tool\_defaults)]} {
 			foreach {p v} [set info($tool\_defaults)] {
-				append commands "set $tool\_config($p) \"$v\"\n"				
+				append commands "set tconfig($p) \"$v\"\n"				
 			}
 		}
 		
 		# Generate commands to adjust the tool's configuration parameters in 
 		# accordance with this steps configuration field.
 		foreach {p v} [Startup_Manager_get_config $info(step)] {
-			append commands "set $tool\_config($p) \"$v\"\n"				
+			append commands "set tconfig($p) \"$v\"\n"				
 		}
 		
 		# Append default startup commands.
@@ -584,9 +604,6 @@ proc Startup_Manager_execute {} {
 		
 		# Spawn the tool with configuration file.
 		LWDAQ_spawn_tool $tool $commands $cfn
-		
-		# Report configuration file and process number.
-		LWDAQ_print $info(text) "Configuration file: \"$cfn\"."
 	}
 	
 	if {$step_type == "starter"} {
@@ -687,7 +704,7 @@ proc Startup_Manager_open {} {
 	
 	set info(text) [LWDAQ_text_widget $w 90 25 1 1]
 	
-	return 1
+	return "SUCCESS"
 }
 
 Startup_Manager_init
@@ -696,7 +713,6 @@ Startup_Manager_open
 if {$Startup_Manager_config(auto_load)} {
 	Startup_Manager_load_script
 }
-
 if {$Startup_Manager_config(auto_run)} {
 	Startup_Manager_command Run
 }
