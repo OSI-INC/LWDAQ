@@ -132,7 +132,7 @@ then
 		echo "Uploading Manual.html..."
 		cp $DOCS/Manual.html $RMTDOCS/Manual.html
 		echo "Generating new Commands.html"
-		GENERATOR_SCRIPT="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Startup/Gen.tcl"
+		GENERATOR_SCRIPT="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Configuration/Gen.tcl"
 		echo "LWDAQ_command_reference; exit" | cat > $GENERATOR_SCRIPT
 		$LWDAQ_DIR/lwdaq --no-gui
 		rm $GENERATOR_SCRIPT

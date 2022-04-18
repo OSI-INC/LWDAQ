@@ -35,16 +35,15 @@ proc LWDAQ_tools_init {} {
 }
 
 #
-# LWDAQ_read_script reads a text file, which we assume to be a LWDAQ
-# tool, or some script that serves a LWDAQ tool. The routine substitutes 
-# new names for obsolete names. To see the substitutions the current 
-# version of the routine performs, enter LWDAQ_obsolete_names at the 
-# console prompt, and it will print a list of obsolete names and their
-# new values. If LWDAQ_read_script finds obsolete names, and it also
-# sees that LWDAQ_Info(quiet_update) is not set, it opens a window, 
-# warns the user which obsolete names the script file contains, and asks 
-# if the user wants to update the script file with a new file that contains 
-# the new names.
+# LWDAQ_read_script reads a text file, which we assume to be a LWDAQ tool, or
+# some script that serves a LWDAQ tool. The routine substitutes new names for
+# obsolete names. To see the substitutions the current version of the routine
+# performs, enter LWDAQ_obsolete_names at the console prompt, and it will print
+# a list of obsolete names and their new values. If LWDAQ_read_script finds
+# obsolete names, and it also sees that LWDAQ_Info(quiet_update) is not set, it
+# opens a window, warns the user which obsolete names the script file contains,
+# and asks if the user wants to update the script file with a new file that
+# contains the new names.
 #
 proc LWDAQ_read_script {{file_name ""}} {
 	global LWDAQ_Info
@@ -106,8 +105,7 @@ proc LWDAQ_read_script {{file_name ""}} {
 }
 
 #
-# LWDAQ_obsolete_names returns a list of obsolete names and their
-# new values.
+# LWDAQ_obsolete_names returns a list of obsolete names and their new values.
 #
 proc LWDAQ_obsolete_names {} {
 	global LWDAQ_Info
@@ -120,20 +118,38 @@ proc LWDAQ_obsolete_names {} {
 }
 
 #
-# LWDAQ_run_tool executes a tool script at the global scope. To
-# read the tool file, the routine uses LWDAQ_read_script, which
-# replaces obsolete parameter and procedure names with their
-# new names. If the routine cannot find the script file, it looks
-# in the Tools folder and the Tools/More folder.
+# LWDAQ_run_tool executes a tool script at the global scope. To read the tool
+# file, the routine uses LWDAQ_read_script, which replaces obsolete parameter
+# and procedure names with their new names. If the routine cannot find the
+# script file using the name we pass to it, the routine looks for a file by that
+# name in the working directory, Tools, Tools/More, and Tools/Spawn. Once the
+# tool file has been found, the routine deduces the tool name from the root of
+# the file name, and uses this name to set two global variables for the tool
+# script to use: one gives the mode in which the tool is to operate, the other
+# gives the tool file name. If the mode is "Standalone", the routine deletes the
+# Instrument and Tool menus so they will not conflict with those provided by the
+# original process that initiated the spawning of a standalone tool. If this
+# routine returns an empty string, it has failed.
 #
-proc LWDAQ_run_tool {{file_name ""}} {
+proc LWDAQ_run_tool {{file_name ""} {mode "Communal"}} {
 	global LWDAQ_Info
+
+	# Our first guess as to the file name is file_name parameter.
 	set fn $file_name
+	
+	# If fn is empty, we have the user browse for a tool file.
 	if {$fn == ""} {set fn [LWDAQ_get_file_name]}
 	if {$fn == ""} {return ""}
+	
+	# If file_name has no extension, we add a .tcl extension, under the assumption
+	# that the file_name we passed is the tool name, and the tool script will be
+	# named Toolname.tcl.
 	if {[file extension $file_name] == ""} {
 		set file_name "$file_name\.tcl"
 	}
+	
+	# We start looking for the file fn, using file_name as a root in various
+	# directories until we either find the file or give up.
 	if {![file exists $fn]} {
 		set fn [file join $LWDAQ_Info(working_dir) $file_name]
 		if {![file exists $fn]} {
@@ -149,9 +165,30 @@ proc LWDAQ_run_tool {{file_name ""}} {
 			}
 		}
 	}
-	set script [LWDAQ_read_script $fn]
-	if {$script != ""} {uplevel #0 $script}
-	return $fn
+	
+	# Deduce the tool name from the tool file name.
+	set name [file root [file tail $fn]]
+	
+	# Set global variables carrying the mode and file name.
+	global $name\_mode 
+	set $name\_mode $mode
+	global $name\_file 
+	set $name\_file $fn
+
+	# If we are running the tool as a standalone, we delete some menus.
+	if {$mode == "Standalone"} {
+		switch $LWDAQ_Info(os) {
+			"MacOS" {.menubar delete 1 2}
+			"Windows" {.menubar delete 3 4}
+			"Linux" {.menubar delete 3 4}
+		}
+	}
+	
+	# Run the tool script at the global scope.
+	uplevel #0 [LWDAQ_read_script $fn]
+	
+	# We return a success flag.
+	return "SUCCESS"
 }
 
 #
@@ -159,140 +196,137 @@ proc LWDAQ_run_tool {{file_name ""}} {
 # spawned LWDAQ, the root window does not contain the Quit button, but instead
 # presents the Tool window. When the new LWDAQ process starts up, it uses a
 # configuration file to launch the specified tool and take over the root window.
-# The tool must be designed for spawning, in that we can set a variable
-# Toolname_mode to "Standalone" and the tool will know it's running in a
-# separate process and will take over the main window. Otherwise the tool will
-# open its own window, and the standalone process will have a root window as
-# well as the tool window. We can pass in our own configuration commands into
-# the routine through the commands string, and these will be appended to the
-# spawning commands in the configuration file. We can pass a configuration file
-# name in for the spawn routine to use, in cases where we are spawning many
-# processes consecutively, each with their own custom configuration, we don't
-# want to over-write one file before it has been used. If we don't provide a
-# file name, the spawn routine generates a file in the temporary directory.
+# The tool must be designed for spawning, in that it checks the global variable
+# Toolname_mode, and if this variable is set to "Standalone", the tool will take
+# over the root window for itself and disable the Instrument and Tool menus. We
+# can pass in our own configuration commands into the routine through the
+# commands string, and these will be appended to the standalone run command in
+# the configuration file. We can pass a configuration file name in for the spawn
+# routine to use, in cases where we are spawning many processes consecutively,
+# each with their own custom configuration, we don't want to over-write one file
+# before it has been used. If we don't provide a file name, the spawn routine
+# generates a file in the temporary directory.
 #
 proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 	global LWDAQ_Info
+	
+	# When we spawn the tool, we the spawned process to start with its operating
+	# system file pointer in a known location. So we change directory to the 
+	# LWDAQ program directory.
 	cd $LWDAQ_Info(program_dir)
+	
+	# If we have not received a configuration file name, compose our own.
 	if {$cfn == ""} {
 		set cfn [file join $LWDAQ_Info(temporary_dir) $tool\.tcl]
 	}
+	
+	# Open the configuration file and write the standalone commands into the
+	# file followed by any user-defined commands.
 	set f [open $cfn w]
-	puts $f "set $tool\_mode Standalone"
-	puts $f "LWDAQ_run_tool $tool\.tcl"
-	puts $f {
-		switch $LWDAQ_Info(os) {
-			"MacOS" {.menubar delete 1 2}
-			"Windows" {.menubar delete 3 4}
-			"Linux" {.menubar delete 3 4}
-		}
-	}
+	puts $f "LWDAQ_run_tool $tool\.tcl Standalone"
 	if {$commands != ""} {puts $f $commands}
 	close $f
+	
+	# Spawn a standalone LWDAQ process and give it the configuration file, which
+	# will cause our chosen tool to start up and take over the root window.
 	switch $LWDAQ_Info(os) {
-		"MacOS" {exec ./lwdaq --child $cfn &}
-		"Windows" {exec ./LWDAQ.bat --child $cfn &}
-		"Linux" {exec ./lwdaq --child $cfn &}
-		default {exec ./lwdaq --child $cfn &}
+		"MacOS" {exec ./lwdaq --spawn $cfn &}
+		"Windows" {exec ./LWDAQ.bat --spawn $cfn &}
+		"Linux" {exec ./lwdaq --spawn $cfn &}
+		default {exec ./lwdaq --spawn $cfn &}
 	}
- 	return $tool
+	
+	# Return a success flag.
+ 	return "SUCCESS"
 }
 
 #
-# LWDAQ_tool_init provides more functionality, and requires that the calling
-# routine, which we assume is a tool initializer, checks to see if the tool
-# window exists. If so, the calling routine should abort. This routine drops
-# support for the embedding of tools in the root window when they are alone in
-# the startup directory. This routine provides full support for tool Help and
-# Data, so long as the tool script is in the Tools or Tools/More directory.
+# LWDAQ_tool_init performs initialization common to all LWDAQ tools. If the tool
+# is already being presented in graphical mode with a window, we do not
+# re-initialize the tool, but simply raise its window. If no such window exists,
+# we delete any existing tool arrays, and initialize some variables common to
+# all tools.
 #
 proc LWDAQ_tool_init {name version} {
 	upvar #0 $name\_info info
 	upvar #0 $name\_config config
+	upvar #0 $name\_mode mode
+	upvar #0 $name\_file tool_file_name
 	global LWDAQ_Info
 	
-	# If a window with this tool's name already exists,
-	# we don't want to re-initialize the tool's arrays
-	# and re-open the window. Instead, we raise the existing
-	# window to the top and return.
-	set w [string tolower .$name]
-	if {[winfo exists $w]} {
-		raise $w
-		return 0
-	}
+	# If the tool window already exists, abort.
+	if {[winfo exists [string tolower .$name]]} {
+		raise [string tolower .$name]
+		return "ABORT"
+	}		
 	
-	# Delete any pre-existing info and config arrays.
+	# When we generate a fresh tool window, the tool window will be named
+	# after the tool, and will be its own toplevel window.
 	array unset info
 	array unset config
 
-	# Fill in elements common to all tools.
+	# The window names will be the same for communal and standalone modes. But
+	# in the case of the standalone the main window for the tool will be a frame
+	# inside the root window, rather than its own top-level window.
+	set info(window) [string tolower .$name]
+	set info(text) $info(window).text
+
+	# Fill in elements common to all tools in all modes.
 	set info(name) $name
 	set info(version) $version
-	set info(window) [string tolower .$name]	
-	set info(text) $info(window).text
-	
-	# Do our best to find the script file, starting with the main
-	# tool directory.
-	set fn [file join $LWDAQ_Info(tools_dir) $name\.tcl]
-	if {![file exists $fn]} {
-		set fn [file join $LWDAQ_Info(tools_dir) More $name\.tcl]
-		if {![file exists $fn]} {
-			set fn [file join $LWDAQ_Info(tools_dir) Spawn $name\.tcl]
-			if {![file exists $fn]} {
-				set fn [file join $LWDAQ_Info(working_dir) $name\.tcl]
-				if {![file exists $fn]} {
-					set fn $name\.tcl
-					if {![file exists $fn]} {
-						error "Cannot find tool file \"$fn\"."
-					}
-				}
-			}
-		}
-	}
-	set info(tool_file_name) $fn
-	
-	# No matter where the tool script is, we use the same settings and
-	# data locations.
+	set info(mode) $mode
+	set info(tool_file_name) $tool_file_name
+	set info(gui) $LWDAQ_Info(gui_enabled)	
 	set info(settings_file_name) \
 		[file join $LWDAQ_Info(tools_dir) Data $name\_Settings.tcl]
-	set info(data_dir) \
-		[file join $LWDAQ_Info(tools_dir) Data]
+	set info(data_dir) [file join $LWDAQ_Info(tools_dir) Data]
 		
-	# Return 1 to show success.
-	return 1
+	# Return a flag to show success.
+	return "SUCCESS"
 }
 
 #
-# LWDAQ_tool_open opens a tool window if none exists. It checks to see if the
-# window is already open, and if so it raises the window to the front and
-# returns an empty string. The calling routine should check to see if this
-# routine returns an empty string, and if so it should not attempt to perform
-# any graphics operations in the existing window without checking for itself the
-# mode in which LWDAQ is running: in no graphics mode, all graphics routines
-# will fail.
+# LWDAQ_tool_open opens a tool window if none exists, and returns the name of
+# the window. If the tool window does exist, the routine raises the tool window
+# and returns an empty string. If graphics are disabled, the routine returns an
+# empty string. 
 #
 proc LWDAQ_tool_open {name} {
 	upvar #0 $name\_info info
-	global LWDAQ_Info
 
-	if {!$LWDAQ_Info(gui_enabled)} {return ""}
-	set w $info(window)
-	if {$w == ""} {
-		catch {destroy .frame}
-		wm title . "$info(name) $info(version)"	
-		raise .	
-		set w .
-	} {
-		if {[LWDAQ_widget_exists $w]} {
-			raise $w
+	if {!$info(gui)} {return ""}
+
+	# Get the maximum size of the root window. We are going to double this
+	# for our tool window.
+	scan [wm maxsize .] %d%d x y	
+
+	# In the standalone mode, we create a frame in the root window for the tool.
+	# In all other modes, we create a new top-level window for the tool.
+	if {$info(mode) == "Standalone"} {
+		if {[winfo exists $info(window)]} {
+			raise .
 			return ""
 		} {
-			toplevel $w
-			wm title $w "$info(name) $info(version)"				
+			catch {destroy .frame}
+			set f [frame $info(window)]
+			pack $f -side top -fill both
+			wm title . "Standalone $info(name) $info(version)"	
+			raise .	
+			wm maxsize . [expr $x*2] [expr $y*2]
 		}
-	}	
+	} {
+		if {[winfo exists $info(window)]} {
+			raise $info(window)
+			return ""
+		} {
+			toplevel $info(window)
+			wm title $info(window) "$info(name) $info(version)"				
+			wm maxsize $info(window) [expr $x*2] [expr $y*2]
+		}
+	}		
 	
-	return $w
+	# Return the frame or window name.
+	return $info(window)
 }
 
 #

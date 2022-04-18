@@ -20,7 +20,7 @@ REM along with this program; if not, write to the Free Software
 REM Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307.
 REM
 REM This program launches LWDAQ from a DOS prompt. You can pass options
-REM --no-gui, --gui, or --no-console, as described in the LWDAQ manual.
+REM --no-gui, --gui, --no-console, or --spawn as described in the LWDAQ manual.
 REM After the option (if any), you can pass a TCL script that will be
 REM executed by LWDAQ after it starts up and initialized. The script can
 REM refer to itself by the name $LWDAQ_Info(configuration_file) to determine
@@ -76,7 +76,7 @@ if [%1]==[--no-console] (
 	set background=1
 	set script=%2
 )
-if [%1]==[--child] (
+if [%1]==[--spawn] (
 	set option=%1
 	set gui_enabled=1
 	set console_enabled=0

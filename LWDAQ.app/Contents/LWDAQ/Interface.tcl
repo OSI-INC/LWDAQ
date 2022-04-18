@@ -386,10 +386,9 @@ proc LWDAQ_make_instrument_menu {} {
 }
 
 #
-# LWDAQ_widget_list returns a list of all existing children
-# of the window or widget you pass to the routine. If you
-# pass just ".", then the routine will list all existing
-# widgets and windows. The routine calls itself recursively.
+# LWDAQ_widget_list returns a list of all existing children of the window or
+# widget you pass to the routine. If you pass just ".", then the routine will
+# list all existing widgets and windows. The routine calls itself recursively.
 #
 proc LWDAQ_widget_list {w} {
 	set wl [list]
@@ -398,16 +397,6 @@ proc LWDAQ_widget_list {w} {
 		set wl [concat $wl [LWDAQ_widget_list $c]]
 	}
 	return $wl
-}
-
-#
-# LWDAQ_widget_exists returns 1 if a widget or window exists
-# and 0 otherwise.
-#
-proc LWDAQ_widget_exists {w} {
-	if {[winfo exists $w]} {return 1}
-	if {($w == "") && [winfo exists "."]} {return 1}
-	return 0
 }
 
 #
@@ -994,7 +983,7 @@ proc LWDAQ_monitor_open {} {
 	}
 	
 	button $f.ssf -text "Save Settings" -command {
-		set f [open [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"] w]
+		set f [open [file join $LWDAQ_Info(config_dir) "Core_Settings.tcl"] w]
 		foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms \
 				blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms \
 				lwdaq_client_port default_to_stdout server_address_filter \
@@ -1005,7 +994,7 @@ proc LWDAQ_monitor_open {} {
 		close $f
 	}
 	button $f.csf -text "Unsave Settings" -command {
-		set fn [file join $LWDAQ_Info(startup_dir) "Core_Settings.tcl"]
+		set fn [file join $LWDAQ_Info(config_dir) "Core_Settings.tcl"]
 		if {[file exists $fn]} {file delete $fn}
 	}
 	pack $f.ssf $f.csf -side left -expand yes

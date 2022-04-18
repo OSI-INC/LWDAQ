@@ -25,7 +25,7 @@ proc Startup_Manager_init {} {
 	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Startup_Manager" 1.0
+	LWDAQ_tool_init "Startup_Manager" 1.1
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -63,12 +63,6 @@ proc Startup_Manager_command {command} {
 		return "IGNORE"
 	}
 
-	if {$command == "Reset"} {
-		if {$info(control) != "Idle"} {set info(control) "Stop"}
-		LWDAQ_reset
-		return "ABORT"
-	}
-	
 	if {$command == "Stop"} {
 		if {$info(control) == "Idle"} {
 			return "ABORT"
@@ -380,7 +374,7 @@ proc Startup_Manager_execute {} {
 	}
 	
 	# If the window is closed, quit the Startup_Manager.
-	if {$LWDAQ_Info(gui_enabled) && ![winfo exists $info(window)]} {
+	if {$info(gui) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
 		return "ABORT"
@@ -419,13 +413,6 @@ proc Startup_Manager_execute {} {
 	}
 	if {$info(control) == "Repeat"} {
 	
-	}
-	if {$info(control) == "Back"} {
-		if {$info(step) == 0} {
-			LWDAQ_print $info(text) "ERROR: Cannot go back past script start."
-		} {
-			incr info(step) -1
-		}
 	}
 	
 	# Obtain the step type from the script. We take some trouble to remove the 
@@ -551,14 +538,9 @@ proc Startup_Manager_execute {} {
 	
 	if {$step_type == "spawn"} {
 		# To spawn a tool, we will launch a separate LWDAQ and configure it with
-		# a configuration file. This file begins with the commands that set up
-		# the tool, which we will find in the spawn menu.
-		set sfn [file join $LWDAQ_Info(spawn_dir) $tool\.tcl]
-		if {![file exists $sfn]} {
-			set result "ERROR: Cannot find \"$tool\" in spawn directory."
-		}
-		
-		# Compose the spawned process configuration file name.		
+		# a configuration file that instructs the new process to run the tool. We
+		# trust that that the tool script exists somewhere that LWDAQ can find it.
+		# We beging by composing the spawned process configuration file name.		
 		set cfn [file join $LWDAQ_Info(temporary_dir) $tool\_$info(step).tcl]
 		
 		# Initialized the command string. We want the spawned process to have 
@@ -569,7 +551,7 @@ proc Startup_Manager_execute {} {
 		append commands "upvar #0 $tool\_info tinfo\n"
 		
 		# Set the window title to include the step name.
-		append commands "wm title . \"\[wm title .]: $name\"\n"
+		append commands "wm title . \"\[wm title .\]: $name\"\n"
 
 		# Generate commands to apply the tool's default configuration parameters.
 		if {[info exists info($tool\_defaults)]} {
@@ -658,25 +640,22 @@ proc Startup_Manager_open {} {
 	pack $f -side top -fill x
 	
 	label $f.l1 -textvariable Startup_Manager_info(control) -width 16 -fg blue
-	label $f.l2 -text "Step" -width 4
+	label $f.l2 -text "Step:" -width 4
 	entry $f.l3 -textvariable Startup_Manager_info(step) -width 10
 	label $f.l4 -text "of" -width 2
 	label $f.l5 -textvariable Startup_Manager_info(num_steps) -width 5
 	pack $f.l1 $f.l2 $f.l3 $f.l4 $f.l5 -side left -expand 1
 
-	button $f.configure -text Configure -command "LWDAQ_tool_configure Startup_Manager"
-	pack $f.configure -side left -expand 1
-	button $f.help -text Help -command "LWDAQ_tool_help Startup_Manager"
-	pack $f.help -side left -expand 1
-
-	set f $w.controls
-	frame $f
-	pack $f -side top -fill x
-	foreach a {Stop Step Repeat Back Run Reset} {
+	foreach a {Stop Step Repeat Run} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Startup_Manager_command $a"
 		pack $f.$b -side left -expand 1
 	}
+
+	button $f.configure -text Configure -command "LWDAQ_tool_configure Startup_Manager"
+	pack $f.configure -side left -expand 1
+	button $f.help -text Help -command "LWDAQ_tool_help Startup_Manager"
+	pack $f.help -side left -expand 1
 
 	set f $w.script
 	frame $f

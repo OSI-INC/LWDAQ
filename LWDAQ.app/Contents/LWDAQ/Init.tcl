@@ -78,7 +78,7 @@ foreach a $argv {
 			set LWDAQ_Info(console_enabled) 1
 			set LWDAQ_Info(run_mode) $a
 		}
-		"--child" {
+		"--spawn" {
 			set LWDAQ_Info(console_enabled) 0
 			set LWDAQ_Info(run_mode) $a
 		}
@@ -172,7 +172,7 @@ if {[catch {
 	set LWDAQ_Info(sources_dir)  [file join $LWDAQ_Info(program_dir) Sources]
 	set LWDAQ_Info(instruments_dir) [file join $LWDAQ_Info(scripts_dir) Instruments]
 	set LWDAQ_Info(temporary_dir) [file join $LWDAQ_Info(scripts_dir) Temporary]
-	set LWDAQ_Info(startup_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Startup]
+	set LWDAQ_Info(config_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Configuration]
 	set LWDAQ_Info(working_dir) $LWDAQ_Info(program_dir)
 	
 	# Add the LWDAQ's package directory to the auto_path for library searches.
@@ -189,7 +189,7 @@ if {[catch {
 	set LWDAQ_Info(settings) [file join $LWDAQ_Info(scripts_dir) Settings.tcl]
 	set LWDAQ_Info(startup_scripts) \
 			[lsort -dictionary \
-				[glob -nocomplain [file join $LWDAQ_Info(startup_dir) *.tcl]]]
+				[glob -nocomplain [file join $LWDAQ_Info(config_dir) *.tcl]]]
 
 	# For our help routines, we construct a list of all the TCL/TK script
 	# files that define the LWDAQ routines.

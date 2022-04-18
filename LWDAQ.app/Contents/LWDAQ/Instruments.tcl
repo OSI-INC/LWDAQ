@@ -571,7 +571,7 @@ proc LWDAQ_close {name} {
 proc LWDAQ_instrument_save {} {
 	global LWDAQ_Info 
 
-	set fn [file join $LWDAQ_Info(startup_dir) "Instrument_Settings.tcl"]
+	set fn [file join $LWDAQ_Info(config_dir) "Instrument_Settings.tcl"]
 	set f [open $fn w]
 	foreach i $LWDAQ_Info(instruments) {
 		upvar LWDAQ_info_$i info
@@ -596,7 +596,7 @@ proc LWDAQ_instrument_save {} {
 proc LWDAQ_instrument_unsave {} {
 	global LWDAQ_Info 
 
-	set fn [file join $LWDAQ_Info(startup_dir) "Instrument_Settings.tcl"]
+	set fn [file join $LWDAQ_Info(config_dir) "Instrument_Settings.tcl"]
 	if {[file exists $fn]} {
 		file delete $fn
 		return $fn

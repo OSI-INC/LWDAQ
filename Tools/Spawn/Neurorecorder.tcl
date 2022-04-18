@@ -27,12 +27,7 @@
 #
 # Neurorecorder_init creates the info and config arrays and the images the
 # Neurorecorder uses to hold data in memory. The config array is available
-# through the Config button but the info array is private. We select the mode in
-# which the Neuroplayer should operate by means of the global Neurorecorder_mode
-# variable. If this is not set, or if it is set to "Main", we create a new
-# toplevel window and construct the Neurorecorder interface in this new window.
-# If the mode is set to "Standalone" we take over the root window and construct
-# in it the Neurorecorder interface.
+# through the Config button but the info array is private. 
 #
 proc Neurorecorder_init {} {
 #
@@ -47,8 +42,7 @@ proc Neurorecorder_init {} {
 #
 	upvar #0 Neurorecorder_info info
 	upvar #0 Neurorecorder_config config
-	global LWDAQ_Info Neurorecorder_mode
-#
+	global LWDAQ_Info
 #
 # We initialise the Neurorecorder with LWDAQ_tool_init. Because this command
 # begins with "LWDAQ" we know that it's one of those in the LWDAQ command
@@ -57,27 +51,10 @@ proc Neurorecorder_init {} {
 #
 	LWDAQ_tool_init "Neurorecorder" "2.0"
 #
-# We check the global Neurorecorder_mode variable, which is the means by which
-# we can direct the Neurorecorder to open itself in a new window or the LWDAQ
-# main window.
+# If a graphical tool window already exists, we abort our initialization.
 #
-	if {![info exists Neurorecorder_mode]} {
-		set info(mode) "Main"
-	} {
-		set info(mode) $Neurorecorder_mode
-	}
-#
-# If we are to take over the LWDAQ main window with the Neurorecorder, we set
-# the tool window name to the empty string. Otherwise we leave it as it has
-# been set by the tool initialization routine, and we check to see if that
-# window already exists. If it does exist, we abort. When we are taking over
-# the main window, we proceed anyway.
-#
-	switch $info(mode) {
-		"Standalone" {set info(window) ""}
-		default {
-			if {[LWDAQ_widget_exists $info(window)]} {return "ABORT"}
-		}
+	if {[winfo exists $info(window)]} {
+		return "ABORT"
 	}
 #
 # We start setting intial values for the private display and control variables.
@@ -109,10 +86,6 @@ proc Neurorecorder_init {} {
 		32 0 2 32 8 2 32 16 2"
 	set config(tracker_coordinates) ""
 	set config(tracker_background) ""
-#
-# A flag to tell us if the Neurorecorder is running with graphics.
-#
-	set info(gui) $LWDAQ_Info(gui_enabled)
 #
 # The recorder buffer variable holds data that we download from the 
 # receiver but are unable to write to disk because the recording file
@@ -693,7 +666,7 @@ proc Neurorecorder_record {{command ""}} {
 	# If we have closed the Neurorecorder window when we are running with graphics,
 	# this indicates that the user wants all recording to stop and the Neurorecorder
 	# to close and reset.
-	if {$info(gui) && ![LWDAQ_widget_exists $info(window)]} {
+	if {$info(gui) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
 		return "ABORT"
@@ -747,7 +720,7 @@ proc Neurorecorder_record {{command ""}} {
 				LWDAQ_support
 				if {$info(record_control) == "Stop"} {
 					set info(record_control) "Idle"
-					if {[LWDAQ_widget_exists $info(window)]} {
+					if {[winfo exists $info(window)]} {
 						LWDAQ_set_bg $info(record_control_label) white
 					}
 					return "ABORT"
@@ -996,22 +969,13 @@ proc Neurorecorder_open {} {
 	upvar #0 Neurorecorder_info info
 	global LWDAQ_Info
 
+	# Open the tool window. If we get an empty string back from the opening
+	# routine, something has gone wrong, or a window already exists for this
+	# tool, so we abort.
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return "ABORT"}
-	if {$w == "."} {set w ""} 
-	scan [wm maxsize .] %d%d x y
 	
-	switch $info(mode) {
-		"Standalone" {
-			wm title . "Standalone Neurorecorder $info(version)"
-			wm maxsize . [expr $x*2] [expr $y*2]
-		}	
-		default {
-			wm title $w "Neurorecorder $info(version)"
-			wm maxsize $w [expr $x*2] [expr $y*2]
-		}	
-	}
-	
+	# Get on with creating the display in the tool's frame or window.
 	set f $w.record
 	frame $f
 	pack $f -side top -fill x
@@ -1108,7 +1072,7 @@ proc Neurorecorder_close {} {
 	upvar #0 Neurorecorder_config config
 	upvar #0 Neurorecorder_info info
 	global LWDAQ_Info
-	if {$info(gui) && [LWDAQ_widget_exists $info(window)]} {
+	if {$info(gui) && [winfo exists $info(window)]} {
 		destroy $info(window)
 	}
 	array unset config

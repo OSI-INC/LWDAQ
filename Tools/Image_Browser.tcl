@@ -20,7 +20,7 @@ proc Image_Browser_init {} {
 	upvar #0 Image_Browser_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Image_Browser" "9"
+	LWDAQ_tool_init "Image_Browser" "10"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(initial_width) 120
@@ -28,6 +28,7 @@ proc Image_Browser_init {} {
 	set info(control) "Idle"	
 
 	set config(file_filter) "*.daq"
+	set config(directory) $LWDAQ_Info(working_dir)
 	set config(zoom) 0.3
 	set config(instrument) Viewer
 	set config(images_per_line) 4
@@ -58,10 +59,10 @@ proc Image_Browser_stop {} {
 }
 
 proc Image_Browser_choose {} {
-	global LWDAQ_Info
+	upvar #0 Image_Browser_config config
 	set d [LWDAQ_get_dir_name]
 	if {$d != ""} {
-		set LWDAQ_Info(working_dir) $d
+		set config(directory) $d
 		Image_Browser_refresh
 	}
 }
@@ -133,7 +134,7 @@ proc Image_Browser_refresh {} {
 	}
 	$info(text) configure -tabs $tabs
 	
-	set files [glob -nocomplain [file join $LWDAQ_Info(working_dir) $config(file_filter)]]
+	set files [glob -nocomplain [file join $config(directory) $config(file_filter)]]
 	set files [lsort -command Image_Browser_sort $files]
 	set index 0
 	set saved_names ""
@@ -210,7 +211,7 @@ proc Image_Browser_open {} {
 	frame $f -border 2
 	pack $f -side top -fill x
 	label $f.l -text "Directory"
-	entry $f.e -textvariable LWDAQ_Info(working_dir) \
+	entry $f.e -textvariable Image_Browser_config(directory) \
 		-relief sunken -bd 1 -width 40
 	button $f.b -text "Choose" -command [list Image_Browser_choose]
 	pack $f.l $f.e $f.b -side left -expand 1

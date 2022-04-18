@@ -58,27 +58,10 @@ proc Neuroplayer_init {} {
 #
 	LWDAQ_tool_init "Neuroplayer" "2.0"
 #
-# We check the global Neuroplayer_mode variable, which is the means by which
-# we can direct the Neuroplayer to open itself in a new window or the LWDAQ
-# main window, and to implement the Recorder only, the Player only, or both.
+# If a graphical tool window already exists, we abort our initialization.
 #
-	if {![info exists Neuroplayer_mode]} {
-		set info(mode) "Main"
-	} {
-		set info(mode) $Neuroplayer_mode
-	}
-#
-# If we are to take over the LWDAQ main window with the Neuroplayer, we set
-# the tool window name to the empty string. Otherwise we leave it as it has
-# been set by the tool initialization routine, and we check to see if that
-# window already exists. If it does exist, we abort. When we are taking over
-# the main window, we proceed anyway.
-#
-	switch $info(mode) {
-		"Standalone" {set info(window) ""}
-		default {
-			if {[LWDAQ_widget_exists $info(window)]} {return "ABORT"}
-		}
+	if {[winfo exists $info(window)]} {
+		return "ABORT"
 	}
 #
 # We start setting intial values for the private display and control variables.
@@ -91,10 +74,6 @@ proc Neuroplayer_init {} {
 	set config(receiver_type) "?"
 	set info(receiver_options) "A3018 A3027 A3032 A3038"
 	set info(alt_options) "A3032 A3038"
-#
-# A flag to tell us if the Neuroplayer is running with graphics.
-#
-	set info(gui) $LWDAQ_Info(gui_enabled)
 #
 # The Neuroplayer uses four LWDAQ images to hold data. The vt_image and
 # af_image are those behind the display of the signal trace and the signal
@@ -774,7 +753,7 @@ proc Neuroplayer_print_event {{event ""}} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return "ABORT"}
 
 	if {$event == ""} {
 		set event "$info(play_file_tail) $info(t_min) \"$config(channel_selector)\"\
@@ -2207,7 +2186,7 @@ proc Neuroplayer_overview_jump {x y} {
 	upvar #0 Neuroplayer_overview ov_config
 
 	# Check the window and declare the overview array.
-	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return "ABORT"}
 	if {![info exists ov_config]} {return "ABORT"}
 	if {![winfo exists $ov_config(w)]} {return "ABORT"}
 
@@ -2236,7 +2215,7 @@ proc Neuroplayer_overview_cursor {} {
 	upvar #0 Neuroplayer_overview ov_config
 
 	# Check the window and declare the overview array.
-	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return "ABORT"}
 	if {![info exists ov_config]} {return "ABORT"}
 	if {![winfo exists $ov_config(w)]} {return "ABORT"}
 
@@ -2284,7 +2263,7 @@ proc Neuroplayer_overview_plot {} {
 	global LWDAQ_Info
 
 	# Check the window and declare the overview array.
-	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return "ABORT"}
 	if {![info exists ov_config]} {return "ABORT"}
 	if {![winfo exists $ov_config(w)]} {return "ABORT"}
 	set w $ov_config(w)
@@ -2752,7 +2731,7 @@ proc Neuroclassifier_plot {tag event} {
 	global LWDAQ_Info
 
 	# Abort if running in no-graphics mode.
-	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return "ABORT"}
 	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
 	
 	set pointsize $info(classifier_point_size)
@@ -4460,10 +4439,10 @@ proc Neuroplayer_clock {} {
 }
 
 #
-# Neuroplayer_exporter_open creates the Export Panel, or raises it to the top 
+# Neuroexporter_open creates the Export Panel, or raises it to the top 
 # for viewing if it already exists.
 #
-proc Neuroplayer_exporter_open {} {
+proc Neuroexporter_open {} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 
@@ -4479,8 +4458,8 @@ proc Neuroplayer_exporter_open {} {
 	set f [frame $w.control]
 	pack $f -side top -fill x
 	label $f.state -textvariable Neuroplayer_info(export_state) -fg blue -width 10
-	button $f.export -text "Start" -command "LWDAQ_post Neuroplayer_export"
-	button $f.stop -text "Abort" -command {Neuroplayer_export "Stop"}
+	button $f.export -text "Start" -command "LWDAQ_post Neuroexporter_export"
+	button $f.stop -text "Abort" -command {Neuroexporter_export "Stop"}
 	pack $f.state $f.export $f.stop -side left -expand yes
 	
 	label $f.lformat -text "File:" -anchor w -fg $info(label_color)
@@ -4524,24 +4503,10 @@ proc Neuroplayer_exporter_open {} {
 	pack $f.ql $f.qlv -side left -expand yes 
 	
 	button $f.ssi -text "Interval Beginning" -command {
-		set Neuroplayer_config(export_start) [Neuroplayer_clock_convert \
-			[expr [Neuroplayer_clock_convert \
-				$Neuroplayer_info(datetime_start_time)] \
-				+ round($Neuroplayer_info(t_min)) ]]
-		LWDAQ_print $Neuroplayer_info(export_text) \
-			"Export starts $Neuroplayer_config(export_start),\
-				time $Neuroplayer_info(t_min) s\
-				in [file tail $Neuroplayer_config(play_file)],\
-				duration $Neuroplayer_config(export_duration) s,\
-				repetions $Neuroplayer_config(export_reps)."
+		Neuroarchiver_begin "Interval"
 	}
 	button $f.ssa -text "Archive Beginning" -command {
-		set Neuroplayer_config(export_start) $Neuroplayer_info(datetime_start_time)
-		LWDAQ_print $Neuroplayer_info(export_text) \
-			"Export starts $Neuroplayer_config(export_start),\
-				time 0.0 s in [file tail $Neuroplayer_config(play_file)],\
-				duration $Neuroplayer_config(export_duration) s,\
-				repetions $Neuroplayer_config(export_reps)."
+		Neuroarchiver_begin "Archive"
 	}
 	pack $f.ssi $f.ssa -side left -expand yes 
 
@@ -4592,26 +4557,63 @@ proc Neuroplayer_exporter_open {} {
 	button $f.ts -text "Tracker" -command "LWDAQ_post Neurotracker_open"
 	pack $f.ts -side left -expand yes
 
-	button $f.edfs -text "EDF" -command "LWDAQ_post Neuroplayer_edf_setup"
+	button $f.edfs -text "EDF" -command "LWDAQ_post Neuroexporter_edf_setup"
 	pack $f.edfs -side left -expand yes
 
-	button $f.texts -text "TXT" -command "LWDAQ_post Neuroplayer_txt_setup"
+	button $f.texts -text "TXT" -command "LWDAQ_post Neuroexporter_txt_setup"
 	pack $f.texts -side left -expand yes
 
 	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
 	
 	# If we have opened the Exporter Panel when the Exporter is Idle, we now
 	# initialize the export start time to the start of the current playback
-	# archive. We repeat playback of the current interval, or play the first
-	# interval of the archive if we are at the start, then set the export start
-	# to the start of the archive.
+	# archive.
 	if {$info(export_state) == "Idle"} {
-		LWDAQ_post {Neuroplayer_play "Repeat"}
-		LWDAQ_post {
-			set Neuroplayer_config(export_start) \
-				$Neuroplayer_info(datetime_start_time)
+		LWDAQ_post {Neuroplayer_play "Reload"}
+		LWDAQ_post {Neuroexporter_begin "Archive"}
+	}
+}
+
+#
+# Neuroexporter_begin sets the start time of the export to the beginning
+# of the current interval or the beginning of the current archive.
+#
+proc Neuroexporter_begin {where} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+	
+	# Decide where to write messages. If the Exporter panel is not open, we write
+	# messages to the Neuroarchiver text window.
+	if {[winfo exists $info(export_text)]} {
+		set t $info(export_text)
+	} {
+		set t $info(text)
+	}
+
+	# Set the export start time according to where.	
+	switch $where {
+		"Interval" {
+			set config(export_start) [Neuroplayer_clock_convert \
+				[expr [Neuroplayer_clock_convert \
+					$info(datetime_start_time)] \
+					+ round($info(t_min)) ]]
+			LWDAQ_print $t "Export starts $config(export_start),\
+				time $info(t_min) s\
+				in [file tail $config(play_file)],\
+				duration $config(export_duration) s,\
+				repetions $config(export_reps)."
+		}
+		default {
+			set config(export_start) $info(datetime_start_time)
+			LWDAQ_print $t "Export starts $config(export_start),\
+				time 0.0 s in [file tail $config(play_file)],\
+				duration $config(export_duration) s,\
+				repetions $config(export_reps)."
 		}
 	}
+	
+	# Return the export start time.
+	return $config(export_start)
 }
 
 #
@@ -4643,11 +4645,11 @@ proc Neuroplayer_autofill {} {
 }
 
 #
-# Neuroplayer_edf_read reads the header of an EDF file and fills the EDF setup
+# Neuroexporter_edf_read reads the header of an EDF file and fills the EDF setup
 # array and composes a new channel selector string from the channels and sample
 # rates in the EDF file. It does not read any data from the file.
 #
-proc Neuroplayer_edf_read {} {
+proc Neuroexporter_edf_read {} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 
@@ -4661,7 +4663,7 @@ proc Neuroplayer_edf_read {} {
 		}
 	}
 	set config(channel_selector) $s
-	Neuroplayer_edf_setup
+	Neuroexporter_edf_setup
 	return $fn
 }
 
@@ -4670,7 +4672,7 @@ proc Neuroplayer_edf_read {} {
 # that the EDF export file header provides for describing signals and defining their
 # ranges. 
 #
-proc Neuroplayer_edf_setup {} {
+proc Neuroexporter_edf_setup {} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 	global EDF
@@ -4696,10 +4698,10 @@ proc Neuroplayer_edf_setup {} {
 	}
 	pack $f.lchannels $f.echannels $f.auto -side left -expand yes
 	
-	button $f.read -text "Read" -command "LWDAQ_post Neuroplayer_edf_read"
+	button $f.read -text "Read" -command "LWDAQ_post Neuroexporter_edf_read"
 	pack $f.read -side left -expand yes
 
-	button $f.refresh -text "Refresh" -command Neuroplayer_edf_setup
+	button $f.refresh -text "Refresh" -command Neuroexporter_edf_setup
 	pack $f.refresh -side left -expand yes
 
 	set f [frame $w.header]
@@ -4790,10 +4792,10 @@ proc Neuroplayer_edf_setup {} {
 }
 
 #
-# Neurotracker_txt_setup opens a panel in which we can create a text header
+# Neuroexporter_txt_setup opens a panel in which we can create a text header
 # that will be written to the start of a text export file.
 #
-proc Neuroplayer_txt_setup {} {
+proc Neuroexporter_txt_setup {} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 
@@ -4809,12 +4811,12 @@ proc Neuroplayer_txt_setup {} {
 	wm title $w "TXT Setup Panel, Neuroplayer $info(version)"
 	LWDAQ_text_widget $w 40 10
 	LWDAQ_enable_text_undo $w.text
-	LWDAQ_bind_command_key $w s [list Neuroplayer_txt_save $w]
+	LWDAQ_bind_command_key $w s [list Neuroexporter_txt_save $w]
 	
 	# Create the Save button.
 	frame $w.f
 	pack $w.f -side top
-	button $w.f.save -text "Save" -command [list Neuroplayer_txt_save $w]
+	button $w.f.save -text "Save" -command [list Neuroexporter_txt_save $w]
 	pack $w.f.save -side left
 	
 	# Print the metadata to the text window.
@@ -4828,13 +4830,13 @@ proc Neuroplayer_txt_setup {} {
 
 
 #
-# Neuroplayer_txt_save transfers the contents of the exporter's TXT setup
+# Neuroexporter_txt_save transfers the contents of the exporter's TXT setup
 # window into the TXT header variable. White space is removed by the routine
 # before storing in the variable. The header will be written to to export files
 # only if it is not empty. If it is written, it will be written with a carriage
 # return at the end.
 #
-proc Neuroplayer_txt_save {w} {
+proc Neuroexporter_txt_save {w} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 
@@ -4843,11 +4845,11 @@ proc Neuroplayer_txt_save {w} {
 }
 
 #
-# Neuroplayer_export manages the exporting of recorded signals to files,
+# Neuroexporter_export manages the exporting of recorded signals to files,
 # tracker signals to files, and the creation of simultaneous video to
 # concatinated video files. that match the export intervals.
 #
-proc Neuroplayer_export {{cmd "Start"}} {
+proc Neuroexporter_export {{cmd "Start"}} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 	
@@ -4932,7 +4934,7 @@ proc Neuroplayer_export {{cmd "Start"}} {
 				LWDAQ_print $t \
 					"ERROR: Cannot use wildcard channel select, aborting export.\
 						Use Autofill or enter select string by hand."
-				LWDAQ_post "Neuroplayer_export Stop"
+				LWDAQ_post "Neuroexporter_export Stop"
 				return "FAIL"
 			}
 			set id [lindex [split $channel :] 0]		
@@ -4941,20 +4943,20 @@ proc Neuroplayer_export {{cmd "Start"}} {
 					|| ($id > $info(max_id))} {
 				LWDAQ_print $t \
 					"ERROR: Invalid channel id \"$id\", aborting export."
-				LWDAQ_post "Neuroplayer_export Stop"
+				LWDAQ_post "Neuroexporter_export Stop"
 				return "FAIL"
 			}
 			set sps [lindex [split $channel :] 1]
 			if {$sps == ""} {
 				LWDAQ_print $t \
 					"ERROR: No sample rate specified for channel $id, aborting export."
-				LWDAQ_post "Neuroplayer_export Stop"
+				LWDAQ_post "Neuroexporter_export Stop"
 				return "FAIL"
 			}
 			if {[lsearch "16 32 64 128 256 512 1024 2048 4096" $sps] < 0} {
 				LWDAQ_print $t \
 					"ERROR: Invalid sample rate \"$sps\", aborting export."
-				LWDAQ_post "Neuroplayer_export Stop"
+				LWDAQ_post "Neuroexporter_export Stop"
 				return "FAIL"
 			}
 			lappend signals $id $sps
@@ -5107,7 +5109,7 @@ proc Neuroplayer_export {{cmd "Start"}} {
 				if {$vfi == ""} {
 					LWDAQ_print $t "ERROR: Cannot find video for $vt s,\
 						aborting export."
-					LWDAQ_post "Neuroplayer_export Stop"
+					LWDAQ_post "Neuroexporter_export Stop"
 					return "FAIL"
 				}
 				scan $vfi %s%d%f vfn vsk vlen
@@ -5121,7 +5123,7 @@ proc Neuroplayer_export {{cmd "Start"}} {
 						vdur=$vdur vsk=$vsk vlen=$vlen\
 						vt=$vt end_s=$info(export_end_s)\
 						vf=[file tail $vfn], aborting export."
-					LWDAQ_post "Neuroplayer_export Stop"
+					LWDAQ_post "Neuroexporter_export Stop"
 					return "FAIL"
 				}
 
@@ -5387,10 +5389,10 @@ proc Neuroplayer_export {{cmd "Start"}} {
 				LWDAQ_print $t "Export complete in\
 					[expr [clock seconds] - $info(export_run_start)] s.\n" purple
 				set info(export_state) "Wait"
-				LWDAQ_post "Neuroplayer_export Repeat" 
+				LWDAQ_post "Neuroexporter_export Repeat" 
 			} {
 				set info(export_state) "Wait"
-				LWDAQ_post "Neuroplayer_export Video"
+				LWDAQ_post "Neuroexporter_export Video"
 				LWDAQ_print $t "Waiting for video extractions to complete."
 			}
 		}
@@ -5404,7 +5406,7 @@ proc Neuroplayer_export {{cmd "Start"}} {
 		if {$info(export_state) == "Wait"} {
 			foreach pid $info(export_epl) {
 				if {[LWDAQ_process_exists $pid]} {
-					LWDAQ_post "Neuroplayer_export Video"
+					LWDAQ_post "Neuroexporter_export Video"
 					return "SUCCESS"
 				}
 			}
@@ -5425,14 +5427,14 @@ proc Neuroplayer_export {{cmd "Start"}} {
 				[file nativename $tempfile] > concat_log.txt &]
 			LWDAQ_print $t "Process $info(export_epl) performing\
 				video concatination into temporary file."
-			LWDAQ_post "Neuroplayer_export Video"
+			LWDAQ_post "Neuroexporter_export Video"
 			return "SUCCESS"
 		}
 
 		# If we are concatinating, we are waiting for the concatination to complete.
 		if {$info(export_state) == "Concat"} {
 			if {[LWDAQ_process_exists $info(export_epl)]} {
-				LWDAQ_post "Neuroplayer_export Video"
+				LWDAQ_post "Neuroexporter_export Video"
 				return "SUCCESS"
 			}
 			set efn [lindex $info(export_vfl) 0]
@@ -5467,7 +5469,7 @@ proc Neuroplayer_export {{cmd "Start"}} {
 			LWDAQ_print $t "Export complete in\
 				[expr [clock seconds] - $info(export_run_start)] s.\n" purple
 			set info(export_state) "Wait"
-			LWDAQ_post "Neuroplayer_export Repeat" 
+			LWDAQ_post "Neuroexporter_export Repeat" 
 			return "SUCCESS"
 		}
 	}
@@ -5497,7 +5499,7 @@ proc Neuroplayer_export {{cmd "Start"}} {
 				[expr [Neuroplayer_clock_convert $info(datetime_start_time)] \
 				+ round($info(t_min)) ]]
 			set info(export_state) "Idle"
-			LWDAQ_post Neuroplayer_export	"Start" 
+			LWDAQ_post Neuroexporter_export
 			return "SUCCESS"	
 		} {
 			set info(export_state) "Idle"
@@ -6011,7 +6013,7 @@ proc Neuroplayer_fresh_graphs {{clear_screen 0}} {
 	upvar #0 Neuroplayer_config config
 	global LWDAQ_Info	
 
-	if {![LWDAQ_widget_exists $info(window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return "ABORT"}
 	
 	lwdaq_graph "0 0" $info(vt_image) -fill 1 \
 			-x_min 0 -x_max 1 -x_div $config(t_div) \
@@ -6077,7 +6079,7 @@ proc Neuroplayer_draw_graphs {} {
 	upvar #0 Neuroplayer_config config
 	global LWDAQ_Info	
 
-	if {!$LWDAQ_Info(gui_enabled)} {return "ABORT"}
+	if {!$info(gui)} {return "ABORT"}
 
 	lwdaq_draw $info(vt_image) $info(vt_photo)
 	if {[winfo exists $info(vt_view)]} {
@@ -6375,7 +6377,7 @@ proc Neuroplayer_plot_spectrum {{color ""} {spectrum ""}} {
 # text file and print them to the text window also. If we don't specify a
 # command, the Neuroplayer continues with the action indicated by its control
 # variable. But we can specify any of the following commands: Play, Step,
-# Repeat, Back, Pick, PickDir, First, and Reload.
+# Repeat, Back, Pick, PickDir, First, Last, and Reload.
 #
 proc Neuroplayer_play {{command ""}} {
 	upvar #0 Neuroplayer_info info
@@ -6395,7 +6397,7 @@ proc Neuroplayer_play {{command ""}} {
 		set info(play_control) "Idle"
 		return "SUCCESS"
 	}
-	if {$info(gui) && ![LWDAQ_widget_exists $info(window)]} {
+	if {$info(gui) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
 		return "ABORT"
@@ -6423,7 +6425,7 @@ proc Neuroplayer_play {{command ""}} {
 	# If the play control label background is yellow and we are 
 	# playing an archive, we won't set the label green yet. Otherwise
 	# we adjust the color.
-	if {[LWDAQ_widget_exists $info(window)]} {
+	if {[winfo exists $info(window)]} {
 		if {($info(play_control) == "Play") \
 				&& ([$info(play_control_label) cget -bg] != "yellow")} {
 			LWDAQ_set_bg $info(play_control_label) green
@@ -6459,7 +6461,8 @@ proc Neuroplayer_play {{command ""}} {
 	}
 	
 	# If Reload, we clear the saved play file name and change the play control to 
-	# Repeat.
+	# Repeat. We update the clock times and set the export start time to the start
+	# time of the current archive.
 	if {$info(play_control) == "Reload"} {
 		set info(saved_play_file) "none"
 		set config(play_time) 0.0
@@ -6469,6 +6472,7 @@ proc Neuroplayer_play {{command ""}} {
 	}
 
 	# If First or Last we find the first or last file in the playback directory tree.
+	# We update the exporter start time.
 	if {($info(play_control) == "First") \
 		|| ($info(play_control) == "Last")} {
 		set play_list [LWDAQ_find_files $config(play_dir) *.ndf]
@@ -6637,7 +6641,7 @@ proc Neuroplayer_play {{command ""}} {
 		return "SUCCESS"
 	}
 	
-	# If Repeat we re-disoplay the previous interval.
+	# If Repeat we re-display the previous interval.
 	if {$info(play_control) == "Repeat"} {
 		set config(play_time) [Neuroplayer_play_time_format \
 			[expr $config(play_time) - $info(play_interval_copy)]]
@@ -6831,7 +6835,7 @@ proc Neuroplayer_play {{command ""}} {
 			# checking the state of the play_control_label, we make sure that we
 			# issue the following print statement only once. While the Player is
 			# waiting, the label remains yellow.
-			if {[LWDAQ_widget_exists $info(window)]} {
+			if {[winfo exists $info(window)]} {
 				if {[$info(play_control_label) cget -bg] != "yellow"} {
 					Neuroplayer_print "Have $num_clocks clocks, need $play_num_clocks.\
 						Waiting for next archive to be recorded." verbose
@@ -6853,7 +6857,7 @@ proc Neuroplayer_play {{command ""}} {
 	
 	# We make sure the Play control label background is no longer yellow, because
 	# we are no longer waiting for data.
-	if {[LWDAQ_widget_exists $info(window)]} {
+	if {[winfo exists $info(window)]} {
 		if {$info(play_control) == "Play"} {
 			LWDAQ_set_bg $info(play_control_label) green
 		} {
@@ -7126,7 +7130,7 @@ proc Neuroplayer_play {{command ""}} {
 			Neurotracker_plot
 		}
 		if {$info(export_state) == "Play"} {
-			Neuroplayer_export "Play"
+			Neuroexporter_export "Play"
 			if {$info(play_control) == "Stop"} {
 				break
 			}
@@ -7615,7 +7619,7 @@ proc Neuroplayer_video_watchdog {pid} {
 		return "Idle"
 	}
 
-	if {$info(gui) && ![LWDAQ_widget_exists $info(window)]} {
+	if {$info(gui) && ![winfo exists $info(window)]} {
 		LWDAQ_process_stop $pid
 		return "Idle"
 	}
@@ -7869,22 +7873,13 @@ proc Neuroplayer_open {} {
 	upvar #0 Neuroplayer_info info
 	global LWDAQ_Info
 
+	# Open the tool window. If we get an empty string back from the opening
+	# routine, something has gone wrong, or a window already exists for this
+	# tool, so we abort.
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return "ABORT"}
-	if {$w == "."} {set w ""} 
-	scan [wm maxsize .] %d%d x y
 	
-	switch $info(mode) {
-		"Standalone" {
-			wm title . "Standalone Neuroplayer $info(version)"
-			wm maxsize . [expr $x*2] [expr $y*2]
-		}	
-		default {
-			wm title $w "Neuroplayer $info(version)"
-			wm maxsize $w [expr $x*2] [expr $y*2]
-		}	
-	}
-	
+	# Get on with creating the display in the tool's frame or window.
 	set f $w.displays
 	frame $f -border 2
 	pack $f -side top -fill x
@@ -8108,7 +8103,7 @@ proc Neuroplayer_open {} {
 	pack $f.cb -side left -expand yes
 	button $f.clock -text "Clock" -command "LWDAQ_post Neuroplayer_clock"
 	pack $f.clock -side left -expand yes
-	button $f.export -text "Export" -command "LWDAQ_post Neuroplayer_exporter_open"
+	button $f.export -text "Export" -command "LWDAQ_post Neuroexporter_open"
 	pack $f.export -side left -expand yes
 	button $f.tb -text "Tracker" -command "LWDAQ_post Neurotracker_open"
 	pack $f.tb -side left -expand yes
@@ -8118,7 +8113,6 @@ proc Neuroplayer_open {} {
 	pack $f.conf -side left -expand yes
 	button $f.help -text "Help" -command "LWDAQ_tool_help Neuroplayer"
 	pack $f.help -side left -expand yes
-
 
 	set info(text) [LWDAQ_text_widget $w 100 10 1 1]
 	
@@ -8146,7 +8140,7 @@ proc Neuroplayer_close {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 	global LWDAQ_Info
-	if {$info(gui) && [LWDAQ_widget_exists $info(window)]} {
+	if {$info(gui) && [winfo exists $info(window)]} {
 		destroy $info(window)
 	}
 	array unset config

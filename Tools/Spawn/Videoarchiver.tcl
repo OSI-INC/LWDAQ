@@ -29,25 +29,9 @@ proc Videoarchiver_init {} {
 	# Initialize the tool. Exit if the window is already open.
 	LWDAQ_tool_init "Videoarchiver" "22"
 
-	# We check the global Videoarchiver_mode variable, which is the means by
-	# which we can direct the Videoarchiver to use the LWDAQ main window or
-	# its own toplevel window.
-	if {![info exists Videoarchiver_mode]} {
-		set info(mode) "Main"
-	} {
-		set info(mode) $Videoarchiver_mode
-	}
-
-	# If we are to take over the LWDAQ main window with the Neuroarchiver, we
-	# set the tool window name to the empty string. Otherwise we leave it as it
-	# has been set by the tool initialization routine, and we check to see if
-	# that window already exists. If it does exist, we abort. When we are taking
-	# over the main window, we proceed anyway.
-	switch $info(mode) {
-		"Standalone" {set info(window) ""}
-		default {
-			if {[LWDAQ_widget_exists $info(window)]} {return "ABORT"}
-		}
+	# If a graphical tool window already exists, we abort our initialization.
+	if {[winfo exists $info(window)]} {
+		return "ABORT"
 	}
 	
 	# Set up directory names.
@@ -1367,7 +1351,7 @@ proc Videoarchiver_transfer {n} {
 	global LWDAQ_Info
 	
 	# Know when to quit. The transfer process quits if the window is gone.
-  	if {![LWDAQ_widget_exists $info(window)]} {
+  	if {![winfo exists $info(window)]} {
 		return "STOP"
  	}
 
@@ -1719,7 +1703,7 @@ proc Videoarchiver_stop {n} {
 	set info(cam$n\_lag) "?"
 	LWDAQ_set_fg $info(cam$n\_laglabel) gray
 
- 	if {![LWDAQ_widget_exists $info(window)]} {
+ 	if {![winfo exists $info(window)]} {
  		set info(text) stdout
  	}
 	
@@ -2537,22 +2521,13 @@ proc Videoarchiver_open {} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 
+	# Open the tool window. If we get an empty string back from the opening
+	# routine, something has gone wrong, or a window already exists for this
+	# tool, so we abort.
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return "ABORT"}
-	if {$w == "."} {set w ""}
-	scan [wm maxsize .] %d%d x y
 	
-	switch $info(mode) {
-		"Standalone" {
-			wm title . "Standalone Videoarchiver $info(version)"
-			wm maxsize . [expr $x*2] [expr $y*2]
-		}	
-		default {
-			wm title $w "Videoarchiver $info(version)"
-			wm maxsize $w [expr $x*2] [expr $y*2]
-		}	
-	}
-	
+	# Get on with creating the display in the tool's frame or window.	
 	set padx 0
 	set f $w.f1
 	frame $f -pady $padx -padx $padx
