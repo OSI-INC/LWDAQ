@@ -703,6 +703,6 @@ return 1
 
 ----------Begin Help----------
 
-The Startup_Manager tool uses a starter script on disk to open and start the operation of LWDAQ tools.
+http://www.bndhep.net/Electronics/LWDAQ/Startup_Manager.html
 
 ----------End Help----------

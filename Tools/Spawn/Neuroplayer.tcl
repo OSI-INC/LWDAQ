@@ -4503,10 +4503,10 @@ proc Neuroexporter_open {} {
 	pack $f.ql $f.qlv -side left -expand yes 
 	
 	button $f.ssi -text "Interval Beginning" -command {
-		Neuroarchiver_begin "Interval"
+		Neuroexporter_begin "Interval"
 	}
 	button $f.ssa -text "Archive Beginning" -command {
-		Neuroarchiver_begin "Archive"
+		Neuroexporter_begin "Archive"
 	}
 	pack $f.ssi $f.ssa -side left -expand yes 
 
@@ -4583,7 +4583,7 @@ proc Neuroexporter_begin {where} {
 	upvar #0 Neuroplayer_config config
 	
 	# Decide where to write messages. If the Exporter panel is not open, we write
-	# messages to the Neuroarchiver text window.
+	# messages to the Neuroplayer text window.
 	if {[winfo exists $info(export_text)]} {
 		set t $info(export_text)
 	} {
@@ -4854,7 +4854,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	upvar #0 Neuroplayer_config config
 	
 	# Decide where to write messages. If the Exporter panel is not open, we write
-	# messages to the Neuroarchiver text window.
+	# messages to the Neuroplayer text window.
 	if {[winfo exists $info(export_text)]} {
 		set t $info(export_text)
 	} {
