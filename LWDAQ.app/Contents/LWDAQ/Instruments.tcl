@@ -565,7 +565,7 @@ proc LWDAQ_close {name} {
 
 #
 # LWDAQ_instrument_save saves instrument settings to a settings file in the
-# LWDAQ startup directory, so they will be loaded automatically when LWDAQ is
+# LWDAQ configuration directory, so they will be loaded automatically when LWDAQ is
 # next launched, or when a new LWDAQ is spawned.
 #
 proc LWDAQ_instrument_save {} {
