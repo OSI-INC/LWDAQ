@@ -404,15 +404,28 @@ proc Startup_Manager_execute {} {
 		return "ABORT"
 	}
 	if {$info(control) == "Step"} {
+		if {$info(step) == $info(num_steps)} {
+			LWDAQ_print $info(text) "ERROR: At end of script, cannot step."
+			set info(control) "Idle"
+			return "ERROR"
+		}
 		incr info(step)
-		if {$info(step) > $info(num_steps)} {set info(step) 1}
 	}
 	if {$info(control) == "Run"} {
+		if {$info(step) == $info(num_steps)} {
+			LWDAQ_print $info(text) "ERROR: At end of script, cannot run."
+			LWDAQ_print $info(text) "SUGGESTION: Enter zero for step number, then run."
+			set info(control) "Idle"
+			return "ERROR"
+		}
 		incr info(step)
-		if {$info(step) > $info(num_steps)} {set info(step) 1}
 	}
 	if {$info(control) == "Repeat"} {
-	
+		if {($info(step) > $info(num_steps)) || ($info(step) < 1)} {
+			LWDAQ_print $info(text) "ERROR: Step number $info(step) out of bounds."
+			set info(control) "Idle"
+			return "ERROR"
+		}
 	}
 	
 	# Obtain the step type from the script. We take some trouble to remove the 
@@ -619,9 +632,9 @@ proc Startup_Manager_execute {} {
 		LWDAQ_post Startup_Manager_execute
 		return $result
 	}
-	if {($info(control) == "Run") && ($info(step) == $info(num_steps))} {
-		LWDAQ_print $info(text) "\nEnd" $config(title_color)
+	if {$info(step) == $info(num_steps)} {
 		if {$config(auto_quit)} {exit}
+		LWDAQ_print $info(text) "\nEnd" $config(title_color)
 	}
 	
 	set info(control) "Idle"
@@ -639,9 +652,9 @@ proc Startup_Manager_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
-	label $f.l1 -textvariable Startup_Manager_info(control) -width 16 -fg blue
+	label $f.l1 -textvariable Startup_Manager_info(control) -width 10 -fg blue
 	label $f.l2 -text "Step:" -width 4
-	entry $f.l3 -textvariable Startup_Manager_info(step) -width 10
+	entry $f.l3 -textvariable Startup_Manager_info(step) -width 6
 	label $f.l4 -text "of" -width 2
 	label $f.l5 -textvariable Startup_Manager_info(num_steps) -width 5
 	pack $f.l1 $f.l2 $f.l3 $f.l4 $f.l5 -side left -expand 1

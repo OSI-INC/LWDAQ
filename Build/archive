@@ -79,8 +79,9 @@ make clean
 
 # Prepare to make archive.
 echo "Preparing LWDAQ files for archive..."
-rm $LWDAQ_DIR/Tools/Data/Acquisifier_Results.txt
-rm $LWDAQ_DIR/Tools/Data/*_Settings.tcl
+rm $LWDAQ_DIR/Tools/Data/*.*
+rm $LIB_DIR/Configuration/*.tcl
+rm $LIB_DIR/Temporary/*.tcl
 mv $LIB_DIR/Toolmaker.tcl $MASTER_DIR/Toolmaker.tcl
 mv $LIB_DIR/Toolmaker_Distribute.tcl $LIB_DIR/Toolmaker.tcl
 
