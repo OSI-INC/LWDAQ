@@ -4597,18 +4597,13 @@ proc Neuroexporter_begin {where} {
 				[expr [Neuroplayer_clock_convert \
 					$info(datetime_start_time)] \
 					+ round($info(t_min)) ]]
-			LWDAQ_print $t "Export starts $config(export_start),\
-				time $info(t_min) s\
-				in [file tail $config(play_file)],\
-				duration $config(export_duration) s,\
-				repetions $config(export_reps)."
+			LWDAQ_print $t "Export start time: $config(export_start),\
+				$info(t_min) s in [file tail $config(play_file)]."
 		}
 		default {
 			set config(export_start) $info(datetime_start_time)
-			LWDAQ_print $t "Export starts $config(export_start),\
-				time 0.0 s in [file tail $config(play_file)],\
-				duration $config(export_duration) s,\
-				repetions $config(export_reps)."
+			LWDAQ_print $t "Export start time: $config(export_start),\
+				0.0 s in [file tail $config(play_file)]."
 		}
 	}
 	

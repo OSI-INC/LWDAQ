@@ -43,6 +43,11 @@ proc Startup_Manager_init {} {
 	set config(analysis_color) brown
 	set config(result_color) darkgreen
 	set config(num_steps_show) 20
+	set config(corner_x) 50
+	set config(corner_x_step) 20
+	set config(corner_y) 20
+	set config(corner_y_step) 10
+	set config(startup_timeout) 20
 	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -432,7 +437,9 @@ proc Startup_Manager_execute {} {
 	# trailing colon from the first word in the step script.
 	set step_type [string replace [lindex $info(steps) $info(step) 0] end end ""]
 	if {[lsearch {default spawn run starter} $step_type] < 0} {
-		set step_type "UNKNOWN"
+		LWDAQ_print $info(text) "ERROR: Unrecognised step type \$step_type\."
+		set info(control) "Idle"
+		return "ERROR"
 	}
 
 	# Obtain the name of the step. Some steps may have no specific name, in
@@ -447,11 +454,6 @@ proc Startup_Manager_execute {} {
 	# Print a title line to the screen.
 	LWDAQ_print $info(text) "\nStep $info(step), $step_type, $name, $tool" \
 		$config(title_color)
-	if {$step_type == "UNKNOWN"} {
-		LWDAQ_print $info(text) "ERROR: Unrecognised step type or malformed step,\
-			check script."
-		set step_type "disabled"
-	}
 
 	# Read this step's metadata out of the script.
 	set metadata [Startup_Manager_get_field $info(step) "metadata"]
@@ -495,7 +497,9 @@ proc Startup_Manager_execute {} {
 	if {$step_type == "run"} {
 		# Run the tool.
 		if {[catch {LWDAQ_run_tool $tool} error_result]} {
-			set result "ERROR: $error_result"
+			LWDAQ_print $info(text) "ERROR: $error_result"
+			set info(control) "Idle"
+			return "ERROR"
 		}
 
 		# Declare the tool config and info arrays for local access as tconfig
@@ -505,6 +509,9 @@ proc Startup_Manager_execute {} {
 		
 		# Set the tool window title.
 		wm title $tinfo(window) "$tool $tinfo(version)\: $name"
+		set config(corner_x) [expr $config(corner_x) + $config(corner_x_step)]
+		set config(corner_y) [expr $config(corner_y) + $config(corner_y_step)]
+		wm geometry . +$config(corner_x)\+$config(corner_y)
 
 		# Apply the tool's default configuration parameters.
 		if {[info exists info($tool\_defaults)]} {
@@ -512,8 +519,9 @@ proc Startup_Manager_execute {} {
 				if {[info exists tconfig($p)]} {
 					set tconfig($p) $v
 					LWDAQ_print $info(text) "$p = \"$v\""
-				} elseif {![LWDAQ_is_error_result $result]} {
-					set result "ERROR: No parameter \"$p\" to assign value \"$v\"."
+				} else {
+					LWDAQ_print $info(text) "WARNING: Tool has no parameter \"$p\".\
+						Check default configuration."
 				}
 			}
 		}
@@ -523,8 +531,9 @@ proc Startup_Manager_execute {} {
 			if {[info exists tconfig($p)]} {
 				set tconfig($p) $v
 				LWDAQ_print $info(text) "$p = \"$v\""
-			} elseif {![LWDAQ_is_error_result $result]} {
-				set result "ERROR: No parameter \"$p\" to assign value \"$v\"."
+			} else {
+				LWDAQ_print $info(text) "WARNING: Tool has no parameter \"$p\".\
+					Check step configuration."
 			}
 		}
 		
@@ -533,9 +542,7 @@ proc Startup_Manager_execute {} {
 		if {[info exists info($tool\_commands)]} {
 			set cmd [set info($tool\_commands)]
 			if {[catch {eval $cmd} error_result]} {
-				if {![LWDAQ_is_error_result $result]} {
-					set result "ERROR: $error_result"
-				}
+				LWDAQ_print $info(text) "ERROR: $error_result"
 			}		
 		}
 				
@@ -543,10 +550,8 @@ proc Startup_Manager_execute {} {
 		# for the name of the step.
 		set cmd [Startup_Manager_get_field $info(step) "commands"]
 		if {[catch {eval $cmd} error_result]} {
-			if {![LWDAQ_is_error_result $result]} {
-				set result "ERROR: $error_result"
-			}
-		}
+			LWDAQ_print $info(text) "ERROR: $error_result"
+		}		
 	}
 	
 	if {$step_type == "spawn"} {
@@ -565,6 +570,9 @@ proc Startup_Manager_execute {} {
 		
 		# Set the window title to include the step name.
 		append commands "wm title . \"\[wm title .\]: $name\"\n"
+		set config(corner_x) [expr $config(corner_x) + $config(corner_x_step)]
+		set config(corner_y) [expr $config(corner_y) + $config(corner_y_step)]
+		append commands "wm geometry . +$config(corner_x)\+$config(corner_y)\n"
 
 		# Generate commands to apply the tool's default configuration parameters.
 		if {[info exists info($tool\_defaults)]} {
@@ -597,16 +605,35 @@ proc Startup_Manager_execute {} {
 			LWDAQ_print $info(text) [string trim $line]
 		}
 		
+		# Append the configuration file deletion command.
+		append commands "file delete $cfn\n"
+		
 		# Spawn the tool with configuration file.
 		LWDAQ_spawn_tool $tool $commands $cfn
+		
+		# Wait until the configuration file is deleted, which indicates that the
+		# spawned tool is running.
+		set start_time [clock seconds]
+		LWDAQ_print $info(text) "Waiting for standalone process to finish starting up."
+		while {[file exists $cfn]} {
+			LWDAQ_update
+			if {$info(control) == "Stop"} {
+				LWDAQ_print $info(text) "Aborted waiting for process to start."
+				set info(control) "Idle"
+				return "ERROR"
+			}
+			if {[clock seconds] - $start_time > $config(startup_timeout)} {
+				LWDAQ_print $info(text) "Timeout waiting for process to start."
+				set info(control) "Idle"
+				return "ERROR"
+			}
+		}
 	}
 	
 	if {$step_type == "starter"} {
 		set commands [Startup_Manager_get_field $info(step) "commands"]
 		if {[catch {eval $commands} error_result]} {
-			if {![LWDAQ_is_error_result $result]} {
-				set result "ERROR: $error_result"
-			}
+			LWDAQ_print $info(text) "ERROR: $error_result"
 		}
 	}
 	
@@ -614,15 +641,6 @@ proc Startup_Manager_execute {} {
 		set result "$name disabled."
 	}
 	
-	# Here we append the step name to error results so we'll know where
-	# the error result comes from.
-	if {[LWDAQ_is_error_result $result]} {
-		if {[string index $result end] == "."} {
-			set result [string replace $result end end ""]
-		}
-		set result "$result in $name\."
-	}
-
 	# Print the step result of the result to the screen.
 	LWDAQ_print $info(text) $result $config(result_color)
 	

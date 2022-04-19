@@ -260,7 +260,7 @@ proc Neurorecorder_clock_convert {datetime} {
 proc Neurorecorder_configure {} {
 	upvar #0 Neurorecorder_config config
 	upvar #0 Neurorecorder_info info
-	LWDAQ_tool_configure Neurorecorder 4
+	LWDAQ_tool_configure Neurorecorder 3
 }
 
 #
