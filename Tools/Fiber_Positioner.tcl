@@ -484,6 +484,9 @@ proc Fiber_Positioner_clear {} {
 			-zoom $config(zoom) \
 			-intensify $config(intensify)
 	}
+	if {$info(control) == "Clear"} {
+		set info(control) "Idle"
+	}
 	
 	return "SUCCESS"
 }
@@ -499,11 +502,10 @@ proc Fiber_Positioner_reset {} {
 	set config(travel_index) 0
 	set config(pass_counter) 0
 	set config(loop_counter) 0
+	Fiber_Positioner_clear
 	if {$info(control) == "Reset"} {
 		set info(control) "Idle"
 	}
-	
-	Fiber_Positioner_clear
 	
 	return "SUCCESS"
 }
