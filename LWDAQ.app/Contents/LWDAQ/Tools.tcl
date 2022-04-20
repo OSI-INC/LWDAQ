@@ -309,7 +309,7 @@ proc LWDAQ_tool_open {name} {
 		} {
 			catch {destroy .frame}
 			set f [frame $info(window)]
-			pack $f -side top -fill both
+			pack $f -side top -fill both -expand yes
 			wm title . "Standalone $info(name) $info(version)" 
 			raise .	
 			wm maxsize . [expr $x*2] [expr $y*2]

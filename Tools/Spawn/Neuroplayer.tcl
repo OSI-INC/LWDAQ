@@ -7956,7 +7956,7 @@ proc Neuroplayer_open {} {
 
 	set f $w.play
 	frame $f -border 4
-	pack $f -side top -fill x 
+	pack $f -side top -fill x
 
 	set f $w.play.a
 	frame $f

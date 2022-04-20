@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "22"
+	LWDAQ_tool_init "Videoarchiver" "23"
 
 	# If a graphical tool window already exists, we abort our initialization.
 	if {[winfo exists $info(window)]} {
@@ -151,7 +151,7 @@ echo "SUCCESS"
 
 	# The following parameters will appear in the configuration panel, so the user can
 	# modify them by hand.
-	set config(transfer_period_s) "60"
+	set config(transfer_period_s) "10"
 	set config(transfer_max_files) "10"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
@@ -1563,15 +1563,16 @@ proc Videoarchiver_transfer {n} {
 			}
 		}
 	
-		# If we still have two or more segments available, we have an opportunity to transfer
-		# segments into the recording file. We will not attempt a transfer if there is only
-		# one segment available, because this segment may be loaded into the recording 
-		# monitor play list.
+		# If we still have two or more segments available, we have an
+		# opportunity to transfer segments into the recording file. We will not
+		# attempt a transfer if there is only one segment available, because
+		# this segment may be loaded into the recording monitor play list.
 		if {[llength $seg_list] > 1} {
 								
-			# If the time since our previous transfer is greater than or equal to 
-			# transfer_period_s, we transfer segments into the recording file. And if the 
-			# state of the camera is no longer Record, we finish up by transferring segments. 
+			# If the time since our previous transfer is greater than or equal
+			# to transfer_period_s, we transfer segments into the recording
+			# file. And if the state of the camera is no longer Record, we
+			# finish up by transferring segments. 
 			if {([clock seconds] - $info(cam$n\_ttime) > $config(transfer_period_s)) \
 				|| ($info(cam$n\_state) != "Record")} {
 	
@@ -1618,13 +1619,15 @@ proc Videoarchiver_transfer {n} {
 				set num_segments [llength $transfer_segments]
 				if {$num_segments > 0} {
 					if {$config(verbose)} {
-						LWDAQ_print $info(text) "$info(cam$n\_id) Adding $num_segments segments\
-							to [file tail $info(cam$n\_file)], $ip." $config(v_col)
+						LWDAQ_print $info(text) "$info(cam$n\_id) Adding $num_segments\
+							segments to [file tail $info(cam$n\_file)], $ip." \
+							$config(v_col)
 					}
 	
 					# We take this opportunity to remove excess lines from the text window.
 					set when "deleting old text"
 					$info(text) delete 1.0 "end [expr 0 - $info(num_lines_keep)] lines"			
+					set start_ms [clock milliseconds]
 					
 					# We are going to copy the existing video file into a temporary
 					# file, followed by copying one or more compressed segments.
@@ -1640,13 +1643,14 @@ proc Videoarchiver_transfer {n} {
 					# Here is where the transfer of files into the current recording file
 					# takes place. We use the ffmpeg concatination function, passing
 					# to ffmpeg the list of files to add to the recording file. The
-					# result is a new file, tempfile. 
+					# result is a new file, Temporary.mp4. 
 					set when "concatinating segments"
 					exec $info(ffmpeg) \
 						-nostdin -f concat -safe 0 -loglevel error \
 						-i transfer_list.txt -c copy \
 						[file nativename $tempfile] \
 						 > transfer_log.txt
+					
 					
 					# We replace the previous recording file with the newly created
 					# video file, delete the old file, and delete all the compressed
@@ -1660,6 +1664,15 @@ proc Videoarchiver_transfer {n} {
 					
 					# We mark this transfer time.
 					set info(cam$n\_ttime) [clock seconds]
+					
+					# Some code that allows us to study how long it takes to copy the
+					# existing file and concatinate new segments, delete the old file.
+					if {0} {
+						set duration_ms [expr [clock milliseconds] - $start_ms]
+						LWDAQ_print $info(text) "$num_segments\
+							[format %.2f [expr 0.000001*[file size $info(cam$n\_file)]]]\
+							$duration_ms"
+					}
 				} else {
 					# We don't expect to end up here. If we have more than one segment, we must
 					# have at least one that we can transfer. But if file names are corrupted,

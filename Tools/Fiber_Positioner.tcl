@@ -887,7 +887,7 @@ proc Fiber_Positioner_open {} {
 	pack $f.tll $f.tle -side left -expand yes
 	
 	set f [frame $w.image_frame]
-	pack $f -side left -fill y 
+	pack $f -side left -fill y -expand yes
 	
 	set info(photo) [image create photo -width 700 -height 520]
 	label $f.image -image $info(photo) 
@@ -897,7 +897,7 @@ proc Fiber_Positioner_open {} {
 	LWDAQ_print $info(data) "Fiber Positioner Data" purple
 
 	set f [frame $w.log]
-	pack $f -side right -fill both -expand true
+	pack $f -side right -fill both -expand yes
 	
 	set info(log) [LWDAQ_text_widget $f 30 60 1 1]
 	LWDAQ_print $info(log) "Fiber Positioner Log" purple

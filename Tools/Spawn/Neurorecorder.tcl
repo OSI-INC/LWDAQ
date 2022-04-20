@@ -987,7 +987,7 @@ proc Neurorecorder_open {} {
 	label $f.control -textvariable Neurorecorder_info(record_control) \
 		-fg blue -width 8
 	set info(record_control_label) $f.control
-	pack $f.control -side left -expand yes
+	pack $f.control -side left
 
 	foreach a {Start Stop PickDir} {
 		set b [string tolower $a]

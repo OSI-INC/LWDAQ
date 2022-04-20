@@ -402,7 +402,7 @@ proc LWDAQ_widget_list {w} {
 #
 # LWDAQ_text_widget opens a text window within the specified window frame. The
 # text window has its "undo" stack turned off. The text widget is a child of an
-# existing window frame "wf", and will be gien the name $wf.text, which is
+# existing window frame "wf", and will be given the name $wf.text, which is
 # returned by the routine. By default, the window has a y scrollbar, but no x
 # scrollbar. If we have an x scrollbar we turn off the text wrapping. We bind
 # the Command-B key to clear the widget of text, and we set the tab size to a
