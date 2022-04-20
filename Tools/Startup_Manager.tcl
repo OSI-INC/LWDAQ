@@ -181,18 +181,16 @@ proc Startup_Manager_get_config {step_num} {
 }
 
 #
-# Startup_Manager_step_list_print prints a list of steps to a text widget. It is
-# used by the list_script and load_script routines. If num_lines > 0, the
-# routine prints the first num_lines steps and the last num_lines steps.
+# Startup_Manager_script_print prints a list of steps.
 #
-proc Startup_Manager_step_list_print {text_widget num_lines} {
+proc Startup_Manager_script_print {} {
 	upvar #0 Startup_Manager_info info
 	upvar #0 Startup_Manager_config config
 
-	LWDAQ_print $text_widget "[format {%6s} Step] \
-			[format {%-12s} Type] \
-			[format {%-22s} Name] \
-			[format {%-12s} Tool]" $config(title_color)
+	LWDAQ_print $info(text) "[format {%4s} Step] \
+			[format {%-8s} Type] \
+			[format {%-40s} Name] \
+			[format {%-20s} Tool]" $config(title_color)
 	for {set step_num 1} {$step_num <= $info(num_steps)} {incr step_num} {
 		set type [string replace [lindex $info(steps) $step_num 0] end end ""]
 		if {[lsearch {starter default run spawn} $type] < 0} {
@@ -200,20 +198,13 @@ proc Startup_Manager_step_list_print {text_widget num_lines} {
 		}
 		set name [Startup_Manager_get_field $step_num "name"]
 		if {$name == ""} {set name "None"}
-		set instrument [Startup_Manager_get_field $step_num "tool"]
-		if {$instrument == ""} {set instrument "None"}
-		LWDAQ_print $text_widget \
-			"[format {%6d} $step_num] \
-			[format {%-12s} $type] \
-			[format {%-22s} $name] \
-			[format {%-12s} $instrument]"
-		if {($step_num == $num_lines) && ($info(num_steps) > [expr $num_lines + $num_lines])} {
-			set step_num [expr $info(num_steps) - $num_lines]
-			LWDAQ_print $text_widget "[format {%6s} ...] \
-					[format {%-12s} ...] \
-					[format {%-22s} ...] \
-					[format {%-12s} ...]" $config(title_color)
-		}
+		set tool [Startup_Manager_get_field $step_num "tool"]
+		if {$tool == ""} {set tool "None"}
+		LWDAQ_print $info(text) \
+			"[format {%4d} $step_num] \
+			[format {%-8s} $type] \
+			[format {%-40s} $name] \
+			[format {%-20s} $tool]"
 	}
 	
 	return 1
@@ -245,7 +236,12 @@ proc Startup_Manager_load_script {{fn ""}} {
 		}
 	}
 
-	if {$fn == ""} {set fn $config(daq_script)}
+	# Determine the script file name.
+	if {$fn == ""} {
+		set fn $config(daq_script)
+	} {
+		set config(daq_script) $fn
+	}
 	LWDAQ_print $info(text) "\nLoad: $fn" $config(title_color)
 
 	if {![file exists $fn]} {
@@ -254,7 +250,7 @@ proc Startup_Manager_load_script {{fn ""}} {
 		set info(control) "Idle"
 		return "ERROR"
 	}
-	
+		
 	# Read file contents and remove comment lines.
 	set as "\n"
 	if {[catch {
@@ -282,7 +278,7 @@ proc Startup_Manager_load_script {{fn ""}} {
 	}
 
 	# Print a summary of the script to the screen.
-	Startup_Manager_step_list_print $info(text) $config(num_steps_show)	
+	Startup_Manager_script_print 
 	LWDAQ_print $info(text) "Load okay." $config(result_color)
 	
 	set info(control) "Idle"
@@ -290,73 +286,21 @@ proc Startup_Manager_load_script {{fn ""}} {
 }
 
 #
-# Startup_Manager_list_script prints an entire script to a separate window.
+# Startup_Manager_edit_script opens a new toplevel window, reads the script file
+# from disk, prints the script in the edit window, and provides buttons to save
+# and duplicate the contents of the text window.
 #
-proc Startup_Manager_list_script {} {
+proc Startup_Manager_edit_script {} {
 	upvar #0 Startup_Manager_info info
 	upvar #0 Startup_Manager_config config
 
-	set w $info(window)\.list
-	if {[winfo exists $w]} {destroy $w}
-	toplevel $w
-	wm title $w "Step List"
-	set step_list ""
-	set t [LWDAQ_text_widget $w 80 20]
-	Startup_Manager_step_list_print $t 0
-
-	return "SUCCESS"
-}
-
-#
-# Startup_Manager_script_string returns a string version of the current script.
-#
-proc Startup_Manager_script_string {} {
-	upvar #0 Startup_Manager_info info
-	upvar #0 Startup_Manager_config config
-
-	set s ""
-	
-	for {set step_num 1} {$step_num <= $info(num_steps)} {incr step_num} {
-		set title 1
-		set in_config 0
-		set param_name 1
-		set field_name 1
-		foreach e [lindex $info(steps) $step_num] {
-			if {$title == 1} {
-				append s "$e\n"
-				set title 0
-				continue
-			}
-			if {$e == "end."} {
-				append s "end.\n\n"
-				break
-			}
-			if {$e == "config:"} {
-				set in_config 1
-				append s "config:\n"
-				continue
-			}
-			if {$in_config == 0} {
-				if {$field_name} {
-					append s "$e "
-					set field_name 0
-				} {
-					append s "\{$e\}\n"
-					set field_name 1
-				}	
-			} {
-				if {$param_name == 1} {
-					append s "	$e "
-					set param_name 0
-				} {
-					append s "\{$e\}\n"
-					set param_name 1
-				}	
-			}
-		}
+	if {![file exists $config(daq_script)]} {
+		LWDAQ_print $info(text) "ERROR: Startup script file does not exist."
+		return "ERROR"
 	}
 	
-	return [string trim $s]
+	LWDAQ_edit_script Open $config(daq_script)
+	return "SUCCESS"
 }
 
 #
@@ -464,7 +408,7 @@ proc Startup_Manager_execute {} {
 	if {($disable != "") && ($disable != "0")} {set step_type "disabled"}
 		
 	# Set the default result string.
-	set result "$name okay."
+	set result "Step \"$name\" okay."
 	
 	# A default step defines default commands and configuration for a tool.
 	if {$step_type == "default"} {
@@ -614,18 +558,18 @@ proc Startup_Manager_execute {} {
 		# Wait until the configuration file is deleted, which indicates that the
 		# spawned tool is running.
 		set start_time [clock seconds]
-		LWDAQ_print $info(text) "Waiting for standalone process to finish starting up."
+		LWDAQ_print $info(text) "Waiting for \"$name\" to configure and run."
 		while {[file exists $cfn]} {
 			LWDAQ_update
 			if {$info(control) == "Stop"} {
-				LWDAQ_print $info(text) "Aborted waiting for process to start."
-				set info(control) "Idle"
-				return "ERROR"
+				LWDAQ_print $info(text) "User aborted waiting for \"$name\"."
+				set result "WARNING: Step \"$name\" may not be running."
+				break
 			}
 			if {[clock seconds] - $start_time > $config(startup_timeout)} {
-				LWDAQ_print $info(text) "Timeout waiting for process to start."
-				set info(control) "Idle"
-				return "ERROR"
+				LWDAQ_print $info(text) "ERROR: Timeout waiting for \"$name\"."
+				set result "ERROR: Step \"$name\" failed to configure and start."
+				break
 			}
 		}
 	}
@@ -638,11 +582,15 @@ proc Startup_Manager_execute {} {
 	}
 	
 	if {$step_type == "disabled"} {
-		set result "$name disabled."
+		set result "Step \"$name\" disabled."
 	}
 	
-	# Print the step result of the result to the screen.
+	# Print the step result of the result to the screen. If it's an error, set
+	# the control to Idle.
 	LWDAQ_print $info(text) $result $config(result_color)
+	if {[LWDAQ_is_error_result $result]} {
+		set info(control) "Idle"
+	}
 	
 	# Adjust the step number and decide whether to post another step
 	# execution now.
@@ -652,7 +600,8 @@ proc Startup_Manager_execute {} {
 	}
 	if {$info(step) == $info(num_steps)} {
 		if {$config(auto_quit)} {exit}
-		LWDAQ_print $info(text) "\nEnd" $config(title_color)
+		LWDAQ_print $info(text) "\nReached end of startup script." $config(title_color)
+		LWDAQ_print $info(text) "Feel free to close this window."
 	}
 	
 	set info(control) "Idle"
@@ -693,11 +642,11 @@ proc Startup_Manager_open {} {
 	pack $f -side top -fill x
 
 	label $f.title -text "Script:"
-	entry $f.entry -textvariable Startup_Manager_config(daq_script) -width 45
+	entry $f.entry -textvariable Startup_Manager_config(daq_script) -width 60
 	button $f.browse -text Browse -command [list LWDAQ_post Startup_Manager_browse_daq_script]
 	pack $f.title $f.entry $f.browse -side left -expand 1
 
-	foreach a {Load Store List} {
+	foreach a {Load Edit} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Startup_Manager_$b\_script"
 		pack $f.$b -side left -expand 1

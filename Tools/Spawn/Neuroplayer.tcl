@@ -4890,8 +4890,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		# Check for incompatible options.
 		if {$config(export_centroid) || $config(export_powers)} {
 			if {$config(export_format) == "EDF"} {
-				LWDAQ_print $t \
-					"ERROR: Cannot store centroid or powers in EDF."
+				LWDAQ_print $t "ERROR: Cannot store centroid or powers in EDF."
 				return "ERROR"
 			}
 		}	
@@ -4919,7 +4918,11 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			- [Neuroplayer_clock_convert $info(datetime_start_time)]]
 		LWDAQ_print $t \
 			"Start archive time $archive_start_time s in [file tail $config(play_file)]."
-		LWDAQ_print $t "Export directory $config(export_dir)."
+		LWDAQ_print $t "Export directory \"$config(export_dir)\"."		
+		if {![file exists $config(export_dir)]} {
+			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
+			return "ERROR"
+		}
 		
 		# Check the channel select string and clean up existing export files.
 		set config(channel_selector) [string trim $config(channel_selector)]
@@ -4930,7 +4933,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					"ERROR: Cannot use wildcard channel select, aborting export.\
 						Use Autofill or enter select string by hand."
 				LWDAQ_post "Neuroexporter_export Stop"
-				return "FAIL"
+				return "ERROR"
 			}
 			set id [lindex [split $channel :] 0]		
 			if {![string is integer -strict $id] \
@@ -4939,20 +4942,20 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				LWDAQ_print $t \
 					"ERROR: Invalid channel id \"$id\", aborting export."
 				LWDAQ_post "Neuroexporter_export Stop"
-				return "FAIL"
+				return "ERROR"
 			}
 			set sps [lindex [split $channel :] 1]
 			if {$sps == ""} {
 				LWDAQ_print $t \
 					"ERROR: No sample rate specified for channel $id, aborting export."
 				LWDAQ_post "Neuroexporter_export Stop"
-				return "FAIL"
+				return "ERROR"
 			}
 			if {[lsearch "16 32 64 128 256 512 1024 2048 4096" $sps] < 0} {
 				LWDAQ_print $t \
 					"ERROR: Invalid sample rate \"$sps\", aborting export."
 				LWDAQ_post "Neuroexporter_export Stop"
-				return "FAIL"
+				return "ERROR"
 			}
 			lappend signals $id $sps
 						
@@ -5105,7 +5108,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					LWDAQ_print $t "ERROR: Cannot find video for $vt s,\
 						aborting export."
 					LWDAQ_post "Neuroexporter_export Stop"
-					return "FAIL"
+					return "ERROR"
 				}
 				scan $vfi %s%d%f vfn vsk vlen
 				if {$info(export_end_s) - $vt > round($vlen - $vsk)} {
@@ -5119,7 +5122,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						vt=$vt end_s=$info(export_end_s)\
 						vf=[file tail $vfn], aborting export."
 					LWDAQ_post "Neuroexporter_export Stop"
-					return "FAIL"
+					return "ERROR"
 				}
 
 				if {$vdur < round($vlen)} {
@@ -5173,8 +5176,12 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	if {$cmd == "Play"} {	
 		# Check the current state of the exporter is "Play", or else we will ignore
 		# this request to play and return.
-		if {$info(export_state) != "Play"} {
-			return "IGNORE"
+		if {$info(export_state) != "Play"} {return "IGNORE"}
+		
+		# Check that the export directory exists.
+		if {![file exists $config(export_dir)]} {
+			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
+			return "ERROR"
 		}
 		
 		# Continue to export, provided that we are not yet done.
@@ -5473,7 +5480,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	# from the point immediately after the end of the previous export.
 	if {$cmd == "Repeat"} {
 		if {$info(export_state) != "Wait"} {
-			return "FAIL"
+			return "ERROR"
 		}
 		
 		if {$config(export_reps) == "*"} {
@@ -5502,7 +5509,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}		
 	}
 
-	return "FAIL"
+	return "ERROR"
 }
 
 #
@@ -7126,9 +7133,7 @@ proc Neuroplayer_play {{command ""}} {
 		}
 		if {$info(export_state) == "Play"} {
 			Neuroexporter_export "Play"
-			if {$info(play_control) == "Stop"} {
-				break
-			}
+			if {$info(play_control) == "Stop"} {break}
 		}
 		if {![LWDAQ_is_error_result $result] && $en_proc} {
 			if {[catch {eval $info(processor_script)} error_result]} {

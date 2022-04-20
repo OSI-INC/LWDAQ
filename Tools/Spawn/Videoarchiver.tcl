@@ -85,7 +85,11 @@ proc Videoarchiver_init {} {
 	set info(tcp_port) "2222"
 	set info(tcl_port) "2223"
 	set info(library_archive) "http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
-	# These are the camera versions and their resolutions and framerates.
+	# These are the camera versions, each version accompanied by four numbers:
+	# the horizontal resolution x, vertical resolution y, frame rate fr, and
+	# constant rate factor crf. The image will be x * y pixels with fr frames
+	# per second, and the H264 compression will be greater as the crf is lower.
+	# Standard crf is 23. The crf of 15 gives a particularly sharp image.
 	set config(versions) [list {A3034B-HR 820 616 20 23} {A3034B-LR 410 308 30 15}]
 	
 	# The rotation of the image readout.
@@ -820,11 +824,12 @@ proc Videoarchiver_stream {n} {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 		
-		# We start video streaming to a TCPIP port. Our command uses the long versions of 
-		# all options for clarity. We are going to perform percent substitution on this
-		# string to allow the user to change the resolution, compensation, rotation
-		# and saturation of the video. The final command to echo the word SUCCESS is to allow our 
-		# secure shell to return a success code. Any error will cause the echo to be skipped.
+		# We start video streaming to a TCPIP port. Our command uses the long
+		# versions of all options for clarity. We are going to perform percent
+		# substitution on this string to allow the user to change the
+		# resolution, compensation, rotation and saturation of the video. The
+		# final command to echo the word SUCCESS is to allow our secure shell to
+		# return a success code. Any error will cause the echo to be skipped.
 		LWDAQ_socket_write $sock "exec raspivid --codec $info(stream_codec) --timeout 0 --flush \
 			--width $width --height $height --saturation $info(cam$n\_sat) \
 			--rotation $info(cam$n\_rot) \
