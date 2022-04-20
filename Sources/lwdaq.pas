@@ -1192,16 +1192,16 @@ analysis bounds of the first image. Elsewhere, the difference image is equal to 
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
-<tr><td>-name</td><td>The name of the new image will be $value.</td></tr>
-<tr><td>-results</td><td>Set the new image results string to value.</td></tr>
-<tr><td>-replace</td><td>If value is 1, delete the original image and replace it with the new one. 0 by default.</td></tr>
-<tr><td>-clear</td><td>If value is 1, clear overlay of final image, 0 by default.</td></tr>
-<tr><td>-fill</td><td>If value is 1, fill overlay of final image with white, 0 by default.</td></tr>
-<tr><td>-paint</td><td>Paint the overlay within the analysis bounds with eight-bit color value, 0 by default.</td></tr>
-<tr><td>-bottom</td><td>Set the bottom of the analysis bounds to value.</td></tr>
-<tr><td>-top</td><td>Set the top of the analysis bounds to value.</td></tr>
-<tr><td>-left</td><td>Set the left of the analysis bounds to value.</td></tr>
-<tr><td>-right</td><td>Set the rigth of the analysis bounds to value.</td></tr>
+<tr><td>-name value</td><td>The name of the new image will be value.</td></tr>
+<tr><td>-results value</td><td>Set the new image results string to value.</td></tr>
+<tr><td>-replace value</td><td>If value is 1, delete the original image and replace with new image, default.</td></tr>
+<tr><td>-clear value</td><td>If value is 1, clear overlay of final image, default 0.</td></tr>
+<tr><td>-fill value</td><td>If value is 1, fill overlay of final image with white, default 0.</td></tr>
+<tr><td>-paint value</td><td>Paint the overlay within the analysis bounds with eight-bit color value, default 0.</td></tr>
+<tr><td>-bottom value</td><td>Set the bottom of the analysis bounds to value.</td></tr>
+<tr><td>-top value</td><td>Set the top of the analysis bounds to value.</td></tr>
+<tr><td>-left value</td><td>Set the left of the analysis bounds to value.</td></tr>
+<tr><td>-right value</td><td>Set the rigth of the analysis bounds to value.</td></tr>
 </table></center>
 
 <p>With -name you specify the name of the new image created by the manipulation, or the existing image if there is no new image created by the manipulation. Any pre-existing images with this name will be destroyed before the name change occurs.</p>

@@ -30,7 +30,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.9"
+	LWDAQ_tool_init "Fiber_Positioner" "1.10"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -104,7 +104,6 @@ proc Fiber_Positioner_init {} {
 	set info(travel_wait) "0"
 	
 	# Travel configuration.
-	set info(travel_window) "$info(window)\.travel_edit"
 	set config(travel_index) "0"
 	set config(loop_counter) "0"
 	set config(pass_counter) "0"
@@ -466,8 +465,32 @@ proc Fiber_Positioner_check {} {
 }
 
 #
-# Fiber_Positioner_reset resets the travel index, pass counter, and loop 
-# counters all to zero.
+# Fiber_Positioner_clear clears the display traces.
+#
+proc Fiber_Positioner_clear {} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
+	upvar #0 LWDAQ_config_BCAM iconfig
+
+	set index 0
+	foreach fiber $config(fiber_elements) {
+		incr index
+		set info(trace_history_$index) [list]
+	}
+	
+	if {[lwdaq_image_exists $iconfig(memory_name)] != ""} {
+		lwdaq_image_manipulate $iconfig(memory_name) none -clear 1
+		lwdaq_draw $iconfig(memory_name) $info(photo) \
+			-zoom $config(zoom) \
+			-intensify $config(intensify)
+	}
+	
+	return "SUCCESS"
+}
+
+#
+# Fiber_Positioner_reset sets the travel index, pass counter, and loop 
+# counters all to zero. It clears the traces.
 #
 proc Fiber_Positioner_reset {} {
 	upvar #0 Fiber_Positioner_config config
@@ -480,10 +503,10 @@ proc Fiber_Positioner_reset {} {
 		set info(control) "Idle"
 	}
 	
+	Fiber_Positioner_clear
+	
 	return "SUCCESS"
 }
-
-
 
 #
 # Fiber_Positioner_step just calls the travel routine. We assume the control 
@@ -790,7 +813,7 @@ proc Fiber_Positioner_open {} {
 	
 	label $f.state -textvariable Fiber_Positioner_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
-	foreach a {Zero Move Check Travel Step Stop Reset} {
+	foreach a {Zero Move Check Travel Step Stop Clear Reset} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Fiber_Positioner_cmd $a"
 		pack $f.$b -side left -expand 1
