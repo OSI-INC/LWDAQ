@@ -51,6 +51,7 @@ proc LWDAQ_init_Camera {} {
 	set info(daq_image_right) 682
 	set info(daq_image_top) 14
 	set info(daq_image_bottom) 506
+	set info(daq_wake_ms) 0
 	set info(daq_password) "no_password"
 	set info(delete_old_images) 1
 	set info(verbose_description) " \
@@ -123,11 +124,19 @@ proc LWDAQ_daq_Camera {} {
 		set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 		LWDAQ_login $sock $info(daq_password)
 
-		# Select the device and set the device type.
+		# Select the device, set the device type, and wake the camera.
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 		LWDAQ_set_device_type $sock $config(daq_device_type)
 		LWDAQ_set_device_element $sock $config(daq_device_element)
+		LWDAQ_wake $sock
 
+		# If wake delay is enabled, wait for the specified interval before
+		# continuing.
+		if {$info(daq_wake_ms) > 0} {
+			LWDAQ_wait_for_driver $sock
+			LWDAQ_wait_ms $info(daq_wake_ms)
+		}
+		
 		# The TC255 and TC237 sensors have frame stores. We transfer the
 		# image into the frame store and read it out from there. This invites
 		# blurring of the image as it is read out, if the read out is not

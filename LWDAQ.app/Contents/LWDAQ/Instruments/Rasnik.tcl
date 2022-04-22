@@ -49,6 +49,7 @@ proc LWDAQ_init_Rasnik {} {
 	set info(daq_image_right) [expr $info(daq_image_width) - 1]
 	set info(daq_image_top) 1
 	set info(daq_image_bottom) [expr $info(daq_image_height) - 1]
+	set info(daq_wake_ms) 0
 	set info(flash_seconds_max) 1.0
 	set info(flash_seconds_step) 0.000001
 	set info(flash_seconds_reduce) 0.2
@@ -326,10 +327,18 @@ proc LWDAQ_daq_Rasnik {} {
 			set sock_2 $sock_1
 		}
 
-		# Select the device and set the device type.
+		# Select the device, set the device type, and wake the device up.
 		LWDAQ_set_driver_mux $sock_1 $config(daq_driver_socket) $config(daq_mux_socket)
 		LWDAQ_set_device_type $sock_1 $info(daq_device_type)
 		LWDAQ_set_device_element $sock_1 $config(daq_device_element)
+		LWDAQ_wake $sock_1
+		
+		# If wake delay is enabled, send the wake command now and wait for the
+		# specified interval before continuing.
+		if {$info(daq_wake_ms) > 0} {
+			LWDAQ_wait_for_driver $sock_1
+			LWDAQ_wait_ms $info(daq_wake_ms)
+		}
 		
 		# Clear the image sensor of charge.
 		LWDAQ_image_sensor_clear $sock_1 $info(daq_device_type)

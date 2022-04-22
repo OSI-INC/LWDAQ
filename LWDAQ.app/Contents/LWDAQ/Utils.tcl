@@ -291,10 +291,9 @@ proc LWDAQ_close_all_sockets {} {
 }
 
 #
-# LWDAQ_socket_flush flushes output from a socket. It returns
-# an error message starting with a capitalized nown. Use this
-# routine with a socket opened by LWDAQ_socket_open, but not
-# with sockets opened with the bare Tcl socket command.
+# LWDAQ_socket_flush flushes output from a socket. Use this routine with a
+# socket opened by LWDAQ_socket_open, but not with sockets opened with the bare
+# Tcl socket command.
 #
 proc LWDAQ_socket_flush {sock} {
 	if {[catch {flush $sock} error_result]} {
@@ -304,24 +303,23 @@ proc LWDAQ_socket_flush {sock} {
 }
 
 #
-# LWDAQ_socket_read reads $size bytes from the input buffer of $sock. If
-# the global LWDAQA_Info(blocking_sockets) variable is 1, the read
-# takes place in one entire data block. While the data arrives, the LWDAQ
-# program freezes. If the same variable is 0, the this procedure reads
-# the data in fragments, allowing the program to respond to menu and window
-# events between fragments. The routine collects all the necessary fragments
-# together and returns them. Use this routine with sockets opened by
-# the LWDAQ_socket_open command. If the size parameter is not an integer,
-# but instead the word "line", we read characters from the socket
-# until we get a newline character, or until a timeout occurs.
+# LWDAQ_socket_read reads $size bytes from the input buffer of $sock. If the
+# global LWDAQA_Info(blocking_sockets) variable is 1, the read takes place in
+# one entire data block. While the data arrives, the LWDAQ program freezes. If
+# the same variable is 0, the this procedure reads the data in fragments,
+# allowing the program to respond to menu and window events between fragments.
+# The routine collects all the necessary fragments together and returns them.
+# Use this routine with sockets opened by the LWDAQ_socket_open command. If the
+# size parameter is not an integer, but instead the word "line", we read
+# characters from the socket until we get a newline character, or until a
+# timeout occurs.
 #
 proc LWDAQ_socket_read {sock size} {
 	global LWDAQ_Info
 	
-	# Check to see if the socket has any problems. If it
-	# does, we abandon the read, close the socket, and report
-	# and error that includes the socket status, if the socket
-	# exists."
+	# Check to see if the socket has any problems. If it does, we abandon the
+	# read, close the socket, and report and error that includes the socket
+	# status, if the socket exists.
 	if {[catch {set status [fconfigure $sock -error]} error_result]} {
 		error "socket error, $error_result"
 	}
@@ -330,14 +328,13 @@ proc LWDAQ_socket_read {sock size} {
 		error "broken socket, $status"
 	}
 
-	# We flush the socket to make sure we send any data
-	# that might provoke the return of our data.
+	# We flush the socket to make sure we send any data that might provoke the
+	# return of our data.
 	LWDAQ_socket_flush $sock
 
-	# If we are working with a blocking socket, we read
-	# the data from the socket in one block. If the block
-	# we get back from the read command is the wrong size,
-	# we close the socket and report an error.
+	# If we are working with a blocking socket, we read the data from the socket
+	# in one block. If the block we get back from the read command is the wrong
+	# size, we close the socket and report an error.
 	if {$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
 		set data [read $sock $size]
 		if {[string length $data] != $size} {
@@ -346,33 +343,26 @@ proc LWDAQ_socket_read {sock size} {
 		}	
 	} 
 	
-	# If we are working with a blocking socket, but the
-	# size is not an integer, we use line buffering, and read
-	# the socket until we get an end of line.
+	# If we are working with a blocking socket, but the size is not an integer,
+	# we use line buffering, and read the socket until we get an end of line.
 	if {$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
 		fconfigure $sock -buffering line -translation auto
 		set data [gets $sock]
 		fconfigure $sock -buffering full -translation binary
 	} 
 
-	# When we work with a non-blocking socket, which is
-	# our default, we define a unique global variable
-	# that we use in conjunction with vwait to direct a
-	# data-reading loop that continues reading until all
-	# the required data has arrived, or until the global
-	# variable is set to an error string. A "readable"
-	# file-event for the socket sets the global
-	# variable, thus notifying the data-reading loop
-	# that it should read all available data from the
-	# socket. This "readable" file-event does not read
-	# the data itself, and in this sense our use of the
-	# "readable" event is unconventional. Most
-	# asynchronous socket-handling in Tcl uses the
-	# "readable" event to itself to read the data. But
-	# we use the "readable" event only to set a global
-	# variable. As a result, we retain control over the
-	# asynchronous read, and we can preserve the
-	# integrity of our event loop.
+	# When we work with a non-blocking socket, which is our default, we define a
+	# unique global variable that we use in conjunction with vwait to direct a
+	# data-reading loop that continues reading until all the required data has
+	# arrived, or until the global variable is set to an error string. A
+	# "readable" file-event for the socket sets the global variable, thus
+	# notifying the data-reading loop that it should read all available data
+	# from the socket. This "readable" file-event does not read the data itself,
+	# and in this sense our use of the "readable" event is unconventional. Most
+	# asynchronous socket-handling in Tcl uses the "readable" event to itself to
+	# read the data. But we use the "readable" event only to set a global
+	# variable. As a result, we retain control over the asynchronous read, and
+	# we can preserve the integrity of our event loop.
 	if {!$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
 		set vwait_var_name [LWDAQ_vwait_var_name]
 		upvar #0 $vwait_var_name vwait_var
@@ -1516,11 +1506,12 @@ proc LWDAQ_stop_vwaits {} {
 # command so that the waiting variable will not be set later.
 #
 proc LWDAQ_wait_ms {time_ms {vwait_var_name ""}} {
-
+	if {![string is integer -strict $time_ms]} {
+		error "Invalid millisecond time \"$time_ms\"."
+	}
 	if {$vwait_var_name == ""} {
 		set vwait_var_name [LWDAQ_vwait_var_name]
 	}
-
 	upvar #0 $vwait_var_name vwait_var
 	set vwait_var "Waiting for $time_ms ms."
 	set cmd [after $time_ms \

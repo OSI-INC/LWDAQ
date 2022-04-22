@@ -51,6 +51,7 @@ proc LWDAQ_init_Thermometer {} {
 	set info(daq_image_right) -1
 	set info(daq_image_top) -1
 	set info(daq_image_bottom) -1
+	set info(daq_wake_ms) 0
 	set info(daq_sample_size) 2
 	set info(daq_settle_s) 0
 	set info(daq_password) "no_password"
@@ -199,11 +200,18 @@ proc LWDAQ_daq_Thermometer {} {
 		set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 		LWDAQ_login $sock $info(daq_password)
 		
-		# Wake up the device.
+		# Select and wake up the device.
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 		LWDAQ_set_device_type $sock $info(daq_device_type)
 		LWDAQ_wake $sock
 
+		# If wake delay is enabled, wait for the specified interval before
+		# continuing.
+		if {$info(daq_wake_ms) > 0} {
+			LWDAQ_wait_for_driver $sock
+			LWDAQ_wait_ms $info(daq_wake_ms)
+		}
+		
 		# Clear the controller RAM.
 		LWDAQ_ram_delete $sock 0 $block_length
 		LWDAQ_set_data_addr $sock 0
