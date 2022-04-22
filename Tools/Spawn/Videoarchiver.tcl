@@ -151,7 +151,7 @@ echo "SUCCESS"
 
 	# The following parameters will appear in the configuration panel, so the user can
 	# modify them by hand.
-	set config(transfer_period_s) "10"
+	set config(transfer_period_s) "60"
 	set config(transfer_max_files) "10"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
