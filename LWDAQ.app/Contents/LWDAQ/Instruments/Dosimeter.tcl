@@ -54,6 +54,7 @@ proc LWDAQ_init_Dosimeter {} {
 	set info(daq_image_right) [expr $info(daq_image_width) - 10]
 	set info(daq_image_top) 11
 	set info(daq_image_bottom) [expr $info(daq_image_height) - 10]
+	set info(daq_wake_ms) 0
 	set info(file_try_header) 1
 	set info(use_image_area) 0
 	set info(analysis_pixel_size_um) 10
@@ -98,27 +99,27 @@ proc LWDAQ_init_Dosimeter {} {
 # LWDAQ_analysis_Dosimeter applies Dosimeter analysis to an image in the lwdaq
 # image list. By default, the routine uses the image named $config(memory_name).
 # It calculates the vertical slope of intensity in cnt/row first. The analysis
-# working with the original image when analyis_enable=1, but switches to using the
-# image after subtraction of background gradient when analysis_enable>=2. With
-# analysis_enable=2 the image in memory remains the same, and analysis operates on
-# a copy of the original. With analysis_enable=3, the analysis replaces the
-# original image with the gradient-subtracted image. The analysis calculates
-# charge density in cnt/px next. The charge density is combined intensity of
-# bright hits divided by the number of pixels in the analysis bounds of the
-# image. A hit is a spot that satisfies the analysis_threshold string. The
-# threshold string specifies a minumum intensity for pixels in a hit. The
-# string "20 & 2 <" specifies a minimum intensity twenty counts above background,
-# and indicates that the background should be the average intensity of the image.
-# The same string sets a limit of two pixels in any valid hit. Following
-# the charge density is the standard deviation of intensity, the value of the
-# threshold intensity, and the number of hits found in the image. Each
+# working with the original image when analyis_enable=1, but switches to using
+# the image after subtraction of background gradient when analysis_enable>=2.
+# With analysis_enable=2 the image in memory remains the same, and analysis
+# operates on a copy of the original. With analysis_enable=3, the analysis
+# replaces the original image with the gradient-subtracted image. The analysis
+# calculates charge density in cnt/px next. The charge density is combined
+# intensity of bright hits divided by the number of pixels in the analysis
+# bounds of the image. A hit is a spot that satisfies the analysis_threshold
+# string. The threshold string specifies a minumum intensity for pixels in a
+# hit. The string "20 & 2 <" specifies a minimum intensity twenty counts above
+# background, and indicates that the background should be the average intensity
+# of the image. The same string sets a limit of two pixels in any valid hit.
+# Following the charge density is the standard deviation of intensity, the value
+# of the threshold intensity, and the number of hits found in the image. Each
 # hit is represented by its total brightness above background, and if
 # analysis_include_ij=1, the row and column number of the pixel closest to the
 # optical center of the hit. Following these values, the analysis will list one
 # or more bright hits in order of descending brightness. With
 # analysis_num_hits="*", all hits found will be listed. With
-# analysis_num_hits="10", ten hits will be listed. If only three hits exist,
-# the remaining seven hits will be represented by brightness "-1" and position "0
+# analysis_num_hits="10", ten hits will be listed. If only three hits exist, the
+# remaining seven hits will be represented by brightness "-1" and position "0
 # 0".
 #
 proc LWDAQ_analysis_Dosimeter {{image_name ""}} {
@@ -205,13 +206,17 @@ proc LWDAQ_daq_Dosimeter {} {
 		set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 		LWDAQ_login $sock $info(daq_password)
 		
-		# Select the Dosimeter sensor, clear the charge out of it, and place it
-		# in its exposure state.
+		# Select the Dosimeter sensor and wake it up.
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 		LWDAQ_set_device_type $sock $info(daq_device_type)
 		LWDAQ_set_device_element $sock $config(daq_device_element)
+		LWDAQ_wake $sock
+		if {$info(daq_wake_ms) > 0} {
+			LWDAQ_wait_for_driver $sock
+			LWDAQ_wait_ms $info(daq_wake_ms)
+		}
 
-		# Clear the image sensor of stored charge.
+		# Clear the image sensor and put it in its exposure state.		
 		LWDAQ_image_sensor_clear $sock $info(daq_device_type)
 
 		# If we have a source of radiation that can be flashed quickly by

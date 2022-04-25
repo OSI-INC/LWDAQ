@@ -57,9 +57,9 @@ proc LWDAQ_init_Gauge {} {
 		"8080 00A0 0880 1080 2080 4080 0081 0082 0084 0088 0090 0180 0480"
 	set info(display_s_per_div) 0.005
 	set info(display_s_offset) 0
-	set info(display_y_per_div) 0.01
+	set info(display_y_per_div) 20
 	set info(display_y_offset) 0
-	set info(display_y_coupling) AC
+	set info(display_y_coupling) "DC"
 	set info(display_num_div) 10
 	set info(rows_per_channel) 3
 	set info(verbose_description) ""
@@ -81,8 +81,8 @@ proc LWDAQ_init_Gauge {} {
 	set config(analysis_enable) 1
 	set config(intensify) none
 	set config(verbose_result) 0
-	set config(ref_bottom_y) 115
-	set config(ref_top_y) 125
+	set config(ref_bottom_y) 15.38
+	set config(ref_top_y) 25.69
 	
 	return 1
 }
@@ -199,14 +199,23 @@ proc LWDAQ_daq_Gauge {} {
 		# Wake up the device.
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 		LWDAQ_set_device_type $sock $info(daq_device_type)
-		LWDAQ_wake $sock
+
+		# Determine the commands that we will use to read the gauges.
+		set channel_list $config(daq_device_element)
+		set command_list $info(gauge_commands)
+		set b_cmd [lindex $command_list 0]
+		set t_cmd [lindex $command_list 1]
+		
+		# Transmit the bottom reference command in order to wake up the device and
+		# give it some time to settle.
+		LWDAQ_transmit_command_hex $sock $b_cmd
 
 		# Clear the controller RAM.
 		LWDAQ_ram_delete $sock 0 $block_length
 		LWDAQ_set_data_addr $sock 0
 		
-		# For each channel, read the bottom reference voltage,
-		# the channel voltage, and the top reference voltage.
+		# For each channel, read the bottom reference voltage, the channel
+		# voltage, and the top reference voltage.
 		set channel_list $config(daq_device_element)
 		set command_list $info(gauge_commands)
 		set b_cmd [lindex $command_list 0]

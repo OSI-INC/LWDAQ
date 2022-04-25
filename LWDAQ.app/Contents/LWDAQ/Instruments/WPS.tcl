@@ -192,10 +192,11 @@ proc LWDAQ_daq_WPS {} {
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 		LWDAQ_set_device_type $sock $info(daq_device_type)
 		
-		# Select camera two, which means the clock signals will be 
-		# applied to both image sensors. Clear the image sensors and
+		# Select camera two, which means the clock signals will be applied to
+		# both image sensors. Wake up the device, clear the image sensors and
 		# put them into their exposing state.
 		LWDAQ_set_device_element $sock 2
+		LWDAQ_wake $sock
 		for {set i 0} {$i < $LWDAQ_Driver(TC255_clears)} {incr i} {
 			LWDAQ_execute_job $sock $LWDAQ_Driver(move_job)
 		}
@@ -209,29 +210,28 @@ proc LWDAQ_daq_WPS {} {
 		LWDAQ_set_device_element $sock 2
 		LWDAQ_execute_job $sock $LWDAQ_Driver(alt_move_job)
 
-		# Select camera one, so that the storage area clock will be applied
-		# only to the first image sensor. We execute a wake job, which 
-		# transmits hex 0180 to select the CCD1 output. We must do this a
-		# few microseconds before we start our read job, in order to allow
-		# the analog circuits to settle down before we check the cable loop
-		# time. The read job gets the image out of the storage area and
-		# into the driver memory.
+		# Select camera one, so that the storage area clock will be applied only
+		# to the first image sensor. We execute a wake job, which transmits hex
+		# 0180 to select the CCD1 output. We must do this a few microseconds
+		# before we start our read job, in order to allow the analog circuits to
+		# settle down before we check the cable loop time. The read job gets the
+		# image out of the storage area and into the driver memory.
 		LWDAQ_set_device_element $sock 1
 		LWDAQ_wake $sock 
 		LWDAQ_set_data_addr $sock 0
 		LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
 
 		if {$config(daq_simultaneous)} {
-			# In simultaneous acquisition, we don't create another
-			# image, we set up the second image sensor so we can read
-			# out the image that already exists in its storage area.
+			# In simultaneous acquisition, we don't create another image, we set
+			# up the second image sensor so we can read out the image that
+			# already exists in its storage area.
 			LWDAQ_set_device_element $sock 2
 			LWDAQ_wake $sock
 		} {
 			# If we don't want, or our hardware does not support, simultaneous
-			# exposure, we clear the image sensors again, flash the light, and 
-			# transfer the images into the storage areas. Later, we will read out 
-			# the second sensor only.
+			# exposure, we clear the image sensors again, flash the light, and
+			# transfer the images into the storage areas. Later, we will read
+			# out the second sensor only.
 			LWDAQ_set_device_element $sock 2
 			for {set i 0} {$i < $LWDAQ_Driver(TC255_clears)} {incr i} {
 				LWDAQ_execute_job $sock $LWDAQ_Driver(move_job)
@@ -259,9 +259,8 @@ proc LWDAQ_daq_WPS {} {
 		return "ERROR: $error_result"
 	}
 	
-	# Construct a LWDAQ image containing the two WPS images
-	# one on top of the other. The camera one image is the
-	# top one.
+	# Construct a LWDAQ image containing the two WPS images one on top of the
+	# other. The camera one image is the top one.
 	set config(memory_name) [lwdaq_image_create \
 		-width $info(daq_image_width) \
 		-height $info(daq_image_height) \

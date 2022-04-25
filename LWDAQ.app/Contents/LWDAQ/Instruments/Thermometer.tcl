@@ -200,10 +200,19 @@ proc LWDAQ_daq_Thermometer {} {
 		set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 		LWDAQ_login $sock $info(daq_password)
 		
-		# Select and wake up the device.
+		# Select the device.
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 		LWDAQ_set_device_type $sock $info(daq_device_type)
-		LWDAQ_wake $sock
+
+		# Define the commands that will read out the thermometer.
+		set channel_list $config(daq_device_element)
+		set command_list $info($config(daq_device_name)\_commands)
+		set b_cmd [lindex $command_list 0]
+		set t_cmd [lindex $command_list 1]
+
+		# Transmit the bottom reference command in order to wake up the device and
+		# give it some time to settle.
+		LWDAQ_transmit_command_hex $sock $b_cmd
 
 		# If wake delay is enabled, wait for the specified interval before
 		# continuing.
@@ -216,8 +225,8 @@ proc LWDAQ_daq_Thermometer {} {
 		LWDAQ_ram_delete $sock 0 $block_length
 		LWDAQ_set_data_addr $sock 0
 		
-		# For each channel, read the bottom reference voltage,
-		# the channel voltage, and the top reference voltage.
+		# For each channel, read the bottom reference voltage, the channel
+		# voltage, and the top reference voltage.
 		set channel_list $config(daq_device_element)
 		set command_list $info($config(daq_device_name)\_commands)
 		set b_cmd [lindex $command_list 0]

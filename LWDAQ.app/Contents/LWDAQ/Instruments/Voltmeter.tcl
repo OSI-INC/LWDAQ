@@ -315,10 +315,11 @@ proc LWDAQ_daq_Voltmeter {} {
 		LWDAQ_login $sock $info(daq_password)
 		
 		# If we have source commands to transmit, do so now. We assume these will provoke
-		# whatever electrical activity we wish to monitor.
+		# whatever electrical activity we wish to monitor. If the source device needs
+		# to be sent to sleep afterwards, we assume the source commands will do this.
 		if {$info(daq_source_commands) != ""} {
-			LWDAQ_set_driver_mux $sock \
-				$info(daq_source_driver_socket) $info(daq_source_mux_socket)
+			LWDAQ_set_driver_mux $sock $info(daq_source_driver_socket) \
+				$info(daq_source_mux_socket)
 			foreach cmd $info(daq_source_commands) {
 				LWDAQ_transmit_command_hex $sock $cmd
 			}
@@ -330,7 +331,10 @@ proc LWDAQ_daq_Voltmeter {} {
 		LWDAQ_set_data_addr $sock $info(daq_image_width)
 		
 		# We wake up the board by sending it a command to read its bottom
-		# reference voltage.
+		# reference voltage. We don't send a wake command because the wake
+		# command does not select any particular return voltage, which might
+		# case problems in the output amplifiers, as it does in the A2057
+		# assembly.
 		LWDAQ_transmit_command_hex $sock [LWDAQ_cmd_Voltmeter $info(ref_bottom_cmd)]
 		LWDAQ_delay_seconds $sock $info(wake_up_delay_s)
 		
