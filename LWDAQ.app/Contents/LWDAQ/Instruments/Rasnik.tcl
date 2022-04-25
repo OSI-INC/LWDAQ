@@ -333,8 +333,7 @@ proc LWDAQ_daq_Rasnik {} {
 		LWDAQ_set_device_element $sock_1 $config(daq_device_element)
 		LWDAQ_wake $sock_1
 		
-		# If wake delay is enabled, send the wake command now and wait for the
-		# specified interval before continuing.
+		# If wake delay is enabled, wait for the specified interval before continuing.
 		if {$info(daq_wake_ms) > 0} {
 			LWDAQ_wait_for_driver $sock_1
 			LWDAQ_wait_ms $info(daq_wake_ms)
@@ -346,10 +345,17 @@ proc LWDAQ_daq_Rasnik {} {
 		# If two drivers, wait for the first to finish.	
 		if {$sock_1 != $sock_2} {LWDAQ_wait_for_driver $sock_1}
 		
-		# Select the source device.
+		# Select the source device and wake it up.
 		LWDAQ_set_driver_mux $sock_2 $config(daq_source_driver_socket) \
 			$config(daq_source_mux_socket)
 		LWDAQ_set_device_type $sock_2 $info(daq_source_device_type)
+		LWDAQ_wake $sock_2
+		
+		# If wake delay is enabled, wait for the specified interval before continuing.
+		if {$info(daq_wake_ms) > 0} {
+			LWDAQ_wait_for_driver $sock_2
+			LWDAQ_wait_ms $info(daq_wake_ms)
+		}		
 
 		# Flash the rasnik illumination.
 		if {$info(daq_source_device_type) == $LWDAQ_Driver(multisource_device)} {

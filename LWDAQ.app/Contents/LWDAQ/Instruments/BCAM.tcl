@@ -190,8 +190,7 @@ proc LWDAQ_daq_BCAM {} {
 		LWDAQ_set_device_element $sock_1 $config(daq_device_element)
 		LWDAQ_wake $sock_1
 		
-		# If wake delay is enabled, transmit the wake command now and wait for the
-		# specified interval before continuing.
+		# If wake delay is enabled, wait for the specified interval before continuing.
 		if {$info(daq_wake_ms) > 0} {
 			LWDAQ_wait_for_driver $sock_1
 			LWDAQ_wait_ms $info(daq_wake_ms)
@@ -203,21 +202,18 @@ proc LWDAQ_daq_BCAM {} {
 		# If two drivers, wait for the first to finish.	
 		if {$sock_1 != $sock_2} {LWDAQ_wait_for_driver $sock_1}
 		
-		# Select the source device.
+		# Select the source device and wake it up.
 		LWDAQ_set_driver_mux $sock_2 $config(daq_source_driver_socket) \
 			$config(daq_source_mux_socket)
 		LWDAQ_set_device_type $sock_2 $info(daq_source_device_type)
-
-		# We start with a dummy flash to make sure the internal
-		# power supply voltages in the device are stable before the
-		# first actual flash.
-		if {$info(daq_source_device_type) == $LWDAQ_Driver(multisource_device)} {
-			LWDAQ_set_multisource_element $sock_2 $info(dummy_flash_element) 0
-		} {
-			LWDAQ_set_device_element $sock_2 $info(dummy_flash_element)
-		}
-		LWDAQ_flash_seconds $sock_2 $info(dummy_flash_seconds)
+		LWDAQ_wake $sock_2
 		
+		# If wake delay is enabled, wait for the specified interval before continuing.
+		if {$info(daq_wake_ms) > 0} {
+			LWDAQ_wait_for_driver $sock_2
+			LWDAQ_wait_ms $info(daq_wake_ms)
+		}		
+
 		# Select the sources one by one and flash them.
 		set total_exposure_time 0
 		foreach e $config(daq_source_device_element) {

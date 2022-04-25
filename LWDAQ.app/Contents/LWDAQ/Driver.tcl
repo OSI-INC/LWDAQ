@@ -16,7 +16,6 @@
 # this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 
-#
 # Driver.tcl defines procedures that communicate with data acquisition drivers
 # and system controllers through TCPIP sockets. The Driver.tcl routines call the
 # sockeet-handling routines defined in Utils.tcl.
@@ -41,7 +40,6 @@
 # client to the server. The Relay is the embedded computer that acts as the
 # server. The Controller is the hardware and address space we read from and
 # write to with routines like LWDAQ_byte_write and LWDAQ_byte_read.
-#
 
 #
 # LWDAQ_driver_init initializes the global variable LWDAQ_Driver that
@@ -178,14 +176,12 @@ proc LWDAQ_driver_init {} {
 
 
 #
-# LWDAQ_transmit_message sends a message through a socket. 
-# The routine detects which protocol the socket uses and
-# formats the message accordingly. The message identifier is
-# passed to the procedure in $id and the contents are in
-# $contents. The routine supports the lwdaq and basic message 
-# formats. The id parameter is a string of chracters that 
-# represent a decimal number. The contents parameter is a 
-# block of binary bytes.
+# LWDAQ_transmit_message sends a message through a socket. The routine detects
+# which protocol the socket uses and formats the message accordingly. The
+# message identifier is passed to the procedure in $id and the contents are in
+# $contents. The routine supports the lwdaq and basic message formats. The id
+# parameter is a string of chracters that represent a decimal number. The
+# contents parameter is a block of binary bytes.
 #
 proc LWDAQ_transmit_message {sock id contents} {
 	global LWDAQ_Driver LWDAQ_Info
@@ -212,11 +208,9 @@ proc LWDAQ_transmit_message {sock id contents} {
 
 
 #
-# LWDAQ_receive_data receives a LWDAQ Message Protocol 
-# data return message from a socket and returns the 
-# message contents. The routine returns the data as
-# a block of binary bytes. It supports the lwdaq
-# protocol only.
+# LWDAQ_receive_data receives a LWDAQ Message Protocol data return message from
+# a socket and returns the message contents. The routine returns the data as a
+# block of binary bytes. It supports the lwdaq protocol only.
 #
 proc LWDAQ_receive_data {sock} {
 	global LWDAQ_Driver LWDAQ_Info
@@ -393,13 +387,13 @@ proc LWDAQ_byte_poll {sock addr value} {
 }
 
 #
-# LWDAQ_login attempts to log into a LWDAQ relay with a login message
-# and password $password. The routine recognises "no_password" as a key
-# phrase to skip the login attempt and return the value 0. Otherwise,
-# the routine sends the password and waits for an answer from the relay.
-# An answer of 1 is success and 0 is failure. On success, the routine
-# returns 1. On failure, the routine will generate an error by default,
-# or return -1 if you pass the value 0 for error_on_fail.
+# LWDAQ_login attempts to log into a LWDAQ relay with a login message and
+# password $password. The routine recognises "no_password" as a key phrase to
+# skip the login attempt and return the value 0. Otherwise, the routine sends
+# the password and waits for an answer from the relay. An answer of 1 is success
+# and 0 is failure. On success, the routine returns 1. On failure, the routine
+# will generate an error by default, or return -1 if you pass the value 0 for
+# error_on_fail.
 #
 proc LWDAQ_login {sock password {error_on_fail 1}} {
 	global LWDAQ_Driver
@@ -413,16 +407,15 @@ proc LWDAQ_login {sock password {error_on_fail 1}} {
 }
 
 #
-# LWDAQ_config_read reads the configuration parameters
-# from the LWDAQ relay at the other end of an open TCPIP socket
-# $sock, and returns them if they are valid. If the contents
-# are not valid, the routine reports an error. The parameters
-# the routine reads are those in the relay's RAM. These are the
-# the ones in effect on the relay. They are not the ones written
-# in the relay's EEPROM configuration file. There is no way to
-# read the EEPROM configuration directly. The EEPROM parameters
-# are loaded into ram after a hardware reset, which can be performed
-# by pressing a button on the driver, or with LWDAQ_relay_reboot.
+# LWDAQ_config_read reads the configuration parameters from the LWDAQ relay at
+# the other end of an open TCPIP socket $sock, and returns them if they are
+# valid. If the contents are not valid, the routine reports an error. The
+# parameters the routine reads are those in the relay's RAM. These are the the
+# ones in effect on the relay. They are not the ones written in the relay's
+# EEPROM configuration file. There is no way to read the EEPROM configuration
+# directly. The EEPROM parameters are loaded into ram after a hardware reset,
+# which can be performed by pressing a button on the driver, or with
+# LWDAQ_relay_reboot.
 #
 proc LWDAQ_config_read {sock} {
 	global LWDAQ_Driver
@@ -433,10 +426,10 @@ proc LWDAQ_config_read {sock} {
 }
 
 #
-# LWDAQ_config_write writes $config to the configuration
-# EEPROM on the relay. The new configuration parameters will not
-# take effect until you reboot the driver. Until then, the 
-# existing parameters in the driver's RAM will remain in effect.
+# LWDAQ_config_write writes $config to the configuration EEPROM on the relay.
+# The new configuration parameters will not take effect until you reboot the
+# driver. Until then, the existing parameters in the driver's RAM will remain in
+# effect.
 #
 proc LWDAQ_config_write {sock config} {
 	global LWDAQ_Driver
@@ -449,10 +442,9 @@ proc LWDAQ_config_write {sock config} {
 }
 
 #
-# LWDAQ_mac_read reads the mac address of the Ethernet
-# chip on the LWDAQ relay at the other end of open TCPIP
-# socket $sock, and returns the address as a string of
-# hexadecimal characters.
+# LWDAQ_mac_read reads the mac address of the Ethernet chip on the LWDAQ relay
+# at the other end of open TCPIP socket $sock, and returns the address as a
+# string of hexadecimal characters.
 #
 proc LWDAQ_mac_read {sock} {
 	global LWDAQ_Driver
@@ -462,10 +454,9 @@ proc LWDAQ_mac_read {sock} {
 }
 
 #
-# LWDAQ_smallint_write writes a two-byte integer $value through
-# open TCPIP socket $sock to controller address $addr. The addr
-# and value parameters are strings of characters that represent
-# decimal numbers.
+# LWDAQ_smallint_write writes a two-byte integer $value through open TCPIP
+# socket $sock to controller address $addr. The addr and value parameters are
+# strings of characters that represent decimal numbers.
 #
 proc LWDAQ_smallint_write {sock addr value} {
 	set integer [binary format S $value]
@@ -476,10 +467,9 @@ proc LWDAQ_smallint_write {sock addr value} {
 }
 
 #
-# LWDAQ_integer_write writes a four-byte integer $value through
-# open TCPIP socket $sock to controller address $addr. The addr and
-# value parameters are strings of characters that represent decimal
-# numbers.
+# LWDAQ_integer_write writes a four-byte integer $value through open TCPIP
+# socket $sock to controller address $addr. The addr and value parameters are
+# strings of characters that represent decimal numbers.
 #
 proc LWDAQ_integer_write {sock addr value} {
 	set integer [binary format I $value]
@@ -492,8 +482,8 @@ proc LWDAQ_integer_write {sock addr value} {
 }
 
 #
-# LWDAQ_firmware_version reads the controller's firmware
-# version number through open socket $sock, and returns the version.
+# LWDAQ_firmware_version reads the controller's firmware version number through
+# open socket $sock, and returns the version.
 #
 proc LWDAQ_firmware_version {sock} {
 	global LWDAQ_Driver
@@ -501,9 +491,8 @@ proc LWDAQ_firmware_version {sock} {
 }
 
 #
-# LWDAQ_hardware_id reads the controller identifier number from
-# the LWDAQ driver at the other end of TCPIP socket $sock, and 
-# returns the identifier.
+# LWDAQ_hardware_id reads the controller identifier number from the LWDAQ driver
+# at the other end of TCPIP socket $sock, and returns the identifier.
 #
 proc LWDAQ_hardware_id {sock} {
 	global LWDAQ_Driver
@@ -511,8 +500,8 @@ proc LWDAQ_hardware_id {sock} {
 }
 
 #
-# LWDAQ_hardware_version reads the controller's hardware
-# version number through open socket $sock, and returns it.
+# LWDAQ_hardware_version reads the controller's hardware version number through
+# open socket $sock, and returns it.
 #
 proc LWDAQ_hardware_version {sock} {
 	global LWDAQ_Driver
@@ -520,9 +509,9 @@ proc LWDAQ_hardware_version {sock} {
 }
 
 #
-# LWDAQ_loop_time reads the contents of a LWDAQ Driver's loop
-# timer register and returns it. The driver is at the other
-# end of an open TCPIP socket named $sock.
+# LWDAQ_loop_time reads the contents of a LWDAQ Driver's loop timer register and
+# returns it. The driver is at the other end of an open TCPIP socket named
+# $sock.
 #
 proc LWDAQ_loop_time {sock} {
 	global LWDAQ_Driver
@@ -530,11 +519,10 @@ proc LWDAQ_loop_time {sock} {
 }
 
 #
-# LWDAQ_most_recent_byte reads the contents of a LWDAQ Driver's mrb
-# register and returns it. The driver is at the other end of an open 
-# TCPIP socket named $sock. The mrb register contains the most recent
-# byte to be written to the Driver's ram, either by the relay or by
-# the controller.
+# LWDAQ_most_recent_byte reads the contents of a LWDAQ Driver's mrb register and
+# returns it. The driver is at the other end of an open TCPIP socket named
+# $sock. The mrb register contains the most recent byte to be written to the
+# Driver's ram, either by the relay or by the controller.
 #
 proc LWDAQ_most_recent_byte {sock} {
 	global LWDAQ_Driver
@@ -542,10 +530,9 @@ proc LWDAQ_most_recent_byte {sock} {
 }
 
 #
-# LWDAQ_set_data_addr sets the four bytes of the driver's
-# data address to $value. The driver is at the other end of open
-# TCPIP socket $sock. The value parameter is a string of characters
-# representing a decimal number.
+# LWDAQ_set_data_addr sets the four bytes of the driver's data address to
+# $value. The driver is at the other end of open TCPIP socket $sock. The value
+# parameter is a string of characters representing a decimal number.
 #
 proc LWDAQ_set_data_addr {sock value} {
 	global LWDAQ_Driver
@@ -554,23 +541,20 @@ proc LWDAQ_set_data_addr {sock value} {
 }
 
 #
-# LWDAQ_set_base_addr_hex sets the four bytes of the driver's
-# base address to $value. The value parameter is a string of 
-# characters representing an eight-digit hexadecimal number, plus
-# an optional colon and number as in daq_driver_socket of an
-# instrument configuration. The routine uses only the hex number.
-# The routine translates the character string into a four-byte
-# integer. The driver is at the other end of open TCPIP socket 
-# $sock. The base address register exists in LWDAQ components 
-# like the VME-TCPIP Interface (A2064), where it sets the base 
-# position in VME address space of the LWDAQ Driver with VME
-# Interface to which subsequent instructions to the A2064 should
-# be directed. We call this routine whenever we open a TCPIP
-# socket to a LWDAQ component. The routine accepts a hex number
-# followed by a colon and an integer, either in the format
-# "00E00000:7" or "E0:7" where "E0" is an abbreviation of the full
-# thirty-two bit address "00E00000". It uses the hex number before 
-# the colon as the base address.
+# LWDAQ_set_base_addr_hex sets the four bytes of the driver's base address to
+# $value. The value parameter is a string of characters representing an
+# eight-digit hexadecimal number, plus an optional colon and number as in
+# daq_driver_socket of an instrument configuration. The routine uses only the
+# hex number. The routine translates the character string into a four-byte
+# integer. The driver is at the other end of open TCPIP socket $sock. The base
+# address register exists in LWDAQ components like the VME-TCPIP Interface
+# (A2064), where it sets the base position in VME address space of the LWDAQ
+# Driver with VME Interface to which subsequent instructions to the A2064 should
+# be directed. We call this routine whenever we open a TCPIP socket to a LWDAQ
+# component. The routine accepts a hex number followed by a colon and an
+# integer, either in the format "00E00000:7" or "E0:7" where "E0" is an
+# abbreviation of the full thirty-two bit address "00E00000". It uses the hex
+# number before the colon as the base address.
 #
 proc LWDAQ_set_base_addr_hex {sock value} {
 	global LWDAQ_Driver
@@ -586,11 +570,10 @@ proc LWDAQ_set_base_addr_hex {sock value} {
 }
 
 #
-# LWDAQ_set_command_reg sets a driver's command register to
-# $value through TCPIP socket $sock. The value parameter is a 
-# string of characters representing a decimal number. This 
-# decimal number will be translated into a sixteen-bit value
-# before transmission to the driver.
+# LWDAQ_set_command_reg sets a driver's command register to $value through TCPIP
+# socket $sock. The value parameter is a string of characters representing a
+# decimal number. This decimal number will be translated into a sixteen-bit
+# value before transmission to the driver.
 #
 proc LWDAQ_set_command_reg {sock value} {
 	global LWDAQ_Driver
@@ -613,9 +596,8 @@ proc LWDAQ_set_command_reg_binary {sock value} {
 }
 
 #
-# LWDAQ_set_command_reg_hex sets a driver's command register 
-# to $value, where $value is a hexadecimal string representation
-# of the register's sixteen bits.
+# LWDAQ_set_command_reg_hex sets a driver's command register to $value, where
+# $value is a hexadecimal string representation of the register's sixteen bits.
 #
 proc LWDAQ_set_command_reg_hex {sock value} {
 	global LWDAQ_Driver
@@ -626,9 +608,9 @@ proc LWDAQ_set_command_reg_hex {sock value} {
 }
 
 #
-# LWDAQ_set_device_type sets a driver's device type register
-# to $value through socket $sock. The value parameter is a 
-# character string representing a decimal number.
+# LWDAQ_set_device_type sets a driver's device type register to $value through
+# socket $sock. The value parameter is a character string representing a decimal
+# number.
 #
 proc LWDAQ_set_device_type {sock value} {
 	global LWDAQ_Driver
@@ -637,9 +619,9 @@ proc LWDAQ_set_device_type {sock value} {
 }
 
 #
-# LWDAQ_set_device_element sets a driver's device type 
-# register to $value through socket $sock. The value parameter
-# is a character string representing a decimal number.
+# LWDAQ_set_device_element sets a driver's device type register to $value
+# through socket $sock. The value parameter is a character string representing a
+# decimal number.
 #
 proc LWDAQ_set_device_element {sock value} {
 	global LWDAQ_Driver
@@ -690,9 +672,9 @@ proc LWDAQ_set_multisource_element {sock value power} {
 }
 
 #
-# LWDAQ_set_delay_ticks sets a driver's delay timer
-# to $value through socket $sock.  The value parameter
-# is a character string representing a decimal number.
+# LWDAQ_set_delay_ticks sets a driver's delay timer to $value through socket
+# $sock.  The value parameter is a character string representing a decimal
+# number.
 #
 proc LWDAQ_set_delay_ticks {sock value} {
 	global LWDAQ_Driver
@@ -701,12 +683,10 @@ proc LWDAQ_set_delay_ticks {sock value} {
 }
 
 #
-# LWDAQ_set_delay_seconds sets a driver's delay timer
-# to a number of ticks that will count down to zero in $value
-# seconds. The driver is at the other end of TCPIP socket $sock.
-# The value parameter is a character string representing a 
+# LWDAQ_set_delay_seconds sets a driver's delay timer to a number of ticks that
+# will count down to zero in $value seconds. The driver is at the other end of
+# TCPIP socket $sock. The value parameter is a character string representing a
 # decimal number.
-#
 #
 proc LWDAQ_set_delay_seconds {sock value} {
 	global LWDAQ_Driver
@@ -716,9 +696,9 @@ proc LWDAQ_set_delay_seconds {sock value} {
 }
 
 #
-# LWDAQ_set_repeat_counter sets a driver's repeat counter
-# to $value through socket $sock.  The value parameter
-# is a character string representing a decimal number.
+# LWDAQ_set_repeat_counter sets a driver's repeat counter to $value through
+# socket $sock.  The value parameter is a character string representing a
+# decimal number.
 #
 proc LWDAQ_set_repeat_counter {sock value} {
 	global LWDAQ_Driver
@@ -727,10 +707,9 @@ proc LWDAQ_set_repeat_counter {sock value} {
 }
 
 #
-# LWDAQ_controller_reset writes the value 1 to the software 
-# reset byte on a controller at the other end of socket $sock, 
-# thus resetting all its state machines and registers. The relay 
-# remains unaffected.
+# LWDAQ_controller_reset writes the value 1 to the software reset byte on a
+# controller at the other end of socket $sock, thus resetting all its state
+# machines and registers. The relay remains unaffected.
 #
 proc LWDAQ_controller_reset {sock} {
 	global LWDAQ_Driver
@@ -739,9 +718,8 @@ proc LWDAQ_controller_reset {sock} {
 }
 
 #
-# LWDAQ_relay_reboot resets the relay without affecting the 
-# controller. This routine is supported only by relay software
-# versions thirteen and up. 
+# LWDAQ_relay_reboot resets the relay without affecting the controller. This
+# routine is supported only by relay software versions thirteen and up. 
 #
 proc LWDAQ_relay_reboot {sock} {
 	global LWDAQ_Driver
@@ -751,12 +729,11 @@ proc LWDAQ_relay_reboot {sock} {
 }
 
 #
-# LWDAQ_ram_read sets the LWDAQ Controller's data address equal to
-# $addr, reads $length consecutive bytes from this same address 
-# location, and returns these bytes as a byte array. The routine is
-# intended for use with a RAM portal, where each consecutive
-# read from the portal returns a consecutive byte in RAM. The addr
-# and length parameters are character strings representing decimal
+# LWDAQ_ram_read sets the LWDAQ Controller's data address equal to $addr, reads
+# $length consecutive bytes from this same address location, and returns these
+# bytes as a byte array. The routine is intended for use with a RAM portal,
+# where each consecutive read from the portal returns a consecutive byte in RAM.
+# The addr and length parameters are character strings representing decimal
 # numbers.
 #
 proc LWDAQ_ram_read {sock addr length} {
@@ -766,12 +743,11 @@ proc LWDAQ_ram_read {sock addr length} {
 }
 
 #
-# LWDAQ_ram_delete sets the LWDAQ Controller's data address equal to
-# $addr and then clears a block of $length bytes starting from
-# address $addr in the LWDAQ Controller memory. The bytes are set
-# to zero unless another value is passed to the routine. The addr,
-# length, and value parameter are character strings representing decimal
-# numbers.
+# LWDAQ_ram_delete sets the LWDAQ Controller's data address equal to $addr and
+# then clears a block of $length bytes starting from address $addr in the LWDAQ
+# Controller memory. The bytes are set to zero unless another value is passed to
+# the routine. The addr, length, and value parameter are character strings
+# representing decimal numbers.
 #
 proc LWDAQ_ram_delete {sock addr length {value 0}} {
 	global LWDAQ_Driver
@@ -780,10 +756,10 @@ proc LWDAQ_ram_delete {sock addr length {value 0}} {
 }
 
 #
-# LWDAQ_ram_write sets the LWDAQ Controller's data address equal to
-# $addr and writes a block of data byte by byte into the RAM Portal.
-# The addr parameter is a string of characters representing a decimal 
-# number. The data parameter is a block of binary bytes.
+# LWDAQ_ram_write sets the LWDAQ Controller's data address equal to $addr and
+# writes a block of data byte by byte into the RAM Portal. The addr parameter is
+# a string of characters representing a decimal number. The data parameter is a
+# block of binary bytes.
 #
 proc LWDAQ_ram_write {sock addr data} {
 	global LWDAQ_Driver
@@ -792,12 +768,11 @@ proc LWDAQ_ram_write {sock addr data} {
 }
 
 #
-# LWDAQ_set_device_addr sets the device address register on
-# a driver to $value through TCPIP socket $sock. The driver
-# will be busy with this instruction for a few tens of microseconds
-# thereafter, as it switches its driver sockets and transmits
-# a new address down the newly active socket. The value parameter
-# is a character string representing a decimal number.
+# LWDAQ_set_device_addr sets the device address register on a driver to $value
+# through TCPIP socket $sock. The driver will be busy with this instruction for
+# a few tens of microseconds thereafter, as it switches its driver sockets and
+# transmits a new address down the newly active socket. The value parameter is a
+# character string representing a decimal number.
 # 
 proc LWDAQ_set_device_addr {sock value} {
 	global LWDAQ_Driver
@@ -806,24 +781,23 @@ proc LWDAQ_set_device_addr {sock value} {
 }
 
 #
-# LWDAQ_set_driver_mux sets the device address register on a driver so as
-# to select driver socket $driver and multiplexer socket (also known as
-# the branch socket) $mux. The driver will be busy for a few tens of
-# microseconds thereafter, as it switches target sockets. The driver
-# socket can be a simple integer specifying the socket on a LWDAQ driver,
-# or it can be of the form b:a, where "b" is a 32-bit "base address"
-# expressed as an eight-digit hex string, and "a" is a decimal number.
-# The base address selects one of several drivers associated with $sock.
-# We might have a VME crate holding twenty LWDAQ Drivers (A2037A) and
-# a single VME-TCPIP interface (A2064). The $sock connection is with the
-# A2064, and we instruct the A2064 to select one of the twenty drivers
-# using "b" in $driver. For example, 00E0000:3 would select the driver 
-# at VME base address hexadecimal 00E00000, and socket 3 within that 
-# driver. We can also specify the base address in an abbreviated fasion
-# like this: "E0:3", and the missing six zeros will be added to the address
-# to compose the full eight-digit address. If we do not specify a base address, 
-# the routine does not bother setting the base address on the TCPIP interface 
-# at $sock. It uses $driver as the decimal socket number.
+# LWDAQ_set_driver_mux sets the device address register on a driver so as to
+# select driver socket $driver and multiplexer socket (also known as the branch
+# socket) $mux. The driver will be busy for a few tens of microseconds
+# thereafter, as it switches target sockets. The driver socket can be a simple
+# integer specifying the socket on a LWDAQ driver, or it can be of the form b:a,
+# where "b" is a 32-bit "base address" expressed as an eight-digit hex string,
+# and "a" is a decimal number. The base address selects one of several drivers
+# associated with $sock. We might have a VME crate holding twenty LWDAQ Drivers
+# (A2037A) and a single VME-TCPIP interface (A2064). The $sock connection is
+# with the A2064, and we instruct the A2064 to select one of the twenty drivers
+# using "b" in $driver. For example, 00E0000:3 would select the driver at VME
+# base address hexadecimal 00E00000, and socket 3 within that driver. We can
+# also specify the base address in an abbreviated fasion like this: "E0:3", and
+# the missing six zeros will be added to the address to compose the full
+# eight-digit address. If we do not specify a base address, the routine does not
+# bother setting the base address on the TCPIP interface at $sock. It uses
+# $driver as the decimal socket number.
 #
 proc LWDAQ_set_driver_mux {sock driver {mux 1}} {
 	set driver [string trim $driver]
@@ -843,8 +817,8 @@ proc LWDAQ_set_driver_mux {sock driver {mux 1}} {
 }
 
 #
-# LWDAQ_on turns on power to all devices connected to the driver
-# listening at the other end of $sock.
+# LWDAQ_on turns on power to all devices connected to the driver listening at
+# the other end of $sock.
 #
 proc LWDAQ_on {sock} {
 	global LWDAQ_Driver
@@ -853,8 +827,8 @@ proc LWDAQ_on {sock} {
 }
 
 #
-# LWDAQ_off turns off power to all devices connected to the driver
-# listening at the other end of $sock.
+# LWDAQ_off turns off power to all devices connected to the driver listening at
+# the other end of $sock.
 #
 proc LWDAQ_off {sock} {
 	global LWDAQ_Driver
@@ -863,10 +837,9 @@ proc LWDAQ_off {sock} {
 }
 
 #
-# LWDAQ_start_job tells a driver to begin a job execution by
-# writing job identifier $job to the job register at socket
-# $sock. The job parameter is a string of characters representing
-# a decimal number.
+# LWDAQ_start_job tells a driver to begin a job execution by writing job
+# identifier $job to the job register at socket $sock. The job parameter is a
+# string of characters representing a decimal number.
 #
 proc LWDAQ_start_job {sock job} {
 	global LWDAQ_Driver
@@ -874,14 +847,13 @@ proc LWDAQ_start_job {sock job} {
 }
 
 #
-# LWDAQ_execute_job tells a driver to execute job with job
-# identifier $job through socket $sock. The driver will be busy
-# thereafter for however long it takes to execute the job, but
-# the routine will return as soon as the TCPIP messages required
-# to instruct the driver have been transmitted. Note that if you 
-# have lazy_flush set to 1, the job won't execute until you 
-# flush the socket, close it, or read from it. The job parameter 
-# is a string of characters representing a decimal number.
+# LWDAQ_execute_job tells a driver to execute job with job identifier $job
+# through socket $sock. The driver will be busy thereafter for however long it
+# takes to execute the job, but the routine will return as soon as the TCPIP
+# messages required to instruct the driver have been transmitted. Note that if
+# you have lazy_flush set to 1, the job won't execute until you flush the
+# socket, close it, or read from it. The job parameter is a string of characters
+# representing a decimal number.
 #
 proc LWDAQ_execute_job {sock job} {
 	global LWDAQ_Driver
@@ -891,16 +863,14 @@ proc LWDAQ_execute_job {sock job} {
 }
 
 #
-# LWDAQ_transmit_command instructs a driver to transmit 
-# LWDAQ command $value to its current target device. The 
-# routine instructs the driver through open TCPIP socket
-# $sock. The driver will be busy for a few microseconds thereafter
-# as it transmits the command, but the routine will return
-# almost immediately. Note that if you have lazy_flush set
-# to 1, the messages produced by the routine will remain in 
-# $sock's output buffer until you flush the socket, close it,
-# or read from it. The value parameter is a string of characters
-# representing a decimal number.
+# LWDAQ_transmit_command instructs a driver to transmit LWDAQ command $value to
+# its current target device. The routine instructs the driver through open TCPIP
+# socket $sock. The driver will be busy for a few microseconds thereafter as it
+# transmits the command, but the routine will return almost immediately. Note
+# that if you have lazy_flush set to 1, the messages produced by the routine
+# will remain in $sock's output buffer until you flush the socket, close it, or
+# read from it. The value parameter is a string of characters representing a
+# decimal number.
 #
 proc LWDAQ_transmit_command {sock value} {
 	global LWDAQ_Driver
@@ -954,15 +924,13 @@ proc LWDAQ_sleep {sock} {
 }
 
 #
-# LWDAQ_delay_seconds tells a driver at the other end of
-# $sock to pause for $value seconds. If the delay is less
-# than max_delay_seconds, the routine sends the delay
-# commands to the driver and exits. The driver will be left
-# executing the delay. But if the delay is greater than
-# max_delay_seconds, the routine sends a sequence of delay
-# job commands to the driver and waits for each one to 
-# complete before sending the next. In this way, the socket
-# is kept open and no timeout will occur.
+# LWDAQ_delay_seconds tells a driver at the other end of $sock to pause for
+# $value seconds. If the delay is less than max_delay_seconds, the routine sends
+# the delay commands to the driver and exits. The driver will be left executing
+# the delay. But if the delay is greater than max_delay_seconds, the routine
+# sends a sequence of delay job commands to the driver and waits for each one to
+# complete before sending the next. In this way, the socket is kept open and no
+# timeout will occur.
 #
 proc LWDAQ_delay_seconds {sock value {flagname ""}} {
 	global LWDAQ_Driver 
@@ -1000,14 +968,12 @@ proc LWDAQ_delay_seconds {sock value {flagname ""}} {
 }
 
 #
-# LWDAQ_flash_seconds is like LWDAQ_delay_seconds, except
-# it flashes a source for an arbitrarily long period, rather
-# than just waiting. When the total flash time is greater than
-# the maximum single-flash time supported by the driver, the
-# routine creates a total flash time by adding together smaller
-# flashes. Ten seconds of flash time will take more than ten
-# seconds to implement because of the delays in communication 
-# between computer and driver.
+# LWDAQ_flash_seconds is like LWDAQ_delay_seconds, except it flashes a source
+# for an arbitrarily long period, rather than just waiting. When the total flash
+# time is greater than the maximum single-flash time supported by the driver,
+# the routine creates a total flash time by adding together smaller flashes. Ten
+# seconds of flash time will take more than ten seconds to implement because of
+# the delays in communication between computer and driver.
 #
 proc LWDAQ_flash_seconds {sock value} {
 	global LWDAQ_Driver 
@@ -1031,8 +997,8 @@ proc LWDAQ_flash_seconds {sock value} {
 }
 
 #
-# LWDAQ_job_done returns 1 if the driver's job register
-# reads back zero, and 1 otherwise.
+# LWDAQ_job_done returns 1 if the driver's job register reads back zero, and 1
+# otherwise.
 #
 proc LWDAQ_job_done {sock} {
 	global LWDAQ_Driver 
@@ -1044,12 +1010,11 @@ proc LWDAQ_job_done {sock} {
 }
 
 #
-# LWDAQ_wait_for_driver waits until the driver has finished
-# executing all pending commands. If you expect the commands
-# to take more than a few seconds, specify how long you expect
-# them to take with the optional $approx parameter. By specifying
-# the approximate delay, you allow this routine to avoid a
-# TCPIP read timeout.
+# LWDAQ_wait_for_driver waits until the driver has finished executing all
+# pending commands. If you expect the commands to take more than a few seconds,
+# specify how long you expect them to take with the optional $approx parameter.
+# By specifying the approximate delay, you allow this routine to avoid a TCPIP
+# read timeout.
 #
 proc LWDAQ_wait_for_driver {sock {approx 0}} {
 	if {$approx != 0} {
@@ -1072,9 +1037,9 @@ proc LWDAQ_echo {sock s} {
 }
 
 #
-# LWDAQ_image_sensor_clear clears charge from an image sensor so it
-# will be ready to expose. We pass the routine a socket to the driver
-# and a device type number that identifies the image sensor.
+# LWDAQ_image_sensor_clear clears charge from an image sensor so it will be
+# ready to expose. We pass the routine a socket to the driver and a device type
+# number that identifies the image sensor.
 #
 proc LWDAQ_image_sensor_clear {sock type} {
 	global LWDAQ_Driver
@@ -1125,10 +1090,10 @@ proc LWDAQ_image_sensor_clear {sock type} {
 }
 
 #
-# LWDAQ_image_sensor_transfer moves the image from the exposure array
-# into the storage or transfer array, is such an array exists in the
-# image sensor. We pass the routine a socket to the driver
-# and a device type number that identifies the image sensor.
+# LWDAQ_image_sensor_transfer moves the image from the exposure array into the
+# storage or transfer array, is such an array exists in the image sensor. We
+# pass the routine a socket to the driver and a device type number that
+# identifies the image sensor.
 #
 proc LWDAQ_image_sensor_transfer {sock type} {
 	global LWDAQ_Driver
