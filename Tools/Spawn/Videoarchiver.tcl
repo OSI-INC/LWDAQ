@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "23"
+	LWDAQ_tool_init "Videoarchiver" "24"
 
 	# If a graphical tool window already exists, we abort our initialization.
 	if {[winfo exists $info(window)]} {
@@ -1969,6 +1969,36 @@ proc Videoarchiver_undraw_list {} {
 }
 
 #
+# Videoarchiver_view chooses between calling the Videoarchiver's live or monitor
+# procedures depending upon whether the camera is idle or recording respectively.
+#
+proc Videoarchiver_view {n} {
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
+
+	# Get IP address and open an interface socket.
+	set ip [Videoarchiver_ip $n]
+
+	# Don't try to contact a non-existent camera.
+	if {$ip == $info(null_addr)} {
+		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		return "FAIL"
+	}
+
+	if {$info(cam$n\_state) == "Idle"} {
+		LWDAQ_post "Videoarchiver_live $n" front
+	} elseif {$info(cam$n\_state) == "Record"} {
+		LWDAQ_post "Videoarchiver_monitor $n" front
+	} else {
+		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id)\
+			Cannot view while $info(cam$n\_state)."
+		return "FAIL"
+	}
+	
+	return "SUCCESS"
+}
+
+#
 # Videoarchiver_draw_list draws the current list of cameras in the 
 # Videoarchiver window.
 #
@@ -2012,16 +2042,14 @@ proc Videoarchiver_draw_list {} {
 		
 		label $ff.state -textvariable Videoarchiver_info(cam$n\_state) -fg blue -width 10
 		pack $ff.state -side left -expand 0
-		
-		button $ff.live -text "Live" -fg green -padx $padx -command \
-			[list LWDAQ_post "Videoarchiver_live $n" front]
+
+		button $ff.view -text "View" -fg green -padx $padx -command \
+			[list Videoarchiver_view $n]
 		button $ff.record -text "Rec" -fg red -padx $padx -command \
 			[list LWDAQ_post "Videoarchiver_record $n" front]
-		button $ff.monitor -text "MRec" -fg orange -padx $padx -command \
-			[list LWDAQ_post "Videoarchiver_monitor $n" front]
 		button $ff.stop -text "Stop" -fg black -padx $padx -command \
 			[list LWDAQ_post "Videoarchiver_stop $n" front]
-		pack $ff.live $ff.record $ff.monitor $ff.stop -side left -expand 1
+		pack $ff.view  $ff.record $ff.stop -side left -expand 1
 
 		button $ff.ch -text "IP" -padx $padx -command [list Videoarchiver_ask_ip $n]
 		pack $ff.ch -side left -expand 1
