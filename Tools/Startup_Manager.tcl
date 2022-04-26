@@ -25,7 +25,7 @@ proc Startup_Manager_init {} {
 	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Startup_Manager" 1.1
+	LWDAQ_tool_init "Startup_Manager" 1.2
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -381,7 +381,7 @@ proc Startup_Manager_execute {} {
 	# trailing colon from the first word in the step script.
 	set step_type [string replace [lindex $info(steps) $info(step) 0] end end ""]
 	if {[lsearch {default spawn run starter} $step_type] < 0} {
-		LWDAQ_print $info(text) "ERROR: Unrecognised step type \$step_type\."
+		LWDAQ_print $info(text) "ERROR: Unrecognised step type \"$step_type\"."
 		set info(control) "Idle"
 		return "ERROR"
 	}
