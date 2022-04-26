@@ -946,8 +946,8 @@ proc Videoarchiver_live {n} {
 
 	# Check the camera state.
 	if {$info(cam$n\_state) != "Idle"} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Wait until Idle\
-			before starting live display."
+		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot provide live\
+			image during \"$info(cam$n\_state)\"."
 		return "ERROR"
 	}
 	set info(cam$n\_state) "Live"
@@ -981,7 +981,7 @@ proc Videoarchiver_live {n} {
 	# the frame to be higher than the actual frame rate, so the player displays
 	# every frame as it arrives, and catches up if it lags behind.
 	set info(cam$n\_lproc) [exec \
-		$info(mplayer) -title "Live From $ip" \
+		$info(mplayer) -title "Live View From $info(cam$n\_id) $ip" \
 		-demuxer lavf -cache 1000 -really-quiet -noconsolecontrols \
 		-zoom -xy $config(display_zoom) -geometry 10%:10% -fps [expr 2*$framerate] \
 		"ffmpeg://tcp://$ip:$info(tcp_port)" \
@@ -1017,7 +1017,7 @@ proc Videoarchiver_live_watchdog {n} {
 	} elseif {$LWDAQ_Info(reset)} {
 		Videoarchiver_stop $n
 	} elseif {![LWDAQ_process_exists $info(cam$n\_lproc)]} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Live video terminated." $config(s_col)
+		LWDAQ_print $info(text) "$info(cam$n\_id) Live view terminated." $config(s_col)
 		Videoarchiver_stop $n
 	} else {
 		LWDAQ_post [list Videoarchiver_live_watchdog $n]
@@ -1048,13 +1048,13 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		set info(monitor_channel) "none"
 		set info(monitor_cam) "0"
 		if {$info(cam$n\_state) != "Record"} {
-			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Can start monitor\
-				only when recording."
+			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot start recording\
+				view during \"$info(cam$n\_state)\"."
 			return "ERROR"
 		}
 		set info(monitor_cam) $n
 		set info(monitor_channel) [open "| $info(mplayer) \
-			-title \"Monitor for $info(cam$n\_id) $ip\" \
+			-title \"Recording View From $info(cam$n\_id) $ip\" \
 			-slave -demuxer lavf -idle -really-quiet \
 			-fixed-vo -zoom -xy $config(display_zoom) -geometry 10%:10% \
 			>& monitor_log.txt" w]
@@ -1062,7 +1062,8 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		set info(monitor_process) [pid $info(monitor_channel)]
 		puts $info(monitor_channel) "vo_ontop 0"
 		puts $info(monitor_channel) "speed_set $config(monitor_speed)"		
-		LWDAQ_print $info(text) "$info(cam$n\_id) Started display monitor, close with ESC key."
+		LWDAQ_print $info(text) "$info(cam$n\_id) Started recording view. Expect\
+			delay of five seconds. Close with escape key."
 	} elseif {$command == "Stop"} {
 		LWDAQ_process_stop $info(monitor_process)
 		catch {close $info(monitor_channel)}
@@ -1072,14 +1073,15 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		if {[catch {
 			puts $info(monitor_channel) $line
 		} message]} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Monitor process has stopped."
+			LWDAQ_print $info(text) "$info(cam$n\_id) Recording view has stopped."
 			LWDAQ_process_stop $info(monitor_process)
 			catch {close $info(monitor_channel)}
 			set info(monitor_channel) "none"
 			set info(monitor_cam) "0"
 		}		
 	} else {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Unknown monitor command \"$command\"."
+		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Unknown recording view\
+			command \"$command\"."
 		return "ERROR"
 	}
 	return "SUCCESS"
@@ -1204,11 +1206,17 @@ proc Videoarchiver_record {n} {
 		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
 		return "FAIL"
 	}
+	
+	# Do nothing if we are already recording.
+	if {$info(cam$n\_state) == "Record"} {
+		return "FAIL"
+	}
+	
 
 	# Check the state of the camera.
 	if {($info(cam$n\_state) != "Idle") && ($info(cam$n\_state) != "Stalled")} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Wait until Idle\
-			before starting recording."
+		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot start recording\
+			during \"$info(cam$n\_state)\"."
 		return "ERROR"
 	}
 	
@@ -1834,8 +1842,8 @@ proc Videoarchiver_directory {{post 1}} {
 	# currently recording or even stalled.
 	foreach n $info(cam_list) {
 		if {($info(cam$n\_state) == "Record") || ($info(cam$n\_state) == "Stalled")} {
-			LWDAQ_print $info(text) "ERROR: Cannot change recording directory while\
-				$info(cam$n\_id) is recording."
+			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot change recording\
+				during \"$info(cam$n\_state)\"."
 			return "ERROR"
 		}
 	}
@@ -1984,17 +1992,18 @@ proc Videoarchiver_view {n} {
 		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
 		return "FAIL"
 	}
-
-	if {$info(cam$n\_state) == "Idle"} {
-		LWDAQ_post "Videoarchiver_live $n" front
-	} elseif {$info(cam$n\_state) == "Record"} {
-		LWDAQ_post "Videoarchiver_monitor $n" front
-	} else {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id)\
-			Cannot view while $info(cam$n\_state)."
-		return "FAIL"
-	}
 	
+	switch $info(cam$n\_state) {
+		"Idle" {LWDAQ_post "Videoarchiver_live $n" front}
+		"Record" {LWDAQ_post "Videoarchiver_monitor $n" front}
+		"Live" {return "ABORT"}
+		default {
+			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot view\
+				during \"$info(cam$n\_state)\"."
+			return "FAIL"
+		}
+	}
+
 	return "SUCCESS"
 }
 
@@ -2296,8 +2305,8 @@ proc Videoarchiver_load_list {{fn ""}} {
 	# We won't load a new list so long as even one camera is not idle.
 	foreach n $info(cam_list) {
 		if {$info(cam$n\_state) != "Idle"} {
-			LWDAQ_print $info(text) "ERROR: Cannot load new camera list while\
-				$info(cam$n\_id) is busy."
+			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot load new camera\
+				list while during \"$info(cam$n\_state)\"."
 			return "ERROR"
 		}
 	}
