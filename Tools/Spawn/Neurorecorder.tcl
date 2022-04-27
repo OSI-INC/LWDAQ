@@ -367,8 +367,9 @@ proc Neurorecorder_metadata_header {} {
 			-format $config(datetime_format)].\
 			\nCreator: Neurorecorder $info(version),\
 			LWDAQ_$LWDAQ_Info(program_patchlevel).\
-			\nReceiver: Type $iinfo(receiver_type) with\
+			\nReceiver: $iinfo(receiver_type) with\
 			firmware $iinfo(receiver_firmware).\
+			\nAddress: $config(daq_ip_addr).\
 			\nPlatform: $LWDAQ_Info(os).</c>\n"
 	append header "<payload>$iconfig(payload_length)</payload>\n"
 	if {[lsearch $info(alt_options) $iinfo(receiver_type)] >= 0} {

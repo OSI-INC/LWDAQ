@@ -6538,7 +6538,7 @@ proc Neuroplayer_play {{command ""}} {
 			set info(player_payload) 0
 		}
 		set coordinates [LWDAQ_xml_get_list $metadata "coordinates"]
-		if {[llength $coordinates] > 1} {
+		if {[llength $coordinates] >= 1} {
 			set config(tracker_coordinates) ""
 			foreach {x y} [lindex $coordinates end] {
 				lappend config(tracker_coordinates) $x $y "2"
