@@ -2052,13 +2052,13 @@ proc Videoarchiver_draw_list {} {
 		label $ff.state -textvariable Videoarchiver_info(cam$n\_state) -fg blue -width 10
 		pack $ff.state -side left -expand 0
 
-		button $ff.view -text "View" -fg green -padx $padx -command \
-			[list Videoarchiver_view $n]
-		button $ff.record -text "Rec" -fg red -padx $padx -command \
+		button $ff.record -text "Record" -fg red -padx $padx -command \
 			[list LWDAQ_post "Videoarchiver_record $n" front]
 		button $ff.stop -text "Stop" -fg black -padx $padx -command \
 			[list LWDAQ_post "Videoarchiver_stop $n" front]
-		pack $ff.view  $ff.record $ff.stop -side left -expand 1
+		button $ff.view -text "View" -fg green -padx $padx -command \
+			[list Videoarchiver_view $n]
+		pack $ff.record $ff.view $ff.stop -side left -expand 1
 
 		button $ff.ch -text "IP" -padx $padx -command [list Videoarchiver_ask_ip $n]
 		pack $ff.ch -side left -expand 1
