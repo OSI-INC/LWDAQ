@@ -2,19 +2,19 @@
 #
 # Copyright (C) 2018-2022 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public Lices_colnse
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA	02111-1307, USA.
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.	See the GNU General Public License for more
+# details.
+
+# You should have received a copy of the GNU General Public Lices_colnse along
+# with this program; if not, write to the Free Software Foundation, Inc., 59
+# Temple Place - Suite 330, Boston, MA	02111-1307, USA.
 
 
 #
@@ -170,8 +170,8 @@ echo "SUCCESS"
 	set config(lag_reset) "40.0"
 	set config(restart_log) [file join $info(scratch_dir) restart_log.txt]
 	
-	# Text window colors. We have a verbose comment color and a standard comment color.
-	set config(v_col) "black"
+	# Text window colors.
+	set config(v_col) "green"
 	set config(s_col) "black"
 	set config(verbose) "0"
 	
@@ -288,7 +288,7 @@ proc Videoarchiver_camera_init {n} {
 		 $command]} message
 	if {[regexp "SUCCESS" $message]} {
 		LWDAQ_print $info(text) "$info(cam$n\_id) initialized,\
-			tcpip interface started, $ip." $config(s_col)
+			tcpip interface started, $ip."
 	} else {
 		error $message
 	}
@@ -817,7 +817,7 @@ proc Videoarchiver_stream {n} {
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video streaming,\
 		$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
 		ec $info(cam$n\_ec), sat $info(cam$n\_sat),\
-		crf $crf, $ip." $config(s_col)
+		crf $crf, $ip."
 	LWDAQ_update
 
 	if {[catch {
@@ -917,7 +917,7 @@ proc Videoarchiver_synchronize {n} {
 	if {![regexp {invalid} $result]} {
 		if {$config(verbose)} {
 			LWDAQ_print $info(text) "$info(cam$n\_id) Synchronized at time $sync_time,\
-				correcting offset of $offset_ms ms." $config(v_col)
+				correcting offset of $offset_ms ms."
 		}
 	} else {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $result"
@@ -929,7 +929,7 @@ proc Videoarchiver_synchronize {n} {
 
 #
 # Videoarchiver_live stream live video from camera "n" and display. The video
-# stream consists of compressed frames, but has no inter-frame compression.
+# stream consists of compressed frames, but has no inter-frame compression. 
 #
 proc Videoarchiver_live {n} {
 	upvar #0 Videoarchiver_config config
@@ -986,8 +986,8 @@ proc Videoarchiver_live {n} {
 		-zoom -xy $config(display_zoom) -geometry 10%:10% -fps [expr 2*$framerate] \
 		"ffmpeg://tcp://$ip:$info(tcp_port)" \
 		>& live_log.txt &]
-	LWDAQ_print $info(text) "$info(cam$n\_id) Starting live video display, this\
-		will take a few seconds..." $config(s_col)
+	LWDAQ_print $info(text) "$info(cam$n\_id) Starting live view,\
+		 this will take a few seconds..." $config(v_col)
 		
 	# We start the live video watchdog process that looks to see if the 
 	# mplayer process has been stopped by a user closing its window. 
@@ -1013,11 +1013,11 @@ proc Videoarchiver_live_watchdog {n} {
 	}
 
 	if {$info(cam$n\_state) != "Live"} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live watchdog." $config(s_col)
+		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live watchdog." $config(v_col)
 	} elseif {$LWDAQ_Info(reset)} {
 		Videoarchiver_stop $n
 	} elseif {![LWDAQ_process_exists $info(cam$n\_lproc)]} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Live view terminated." $config(s_col)
+		LWDAQ_print $info(text) "$info(cam$n\_id) Live view terminated." $config(v_col)
 		Videoarchiver_stop $n
 	} else {
 		LWDAQ_post [list Videoarchiver_live_watchdog $n]
@@ -1043,6 +1043,16 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 
 	# Check the state of the camera.
 	if {$command == "Start"} {
+		if {[LWDAQ_process_exists $info(monitor_process)]} {
+			if {$info(monitor_cam) == $n} {
+				LWDAQ_print $info(text) "$info(cam$n\_id)\
+					Restarting recording view." $config(v_col)
+			} {
+				LWDAQ_print $info(text) "$info(cam$info(monitor_cam)\_id)\
+					Stopping recording view: only one recording may be\
+					viewed at a time." $config(v_col)			
+			}
+		}
 		LWDAQ_process_stop $info(monitor_process)
 		catch {close $info(monitor_channel)}
 		set info(monitor_channel) "none"
@@ -1062,9 +1072,14 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		set info(monitor_process) [pid $info(monitor_channel)]
 		puts $info(monitor_channel) "vo_ontop 0"
 		puts $info(monitor_channel) "speed_set $config(monitor_speed)"		
-		LWDAQ_print $info(text) "$info(cam$n\_id) Started recording view. Expect\
-			delay of five seconds. Close with escape key."
+		LWDAQ_print $info(text) "$info(cam$n\_id) Started recording view,\
+			expect delay of five seconds, close with escape key." $config(v_col)
 	} elseif {$command == "Stop"} {
+		if {[LWDAQ_process_exists $info(monitor_process)] \
+			&& ($info(monitor_cam) == $n)} {
+			LWDAQ_print $info(text) "$info(cam$n\_id)\
+				Stopping recording view." $config(v_col)
+		}
 		LWDAQ_process_stop $info(monitor_process)
 		catch {close $info(monitor_channel)}
 		set info(monitor_channel) "none"
@@ -1073,7 +1088,7 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		if {[catch {
 			puts $info(monitor_channel) $line
 		} message]} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Recording view has stopped."
+			LWDAQ_print $info(text) "$info(cam$n\_id) Recording view has stopped." $config(v_col)
 			LWDAQ_process_stop $info(monitor_process)
 			catch {close $info(monitor_channel)}
 			set info(monitor_channel) "none"
@@ -1081,7 +1096,7 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		}		
 	} else {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Unknown recording view\
-			command \"$command\"."
+			command \"$command\"." $config(v_col)
 		return "ERROR"
 	}
 	return "SUCCESS"
@@ -1125,7 +1140,7 @@ proc Videoarchiver_compress {n} {
 			}
 		}
 		LWDAQ_print $info(text) "$info(cam$n\_id) Started $info(compression_num_cpu)\
-			compression engines on camera." $config(s_col)
+			compression engines on camera."
 
 		# Close socket.
 		LWDAQ_socket_close $sock
@@ -1211,13 +1226,10 @@ proc Videoarchiver_record {n} {
 	if {$info(cam$n\_state) == "Record"} {
 		return "FAIL"
 	}
-	
 
 	# Check the state of the camera.
 	if {($info(cam$n\_state) != "Idle") && ($info(cam$n\_state) != "Stalled")} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot start recording\
-			during \"$info(cam$n\_state)\"."
-		return "ERROR"
+		Videoarchiver_stop $n
 	}
 	
 	# Make sure we have a place to record video.
@@ -1274,7 +1286,7 @@ proc Videoarchiver_record {n} {
 
 	# Start transfer of files from camera with concatination.
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting remote transfer process\
-		 with period $config(transfer_period_s) s." $config(s_col)
+		 with period $config(transfer_period_s) s." 
 	set info(cam$n\_ttime) [clock seconds]
 	set info(cam$n\_file) [file join $info(cam$n\_dir) V0000000000.mp4]
 	LWDAQ_post [list Videoarchiver_transfer $n]
@@ -1478,7 +1490,7 @@ proc Videoarchiver_transfer {n} {
 					LWDAQ_print $info(text) "$info(cam$n\_id)\
 						Transferred [llength $seg_list] segments,\
 						[format %.1f [expr 0.001*$data_size]] kByte in $download_ms ms,\
-						lag $lag s, $freq GHz, $temp C, $ip." $config(v_col)
+						lag $lag s, $freq GHz, $temp C, $ip."
 				}
 				
 				# If the recording monitor is running for this channel, load the new segments 
@@ -1492,7 +1504,7 @@ proc Videoarchiver_transfer {n} {
 						set tnow [clock seconds]
 						LWDAQ_print $info(text) "$info(cam$n\_id)\
 							Added [llength $seg_list] segments to monitor playlist,\
-							monitor lagging by [expr $tnow-$tfirst+1] s." $config(v_col)
+							monitor lagging by [expr $tnow-$tfirst+1] s."
 					}
 				}
 				
@@ -1553,7 +1565,7 @@ proc Videoarchiver_transfer {n} {
 			
 				if {$config(verbose)} {
 					LWDAQ_print $info(text) "$info(cam$n\_id) Creating $infile,\
-						time [clock format $segment_time], $ip." $config(v_col)
+						time [clock format $segment_time], $ip."
 				}
 				set info(cam$n\_file) [file join $info(cam$n\_dir) $infile]
 				set info(cam$n\_rt) $segment_time
@@ -1628,8 +1640,7 @@ proc Videoarchiver_transfer {n} {
 				if {$num_segments > 0} {
 					if {$config(verbose)} {
 						LWDAQ_print $info(text) "$info(cam$n\_id) Adding $num_segments\
-							segments to [file tail $info(cam$n\_file)], $ip." \
-							$config(v_col)
+							segments to [file tail $info(cam$n\_file)], $ip."
 					}
 	
 					# We take this opportunity to remove excess lines from the text window.
@@ -1703,7 +1714,7 @@ proc Videoarchiver_transfer {n} {
 		return "SUCCESS"
 	} else {
 		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped remote\
-			transfer process, $ip." $config(s_col)
+			transfer process, $ip." 
 		return "STOP"
 	}	
 }
@@ -1735,11 +1746,13 @@ proc Videoarchiver_stop {n} {
 	
 	set ip [Videoarchiver_ip $n]
 	
-	Videoarchiver_monitor $n "Stop"
-
+	if {$info(monitor_cam) == $n} {
+		Videoarchiver_monitor $n "Stop"
+	}
+	
 	if {[LWDAQ_process_exists $info(cam$n\_lproc)]} {
 		LWDAQ_process_stop $info(cam$n\_lproc)
-		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped local live process, $ip." 
+		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live view, $ip." $config(v_col)
 	}
 	
 	LWDAQ_print $info(text) "$info(cam$n\_id) Stopping streaming, segmentation,\
@@ -1843,7 +1856,7 @@ proc Videoarchiver_directory {{post 1}} {
 	foreach n $info(cam_list) {
 		if {($info(cam$n\_state) == "Record") || ($info(cam$n\_state) == "Stalled")} {
 			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot change recording\
-				during \"$info(cam$n\_state)\"."
+				directory during \"$info(cam$n\_state)\"."
 			return "ERROR"
 		}
 	}
@@ -1978,7 +1991,8 @@ proc Videoarchiver_undraw_list {} {
 
 #
 # Videoarchiver_view chooses between calling the Videoarchiver's live or monitor
-# procedures depending upon whether the camera is idle or recording respectively.
+# procedures depending upon whether the camera is idle or recording
+# respectively.
 #
 proc Videoarchiver_view {n} {
 	upvar #0 Videoarchiver_config config
@@ -1998,8 +2012,8 @@ proc Videoarchiver_view {n} {
 		"Record" {LWDAQ_post "Videoarchiver_monitor $n" front}
 		"Live" {return "ABORT"}
 		default {
-			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot view\
-				during \"$info(cam$n\_state)\"."
+			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id)\
+				Cannot view during \"$info(cam$n\_state)\"."
 			return "FAIL"
 		}
 	}
@@ -2057,7 +2071,7 @@ proc Videoarchiver_draw_list {} {
 		button $ff.stop -text "Stop" -fg black -padx $padx -command \
 			[list LWDAQ_post "Videoarchiver_stop $n" front]
 		button $ff.view -text "View" -fg green -padx $padx -command \
-			[list Videoarchiver_view $n]
+			[list LWDAQ_post "Videoarchiver_view $n" front]
 		pack $ff.record $ff.view $ff.stop -side left -expand 1
 
 		button $ff.ch -text "IP" -padx $padx -command [list Videoarchiver_ask_ip $n]
@@ -2306,7 +2320,7 @@ proc Videoarchiver_load_list {{fn ""}} {
 	foreach n $info(cam_list) {
 		if {$info(cam$n\_state) != "Idle"} {
 			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot load new camera\
-				list while during \"$info(cam$n\_state)\"."
+				list during \"$info(cam$n\_state)\"."
 			return "ERROR"
 		}
 	}
