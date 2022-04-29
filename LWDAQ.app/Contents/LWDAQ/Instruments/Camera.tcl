@@ -133,8 +133,7 @@ proc LWDAQ_daq_Camera {} {
 		# If wake delay is enabled, wait for the specified interval before
 		# continuing.
 		if {$info(daq_wake_ms) > 0} {
-			LWDAQ_wait_for_driver $sock
-			LWDAQ_wait_ms $info(daq_wake_ms)
+			LWDAQ_delay_seconds $sock [expr $info(daq_wake_ms) * 0.001]
 		}
 		
 		# The TC255 and TC237 sensors have frame stores. We transfer the

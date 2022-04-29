@@ -335,8 +335,7 @@ proc LWDAQ_daq_Rasnik {} {
 		
 		# If wake delay is enabled, wait for the specified interval before continuing.
 		if {$info(daq_wake_ms) > 0} {
-			LWDAQ_wait_for_driver $sock_1
-			LWDAQ_wait_ms $info(daq_wake_ms)
+			LWDAQ_delay_seconds $sock_1 [expr $info(daq_wake_ms) * 0.001]
 		}
 		
 		# Clear the image sensor of charge.
@@ -353,8 +352,7 @@ proc LWDAQ_daq_Rasnik {} {
 		
 		# If wake delay is enabled, wait for the specified interval before continuing.
 		if {$info(daq_wake_ms) > 0} {
-			LWDAQ_wait_for_driver $sock_2
-			LWDAQ_wait_ms $info(daq_wake_ms)
+			LWDAQ_delay_seconds $sock_2 [expr $info(daq_wake_ms) * 0.001]
 		}		
 
 		# Flash the rasnik illumination.

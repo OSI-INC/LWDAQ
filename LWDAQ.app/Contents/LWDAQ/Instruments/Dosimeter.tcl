@@ -212,8 +212,7 @@ proc LWDAQ_daq_Dosimeter {} {
 		LWDAQ_set_device_element $sock $config(daq_device_element)
 		LWDAQ_wake $sock
 		if {$info(daq_wake_ms) > 0} {
-			LWDAQ_wait_for_driver $sock
-			LWDAQ_wait_ms $info(daq_wake_ms)
+			LWDAQ_delay_seconds $sock [expr $info(daq_wake_ms) * 0.001]
 		}
 
 		# Clear the image sensor and put it in its exposure state.		

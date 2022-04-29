@@ -217,8 +217,7 @@ proc LWDAQ_daq_Thermometer {} {
 		# If wake delay is enabled, wait for the specified interval before
 		# continuing.
 		if {$info(daq_wake_ms) > 0} {
-			LWDAQ_wait_for_driver $sock
-			LWDAQ_wait_ms $info(daq_wake_ms)
+			LWDAQ_delay_seconds $sock [expr $info(daq_wake_ms) * 0.001]
 		}
 		
 		# Clear the controller RAM.
