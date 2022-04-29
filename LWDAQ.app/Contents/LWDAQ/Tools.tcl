@@ -2,19 +2,19 @@
 # Copyright (C) 2005-2021 Kevan Hashemi, Brandeis University
 # Copyright (C) 2021 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #
 # Tools.tcl contains routines that configure and manage polite and standard 
@@ -454,10 +454,9 @@ proc LWDAQ_tool_rewrite_data {name data} {
 
 
 #
-# LWDAQ_tool_configure opens a configuration window so
-# we can set a tool's configuration array elements. It
-# also provides for extra configuration buttons by returning
-# the name of a frame below the Save button.
+# LWDAQ_tool_configure opens a configuration panel so we can set a tool's
+# configuration array elements. It also provides for extra configuration buttons
+# by returning the name of a frame below the Save button.
 #
 proc LWDAQ_tool_configure {name {num_columns 2}} {
 	upvar #0 $name\_info info
@@ -467,7 +466,7 @@ proc LWDAQ_tool_configure {name {num_columns 2}} {
 	if {[winfo exists $w]} {destroy $w}
 
 	toplevel $w
-	wm title $w "$info(name) Configuration Array"
+	wm title $w "$info(name) Configuration Panel"
 	scan [wm maxsize .] %d%d x y
 	wm maxsize $w [expr $x*4] [expr $y*1]
 	

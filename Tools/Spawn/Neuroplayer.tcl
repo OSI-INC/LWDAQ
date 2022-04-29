@@ -56,7 +56,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "2.0"
+	LWDAQ_tool_init "Neuroplayer" "2.1"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -8116,14 +8116,21 @@ proc Neuroplayer_open {} {
 
 	set info(text) [LWDAQ_text_widget $w 100 10 1 1]
 	
-	LWDAQ_bind_command_key $w Left {Neuroplayer_command Back}
-	LWDAQ_bind_command_key $w Right {Neuroplayer_command Step}
-	LWDAQ_bind_command_key $w greater {Neuroplayer_command Play}
-	LWDAQ_bind_command_key $w Down \
+	# We have to bind keys to a window, not a frame, and in standalone mode our
+	# $w is a frame in the root window, so we use the root window instead.
+	if {$info(mode) == "Standalone"} {
+		set b .
+	} {
+		set b $w
+	}
+	LWDAQ_bind_command_key $b Left {Neuroplayer_command Back}
+	LWDAQ_bind_command_key $b Right {Neuroplayer_command Step}
+	LWDAQ_bind_command_key $b greater {Neuroplayer_command Play}
+	LWDAQ_bind_command_key $b Down \
 		[list LWDAQ_post {Neuroplayer_jump Next_NDF 0}]
-	LWDAQ_bind_command_key $w Up \
+	LWDAQ_bind_command_key $b Up \
 		[list LWDAQ_post {Neuroplayer_jump Previous_NDF 0}]
-	LWDAQ_bind_command_key $w less \
+	LWDAQ_bind_command_key $b less \
 		[list LWDAQ_post {Neuroplayer_jump Current_NDF 0}]
 	$info(text) tag configure textbutton -background cyan
 	$info(text) tag bind textbutton <Enter> {%W configure -cursor arrow} 
