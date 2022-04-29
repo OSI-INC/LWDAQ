@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "2.0"
+	LWDAQ_tool_init "Neurorecorder" "157"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
