@@ -32,6 +32,7 @@
 # Version 3.3 Sort channel numbers correctly for printout.
 # Version 3.4 Fix repeat frequency value in 512 SPS sweep.
 # Version 3.5 Add autofill for channel numbers.
+# Version 3.6 Add Receiver button.
 
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
@@ -46,7 +47,7 @@ proc Function_Generator_init {} {
 	global LWDAQ_Driver
 
 	
-	LWDAQ_tool_init "Function_Generator" "3.3"
+	LWDAQ_tool_init "Function_Generator" "3.6"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -1090,6 +1091,8 @@ proc Function_Generator_open {} {
 	button $e1.config -text "Configure" -command "LWDAQ_tool_configure Function_Generator"
 	button $c.upload -text "Upload RAM" -command Function_Generator_upload_ram
     button $c.viewwv -text "View Waveform" -command Function_Generator_view_waveform
+    button $c.receiver -text "Receiver" -command "LWDAQ_open Receiver"
+    button $c.spectrometer -text "Spectrometer" -command "LWDAQ_run_tool Spectrometer"
 	
 	grid $c.l_ipaddr $c.e_ipaddr -sticky news
 	grid $c.l_driversocket $c.e_driversocket -sticky news
@@ -1098,6 +1101,7 @@ proc Function_Generator_open {} {
 	grid $c.l_infreq $c.e_infreq -sticky news
 	grid $c.l_amplitude $c.e_amplitude -sticky news
 	grid $c.upload $c.viewwv -sticky news
+	grid $c.receiver $c.spectrometer -sticky news
 
 		
 	label $c2.l_Rdriverip -text "Receiver IP Address" -anchor w 
