@@ -439,6 +439,7 @@ proc Startup_Manager_execute {} {
 	# These commands may start the tool doing something, or just complete its
 	# configuration.
 	if {($step_type == "communal") || ($step_type == "run")} {
+
 		# Run the tool.
 		if {[catch {LWDAQ_run_tool $tool} error_result]} {
 			LWDAQ_print $info(text) "ERROR: $error_result"
@@ -490,12 +491,12 @@ proc Startup_Manager_execute {} {
 			}		
 		}
 				
-		# Execute the startup commands defined by this step. We perform percent substitution
+ 		# Execute the startup commands defined by this step. We perform percent substitution
 		# for the name of the step.
 		set cmd [Startup_Manager_get_field $info(step) "commands"]
 		if {[catch {eval $cmd} error_result]} {
 			LWDAQ_print $info(text) "ERROR: $error_result"
-		}		
+		}				
 	}
 	
 	if {($step_type == "standalone") || ($step_type == "spawn")} {
@@ -677,10 +678,8 @@ if {$Startup_Manager_config(auto_run)} {
 	Startup_Manager_command Run
 }
 
-# This is the final return. There must be no tab or space in
-# front of the return command, or else the spawn procedure
-# won't work.
-return 1
+# This is the final return.
+return "SUCCESS"
 
 ----------Begin Help----------
 

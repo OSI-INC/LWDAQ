@@ -27,146 +27,67 @@
 #
 proc LWDAQ_tools_init {} {
 	global LWDAQ_Info
-	set LWDAQ_Info(quiet_update) 0
-	set LWDAQ_Info(name_substitutions) "\
-		LWDAQ_debug_dump LWDAQ_debug_log\
-		LWDAQ_get_page LWDAQ_url_download"
-	return 1
+	return "SUCCESS"
 }
 
 #
-# LWDAQ_read_script reads a text file, which we assume to be a LWDAQ tool, or
-# some script that serves a LWDAQ tool. The routine substitutes new names for
-# obsolete names. To see the substitutions the current version of the routine
-# performs, enter LWDAQ_obsolete_names at the console prompt, and it will print
-# a list of obsolete names and their new values. If LWDAQ_read_script finds
-# obsolete names, and it also sees that LWDAQ_Info(quiet_update) is not set, it
-# opens a window, warns the user which obsolete names the script file contains,
-# and asks if the user wants to update the script file with a new file that
-# contains the new names.
+# LWDAQ_read_script reads a file from disk and returns its contents.
 #
-proc LWDAQ_read_script {{file_name ""}} {
-	global LWDAQ_Info
-	if {$file_name == ""} {set file_name [LWDAQ_get_file_name]}
-	if {[file exists $file_name]} {
-		set f [open $file_name r]
-		set script [read $f]
-		close $f
-		set replacements ""
-		foreach {old new} $LWDAQ_Info(name_substitutions) {
-			if {[regsub -all $old $script $new script]} {
-				append replacements "$old -> $new\n"
-			}
-		}
-		if {($replacements != "") && ($LWDAQ_Info(quiet_update) == 0)} {
-			set w [LWDAQ_toplevel_window "Obsolete Names"]
-			set f [frame $w.f1]
-			pack $f -side top -fill x
-			set t [LWDAQ_text_widget $f 60 30]
-			LWDAQ_print $t "WARNING: Found obsolete names in [file tail $file_name]."
-			LWDAQ_print $t "\nLWDAQ replaced obsolete names as follows:"
-			LWDAQ_print $t $replacements
-			LWDAQ_print $t "\n\
-				You can replace the obsolete names in your file on disk\n\
-				with Update File. If you update your file, it won't be\n\
-				compatible with earlier versions of LWDAQ. Instead of\n\
-				updating the file, you can press Stop Warning Me, and\n\
-				LWDAQ will replace obsolete names in scrips without\n\
-				warning you, and leave the files unchanged." blue
-			set f [frame $w.f2]
-			pack $f -side top -fill x
-			button $f.b1 -text "Close" -command \
-				[list LWDAQ_rsr C $w $file_name $script]
-			button $f.b2 -text "Update File" -command \
-				[list LWDAQ_rsr UF $w $file_name $script]
-			button $f.b3 -text "Stop Warning Me" -command \
-				[list LWDAQ_rsr SWM $w $file_name $script]
-			pack $f.b1 $f.b2 $f.b3 -side left -expand 1
-			proc LWDAQ_rsr {c w fn s} {
-				global LWDAQ_Info
-				if {$c == "C"} {destroy $w}
-				if {$c == "UF"} {
-					set f [open $fn w]
-					puts -nonewline $f $s
-					close $f
-					LWDAQ_print $w.f1.text \
-						"\nObsolete names replaced in [file tail $fn]."
-				}
-				if {$c == "SWM"} {
-					set LWDAQ_Info(quiet_update) 1
-					destroy $w
-				}
-			}
-		}
-		return $script
-	} {
-		error "script file \"$file_name\" does not exist"
-	}
+proc LWDAQ_read_script {fn} {
+	set f [open $fn]
+	set contents [read $f]
+	close $f
+	return $contents
 }
 
 #
-# LWDAQ_obsolete_names returns a list of obsolete names and their new values.
+# LWDAQ_run_tool runs a tool script. If we pass it an empty string, the routine
+# opens a browser and asks the user to select a file. It deduces the tool name
+# from the file name and runs the tool. If we pass it a tool name, the routine
+# looks for the tool script in Tools, Tools/More, Tools/Spawn, the default
+# directory, and the working directory in that order. The routine deduces the
+# tool name from the root of the file name. Once we have the tool name and its
+# script file name, we prepare to run the tool. We set two global variables for
+# the tool script to use: one gives the mode in which the tool is to operate,
+# the other gives the tool file name. If the mode is "Standalone", the routine
+# deletes the Instrument and Tool menus so they will not conflict with those
+# provided by the original process that initiated the spawning of a standalone
+# tool. The default mode is "Communal", in which tools share the same LWDAQ
+# process.
 #
-proc LWDAQ_obsolete_names {} {
-	global LWDAQ_Info
-	set s ""
-	foreach {old new} $LWDAQ_Info(name_substitutions) {
-		if {$s != ""} {append s "\n"}
-		append s "$old $new"
-	}
-	return $s
-}
-
-#
-# LWDAQ_run_tool executes a tool script at the global scope. To read the tool
-# file, the routine uses LWDAQ_read_script, which replaces obsolete parameter
-# and procedure names with their new names. If the routine cannot find the
-# script file using the name we pass to it, the routine looks for a file by that
-# name in the working directory, Tools, Tools/More, and Tools/Spawn. Once the
-# tool file has been found, the routine deduces the tool name from the root of
-# the file name, and uses this name to set two global variables for the tool
-# script to use: one gives the mode in which the tool is to operate, the other
-# gives the tool file name. If the mode is "Standalone", the routine deletes the
-# Instrument and Tool menus so they will not conflict with those provided by the
-# original process that initiated the spawning of a standalone tool. If this
-# routine returns an empty string, it has failed.
-#
-proc LWDAQ_run_tool {{file_name ""} {mode "Communal"}} {
+proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 	global LWDAQ_Info
 
-	# Our first guess as to the file name is file_name parameter.
-	set fn $file_name
-	
-	# If fn is empty, we have the user browse for a tool file.
-	if {$fn == ""} {set fn [LWDAQ_get_file_name]}
-	if {$fn == ""} {return ""}
-	
-	# If file_name has no extension, we add a .tcl extension, under the assumption
-	# that the file_name we passed is the tool name, and the tool script will be
-	# named Toolname.tcl.
-	if {[file extension $file_name] == ""} {
-		set file_name "$file_name\.tcl"
-	}
-	
-	# We start looking for the file fn, using file_name as a root in various
-	# directories until we either find the file or give up.
-	if {![file exists $fn]} {
-		set fn [file join $LWDAQ_Info(working_dir) $file_name]
+	if {$tool == ""} {
+		# Browse for the tool file.
+		set fn [LWDAQ_get_file_name]
+		if {$fn == ""} {return "FAIL"}
+	} else {
+		# Search for the tool file. The tool name may already contain the tcl 
+		# extension, and the tool name may include a file path. We strip off
+		# the file path and we add the extension. 
+		set tool [file root [file tail $tool]]\.tcl
+
+		# We start looking for the file in various directories.
+		set fn [file join $LWDAQ_Info(tools_dir) $tool]
 		if {![file exists $fn]} {
-			set fn [file join $LWDAQ_Info(tools_dir) $file_name]
+			set fn [file join $LWDAQ_Info(tools_dir) More $tool]
 			if {![file exists $fn]} {
-				set fn [file join $LWDAQ_Info(tools_dir) More $file_name]
+				set fn [file join $LWDAQ_Info(tools_dir) Spawn $tool]
 				if {![file exists $fn]} {
-					set fn [file join $LWDAQ_Info(tools_dir) Spawn $file_name]
+					set fn $tool
 					if {![file exists $fn]} {
-						error "Cannot find tool file \"$file_name\""
+						set fn [file join $LWDAQ_Info(working_dir) $tool]
+						if {![file exists $fn]} {
+							error "Cannot find tool file \"$tool\""
+						}
 					}
 				}
 			}
 		}
 	}
 	
-	# Deduce the tool name from the tool file name.
+	# Deduce the tool name from the file name.
 	set name [file root [file tail $fn]]
 	
 	# Set global variables carrying the mode and file name.
@@ -184,10 +105,10 @@ proc LWDAQ_run_tool {{file_name ""} {mode "Communal"}} {
 		}
 	}
 	
-	# Run the tool script at the global scope.
-	uplevel #0 [LWDAQ_read_script $fn]
+	# Proceed to run the script at the global scope.
+	uplevel #0 source $fn
 	
-	# We return a success flag.
+	# At this point, we can assume success.
 	return "SUCCESS"
 }
 
