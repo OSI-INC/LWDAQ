@@ -90,24 +90,21 @@ proc Videoarchiver_init {} {
 	# constant rate factor crf. The image will be x * y pixels with fr frames
 	# per second, and the H264 compression will be greater as the crf is lower.
 	# Standard crf is 23. The crf of 15 gives a particularly sharp image.
-	set config(versions) [list {A3034B-HR 820 616 20 23} {A3034B-LR 410 308 30 15}]
+	set config(versions) [list {A3034-HR 820 616 20 23} {A3034-LR 410 308 30 15}]
 	
 	# The rotation of the image readout.
 	set info(rotation_options) "0 90 180 270"
 		
-	# In the following paragraphs, we define shell commands that we pass via secure
-	# shell (ssh) to the camera, where we can run the raspivid or raspistill
-	# utilities to operate the camera, of control input and output lines with the
-	# gpio utility. Each string we send directly to the camera with ssh to be executed
-	# on the camera. For documentation on the camera utilities see here:
-	# https://www.raspberrypi.org/documentation/raspbian/applications/camera.md
-	# For documentation on the gpio utility see here:
-	# https://www.raspberrypi.org/documentation/usage/gpio/
+	# In the following paragraphs, we define shell commands that we pass via
+	# secure shell (ssh) to the camera, where we can run the libcamera-vid or
+	# raspivid utilities to operate the camera, of control input and output
+	# lines with the gpio utility. Each string we send directly to the camera
+	# with ssh to be executed on the camera. 
 	
-	# We initialize the camera by making sure the Videoarchiver directory exists,
-	# moving to that directory, cleaning up old log, video, and image files, killing
-	# all videoarchiver-generated processes, video processes, and image capture
-	# processes, and starting the TCPIP interface.
+	# We initialize the camera by making sure the Videoarchiver directory
+	# exists, moving to that directory, cleaning up old log, video, and image
+	# files, killing all videoarchiver-generated processes, video processes, and
+	# image capture processes, and starting the TCPIP interface.
 	set info(camera_init) {
 cd Videoarchiver
 rm -f *_log.txt
@@ -116,7 +113,7 @@ rm -f *.gif
 killall -9 tclsh 
 killall -9 ffmpeg 
 killall -9 raspivid 
-killall -9 raspivstill 
+killall -9 libcamera-vid
 tclsh interface.tcl -port %Q >& interface_log.txt &
 echo "SUCCESS"
 }	
@@ -129,7 +126,7 @@ cd Videoarchiver
 killall -9 tclsh 
 killall -9 ffmpeg
 killall -9 raspivid
-killall -9 raspivstill
+killall -9 libcamera-vid
 tclsh interface.tcl -port %Q >& interface_log.txt &
 echo "SUCCESS"
 }
@@ -824,17 +821,44 @@ proc Videoarchiver_stream {n} {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 		
+		# Get the camera configuration file so we can decide what camera utility to
+		# call.
+		LWDAQ_socket_write $sock "getfile videoarchiver.config\n"
+		set size [LWDAQ_socket_read $sock line]
+		if {[LWDAQ_is_error_result $size]} {error $size}
+		set configuration [LWDAQ_socket_read $sock $size]
+
 		# We start video streaming to a TCPIP port. Our command uses the long
 		# versions of all options for clarity. We are going to perform percent
 		# substitution on this string to allow the user to change the
 		# resolution, compensation, rotation and saturation of the video. The
 		# final command to echo the word SUCCESS is to allow our secure shell to
 		# return a success code. Any error will cause the echo to be skipped.
-		LWDAQ_socket_write $sock "exec raspivid --codec $info(stream_codec) --timeout 0 --flush \
-			--width $width --height $height --saturation $info(cam$n\_sat) \
-			--rotation $info(cam$n\_rot) \
-			--ev $info(cam$n\_ec) --nopreview --framerate $framerate \
-			--listen --output tcp://0.0.0.0:$info(tcp_port) >& stream_log.txt & \n"
+		if {[regexp "A3034D" $configuration]} {
+			LWDAQ_socket_write $sock "exec libcamera-vid \
+				--codec $info(stream_codec) \
+				--timeout 0 \
+				--flush \
+				--width $width --height $height \
+				--rotation $info(cam$n\_rot) \
+				--nopreview \
+				--framerate $framerate \
+				--listen --output tcp://0.0.0.0:$info(tcp_port) \
+				>& stream_log.txt & \n"
+		} {
+			LWDAQ_socket_write $sock "exec raspivid \
+				--codec $info(stream_codec) \
+				--timeout 0 \
+				--flush \
+				--width $width --height $height \
+				--saturation $info(cam$n\_sat) \
+				--rotation $info(cam$n\_rot) \
+				--ev $info(cam$n\_ec) \
+				--nopreview \
+				--framerate $framerate \
+				--listen --output tcp://0.0.0.0:$info(tcp_port) \
+				>& stream_log.txt & \n"
+		}
 		set result [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $result]} {
 			set message [regsub "ERROR: " $result ""]
@@ -2046,7 +2070,7 @@ proc Videoarchiver_draw_list {} {
 			set info(cam$n\_ttime) "0"
 			set info(cam$n\_lproc) "0"
 			set info(cam$n\_rt) "0"
-			set info(cam$n\_ver) "A3034B_HR"
+			set info(cam$n\_ver) "A3034-HR"
 			set info(cam$n\_white) "0"
 			set info(cam$n\_infrared) "0"
 			set info(cam$n\_lag) "?"
@@ -2250,7 +2274,7 @@ proc Videoarchiver_add_camera {} {
 	
 	# Configure the new sensor to default values.
 	set info(cam$n\_id) "Z000$n"
-	set info(cam$n\_ver) "A3034B-HR"
+	set info(cam$n\_ver) "A3034-HR"
 	set info(cam$n\_addr) $info(default_ip_addr)
 	set info(cam$n\_ec) "4"
 	set info(cam$n\_rot) "0"
@@ -2665,10 +2689,13 @@ http://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
 
 ----------Begin Data----------
 <script>
-# The TCPIP interface process that runs on the camera. It opens a server socket that
-# will receive connections and allow us to download files, get directory listings, and
-# other tasks. We assume its stdout it directed to a log file.
 #
+# Videoarchiver/interface.tcl
+#
+# The TCPIP interface process that runs on the camera. It opens a server socket
+# that will receive connections and allow us to download files, get directory
+# listings, and other tasks. We assume its stdout it directed to a log file.
+
 # WARNING: No single-quotation marks allowed in this script, because we use
 # secure shell to upload the entire script to a file on the Pi, and a single
 # quote markes the end of a Bash argument.
@@ -2698,9 +2725,9 @@ foreach {option value} $argv {
 puts "Starting interface process at [clock seconds] with:"
 puts "verbose = $verbose, port = $port, maxshow = $maxshow."
 
-# The socket acceptor receives a connection, sets up a socket channel, and configures
-# it so that every time it is readable, the incoming data is passed to the interpreter
-# procesdure.
+# The socket acceptor receives a connection, sets up a socket channel, and
+# configures it so that every time it is readable, the incoming data is passed
+# to the interpreter procesdure.
 proc accept {sock addr port} {
 	global verbose
 
@@ -2715,8 +2742,8 @@ proc accept {sock addr port} {
 	return 1
 }
 
-# The interpreter implements a set of commands for the Videoarchiver. We call this
-# procedure whenever the socket is readable.
+# The interpreter implements a set of commands for the Videoarchiver. We call
+# this procedure whenever the socket is readable.
 proc interpreter {sock} {
 	global verbose maxshow
 
@@ -2752,13 +2779,15 @@ proc interpreter {sock} {
 	set argv [lrange $line 1 end]
 	
 	if {[catch {
-		# The getfile command asks the interface to read a named file, transmit its
-		# size as a string, then transmit the entire file contents as a binary object.
+		# The getfile command asks the interface to read a named file, transmit
+		# its size as a string, then transmit the entire file contents as a
+		# binary object.
 		if {$cmd == "getfile"} {
 			
-			# If the file exists, read its contents. When we read the file, we assume 
-			# it is binary so that we can read any type of file. If the file does not
-			# exist, we set the contents to an empty string and the size to zero.
+			# If the file exists, read its contents. When we read the file, we
+			# assume it is binary so that we can read any type of file. If the
+			# file does not exist, we set the contents to an empty string and
+			# the size to zero.
 			set fn [lindex $argv 0]
 			if {[file exists $fn]} {
 				set f [open $fn r]
@@ -2776,24 +2805,26 @@ proc interpreter {sock} {
 				}
 			}
 			
-			# Transmit the size of the file contents so the client will know how many
-			# bytes it must read. If the file does not exist, the file size will be zero,
-			# but we raise no other error.
+			# Transmit the size of the file contents so the client will know how
+			# many bytes it must read. If the file does not exist, the file size
+			# will be zero, but we raise no other error.
 			puts $sock [string length $contents]
 			
 			# Now reconfigure the socket for binary data with full buffering and
-			# send the contents without a line break at the end. Flush the socket.
+			# send the contents without a line break at the end. Flush the
+			# socket.
 			fconfigure $sock -translation binary -buffering full
 			puts -nonewline $sock $contents
 			flush $sock
 			
-			# Return the socket to line buffering and automatic line break translation.
+			# Return the socket to line buffering and automatic line break
+			# translation.
 			fconfigure $sock -translation auto -buffering line
 	
-		# The putfile command takes a filename and file contents and writes the contents
-		# to the filename on disk. First the command obtains the file name and the size
-		# of the file from the command line, then waits for the data to be transferred
-		# over the socket.
+		# The putfile command takes a filename and file contents and writes the
+		# contents to the filename on disk. First the command obtains the file
+		# name and the size of the file from the command line, then waits for
+		# the data to be transferred over the socket.
 		} elseif {$cmd == "putfile"} {
 			
 			# Get the file name and the size of the contents.
@@ -2816,13 +2847,14 @@ proc interpreter {sock} {
 				puts "Wrote $size bytes to \"$fn\" at [clock seconds]."
 			}
 			
-			# Return the socket to line buffering and automatic line break translation.
+			# Return the socket to line buffering and automatic line break
+			# translation.
 			fconfigure $sock -translation auto -buffering line
 			
 			# Send back the number of bytes written.
 			puts $sock $size
 
-		# The sockname command returns the local name of the socket so we can 
+		# The sockname command returns the local name of the socket so we can
 		# refer to the socket in subsequent commands.
 		} elseif {$cmd == "sockname"} {
 			puts $sock $sock
@@ -2860,6 +2892,7 @@ proc interpreter {sock} {
 			puts $f $contents
 			close $f
 			exec sudo cp temp.txt /etc/dhcpcd.conf
+			exec rm temp.txt
 			puts $sock $new_ip
 			after 100
 			close $sock
@@ -2904,8 +2937,8 @@ proc interpreter {sock} {
 			# Return the intensity as confirmation.
 			puts $sock $intensity	
 			
-		# By default, the interface evaluates the entire line as a command
-		# at the global scope, and returns the result of the command.
+		# By default, the interface evaluates the entire line as a command at
+		# the global scope, and returns the result of the command.
 		} else {
 			set result [uplevel #0 $line]
 			puts $sock $result
@@ -2927,18 +2960,21 @@ vwait quit
 </script>
 
 <script>
-# Compression engine and watchdog to run on the Raspberry Pi. When there are 
-# two or more segment files, which we assume is any file named S*.mp4, we take 
-# the older of the two, rename it, compress it, and rename it again. In renaming, 
-# we transform the ffmpeg year, day, hour, minute, second timestamp in the original
-# name into a UNIX timestamp. If there are too many compressed video files in the 
-# local directory, the watchdog deletes some of them. We assume that this process
-# will run in the background, with stdout directed to a log file. We can pass
-# parameters into the process when we start it up. In particular, we must specify
-# the framerate for the ffmpeg compressor. It is also a good idea to specify the
-# number of compression processes running simultaneously, and give this one an 
-# index between 1 and this number so that the compressors can avoid trying to 
-# manipulate the same files.
+#
+# Videoarchiver/compressor.tcl
+#
+# Compression engine and watchdog to run on the Raspberry Pi. When there are two
+# or more segment files, which we assume is any file named S*.mp4, we take the
+# older of the two, rename it, compress it, and rename it again. In renaming, we
+# transform the ffmpeg year, day, hour, minute, second timestamp in the original
+# name into a UNIX timestamp. If there are too many compressed video files in
+# the local directory, the watchdog deletes some of them. We assume that this
+# process will run in the background, with stdout directed to a log file. We can
+# pass parameters into the process when we start it up. In particular, we must
+# specify the framerate for the ffmpeg compressor. It is also a good idea to
+# specify the number of compression processes running simultaneously, and give
+# this one an index between 1 and this number so that the compressors can avoid
+# trying to manipulate the same files.
 #
 
 # Get the command line arguments.
@@ -2989,16 +3025,17 @@ cd tmp
 # An infinite loop. This process must be killed if it is to be stopped.
 while {1} {
 
-	# We wait a random amount of time before executing, to reduce the probability of collisions.
+	# We wait a random amount of time before executing, to reduce the
+	# probability of collisions.
 	after [expr round($loopwait*rand())]
 
 	# Get a list of all the uncompressed files.
 	set sfl [lsort -increasing [glob -nocomplain S*.mp4]]
  
-	# Look for excessive number of uncompressed segments. If there are more than 
-	# maxfiles, delete some of the oldest, but not the oldest, because they might be
-	# involved in the start of a compression. We delete as many files as there are
-	# processes.
+	# Look for excessive number of uncompressed segments. If there are more than
+	# maxfiles, delete some of the oldest, but not the oldest, because they
+	# might be involved in the start of a compression. We delete as many files
+	# as there are processes.
 	if {[llength $sfl] >= $maxfiles} {
 		puts "ERROR: Too many uncompressed segments, deleting $processes\
 			segments at time [clock seconds]."
@@ -3011,9 +3048,9 @@ while {1} {
 		}
 	}
 	
-	# Extract the segments that match this process index. If the index-1 is equal
-	# to the file timestamp modulo the number of processes, or if the index is zero,
-	# we add a segment to the list of relevant segments.
+	# Extract the segments that match this process index. If the index-1 is
+	# equal to the file timestamp modulo the number of processes, or if the
+	# index is zero, we add a segment to the list of relevant segments.
 	set new_sfl [list]
 	foreach sfn $sfl {
 		if {[regexp {S([0-9]{10})} [file tail $sfn] match timestamp]} {
@@ -3037,10 +3074,10 @@ while {1} {
 			continue
 		}
 	
-		# Rename the segment file so other compressors do not try to compress it as well.
-		# If we encounter an error during the re-name, this is probably because another
-		# compressor just renamed the file while we were checking its name, so just 
-		# continue.
+		# Rename the segment file so other compressors do not try to compress it
+		# as well. If we encounter an error during the re-name, this is probably
+		# because another compressor just renamed the file while we were
+		# checking its name, so just continue.
 		set tfn [file join [file dirname $sfn] [regsub {^S} [file tail $sfn] T]]
 		if {[catch {file rename $sfn $tfn} message]} {
 			puts "ERROR: Conflict renaming segment $sfn at time [clock seconds]."
@@ -3052,14 +3089,15 @@ while {1} {
 		set wfn W$timestamp\.mp4
 		set vfn V$timestamp\.mp4
 	
-		# Compress with ffmpeg libx264 to produce video with the specified frame rate.
-		# If we encounter an ffmpeg error, we report the error but otherwise proceed,
-		# because ffmpeg will report errors even though it completes compression. The
-		# Pi has a graphics processor, which we can enlist with the h264_omx codec, but
-		# we can run only one compressor on this processor at a time, and it is not
-		# capable of compressing high-resolution video on its own, even though it is
-		# twice as fast as the libx264 compression that runs in the main Pi processor
-		# cores. So we instead enlist three of the processor cores into compression
+		# Compress with ffmpeg libx264 to produce video with the specified frame
+		# rate. If we encounter an ffmpeg error, we report the error but
+		# otherwise proceed, because ffmpeg will report errors even though it
+		# completes compression. The Pi has a graphics processor, which we can
+		# enlist with the h264_omx codec, but we can run only one compressor on
+		# this processor at a time, and it is not capable of compressing
+		# high-resolution video on its own, even though it is twice as fast as
+		# the libx264 compression that runs in the main Pi processor cores. So
+		# we instead enlist three of the processor cores into compression
 		# simultaneously using the libx264 codec.
 		if {[catch {
 			exec /usr/bin/ffmpeg -nostdin -loglevel error \
@@ -3083,68 +3121,70 @@ while {1} {
 </script>
 
 <script>
-# Dynamic Host Configuration Protocol Configuration File for
-# the Animal Cage Camera (A3034B), Open Source Instruments Inc.
 #
-# See dhcpcd.conf(5) for details of the options. This 
-# configuration assigns a static IP address to the camera.
+# Videoarchiver/dhcpcd_default.conf
+#
+# Dynamic Host Configuration Protocol Configuration File for the Animal Cage
+# Camera (A3034), Open Source Instruments Inc.
+#
+
+# See dhcpcd.conf(5) for details of the options. This configuration assigns a
+# static IP address to the camera.
 
 # Allow users of this group to interact with dhcpcd via the control socket.
 controlgroup wheel
 
-# A static IP configuration. Do not change the static IP address in this
-# file unless you are prepared to change it in the Videoarchiver's
-# set_ip routine as well.
+# A static IP configuration. Do not change the static IP address in this file
+# unless you are prepared to change it in the Videoarchiver's set_ip routine as
+# well.
 interface eth0
 static ip_address=10.0.0.34/24
 static routers=10.0.0.1
 </script>
 
 <script>
+#
+# Videoarchiver/init.sh
+#
+# The startup Bash script run by the Animal Cage Camera (A3034) after it boots
+# up. We turn off the infrared and white lights, flash the white ones three
+# times, check the configuration switch. If the switch is pressed, we flash the
+# white lights five times and overwrite the existing TCPIP configuration file to
+# return the camera's IP address to the factory default value. If the switch is
+# not pressed, we continue. The final action is to start up the TCL interface on
+# port 2223.
+#
+
 # Move to the Videoarchiver directory.
 cd /home/pi/Videoarchiver
 
-# Set the configuration switch port to input with pull-up
-# resistor.
-gpio -g mode 5 in
-gpio -g mode 5 up
+# Determine the camera version. The "B" and "C" versions run Rasbian Stretch
+# with the gpio command. These versions both have "A3034B" in their
+# configuration file. The "D" version runs Raspberry Pi Bullseye and has
+# "A3034D" in its configuration file.
+if [ "`grep A3034B videoarchiver.config`" != "" ]
+then
+	# We use gpio routines to configure and flash lights on A3034B and A3034C.
 
-# Turn off the infrared LEDs.
-for value in 16 26 20 21; do
-	gpio -g mode $value out
-	gpio -g write $value 0
-done
+	# Set the configuration switch port to input with pull-up resistor.
+	gpio -g mode 5 in
+	gpio -g mode 5 up
 
-# Turn off the white LEDs.
-for value in 2 3 4 14; do
-	gpio -g mode $value out
-	gpio -g write $value 0
-done
-
-# Flash the white LEDs three times, then wait one second.
-for count in 1 2 3; do
-	sleep 0.3
-	for value in 2 3 4 14; do
-		gpio -g write $value 1
-	done
-	sleep 0.1
-	for value in 2 3 4 14; do
+	# Turn off the infrared LEDs.
+	for value in 16 26 20 21; do
+		gpio -g mode $value out
 		gpio -g write $value 0
 	done
-done
 
-# Check the configuration switch. If it is depressed, we 
-# replace the existing /etc/dhcpcd.conf file with the
-# dhcpcd_default.conf, which sets the IP address of 
-# this camera to the default value 10.0.0.34. While this
-# reset is taking place, we turn the white LEDs on half
-# power.
-if [ `gpio -g read 5` -eq 0 ]
-then
-	sleep 1.0
-	sudo ifconfig eth0 down
-	sudo cp dhcpcd_default.conf /etc/dhcpcd.conf
-	for count in 1 2 3 4 5; do
+	# Turn off the white LEDs.
+	for value in 2 3 4 14; do
+		gpio -g mode $value out
+		gpio -g write $value 0
+	done
+
+	# Flash the white LEDs three times, then wait one second.
+	for count in 1 2 3; do
+		sleep 0.3
 		for value in 2 3 4 14; do
 			gpio -g write $value 1
 		done
@@ -3152,10 +3192,68 @@ then
 		for value in 2 3 4 14; do
 			gpio -g write $value 0
 		done
-		sleep 0.1
 	done
-	sudo ifconfig eth0 up
-	sleep 0.5
+
+	# Check the configuration switch. If it is depressed, we replace the existing
+	# /etc/dhcpcd.conf file with the dhcpcd_default.conf, which sets the IP address
+	# of this camera to the default value 10.0.0.34. While this reset is taking
+	# place, we turn the white LEDs on half power.
+	if [ `gpio -g read 5` -eq 0 ]
+	then
+		sleep 1.0
+		sudo ifconfig eth0 down
+		sudo cp dhcpcd_default.conf /etc/dhcpcd.conf
+		for count in 1 2 3 4 5; do
+			for value in 2 3 4 14; do
+				gpio -g write $value 1
+			done
+			sleep 0.1
+			for value in 2 3 4 14; do
+				gpio -g write $value 0
+			done
+			sleep 0.1
+		done
+		sudo ifconfig eth0 up
+		sleep 0.5
+	fi
+else
+	# We use gpio routines to configure and flash lights on A3034D.
+
+	# Set the configuration switch port to input with pull-up resistor.
+	raspi-gpio set 5 ip pu
+
+	# Turn off the infrared LEDs.
+	raspi-gpio set 16,26,20,21 op dl
+
+	# Turn off the white LEDs.
+	raspi-gpio set 2,3,4,14 op dl
+
+	# Flash the white LEDs three times, then wait one second.
+	for count in 1 2 3; do
+		sleep 0.3
+		raspi-gpio set 2,3,4,14 op dh
+		sleep 0.1
+		raspi-gpio set 2,3,4,14 op dl
+	done
+
+	# Check the configuration switch. If it is depressed, we replace the existing
+	# /etc/dhcpcd.conf file with the dhcpcd_default.conf, which sets the IP address
+	# of this camera to the default value 10.0.0.34. While this reset is taking
+	# place, we turn the white LEDs on half power.
+	if [ "`raspi-gpio get 5 | grep level=0`" != "" ]
+	then
+		sleep 1.0
+		sudo ifconfig eth0 down
+		sudo cp dhcpcd_default.conf /etc/dhcpcd.conf
+		for count in 1 2 3 4 5; do
+			raspi-gpio set 2,3,4,14 op dh
+			sleep 0.1
+			raspi-gpio set 2,3,4,14 op dl
+			sleep 0.1
+		done
+		sudo ifconfig eth0 up
+		sleep 0.5
+	fi
 fi
 
 # Start the TCPIP interface process as user PI.
