@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "24"
+	LWDAQ_tool_init "Videoarchiver" "25"
 
 	# If a graphical tool window already exists, we abort our initialization.
 	if {[winfo exists $info(window)]} {
