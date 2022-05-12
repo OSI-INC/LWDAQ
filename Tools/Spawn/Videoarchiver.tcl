@@ -141,10 +141,12 @@ echo "SUCCESS"
 
 	# Extract the compressor script from the data field of this script.
 	set script_list [LWDAQ_xml_get_list [LWDAQ_tool_data $info(name)] script]
-	set info(interface_script) [lindex $script_list 0]
-	set info(compressor_script) [lindex $script_list 1]
-	set info(dhcpcd_script) [lindex $script_list 2]
-	set info(init_script) [lindex $script_list 3]
+	set n 0
+	foreach a {interface compressor dhcpcd init \
+			stream segment framerate single compress} {
+		set info($a\_script) [lindex $script_list $n]
+		incr n
+	}
 
 	# The following parameters will appear in the configuration panel, so the user can
 	# modify them by hand.
@@ -561,7 +563,8 @@ proc Videoarchiver_cleanup {n} {
 
 #
 # Videoarchiver_update uploads new interface, compressor, initialization, and 
-# factory-default dhcp configuration files on the camera.
+# factory-default dhcp configuration files on the camera, as well as the latest
+# suite of test code.
 #
 proc Videoarchiver_update {n} {
 	upvar #0 Videoarchiver_config config
@@ -627,10 +630,26 @@ proc Videoarchiver_update {n} {
 	
 		# Open a socket to the tcpip interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
-	
+		
+		# Make sure the test subdirectory exists.
+		LWDAQ_print $info(text) "$info(cam$n\_id) Creating test directory, $ip..."
+		LWDAQ_socket_write $sock "mkdir test\n"
+		set result [LWDAQ_socket_read $sock line]
+		if {$result != "test"} {
+			catch {close $sock}
+			error "Failed to create test directory."
+		}
+		
 		# Update files on the camera. For each file we provide a functional name and
 		# a file name.
-		foreach {sn fn} {compressor compressor.tcl dhcpcd dhcpcd_default.conf init init.sh} {
+		foreach {sn fn} {compressor compressor.tcl \
+				dhcpcd dhcpcd_default.conf \
+				init init.sh \
+				stream test/stream.sh \
+				segment test/segment.sh \
+				framerate test/framerate.tcl \
+				single test/single.tcl \
+				compress test/compress.tcl} {
 			LWDAQ_print $info(text) "$info(cam$n\_id) Updating $sn script..."
 			LWDAQ_update
 			set size [string length $info($sn\_script)]
@@ -813,7 +832,7 @@ proc Videoarchiver_stream {n} {
 	# Print notification.
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video streaming,\
 		$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
-		ec $info(cam$n\_ec), sat $info(cam$n\_sat),\
+		saturation $info(cam$n\_sat),\
 		crf $crf, $ip."
 	LWDAQ_update
 
@@ -834,13 +853,14 @@ proc Videoarchiver_stream {n} {
 		# resolution, compensation, rotation and saturation of the video. The
 		# final command to echo the word SUCCESS is to allow our secure shell to
 		# return a success code. Any error will cause the echo to be skipped.
-		if {[regexp "A3034D" $configuration]} {
+		if {[regexp "Bullseye" $configuration]} {
 			LWDAQ_socket_write $sock "exec libcamera-vid \
-				--codec $info(stream_codec) \
+				--codec mjpeg \
 				--timeout 0 \
 				--flush \
 				--width $width --height $height \
 				--rotation $info(cam$n\_rot) \
+				--saturation $info(cam$n\_sat) \
 				--nopreview \
 				--framerate $framerate \
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
@@ -851,9 +871,9 @@ proc Videoarchiver_stream {n} {
 				--timeout 0 \
 				--flush \
 				--width $width --height $height \
-				--saturation $info(cam$n\_sat) \
+				--saturation [expr round(200*$info(cam$n\_sat)-100)] \
 				--rotation $info(cam$n\_rot) \
-				--ev $info(cam$n\_ec) \
+				--ev 4 \
 				--nopreview \
 				--framerate $framerate \
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
@@ -2122,15 +2142,15 @@ proc Videoarchiver_draw_list {} {
 		}	
 		pack $ff.rotm -side left -expand 1
 	
-		label $ff.ecl -text "EC:" -fg brown -justify right
-		pack $ff.ecl -side left -expand 0
-		set m [tk_optionMenu $ff.ecm Videoarchiver_info(cam$n\_ec) none]
+		label $ff.satl -text "Sat:" -fg brown -justify right
+		pack $ff.satl -side left -expand 0
+		set m [tk_optionMenu $ff.satm Videoarchiver_info(cam$n\_sat) none]
 		$m delete 0 end
-		for {set ec -10} {$ec <= +10} {incr ec} {
-			$m add command -label "$ec" \
-				-command [list set Videoarchiver_info(cam$n\_ec) $ec]
+		for {set sat 0.0} {$sat <= 1.0} {set sat [format %.1f [expr $sat + 0.1]]} {
+			$m add command -label "$sat" \
+				-command [list set Videoarchiver_info(cam$n\_sat) $sat]
 		}	
-		pack $ff.ecm -side left -expand 1
+		pack $ff.satm -side left -expand 1
 
 		label $ff.wl -text "Wht:" -padx $padx -fg brown -justify right
 		pack $ff.wl -side left -expand 0
@@ -2236,7 +2256,6 @@ proc Videoarchiver_remove {n} {
 	unset info(cam$n\_id)
 	unset info(cam$n\_ver)
 	unset info(cam$n\_addr)
-	unset info(cam$n\_ec)
 	unset info(cam$n\_rot)
 	unset info(cam$n\_sat)
 	unset info(cam$n\_dir)
@@ -2276,9 +2295,8 @@ proc Videoarchiver_add_camera {} {
 	set info(cam$n\_id) "Z000$n"
 	set info(cam$n\_ver) "A3034-HR"
 	set info(cam$n\_addr) $info(default_ip_addr)
-	set info(cam$n\_ec) "4"
 	set info(cam$n\_rot) "0"
-	set info(cam$n\_sat) "0"
+	set info(cam$n\_sat) "0.0"
 	set info(cam$n\_dir) [file normalize "~/Desktop"]
 	set info(cam$n\_file) [file join $info(cam$n\_dir) V0000000000.mp4]
 	set info(cam$n\_state) "Idle"
@@ -2853,6 +2871,23 @@ proc interpreter {sock} {
 			
 			# Send back the number of bytes written.
 			puts $sock $size
+			
+		# The mkdir command creates a new directory if it does not exist.
+		} elseif {$cmd == "mkdir"} {
+			
+			# Get the directory name and report it.
+			set dn [lindex $argv 0]
+			if {$verbose} {
+				puts "$sock mkdir \"$dn\" at [clock seconds]."
+			}
+
+			# Make the directory.
+			if {![file exists $dn]} {
+				file mkdir $dn
+			}
+			
+			# Return the directory name as success.
+			puts $sock $dn
 
 		# The sockname command returns the local name of the socket so we can
 		# refer to the socket in subsequent commands.
@@ -2872,8 +2907,9 @@ proc interpreter {sock} {
 			set frequency [expr 1.0*$frequency/1e9]
 			puts $sock [format %.2f $frequency]
 	
-		# The setip command sets the static IP address of the camera
-		# by re-writing the dhcpcd.conf file.
+		# The setip command sets the static IP address of the camera by
+		# re-writing the dhcpcd.conf file. It then shuts off the ethernet
+		# interface and turns it on again, which closes the socket.
 		} elseif {$cmd == "setip"} {
 			set new_ip [lindex $argv 0]
 			if {![regexp {[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $new_ip]} {
@@ -3162,7 +3198,7 @@ cd /home/pi/Videoarchiver
 # with the gpio command. These versions both have "A3034B" in their
 # configuration file. The "D" version runs Raspberry Pi Bullseye and has
 # "A3034D" in its configuration file.
-if [ "`grep A3034B videoarchiver.config`" != "" ]
+if [ "`grep Bullseye videoarchiver.config`" == "" ]
 then
 	# We use gpio routines to configure and flash lights on A3034B and A3034C.
 
@@ -3260,6 +3296,93 @@ fi
 sudo -u pi bash -c "tclsh interface.tcl -port 2223 > interface_log.txt &"
 
 </script>
+
+<script>
+#
+# Videoarchiver/test/stream.sh
+#
+# Stream video to port 2222 in MJPEG format, frame-by-frame compression only.
+#
+if [ "`grep Bullseye ../videoarchiver.config`" == "" ]
+then
+  raspivid --codec MJPEG --timeout 0 --flush --width 820 --height 616 \
+    --nopreview --framerate 20 --listen --output tcp://0.0.0.0:2222 \
+    >& stream_log.txt
+else
+  libcamera-vid --codec MJPEG --timeout 0 --flush --width 820 --height 616 \
+  	--nopreview --framerate 20 --listen --saturation 0.5 --output tcp://0.0.0.0:2222 \
+	>& stream_log.txt
+fi
+</script>
+
+<script>
+# 
+# Videoarchiver/test/segment.sh
+#
+# Take video stream and divide into one-second segments.
+#
+ffmpeg -nostdin -loglevel error -i tcp://127.0.0.1:2222 -framerate 20 -f segment \
+	-segment_atclocktime 1 -segment_time 1 -reset_timestamps 1 -c copy \
+	-strftime 1 S%s.mp4 >& segment_log.txt
+</script>
+
+<script>
+# 
+# Videoarchiver/test/framerate.tcl
+#
+# Measure the number of frames in each mp4 file in the local directory.
+#
+set fnl [lsort -dictionary [glob -nocomplain *.mp4]]
+foreach fn $fnl {
+	catch {exec /usr/bin/ffmpeg -i $fn -c copy -f null -} result
+	if {[regexp {frame= *([0-9]+)} $result match numf]} {
+		puts "$fn $numf"
+	}
+}
+</script>
+
+<script>
+# 
+# Videoarchiver/test/single.tcl
+#
+# Compress a single mp4 segment to a new one with V prefix, delete pre-existing.
+# 
+set fn [file tail [lindex $argv 0]]
+if {$fn != ""} {
+  if {[file exists V$fn]} {file delete V$fn }
+  exec /usr/bin/ffmpeg -loglevel error -i $fn -c:v libx264 -preset veryfast V$fn
+}
+</script>
+
+<script>
+# 
+# Videoarchiver/test/compress.tcl
+#
+# Measures compression rate. Specify P1..P4 for number of processes. Comresses all
+# videos S*.mp4 in local directory using xargs and single.tcl.
+#
+set start_time [clock seconds]
+set fnl [glob -nocomplain S*.mp4]
+set n 1
+foreach v $argv {
+  switch -nocase $v {
+    p1 {set n 1}
+    p2 {set n 2}
+    p3 {set n 3}
+    p4 {set n 4}
+  }
+}
+puts "Compressing [llength $fnl] files using $n processes..."
+exec find ./ -name "S*.mp4" -print | xargs -n1 -P$n tclsh single.tcl
+set t [expr [clock seconds] - $start_time]
+if {[llength $fnl] > 0} {
+  set tt [expr 1.0*$t/[llength $fnl]]
+} else {
+  set tt $t
+}
+puts "Done in $t seconds, [format %.2f $tt] per segment." 
+</script>
+
 ----------End Data----------
 
 
