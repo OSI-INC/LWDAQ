@@ -287,7 +287,7 @@ proc Videoarchiver_camera_init {n} {
 		 $command]} message
 	if {[regexp "SUCCESS" $message]} {
 		LWDAQ_print $info(text) "$info(cam$n\_id) initialized,\
-			tcpip interface started, $ip."
+			tcpip interface started."
 	} else {
 		error $message
 	}
@@ -515,7 +515,7 @@ proc Videoarchiver_setlamp {n color intensity} {
 		# Report the change, provided verbose flag is set. Set the menubutton value.
 		if {$config(verbose)} {
 			LWDAQ_print $info(text) "$info(cam$n\_id) Set $color lamps to\
-				intensity $intensity, $ip." 
+				intensity $intensity." 
 		}
 		set info(cam$n\_$color) $intensity
 	} message]} {
@@ -610,7 +610,7 @@ proc Videoarchiver_update {n} {
 		if {$message != ""} {error $message}
 	
 		# Start the tcpip interface using the camera initialization command.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Starting tcpip interface, $ip..."
+		LWDAQ_print $info(text) "$info(cam$n\_id) Starting tcpip interface..."
 		LWDAQ_update
 		set command $info(camera_init)
 		set command [regsub -all {%Q} $command $info(tcl_port)]
@@ -632,7 +632,7 @@ proc Videoarchiver_update {n} {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 		
 		# Make sure the test subdirectory exists.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Creating test directory, $ip..."
+		LWDAQ_print $info(text) "$info(cam$n\_id) Creating test directory..."
 		LWDAQ_socket_write $sock "mkdir test\n"
 		set result [LWDAQ_socket_read $sock line]
 		if {$result != "test"} {
@@ -763,7 +763,7 @@ proc Videoarchiver_set_ip {n {new_ip ""}} {
 		if {![regexp "SUCCESS" $message]} {error $message}
 		
 		# Start the tcpip interface using the camera initialization command.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Starting tcpip interface, $ip..."
+		LWDAQ_print $info(text) "$info(cam$n\_id) Starting tcpip interface..."
 		LWDAQ_update
 		set command $info(camera_init)
 		set command [regsub -all {%Q} $command $info(tcl_port)]
@@ -833,7 +833,7 @@ proc Videoarchiver_stream {n} {
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video streaming,\
 		$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
 		saturation $info(cam$n\_sat),\
-		crf $crf, $ip."
+		crf $crf."
 	LWDAQ_update
 
 	if {[catch {
@@ -1433,15 +1433,14 @@ proc Videoarchiver_transfer {n} {
 		return "FAIL"
 	}
 
-	# We move to the scratch directory because file names are simpler
-	# when calling mplayer and ffmpeg so we can use the same command line
-	# code for all operating systems.
+	# We move to the scratch directory because file names are simpler when
+	# calling mplayer and ffmpeg so we can use the same command line code for
+	# all operating systems.
 	cd [Videoarchiver_segdir $n]
 	
-	# If recording has been stopped, we don't want to try to contact the
-	# camera because its interface will have been stopped too. Instead,
-	# we will skip the downloading and transfer all remaining segments,
-	# then stop.
+	# If recording has been stopped, we don't want to try to contact the camera
+	# because its interface will have been stopped too. Instead, we will skip
+	# the downloading and transfer all remaining segments, then stop.
 	if {$info(cam$n\_state) == "Record"} {
 
 		# Get a list of segments that are available for download on the camera. 
@@ -1461,18 +1460,19 @@ proc Videoarchiver_transfer {n} {
 			return "FAIL"
 		}
 		
-		# If there are one or more segments available, download up to transfer_max_files of them
-		# from the camera, save to the local segment directory, and delete from the camera.
+		# If there are one or more segments available, download up to
+		# transfer_max_files of them from the camera, save to the local segment
+		# directory, and delete from the camera.
 		if {$seg_list != ""} {
 		
-			# Sort the segment list into increasing order, which will be oldest to newest. Take
-			# from this list up to transfer_max_files names.
+			# Sort the segment list into increasing order, which will be oldest
+			# to newest. Take from this list up to transfer_max_files names.
 			set seg_list [lrange [lsort -increasing $seg_list] \
 				0 [expr $config(transfer_max_files) - 1]]
 				
 			if {[catch {
 			
-				# Open a socket to the camera. We will use the same socket to 
+				# Open a socket to the camera. We will use the same socket to
 				# download all segment files.
 				set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 
@@ -1482,8 +1482,8 @@ proc Videoarchiver_transfer {n} {
 
 				# Download, save, and delete each file.
 				foreach sf $seg_list {
-					# Download the first segment, adding its size to the total number
-					# of bytes transferred.
+					# Download the first segment, adding its size to the total
+					# number of bytes transferred.
 					set when "downloading $sf"
 					LWDAQ_socket_write $sock "getfile tmp/$sf\n"
 					set size [LWDAQ_socket_read $sock line]
@@ -1519,8 +1519,8 @@ proc Videoarchiver_transfer {n} {
 				# Calculate download time.			
 				set download_ms [expr [clock milliseconds] - $start_ms]
 
-				# Calculate the time lag between the current time and the timestamp
-				# of the last segment we downloaded and saved.
+				# Calculate the time lag between the current time and the
+				# timestamp of the last segment we downloaded and saved.
 				set when "reporting"
 				set sf [lindex $seg_list end]
 				if {[regexp {V([0-9]{10})} $sf match timestamp]} {
@@ -1534,11 +1534,11 @@ proc Videoarchiver_transfer {n} {
 					LWDAQ_print $info(text) "$info(cam$n\_id)\
 						Transferred [llength $seg_list] segments,\
 						[format %.1f [expr 0.001*$data_size]] kByte in $download_ms ms,\
-						lag $lag s, $freq GHz, $temp C, $ip."
+						lag $lag s, $freq GHz, $temp C."
 				}
 				
-				# If the recording monitor is running for this channel, load the new segments 
-				# into the monitor
+				# If the recording monitor is running for this channel, load the
+				# new segments into the monitor
 				if {($info(monitor_cam) == $n) && ($info(monitor_channel) != "none")} {
 					set when "loading monitor"
 					foreach sf $seg_list {Videoarchiver_monitor $n Write \
@@ -1609,20 +1609,22 @@ proc Videoarchiver_transfer {n} {
 			
 				if {$config(verbose)} {
 					LWDAQ_print $info(text) "$info(cam$n\_id) Creating $infile,\
-						time [clock format $segment_time], $ip."
+						time [clock format $segment_time]."
 				}
 				set info(cam$n\_file) [file join $info(cam$n\_dir) $infile]
 				set info(cam$n\_rt) $segment_time
 				file rename $infile $info(cam$n\_file)
 				set info(cam$n\_ttime) [clock seconds]
 				
-				# If we are still recording, we take take this opportunity to synchronize the
-				# camera clock. Otherwise, don't bother because we have stopped transferring
-				# segments, and this may be because of a communication problem, which would 
-				# result in the synchronization failing.
+				# If we are still recording, we take take this opportunity to
+				# synchronize the camera clock. Otherwise, don't bother because
+				# we have stopped transferring segments, and this may be because
+				# of a communication problem, which would result in the
+				# synchronization failing.
 				if {$info(cam$n\_state) == "Record"} {Videoarchiver_synchronize $n}
 	
-				# Delete the first segment from the segment list, now that it has been moved.
+				# Delete the first segment from the segment list, now that it
+				# has been moved.
 				set seg_list [lrange $seg_list 1 end]
 			}
 		}
@@ -1640,31 +1642,53 @@ proc Videoarchiver_transfer {n} {
 			if {([clock seconds] - $info(cam$n\_ttime) > $config(transfer_period_s)) \
 				|| ($info(cam$n\_state) != "Record")} {
 	
-				# Open a text file into which we are going to write a list of segments to
-				# transfer to the recording file.
+				# Open a text file into which we are going to write a list of
+				# segments to transfer to the recording file.
 				set when "composing segment list"
 				set ifl [open transfer_list.txt w]
 	
-				# Here we must make sure that we give ffmpeg a native-format file path to
-				# the recording directory. We have to specify backslashes with double-
-				# backslashes in ffmpeg file lists, so here we replace each backslash in
-				# the native name with two backslashes. We have to specify each backslash
-				# in the regsub command with two backslashes, so the resulting regular
+				# Here we must make sure that we give ffmpeg a native-format
+				# file path to the recording directory. We have to specify
+				# backslashes with double- backslashes in ffmpeg file lists, so
+				# here we replace each backslash in the native name with two
+				# backslashes. We have to specify each backslash in the regsub
+				# command with two backslashes, so the resulting regular
 				# expression is as follows.
-				puts $ifl "file [regsub -all {\\} [file nativename $info(cam$n\_file)] {\\\\}]"
+				puts $ifl \
+					"file [regsub -all {\\} [file nativename $info(cam$n\_file)] {\\\\}]"
 				
-				# We go through the available segments, up to but not including the most recent
-				# segment, and check to see if it belongs in the recording file. We do not include
-				# the most recent segment because this one may be loaded into the monitor.
+				# We go through the available segments, up to but not including
+				# the most recent segment, and check to see if it belongs in the
+				# recording file. We do not include the most recent segment
+				# because this one may be loaded into the monitor. If something
+				# is going wrong with the camera's compression system, it is
+				# possible for segments to arrive out of order, or for segments
+				# to be missing. As we add each segment, we check to see if it
+				# is exactly one second newer than the previous segment we
+				# added, and if it isn't we issue a warning.
 				set transfer_segments [list]
+				set expected_segment_time [expr $info(cam$n\_rt) + 1]
 				foreach infile [lrange $seg_list 0 end-1] {
 					if {![regexp {V([0-9]{10})} $infile match segment_time]} {
-						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id) Deleting unexpected\
-							file \"$infile\", $ip."
+						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
+							Deleting unexpected file \"$infile\"."
 						catch {file delete $infile}
 						LWDAQ_post [list Videoarchiver_transfer $ip]
 						return "FAIL"	
 					}
+					if {$segment_time > $expected_segment_time} {
+						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
+							Missing [expr $segment_time - $expected_segment_time]\
+							segments before \"$infile\"."
+					} elseif {$segment_time = $expected_segment_time - 1} {
+						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
+							Segment \"$infile\" is a duplicate of the previous segment."
+					} elseif {$segment_time < $expected_segment_time - 1} {
+						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
+							Segment \"$infile\" preceeds previous segment by\
+							[expr $expected_segment_time - $segment_time] s."
+					}
+					set expected_segment_time [expr $segment_time + 1]
 					set time_remaining [expr $config(record_length_s) \
 						- ($segment_time - $info(cam$n\_rt))]
 					if {$time_remaining > 0} {
@@ -1678,46 +1702,50 @@ proc Videoarchiver_transfer {n} {
 				# Our list is complete.
 				close $ifl
 				
-				# To be safe, we attempt to concatinate only if we have at least one file
-				# in our list, although we should always have one or more at this point.
+				# To be safe, we attempt to concatinate only if we have at least
+				# one file in our list, although we should always have one or
+				# more at this point.
 				set num_segments [llength $transfer_segments]
 				if {$num_segments > 0} {
 					if {$config(verbose)} {
 						LWDAQ_print $info(text) "$info(cam$n\_id) Adding $num_segments\
-							segments to [file tail $info(cam$n\_file)], $ip."
+							segments to [file tail $info(cam$n\_file)]."
 					}
 	
-					# We take this opportunity to remove excess lines from the text window.
+					# We take this opportunity to remove excess lines from the
+					# text window.
 					set when "deleting old text"
 					$info(text) delete 1.0 "end [expr 0 - $info(num_lines_keep)] lines"			
 					set start_ms [clock milliseconds]
 					
-					# We are going to copy the existing video file into a temporary
-					# file, followed by copying one or more compressed segments.
-					# We want the temporary file in the same directory as the recording
-					# file so that, when we replace the recording file with the temporary
-					# file, all we have to do is delete the recording file and rename the
-					# temporary file, rather than copying a video file. If we were to 
-					# put the temporary file in the segment directory, this might be on
-					# a different volume from the recording directory, and moving the 
-					# completed temporary file would require copying and deleting.
+					# We are going to copy the existing video file into a
+					# temporary file, followed by copying one or more compressed
+					# segments. We want the temporary file in the same directory
+					# as the recording file so that, when we replace the
+					# recording file with the temporary file, all we have to do
+					# is delete the recording file and rename the temporary
+					# file, rather than copying a video file. If we were to put
+					# the temporary file in the segment directory, this might be
+					# on a different volume from the recording directory, and
+					# moving the completed temporary file would require copying
+					# and deleting.
 					set tempfile [file join $info(cam$n\_dir) Temporary.mp4]
 					
-					# Here is where the transfer of files into the current recording file
-					# takes place. We use the ffmpeg concatination function, passing
-					# to ffmpeg the list of files to add to the recording file. The
-					# result is a new file, Temporary.mp4. 
+					# Here is where the transfer of files into the current
+					# recording file takes place. We use the ffmpeg
+					# concatination function, passing to ffmpeg the list of
+					# files to add to the recording file. The result is a new
+					# file, Temporary.mp4. 
 					set when "concatinating segments"
 					exec $info(ffmpeg) \
 						-nostdin -f concat -safe 0 -loglevel error \
 						-i transfer_list.txt -c copy \
 						[file nativename $tempfile] \
 						 > transfer_log.txt
-					
-					
-					# We replace the previous recording file with the newly created
-					# video file, delete the old file, and delete all the compressed
-					# segments from the segments directory.
+										
+					# We replace the previous recording file with the newly
+					# created video file, delete the old file, and delete all
+					# the compressed segments from the segments directory.
 					set when "renaming video file"
 					foreach infile $transfer_segments {
 						file delete $infile
@@ -1728,8 +1756,9 @@ proc Videoarchiver_transfer {n} {
 					# We mark this transfer time.
 					set info(cam$n\_ttime) [clock seconds]
 					
-					# Some code that allows us to study how long it takes to copy the
-					# existing file and concatinate new segments, delete the old file.
+					# Some code that allows us to study how long it takes to
+					# copy the existing file and concatinate new segments,
+					# delete the old file.
 					if {0} {
 						set duration_ms [expr [clock milliseconds] - $start_ms]
 						LWDAQ_print $info(text) "$num_segments\
@@ -1737,9 +1766,9 @@ proc Videoarchiver_transfer {n} {
 							$duration_ms"
 					}
 				} else {
-					# We don't expect to end up here. If we have more than one segment, we must
-					# have at least one that we can transfer. But if file names are corrupted,
-					# we could end up here. 
+					# We don't expect to end up here. If we have more than one
+					# segment, we must have at least one that we can transfer.
+					# But if file names are corrupted, we could end up here. 
 					error "Expected segments but found none"
 				}
 			}
@@ -1752,13 +1781,14 @@ proc Videoarchiver_transfer {n} {
 		return "FAIL"
 	}
 	
-	# If we are no longer recording, stop the transfer process, otherwise re-post it.
+	# If we are no longer recording, stop the transfer process, otherwise
+	# re-post it.
 	if {$info(cam$n\_state) == "Record"} {
 		LWDAQ_post [list Videoarchiver_transfer $n]
 		return "SUCCESS"
 	} else {
 		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped remote\
-			transfer process, $ip." 
+			transfer process." 
 		return "STOP"
 	}	
 }
@@ -1796,11 +1826,11 @@ proc Videoarchiver_stop {n} {
 	
 	if {[LWDAQ_process_exists $info(cam$n\_lproc)]} {
 		LWDAQ_process_stop $info(cam$n\_lproc)
-		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live view, $ip." $config(v_col)
+		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live view." $config(v_col)
 	}
 	
 	LWDAQ_print $info(text) "$info(cam$n\_id) Stopping streaming, segmentation,\
-		and compression, $ip."
+		and compression."
 	LWDAQ_update
 	cd $info(main_dir)
 	catch {exec $info(ssh) \
@@ -1812,7 +1842,8 @@ proc Videoarchiver_stop {n} {
 		"$info(camera_login)@$ip" \
 		$info(stop)]} message
 	if {![regexp "SUCCESS" $message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Failed to connect to $ip with ssh."
+		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id)\
+			Failed to connect to $ip with ssh."
 	}
 	
 	set info(cam$n\_state) "Idle"
@@ -3349,6 +3380,7 @@ foreach fn $fnl {
 # 
 set fn [file tail [lindex $argv 0]]
 if {$fn != ""} {
+  puts $fn
   if {[file exists V$fn]} {file delete V$fn }
   exec /usr/bin/ffmpeg -loglevel error -i $fn -c:v libx264 -preset veryfast V$fn
 }
@@ -3358,18 +3390,22 @@ if {$fn != ""} {
 # 
 # Videoarchiver/test/compress.tcl
 #
-# Measures compression rate. Specify P1..P4 for number of processes. Comresses all
-# videos S*.mp4 in local directory using xargs and single.tcl.
+# Measures compression rate. Specify -P1 to -P4 for number of processes.
+# Comresses all videos S*.mp4 in local directory using xargs and single.tcl.
 #
 set start_time [clock seconds]
 set fnl [glob -nocomplain S*.mp4]
 set n 1
 foreach v $argv {
   switch -nocase $v {
-    p1 {set n 1}
-    p2 {set n 2}
-    p3 {set n 3}
-    p4 {set n 4}
+    "-P1" {set n 1}
+    "-P2" {set n 2}
+    "-P3" {set n 3}
+    "-P4" {set n 4}
+    default {
+    	puts "Unrecognised option \"$v\", must be one of -P1, -P2, -P3, or -P4."
+    	exit
+    }
   }
 }
 puts "Compressing [llength $fnl] files using $n processes..."
