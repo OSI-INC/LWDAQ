@@ -78,10 +78,10 @@ proc Videoarchiver_init {} {
 
 	# Fixed IP addresses for default configurations and camera streaming.
 	set info(local_ip_addr) "127.0.0.1"
-	set info(default_ip_addr) "10.0.0.34"
+	set info(default_addr) "10.0.0.34"
 	set info(default_router_addr) "10.0.0.1"
 	set info(null_addr) "0.0.0.0"
-	set info(new_ip_addr) $info(default_ip_addr)
+	set info(new_ip_addr) $info(default_addr)
 	set info(tcp_port) "2222"
 	set info(tcl_port) "2223"
 	set info(library_archive) "http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
@@ -94,6 +94,10 @@ proc Videoarchiver_init {} {
 	
 	# The rotation of the image readout.
 	set info(rotation_options) "0 90 180 270"
+	
+	# Default settings for cameras.
+	set info(default_rot) "0"
+	set info(default_sat) "0.5"
 		
 	# In the following paragraphs, we define shell commands that we pass via
 	# secure shell (ssh) to the camera, where we can run the libcamera-vid or
@@ -1175,8 +1179,13 @@ proc Videoarchiver_compress {n} {
 		# for errors. The compressor script is at the end of this program file.
 		for {set i 1} {$i <= $info(compression_num_cpu)} {incr i} {
 			LWDAQ_socket_write $sock "exec /usr/bin/tclsh compressor.tcl \
-				-framerate $framerate -codec $info(compression_codec) -crf $crf \
-				-processes $info(compression_num_cpu) -index $i >& compressor_$i\_log.txt & \n"
+				-framerate $framerate \
+				-codec $info(compression_codec) \
+				-crf $crf \
+				-verbose 0 \
+				-processes $info(compression_num_cpu) \
+				-index $i >& \
+				compressor_$i\_log.txt & \n"
 			set result [LWDAQ_socket_read $sock line]
 			if {[LWDAQ_is_error_result $result]} {
 				set message [regsub "ERROR: " $result ""]
@@ -1476,19 +1485,25 @@ proc Videoarchiver_transfer {n} {
 				# download all segment files.
 				set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 
-				# Start a timer and zero a data size accumulator.
-				set start_ms [clock milliseconds]
-				set data_size 0
-
+				# Get temperature and frequency of CPU.
+				set when "measuring temperature"
+				LWDAQ_socket_write $sock "gettemp\n"
+				set temp [LWDAQ_socket_read $sock line]
+				set when "measuring frequency"
+				LWDAQ_socket_write $sock "getfreq\n"
+				set freq [LWDAQ_socket_read $sock line]
+				
 				# Download, save, and delete each file.
 				foreach sf $seg_list {
+					# Start timer.
+					set start_ms [clock milliseconds]
+					
 					# Download the first segment, adding its size to the total
 					# number of bytes transferred.
 					set when "downloading $sf"
 					LWDAQ_socket_write $sock "getfile tmp/$sf\n"
 					set size [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $size]} {error $size}
-					set data_size [expr $data_size + $size]
 					set contents [LWDAQ_socket_read $sock $size]
 	
 					# Delete the original segment file.
@@ -1503,40 +1518,32 @@ proc Videoarchiver_transfer {n} {
 					fconfigure $f -translation binary
 					puts -nonewline $f $contents
 					close $f
-				}
+
+					# Calculate download time.			
+					set download_ms [expr [clock milliseconds] - $start_ms]
+
+					# Calculate the time lag between the current time and the
+					# timestamp of the last segment we downloaded and saved.
+					set when "reporting"
+					set sf [lindex $seg_list end]
+					if {[regexp {V([0-9]{10})} $sf match timestamp]} {
+						set lag [expr [clock seconds] - $timestamp]
+					} else {
+						set lag "?"
+					}
 				
-				# Get temperature and frequency of CPU.
-				set when "measuring temperature"
-				LWDAQ_socket_write $sock "gettemp\n"
-				set temp [LWDAQ_socket_read $sock line]
-				set when "measuring frequency"
-				LWDAQ_socket_write $sock "getfreq\n"
-				set freq [LWDAQ_socket_read $sock line]
+					# If verbose, report to text window.
+					if {$config(verbose)} {
+						LWDAQ_print $info(text) "$info(cam$n\_id)\
+							Downloaded $sf,\
+							[format %.1f [expr 0.001*$size]] kByte in $download_ms ms,\
+							lag $lag s, $freq GHz, $temp C."
+					}				
+				}
 				
 				# Close the socket.
 				LWDAQ_socket_close $sock
 
-				# Calculate download time.			
-				set download_ms [expr [clock milliseconds] - $start_ms]
-
-				# Calculate the time lag between the current time and the
-				# timestamp of the last segment we downloaded and saved.
-				set when "reporting"
-				set sf [lindex $seg_list end]
-				if {[regexp {V([0-9]{10})} $sf match timestamp]} {
-					set lag [expr [clock seconds] - $timestamp]
-				} else {
-					set lag "?"
-				}
-				
-				# If verbose, report to text window.
-				if {$config(verbose)} {
-					LWDAQ_print $info(text) "$info(cam$n\_id)\
-						Transferred [llength $seg_list] segments,\
-						[format %.1f [expr 0.001*$data_size]] kByte in $download_ms ms,\
-						lag $lag s, $freq GHz, $temp C."
-				}
-				
 				# If the recording monitor is running for this channel, load the
 				# new segments into the monitor
 				if {($info(monitor_cam) == $n) && ($info(monitor_channel) != "none")} {
@@ -1585,26 +1592,29 @@ proc Videoarchiver_transfer {n} {
 	set seg_list [lsort -dictionary [glob -nocomplain V*.mp4]]
 	
 	if {[catch {
-		# If we have one or more segments available for transfer, calculate the time remaining
-		# to complete the existing recording file. If this time is zero or less, or if there
-		# is no recording file created yet, we copy the first available segment into the 
-		# recording directory to act as the new recording file.
+		# If we have one or more segments available for transfer, calculate the
+		# time remaining to complete the existing recording file. If this time
+		# is zero or less, or if there is no recording file created yet, we copy
+		# the first available segment into the recording directory to act as the
+		# new recording file.
 		if {[llength $seg_list] > 0} {
 		
-			# We look at the first file in the list, which is the oldest file. We want to know
-			# how much video time remains to complete the current recording file from the 
-			# start time of this oldest segment. 
+			# We look at the first file in the list, which is the oldest file.
+			# We want to know how much video time remains to complete the
+			# current recording file from the start time of this oldest segment. 
 			set when "calculating time remaining"
 			set infile [lindex $seg_list 0]
 			if {![regexp {V([0-9]{10})} $infile match segment_time]} {
 				catch {file delete $infile}
 				error "Unexpected file \"$infile\""
 			}
-			set time_remaining [expr $config(record_length_s) - $segment_time + $info(cam$n\_rt)]
+			set time_remaining [expr $config(record_length_s) \
+				- $segment_time + $info(cam$n\_rstart)]
 				
-			# If the recording file does not exist, or the time remaining in the existing recording
-			# file is zero or less, we create a new file in the recording directory by moving the 
-			# first segment into the recording directory.
+			# If the recording file does not exist, or the time remaining in the
+			# existing recording file is zero or less, we create a new file in
+			# the recording directory by moving the first segment into the
+			# recording directory.
 			if {![file exists $info(cam$n\_file)] || ($time_remaining <= 0)} {
 			
 				if {$config(verbose)} {
@@ -1612,7 +1622,8 @@ proc Videoarchiver_transfer {n} {
 						time [clock format $segment_time]."
 				}
 				set info(cam$n\_file) [file join $info(cam$n\_dir) $infile]
-				set info(cam$n\_rt) $segment_time
+				set info(cam$n\_rstart) $segment_time
+				set info(cam$n\_rend) [expr $segment_time + 1]
 				file rename $infile $info(cam$n\_file)
 				set info(cam$n\_ttime) [clock seconds]
 				
@@ -1667,7 +1678,6 @@ proc Videoarchiver_transfer {n} {
 				# is exactly one second newer than the previous segment we
 				# added, and if it isn't we issue a warning.
 				set transfer_segments [list]
-				set expected_segment_time [expr $info(cam$n\_rt) + 1]
 				foreach infile [lrange $seg_list 0 end-1] {
 					if {![regexp {V([0-9]{10})} $infile match segment_time]} {
 						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
@@ -1676,21 +1686,21 @@ proc Videoarchiver_transfer {n} {
 						LWDAQ_post [list Videoarchiver_transfer $ip]
 						return "FAIL"	
 					}
-					if {$segment_time > $expected_segment_time} {
+					if {$segment_time > $info(cam$n\_rend)} {
 						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-							Missing [expr $segment_time - $expected_segment_time]\
+							Missing [expr $segment_time - $info(cam$n\_rend)]\
 							segments before \"$infile\"."
-					} elseif {$segment_time = $expected_segment_time - 1} {
+					} elseif {$segment_time == $info(cam$n\_rend) - 1} {
 						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
 							Segment \"$infile\" is a duplicate of the previous segment."
-					} elseif {$segment_time < $expected_segment_time - 1} {
+					} elseif {$segment_time < $info(cam$n\_rend) - 1} {
 						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
 							Segment \"$infile\" preceeds previous segment by\
-							[expr $expected_segment_time - $segment_time] s."
+							[expr $info(cam$n\_rend) - $segment_time - 1] s."
 					}
-					set expected_segment_time [expr $segment_time + 1]
+					set info(cam$n\_rend) [expr $segment_time + 1]
 					set time_remaining [expr $config(record_length_s) \
-						- ($segment_time - $info(cam$n\_rt))]
+						- ($segment_time - $info(cam$n\_rstart))]
 					if {$time_remaining > 0} {
 						puts $ifl "file $infile"
 						lappend transfer_segments $infile
@@ -2120,7 +2130,8 @@ proc Videoarchiver_draw_list {} {
 			set info(cam$n\_state) "Idle"
 			set info(cam$n\_ttime) "0"
 			set info(cam$n\_lproc) "0"
-			set info(cam$n\_rt) "0"
+			set info(cam$n\_rstart) "0"
+			set info(cam$n\_rend) "0"
 			set info(cam$n\_ver) "A3034-HR"
 			set info(cam$n\_white) "0"
 			set info(cam$n\_infrared) "0"
@@ -2294,7 +2305,8 @@ proc Videoarchiver_remove {n} {
 	unset info(cam$n\_state)
 	unset info(cam$n\_ttime)
 	unset info(cam$n\_lproc)
-	unset info(cam$n\_rt)
+	unset info(cam$n\_rstart)
+	unset info(cam$n\_rend)
 	unset info(cam$n\_white)
 	unset info(cam$n\_infrared)
 	unset info(cam$n\_lag)
@@ -2325,15 +2337,16 @@ proc Videoarchiver_add_camera {} {
 	# Configure the new sensor to default values.
 	set info(cam$n\_id) "Z000$n"
 	set info(cam$n\_ver) "A3034-HR"
-	set info(cam$n\_addr) $info(default_ip_addr)
-	set info(cam$n\_rot) "0"
-	set info(cam$n\_sat) "0.0"
+	set info(cam$n\_addr) $info(default_addr)
+	set info(cam$n\_rot) $info(default_rot)
+	set info(cam$n\_sat) $info(default_sat)
 	set info(cam$n\_dir) [file normalize "~/Desktop"]
 	set info(cam$n\_file) [file join $info(cam$n\_dir) V0000000000.mp4]
 	set info(cam$n\_state) "Idle"
 	set info(cam$n\_ttime) "0"
 	set info(cam$n\_lproc) "0"
-	set info(cam$n\_rt) "0"
+	set info(cam$n\_rstart) "0"
+	set info(cam$n\_rend) "0"
 	set info(cam$n\_white) "0"
 	set info(cam$n\_infrared) "0"
 	set info(cam$n\_lag) "?"
@@ -2873,7 +2886,7 @@ proc interpreter {sock} {
 		# The putfile command takes a filename and file contents and writes the
 		# contents to the filename on disk. First the command obtains the file
 		# name and the size of the file from the command line, then waits for
-		# the data to be transferred over the socket.
+		# the data to be downloaded over the socket.
 		} elseif {$cmd == "putfile"} {
 			
 			# Get the file name and the size of the contents.
@@ -3051,6 +3064,7 @@ set loopwait 200
 set processes 1
 set index 0
 set crf 23
+set verbose 0
 set codec libx264
 foreach {option value} $argv {
 	switch $option {
@@ -3074,6 +3088,9 @@ foreach {option value} $argv {
 		}
 		"-codec" {
 			set codec $value
+		}
+		"-verbose" {
+			set verbose $value
 		}
 		default {
 			puts "WARNING: Unknown option \"$option\"."
@@ -3182,6 +3199,11 @@ while {1} {
 		# Delete the original segment. Report any error.
 		if {[catch {file delete $tfn} message]} {
 			puts "ERROR: $message at [clock seconds]."
+		}
+		
+		# Verbose reporting.
+		if {$verbose} {
+			puts "Compressed \"$sfn\" to \"$vfn\"." 
 		}
 	}
 }
