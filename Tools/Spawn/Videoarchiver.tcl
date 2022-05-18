@@ -12,7 +12,7 @@
 # FOR A PARTICULAR PURPOSE.	See the GNU General Public License for more
 # details.
 
-# You should have received a copy of the GNU General Public Lices_colnse along
+# You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc., 59
 # Temple Place - Suite 330, Boston, MA	02111-1307, USA.
 
@@ -159,6 +159,18 @@ echo "SUCCESS"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
 	set config(restart_wait_s) "30"
+	
+	# Set the verbose compressor argument to have the compressors print input and output
+	# segment names to their log files. With two-second segments, we will have thirty
+	# lines added to the log files per minute, or 1.3 million lines per month. The log
+	# files will be too long to view in the Query window. So we will print only the last
+	# log_max lines of the file.
+	set config(verbose_compressors) "0"
+	set config(log_max) "100"
+	
+	# The segment length. Video will be saved on the camera and transferred to the 
+	# data acquisition computer in segments.
+	set info(segment_len) "1"
 
 	# Monitor parameters
 	set config(monitor_speed) "1.0"
@@ -290,7 +302,7 @@ proc Videoarchiver_camera_init {n} {
 		"$info(camera_login)@$ip" \
 		 $command]} message
 	if {[regexp "SUCCESS" $message]} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) initialized,\
+		LWDAQ_print $info(text) "$info(cam$n\_id) Initialized,\
 			tcpip interface started."
 	} else {
 		error $message
@@ -299,6 +311,27 @@ proc Videoarchiver_camera_init {n} {
 	# Wait for the tcpip interface to start up.
 	LWDAQ_wait_ms $info(pi_start_ms)
 	
+	# Try out the interface. Read configuration file and adjust the segment length to
+	# match.
+	if {[catch {
+		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
+
+		LWDAQ_socket_write $sock "getfile videoarchiver.config\n"
+		set size [LWDAQ_socket_read $sock line]
+		if {[LWDAQ_is_error_result $size]} {error $size}
+		set configuration [LWDAQ_socket_read $sock $size]
+		if {[regexp "os Bullseye" $configuration]} {
+			set info(segment_len) "2.0"
+		} else {
+			set info(segment_len) "1.0"
+		}
+		LWDAQ_print $info(text) "$info(cam$n\_id) Using segment length\
+			$info(segment_len) s."
+		LWDAQ_socket_close $sock
+	} message]} {
+		error $message	
+	}
+
 	return "SUCCESS"
 }
 
@@ -355,7 +388,7 @@ proc Videoarchiver_query {n} {
 	set t $w.text
 	if {![winfo exists $w]} {
 		toplevel $w
-		LWDAQ_text_widget $w 80 20
+		LWDAQ_text_widget $w 100 20
 		wm title $w "Query Results for Camera $info(cam$n\_id) at $ip"
 	}
 
@@ -375,14 +408,18 @@ proc Videoarchiver_query {n} {
 		}
 		set contents [string trim $contents]
 		LWDAQ_print $t "Contents of local [file tail $fn]\:" purple
-		if {$contents != ""} {LWDAQ_print $t $contents}
+		if {$contents != ""} {
+			foreach line [lrange [split $contents \n] end-$config(log_max) end] {
+				LWDAQ_print $t $line
+			}
+		}
 		LWDAQ_update
 	}
 	
 	if {[catch {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 			
-		foreach log {stream compressor_1 compressor_2 compressor_3 segmentation interface} {
+		foreach log {interface stream segmentation} {
 			set lfn "$log\_log.txt"
 			LWDAQ_socket_write $sock "getfile $lfn\n"
 			set size [LWDAQ_socket_read $sock line]
@@ -390,16 +427,37 @@ proc Videoarchiver_query {n} {
 			set contents [LWDAQ_socket_read $sock $size]	
 			set contents [regsub -all {\.\.\.} $contents "...\n"]
 			set contents [string trim $contents]
-			LWDAQ_print $t "Contents of remote $log\_log.txt on $info(cam$n\_id):" purple
-			if {$size > 0} {LWDAQ_print $t $contents} 
+			LWDAQ_print $t "Contents of remote $lfn on $info(cam$n\_id):" purple
+			if {$size > 0} {
+				foreach line [lrange [split $contents \n] end-$config(log_max) end] {
+					LWDAQ_print $t $line
+				}
+			} 
 			LWDAQ_update
 		}
 	
-		LWDAQ_socket_write $sock "getfile videoarchiver.conf\n"
+		for {set i 1} {$i <= $info(compression_num_cpu)} {incr i} {
+			set lfn "compressor_$i\_log.txt"
+			LWDAQ_socket_write $sock "getfile $lfn\n"
+			set size [LWDAQ_socket_read $sock line]
+			if {[LWDAQ_is_error_result $size]} {error $size}
+			set contents [LWDAQ_socket_read $sock $size]	
+			set contents [regsub -all {\.\.\.} $contents "...\n"]
+			set contents [string trim $contents]
+			LWDAQ_print $t "Contents of remote $lfn on $info(cam$n\_id):" purple
+			if {$size > 0} {
+				foreach line [lrange [split $contents \n] end-$config(log_max) end] {
+					LWDAQ_print $t $line
+				}
+			} 
+			LWDAQ_update
+		}
+
+		LWDAQ_socket_write $sock "getfile videoarchiver.config\n"
 		set size [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $size]} {error $size}
 		set contents [string trim [LWDAQ_socket_read $sock $size]]
-		LWDAQ_print $t "Contents of remote videoarchiver.conf:" purple
+		LWDAQ_print $t "Contents of remote videoarchiver.config:" purple
 		if {$size > 0} {LWDAQ_print $t $contents}
 
 		LWDAQ_socket_write $sock "llength \[glob -nocomplain tmp/V*.mp4\]\n"
@@ -425,9 +483,7 @@ proc Videoarchiver_query {n} {
 		LWDAQ_print $info(text) "ERROR: $message"
 		catch {LWDAQ_socket_close $sock}
 		return "ERROR"	
-	}
-
-	
+	}	
 }
 
 #
@@ -664,7 +720,7 @@ proc Videoarchiver_update {n} {
 				error "Failed to write $size bytes to $fn on $info(cam$n\_id)"
 			}
 		}
-			
+		
 		# Close the socket, the update is complete.
 		LWDAQ_socket_close $sock
 
@@ -673,9 +729,9 @@ proc Videoarchiver_update {n} {
 		Videoarchiver_synchronize $n
 		
 		# Update is complete.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Update complete."
+		LWDAQ_print $info(text) "$info(cam$n\_id) Update complete.\n"
 	} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
+		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message.\n"
 		catch {LWDAQ_socket_close $sock}
 		return "ERROR"
 	}
@@ -857,7 +913,7 @@ proc Videoarchiver_stream {n} {
 		# resolution, compensation, rotation and saturation of the video. The
 		# final command to echo the word SUCCESS is to allow our secure shell to
 		# return a success code. Any error will cause the echo to be skipped.
-		if {[regexp "Bullseye" $configuration]} {
+		if {[regexp "os Bullseye" $configuration]} {
 			LWDAQ_socket_write $sock "exec libcamera-vid \
 				--codec mjpeg \
 				--timeout 0 \
@@ -1182,7 +1238,7 @@ proc Videoarchiver_compress {n} {
 				-framerate $framerate \
 				-codec $info(compression_codec) \
 				-crf $crf \
-				-verbose 0 \
+				-verbose $config(verbose_compressors) \
 				-processes $info(compression_num_cpu) \
 				-index $i >& \
 				compressor_$i\_log.txt & \n"
@@ -1225,7 +1281,8 @@ proc Videoarchiver_segment {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d version width height framerate crf
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
+		version width height framerate crf
 	
 	if {[catch {
 		# Open a socket to the interface.
@@ -1233,11 +1290,20 @@ proc Videoarchiver_segment {n} {
 		
 		# Start the ffmpeg segmenter as a background process. We assume the segmenter 
 		# will be started after streaming and compression engines are already running. 
-		LWDAQ_socket_write $sock "exec ffmpeg -nostdin -loglevel error -i \
-			tcp://$info(local_ip_addr)\:$info(tcp_port) \
-			-framerate $framerate -f segment \
-			-segment_atclocktime 1 -segment_time 1 -reset_timestamps 1 -c copy \
-			-strftime 1 tmp/S%s.mp4 >& segmentation_log.txt & \n"
+		LWDAQ_socket_write $sock "exec ffmpeg \
+			-nostdin \
+			-loglevel error \
+			-i tcp://$info(local_ip_addr)\:$info(tcp_port) \
+			-framerate $framerate \
+			-f segment \
+			-segment_atclocktime 1 \
+			-segment_time $info(segment_len) \
+			-reset_timestamps 1 \
+			-codec copy \
+			-segment_list segment_list.txt \
+			-segment_list_size 1000 \
+			-strftime 1 tmp/S%s.mp4 \
+			>& segmentation_log.txt & \n"
 		set result [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $result]} {
 			set message [regsub "ERROR: " $result ""]
@@ -1265,7 +1331,7 @@ proc Videoarchiver_segment {n} {
 proc Videoarchiver_record {n} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
-
+	
 	# Get IP address and open an interface socket.
 	set ip [Videoarchiver_ip $n]
 
@@ -1342,7 +1408,7 @@ proc Videoarchiver_record {n} {
 		 with period $config(transfer_period_s) s." 
 	set info(cam$n\_ttime) [clock seconds]
 	set info(cam$n\_file) [file join $info(cam$n\_dir) V0000000000.mp4]
-	LWDAQ_post [list Videoarchiver_transfer $n]
+	LWDAQ_post [list Videoarchiver_transfer $n 1]
 
 	# We can now say that we are recording, and return a success flag.
 	set info(cam$n\_state) "Record"	
@@ -1421,9 +1487,11 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 #
 # Videoarchiver_transfer downloads video segments from the camera, where they are 
 # being compressed. Keeps the camera clock synchronized. Arranges video segments in 
-# correct order adds to recording file. 
+# correct order adds to recording file. The first time we call the routine to start
+# a transfer process, we pass a 1 for the init parameter. This allows the routine
+# to delete the first segment in the stream, which is often corrupted.
 #
-proc Videoarchiver_transfer {n} {
+proc Videoarchiver_transfer {n {init 0}} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 	global LWDAQ_Info
@@ -1498,8 +1566,7 @@ proc Videoarchiver_transfer {n} {
 					# Start timer.
 					set start_ms [clock milliseconds]
 					
-					# Download the first segment, adding its size to the total
-					# number of bytes transferred.
+					# Download the segment.
 					set when "downloading $sf"
 					LWDAQ_socket_write $sock "getfile tmp/$sf\n"
 					set size [LWDAQ_socket_read $sock line]
@@ -1537,7 +1604,7 @@ proc Videoarchiver_transfer {n} {
 						LWDAQ_print $info(text) "$info(cam$n\_id)\
 							Downloaded $sf,\
 							[format %.1f [expr 0.001*$size]] kByte in $download_ms ms,\
-							lag $lag s, $freq GHz, $temp C."
+							lag $lag s, $freq GHz, $temp C, time [clock seconds] s."
 					}				
 				}
 				
@@ -1592,13 +1659,24 @@ proc Videoarchiver_transfer {n} {
 	set seg_list [lsort -dictionary [glob -nocomplain V*.mp4]]
 	
 	if {[catch {
+		# If we are initializing, we delete the first segment.
+		if {$init && ([llength $seg_list] > 0)} {
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "$info(cam$n\_id) Deleting initial segment\
+					[lindex $seg_list 0]."
+			}
+			file delete [lindex $seg_list 0]
+			set seg_list [lrange $seg_list 1 end]
+			set init 0
+		}
+		
 		# If we have one or more segments available for transfer, calculate the
 		# time remaining to complete the existing recording file. If this time
 		# is zero or less, or if there is no recording file created yet, we copy
 		# the first available segment into the recording directory to act as the
 		# new recording file.
 		if {[llength $seg_list] > 0} {
-		
+			
 			# We look at the first file in the list, which is the oldest file.
 			# We want to know how much video time remains to complete the
 			# current recording file from the start time of this oldest segment. 
@@ -1623,7 +1701,7 @@ proc Videoarchiver_transfer {n} {
 				}
 				set info(cam$n\_file) [file join $info(cam$n\_dir) $infile]
 				set info(cam$n\_rstart) $segment_time
-				set info(cam$n\_rend) [expr $segment_time + 1]
+				set info(cam$n\_prevseg) $infile
 				file rename $infile $info(cam$n\_file)
 				set info(cam$n\_ttime) [clock seconds]
 				
@@ -1671,39 +1749,26 @@ proc Videoarchiver_transfer {n} {
 				# We go through the available segments, up to but not including
 				# the most recent segment, and check to see if it belongs in the
 				# recording file. We do not include the most recent segment
-				# because this one may be loaded into the monitor. If something
-				# is going wrong with the camera's compression system, it is
-				# possible for segments to arrive out of order, or for segments
-				# to be missing. As we add each segment, we check to see if it
-				# is exactly one second newer than the previous segment we
-				# added, and if it isn't we issue a warning.
+				# because this one may be loaded into the monitor.
 				set transfer_segments [list]
 				foreach infile [lrange $seg_list 0 end-1] {
 					if {![regexp {V([0-9]{10})} $infile match segment_time]} {
 						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-							Deleting unexpected file \"$infile\"."
+							Deleting unexpected segment \"$infile\"."
 						catch {file delete $infile}
-						LWDAQ_post [list Videoarchiver_transfer $ip]
+						LWDAQ_post [list Videoarchiver_transfer $ip $init]
 						return "FAIL"	
 					}
-					if {$segment_time > $info(cam$n\_rend)} {
-						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-							Missing [expr $segment_time - $info(cam$n\_rend)]\
-							segments before \"$infile\"."
-					} elseif {$segment_time == $info(cam$n\_rend) - 1} {
-						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-							Segment \"$infile\" is a duplicate of the previous segment."
-					} elseif {$segment_time < $info(cam$n\_rend) - 1} {
-						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-							Segment \"$infile\" preceeds previous segment by\
-							[expr $info(cam$n\_rend) - $segment_time - 1] s."
-					}
-					set info(cam$n\_rend) [expr $segment_time + 1]
 					set time_remaining [expr $config(record_length_s) \
 						- ($segment_time - $info(cam$n\_rstart))]
 					if {$time_remaining > 0} {
+						if {$info(cam$n\_prevseg) == $infile} {
+							LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
+								Duplicate segment \"$infile\"."
+						}
 						puts $ifl "file $infile"
 						lappend transfer_segments $infile
+						set info(cam$n\_prevseg) $infile						
 					} else {
 						break
 					}
@@ -1794,7 +1859,7 @@ proc Videoarchiver_transfer {n} {
 	# If we are no longer recording, stop the transfer process, otherwise
 	# re-post it.
 	if {$info(cam$n\_state) == "Record"} {
-		LWDAQ_post [list Videoarchiver_transfer $n]
+		LWDAQ_post [list Videoarchiver_transfer $n $init]
 		return "SUCCESS"
 	} else {
 		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped remote\
@@ -2131,7 +2196,7 @@ proc Videoarchiver_draw_list {} {
 			set info(cam$n\_ttime) "0"
 			set info(cam$n\_lproc) "0"
 			set info(cam$n\_rstart) "0"
-			set info(cam$n\_rend) "0"
+			set info(cam$n\_prevseg) "V0000000000.mp4"
 			set info(cam$n\_ver) "A3034-HR"
 			set info(cam$n\_white) "0"
 			set info(cam$n\_infrared) "0"
@@ -2306,7 +2371,7 @@ proc Videoarchiver_remove {n} {
 	unset info(cam$n\_ttime)
 	unset info(cam$n\_lproc)
 	unset info(cam$n\_rstart)
-	unset info(cam$n\_rend)
+	unset info(cam$n\_prevseg)
 	unset info(cam$n\_white)
 	unset info(cam$n\_infrared)
 	unset info(cam$n\_lag)
@@ -2346,7 +2411,7 @@ proc Videoarchiver_add_camera {} {
 	set info(cam$n\_ttime) "0"
 	set info(cam$n\_lproc) "0"
 	set info(cam$n\_rstart) "0"
-	set info(cam$n\_rend) "0"
+	set info(cam$n\_prevseg) "V0000000000.mp4"
 	set info(cam$n\_white) "0"
 	set info(cam$n\_infrared) "0"
 	set info(cam$n\_lag) "?"
@@ -3060,12 +3125,12 @@ vwait quit
 # Get the command line arguments.
 set framerate 20
 set maxfiles 40
-set loopwait 200
+set loopwait 20
 set processes 1
 set index 0
 set crf 23
-set verbose 0
 set codec libx264
+set verbose 0
 foreach {option value} $argv {
 	switch $option {
 		"-framerate" {
@@ -3093,7 +3158,7 @@ foreach {option value} $argv {
 			set verbose $value
 		}
 		default {
-			puts "WARNING: Unknown option \"$option\"."
+			puts "ERROR: Unknown option \"$option\"."
 		}
 	}
 }
@@ -3132,21 +3197,8 @@ while {1} {
 		}
 	}
 	
-	# Extract the segments that match this process index. If the index-1 is
-	# equal to the file timestamp modulo the number of processes, or if the
-	# index is zero, we add a segment to the list of relevant segments.
-	set new_sfl [list]
-	foreach sfn $sfl {
-		if {[regexp {S([0-9]{10})} [file tail $sfn] match timestamp]} {
-			if {($index == 0) || \
-					(($timestamp % $processes) == (($index - 1) % $processes))} {
-				lappend new_sfl $sfn
-			}
-		}
-	}
-	set sfl $new_sfl
-	
-	# If there is more than one uncompressed segment available, compress the eldest.
+	# If there is more than one uncompressed segment available, compress the eldest 
+	# file that still exists.
 	if {[llength $sfl] > 1} {
 	
 		# Check the file name is of the correct format. If not, we delete it and continue.
@@ -3158,20 +3210,22 @@ while {1} {
 			continue
 		}
 	
-		# Rename the segment file so other compressors do not try to compress it
-		# as well. If we encounter an error during the re-name, this is probably
-		# because another compressor just renamed the file while we were
-		# checking its name, so just continue.
-		set tfn [file join [file dirname $sfn] [regsub {^S} [file tail $sfn] T]]
-		if {[catch {file rename $sfn $tfn} message]} {
-			puts "ERROR: Conflict renaming segment $sfn at time [clock seconds]."
-			continue
-		}
-		
-		# Use the timestamp to construct the working compression output file
-		# and the final compressed video segment file name.
+		# Use the timestamp to construct the a temporary name, a working name,
+		# and the final segment name.
+		set tfn T$timestamp\.mp4
 		set wfn W$timestamp\.mp4
 		set vfn V$timestamp\.mp4
+		
+		# Rename the segment so no other compressor will try to compress it. If we 
+		# cannot find the segment, abandon this file, reporting only if verbose.
+		if {[file exists $tfn] \
+				|| ![file exists $sfn] \
+				|| [catch {file rename $sfn $tfn} message]} {
+			if {$verbose} {
+				puts "Collided with another compressor over $sfn\."
+				continue
+			}
+		}
 	
 		# Compress with ffmpeg libx264 to produce video with the specified frame
 		# rate. If we encounter an ffmpeg error, we report the error but
@@ -3183,27 +3237,38 @@ while {1} {
 		# the libx264 compression that runs in the main Pi processor cores. So
 		# we instead enlist three of the processor cores into compression
 		# simultaneously using the libx264 codec.
+		set start [clock milliseconds]
 		if {[catch {
-			exec /usr/bin/ffmpeg -nostdin -loglevel error \
-				-r $framerate -i $tfn \
-				-c:v $codec -crf $crf -preset veryfast $wfn
+			exec /usr/bin/ffmpeg \
+				-nostdin -loglevel error \
+				-r $framerate \
+				-i $tfn \
+				-c:v $codec \
+				-crf $crf \
+				-preset veryfast \
+				-r $framerate \
+				-force_key_frames "expr:eq(mod(n,20),0)" \
+				$wfn
 		} message]} {
-			puts "ERROR: $message during compression of [file tail $tfn] at time [clock seconds]."
+			puts "ERROR: $message during compression of [file tail $tfn]."
 		}
+		set duration [expr [clock milliseconds] - $start]
 	
-		# Rename the output file. Report any error but proceed anyway.
-		if {[catch {file rename $wfn $vfn} message]} {
-			puts "ERROR: $message at [clock seconds]."
-		}
-		
-		# Delete the original segment. Report any error.
-		if {[catch {file delete $tfn} message]} {
-			puts "ERROR: $message at [clock seconds]."
-		}
-		
 		# Verbose reporting.
 		if {$verbose} {
-			puts "Compressed \"$sfn\" to \"$vfn\"." 
+			set ssize [format %.1f [expr 1.0 * [file size $tfn] / 1000]]
+			set vsize [format %.1f [expr 1.0 * [file size $wfn] / 1000]]
+			puts "Compressed $sfn $ssize kByte to $vfn $vsize kByte in $duration ms." 
+		}
+		
+		# Rename the output file. Report any error but proceed anyway.
+		if {[catch {file rename $wfn $vfn} message]} {
+			puts "ERROR: $message\."
+		}
+		 
+		# Delete the original segment. Report any error.
+		if {[catch {file delete $tfn} message]} {
+			puts "ERROR: $message\."
 		}
 	}
 }
@@ -3232,13 +3297,15 @@ static routers=10.0.0.1
 </script>
 
 <script>
+#!/bin/bash
 #
 # Videoarchiver/init.sh
 #
 # The startup Bash script run by the Animal Cage Camera (A3034) after it boots
-# up. We turn off the infrared and white lights, flash the white ones three
-# times, check the configuration switch. If the switch is pressed, we flash the
-# white lights five times and overwrite the existing TCPIP configuration file to
+# up. We must run it in a bash shell or else the regular expressions don't work
+# We turn off the infrared and white lights, flash the white ones three times,
+# check the configuration switch. If the switch is pressed, we flash the white
+# lights five times and overwrite the existing TCPIP configuration file to
 # return the camera's IP address to the factory default value. If the switch is
 # not pressed, we continue. The final action is to start up the TCL interface on
 # port 2223.
@@ -3247,13 +3314,26 @@ static routers=10.0.0.1
 # Move to the Videoarchiver directory.
 cd /home/pi/Videoarchiver
 
+# Report to log file.
+if [ "$SHELL" != "" ]
+then
+	echo "init.sh running in $SHELL" > init_log.txt
+else
+	echo "init.sh running in unknown shell" > init_log.txt
+fi
+echo "moved to directory `pwd`, reading videoarchiver config" >> init_log.txt
+cat videoarchiver.config >> init_log.txt
+OS=`grep "os " videoarchiver.config`
+echo "operating system: $OS" >> init_log.txt
+
 # Determine the camera version. The "B" and "C" versions run Rasbian Stretch
 # with the gpio command. These versions both have "A3034B" in their
 # configuration file. The "D" version runs Raspberry Pi Bullseye and has
 # "A3034D" in its configuration file.
-if [ "`grep Bullseye videoarchiver.config`" == "" ]
+if [ "$OS" != "os Bullseye" ]
 then
 	# We use gpio routines to configure and flash lights on A3034B and A3034C.
+	echo "detected Stretch, using gpio" >> init_log.txt
 
 	# Set the configuration switch port to input with pull-up resistor.
 	gpio -g mode 5 in
@@ -3271,7 +3351,7 @@ then
 		gpio -g write $value 0
 	done
 
-	# Flash the white LEDs three times, then wait one second.
+	# Flash the white LEDs three times.
 	for count in 1 2 3; do
 		sleep 0.3
 		for value in 2 3 4 14; do
@@ -3307,6 +3387,7 @@ then
 	fi
 else
 	# We use gpio routines to configure and flash lights on A3034D.
+	echo "detected Bullseye, using raspi-gpio." >> init_log.txt
 
 	# Set the configuration switch port to input with pull-up resistor.
 	raspi-gpio set 5 ip pu
@@ -3374,9 +3455,19 @@ fi
 #
 # Take video stream and divide into one-second segments.
 #
-ffmpeg -nostdin -loglevel error -i tcp://127.0.0.1:2222 -framerate 20 -f segment \
-	-segment_atclocktime 1 -segment_time 1 -reset_timestamps 1 -c copy \
-	-strftime 1 S%s.mp4 >& segment_log.txt
+ffmpeg -nostdin \
+	-loglevel error \
+	-i tcp://127.0.0.1:2222 \
+	-framerate 20 \
+	-f segment \
+	-segment_atclocktime 1 \
+	-segment_time 2 \
+	-reset_timestamps 1 \
+	-codec copy \
+	-segment_list segment_list.txt \
+	-segment_list_size 1000 \
+	-strftime 1 S%s.mp4 \
+	>& segment_log.txt
 </script>
 
 <script>

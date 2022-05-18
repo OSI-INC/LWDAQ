@@ -56,7 +56,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "157"
+	LWDAQ_tool_init "Neuroplayer" "158"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -631,7 +631,8 @@ proc Neuroplayer_init {} {
 	set info(video_end_time) 0.0
 	set info(video_wait_ms) 100
 	set info(video_num_waits) 10
-	set info(video_min_interval_s) 1.0
+	set info(video_frame_time) 0.05
+	set info(video_min_interval) 1.0
 	set config(video_speed) "1.0"
 	set config(video_zoom) "1.0"
 	set info(video_state) "Idle"
@@ -6177,15 +6178,15 @@ proc Neuroplayer_magnified_view {figure} {
 
 
 #
-# Neuroplayer_plot_signal plots the a signal on the screen. It uses
-# lwdaq_graph to plot data in the vt_image overlay. The procedure does not draw
-# the graph on the screen. We leave the drawing until all the signals have been
-# plotted in the vt_image overlay by successive calls to this procedure. For
-# more information about lwdaw_graph, see the LWDAQ Command Reference. If we
-# don't pass a signal to the routine, it uses $info(signal). The signal string
-# must be a list of time and sample values "t v ". If we don't specify a color,
-# the routine uses the info(channel_num) as the color code. If we don't specify
-# a signal, the routine uses the $info(signal).
+# Neuroplayer_plot_signal plots the a signal on the screen. It uses lwdaq_graph
+# to plot data in the vt_image overlay. The procedure does not draw the graph on
+# the screen. We leave the drawing until all the signals have been plotted in
+# the vt_image overlay by successive calls to this procedure. For more
+# information about lwdaw_graph, see the LWDAQ Command Reference. If we don't
+# pass a signal to the routine, it uses $info(signal). The signal string must be
+# a list of time and sample values "t v ". If we don't specify a color, the
+# routine uses the info(channel_num) as the color code. If we don't specify a
+# signal, the routine uses the $info(signal).
 #
 proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 	upvar #0 Neuroplayer_info info
@@ -6409,9 +6410,9 @@ proc Neuroplayer_play {{command ""}} {
 		set info(play_control) "Idle"
 		return "SUCCESS"
 	}
-	if {$config(video_enable) && ($config(play_interval) < $info(video_min_interval_s))} {
+	if {$config(video_enable) && ($config(play_interval) < $info(video_min_interval))} {
 		Neuroplayer_print "ERROR: Playback interval must be a multiple\
-			of $info(video_min_interval_s) when video is enabled."
+			of $info(video_min_interval) when video is enabled."
 		LWDAQ_set_bg $info(play_control_label) white
 		set info(play_control) "Idle"
 		return "SUCCESS"
@@ -7715,7 +7716,7 @@ proc Neuroplayer_video_action {cmd datetime length} {
 	# Look in our video file cache to see if the start and end of the 
 	# requested interval is contained in a video we have already used.
 	set vf ""
-	set min_length [format %.1f [expr $info(video_min_interval_s)*0.5]]
+	set min_length [format %.1f [expr $info(video_min_interval)*0.5]]
 	set camera_id [file tail $config(video_dir)]
 	foreach entry $info(video_file_cache) {
 		set fn [lindex $entry 0]
@@ -7775,7 +7776,7 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		
 		# Check that the video file contains the interval end.
 		set missing [expr ($datetime + $length) - ($vtime + $vlen)]
-		if {$missing > 0} {
+		if {$missing > $info(video_frame_time)} {
 			Neuroplayer_print "WARNING: File [file tail $vf] missing final\
 				$missing s of requested interval."
 		}
@@ -7816,8 +7817,13 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		
 		# Create Mplayer window with channel to write in commands and
 		# read back answers.
+		if {[winfo parent $info(window)] == ""} {
+			set title "Camera $camera_id in [wm title .]"
+		} {
+			set title "Camera $camera_id in [wm title [winfo parent $info(window)]]"
+		}
 		set info(video_channel) [open "| $info(mplayer) \
-			-title \"Neuroplayer Video Player for Camera $camera_id\" \
+			-title \"$title\" \
 			-geometry 10%:10% -slave -idle -quiet -fixed-vo \
 			-zoom -xy $config(video_zoom)" w+]
 		fconfigure $info(video_channel) -buffering line -translation auto -blocking 0
@@ -7838,9 +7844,12 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		LWDAQ_post [list Neuroplayer_video_watchdog $info(video_process)]
 	}
 
-	# Set the end time of the video and the stop time.
-	set info(video_end_time) [format %.1f $vlen]
-	set info(video_stop_time) [format %.1f [expr $vseek + $length]]
+	# Set the end time of the video and the stop time. The stop time is one
+	# half-frame before the end time, so we don't play the first frame of the
+	# next interval.
+	set info(video_end_time) [format %.3f $vlen]
+	set info(video_stop_time) [format %.3f \
+		[expr $vseek + $length - $info(video_frame_time)]]
 	if {$info(video_stop_time) > $info(video_end_time)} {
 		set info(video_stop_time) $info(video_end_time)
 	}
@@ -7860,13 +7869,13 @@ proc Neuroplayer_video_action {cmd datetime length} {
 }
 
 #
-# Neuroplayer_open creates the Neuroplayer window, with all its buttons,
-# boxes, and displays. It uses routines from the TK library to make the frames
-# and widgets. To make sense of what the procedure is doing, look at the
-# features in the Neuroplayer from top-left to bottom right. That's the order
-# in which we create them in the code. Frames enclose rows of buttons, labels,
-# and entry boxes. The images are TK "photos" associated with label widgets. The
-# last thing to go into the Neuroplayer panel is its text window. 
+# Neuroplayer_open creates the Neuroplayer window, with all its buttons, boxes,
+# and displays. It uses routines from the TK library to make the frames and
+# widgets. To make sense of what the procedure is doing, look at the features in
+# the Neuroplayer from top-left to bottom right. That's the order in which we
+# create them in the code. Frames enclose rows of buttons, labels, and entry
+# boxes. The images are TK "photos" associated with label widgets. The last
+# thing to go into the Neuroplayer panel is its text window. 
 #
 proc Neuroplayer_open {} {
 	upvar #0 Neuroplayer_config config
