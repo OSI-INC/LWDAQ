@@ -7695,11 +7695,11 @@ proc Neuroplayer_video_watchdog {pid} {
 # ffmpeg, and this calculation is time-consuming. If the video is not in the
 # cache, we use the video directory as a source of video files. We pass three
 # parameters to the routine: a command "cmd", a Unix time in seconds "datetime",
-# and an interval length in seconds "length". The command is  "Seek" by default.
-# The Seek command returns the name of the video containing the datetime, the
-# time within the video that corresponds to the datetime, and the duration of
-# the video. The Play command plays the video starting at datetime and going on
-# for length seconds.
+# and an interval length in seconds "length". The command must be "Seek" or
+# "Play". The Seek command returns the name of the video containing the
+# datetime, the time within the video that corresponds to the datetime, and the
+# duration of the video. The Play command plays the video starting at datetime
+# and going on for length seconds.
 # 
 proc Neuroplayer_video_action {cmd datetime length} {
 	upvar #0 Neuroplayer_config config
@@ -7760,7 +7760,7 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		# If we still have no file, issue an error and exit.
 		if {$vf == ""} {
 			Neuroplayer_print "ERROR: No video in [file tail $config(video_dir)]\
-				begins before time $datetime s."
+				begins before $datetime s."
 			return ""
 		}
 
@@ -7768,17 +7768,17 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		set vlen [Neuroplayer_video_duration $vf]
 
 		# Check that the video file includes the start of the requested interval.
-		if {($vtime + $vlen <= $datetime)} {
-			Neuroplayer_print "ERROR: File [file tail $vf], length $vlen s,\
-				does not contain time $datetime s."
-			return ""
+		set gap [expr $datetime - ($vtime + $vlen)]
+		if {$gap > 0} {
+			Neuroplayer_print "WARNIMG: File [file tail $vf], length $vlen s,\
+				ends $gap s before start of requested interval."
 		}
 		
 		# Check that the video file contains the interval end.
 		set missing [expr ($datetime + $length) - ($vtime + $vlen)]
 		if {$missing > $info(video_frame_time)} {
-			Neuroplayer_print "WARNING: File [file tail $vf] missing final\
-				$missing s of requested interval."
+			Neuroplayer_print "WARNING: File [file tail $vf], length $vlen s,\
+				ends $missing s before end of requested interval."
 		}
 
 		# Add the video file to the cache. Keep the cache of finite length.

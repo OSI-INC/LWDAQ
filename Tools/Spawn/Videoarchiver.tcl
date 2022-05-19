@@ -72,9 +72,9 @@ proc Videoarchiver_init {} {
 	# but there is only one GPU, while there are four CPUs. If we try to use both
 	# codecs, ffmpeg fails to concatinate them correctly on the data acquisition 
 	# machine.
-	set info(compression_codec) "libx264"
-	set info(stream_codec) "MJPEG"
-	set info(compression_num_cpu) "3"
+	set config(compression_codec) "libx264"
+	set config(stream_codec) "MJPEG"
+	set config(compression_num_cpu) "3"
 
 	# Fixed IP addresses for default configurations and camera streaming.
 	set info(local_ip_addr) "127.0.0.1"
@@ -159,6 +159,8 @@ echo "SUCCESS"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
 	set config(restart_wait_s) "30"
+	set config(del_first_seg) "1"
+	set config(min_seg_size) "5.0"
 	
 	# Set the verbose compressor argument to have the compressors print input and output
 	# segment names to their log files. With two-second segments, we will have thirty
@@ -436,7 +438,7 @@ proc Videoarchiver_query {n} {
 			LWDAQ_update
 		}
 	
-		for {set i 1} {$i <= $info(compression_num_cpu)} {incr i} {
+		for {set i 1} {$i <= $config(compression_num_cpu)} {incr i} {
 			set lfn "compressor_$i\_log.txt"
 			LWDAQ_socket_write $sock "getfile $lfn\n"
 			set size [LWDAQ_socket_read $sock line]
@@ -915,7 +917,7 @@ proc Videoarchiver_stream {n} {
 		# return a success code. Any error will cause the echo to be skipped.
 		if {[regexp "os Bullseye" $configuration]} {
 			LWDAQ_socket_write $sock "exec libcamera-vid \
-				--codec mjpeg \
+				--codec $config(stream_codec) \
 				--timeout 0 \
 				--flush \
 				--width $width --height $height \
@@ -927,7 +929,7 @@ proc Videoarchiver_stream {n} {
 				>& stream_log.txt & \n"
 		} {
 			LWDAQ_socket_write $sock "exec raspivid \
-				--codec $info(stream_codec) \
+				--codec $config(stream_codec) \
 				--timeout 0 \
 				--flush \
 				--width $width --height $height \
@@ -1233,13 +1235,13 @@ proc Videoarchiver_compress {n} {
 		
 		# Send three commands, one for each processor. Check result string
 		# for errors. The compressor script is at the end of this program file.
-		for {set i 1} {$i <= $info(compression_num_cpu)} {incr i} {
+		for {set i 1} {$i <= $config(compression_num_cpu)} {incr i} {
 			LWDAQ_socket_write $sock "exec /usr/bin/tclsh compressor.tcl \
 				-framerate $framerate \
-				-codec $info(compression_codec) \
+				-codec $config(compression_codec) \
 				-crf $crf \
 				-verbose $config(verbose_compressors) \
-				-processes $info(compression_num_cpu) \
+				-processes $config(compression_num_cpu) \
 				-index $i >& \
 				compressor_$i\_log.txt & \n"
 			set result [LWDAQ_socket_read $sock line]
@@ -1248,7 +1250,7 @@ proc Videoarchiver_compress {n} {
 				error $message
 			}
 		}
-		LWDAQ_print $info(text) "$info(cam$n\_id) Started $info(compression_num_cpu)\
+		LWDAQ_print $info(text) "$info(cam$n\_id) Started $config(compression_num_cpu)\
 			compression engines on camera."
 
 		# Close socket.
@@ -1489,7 +1491,7 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 # being compressed. Keeps the camera clock synchronized. Arranges video segments in 
 # correct order adds to recording file. The first time we call the routine to start
 # a transfer process, we pass a 1 for the init parameter. This allows the routine
-# to delete the first segment in the stream, which is often corrupted.
+# to delete the first segment in a stream when config(del_first_seg) is set.
 #
 proc Videoarchiver_transfer {n {init 0}} {
 	upvar #0 Videoarchiver_config config
@@ -1563,32 +1565,34 @@ proc Videoarchiver_transfer {n {init 0}} {
 				
 				# Download, save, and delete each file.
 				foreach sf $seg_list {
-					# Start timer.
-					set start_ms [clock milliseconds]
-					
 					# Download the segment.
+					set start_ms [clock milliseconds]
 					set when "downloading $sf"
 					LWDAQ_socket_write $sock "getfile tmp/$sf\n"
 					set size [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $size]} {error $size}
 					set contents [LWDAQ_socket_read $sock $size]
-	
+					set download_ms [expr [clock milliseconds] - $start_ms]
+
 					# Delete the original segment file.
 					set when "deleting original $sf"
 					LWDAQ_socket_write $sock "file delete tmp/$sf\n"
 					set result [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $result]} {error $result}
-	
-					# Write the file to disk.
+					
+					# If the segment has no obvious flaws, write it to disk.
 					set when "saving copy $sf"
-					set f [open $sf w]
-					fconfigure $f -translation binary
-					puts -nonewline $f $contents
-					close $f
-
-					# Calculate download time.			
-					set download_ms [expr [clock milliseconds] - $start_ms]
-
+					if {$size*0.001 >= $config(min_seg_size)} {
+						set f [open $sf w]
+						fconfigure $f -translation binary
+						puts -nonewline $f $contents
+						close $f
+					} else {
+						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
+							Rejecting $sf, size $size < $config(min_seg_size),\
+							compression processes on camera ."
+					}
+					
 					# Calculate the time lag between the current time and the
 					# timestamp of the last segment we downloaded and saved.
 					set when "reporting"
@@ -1660,7 +1664,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 	
 	if {[catch {
 		# If we are initializing, we delete the first segment.
-		if {$init && ([llength $seg_list] > 0)} {
+		if {$init && ([llength $seg_list] > 0) && $config(del_first_seg)} {
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) "$info(cam$n\_id) Deleting initial segment\
 					[lindex $seg_list 0]."
@@ -1853,6 +1857,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 		LWDAQ_print $info(text) $error_description
 		LWDAQ_print $config(restart_log) $error_description
 		LWDAQ_post [list Videoarchiver_restart_recording $n]
+		catch {file delete $tempfile}
 		return "FAIL"
 	}
 	
@@ -3246,7 +3251,6 @@ while {1} {
 				-c:v $codec \
 				-crf $crf \
 				-preset veryfast \
-				-r $framerate \
 				-force_key_frames "expr:eq(mod(n,20),0)" \
 				$wfn
 		} message]} {
@@ -3317,23 +3321,61 @@ cd /home/pi/Videoarchiver
 # Report to log file.
 if [ "$SHELL" != "" ]
 then
-	echo "init.sh running in $SHELL" > init_log.txt
+	echo "Shell init.sh running in $SHELL" > init_log.txt
 else
-	echo "init.sh running in unknown shell" > init_log.txt
+	echo "Shell init.sh running in unknown shell" > init_log.txt
 fi
-echo "moved to directory `pwd`, reading videoarchiver config" >> init_log.txt
+echo "Moved to directory `pwd`, reading videoarchiver config" >> init_log.txt
 cat videoarchiver.config >> init_log.txt
-OS=`grep "os " videoarchiver.config`
-echo "operating system: $OS" >> init_log.txt
+OS=`grep "Bullseye" videoarchiver.config`
 
 # Determine the camera version. The "B" and "C" versions run Rasbian Stretch
 # with the gpio command. These versions both have "A3034B" in their
 # configuration file. The "D" version runs Raspberry Pi Bullseye and has
 # "A3034D" in its configuration file.
-if [ "$OS" != "os Bullseye" ]
+if [ "$OS" != "" ]
 then
+	# We use raspi-gpio routines to configure and flash lights on A3034D.
+	echo "Detected Bullseye, using raspi-gpio." >> init_log.txt
+
+	# Set the configuration switch port to input with pull-up resistor.
+	raspi-gpio set 5 ip pu
+
+	# Turn off the infrared LEDs.
+	raspi-gpio set 16,26,20,21 op dl
+
+	# Turn off the white LEDs.
+	raspi-gpio set 2,3,4,14 op dl
+
+	# Flash the white LEDs three times, then wait one second.
+	for count in 1 2 3; do
+		sleep 0.3
+		raspi-gpio set 2,3,4,14 op dh
+		sleep 0.1
+		raspi-gpio set 2,3,4,14 op dl
+	done
+
+	# Check the configuration switch. If it is depressed, we replace the existing
+	# /etc/dhcpcd.conf file with the dhcpcd_default.conf, which sets the IP address
+	# of this camera to the default value 10.0.0.34. While this reset is taking
+	# place, we turn the white LEDs on half power.
+	if [ "`raspi-gpio get 5 | grep level=0`" != "" ]
+	then
+		sleep 1.0
+		sudo ifconfig eth0 down
+		sudo cp dhcpcd_default.conf /etc/dhcpcd.conf
+		for count in 1 2 3 4 5; do
+			raspi-gpio set 2,3,4,14 op dh
+			sleep 0.1
+			raspi-gpio set 2,3,4,14 op dl
+			sleep 0.1
+		done
+		sudo ifconfig eth0 up
+		sleep 0.5
+	fi
+else
 	# We use gpio routines to configure and flash lights on A3034B and A3034C.
-	echo "detected Stretch, using gpio" >> init_log.txt
+	echo "Defaulting to Stretch, using gpio" >> init_log.txt
 
 	# Set the configuration switch port to input with pull-up resistor.
 	gpio -g mode 5 in
@@ -3385,50 +3427,11 @@ then
 		sudo ifconfig eth0 up
 		sleep 0.5
 	fi
-else
-	# We use gpio routines to configure and flash lights on A3034D.
-	echo "detected Bullseye, using raspi-gpio." >> init_log.txt
-
-	# Set the configuration switch port to input with pull-up resistor.
-	raspi-gpio set 5 ip pu
-
-	# Turn off the infrared LEDs.
-	raspi-gpio set 16,26,20,21 op dl
-
-	# Turn off the white LEDs.
-	raspi-gpio set 2,3,4,14 op dl
-
-	# Flash the white LEDs three times, then wait one second.
-	for count in 1 2 3; do
-		sleep 0.3
-		raspi-gpio set 2,3,4,14 op dh
-		sleep 0.1
-		raspi-gpio set 2,3,4,14 op dl
-	done
-
-	# Check the configuration switch. If it is depressed, we replace the existing
-	# /etc/dhcpcd.conf file with the dhcpcd_default.conf, which sets the IP address
-	# of this camera to the default value 10.0.0.34. While this reset is taking
-	# place, we turn the white LEDs on half power.
-	if [ "`raspi-gpio get 5 | grep level=0`" != "" ]
-	then
-		sleep 1.0
-		sudo ifconfig eth0 down
-		sudo cp dhcpcd_default.conf /etc/dhcpcd.conf
-		for count in 1 2 3 4 5; do
-			raspi-gpio set 2,3,4,14 op dh
-			sleep 0.1
-			raspi-gpio set 2,3,4,14 op dl
-			sleep 0.1
-		done
-		sudo ifconfig eth0 up
-		sleep 0.5
-	fi
 fi
 
 # Start the TCPIP interface process as user PI.
+echo "Starting TCL interface process." >> init_log.txt
 sudo -u pi bash -c "tclsh interface.tcl -port 2223 > interface_log.txt &"
-
 </script>
 
 <script>
@@ -3437,15 +3440,15 @@ sudo -u pi bash -c "tclsh interface.tcl -port 2223 > interface_log.txt &"
 #
 # Stream video to port 2222 in MJPEG format, frame-by-frame compression only.
 #
-if [ "`grep Bullseye ../videoarchiver.config`" == "" ]
+if [ "`grep Bullseye ../videoarchiver.config`" == "os Bullseye" ]
 then
-  raspivid --codec MJPEG --timeout 0 --flush --width 820 --height 616 \
-    --nopreview --framerate 20 --listen --output tcp://0.0.0.0:2222 \
-    >& stream_log.txt
-else
-  libcamera-vid --codec MJPEG --timeout 0 --flush --width 820 --height 616 \
-  	--nopreview --framerate 20 --listen --saturation 0.5 --output tcp://0.0.0.0:2222 \
+	libcamera-vid --codec MJPEG --timeout 0 --flush --width 820 --height 616 \
+		--nopreview --framerate 20 --listen --saturation 0.5 --output tcp://0.0.0.0:2222 \
 	>& stream_log.txt
+else
+	raspivid --codec MJPEG --timeout 0 --flush --width 820 --height 616 \
+		--nopreview --framerate 20 --listen --output tcp://0.0.0.0:2222 \
+		>& stream_log.txt
 fi
 </script>
 
@@ -3461,7 +3464,7 @@ ffmpeg -nostdin \
 	-framerate 20 \
 	-f segment \
 	-segment_atclocktime 1 \
-	-segment_time 2 \
+	-segment_time 1 \
 	-reset_timestamps 1 \
 	-codec copy \
 	-segment_list segment_list.txt \
@@ -3474,13 +3477,34 @@ ffmpeg -nostdin \
 # 
 # Videoarchiver/test/framerate.tcl
 #
-# Measure the number of frames in each mp4 file in the local directory.
+# Measure the number of frames in each S*.mp4 file in the local directory, as well
+# as the size of the files, and then all the V*.mp4 files.
 #
-set fnl [lsort -dictionary [glob -nocomplain *.mp4]]
-foreach fn $fnl {
-	catch {exec /usr/bin/ffmpeg -i $fn -c copy -f null -} result
-	if {[regexp {frame= *([0-9]+)} $result match numf]} {
-		puts "$fn $numf"
+foreach prefix {S V} {
+	puts "Looking for [set prefix]*.mp4 segments... "
+	set fnl [lsort -dictionary [glob -nocomplain [set prefix]*.mp4]]
+	if {[llength $fnl] < 1} {
+		puts "No [set prefix]*.mp4 segments found."
+		continue
+	} else {
+		puts "Found [llength $fnl] [set prefix]*.mp4 segments."
+		set sum_size 0
+		set sum_frames 0
+		foreach fn $fnl {
+			set size [format %.1f [expr [file size $fn] * 0.001]]
+			set sum_size [expr $sum_size + $size]
+			catch {exec /usr/bin/ffmpeg -i $fn -c copy -f null -} result
+			if {[regexp -all {frame= *([0-9]+)} $result match frames]} {
+				puts "$fn\: $frames frames, $size kBytes,\
+					[format %.2f [expr $size / $frames]] kByte/frame"
+				set sum_frames [expr $sum_frames + $frames]
+			} else {
+				puts "ERROR: Cannot obtain frame count for $fn\."
+				exit
+			}
+		}
+		puts "Average size: [format %.1f [expr $sum_size / [llength $fnl]]] kBytes."
+		puts "Average frame size: [format %.1f [expr $sum_size / $sum_frames]] kBytes."
 	}
 }
 </script>
@@ -3493,9 +3517,13 @@ foreach fn $fnl {
 # 
 set fn [file tail [lindex $argv 0]]
 if {$fn != ""} {
-  puts $fn
-  if {[file exists V$fn]} {file delete V$fn }
-  exec /usr/bin/ffmpeg -loglevel error -i $fn -c:v libx264 -preset veryfast V$fn
+	puts $fn
+	if {[file exists V$fn]} {file delete V$fn }
+	exec /usr/bin/ffmpeg \
+		-loglevel error \
+		-i $fn \
+		-c:v libx264 \
+		-preset veryfast V$fn
 }
 </script>
 
@@ -3510,24 +3538,24 @@ set start_time [clock seconds]
 set fnl [glob -nocomplain S*.mp4]
 set n 1
 foreach v $argv {
-  switch -nocase $v {
-    "-P1" {set n 1}
-    "-P2" {set n 2}
-    "-P3" {set n 3}
-    "-P4" {set n 4}
-    default {
-    	puts "Unrecognised option \"$v\", must be one of -P1, -P2, -P3, or -P4."
-    	exit
-    }
-  }
+	switch -nocase $v {
+		"-P1" {set n 1}
+		"-P2" {set n 2}
+		"-P3" {set n 3}
+		"-P4" {set n 4}
+		default {
+			puts "Unrecognised option \"$v\", must be one of -P1, -P2, -P3, or -P4."
+			exit
+		}
+	}
 }
 puts "Compressing [llength $fnl] files using $n processes..."
 exec find ./ -name "S*.mp4" -print | xargs -n1 -P$n tclsh single.tcl
 set t [expr [clock seconds] - $start_time]
 if {[llength $fnl] > 0} {
-  set tt [expr 1.0*$t/[llength $fnl]]
+	set tt [expr 1.0*$t/[llength $fnl]]
 } else {
-  set tt $t
+	set tt $t
 }
 puts "Done in $t seconds, [format %.2f $tt] per segment." 
 </script>
