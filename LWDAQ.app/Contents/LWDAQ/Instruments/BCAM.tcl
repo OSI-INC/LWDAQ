@@ -209,11 +209,13 @@ proc LWDAQ_daq_BCAM {} {
 		
 		# If wake delay is enabled, wait for the specified interval before continuing.
 		if {$info(daq_wake_ms) > 0} {
-			LWDAQ_delay_seconds $sock_2 [expr $info(daq_wake_ms) * 0.001]
-		}		
+			set background_exposure_s [expr $info(daq_wake_ms) * 0.001]	
+			LWDAQ_delay_seconds $sock_2 $background_exposure_s
+		} {
+			set background_exposure_s 0		
+		}
 
 		# Select the sources one by one and flash them.
-		set total_exposure_time 0
 		foreach e $config(daq_source_device_element) {
 			set en [lindex [split $e *] 0]
 			set ff [lindex [split $e *] 1]
@@ -224,7 +226,7 @@ proc LWDAQ_daq_BCAM {} {
 			if {$ft > $info(flash_seconds_max)} {
 				set ft $info(flash_seconds_max)
 			}
-			set total_exposure_time [expr $total_exposure_time + $ft]
+			set background_exposure_s [expr $background_exposure_s + $ft]
 			if {$info(daq_source_device_type) == $LWDAQ_Driver(multisource_device)} {
 				LWDAQ_set_multisource_element $sock_2 $en $info(daq_source_power)
 			} {
@@ -240,7 +242,7 @@ proc LWDAQ_daq_BCAM {} {
 		# Add the ambient exposure if it's non-zero.
 		if {$info(ambient_exposure_seconds) > 0.0} {
 			LWDAQ_delay_seconds $sock_2 $info(ambient_exposure_seconds)
-			set total_exposure_time [expr $total_exposure_time \
+			set background_exposure_s [expr $background_exposure_s \
 				+ $info(ambient_exposure_seconds)]
 		}
 		
@@ -262,15 +264,16 @@ proc LWDAQ_daq_BCAM {} {
 		# Download the image from the driver.
 		set image_contents [LWDAQ_ram_read $sock_1 0 $image_size]
 
-		# Now we do it all again for background subtraction, but without
-		# flashing the light sources.
+		# Now we do it all again for background subtraction. We duplicate the total
+		# exposure time of the foreground image by implementing delays in place of
+		# the light flashes.
 		if {$config(daq_subtract_background)} {
 			LWDAQ_image_sensor_clear $sock_1 $info(daq_device_type)
 			if {$sock_1 != $sock_2} {LWDAQ_wait_for_driver $sock_1}
 			LWDAQ_set_driver_mux $sock_2 $config(daq_source_driver_socket) \
 				$config(daq_source_mux_socket)
 			LWDAQ_set_device_type $sock_2 $info(daq_source_device_type)
-			LWDAQ_delay_seconds $sock_2 $total_exposure_time
+			LWDAQ_delay_seconds $sock_2 $background_exposure_s
 			if {$sock_1 != $sock_2} {LWDAQ_wait_for_driver $sock_2}
 			LWDAQ_set_driver_mux $sock_1 $config(daq_driver_socket) $config(daq_mux_socket)
 			LWDAQ_set_device_type $sock_1 $info(daq_device_type)

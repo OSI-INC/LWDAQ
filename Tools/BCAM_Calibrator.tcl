@@ -45,7 +45,7 @@ proc BCAM_Calibrator_init {} {
 	set config(apparatus_file) "apparatus_database.txt"
 	set config(calibration_file) [clock format [clock seconds] \
 		-format BCAM_calib_%d_%b_%y.txt]
-	set config(daq_ip_addr) 129.64.37.87
+	set config(daq_ip_addr) "10.0.0.37"
 	set config(bcam_driver_socket) 7
 	set config(apparatus_driver_socket) 3
 	set config(ref_camera_branch) 10

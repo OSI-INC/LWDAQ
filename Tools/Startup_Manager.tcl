@@ -25,7 +25,7 @@ proc Startup_Manager_init {} {
 	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Startup_Manager" 1.3
+	LWDAQ_tool_init "Startup_Manager" 1.4
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -188,12 +188,12 @@ proc Startup_Manager_script_print {} {
 	upvar #0 Startup_Manager_config config
 
 	LWDAQ_print $info(text) "[format {%4s} Step] \
-			[format {%-8s} Type] \
+			[format {%-12s} Type] \
 			[format {%-40s} Name] \
 			[format {%-20s} Tool]" $config(title_color)
 	for {set step_num 1} {$step_num <= $info(num_steps)} {incr step_num} {
 		set type [string replace [lindex $info(steps) $step_num 0] end end ""]
-		if {[lsearch {starter default communal standalone run spawn} $type] < 0} {
+		if {[lsearch {starter startup default communal standalone run spawn} $type] < 0} {
 			set type "UNKNOWN"
 		}
 		set name [Startup_Manager_get_field $step_num "name"]
@@ -202,7 +202,7 @@ proc Startup_Manager_script_print {} {
 		if {$tool == ""} {set tool "None"}
 		LWDAQ_print $info(text) \
 			"[format {%4d} $step_num] \
-			[format {%-8s} $type] \
+			[format {%-12s} $type] \
 			[format {%-40s} $name] \
 			[format {%-20s} $tool]"
 	}
@@ -245,7 +245,7 @@ proc Startup_Manager_load_script {{fn ""}} {
 	LWDAQ_print $info(text) "\nLoad: $fn" $config(title_color)
 
 	if {![file exists $fn]} {
-		LWDAQ_print $info(text) "ERROR: Can't find starter script."
+		LWDAQ_print $info(text) "ERROR: Can't find startup manager script."
 		LWDAQ_print $info(text) "SUGGESTION: Press \"Browse\" and choose a script."
 		set info(control) "Idle"
 		return "ERROR"
@@ -380,7 +380,7 @@ proc Startup_Manager_execute {} {
 	# Obtain the step type from the script. We take some trouble to remove the 
 	# trailing colon from the first word in the step script.
 	set step_type [string replace [lindex $info(steps) $info(step) 0] end end ""]
-	if {[lsearch {default standalone communal spawn run starter} $step_type] < 0} {
+	if {[lsearch {default standalone communal spawn run starter startup} $step_type] < 0} {
 		LWDAQ_print $info(text) "ERROR: Unrecognised step type \"$step_type\"."
 		set info(control) "Idle"
 		return "ERROR"
@@ -576,7 +576,7 @@ proc Startup_Manager_execute {} {
 		}
 	}
 	
-	if {$step_type == "starter"} {
+	if {($step_type == "starter") || ($step_type == "startup")} {
 		set commands [Startup_Manager_get_field $info(step) "commands"]
 		if {[catch {eval $commands} error_result]} {
 			LWDAQ_print $info(text) "ERROR: $error_result"
