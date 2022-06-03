@@ -1057,6 +1057,7 @@ proc Videoarchiver_live {n} {
 		return "ERROR"
 	}
 	set info(cam$n\_state) "Live"
+	LWDAQ_set_bg $info(cam$n\_state_label) yellow
 	Videoarchiver_cleanup $n
 	
 	# Initialize the camera.
@@ -1436,6 +1437,7 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 	# lag indicator.
 	if {$info(cam$n\_state) == "Record"} {
 		set info(cam$n\_state) "Stalled"
+		LWDAQ_set_bg $info(cam$n\_state_label) red
 		set info(cam$n\_lag) "?"
 		LWDAQ_set_fg $info(cam$n\_laglabel) gray
 	}
@@ -1521,7 +1523,6 @@ proc Videoarchiver_transfer {n {init 0}} {
 	# because its interface will have been stopped too. Instead, we will skip
 	# the downloading and transfer all remaining segments, then stop.
 	if {$info(cam$n\_state) == "Record"} {
-
 		# Get a list of segments that are available for download on the camera. 
 		set when "fetching segment list"
 		if {[catch {
@@ -1543,6 +1544,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 		# transfer_max_files of them from the camera, save to the local segment
 		# directory, and delete from the camera.
 		if {$seg_list != ""} {
+			# Flash the background of the state label.
+			LWDAQ_set_bg $info(cam$n\_state_label) yellow
 		
 			# Sort the segment list into increasing order, which will be oldest
 			# to newest. Take from this list up to transfer_max_files names.
@@ -1550,6 +1553,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 				0 [expr $config(transfer_max_files) - 1]]
 				
 			if {[catch {
+				# Indicate camera activity by making label yellow.
+				LWDAQ_set_bg $info(cam$n\_state_label) yellow
 			
 				# Open a socket to the camera. We will use the same socket to
 				# download all segment files.
@@ -1680,6 +1685,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 		# the first available segment into the recording directory to act as the
 		# new recording file.
 		if {[llength $seg_list] > 0} {
+			# Flash the background of the state label.
+			LWDAQ_set_bg $info(cam$n\_state_label) yellow
 			
 			# We look at the first file in the list, which is the oldest file.
 			# We want to know how much video time remains to complete the
@@ -1861,6 +1868,9 @@ proc Videoarchiver_transfer {n {init 0}} {
 		return "FAIL"
 	}
 	
+	# Restore the background of the state label to white.
+	LWDAQ_set_bg $info(cam$n\_state_label) white
+	
 	# If we are no longer recording, stop the transfer process, otherwise
 	# re-post it.
 	if {$info(cam$n\_state) == "Record"} {
@@ -1891,6 +1901,7 @@ proc Videoarchiver_stop {n} {
 	
 	# Set the state variable and reset the lag indicator.
 	set info(cam$n\_state) "Stop"
+	LWDAQ_set_bg $info(cam$n\_state_label) white
 	set info(cam$n\_lag) "?"
 	LWDAQ_set_fg $info(cam$n\_laglabel) gray
 
@@ -2221,6 +2232,7 @@ proc Videoarchiver_draw_list {} {
 		
 		label $ff.state -textvariable Videoarchiver_info(cam$n\_state) -fg blue -width 10
 		pack $ff.state -side left -expand 0
+		set info(cam$n\_state_label) $ff.state
 
 		button $ff.record -text "Record" -fg red -padx $padx -command \
 			[list LWDAQ_post "Videoarchiver_record $n" front]
