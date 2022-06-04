@@ -146,7 +146,7 @@ echo "SUCCESS"
 	# Extract the compressor script from the data field of this script.
 	set script_list [LWDAQ_xml_get_list [LWDAQ_tool_data $info(name)] script]
 	set n 0
-	foreach a {interface compressor dhcpcd init \
+	foreach a {interface manager compressor dhcpcd init \
 			stream segment framerate single compress} {
 		set info($a\_script) [lindex $script_list $n]
 		incr n
@@ -421,7 +421,7 @@ proc Videoarchiver_query {n} {
 	if {[catch {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 			
-		foreach log {interface stream segmentation} {
+		foreach log {interface stream segmentation compression} {
 			set lfn "$log\_log.txt"
 			LWDAQ_socket_write $sock "getfile $lfn\n"
 			set size [LWDAQ_socket_read $sock line]
@@ -438,23 +438,6 @@ proc Videoarchiver_query {n} {
 			LWDAQ_update
 		}
 	
-		for {set i 1} {$i <= $config(compression_num_cpu)} {incr i} {
-			set lfn "compressor_$i\_log.txt"
-			LWDAQ_socket_write $sock "getfile $lfn\n"
-			set size [LWDAQ_socket_read $sock line]
-			if {[LWDAQ_is_error_result $size]} {error $size}
-			set contents [LWDAQ_socket_read $sock $size]	
-			set contents [regsub -all {\.\.\.} $contents "...\n"]
-			set contents [string trim $contents]
-			LWDAQ_print $t "Contents of remote $lfn on $info(cam$n\_id):" purple
-			if {$size > 0} {
-				foreach line [lrange [split $contents \n] end-$config(log_max) end] {
-					LWDAQ_print $t $line
-				}
-			} 
-			LWDAQ_update
-		}
-
 		LWDAQ_socket_write $sock "getfile videoarchiver.config\n"
 		set size [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $size]} {error $size}
@@ -704,7 +687,8 @@ proc Videoarchiver_update {n} {
 		
 		# Update files on the camera. For each file we provide a functional name and
 		# a file name.
-		foreach {sn fn} {compressor compressor.tcl \
+		foreach {sn fn} {manager manager.tcl \
+				compressor compressor.tcl \
 				dhcpcd dhcpcd_default.conf \
 				init init.sh \
 				stream test/stream.sh \
@@ -712,7 +696,7 @@ proc Videoarchiver_update {n} {
 				framerate test/framerate.tcl \
 				single test/single.tcl \
 				compress test/compress.tcl} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Updating $sn script..."
+			LWDAQ_print $info(text) "$info(cam$n\_id) Updating $fn..."
 			LWDAQ_update
 			set size [string length $info($sn\_script)]
 			LWDAQ_socket_write $sock "putfile $fn $size\n$info($sn\_script)"
@@ -1234,25 +1218,21 @@ proc Videoarchiver_compress {n} {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 		
-		# Send three commands, one for each processor. Check result string
-		# for errors. The compressor script is at the end of this program file.
-		for {set i 1} {$i <= $config(compression_num_cpu)} {incr i} {
-			LWDAQ_socket_write $sock "exec /usr/bin/tclsh compressor.tcl \
-				-framerate $framerate \
-				-codec $config(compression_codec) \
-				-crf $crf \
-				-verbose $config(verbose_compressors) \
-				-processes $config(compression_num_cpu) \
-				-index $i >& \
-				compressor_$i\_log.txt & \n"
-			set result [LWDAQ_socket_read $sock line]
-			if {[LWDAQ_is_error_result $result]} {
-				set message [regsub "ERROR: " $result ""]
-				error $message
-			}
+		# Start the compression manager.
+		LWDAQ_socket_write $sock "exec /usr/bin/tclsh manager.tcl \
+			-framerate $framerate \
+			-codec $config(compression_codec) \
+			-crf $crf \
+			-preset veryfast \
+			-verbose $config(verbose_compressors) \
+			-processes $config(compression_num_cpu) \
+			>& manager_log.txt & \n"
+		set result [LWDAQ_socket_read $sock line]
+		if {[LWDAQ_is_error_result $result]} {
+			set message [regsub "ERROR: " $result ""]
+			error $message
 		}
-		LWDAQ_print $info(text) "$info(cam$n\_id) Started $config(compression_num_cpu)\
-			compression engines on camera."
+		LWDAQ_print $info(text) "$info(cam$n\_id) Started compression manager on camera."
 
 		# Close socket.
 		LWDAQ_socket_close $sock
@@ -3123,31 +3103,23 @@ vwait quit
 
 <script>
 #
-# Videoarchiver/compressor.tcl
+# Videoarchiver/manager.tcl
 #
-# Compression engine and watchdog to run on the Raspberry Pi. When there are two
-# or more segment files, which we assume is any file named S*.mp4, we take the
-# older of the two, rename it, compress it, and rename it again. In renaming, we
-# transform the ffmpeg year, day, hour, minute, second timestamp in the original
-# name into a UNIX timestamp. If there are too many compressed video files in
-# the local directory, the watchdog deletes some of them. We assume that this
-# process will run in the background, with stdout directed to a log file. We can
-# pass parameters into the process when we start it up. In particular, we must
-# specify the framerate for the ffmpeg compressor. It is also a good idea to
-# specify the number of compression processes running simultaneously, and give
-# this one an index between 1 and this number so that the compressors can avoid
-# trying to manipulate the same files.
+# The manager takes new video segments, spawns compression processes to compress
+# the segments, and makes the compressed segments available for download by the
+# Videoarchiver in order of oldest to newest. 
 #
 
 # Get the command line arguments.
-set framerate 20
-set maxfiles 40
-set loopwait 20
-set processes 1
-set index 0
-set crf 23
-set codec libx264
-set verbose 0
+set framerate "20"
+set maxfiles "40"
+set processes "2"
+set crf "23"
+set codec "libx264"
+set preset "veryfast"
+set verbose "0"
+set loopwait "100"
+set segdir "tmp"
 foreach {option value} $argv {
 	switch $option {
 		"-framerate" {
@@ -3156,14 +3128,8 @@ foreach {option value} $argv {
 		"-maxfiles" {
 			set maxfiles $value
 		}
-		"-loopwait" {
-			set loopwait $value
-		}
 		"-processes" {
 			set processes $value
-		}
-		"-index" {
-			set index $value
 		}
 		"-crf" {
 			set crf $value
@@ -3171,8 +3137,17 @@ foreach {option value} $argv {
 		"-codec" {
 			set codec $value
 		}
+		"-preset" {
+			set preset $value
+		}
 		"-verbose" {
 			set verbose $value
+		}
+		"-loopwait" {
+			set loopwait $value
+		}
+		"-segdir" {
+			set segdir $value
 		}
 		default {
 			puts "ERROR: Unknown option \"$option\"."
@@ -3181,22 +3156,21 @@ foreach {option value} $argv {
 }
 
 # Announce the start of compression in stdout.
-puts "Starting compression process at [clock seconds] with:"
-puts "framerate = $framerate fps, crf = $crf, codec = $codec, maxfiles = $maxfiles,"
-puts "processes = $processes, index = $index, loopwait = $loopwait ms."
+puts "Starting compression manager at [clock seconds] with:"
+puts "framerate = $framerate fps, codec = $codec, crf = $crf, preset = $preset,"
+puts "maxfiles = $maxfiles, processes = $processes, verbose = $verbose, segdir = $segdir."
 
-# Change directory to the ramdisk.
-cd tmp
+# Initialize our compressor list.
+set compressors [list]
 
 # An infinite loop. This process must be killed if it is to be stopped.
 while {1} {
 
-	# We wait a random amount of time before executing, to reduce the
-	# probability of collisions.
-	after [expr round($loopwait*rand())]
+	# Begin with a delay.
+	after $loopwait
 
 	# Get a list of all the uncompressed files.
-	set sfl [lsort -increasing [glob -nocomplain S*.mp4]]
+	set sfl [lsort -increasing [glob -nocomplain $segdir/S*.mp4]]
  
 	# Look for excessive number of uncompressed segments. If there are more than
 	# maxfiles, delete some of the oldest, but not the oldest, because they
@@ -3214,9 +3188,9 @@ while {1} {
 		}
 	}
 	
-	# If there is more than one uncompressed segment available, compress the eldest 
-	# file that still exists.
-	if {[llength $sfl] > 1} {
+	# If there is more than one uncompressed segment available, and our compressor list
+	# is not full, compress the eldest file that still exists.
+	if {([llength $sfl] > 1) && ([llength $compressors] < $processes)} {
 	
 		# Check the file name is of the correct format. If not, we delete it and continue.
 		set sfn [lindex $sfl 0]
@@ -3227,66 +3201,170 @@ while {1} {
 			continue
 		}
 	
-		# Use the timestamp to construct the a temporary name, a working name,
-		# and the final segment name.
-		set tfn T$timestamp\.mp4
-		set wfn W$timestamp\.mp4
-		set vfn V$timestamp\.mp4
+		# Use the timestamp to construct the temporary name.
+		set tfn $segdir/T$timestamp\.mp4
 		
-		# Rename the segment so no other compressor will try to compress it. If we 
-		# cannot find the segment, abandon this file, reporting only if verbose.
-		if {[file exists $tfn] \
-				|| ![file exists $sfn] \
-				|| [catch {file rename $sfn $tfn} message]} {
-			if {$verbose} {
-				puts "Collided with another compressor over $sfn\."
-				continue
-			}
+		# Check that the temporary file does not exist already. If it does, 
+		# delete the temporary file.
+		if {[file exists $tfn]} {
+			puts "ERROR: File \"[file tail $tfn]\" already exists, deleting."
+			catch {file delete $tfn}
+			continue
 		}
-	
-		# Compress with ffmpeg libx264 to produce video with the specified frame
-		# rate. If we encounter an ffmpeg error, we report the error but
-		# otherwise proceed, because ffmpeg will report errors even though it
-		# completes compression. The Pi has a graphics processor, which we can
-		# enlist with the h264_omx codec, but we can run only one compressor on
-		# this processor at a time, and it is not capable of compressing
-		# high-resolution video on its own, even though it is twice as fast as
-		# the libx264 compression that runs in the main Pi processor cores. So
-		# we instead enlist three of the processor cores into compression
-		# simultaneously using the libx264 codec.
-		set start [clock milliseconds]
-		if {[catch {
-			exec /usr/bin/ffmpeg \
-				-nostdin -loglevel error \
-				-r $framerate \
-				-i $tfn \
-				-c:v $codec \
-				-crf $crf \
-				-preset veryfast \
-				-force_key_frames "expr:eq(mod(n,20),0)" \
-				$wfn
-		} message]} {
-			puts "ERROR: $message during compression of [file tail $tfn]."
+		
+		# Rename the segment so that we will not try to compress it twice.
+		if {[catch {file rename $sfn $tfn} message]} {
+			puts "ERROR: $message."
+			continue
 		}
-		set duration [expr [clock milliseconds] - $start]
+		
+		# Add the file timestamp to our compressor list.
+		lappend compressors $timestamp
 	
-		# Verbose reporting.
+		# Spawn a compressor process to compress the temporary file.
 		if {$verbose} {
-			set ssize [format %.1f [expr 1.0 * [file size $tfn] / 1000]]
-			set vsize [format %.1f [expr 1.0 * [file size $wfn] / 1000]]
-			puts "Compressed $sfn $ssize kByte to $vfn $vsize kByte in $duration ms." 
+			puts "Starting compression of $sfn."
 		}
-		
-		# Rename the output file. Report any error but proceed anyway.
-		if {[catch {file rename $wfn $vfn} message]} {
-			puts "ERROR: $message\."
-		}
-		 
-		# Delete the original segment. Report any error.
-		if {[catch {file delete $tfn} message]} {
-			puts "ERROR: $message\."
+		if {[catch {
+			exec tclsh compressor.tcl \
+				-infile $tfn \
+				-framerate $framerate \
+				-codec $codec \
+				-crf $crf \
+				-preset $preset \
+				-verbose $verbose \
+				>> compressor_log.txt &
+		} message]} {
+			puts "ERROR: $message starting compression of [file tail $tfn]."
 		}
 	}
+	
+	# Check the first entry in our compressor list to see if it is complete.
+	if {[llength $compressors] > 0} {
+	
+		# We get the timestamp from the compressor list and use it to construct
+		# the temporary name, working name, and final segment name.
+		set timestamp [lindex $compressors 0]
+		set tfn $segdir/T$timestamp\.mp4
+		set wfn $segdir/W$timestamp\.mp4
+		set vfn $segdir/V$timestamp\.mp4
+	
+		# If the temporary file no longer exists, compression is complete.
+		if {![file exists $tfn]} {
+		
+			# Rename the output file. The compressed file is available for
+			# download. Report any error but proceed anyway.
+			if {[catch {file rename $wfn $vfn} message]} {
+				puts "ERROR: $message\."
+			}
+			
+			# Delete this compressor from the list.
+			set compressors [lrange $compressors 1 end]
+		} 
+	}
+}
+</script>
+
+<script>
+#
+# Videoarchiver/compressor.tcl
+#
+# Compression engine to run on the Raspberry Pi. The compression_manager calls
+# the compressor, passing it a file name. The file must be a video segment, and
+# the name must be in the form Tx.mp4, where x is a UNIX time. The compressor
+# compresses the segment into another file named Wx.mp4. When it's done, the
+# compressor deletes Tx.mp4 and exits. It reports errors and verbose status to
+# stdout, which the compression_manager can redirect wherever it likes.
+#
+
+# Get the command line arguments.
+set infile "T0000000000.mp4"
+set framerate "20"
+set crf "23"
+set codec "libx264"
+set verbose "0"
+set preset "veryfast"
+foreach {option value} $argv {
+	switch $option {
+		"-infile" {
+			set infile $value
+		}
+		"-framerate" {
+			set framerate $value
+		}
+		"-crf" {
+			set crf $value
+		}
+		"-codec" {
+			set codec $value
+		}
+		"-verbose" {
+			set verbose $value
+		}
+		"-preset" {
+			set preset $value
+		}
+		default {
+			puts "ERROR: Unknown option \"$option\"."
+		}
+	}
+}
+
+# Check the file name is of the correct format. If not, we delete it and continue.
+if {![regexp {T([0-9]{10})} [file tail $infile] match timestamp]} {
+	puts "ERROR: Bad segment name \"[file tail $infile]\" at time [clock seconds]."
+	exit
+}
+
+# Check that the file exists.
+if {![file exists $infile]} {
+	puts "ERROR: File $infile does not exist."
+	exit
+}
+	
+# Use the timestamp to construct a working file name.
+set outfile [file dirname $infile]/W$timestamp\.mp4
+
+# Verbose reporting.
+if {$verbose} {
+	puts "Compressing $infile to $outfile..." 
+}
+
+# Compress with ffmpeg to produce video with the specified frame rate. If we
+# encounter an ffmpeg error, we report the error but otherwise proceed, because
+# ffmpeg will report errors even though it completes compression. The Pi has a
+# graphics processor, which we can enlist with the h264_omx codec, but we can
+# run only one compressor on this processor at a time, and it is not capable of
+# compressing high-resolution video on its own, even though it is twice as fast
+# as the libx264 compression that runs in the main Pi processor cores. So we
+# instead enlist three of the processor cores into compression simultaneously
+# using the libx264 codec.
+set start [clock milliseconds]
+if {[catch {
+	exec /usr/bin/ffmpeg \
+		-nostdin -loglevel error \
+		-r $framerate \
+		-i $infile \
+		-c:v $codec \
+		-crf $crf \
+		-preset $preset \
+		-force_key_frames "expr:eq(mod(n,20),0)" \
+		$outfile
+} message]} {
+	puts "ERROR: $message during compression of [file tail $infile]."
+}
+set duration [expr [clock milliseconds] - $start]
+	
+# Verbose reporting.
+if {$verbose} {
+	set insize [format %.1f [expr 1.0 * [file size $infile] / 1000]]
+	set outsize [format %.1f [expr 1.0 * [file size $outfile] / 1000]]
+	puts "Compressed $infile $insize kByte to $outfile $outsize kByte in $duration ms." 
+}
+		
+# Delete the original segment. Report any error.
+if {[catch {file delete $infile} message]} {
+	puts "ERROR: $message\."
 }
 </script>
 
