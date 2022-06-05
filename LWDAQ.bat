@@ -3,7 +3,7 @@
 REM
 REM Long-Wire Data Acquisition Software (LWDAQ)
 REM Copyright (C) 2009-2021 Kevan Hashemi, Brandeis University
-REM Copyright (C) 2021 Kevan Hashemi, Open Source Instruments Inc.
+REM Copyright (C) 2022 Kevan Hashemi, Open Source Instruments Inc.
 REM
 REM This program is free software; you can redistribute it and/or
 REM modify it under the terms of the GNU General Public License

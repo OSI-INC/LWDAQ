@@ -1,6 +1,6 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 # Copyright (C) 2004-2020 Kevan Hashemi, Brandeis University
-# Copyright (C) 2021 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2022 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -201,7 +201,7 @@ proc LWDAQ_about {} {
 		$info(program_name) $info(program_patchlevel),\
 		TclTk $info(tcl_version), $info(os) $info(arch)\n\n \
 		Copyright 2003-2021, Kevan Hashemi, Brandeis University\n \
-		Copyright 2006-2021, Kevan Hashemi, Open Source Instruments\n\n \
+		Copyright 2006-2022, Kevan Hashemi, Open Source Instruments Inc.\n\n \
 		Distributed under GNU Public License (GPL).\n \
 		This program is free and comes with absolutely no warranty." \
 		-pady 5
