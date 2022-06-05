@@ -500,7 +500,7 @@ begin
 				A[j,i]:=random_0_to_1;
 		B:=matrix_inverse(A);
 	end;
-	writeln('Each inverion takes ',1.0*(clock_milliseconds-start_ms)/mreps:1:1,' ms.');
+	writeln('Each inversion takes ',1.0*(clock_milliseconds-start_ms)/mreps:1:1,' ms.');
 {
 	Test simplex fitter.
 }

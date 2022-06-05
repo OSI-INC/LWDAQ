@@ -3,19 +3,18 @@ Utilities for Mathematical Analysis
 Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 Copyright (C) 2022 Kevan Hashemi, Open Source Instruments Inc.
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA	02111-1307, USA.
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place - Suite 330, Boston, MA	02111-1307, USA.
 }
 
 unit utils;
@@ -330,11 +329,10 @@ function coastline_xy_graph_progress(var gp:xy_graph_type):xy_graph_type;
 	available elements. We won't use the 0th row or column. Our matrix_rows and
 	matrix_columns routines return the number of rows and columns in a matrix to
 	keep our code clean. The new_matrix routine takes the number of rows and
-	columns and returns a pointer to the new matrix.
-
-	In order for our three-dimensional fixed matrices to be compatible with our
-	dynamic matrices, we have their indices begin at zero, even though we will
-	not use the 0th row or column in any of our calculations.
+	columns and returns a pointer to the new matrix. In order for our
+	three-dimensional fixed matrices to be compatible with our dynamic matrices,
+	we have their indices begin at zero, even though we do not use the 0th row
+	or column in any of our calculations.
 }
 type 
 	matrix_type=array of array of real;
@@ -574,8 +572,6 @@ type
 	byte_array = array of byte;
 	byte_array_ptr = ^byte_array;
 
-function new_byte_array(size:integer):byte_array_ptr;
-procedure dispose_byte_array(b:byte_array_ptr);
 function check_big_endian:boolean;
 function big_endian_from_local_smallint(i:smallint):smallint;
 procedure block_clear(a:pointer;length:integer);
@@ -3286,29 +3282,6 @@ begin
 end;
 
 {
-	new_byte_array allocates space for a new byte_array, and returns a
-	pointer to that space.
-}
-function new_byte_array(size:integer):byte_array_ptr;
-var b:byte_array_ptr;
-begin
-	new(b);
-	setlength(b^,size);
-	inc_num_outstanding_ptrs(length(b^),'new_byte_array');
-	new_byte_array:=b;
-end;
-
-{
-	dispose_byte array disposes of a byte_array.
-}
-procedure dispose_byte_array(b:byte_array_ptr);
-begin
-	if b=nil then exit;
-	dec_num_outstanding_ptrs(length(b^),'dispose_byte_array');
-	dispose(b);
-end;
-
-{
 	bubble_sort arranges the elements of a list in ascending order, as defined
 	by the "after" function, and does so by applying the "swap" function. The
 	bubble sort algorithm usually completes in n*n time, where n is the length
@@ -3732,21 +3705,20 @@ begin
 end;
 
 {
-	matrix_rows returns the number of rows in a matrix. This number is not
-	necessarily the same as the length of the array of rows in the matrix
-	variable. We implement matrices with two-dimensional dynamic arrays. Each
-	row is an array of real numbers, and the matrix is an array of rows. But the
-	FPC dynamic arrays are constrained to have low index zero, while we want to
-	refer to rows 1..n in a matrix with n rows. Thus the matrix variable
-	contains n+1 row arrays, and we use only those with index 1..n. So the
-	routine below returns the highest row number, assuming the first row is row
-	number one. We pass the matrix as a variable parameter to make certain that
-	we don't copy the matrix when calling this routine. In FPC, no such copy
-	would take place in any case, because a matrix is a dynamic variable with a
-	reference count, so apparent copies are merely duplicate references to the
-	same data structure. In order to make a real copy of a matrix, we have to
-	create a new matrix and copy each element individually, as in the
-	copy_matrix routine.
+	matrix_rows returns the number of rows in a matrix. This number is one less
+	than the length of the array of rows in the matrix variable. We implement
+	matrices with two-dimensional dynamic arrays. Each row is an array of real
+	numbers, and the matrix is an array of rows. But the FPC dynamic arrays are
+	constrained to have low index zero, while we want to refer to rows 1..n in a
+	matrix with n rows. Thus the matrix variable contains n+1 row arrays, and we
+	use only those with index 1..n. So the routine below returns the highest row
+	number, assuming the first row is row number one. We pass the matrix as a
+	variable parameter to make certain that we don't copy the matrix when
+	calling this routine. In FPC, no such copy would take place in any case,
+	because a matrix is a dynamic variable with a reference count, so apparent
+	copies are merely duplicate references to the same data structure. In order
+	to make a real copy of a matrix, we have to create a new matrix and copy
+	each element individually, as in the copy_matrix routine.
 }
 function matrix_rows(var A:matrix_type):integer;
 begin 
@@ -3754,7 +3726,8 @@ begin
 end;
 
 {
-	matrix_columns is like matrix_rows, but for the number of columns.
+	matrix_columns is like matrix_rows, but returns the number of columns in the
+	matrix.
 }
 function matrix_columns(var A:matrix_type):integer;
 begin 
@@ -3762,8 +3735,8 @@ begin
 end;
 
 {
-	unit_matrix returns a square unit matrix of num_rows rows. It sets
-	the diagonal elements to 1 and all others to 0.
+	unit_matrix returns a square unit matrix of num_rows rows. It sets the
+	diagonal elements to 1 and all others to 0.
 }
 function unit_matrix(num_rows:integer):matrix_type;
 var 
@@ -3779,10 +3752,9 @@ end;
 
 {
 	matrix_copy returns a copy of matrix A. This copy is a duplicate dynamic
-	array in memory, with its own location and reference count. In FPC, we cannot
-	obtain a copy of A by use of B:=A when A is a dynamic array like a matrix,
-	because this results only in a duplicate pointer reference to the dynamic
-	array stored in B.
+	array in memory, with its own location and reference count. In FPC, we
+	cannot obtain a copy of dynamic array A with B:=A because this results only
+	in a duplicate pointer reference to the dynamic array stored in B.
 }
 function matrix_copy(var A:matrix_type):matrix_type;
 var

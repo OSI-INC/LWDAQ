@@ -136,7 +136,7 @@ type
 		directive, as an empty string.
 
 		When we run the Tcl or TclTk interpreter, however, we do have to tell
-		the dynami linker where to find the Tcl and Tk dynamic libraries,
+		the dynamic linker where to find the Tcl and Tk dynamic libraries,
 		because the interpreter executable is not a self-contained program, but
 		rather relies upon the existence of the Tcl and Tk libraries either in
 		memory or on disk. When we launch LWDAQ, we must provide an absolute
@@ -151,9 +151,9 @@ type
 		directory, we can obtain the absolute path to the libraries from the
 		absolute path to the launch script itself.
 
-		We do not add an underscrore to routine names we export because on MacOS,
-		the Tcl load command does not add an underscore to the name we specify when
-		looking for a routine.
+		We do not add an underscrore to routine names we export because on
+		MacOS, the Tcl load command does not add an underscore to the name we
+		specify when looking for a routine.
 	}
 	{$define _TCLLIB_:=}
 	{$define _TKLIB_:=}
