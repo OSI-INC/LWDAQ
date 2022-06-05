@@ -3113,13 +3113,14 @@ vwait quit
 # Get the command line arguments.
 set framerate "20"
 set maxfiles "40"
-set processes "2"
+set processes "3"
 set crf "23"
 set codec "libx264"
 set preset "veryfast"
 set verbose "0"
 set loopwait "100"
 set segdir "tmp"
+set maxage "40"
 foreach {option value} $argv {
 	switch $option {
 		"-framerate" {
@@ -3149,13 +3150,16 @@ foreach {option value} $argv {
 		"-segdir" {
 			set segdir $value
 		}
+		"-maxage" {
+			set maxage $value
+		}
 		default {
 			puts "ERROR: Unknown option \"$option\"."
 		}
 	}
 }
 
-# Announce the start of compression in stdout.
+# Announce the start of compression to stdout.
 puts "Starting compression manager at [clock seconds] with:"
 puts "framerate = $framerate fps, codec = $codec, crf = $crf, preset = $preset,"
 puts "maxfiles = $maxfiles, processes = $processes, verbose = $verbose, segdir = $segdir."
@@ -3218,24 +3222,30 @@ while {1} {
 			continue
 		}
 		
-		# Add the file timestamp to our compressor list.
-		lappend compressors $timestamp
-	
-		# Spawn a compressor process to compress the temporary file.
+		# Spawn a compressor to compress the temporary file. The Pi has a
+		# graphics processor, which we can enlist with the h264_omx codec, but
+		# the graphics processor is not capable of compressing video of the
+		# quality we require in real time. We instead enlist multiple processor
+		# cores to compress our segments using the ffmpeg libx264 codec. The
+		# number of processes we enlist is given by our "processes" argument.
 		if {$verbose} {
 			puts "Starting compression of $sfn."
 		}
 		if {[catch {
-			exec tclsh compressor.tcl \
+			set pid [exec tclsh compressor.tcl \
 				-infile $tfn \
 				-framerate $framerate \
 				-codec $codec \
 				-crf $crf \
 				-preset $preset \
 				-verbose $verbose \
-				>> compressor_log.txt &
+				>> compressor_log.txt &]
 		} message]} {
 			puts "ERROR: $message starting compression of [file tail $tfn]."
+		} else {
+		# If we did not encounter an error, we add the timestamp and process
+		# id to our compressor list.
+			lappend compressors $timestamp		
 		}
 	}
 	
@@ -3244,7 +3254,7 @@ while {1} {
 	
 		# We get the timestamp from the compressor list and use it to construct
 		# the temporary name, working name, and final segment name.
-		set timestamp [lindex $compressors 0]
+		set timestamp [lindex $compressors 0 0]
 		set tfn $segdir/T$timestamp\.mp4
 		set wfn $segdir/W$timestamp\.mp4
 		set vfn $segdir/V$timestamp\.mp4
@@ -3260,7 +3270,19 @@ while {1} {
 			
 			# Delete this compressor from the list.
 			set compressors [lrange $compressors 1 end]
-		} 
+		} else {
+		# If the file does exist, we check to see how old it is, and if it is
+		# too old, we kill the compressor process and delete its files. We report
+		# an error.
+			if {[clock seconds] - $timestamp > $maxage} {
+				set pid [lindex $compressors 0 1]
+				catch {exec kill $pid}
+				catch {rm $tfn}
+				catch {rm $wfn}
+				set compressors [lrange $compressors 1 end]
+				puts "ERROR: Compression of $tfn frozen, now killed, segment lost."
+			}
+		}
 	}
 }
 </script>
@@ -3273,8 +3295,10 @@ while {1} {
 # the compressor, passing it a file name. The file must be a video segment, and
 # the name must be in the form Tx.mp4, where x is a UNIX time. The compressor
 # compresses the segment into another file named Wx.mp4. When it's done, the
-# compressor deletes Tx.mp4 and exits. It reports errors and verbose status to
-# stdout, which the compression_manager can redirect wherever it likes.
+# compressor deletes Tx.mp4 and exits. It reports errors to stdout, which the
+# compression_manager can redirect wherever it likes. With the verbose option,
+# the compressor reports progress to stdout as well. We assume that the process
+# spawning the compressor has redirected stdout to a log file.
 #
 
 # Get the command line arguments.
@@ -3310,7 +3334,7 @@ foreach {option value} $argv {
 	}
 }
 
-# Check the file name is of the correct format. If not, we delete it and continue.
+# Check the file name is of the correct format. If not, we exit.
 if {![regexp {T([0-9]{10})} [file tail $infile] match timestamp]} {
 	puts "ERROR: Bad segment name \"[file tail $infile]\" at time [clock seconds]."
 	exit
@@ -3331,14 +3355,8 @@ if {$verbose} {
 }
 
 # Compress with ffmpeg to produce video with the specified frame rate. If we
-# encounter an ffmpeg error, we report the error but otherwise proceed, because
-# ffmpeg will report errors even though it completes compression. The Pi has a
-# graphics processor, which we can enlist with the h264_omx codec, but we can
-# run only one compressor on this processor at a time, and it is not capable of
-# compressing high-resolution video on its own, even though it is twice as fast
-# as the libx264 compression that runs in the main Pi processor cores. So we
-# instead enlist three of the processor cores into compression simultaneously
-# using the libx264 codec.
+# encounter an ffmpeg error, we report to stdout, but otherwise proceed, because
+# ffmpeg will report errors even though it completes compression.
 set start [clock milliseconds]
 if {[catch {
 	exec /usr/bin/ffmpeg \
@@ -3621,26 +3639,25 @@ if {$fn != ""} {
 # 
 # Videoarchiver/test/compress.tcl
 #
-# Measures compression rate. Specify -P1 to -P4 for number of processes.
-# Comresses all videos S*.mp4 in local directory using xargs and single.tcl.
+# Measures compression rate. Specify the number of processors we want to use for
+# compression with the -processes option. Compresses all videos S*.mp4 in local
+# directory using xargs and single.tcl.
 #
 set start_time [clock seconds]
 set fnl [glob -nocomplain S*.mp4]
-set n 1
-foreach v $argv {
-	switch -nocase $v {
-		"-P1" {set n 1}
-		"-P2" {set n 2}
-		"-P3" {set n 3}
-		"-P4" {set n 4}
+set processes 1
+foreach {option value} $argv {
+	switch $option {
+		"-processes" {
+			set processes $value
+		}
 		default {
-			puts "Unrecognised option \"$v\", must be one of -P1, -P2, -P3, or -P4."
-			exit
+			puts "ERROR: Unknown option \"$option\"."
 		}
 	}
 }
-puts "Compressing [llength $fnl] files using $n processes..."
-exec find ./ -name "S*.mp4" -print | xargs -n1 -P$n tclsh single.tcl
+puts "Compressing [llength $fnl] files using $processes processes..."
+exec find ./ -name "S*.mp4" -print | xargs -n1 -P$processes tclsh single.tcl
 set t [expr [clock seconds] - $start_time]
 if {[llength $fnl] > 0} {
 	set tt [expr 1.0*$t/[llength $fnl]]
