@@ -66,12 +66,12 @@ proc Videoarchiver_init {} {
 	# The time we alloew for video streaming to start on the camera.
 	set info(pi_start_ms) "500"
 	
-	# The codec to use for compression on the Pi. The libx264 codec is provided by
-	# ffmpeg in compiled code that runs on the Pi microprocessor cores (CPUs). If 
-	# we want to use the Pi's graphics co-processor (GPU), we must use h264_omx, 
-	# but there is only one GPU, while there are four CPUs. If we try to use both
-	# codecs, ffmpeg fails to concatinate them correctly on the data acquisition 
-	# machine.
+	# The codec to use for compression on the Pi. The libx264 codec is provided
+	# by ffmpeg in compiled code that runs on the Pi microprocessor cores
+	# (CPUs). If we want to use the Pi's graphics co-processor (GPU), we must
+	# use h264_omx, but there is only one GPU, while there are four CPUs. If we
+	# try to use both codecs, ffmpeg fails to concatinate them correctly on the
+	# data acquisition machine.
 	set config(compression_codec) "libx264"
 	set config(stream_codec) "MJPEG"
 	set config(compression_num_cpu) "3"
@@ -85,6 +85,7 @@ proc Videoarchiver_init {} {
 	set info(tcp_port) "2222"
 	set info(tcl_port) "2223"
 	set info(library_archive) "http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
+
 	# These are the camera versions, each version accompanied by four numbers:
 	# the horizontal resolution x, vertical resolution y, frame rate fr, and
 	# constant rate factor crf. The image will be x * y pixels with fr frames
@@ -104,7 +105,7 @@ proc Videoarchiver_init {} {
 	# raspivid utilities to operate the camera, of control input and output
 	# lines with the gpio utility. Each string we send directly to the camera
 	# with ssh to be executed on the camera. 
-	
+
 	# We initialize the camera by making sure the Videoarchiver directory
 	# exists, moving to that directory, cleaning up old log, video, and image
 	# files, killing all videoarchiver-generated processes, video processes, and
@@ -122,9 +123,9 @@ tclsh interface.tcl -port %Q >& interface_log.txt &
 echo "SUCCESS"
 }	
 	
-	# To stop the streaming of video, and the capture of an image, we call the Linux
-	# command "killall". After stopping everything, we restart the TCPIP interface
-	# process.
+	# To stop the streaming of video, and the capture of an image, we call the
+	# Linux command "killall". After stopping everything, we restart the TCPIP
+	# interface process.
 	set info(stop) {
 cd Videoarchiver
 killall -9 tclsh 
@@ -135,9 +136,9 @@ tclsh interface.tcl -port %Q >& interface_log.txt &
 echo "SUCCESS"
 }
 
-	# The Raspberry Pi lets us re-boot as the Pi user without a password, so we can
-	# reboot with the reboot command, running the command in the background allows
-	# us to send back a success word before the reboot completes.
+	# The Raspberry Pi lets us re-boot as the Pi user without a password, so we
+	# can reboot with the reboot command, running the command in the background
+	# allows us to send back a success word before the reboot completes.
 	set info(reboot) {
 sudo reboot &
 echo "SUCCESS"
@@ -152,8 +153,8 @@ echo "SUCCESS"
 		incr n
 	}
 
-	# The following parameters will appear in the configuration panel, so the user can
-	# modify them by hand.
+	# The following parameters will appear in the configuration panel, so the
+	# user can modify them by hand.
 	set config(transfer_period_s) "60"
 	set config(transfer_max_files) "10"
 	set config(record_length_s) "600"
@@ -162,16 +163,16 @@ echo "SUCCESS"
 	set config(del_first_seg) "1"
 	set config(min_seg_size) "5.0"
 	
-	# Set the verbose compressor argument to have the compressors print input and output
-	# segment names to their log files. With two-second segments, we will have thirty
-	# lines added to the log files per minute, or 1.3 million lines per month. The log
-	# files will be too long to view in the Query window. So we will print only the last
-	# log_max lines of the file.
+	# Set the verbose compressor argument to have the compressors print input
+	# and output segment names to their log files. With two-second segments, we
+	# will have thirty lines added to the log files per minute, or 1.3 million
+	# lines per month. The log files will be too long to view in the Query
+	# window. So we will print only the last log_max lines of the file.
 	set config(verbose_compressors) "0"
 	set config(log_max) "100"
 	
-	# The segment length. Video will be saved on the camera and transferred to the 
-	# data acquisition computer in segments.
+	# The segment length. Video will be saved on the camera and transferred to
+	# the data acquisition computer in segments.
 	set info(segment_len) "1"
 
 	# Monitor parameters
@@ -195,28 +196,29 @@ echo "SUCCESS"
 	# Text window number of lines to keep.
 	set info(num_lines_keep) "200"
 	
-	# The following parameter gives the four-bit DAC values that correspond to the 
-	# six power settings 0-4 presented to the use and programmer for controlling
-	# the intensity of the LEDs, both white and infrared.
+	# The following parameter gives the four-bit DAC values that correspond to
+	# the six power settings 0-4 presented to the use and programmer for
+	# controlling the intensity of the LEDs, both white and infrared.
 	set info(lamp_dac_values) "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"	
 	
-	# Camera login details. We don't use the camera password, but we record it here for 
-	# manual ssh access.
+	# Camera login details. We don't use the camera password, but we record it
+	# here for manual ssh access.
 	set info(camera_login) "pi"
 	set info(camera_password) "osicamera"
 
-	# A list of cameras, which is now empty, but will be filled later, or given a single
-	# entry as a starting point.
+	# A list of cameras, which is now empty, but will be filled later, or given
+	# a single entry as a starting point.
 	set info(cam_list) [list]	
 	
-	# The camera list file defines a list of cameras with TCL commands that set the
-	# camera list string and camera parameters.
+	# The camera list file defines a list of cameras with TCL commands that set
+	# the camera list string and camera parameters.
 	set config(cam_list_file) [file normalize "~/Desktop/CamList.tcl"]
 
-	# The recording directory is where we store video to disk. The Videoarchiver creates 
-	# individual directories for each camera, using the camera ID for the directory name. 
-	# By default, we create these folders on the desktop. Even if this is the wrong place,
-	# at least our user will see them appearing.
+	# The recording directory is where we store video to disk. The Videoarchiver
+	# creates individual directories for each camera, using the camera ID for
+	# the directory name. By default, we create these folders on the desktop.
+	# Even if this is the wrong place, at least our user will see them
+	# appearing.
 	set config(recording_dir) [file normalize "~/Desktop"]
 	
 	# Variables that control the scheduler.
@@ -259,10 +261,11 @@ proc Videoarchiver_ip {n} {
 }
 
 #
-# Videoarchiver_segdir return the segment directory, which is a sub-directory of 
-# the scratch directory, and is named after the camera IP address. If this sub-directory 
-# does not exist, the routine creates the directory. We pass the camera index into the 
-# routine and the routine looks up the camera's IP address.
+# Videoarchiver_segdir return the segment directory, which is a sub-directory of
+# the scratch directory, and is named after the camera IP address. If this
+# sub-directory does not exist, the routine creates the directory. We pass the
+# camera index into the routine and the routine looks up the camera's IP
+# address.
 #
 proc Videoarchiver_segdir {n} {
 	upvar #0 Videoarchiver_config config
@@ -421,7 +424,7 @@ proc Videoarchiver_query {n} {
 	if {[catch {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 			
-		foreach log {interface stream segmentation compression} {
+		foreach log {interface stream segmentation manager compression} {
 			set lfn "$log\_log.txt"
 			LWDAQ_socket_write $sock "getfile $lfn\n"
 			set size [LWDAQ_socket_read $sock line]
@@ -429,7 +432,7 @@ proc Videoarchiver_query {n} {
 			set contents [LWDAQ_socket_read $sock $size]	
 			set contents [regsub -all {\.\.\.} $contents "...\n"]
 			set contents [string trim $contents]
-			LWDAQ_print $t "Contents of remote $lfn on $info(cam$n\_id):" purple
+			LWDAQ_print $t "Contents of $lfn on $info(cam$n\_id):" purple
 			if {$size > 0} {
 				foreach line [lrange [split $contents \n] end-$config(log_max) end] {
 					LWDAQ_print $t $line
@@ -442,13 +445,15 @@ proc Videoarchiver_query {n} {
 		set size [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $size]} {error $size}
 		set contents [string trim [LWDAQ_socket_read $sock $size]]
-		LWDAQ_print $t "Contents of remote videoarchiver.config:" purple
+		LWDAQ_print $t "Contents of videoarchiver.config\
+			on $info(cam$n\_id):" purple
 		if {$size > 0} {LWDAQ_print $t $contents}
 
 		LWDAQ_socket_write $sock "llength \[glob -nocomplain tmp/V*.mp4\]\n"
 		set len [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $len]} {error $len}
-		LWDAQ_print $t "Number of compressed video segments: $len" purple
+		LWDAQ_print $t "Number of compressed video segments\
+			on $info(cam$n\_id): $len" purple
 
 		LWDAQ_socket_write $sock "gettemp\n"
 		set temp [LWDAQ_socket_read $sock line]
@@ -460,8 +465,7 @@ proc Videoarchiver_query {n} {
 		if {[LWDAQ_is_error_result $freq]} {error $freq}
 		LWDAQ_print $t "Microprocessor clock frequency (GHz): $freq" purple
 		
-	LWDAQ_print $t "\n"
-
+		LWDAQ_print $t "\n"
 		LWDAQ_socket_close $sock
 	} message]} {
 		set message [regsub "ERROR: " $message ""]
@@ -873,7 +877,8 @@ proc Videoarchiver_stream {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d version width height framerate crf
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
+		version width height framerate crf
 		
 	# Print notification.
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video streaming,\
@@ -1066,7 +1071,8 @@ proc Videoarchiver_live {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d version width height framerate crf
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
+		version width height framerate crf
 				
 	# Start the mplayer receiving the stream directly from the camera. We set 
 	# the frame to be higher than the actual frame rate, so the player displays
@@ -1179,7 +1185,8 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		if {[catch {
 			puts $info(monitor_channel) $line
 		} message]} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Recording view has stopped." $config(v_col)
+			LWDAQ_print $info(text) "$info(cam$n\_id) Recording view has stopped." \
+				$config(v_col)
 			LWDAQ_process_stop $info(monitor_process)
 			catch {close $info(monitor_channel)}
 			set info(monitor_channel) "none"
@@ -1212,7 +1219,8 @@ proc Videoarchiver_compress {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d version width height framerate crf
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
+		version width height framerate crf
 		
 	if {[catch {
 		# Open a socket to the interface.
@@ -1339,8 +1347,8 @@ proc Videoarchiver_record {n} {
 		set info(cam$n\_dir) [file join $config(recording_dir) $info(cam$n\_id)]
 		if {![file exists $info(cam$n\_dir)]} {
 			file mkdir $info(cam$n\_dir)
-			LWDAQ_print $info(text) "$info(cam$n\_id) Created directory $info(cam$n\_dir) for\
-				video files."
+			LWDAQ_print $info(text) "$info(cam$n\_id) Created directory \
+				$info(cam$n\_dir) for video files."
 		} 
 	} message]} {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message ."
@@ -1451,7 +1459,8 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 	# To re-start, we stop the camera and then try to start recording
 	# using existing routines that catch their own errors and return
 	# the ERROR word when they fail. 
-	LWDAQ_print $info(text) "$info(cam$n\_id) Trying to re-start video recording after fatal error."
+	LWDAQ_print $info(text) "$info(cam$n\_id) Trying to re-start\
+		video recording after fatal error."
 	set result [Videoarchiver_record $n]
 	
 	# If the recording process returned an error, we try to restart
@@ -2012,7 +2021,8 @@ proc Videoarchiver_directory {{post 1}} {
 	# error message.
 	set dn [LWDAQ_get_dir_name $config(recording_dir)]
 	if {![file exists $dn]} {
-		LWDAQ_print $info(text) "ERROR: Proposed recording directory \"$dn\" does not exist."
+		LWDAQ_print $info(text) "ERROR: Proposed recording directory \"$dn\"\
+			does not exist."
 		return "ERROR"
 	} else {
 		set config(recording_dir) $dn
@@ -2049,7 +2059,8 @@ proc Videoarchiver_suggest_download {} {
 	upvar #0 Videoarchiver_info info
 
 	LWDAQ_print $info(text) ""
-	LWDAQ_print $info(text) "  Click on link below to download Videoarchiver library zip archive."
+	LWDAQ_print $info(text) "  Click on link below to download Videoarchiver\
+		library zip archive."
 	$info(text) insert end "           "
 	$info(text) insert end "$info(library_archive)" "textbutton download"
 	$info(text) tag bind download <Button> Videoarchiver_download_libraries
@@ -2527,9 +2538,10 @@ proc Videoarchiver_configure {} {
 }
 
 #
-# Videoarchiver_lamps_adjust sets all lamps of a particular color to a specified intensity, 
-# but does so taking "step" seconds per change in intensity. It uses the intensity value
-# stored in the camera info arrays to find the current intensity.
+# Videoarchiver_lamps_adjust sets all lamps of a particular color to a specified
+# intensity, but does so taking "step" seconds per change in intensity. It uses
+# the intensity value stored in the camera info arrays to find the current
+# intensity.
 #
 proc Videoarchiver_lamps_adjust {color intensity {step "1"} {previous "0"}} {
 	upvar #0 Videoarchiver_config config
@@ -2708,7 +2720,8 @@ proc Videoarchiver_schedule_start {} {
 			intensity $info($a\_int)\
 			and step interval $info($a\_step) s."
 		LWDAQ_schedule_task $a $schedule \
-			"Videoarchiver_lamps_adjust [regsub {_.*} $a ""] $info($a\_int) $info($a\_step)"
+			"Videoarchiver_lamps_adjust [regsub {_.*} $a ""]\
+				$info($a\_int) $info($a\_step)"
 	}
 	set info(scheduler_state) "Run"
 }
@@ -2846,7 +2859,7 @@ foreach {option value} $argv {
 }
 
 # Announce the start of interface in stdout.
-puts "Starting interface process at [clock seconds] with:"
+puts "Starting interface process at [clock format [clock seconds]] with:"
 puts "verbose = $verbose, port = $port, maxshow = $maxshow."
 
 # The socket acceptor receives a connection, sets up a socket channel, and
@@ -2862,7 +2875,8 @@ proc accept {sock addr port} {
 	# Call the interpreter every time a complete command has been received.
 	fileevent $sock readable [list interpreter $sock]
 	
-	if {$verbose} {puts "$sock connection from $addr at [clock seconds]."}
+	if {$verbose} {puts "$sock connection from $addr at\
+		[clock format [clock seconds]]."}
 	return 1
 }
 
@@ -2873,14 +2887,16 @@ proc interpreter {sock} {
 
 	# If the client closes the socket, we do the same.
 	if {[eof $sock]} {
-		if {$verbose} {puts "$sock closed by client at [clock seconds]."}
+		if {$verbose} {puts "$sock closed by client at\
+			[clock format [clock seconds]]."}
 		close $sock
 		return 1
 	}	
 	
 	# Read the command line from the socket.
 	if {[catch {gets $sock line} result]} {
-		if {$verbose} {puts "$sock broken at [clock seconds]."}
+		if {$verbose} {puts "$sock broken at\
+			[clock format [clock seconds]]."}
 		close $sock
 		return 1
 	}
@@ -2925,7 +2941,8 @@ proc interpreter {sock} {
 			} else {
 				set contents ""
 				if {$verbose} {
-					puts "$sock getfile \"$fn\" does not exist at [clock seconds]."
+					puts "$sock getfile \"$fn\" does not exist at\
+						[clock format [clock seconds]]."
 				}
 			}
 			
@@ -2955,7 +2972,8 @@ proc interpreter {sock} {
 			set fn [lindex $argv 0]
 			set size [lindex $argv 1]
 			if {$verbose} {
-				puts "$sock putfile \"$fn\" size $size bytes at [clock seconds]."
+				puts "$sock putfile \"$fn\" size $size bytes at\
+					[clock format [clock seconds]]."
 			}
 			
 			# Now reconfigure the socket for binary data with full buffering and
@@ -2968,7 +2986,8 @@ proc interpreter {sock} {
 			puts -nonewline $f $contents
 			close $f			
 			if {$verbose} {
-				puts "Wrote $size bytes to \"$fn\" at [clock seconds]."
+				puts "Wrote $size bytes to \"$fn\" at\
+					[clock format [clock seconds]]."
 			}
 			
 			# Return the socket to line buffering and automatic line break
@@ -2984,7 +3003,7 @@ proc interpreter {sock} {
 			# Get the directory name and report it.
 			set dn [lindex $argv 0]
 			if {$verbose} {
-				puts "$sock mkdir \"$dn\" at [clock seconds]."
+				puts "$sock mkdir \"$dn\" at [clock format [clock seconds]]."
 			}
 
 			# Make the directory.
@@ -3086,7 +3105,7 @@ proc interpreter {sock} {
 			puts $sock $result
 		}
 	} message]} {
-		puts "ERROR: $message, at [clock seconds]."
+		puts "ERROR: $message, at [clock format [clock seconds]]."
 		puts $sock "ERROR: $message."
 	}
 	
@@ -3160,7 +3179,7 @@ foreach {option value} $argv {
 }
 
 # Announce the start of compression to stdout.
-puts "Starting compression manager at [clock seconds] with:"
+puts "Starting compression manager at [clock format [clock seconds]] with:"
 puts "framerate = $framerate fps, codec = $codec, crf = $crf, preset = $preset,"
 puts "maxfiles = $maxfiles, processes = $processes, verbose = $verbose, segdir = $segdir."
 
@@ -3182,7 +3201,7 @@ while {1} {
 	# as there are processes.
 	if {[llength $sfl] >= $maxfiles} {
 		puts "ERROR: Too many uncompressed segments, deleting $processes\
-			segments at time [clock seconds]."
+			segments at time [clock format [clock seconds]]."
 		for {set i $processes} {$i < 2*$processes} {incr i} {
 			if {[catch {
 				file delete [lindex $sfl $i]
@@ -3200,7 +3219,7 @@ while {1} {
 		set sfn [lindex $sfl 0]
 		if {![regexp {S([0-9]{10})} [file tail $sfn] match timestamp]} {
 			puts "ERROR: Bad segment name \"[file tail $sfn]\",\
-				deleting segment at time [clock seconds]."
+				deleting segment at time [clock format [clock seconds]]."
 			catch {file delete $sfn}
 			continue
 		}
@@ -3336,7 +3355,8 @@ foreach {option value} $argv {
 
 # Check the file name is of the correct format. If not, we exit.
 if {![regexp {T([0-9]{10})} [file tail $infile] match timestamp]} {
-	puts "ERROR: Bad segment name \"[file tail $infile]\" at time [clock seconds]."
+	puts "ERROR: Bad segment name \"[file tail $infile]\" at time\
+		[clock format [clock seconds]]."
 	exit
 }
 

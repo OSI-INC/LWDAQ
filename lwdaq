@@ -41,7 +41,6 @@
 LWDAQ_DIR=`dirname $0`
 
 # Determine the architecture. We support only 64-bit.
-ARCH=x86_64
 
 # Determine operating system. Default is Unix. 
 OS=UNIX
@@ -56,11 +55,14 @@ fi
 if [ "`uname -a | grep -i Linux`" != "" ]
 then 
 	OS=Linux
+	if [ "`cat /etc/os-release | grep -i Raspbian`" != ""]
+	then
+		OS=Raspbian
+	fi 
 fi
 
 # Print operating system and architecture.
 echo "OS: $OS"
-echo "ARCH: $ARCH"
 
 # Determine the option and configuration script name. We look for the "--"
 # string at the start of the first parameter, and if we find it, we use this as
@@ -174,6 +176,15 @@ fi
 # Pick the TclTk shell based upon the options, operating system
 # and architecture.
 if [ $OS == UNIX ]
+then
+	if [ $GUI_ENABLED == 1 ]
+	then
+		SHELL=wish
+	else
+		SHELL=tclsh
+	fi
+fi
+if [ $OS == Raspbian ]
 then
 	if [ $GUI_ENABLED == 1 ]
 	then

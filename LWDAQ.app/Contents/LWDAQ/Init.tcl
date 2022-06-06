@@ -27,10 +27,15 @@ set num_errors 0
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.4"
-set LWDAQ_Info(program_patchlevel) "10.4.2"
+set LWDAQ_Info(program_patchlevel) "10.4.3"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 set LWDAQ_Info(console_prompt) "LWDAQ% "
 	
+# Determine architecture.
+package require platform
+set LWDAQ_Info(arch) [platform::identify]
+package forget platform
+
 # Determine operating system.
 set LWDAQ_Info(os) "Unix"
 if {[regexp -nocase "Darwin" $tcl_platform(os)]} {
@@ -41,10 +46,10 @@ if {[regexp -nocase "Windows" $tcl_platform(os)]} {
 }
 if {[regexp -nocase "Linux" $tcl_platform(os)]} {
 	set LWDAQ_Info(os) "Linux"
+	if {[string match *-arm $LWDAQ_Info(arch)]} {
+		set LWDAQ_Info(os) "Raspbian"
+	}
 }
-
-# Determine architecture.
-set LWDAQ_Info(arch) "x86_64"
 
 # Set the user-defined flags to their default values.
 set LWDAQ_Info(run_mode) "--gui"

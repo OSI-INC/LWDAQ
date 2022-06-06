@@ -16,6 +16,9 @@ ifneq ($(shell uname -a | grep -i Windows),)
 endif
 ifneq ($(shell uname -a | grep -i Linux),)
 	OS = Linux
+	ifneq ($(shell cat /etc/os-release | grep -i Raspbian),)
+		OS = Raspbian
+	endif
 endif
 
 # Determine the local architecture. We support only 64-bit Intel.
@@ -61,6 +64,18 @@ endif
 ifeq ($(OS),Linux)
 	TCL_FLAGS = 
 	FPC_FLAGS = -Px86_64 -O3 -Cg
+endif
+
+# Raspbian is Linux compiled for the the Raspberry Pi, architecture is ARM and
+# will run 32-bit and 64-bit code. Our LWDAQ distribution does not come bundled
+# with a Raspbian LWDAQ library or Raspbian TclTk executables. Instead, we ask
+# the user to install TclTk and FPC and compile the LWDAQ library herself.
+# Raspbian, being Linux, uses weak linking by default. We need to force
+# position-independent code with -Cg so the library is dynamic. We don't specify
+# the architecture because we don't need to: FPC will use the local architecture.
+ifeq ($(OS),Raspbian)
+	TCL_FLAGS = 
+	FPC_FLAGS = -O3 -Cg
 endif
 
 # Names and locations of shared libraries.
