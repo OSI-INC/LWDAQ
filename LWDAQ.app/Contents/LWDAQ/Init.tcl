@@ -37,18 +37,18 @@ set LWDAQ_Info(arch) [platform::identify]
 package forget platform
 
 # Determine operating system.
-set LWDAQ_Info(os) "Unix"
 if {[regexp -nocase "Darwin" $tcl_platform(os)]} {
 	set LWDAQ_Info(os) "MacOS"
-}
-if {[regexp -nocase "Windows" $tcl_platform(os)]} {
+} elseif {[regexp -nocase "Windows" $tcl_platform(os)]} {
 	set LWDAQ_Info(os) "Windows"
-}
-if {[regexp -nocase "Linux" $tcl_platform(os)]} {
-	set LWDAQ_Info(os) "Linux"
+} elseif {[regexp -nocase "Linux" $tcl_platform(os)]} {
 	if {[string match *-arm $LWDAQ_Info(arch)]} {
 		set LWDAQ_Info(os) "Raspbian"
+	} else {
+		set LWDAQ_Info(os) "Linux"
 	}
+} else {
+	set LWDAQ_Info(os) "Unknown"
 }
 
 # Set the user-defined flags to their default values.
@@ -143,28 +143,36 @@ if {[catch {
 			$LWDAQ_Info(program_patchlevel) on $LWDAQ_Info(os)"
 	}
 	
-	# Set directory variables
+	# Determine the contents directory name. On MacOS, Linux, and Windows we
+	# have our bundled TclTk executable as a reference point. For Raspbian, we
+	# assume we are calling wish or tclsh with this file as the initialization 
+	# script, so we use argv0 to obtain the contents directory. By default we
+	# use argv0 also, as for unix.
 	set LWDAQ_Info(exec_dir) [file dirname [info nameofexecutable]]
-	
-	if {$LWDAQ_Info(os) == "MacOS"} {
-		set LWDAQ_Info(contents_dir) [file normalize \
-			[file join $LWDAQ_Info(exec_dir) ..]]
-		set LWDAQ_Info(stdout_available) 1
-	}
-	if {$LWDAQ_Info(os) == "Linux"} {
-		set LWDAQ_Info(contents_dir) [file normalize [file join \
-			$LWDAQ_Info(exec_dir) .. ..]]
-		set LWDAQ_Info(stdout_available) 1
-	}
-	if {$LWDAQ_Info(os) == "Windows"} {
-		set LWDAQ_Info(contents_dir) [file normalize [file join \
-			$LWDAQ_Info(exec_dir) .. ..]]
-		set LWDAQ_Info(stdout_available) 0
-	}
-	if {$LWDAQ_Info(os) == "Unix"} {
-		set LWDAQ_Info(contents_dir) [file normalize [file join \
-			.  LWDAQ.app Contents]]
-		set LWDAQ_Info(stdout_available) 1
+	switch $LWDAQ_Info(os) {
+		"MacOS" {
+			set LWDAQ_Info(contents_dir) [file normalize \
+				[file join $LWDAQ_Info(exec_dir) ..]]
+			set LWDAQ_Info(stdout_available) 1
+		}
+		"Linux" {
+			set LWDAQ_Info(contents_dir) [file normalize [file join \
+				$LWDAQ_Info(exec_dir) .. ..]]
+			set LWDAQ_Info(stdout_available) 1
+		}
+		"Windows" {
+			set LWDAQ_Info(contents_dir) [file normalize [file join \
+				$LWDAQ_Info(exec_dir) .. ..]]
+			set LWDAQ_Info(stdout_available) 0
+		}
+		"Raspbian" {
+			set LWDAQ_Info(contents_dir) [file normalize [file join $argv0 ..]]
+			set LWDAQ_Info(stdout_available) 0
+		}
+		default {
+			set LWDAQ_Info(contents_dir) [file normalize [file join $argv0 ..]]
+			set LWDAQ_Info(stdout_available) 1
+		}
 	}
 
 	# Set the platform-dependent names for LWDAQ's directories.
@@ -234,17 +242,22 @@ if {[catch {
 
 	# Set up options for TCL commands defined in our analysis library. These 
 	# vary from one platform to the next.
-	if {$LWDAQ_Info(os) == "MacOS"} {
-		lwdaq_config -stdout_available 1 -stdin_available 0 -wait_ms 100
-	}
-	if {$LWDAQ_Info(os) == "Linux"} {
-		lwdaq_config -stdout_available 1 -stdin_available 0 -wait_ms 100
-	}
-	if {$LWDAQ_Info(os) == "Windows"} {
-		lwdaq_config -stdout_available 0 -stdin_available 0 -wait_ms 100
-	}
-	if {$LWDAQ_Info(os) == "Unix"} {
-		lwdaq_config -stdout_available 1 -stdin_available 0 -wait_ms 100
+	switch $LWDAQ_Info(os) {
+		"MacOS" {
+			lwdaq_config -stdout_available 1 -stdin_available 0 -wait_ms 100
+		}
+		"Linux" {
+			lwdaq_config -stdout_available 1 -stdin_available 0 -wait_ms 100
+		}
+		"Windows" {
+			lwdaq_config -stdout_available 0 -stdin_available 0 -wait_ms 100
+		}
+		"Raspbian" {
+			lwdaq_config -stdout_available 1 -stdin_available 0 -wait_ms 100
+		}
+		default {
+			lwdaq_config -stdout_available 1 -stdin_available 0 -wait_ms 100
+		}
 	}
 } error_message]} {
 	puts "ERROR: In initialization, $error_message"

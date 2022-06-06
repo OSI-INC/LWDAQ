@@ -7,7 +7,7 @@
 
 # Determine the operating system. Our Default
 # operating system is Unix.
-OS = Unix
+OS = Unknown
 ifneq ($(shell uname -a | grep -i Darwin),)
 	OS = MacOS
 endif
@@ -21,13 +21,10 @@ ifneq ($(shell uname -a | grep -i Linux),)
 	endif
 endif
 
-# Determine the local architecture. We support only 64-bit Intel.
-ARCH = x86_64
-
-# Determine the location of the TCL/TK libraries and the GCC libraries. On Unix,
-# we assume the libraries are in one of the default library paths.
+# Determine the location of the TclTk libraries and the GCC libraries. By default,
+# we assume use of system TclTk and default architecture.
 TCL_FLAGS = 
-FPC_FLAGS = -Px86_64 -O3
+FPC_FLAGS = -O3
 
 # On Windows, we tell FPC compiler where it can find the TclTk libraries, so
 # that it can embed a path to these libraries in the compiled object. At

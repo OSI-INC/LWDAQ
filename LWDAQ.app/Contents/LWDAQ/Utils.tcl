@@ -1671,8 +1671,6 @@ proc LWDAQ_url_open {url} {
 	switch $info(os) {
 		"Windows" {set command [auto_execok "start"]}
 		"MacOS" {set command [auto_execok "open"]}
-		"Linux" {set command [auto_execok "xdg-open"]}
-		"Unix" {set command [auto_execok "xdg-open"]}
 		default {set command [auto_execok "xdg-open"]}
 	}
 	

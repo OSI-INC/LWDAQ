@@ -686,7 +686,6 @@ procedure write_xyz(var s:string;p:xyz_point_type);
 procedure write_xyz_line(var s:string;l:xyz_line_type);
 procedure write_xyz_plane(var s:string;p:xyz_plane_type);
 procedure write_xyz_matrix(var s:string;M:xyz_matrix_type);
-procedure write_memory_map(var s:string;base:qword;size:integer);
 procedure write_matrix(var s:string;var M:matrix_type);
 function string_from_matrix(var M:matrix_type):string;
 procedure write_kinematic_mount(var s:string;mount:kinematic_mount_type);
@@ -5892,29 +5891,6 @@ procedure write_memory_qword(address:qword;value:qword);
 begin 
 	qword_ptr(address)^:=value;
 end; 
-
-{
-	write_memory_map writes memory contents to a string. It displays
-	the values of size bytes starting with the byte at address base, 
-	and expresses the values in hex.
-}
-procedure write_memory_map(var s:string;base:qword;size:integer);
-
-const
-	bytes_per_line=8;
-	fs=3;
-
-var
-	address:qword;
-
-begin
-	for address:=base to base+size-1 do begin
-		if (address-base) mod bytes_per_line=0 then begin
-			s:=s+eol+'0x'+hex_string_from_qword(address)+': ';
-		end;
-		s:=s+hex_string_from_byte(memory_byte(address));
-	end;
-end;
 
 {
 	block_move copies length bytes starting at a^ to the location

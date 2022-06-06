@@ -6,8 +6,8 @@
 # Mount point for remote disk.
 RMT="/Users/kevan/BND-SFTP"
 
-# Determine operating system. Default is Unix. 
-OS=UNIX
+# Determine operating system. Default is Unknown. 
+OS=Unknown
 if [ "`uname -a | grep -i Darwin`" != "" ]
 then 
 	OS=MacOS
