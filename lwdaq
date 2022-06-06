@@ -56,7 +56,7 @@ fi
 if [ "`uname -a | grep -i Linux`" != "" ]
 then 
 	OS=Linux
-	if [ "`cat /etc/os-release | grep -i Raspbian`" != ""]
+	if [ "`cat /etc/os-release | grep -i Raspbian`" != "" ]
 	then
 		OS=Raspbian
 	fi 
