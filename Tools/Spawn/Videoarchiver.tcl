@@ -58,9 +58,15 @@ proc Videoarchiver_init {} {
 		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) [file join $info(os_dir) ffmpeg/ffmpeg]
 		set info(mplayer) [file join $info(os_dir) mplayer]
+	} elseif {$LWDAQ_Info(os) == "Raspbian"} {
+		set info(ssh) "/usr/bin/ssh"
+		set info(ffmpeg) "/usr/bin/ffmpeg"
+		set info(mplayer) "/usr/bin/mplayer"
 	} else {
-		error "Videoarchiver does not support $info(os)."
-		return ""
+		Neuroplayer_print "WARNING: Videoarchive may not work on $LWDAQ_Info(os)."
+		set info(ssh) "/usr/bin/ssh"
+		set info(ffmpeg) "/usr/bin/ffmpeg"
+		set info(mplayer) "/usr/bin/mplayer"
 	}
 	
 	# The time we alloew for video streaming to start on the camera.

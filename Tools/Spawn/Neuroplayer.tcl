@@ -656,9 +656,15 @@ proc Neuroplayer_init {} {
 		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) [file join $os_dir ffmpeg/ffmpeg]
 		set info(mplayer) [file join $os_dir mplayer]
+	} elseif {$LWDAQ_Info(os) == "Raspbian"} {
+		set info(ssh) "/usr/bin/ssh"
+		set info(ffmpeg) "/usr/bin/ffmpeg"
+		set info(mplayer) "/usr/bin/mplayer"
 	} else {
-		error "Videoarchiver does not support $LWDAQ_Info(os)."
-		return ""
+		Neuroplayer_print "WARNING: Video playback may not work on $LWDAQ_Info(os)."
+		set info(ssh) "/usr/bin/ssh"
+		set info(ffmpeg) "/usr/bin/ffmpeg"
+		set info(mplayer) "/usr/bin/mplayer"
 	}
 #
 # The Save button in the Configuration Panel allows you to save your own
