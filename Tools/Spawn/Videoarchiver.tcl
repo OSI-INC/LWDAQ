@@ -3426,12 +3426,17 @@ if {[catch {file delete $infile} message]} {
 # Allow users of this group to interact with dhcpcd via the control socket.
 controlgroup wheel
 
+# We include instructions for the wireless interface in case we edit
+# /boot/config.txt to enable the interface, in which case we want it to talk to
+# the outside world. We specify Google name servers.
+interface wlan0
+static domain_name_servers=8.8.4.4 8.8.8.8
+
 # A static IP configuration. Do not change the static IP address in this file
 # unless you are prepared to change it in the Videoarchiver's set_ip routine as
 # well.
 interface eth0
 static ip_address=10.0.0.34/24
-static routers=10.0.0.1
 </script>
 
 <script>

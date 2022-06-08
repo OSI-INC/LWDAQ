@@ -76,6 +76,8 @@ foreach a $argv {
 				"MacOS" {set LWDAQ_Info(console_enabled) 0}
 				"Windows" {set LWDAQ_Info(console_enabled) 0}
 				"Linux" {set LWDAQ_Info(console_enabled) 1}
+				"Raspbian" {set LWDAQ_Info(console_enabled) 1}
+				default {set LWDAQ_Info(console_enabled) 1}
 			}
 			set LWDAQ_Info(run_mode) $a
 		}
@@ -160,16 +162,16 @@ if {[catch {
 				$LWDAQ_Info(exec_dir) .. ..]]
 			set LWDAQ_Info(stdout_available) 1
 		}
-		"Windows" {
-			set LWDAQ_Info(contents_dir) [file normalize [file join \
-				$LWDAQ_Info(exec_dir) .. ..]]
-			set LWDAQ_Info(stdout_available) 0
 		}
 		"Raspbian" {
 			set LWDAQ_Info(contents_dir) [file normalize \
 				[file join [file dirname $argv0] ..]]
-			set LWDAQ_Info(stdout_available) 0
+			set LWDAQ_Info(stdout_available) 1
 		}
+		"Windows" {
+			set LWDAQ_Info(contents_dir) [file normalize [file join \
+				$LWDAQ_Info(exec_dir) .. ..]]
+			set LWDAQ_Info(stdout_available) 0
 		default {
 			set LWDAQ_Info(contents_dir) [file normalize \
 				[file join [file dirname $argv0] ..]]
