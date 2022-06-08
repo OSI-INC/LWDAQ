@@ -162,7 +162,6 @@ if {[catch {
 				$LWDAQ_Info(exec_dir) .. ..]]
 			set LWDAQ_Info(stdout_available) 1
 		}
-		}
 		"Raspbian" {
 			set LWDAQ_Info(contents_dir) [file normalize \
 				[file join [file dirname $argv0] ..]]
@@ -171,7 +170,7 @@ if {[catch {
 		"Windows" {
 			set LWDAQ_Info(contents_dir) [file normalize [file join \
 				$LWDAQ_Info(exec_dir) .. ..]]
-			set LWDAQ_Info(stdout_available) 0
+		}	set LWDAQ_Info(stdout_available) 0
 		default {
 			set LWDAQ_Info(contents_dir) [file normalize \
 				[file join [file dirname $argv0] ..]]
