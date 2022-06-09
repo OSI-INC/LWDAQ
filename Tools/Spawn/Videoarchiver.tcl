@@ -3054,7 +3054,7 @@ proc interpreter {sock} {
 			set contents [read $f]
 			close $f
 			set contents [regsub -all 10.0.0.34 $contents $new_ip]
-			set contents [regsub -all 10.0.0.1 $contents $new_router_ip]
+			set contents [regsub -all 0.0.0.0 $contents $new_router_ip]
 			set f [open temp.txt w]
 			puts $f $contents
 			close $f
