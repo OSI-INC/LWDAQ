@@ -12,9 +12,9 @@
 # FOR A PARTICULAR PURPOSE.	See the GNU General Public License for more
 # details.
 
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc., 59
-# Temple Place - Suite 330, Boston, MA	02111-1307, USA.
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place - Suite 330, Boston, MA	02111-1307, USA.
 
 
 #
@@ -84,10 +84,10 @@ proc Videoarchiver_init {} {
 
 	# Fixed IP addresses for default configurations and camera streaming.
 	set info(local_ip_addr) "127.0.0.1"
-	set info(default_addr) "10.0.0.34"
-	set info(default_router_addr) "10.0.0.1"
+	set info(default_ip_addr) "10.0.0.34"
 	set info(null_addr) "0.0.0.0"
-	set info(new_ip_addr) $info(default_addr)
+	set info(new_ip_addr) $info(default_ip_addr)
+	set info(new_router_addr) $info(null_addr)
 	set info(tcp_port) "2222"
 	set info(tcl_port) "2223"
 	set info(library_archive) "http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
@@ -750,25 +750,41 @@ proc Videoarchiver_ask_ip {n} {
 		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
 		return "FAIL"
 	}
-	
+
+	# Check to see if the New IP window already exists.	
 	set new_ip $ip
 	set w $info(window)\.changeip$n
 	if {[winfo exists $w]} {
 		raise $w
 		return "FAIL"
 	}
+	
+	# Set the proposed new IP address and router address. We always propose
+	# the pre-existing IP address and the null router address.
+	set info(new_ip_addr) $ip
+	set info(new_router_addr) $info(null_addr)
+	
+	# Make a window with entries and proceed button.
 	toplevel $w
 	wm title $w "Change IP Address of Camera $info(cam$n\_id)"
 	label $w.nal -text "New IP Address:" -fg purple
 	entry $w.nae -textvariable Videoarchiver_info(new_ip_addr) -width 10
-	button $w.proceed -text "Proceed" -command [list Videoarchiver_set_ip $n]
-	pack $w.nal $w.nae $w.proceed -side left
+	label $w.nrl -text "New Router Address:" -fg purple
+	entry $w.nre -textvariable Videoarchiver_info(new_router_addr) -width 10
+	label $w.setl -text "Apply New Addresses:"
+	button $w.setb -text "Go" -command [list Videoarchiver_set_ip $n]
+	grid $w.nal $w.nae -sticky nsew
+	grid $w.nrl $w.nre -sticky nsew
+	grid $w.setl $w.setb -sticky nsew
+	
+	# Return.
+	return "SUCCESS"
 }
 
 #
 # Videoarchiver_set_ip change a camera's IP address.
 #
-proc Videoarchiver_set_ip {n {new_ip ""}} {
+proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 
@@ -794,16 +810,20 @@ proc Videoarchiver_set_ip {n {new_ip ""}} {
 		return "FAIL"
 	}
 
-	# Use the IP address stored in a global variable.	
+	# If we have not passed the IP and router addresses as arguments, use the
+	# global variables.	
 	if {$new_ip == ""} {set new_ip $info(new_ip_addr)}
+	if {$new_router == ""} {set new_router $info(new_router_addr)}
 	
 	LWDAQ_print $info(text) "\n$info(cam$n\_id) Setting IP address to $new_ip" purple
 	if {[catch {	
-		# Start by checking the new IP address.
-		if {![regexp {([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+} $new_ip match new_router_ip]} {
+		# Start by checking the new IP addresses.
+		if {![regexp {([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+} $new_ip match subnet_ip]} {
 			error "Invalid IP address \"$new_ip\", operation aborted"
 		}
-		set new_router_ip "$new_router_ip\.1"
+		if {![regexp {([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+} $new_router match subnet_ip]} {
+			error "Invalid router address \"$new_router\", operation aborted"
+		}
 			
 		# Stop all camera activity in preparation for the update.
 		LWDAQ_print $info(text) "$info(cam$n\_id) Stopping all activity..."
@@ -839,7 +859,7 @@ proc Videoarchiver_set_ip {n {new_ip ""}} {
 		# Open a socket to the tcpip interface and instruct the interface
 		# to update the IP address.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
-		LWDAQ_socket_write $sock "setip $new_ip $new_router_ip\n"
+		LWDAQ_socket_write $sock "setip $new_ip $new_router\n"
 		set result [LWDAQ_socket_read $sock line]
 		if {$result != $new_ip} {error $result}
 			
@@ -850,7 +870,7 @@ proc Videoarchiver_set_ip {n {new_ip ""}} {
 		set info(cam$n\_addr) $new_ip
 		
 		LWDAQ_print $info(text) "$info(cam$n\_id) New IP address is $new_ip,\
-			new router address is $new_router_ip, ready in a few seconds."
+			new router address is $new_router, ready in a few seconds."
 	} message]} {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
 		catch {LWDAQ_socket_close $sock}
@@ -2416,7 +2436,7 @@ proc Videoarchiver_add_camera {} {
 	# Configure the new sensor to default values.
 	set info(cam$n\_id) "Z000$n"
 	set info(cam$n\_ver) "A3034-HR"
-	set info(cam$n\_addr) $info(default_addr)
+	set info(cam$n\_addr) $info(default_ip_addr)
 	set info(cam$n\_rot) $info(default_rot)
 	set info(cam$n\_sat) $info(default_sat)
 	set info(cam$n\_dir) [file normalize "~/Desktop"]
@@ -3046,15 +3066,15 @@ proc interpreter {sock} {
 			if {![regexp {[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $new_ip]} {
 				error "Invalid internet protocol address \"$new_ip\""
 			}
-			set new_router_ip [lindex $argv 1]
-			if {![regexp {[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $new_router_ip]} {
-				error "Invalid router internet protocol address \"$new_router_ip\""
+			set new_router [lindex $argv 1]
+			if {![regexp {[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $new_router]} {
+				error "Invalid router internet protocol address \"$new_router\""
 			}
 			set f [open dhcpcd_default.conf r]
 			set contents [read $f]
 			close $f
 			set contents [regsub -all 10.0.0.34 $contents $new_ip]
-			set contents [regsub -all 0.0.0.0 $contents $new_router_ip]
+			set contents [regsub -all 0.0.0.0 $contents $new_router]
 			set f [open temp.txt w]
 			puts $f $contents
 			close $f
@@ -3420,23 +3440,26 @@ if {[catch {file delete $infile} message]} {
 # Camera (A3034), Open Source Instruments Inc.
 #
 
-# See dhcpcd.conf(5) for details of the options. This configuration assigns a
-# static IP address to the camera.
+# We assign a static IP address with subnet mask 255.255.255.0 to the wired
+# ethernet interface, which the operating system calls "eth0". Do not change the 
+# static IP address in this file unless you are prepared to change it in the 
+# Videoarchiver's set_ip routine as well. We disable routers for this interface
+# with router address 0.0.0.0, which is a null address. The operating system
+# will not attempt to use eth0 to communicate with any other subnet. 
+interface eth0
+static ip_address=10.0.0.34/24
+static routers=0.0.0.0
 
-# Allow users of this group to interact with dhcpcd via the control socket.
-controlgroup wheel
-
-# We include instructions for the wireless interface in case we edit
-# /boot/config.txt to enable the interface, in which case we want it to talk to
-# the outside world. We specify Google name servers.
+# In normal operation, the camera's wireless interface is disabled at boot time
+# by a command in the /boot/config.txt file. But if we were to remove that command
+# and allow the wireless interface to power up, and if we have given the operating
+# system the name and password for a local wireless network, the camera will try
+# to connect to that network. Here we give static addresses for name servers and 
+# we allow the interface to obtain its own IP address and router address through
+# a dynamic host configuration protocol (DHCP) exchange. 
 interface wlan0
 static domain_name_servers=8.8.4.4 8.8.8.8
 
-# A static IP configuration. Do not change the static IP address in this file
-# unless you are prepared to change it in the Videoarchiver's set_ip routine as
-# well.
-interface eth0
-static ip_address=10.0.0.34/24
 </script>
 
 <script>
