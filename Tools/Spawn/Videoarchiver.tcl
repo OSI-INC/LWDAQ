@@ -105,6 +105,7 @@ proc Videoarchiver_init {} {
 	# Default settings for cameras.
 	set info(default_rot) "0"
 	set info(default_sat) "0.5"
+	set info(default_ec) "0.5"
 		
 	# In the following paragraphs, we define shell commands that we pass via
 	# secure shell (ssh) to the camera, where we can run the libcamera-vid or
@@ -766,7 +767,7 @@ proc Videoarchiver_ask_ip {n} {
 	
 	# Make a window with entries and proceed button.
 	toplevel $w
-	wm title $w "Change IP Address of Camera $info(cam$n\_id)"
+	wm title $w "Set Address of $info(cam$n\_id)"
 	label $w.nal -text "New IP Address:" -fg purple
 	entry $w.nae -textvariable Videoarchiver_info(new_ip_addr) -width 10
 	label $w.nrl -text "New Router Address:" -fg purple
@@ -907,9 +908,9 @@ proc Videoarchiver_stream {n} {
 		version width height framerate crf
 		
 	# Print notification.
-	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video streaming,\
+	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
 		$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
-		saturation $info(cam$n\_sat),\
+		saturation $info(cam$n\_sat), compensation $info(cam$n\_ec), \
 		crf $crf."
 	LWDAQ_update
 
@@ -937,7 +938,8 @@ proc Videoarchiver_stream {n} {
 				--flush \
 				--width $width --height $height \
 				--rotation $info(cam$n\_rot) \
-				--saturation $info(cam$n\_sat) \
+				--saturation [format %.1f $info(cam$n\_sat)] \
+				--ev [format %.1f [expr 2.0*($info(cam$n\_ec)-0.5)]] \
 				--nopreview \
 				--framerate $framerate \
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
@@ -949,8 +951,8 @@ proc Videoarchiver_stream {n} {
 				--flush \
 				--width $width --height $height \
 				--saturation [expr round(200*$info(cam$n\_sat)-100)] \
+				--ev [expr round(20.0*($info(cam$n\_ec)-0.5))] \
 				--rotation $info(cam$n\_rot) \
-				--ev 4 \
 				--nopreview \
 				--framerate $framerate \
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
@@ -2293,6 +2295,16 @@ proc Videoarchiver_draw_list {} {
 		}	
 		pack $ff.satm -side left -expand 1
 
+		label $ff.ecl -text "Exp:" -fg brown -justify right
+		pack $ff.ecl -side left -expand 0
+		set m [tk_optionMenu $ff.ecm Videoarchiver_info(cam$n\_ec) none]
+		$m delete 0 end
+		for {set ec 0.0} {$ec <= 1.0} {set ec [format %.1f [expr $ec + 0.1]]} {
+			$m add command -label "$ec" \
+				-command [list set Videoarchiver_info(cam$n\_ec) $ec]
+		}	
+		pack $ff.ecm -side left -expand 1
+
 		label $ff.wl -text "Wht:" -padx $padx -fg brown -justify right
 		pack $ff.wl -side left -expand 0
 		set m [tk_optionMenu $ff.wm Videoarchiver_info(cam$n\_white) none]
@@ -2399,7 +2411,8 @@ proc Videoarchiver_remove {n} {
 	unset info(cam$n\_addr)
 	unset info(cam$n\_rot)
 	unset info(cam$n\_sat)
-	unset info(cam$n\_dir)
+	unset info(cam$n\_sat)
+	unset info(cam$n\_ec)
 	unset info(cam$n\_file)
 	unset info(cam$n\_state)
 	unset info(cam$n\_ttime)
@@ -2439,6 +2452,7 @@ proc Videoarchiver_add_camera {} {
 	set info(cam$n\_addr) $info(default_ip_addr)
 	set info(cam$n\_rot) $info(default_rot)
 	set info(cam$n\_sat) $info(default_sat)
+	set info(cam$n\_ec) $info(default_ec)
 	set info(cam$n\_dir) [file normalize "~/Desktop"]
 	set info(cam$n\_file) [file join $info(cam$n\_dir) V0000000000.mp4]
 	set info(cam$n\_state) "Idle"
