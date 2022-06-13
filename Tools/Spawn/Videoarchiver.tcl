@@ -168,7 +168,7 @@ echo "SUCCESS"
 	set config(connect_timeout_s) "5"
 	set config(restart_wait_s) "30"
 	set config(del_first_seg) "1"
-	set config(min_seg_size) "5.0"
+	set config(min_seg_size) "1.0"
 	
 	# Set the verbose compressor argument to have the compressors print input
 	# and output segment names to their log files. With two-second segments, we
@@ -188,6 +188,9 @@ echo "SUCCESS"
 	set info(monitor_process) "0"
 	set info(monitor_channel) "none"
 	set info(monitor_cam) "0"
+	set config(monitor_longevity) "30"
+	set info(monitor_start) "0"
+	
 	
 	# Lag thresholds and restart log.
 	set config(lag_warning) "10.0"
@@ -932,6 +935,11 @@ proc Videoarchiver_stream {n} {
 		# final command to echo the word SUCCESS is to allow our secure shell to
 		# return a success code. Any error will cause the echo to be skipped.
 		if {[regexp "os Bullseye" $configuration]} {
+			if {($info(cam$n\_rot) == 90) || ($info(cam$n\_rot) == 180)} {
+				LWDAQ_print $info(text) "WARNING: Rotation $info(cam$n\_rot) degrees,\
+					not supported on this camera, setting to zero."
+				set info(cam$n\_rot) 0
+			}
 			LWDAQ_socket_write $sock "exec libcamera-vid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
@@ -1051,8 +1059,9 @@ proc Videoarchiver_synchronize {n} {
 }
 
 #
-# Videoarchiver_live stream live video from camera "n" and display. The video
-# stream consists of compressed frames, but has no inter-frame compression. 
+# Videoarchiver_live streams live video from camera "n" and displays it on the
+# screen. The video stream consists of individual compressed frames (MJPEG), but
+# has no inter-frame compression (no H264 compression). 
 #
 proc Videoarchiver_live {n} {
 	upvar #0 Videoarchiver_config config
@@ -1108,7 +1117,9 @@ proc Videoarchiver_live {n} {
 	set info(cam$n\_lproc) [exec \
 		$info(mplayer) -title "Live View From $info(cam$n\_id) $ip" \
 		-demuxer lavf -cache 1000 -really-quiet -noconsolecontrols \
-		-zoom -xy $config(display_zoom) -geometry 10%:10% -fps [expr 2*$framerate] \
+		-zoom -xy $config(display_zoom) \
+		-geometry 10%:10% \
+		-fps [expr 2*$framerate] \
 		"ffmpeg://tcp://$ip:$info(tcp_port)" \
 		>& live_log.txt &]
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting live view,\
@@ -1199,6 +1210,7 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		puts $info(monitor_channel) "speed_set $config(monitor_speed)"		
 		LWDAQ_print $info(text) "$info(cam$n\_id) Started recording view,\
 			expect delay of five seconds, close with escape key." $config(v_col)
+		set info(monitor_start) [clock seconds]
 	} elseif {$command == "Stop"} {
 		if {[LWDAQ_process_exists $info(monitor_process)] \
 			&& ($info(monitor_cam) == $n)} {
@@ -1210,6 +1222,12 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		set info(monitor_channel) "none"
 		set info(monitor_cam) "0"
 	} elseif {$command == "Write"} {
+		if {[clock seconds] - $info(monitor_start) > $config(monitor_longevity)} {
+			LWDAQ_print $info(text) "Closing recording view automatically after\
+				$config(monitor_longevity) s." $config(v_col)
+			LWDAQ_post [list Videoarchiver_monitor $n "Stop"]
+			return "ABORT" 
+		}
 		if {[catch {
 			puts $info(monitor_channel) $line
 		} message]} {
