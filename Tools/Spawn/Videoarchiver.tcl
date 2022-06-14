@@ -1283,11 +1283,11 @@ proc Videoarchiver_compress {n} {
 	
 	# Determine if the compressors should rotate the images by ninety 
 	# degrees.
+	set rotation 0
 	if {$info(cam$n\_os) == "Bullseye"} {
 		switch $info(cam$n\_rot) {
 			90 {set rotation 90}
 			270 {set rotation 90}
-			default {set rotation 0}
 		}
 	}
 			
