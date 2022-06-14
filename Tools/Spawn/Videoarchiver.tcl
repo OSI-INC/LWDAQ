@@ -337,8 +337,10 @@ proc Videoarchiver_camera_init {n} {
 		set configuration [LWDAQ_socket_read $sock $size]
 		if {[regexp "os Bullseye" $configuration]} {
 			set info(segment_len) "2.0"
+			set info(cam$n\_os) "Bullseye"
 		} else {
 			set info(segment_len) "1.0"
+			set info(cam$n\_os) "Stretch"
 		}
 		LWDAQ_print $info(text) "$info(cam$n\_id) Using segment length\
 			$info(segment_len) s."
@@ -921,38 +923,33 @@ proc Videoarchiver_stream {n} {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 		
-		# Get the camera configuration file so we can decide what camera utility to
-		# call.
-		LWDAQ_socket_write $sock "getfile videoarchiver.config\n"
-		set size [LWDAQ_socket_read $sock line]
-		if {[LWDAQ_is_error_result $size]} {error $size}
-		set configuration [LWDAQ_socket_read $sock $size]
-
 		# We start video streaming to a TCPIP port. Our command uses the long
 		# versions of all options for clarity. We are going to perform percent
 		# substitution on this string to allow the user to change the
 		# resolution, compensation, rotation and saturation of the video. The
 		# final command to echo the word SUCCESS is to allow our secure shell to
 		# return a success code. Any error will cause the echo to be skipped.
-		if {[regexp "os Bullseye" $configuration]} {
-			if {($info(cam$n\_rot) == 90) || ($info(cam$n\_rot) == 180)} {
-				LWDAQ_print $info(text) "WARNING: Rotation $info(cam$n\_rot) degrees,\
-					not supported on this camera, setting to zero."
-				set info(cam$n\_rot) 0
+		if {$info(cam$n\_os) == "Bullseye"} {
+			switch $info(cam$n\_rot) {
+				0 {set rot 0}
+				90 {set rot 0}
+				180 {set rot 180}
+				270 {set rot 180}
+				default {set rot 0}
 			}
 			LWDAQ_socket_write $sock "exec libcamera-vid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
 				--flush \
 				--width $width --height $height \
-				--rotation $info(cam$n\_rot) \
+				--rotation $rot \
 				--saturation [format %.1f $info(cam$n\_sat)] \
 				--ev [format %.1f [expr 2.0*($info(cam$n\_ec)-0.5)]] \
 				--nopreview \
 				--framerate $framerate \
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
 				>& stream_log.txt & \n"
-		} {
+		} else {
 			LWDAQ_socket_write $sock "exec raspivid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
@@ -1110,18 +1107,32 @@ proc Videoarchiver_live {n} {
 	if {$sensor_index < 0} {set sensor_index 0}
 	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
 		version width height framerate crf
-				
+		
+	# Construct mplayer command.
+	set cmd [list $info(mplayer) \
+		-title "Live View From $info(cam$n\_id) $ip" \
+		-really-quiet \
+		-noconsolecontrols \
+		-demuxer lavf -cache 1000 \
+		-zoom -xy $config(display_zoom) \
+		-geometry 10%:10% \
+		-fps [expr 2*$framerate]]
+
+	# Determine the rotation command, if any.
+	if {$info(cam$n\_os) == "Bullseye"} {
+		switch $info(cam$n\_rot) {
+			90 {lappend cmd -vf rotate=1}
+			270 {lappend cmd -vf rotate=1}
+		}
+	}
+	
+	# Add stream source.
+	lappend cmd "ffmpeg://tcp://$ip:$info(tcp_port)"
+	
 	# Start the mplayer receiving the stream directly from the camera. We set 
 	# the frame to be higher than the actual frame rate, so the player displays
 	# every frame as it arrives, and catches up if it lags behind.
-	set info(cam$n\_lproc) [exec \
-		$info(mplayer) -title "Live View From $info(cam$n\_id) $ip" \
-		-demuxer lavf -cache 1000 -really-quiet -noconsolecontrols \
-		-zoom -xy $config(display_zoom) \
-		-geometry 10%:10% \
-		-fps [expr 2*$framerate] \
-		"ffmpeg://tcp://$ip:$info(tcp_port)" \
-		>& live_log.txt &]
+	set info(cam$n\_lproc) [exec {*}$cmd >& live_log.txt &]
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting live view,\
 		 this will take a few seconds..." $config(v_col)
 		
@@ -1153,7 +1164,8 @@ proc Videoarchiver_live_watchdog {n} {
 	} elseif {$LWDAQ_Info(reset)} {
 		Videoarchiver_stop $n
 	} elseif {![LWDAQ_process_exists $info(cam$n\_lproc)]} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Live view terminated." $config(v_col)
+		LWDAQ_print $info(text) "$info(cam$n\_id) Live view has stopped running." \
+			$config(v_col)
 		Videoarchiver_stop $n
 	} else {
 		LWDAQ_post [list Videoarchiver_live_watchdog $n]
@@ -1209,7 +1221,8 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		puts $info(monitor_channel) "vo_ontop 0"
 		puts $info(monitor_channel) "speed_set $config(monitor_speed)"		
 		LWDAQ_print $info(text) "$info(cam$n\_id) Started recording view,\
-			expect delay of five seconds, close with escape key." $config(v_col)
+			expect delay of five seconds, will close itself in\
+			$config(monitor_longevity) s." $config(v_col)
 		set info(monitor_start) [clock seconds]
 	} elseif {$command == "Stop"} {
 		if {[LWDAQ_process_exists $info(monitor_process)] \
@@ -1267,7 +1280,17 @@ proc Videoarchiver_compress {n} {
 	if {$sensor_index < 0} {set sensor_index 0}
 	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
 		version width height framerate crf
-		
+	
+	# Determine if the compressors should rotate the images by ninety 
+	# degrees.
+	if {$info(cam$n\_os) == "Bullseye"} {
+		switch $info(cam$n\_rot) {
+			90 {set rotation 90}
+			270 {set rotation 90}
+			default {set rotation 0}
+		}
+	}
+			
 	if {[catch {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
@@ -1279,6 +1302,7 @@ proc Videoarchiver_compress {n} {
 			-crf $crf \
 			-preset veryfast \
 			-verbose $config(verbose_compressors) \
+			-rotation $rotation \
 			-processes $config(compression_num_cpu) \
 			>& manager_log.txt & \n"
 		set result [LWDAQ_socket_read $sock line]
@@ -2428,6 +2452,7 @@ proc Videoarchiver_remove {n} {
 	unset info(cam$n\_ver)
 	unset info(cam$n\_addr)
 	unset info(cam$n\_rot)
+	unset info(cam$n\_os)
 	unset info(cam$n\_sat)
 	unset info(cam$n\_sat)
 	unset info(cam$n\_ec)
@@ -2469,6 +2494,7 @@ proc Videoarchiver_add_camera {} {
 	set info(cam$n\_ver) "A3034-HR"
 	set info(cam$n\_addr) $info(default_ip_addr)
 	set info(cam$n\_rot) $info(default_rot)
+	set info(cam$n\_os) "unknown"
 	set info(cam$n\_sat) $info(default_sat)
 	set info(cam$n\_ec) $info(default_ec)
 	set info(cam$n\_dir) [file normalize "~/Desktop"]
@@ -3194,6 +3220,7 @@ set processes "3"
 set crf "23"
 set codec "libx264"
 set preset "veryfast"
+set rotation "0"
 set verbose "0"
 set loopwait "100"
 set segdir "tmp"
@@ -3218,6 +3245,9 @@ foreach {option value} $argv {
 		"-preset" {
 			set preset $value
 		}
+		"-rotation" {
+			set rotation $value
+		}
 		"-verbose" {
 			set verbose $value
 		}
@@ -3239,7 +3269,8 @@ foreach {option value} $argv {
 # Announce the start of compression to stdout.
 puts "Starting compression manager at [clock format [clock seconds]] with:"
 puts "framerate = $framerate fps, codec = $codec, crf = $crf, preset = $preset,"
-puts "maxfiles = $maxfiles, processes = $processes, verbose = $verbose, segdir = $segdir."
+puts "maxfiles = $maxfiles, processes = $processes, verbose = $verbose,\
+	segdir = $segdir, rotation = $rotation."
 
 # Initialize our compressor list.
 set compressors [list]
@@ -3315,6 +3346,7 @@ while {1} {
 				-codec $codec \
 				-crf $crf \
 				-preset $preset \
+				-rotation $rotation \
 				-verbose $verbose \
 				>> compressor_log.txt &]
 		} message]} {
@@ -3381,10 +3413,11 @@ while {1} {
 # Get the command line arguments.
 set infile "T0000000000.mp4"
 set framerate "20"
-set crf "23"
 set codec "libx264"
-set verbose "0"
+set crf "23"
 set preset "veryfast"
+set rotation "0"
+set verbose "0"
 foreach {option value} $argv {
 	switch $option {
 		"-infile" {
@@ -3393,17 +3426,20 @@ foreach {option value} $argv {
 		"-framerate" {
 			set framerate $value
 		}
-		"-crf" {
-			set crf $value
-		}
 		"-codec" {
 			set codec $value
 		}
-		"-verbose" {
-			set verbose $value
+		"-crf" {
+			set crf $value
 		}
 		"-preset" {
 			set preset $value
+		}
+		"-rotation" {
+			set rotation $value
+		}
+		"-verbose" {
+			set verbose $value
 		}
 		default {
 			puts "ERROR: Unknown option \"$option\"."
@@ -3432,21 +3468,24 @@ if {$verbose} {
 	puts "Compressing $infile to $outfile..." 
 }
 
+# Compose the ffmpeg command.
+set cmd [list /usr/bin/ffmpeg \
+	-nostdin -loglevel error \
+	-r $framerate \
+	-i $infile \
+	-c:v $codec \
+	-crf $crf \
+	-preset $preset]
+if {$rotation == 90} {
+	lappend cmd -vf "transpose=clock"
+}
+lappend cmd -force_key_frames "expr:eq(mod(n,20),0)" $outfile
+
 # Compress with ffmpeg to produce video with the specified frame rate. If we
 # encounter an ffmpeg error, we report to stdout, but otherwise proceed, because
 # ffmpeg will report errors even though it completes compression.
 set start [clock milliseconds]
-if {[catch {
-	exec /usr/bin/ffmpeg \
-		-nostdin -loglevel error \
-		-r $framerate \
-		-i $infile \
-		-c:v $codec \
-		-crf $crf \
-		-preset $preset \
-		-force_key_frames "expr:eq(mod(n,20),0)" \
-		$outfile
-} message]} {
+if {[catch {exec {*}$cmd} message]} {
 	puts "ERROR: $message during compression of [file tail $infile]."
 }
 set duration [expr [clock milliseconds] - $start]
