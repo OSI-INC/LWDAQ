@@ -912,7 +912,7 @@ return 1
 
 ----------Begin Help----------
 
-http://www.opensourceinstruments.com/Fiber_Positioner/Development.html#Software
+http://www.opensourceinstruments.com/DFPS/Development.html
 
 ----------End Help----------
 
