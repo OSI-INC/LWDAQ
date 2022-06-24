@@ -1644,17 +1644,18 @@ proc Videoarchiver_transfer {n {init 0}} {
 					set result [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $result]} {error $result}
 					
-					# If the segment has no obvious flaws, write it to disk.
+					# Write the segment to disk.
 					set when "saving copy $sf"
-					if {$size*0.001 >= $config(min_seg_size)} {
-						set f [open $sf w]
-						fconfigure $f -translation binary
-						puts -nonewline $f $contents
-						close $f
-					} else {
+					set f [open $sf w]
+					fconfigure $f -translation binary
+					puts -nonewline $f $contents
+					close $f
+
+					# Issue a warning if the size is below a minimum.
+					if {$size*0.001 < $config(min_seg_size)} {
 						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-							Rejecting $sf, size $size < $config(min_seg_size),\
-							time [clock seconds]."
+							$sf size $size < $config(min_seg_size),\
+							[clock format [clock seconds]]."
 					}
 					
 					# Calculate the time lag between the current time and the
