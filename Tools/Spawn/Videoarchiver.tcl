@@ -1651,11 +1651,13 @@ proc Videoarchiver_transfer {n {init 0}} {
 					puts -nonewline $f $contents
 					close $f
 
-					# Issue a warning if the size is below a minimum.
-					if {$size*0.001 < $config(min_seg_size)} {
-						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-							$sf size $size < $config(min_seg_size),\
-							[clock format [clock seconds]]."
+					# When verbose, issue a warning if the size is below a minimum.
+					if {$config(verbose)} {					
+						if {$size*0.001 < $config(min_seg_size)} {
+							LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
+								$sf size $size < $config(min_seg_size),\
+								[clock format [clock seconds]]."
+						}
 					}
 					
 					# Calculate the time lag between the current time and the
