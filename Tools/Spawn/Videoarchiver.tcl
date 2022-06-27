@@ -1652,10 +1652,11 @@ proc Videoarchiver_transfer {n {init 0}} {
 					close $f
 
 					# When verbose, issue a warning if the size is below a minimum.
-					if {$config(verbose)} {					
-						if {$size*0.001 < $config(min_seg_size)} {
+					if {$config(verbose)} {		
+						set size_kb [format %.1f [expr $size*0.001]]
+						if {$size_kb < $config(min_seg_size)} {
 							LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-								$sf size $size < $config(min_seg_size),\
+								$sf size $size_kb kByte < $config(min_seg_size) kByte,\
 								[clock format [clock seconds]]."
 						}
 					}
