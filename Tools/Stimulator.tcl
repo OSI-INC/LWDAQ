@@ -131,29 +131,15 @@ proc Stimulator_commands {n} {
 	lappend commands 3 $current
 	
 	# Set the two bytes of the pulse length.
-	set len [expr round($config(device_rck_khz) * [set info(dev$n\_pulse_ms)])]
-	if {$len > $config(max_len)} {
-		set len $config(max_len)
-		LWDAQ_print $info(text) "WARNING: Pulses truncated to\
-			[format %.3f [expr 1.0*$len/$config(device_rck_khz)]] ms."
-	}
+	set len [expr round($config(device_rck_khz) * $info(dev$n\_pulse_ms))]
 	lappend commands 4 [expr $len / 256] 5 [expr $len % 256]
 
 	# Set the two bytes of the interval length.
-	set len [expr round([set info(dev$n\_period_ms)])]
-	if {$len > $config(max_len)} {
-		set len $config(max_len)
-		LWDAQ_print $info(text) "WARNING: Interval truncated $len ms."
-	}
-	lappend commands 6 [expr $len / 256] 7 [expr $len % 256]
+	set len [expr round($config(device_rck_khz) * $info(dev$n\_period_ms))]
+	lappend commands 6 [expr $len / 65536] 7 [expr ($len / 256) % 256]
 
 	# Set the two bytes of the stimulus length, which is the number of intervals.
-	set len [set info(dev$n\_num_pulses)]
-	if {$len > $config(max_len)} {
-		set len $config(max_len)
-		LWDAQ_print $info(text) "WARNING: Stimulus truncated to $len pulses."
-		
-	}
+	set len $info(dev$n\_num_pulses)
 	lappend commands 8 [expr $len / 256] 9 [expr $len % 256]
 
 	# Randomize the pulses, or not.
