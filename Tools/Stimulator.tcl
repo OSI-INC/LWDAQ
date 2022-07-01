@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "2.0"
+	LWDAQ_tool_init "Stimulator" "2.1"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -73,6 +73,13 @@ proc Stimulator_init {} {
 	set config(default_id) "0000"
 	set config(verbose) "1"
 	
+	set info(op_stop_stim) "0"
+	set info(op_start_stim) "1"
+	set info(op_xmit) "2"
+	set info(op_ack) "3"
+	set info(op_battery) "4"
+	set info(op_randomize) "5"
+	
 	set info(state) "Idle"
 	set info(monitor_interval_ms) "100"
 	set info(monitor_ms) "0"
@@ -90,7 +97,7 @@ proc Stimulator_init {} {
 
 #
 # Stimulator_id_bytes returns a list of two bytes as decimal numbers that represent
-# the idendifier of the implant.
+# the identifier of the implant.
 #
 proc Stimulator_id_bytes {n} {
 	upvar #0 Stimulator_config config
@@ -125,30 +132,35 @@ proc Stimulator_commands {n} {
 	# for "select all".
 	set commands [Stimulator_id_bytes $n]
 	
-	# Set the stimulus current.
+	# Append the stimulus start command.
+	lappend commands $info(op_start_stim)
+	
+	# Append the current.
 	set current [expr round([set info(dev$n\_current)])]
 	if {$current < $config(min_current)} {set current $config(min_current)}
 	if {$current > $config(max_current)} {set current $config(max_current)}
 	set info(dev$n\_current) $current
-	lappend commands 3 $current
+	lappend commands $current
 	
-	# Set the two bytes of the pulse length.
+	# Append the two bytes of the pulse length.
 	set len [expr round($config(device_rck_khz) * $info(dev$n\_pulse_ms))]
 	if {$len > $config(max_pulse_len)} {
 		set len $config(max_pulse_len)
 		LWDAQ_print $info(text) "WARNING: Pulses truncated to\
 			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
 	}
-	lappend commands 4 [expr $len / 256] 5 [expr $len % 256]
+	lappend commands [expr $len / 256] [expr $len % 256]
 
-	# Set the two bytes of the interval length.
+	# Set the three bytes of the interval length.
 	set len [expr round($config(device_rck_khz) * $info(dev$n\_period_ms))]
 	if {$len > $config(max_interval_len)} {
 		set len $config(max_interval_len)
 		LWDAQ_print $info(text) "WARNING: Intervals truncated to\
 			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
 	}
-	lappend commands 6 [expr $len / 65536] 7 [expr ($len / 256) % 256]
+	lappend commands [expr $len / 65536] \
+		[expr ($len / 256) % 256] \
+		[expr $len % 256]
 
 	# Set the two bytes of the stimulus length, which is the number of intervals.
 	set len $info(dev$n\_num_pulses)
@@ -156,22 +168,19 @@ proc Stimulator_commands {n} {
 		set len $config(max_stimulus_len)
 		LWDAQ_print $info(text) "WARNING: Stimulus truncated to $len pulses."
 	}
-	lappend commands 8 [expr $len / 256] 9 [expr $len % 256]
+	lappend commands [expr $len / 256] [expr $len % 256]
 
 	# Randomize the pulses, or not.
 	if {[set info(dev$n\_random)]} {
-		lappend commands 10 1
+		lappend commands $info(op_randomize) 1
 	} {
-		lappend commands 10 0
+		lappend commands $info(op_randomize) 0
 	}
 	
 	# Request an acknowledgement.
 	if {$config(ack_enable)} {
-		lappend commands 12 $config(ack_key)
+		lappend commands $info(op_ack) $config(ack_key)
 	}
-	
-	# Start the stimulus.
-	lappend commands 1
 	
 	# We return the command string, which does not yet have the checksum
 	# attached to the end, but is otherwise a sequence of operation codes
@@ -325,9 +334,9 @@ proc Stimulator_stop {n} {
 	# Send the stimulus stop command, which is just a zero. We request an
 	# acknowledgement only when we are instructing one particular device.
 	set commands [Stimulator_id_bytes $n]
-	lappend commands 0
+	lappend commands $info(op_stop_stim)
 	if {$config(ack_enable)} {
-		lappend commands 12 $config(ack_key)
+		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_id) Stop $ack_time"
 	}
 	Stimulator_transmit $n $commands
@@ -362,10 +371,10 @@ proc Stimulator_xon {n} {
 	# Send the Xon command. We request an acknowledgement
 	# only when we are instructing one particular device.
 	set commands [Stimulator_id_bytes $n]
-	lappend commands 2 $info(dev$n\_ch)\
+	lappend commands $info(op_xmit) $info(dev$n\_ch)\
 		[expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
 	if {$config(ack_enable)} {
-		lappend commands 12 $config(ack_key)
+		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_id) Xon $ack_time"
 	}
 	Stimulator_transmit $n $commands
@@ -395,9 +404,9 @@ proc Stimulator_xoff {n} {
 	# Send the Xoff command. We request an acknowledgement
 	# only when we are instructing one particular device.
 	set commands [Stimulator_id_bytes $n]
-	lappend commands 2 0 0
+	lappend commands $info(op_xmit) 1 0
 	if {$config(ack_enable)} {
-		lappend commands 12 $config(ack_key)
+		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_id) Xff $ack_time"
 	}
 	Stimulator_transmit $n $commands
@@ -426,9 +435,9 @@ proc Stimulator_battery {n} {
 	
 	# Send battery measurement request.
 	set commands [Stimulator_id_bytes $n]
-	lappend commands 13
+	lappend commands $info(op_battery)
 	if {$config(ack_enable)} {
-		lappend commands 12 $config(ack_key)
+		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_id) Battery $ack_time"
 	}
 	Stimulator_transmit $n $commands
