@@ -30,7 +30,9 @@ proc Stimulator_init {} {
 	set config(ip_addr) "10.0.0.37"
 
 	set config(device_rck_khz) "32.768"
-	set config(max_len) "65535"
+	set config(max_pulse_len) [expr (256 * 256) - 1]
+	set config(max_interval_len) [expr (256 * 256 * 256) - 1]
+	set config(max_stimulus_len) [expr (256 * 256) - 1]
 	set config(min_current) "0"
 	set config(max_current) "15"
 	set config(initiate_delay) "0.010"
@@ -132,14 +134,28 @@ proc Stimulator_commands {n} {
 	
 	# Set the two bytes of the pulse length.
 	set len [expr round($config(device_rck_khz) * $info(dev$n\_pulse_ms))]
+	if {$len > $config(max_pulse_len)} {
+		set len $config(max_pulse_len)
+		LWDAQ_print $info(text) "WARNING: Pulses truncated to\
+			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
+	}
 	lappend commands 4 [expr $len / 256] 5 [expr $len % 256]
 
 	# Set the two bytes of the interval length.
 	set len [expr round($config(device_rck_khz) * $info(dev$n\_period_ms))]
+	if {$len > $config(max_interval_len)} {
+		set len $config(max_interval_len)
+		LWDAQ_print $info(text) "WARNING: Intervals truncated to\
+			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
+	}
 	lappend commands 6 [expr $len / 65536] 7 [expr ($len / 256) % 256]
 
 	# Set the two bytes of the stimulus length, which is the number of intervals.
 	set len $info(dev$n\_num_pulses)
+	if {$len > $config(max_stimulus_len)} {
+		set len $config(max_stimulus_len)
+		LWDAQ_print $info(text) "WARNING: Stimulus truncated to $len pulses."
+	}
 	lappend commands 8 [expr $len / 256] 9 [expr $len % 256]
 
 	# Randomize the pulses, or not.
@@ -207,6 +223,10 @@ proc Stimulator_transmit {n commands} {
 	global LWDAQ_Driver
 
 	set commands [Stimulator_append_checksum $commands]
+	
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "Transmitting: $commands"
+	}
 
 	if {[catch {
 		set sock [LWDAQ_socket_open $config(ip_addr)]
@@ -230,9 +250,6 @@ proc Stimulator_transmit {n commands} {
 		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]"
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		return "FAIL"
-	}
-	if {$config(verbose)} {
-		LWDAQ_print $info(text) "Bytes Transmitted: $commands"
 	}
 	
 	return "SUCCESS"
