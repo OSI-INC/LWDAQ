@@ -295,17 +295,18 @@ proc Stimulator_start {n} {
 			+ [set info(dev$n\_period_ms)] * [set info(dev$n\_num_pulses)]]
 	}
 	
-	# Determine the acknowledgement timeout moment. The acknowledgement
-	# key is the least significant eight bits of the timeout moment.
+	# Determine the acknowledgement time and key.
 	set ack_time [clock milliseconds]
 	set config(ack_key) [expr $ack_time % 256]
 	
 	# Transmit the commands.
 	Stimulator_transmit $n [Stimulator_commands $n]
 
-	# Set acknowledgement timeout moment.
+	# Add the requested acknowledgement to the list of those we are expecting.
+	# Our list includes the device identifier, the command that asked for the
+	# acknowledgement and the time.
 	if {$config(ack_enable)} {
-		lappend config(ack_pending) "$n $info(dev$n\_id) Start $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_ch) Start $ack_time"
 	}
 
 	# Set state variables.
@@ -337,7 +338,7 @@ proc Stimulator_stop {n} {
 	lappend commands $info(op_stop_stim)
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_id) Stop $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_ch) Stop $ack_time"
 	}
 	Stimulator_transmit $n $commands
 	
@@ -375,7 +376,7 @@ proc Stimulator_xon {n} {
 		[expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_id) Xon $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_ch) Xon $ack_time"
 	}
 	Stimulator_transmit $n $commands
 
@@ -407,7 +408,7 @@ proc Stimulator_xoff {n} {
 	lappend commands $info(op_xmit) 1 0
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_id) Xff $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_ch) Xff $ack_time"
 	}
 	Stimulator_transmit $n $commands
 
@@ -438,7 +439,7 @@ proc Stimulator_battery {n} {
 	lappend commands $info(op_battery)
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_id) Battery $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_ch) Battery $ack_time"
 	}
 	Stimulator_transmit $n $commands
 
@@ -516,7 +517,7 @@ proc Stimulator_monitor {} {
 	}
 	
 	# If acknowledgement monitoring is enabled, check for their arrival. The 
-	# acknowledgements we obtain from the Receiver Instrument's auxilliary
+	# acknowledgements we obtain from the Receiver Instrument's auxiliary
 	# message list, which is accessible here by the name "aux". This list will
 	# contain new acknowledgements only if the Receiver Instrument is downloading
 	# live data, either because it is Looping, or because the Neuroarchiver is
@@ -533,7 +534,7 @@ proc Stimulator_monitor {} {
 				foreach ack $config(ack_pending) {
 					scan $ack %s%s%s%s n ack_id ack_type ack_time
 					set ack_key [expr $ack_time % 256]
-					if {([expr 0x$ack_id % 255] == $id) && ($ack_key == $db)} {
+					if {($ack_id == $id) && ($ack_key == $db)} {
 						if {$config(verbose)} {
 							LWDAQ_print $info(text) "Acknowledgement Received:\
 								device=$n id=$ack_id type=$ack_type key=$ack_key time=$ack_time\."
@@ -557,7 +558,7 @@ proc Stimulator_monitor {} {
 			set ack_key [expr $ack_time % 256]
 			if {$ack_time + $config(ack_timeout_ms) < $now_time} {
 				LWDAQ_print $info(text) "Acknowledgement Lost:\
-					device=$n id=$ack_id type=$ack_type key=$ack_key time=$ack_time\." \
+					device=$n ch=$ack_id type=$ack_type key=$ack_key time=$ack_time\." \
 					$config(ack_lost_color)
 			} {
 				lappend new_acks $ack
@@ -566,11 +567,10 @@ proc Stimulator_monitor {} {
 		set config(ack_pending) $new_acks
 	}
 
-	# Look for battery measurement reports in the auxilliary message list.
+	# Look for battery measurement reports in the auxiliary message list.
 	set new_aux [list]
 	set id_list [list]
-	foreach n $info(dev_list) {lappend id_list \
-		"$n [expr 0x$info(dev$n\_id) % 256]"}
+	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_ch)"}
 	foreach am $aux {
 		scan $am %d%d%d%d id fa db ts
 		
@@ -586,25 +586,19 @@ proc Stimulator_monitor {} {
 			continue
 		}
 		
-		# If an auxilliary message is a battery measurement, analyze and report.
+		# If an auxiliary message is a battery measurement, analyze and report.
 		if {$fa == $config(bat_fa)} {
 			# Report the battery measurement if verbose flag is set.
 			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Battery: device=$n id=$info(dev$n\_id)\
+				LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_ch)\
 					value=$db time=$ts\."
 			}
 			
 			# We interpret battery measurements in a manner particular to the
 			# various supported device versions.
 			set ver [set info(dev$n\_ver)]
-			if {$ver == "A3030"} {
-				scan $config(bat_calib_A3030) %f%f vref scale
-				set voltage [format %.1f [expr 1.0 * ($db - $vref) / $scale]]
-			} elseif {$ver == "A3036"} {
-				scan $config(bat_calib_A3036) %f%f%f vref mref scale
-				set voltage [format %.1f [expr $vref + 1.0 * ($db - $mref) / $scale]]
-			} else {
-				set voltage "?"
+			if {$ver == "A3041"} {
+				set voltage "2.7"
 			}
 			
 			# Set the battery voltage indicator and set its background according
