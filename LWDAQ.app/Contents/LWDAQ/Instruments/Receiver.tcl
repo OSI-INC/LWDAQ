@@ -99,7 +99,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(aux_list_length) 0
 	set info(set_size) "16"
 	set info(clock_id) 0
-	set info(aux_num_keep) 1000
+	set info(aux_num_keep) 64
 	set info(show_errors) 0
 	set info(show_error_extent) 20
 	

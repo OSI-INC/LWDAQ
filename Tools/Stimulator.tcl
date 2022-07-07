@@ -58,19 +58,19 @@ proc Stimulator_init {} {
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 
-	set config(bat_calib_A3030) "8 40"
-	set config(bat_calib_A3036) "3.7 200 -60"
-	set config(blow) "3.6"
-	set config(bempty) "3.2"
+	set config(blow) "2.3"
+	set config(bempty) "2.2"
 
 	set config(ack_enable) "0"
 	set config(ack_timeout_ms) "2000"
 	set config(ack_key) "0"
-	set config(ack_fa) "1"
-	set config(bat_fa) "2"
+	set config(id_at) "0"
+	set config(ack_at) "1"
+	set config(bat_at) "2"
+	set config(sync_at) "3"
 	set config(ack_pending) ""
 	set config(default_ver) "A3041"
-	set config(default_id) "0000"
+	set config(default_id) "ABCD"
 	set config(verbose) "1"
 	
 	set info(op_stop_stim) "0"
@@ -78,7 +78,8 @@ proc Stimulator_init {} {
 	set info(op_xmit) "2"
 	set info(op_ack) "3"
 	set info(op_battery) "4"
-	set info(op_randomize) "5"
+	set info(op_identify) "5"
+	set info(op_setpcn) "6"
 	
 	set info(state) "Idle"
 	set info(monitor_interval_ms) "100"
@@ -103,7 +104,7 @@ proc Stimulator_id_bytes {n} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
-	set id [string trim [set info(dev$n\_id)]]
+	set id [string trim $info(dev$n\_id)]
 	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
 		return "[expr 0x$b1] [expr 0x$b2]"
 	} elseif {$id == "*"} {
@@ -131,12 +132,12 @@ proc Stimulator_commands {n} {
 	# the ID field by four hex digits. If the id is set to "*" we transmit FFFF 
 	# for "select all".
 	set commands [Stimulator_id_bytes $n]
-	
+
 	# Append the stimulus start command.
 	lappend commands $info(op_start_stim)
 	
 	# Append the current.
-	set current [expr round([set info(dev$n\_current)])]
+	set current [expr round($info(dev$n\_current))]
 	if {$current < $config(min_current)} {set current $config(min_current)}
 	if {$current > $config(max_current)} {set current $config(max_current)}
 	set info(dev$n\_current) $current
@@ -171,14 +172,16 @@ proc Stimulator_commands {n} {
 	lappend commands [expr $len / 256] [expr $len % 256]
 
 	# Randomize the pulses, or not.
-	if {[set info(dev$n\_random)]} {
-		lappend commands $info(op_randomize) 1
+	if {$info(dev$n\_random)} {
+		lappend commands 1
 	} {
-		lappend commands $info(op_randomize) 0
+		lappend commands 0
 	}
 	
-	# Request an acknowledgement.
+	# Request an acknowledgement. We specify a primary channel number for
+	# the acknowledgment to use.
 	if {$config(ack_enable)} {
+		lappend commands $info(op_setpcn) $info(dev$n\_ch)
 		lappend commands $info(op_ack) $config(ack_key)
 	}
 	
@@ -244,7 +247,7 @@ proc Stimulator_transmit {n commands} {
 		} {
 			set sd $config(spacing_delay_A2071E)
 		}
-		LWDAQ_set_driver_mux $sock [set info(dev$n\_sckt)] 1
+		LWDAQ_set_driver_mux $sock $info(dev$n\_sckt) 1
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		foreach c $commands {
@@ -288,11 +291,11 @@ proc Stimulator_start {n} {
 	# A finite stimulus ends at after the interval length multiplied by the
 	# stimulus length, the former being in milliseconds and the latter in 
 	# intervals.
-	if {[set info(dev$n\_num_pulses)] == 0} {
+	if {$info(dev$n\_num_pulses) == 0} {
 		set info(dev$n\_end)  0
 	} {
 		set info(dev$n\_end) [expr [clock milliseconds] \
-			+ [set info(dev$n\_period_ms)] * [set info(dev$n\_num_pulses)]]
+			+ $info(dev$n\_period_ms) * $info(dev$n\_num_pulses)]
 	}
 	
 	# Determine the acknowledgement time and key.
@@ -310,7 +313,7 @@ proc Stimulator_start {n} {
 	}
 
 	# Set state variables.
-	LWDAQ_set_bg [set info(dev$n\_state)] $config(son_color)
+	LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
 	set info(state) "Idle"
 	
 	return "SUCCESS"
@@ -332,11 +335,16 @@ proc Stimulator_stop {n} {
 	set ack_time [clock milliseconds]
 	set config(ack_key) [expr $ack_time % 256]
 	
-	# Send the stimulus stop command, which is just a zero. We request an
-	# acknowledgement only when we are instructing one particular device.
+	# Select the device and specify a primary channel number for acknowledgement.
 	set commands [Stimulator_id_bytes $n]
+
+	# Send the stimulus stop command, which is just a zero.
 	lappend commands $info(op_stop_stim)
+	
+	# If we want an acknowledgement, specify a primary channel number and
+	# request the acknowledgement.
 	if {$config(ack_enable)} {
+		lappend commands $info(op_setpcn) $info(dev$n\_ch)
 		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_ch) Stop $ack_time"
 	}
@@ -346,7 +354,7 @@ proc Stimulator_stop {n} {
 	set info(dev$n\_end) 0
 	
 	# Set state variables.
-	LWDAQ_set_bg [set info(dev$n\_state)] $config(soff_color)
+	LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 	set info(state) "Idle"
 	
 	return "SUCCESS"
@@ -368,20 +376,27 @@ proc Stimulator_xon {n} {
 	# Set the acknowledgement time and key.
 	set ack_time [clock milliseconds]
 	set config(ack_key) [expr $ack_time % 256]
-	
-	# Send the Xon command. We request an acknowledgement
-	# only when we are instructing one particular device.
+
+	# Select the device and specify a primary channel number for transmission.
 	set commands [Stimulator_id_bytes $n]
-	lappend commands $info(op_xmit) $info(dev$n\_ch)\
+	lappend commands $info(op_setpcn) $info(dev$n\_ch)
+
+	# Send the Xon command with transmit period. 
+	lappend commands $info(op_xmit) \
 		[expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
+		
+	# We request an acknowledgement only when we are instructing one particular
+	# device.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_ch) Xon $ack_time"
 	}
+	
+	# Transmit the command.
 	Stimulator_transmit $n $commands
 
 	# Set state variables.
-	LWDAQ_set_fg [set info(dev$n\_state)] $config(xon_color)
+	LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
 	set info(state) "Idle"
 	
 	return "SUCCESS"
@@ -402,18 +417,23 @@ proc Stimulator_xoff {n} {
 	set ack_time [clock milliseconds]
 	set config(ack_key) [expr $ack_time % 256]
 	
-	# Send the Xoff command. We request an acknowledgement
-	# only when we are instructing one particular device.
+	# Select device and specify primary channel number.
 	set commands [Stimulator_id_bytes $n]
-	lappend commands $info(op_xmit) 1 0
+	
+	# Send the Xoff command, which is a transmit command with zero period.
+	lappend commands $info(op_xmit) 0
+	
+	# If we want an acknowledgement, specify a primary channel number and
+	# an acknowledgement key.
 	if {$config(ack_enable)} {
+	lappend commands $info(op_setpcn) $info(dev$n\_ch)
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_ch) Xff $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_ch) Xoff $ack_time"
 	}
 	Stimulator_transmit $n $commands
 
 	# Set state variables.
-	LWDAQ_set_fg [set info(dev$n\_state)] $config(xoff_color)
+	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 	set info(state) "Idle"
 	
 	return "SUCCESS"
@@ -434,13 +454,21 @@ proc Stimulator_battery {n} {
 	set ack_time [clock milliseconds]
 	set config(ack_key) [expr $ack_time % 256]
 	
-	# Send battery measurement request.
+	# Select the device and specify a primary channel number for the
+	# battery report to use.
 	set commands [Stimulator_id_bytes $n]
+	lappend commands $info(op_setpcn) $info(dev$n\_ch)
+
+	# Send battery measurement request.
 	lappend commands $info(op_battery)
+	
+	# Add acknowledgement request if specified.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_ch) Battery $ack_time"
 	}
+	
+	# Transmit commands.
 	Stimulator_transmit $n $commands
 
 	# Set state variables.
@@ -460,7 +488,7 @@ proc Stimulator_all {action} {
 	upvar #0 Stimulator_info info
 
 	foreach n $info(dev_list) {
-		if {[set info(dev$n\_id)] != "*"} {
+		if {$info(dev$n\_id) != "*"} {
 			Stimulator_$action $n
 		}
 		LWDAQ_wait_seconds $config(spacing_delay_cmd)
@@ -476,9 +504,9 @@ proc Stimulator_clear {n} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
-	LWDAQ_set_bg [set info(dev$n\_state)] $config(soff_color)
-	LWDAQ_set_fg [set info(dev$n\_state)] $config(xoff_color)
-	LWDAQ_set_bg [set info(dev$n\_vbat_label)] $config(bnone_color)
+	LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+	LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bnone_color)
 	set info(dev$n\_battery) "?"	
 
 	return "SUCCESS"
@@ -510,9 +538,9 @@ proc Stimulator_monitor {} {
 	
 	# Check the stimuli and mark device state label when stimulus is complete.
 	foreach n $info(dev_list) {
-		set end_time [set info(dev$n\_end)]
+		set end_time $info(dev$n\_end)
 		if {($end_time > 0) && ($end_time <= $now_time)} {
-			LWDAQ_set_bg [set info(dev$n\_state)] $config(soff_color)
+			LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 		}	
 	}
 	
@@ -529,7 +557,7 @@ proc Stimulator_monitor {} {
 		foreach am $aux {
 			set match 0
 			scan $am %d%d%d%d id fa db ts
-			if {$fa == $config(ack_fa)} {
+			if {$fa == $config(ack_at)} {
 				set new_acks [list]
 				foreach ack $config(ack_pending) {
 					scan $ack %s%s%s%s n ack_id ack_type ack_time
@@ -573,7 +601,7 @@ proc Stimulator_monitor {} {
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_ch)"}
 	foreach am $aux {
 		scan $am %d%d%d%d id fa db ts
-		
+
 		# The battery measurements have only the device id to identify them, so
 		# we look for the first device entry with a matching id and assume this
 		# is the matching device. If we find no matching id, we move on to the
@@ -587,7 +615,7 @@ proc Stimulator_monitor {} {
 		}
 		
 		# If an auxiliary message is a battery measurement, analyze and report.
-		if {$fa == $config(bat_fa)} {
+		if {$fa == $config(bat_at)} {
 			# Report the battery measurement if verbose flag is set.
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_ch)\
@@ -596,9 +624,14 @@ proc Stimulator_monitor {} {
 			
 			# We interpret battery measurements in a manner particular to the
 			# various supported device versions.
-			set ver [set info(dev$n\_ver)]
-			if {$ver == "A3041"} {
-				set voltage "2.7"
+			set ver $info(dev$n\_ver)
+			switch $ver {
+				"A3041" {
+					set voltage [format %.1f [expr 255.0/$db*1.2]]
+				}
+				default {
+					set voltage "?"
+				}
 			}
 			
 			# Set the battery voltage indicator and set its background according
@@ -607,13 +640,13 @@ proc Stimulator_monitor {} {
 			# question mark.
 			set info(dev$n\_battery) $voltage	
 			if {$voltage == "?"} {
-				LWDAQ_set_bg [set info(dev$n\_vbat_label)] $config(bnone_color)
+				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bnone_color)
 			} elseif {$voltage > $config(blow)} {
-				LWDAQ_set_bg [set info(dev$n\_vbat_label)] $config(bokay_color)
+				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bokay_color)
 			} elseif {$voltage > $config(bempty)} {
-				LWDAQ_set_bg [set info(dev$n\_vbat_label)] $config(blow_color)
+				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(blow_color)
 			} else {
-				LWDAQ_set_bg [set info(dev$n\_vbat_label)] $config(bempty_color)
+				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bempty_color)
 			}
 		} {
 			lappend new_aux $am
@@ -670,7 +703,7 @@ proc Stimulator_draw_list {} {
 			set info(dev$n\_period_ms) "100"
 			set info(dev$n\_num_pulses) "10"
 			set info(dev$n\_random) "0"
-			set info(dev$n\_ch) "1"
+			set info(dev$n\_ch) [expr 0x$config(default_id) % 256]
 			set info(dev$n\_sps) "128"
 			set info(dev$n\_battery) "?"
 			set info(dev$n\_end) "0"
@@ -837,7 +870,7 @@ proc Stimulator_add_device {} {
 	set info(dev$n\_period_ms) "100"
 	set info(dev$n\_num_pulses) "10"
 	set info(dev$n\_current) "15"
-	set info(dev$n\_ch) "1"
+	set info(dev$n\_ch) [expr 0x$config(default_id) % 256]
 	set info(dev$n\_sps) "128"
 	set info(dev$n\_random) "0"
 	set info(dev$n\_end) "0"
@@ -903,8 +936,8 @@ proc Stimulator_load_list {{fn ""}} {
 		uplevel #0 [list source $fn]
 		Stimulator_draw_list
 		foreach n $info(dev_list) {
-			LWDAQ_set_bg [set info(dev$n\_state)] $config(soff_color)
-			LWDAQ_set_fg [set info(dev$n\_state)] $config(xoff_color)
+			LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+			LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 			set info(dev$n\_battery) "?"
 		}
 	} error_message]} {
