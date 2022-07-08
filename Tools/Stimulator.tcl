@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "2.1"
+	LWDAQ_tool_init "Stimulator" "2.2"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -468,6 +468,32 @@ proc Stimulator_battery {n} {
 		lappend config(ack_pending) "$n $info(dev$n\_ch) Battery $ack_time"
 	}
 	
+	# Transmit commands.
+	Stimulator_transmit $n $commands
+
+	# Set state variables.
+	set info(state) "Idle"
+	
+	return "SUCCESS"
+}
+
+#
+# Stimulator_identify requests a identifying messages from all devices.
+#
+proc Stimulator_identify {n} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+
+	# Set the tool state variable.
+	if {$info(state) != "Idle"} {return}
+	set info(state) "Command"
+
+	# Provide the multicast address.
+	set commands "255 255"
+	
+	# Add the idenfity command.
+	lappend commands $info(op_identify)
+
 	# Transmit commands.
 	Stimulator_transmit $n $commands
 
