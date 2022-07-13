@@ -66,7 +66,7 @@ proc Stimulator_init {} {
 	set config(ack_key) "0"
 	set config(id_at) "0"
 	set config(ack_at) "1"
-	set config(bat_at) "2"
+	set config(batt_at) "2"
 	set config(sync_at) "3"
 	set config(ack_pending) ""
 	set config(default_ver) "A3041"
@@ -181,7 +181,7 @@ proc Stimulator_commands {n} {
 	# Request an acknowledgement. We specify a primary channel number for
 	# the acknowledgment to use.
 	if {$config(ack_enable)} {
-		lappend commands $info(op_setpcn) $info(dev$n\_ch)
+		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 		lappend commands $info(op_ack) $config(ack_key)
 	}
 	
@@ -309,7 +309,7 @@ proc Stimulator_start {n} {
 	# Our list includes the device identifier, the command that asked for the
 	# acknowledgement and the time.
 	if {$config(ack_enable)} {
-		lappend config(ack_pending) "$n $info(dev$n\_ch) Start $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_pcn) Start $ack_time"
 	}
 
 	# Set state variables.
@@ -344,9 +344,9 @@ proc Stimulator_stop {n} {
 	# If we want an acknowledgement, specify a primary channel number and
 	# request the acknowledgement.
 	if {$config(ack_enable)} {
-		lappend commands $info(op_setpcn) $info(dev$n\_ch)
+		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_ch) Stop $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_pcn) Stop $ack_time"
 	}
 	Stimulator_transmit $n $commands
 	
@@ -379,7 +379,7 @@ proc Stimulator_xon {n} {
 
 	# Select the device and specify a primary channel number for transmission.
 	set commands [Stimulator_id_bytes $n]
-	lappend commands $info(op_setpcn) $info(dev$n\_ch)
+	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 
 	# Send the Xon command with transmit period. 
 	lappend commands $info(op_xmit) \
@@ -389,7 +389,7 @@ proc Stimulator_xon {n} {
 	# device.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_ch) Xon $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_pcn) Xon $ack_time"
 	}
 	
 	# Transmit the command.
@@ -426,9 +426,9 @@ proc Stimulator_xoff {n} {
 	# If we want an acknowledgement, specify a primary channel number and
 	# an acknowledgement key.
 	if {$config(ack_enable)} {
-	lappend commands $info(op_setpcn) $info(dev$n\_ch)
+	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_ch) Xoff $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_pcn) Xoff $ack_time"
 	}
 	Stimulator_transmit $n $commands
 
@@ -457,7 +457,7 @@ proc Stimulator_battery {n} {
 	# Select the device and specify a primary channel number for the
 	# battery report to use.
 	set commands [Stimulator_id_bytes $n]
-	lappend commands $info(op_setpcn) $info(dev$n\_ch)
+	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 
 	# Send battery measurement request.
 	lappend commands $info(op_battery)
@@ -465,7 +465,7 @@ proc Stimulator_battery {n} {
 	# Add acknowledgement request if specified.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_ch) Battery $ack_time"
+		lappend config(ack_pending) "$n $info(dev$n\_pcn) Battery $ack_time"
 	}
 	
 	# Transmit commands.
@@ -478,11 +478,16 @@ proc Stimulator_battery {n} {
 }
 
 #
-# Stimulator_identify requests a identifying messages from all devices.
+# Stimulator_identify requests a identifying messages from all devices. It uses
+# the data acquisition configuration of the first device in our list.
 #
-proc Stimulator_identify {n} {
+proc Stimulator_identify {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
+
+	# We will use the first device's data acquisition configuration
+	# as a starting point.
+	set n [lindex $info(dev_list) 0]
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
@@ -624,14 +629,14 @@ proc Stimulator_monitor {} {
 	# Look for battery measurement reports in the auxiliary message list.
 	set new_aux [list]
 	set id_list [list]
-	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_ch)"}
+	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_pcn)"}
 	foreach am $aux {
 		scan $am %d%d%d%d id fa db ts
 
-		# The battery measurements have only the device id to identify them, so
-		# we look for the first device entry with a matching id and assume this
-		# is the matching device. If we find no matching id, we move on to the
-		# next message.
+		# The battery measurements have only the primary channel number to
+		# identify them, so we look for the first device entry with a matching
+		# id and assume this is the matching device. If we find no matching id,
+		# we move on to the next message.
 		set i [lsearch -index 1 $id_list $id]
 		if {$i >= 0} {
 			set n [lindex $id_list $i 0]
@@ -641,10 +646,10 @@ proc Stimulator_monitor {} {
 		}
 		
 		# If an auxiliary message is a battery measurement, analyze and report.
-		if {$fa == $config(bat_at)} {
+		if {$fa == $config(batt_at)} {
 			# Report the battery measurement if verbose flag is set.
 			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_ch)\
+				LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_pcn)\
 					value=$db time=$ts\."
 			}
 			
@@ -675,6 +680,23 @@ proc Stimulator_monitor {} {
 				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bempty_color)
 			}
 		} {
+			lappend new_aux $am
+		}
+	}
+	set aux $new_aux
+
+	# Look for identify messages.
+	set new_aux [list]
+	foreach am $aux {
+		scan $am %d%d%d%d id fa db ts
+
+		# If an auxiliary message is an identify measurement, analyze and report.
+		if {$fa == $config(id_at)} {
+			set device_id [format %04X [expr $id +  (256 * $db)]]
+			LWDAQ_print $info(text) "FOUND: Device $device_id at time=$ts\." green
+		} {
+		# Otherwise append it to our new list, which we will return to the
+		# Receiver Instrument.
 			lappend new_aux $am
 		}
 	}
@@ -729,7 +751,7 @@ proc Stimulator_draw_list {} {
 			set info(dev$n\_period_ms) "100"
 			set info(dev$n\_num_pulses) "10"
 			set info(dev$n\_random) "0"
-			set info(dev$n\_ch) [expr 0x$config(default_id) % 256]
+			set info(dev$n\_pcn) [expr 0x$config(default_id) % 256]
 			set info(dev$n\_sps) "128"
 			set info(dev$n\_battery) "?"
 			set info(dev$n\_end) "0"
@@ -767,7 +789,7 @@ proc Stimulator_draw_list {} {
 			pack $ff.$b -side left -expand 1
 		}
 
-		foreach {a c} {ch 4 sps 4} {
+		foreach {a c} {pcn 4 sps 4} {
 			set b [string tolower $a]
 			label $ff.l$b -text "$a\:" -fg $config(label_color)
 			entry $ff.$b -textvariable Stimulator_info(dev$n\_$b) -width $c
@@ -862,7 +884,7 @@ proc Stimulator_remove {n} {
 	unset info(dev$n\_current) 
 	unset info(dev$n\_num_pulses) 
 	unset info(dev$n\_random)
-	unset info(dev$n\_ch) 
+	unset info(dev$n\_pcn) 
 	unset info(dev$n\_sps)
 	unset info(dev$n\_end)
 	
@@ -896,7 +918,7 @@ proc Stimulator_add_device {} {
 	set info(dev$n\_period_ms) "100"
 	set info(dev$n\_num_pulses) "10"
 	set info(dev$n\_current) "15"
-	set info(dev$n\_ch) [expr 0x$config(default_id) % 256]
+	set info(dev$n\_pcn) [expr 0x$config(default_id) % 256]
 	set info(dev$n\_sps) "128"
 	set info(dev$n\_random) "0"
 	set info(dev$n\_end) "0"
@@ -1014,7 +1036,7 @@ proc Stimulator_refresh_list {{fn ""}} {
 		lappend new_list "$m $info(dev$m\_id)"
 		incr m
 	}
-	set new_list [lsort -increasing -integer -index 1 $new_list]
+	set new_list [lsort -increasing -dictionary -index 1 $new_list]
 	
 	set info(dev_list) [list]
 	set m 1
@@ -1056,6 +1078,10 @@ proc Stimulator_tx_cmd {} {
 	button $f.transmit -text "Transmit" \
 		-command [list LWDAQ_post "Stimulator_transmit 0"]
 	pack $f.transmit -side left -expand yes
+	
+	# We will use the first device's data acquisition configuration
+	# as a starting point.
+	set n [lindex $info(dev_list) 0]
 
 	label $f.lsckt -text "sckt:" -fg $config(label_color)
 	entry $f.esckt -textvariable Stimulator_info(dev$n\_sckt) -width 3
@@ -1102,7 +1128,7 @@ proc Stimulator_open {} {
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
 	}
-
+	
 	set f $w.list
 	frame $f
 	pack $f -side top -fill x
@@ -1113,7 +1139,7 @@ proc Stimulator_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	foreach a {Add_Device Save_List Load_List Refresh_List Tx_Cmd} {
+	foreach a {Add_Device Save_List Load_List Refresh_List Identify Tx_Cmd} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Stimulator_$b"
 		pack $f.$b -side left -expand 1

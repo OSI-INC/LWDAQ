@@ -1,36 +1,183 @@
 <script>
+# Simulate a sixteen-bit Galois linear feedback shift register (LFSR) and check that it
+# produces no duplicate values.
+set x "10100001"
+set y "00100011"
+set print_num 1000
+set max_num 6553
+set numbers [list]
 
+LWDAQ_print $t "Generating numbers..." green
+for {set i 0} {$i < $max_num} {incr i} {
+	set c [string index $x end]
+  set x "0[string range $x 0 end-1]"
+	set cc [string index $y end]
+	set y "$c[string range $y 0 end-1]"
+  if {$cc} {
+		set xx [expr $cc ^ [string index $x 0]]
+		append xx [string index $x 1]
+		append xx [expr $cc ^ [string index $x 2]]
+		append xx [expr $cc ^ [string index $x 3]]
+		append xx [string index $x 4]
+		append xx [expr $cc ^ [string index $x 5]]
+		append xx [string index $x 6]
+		append xx [string index $x 7]
+	} {
+		set xx $x
+	}
+	set x $xx
+  if {$i < $print_num} {LWDAQ_print $t "$i [expr 0b$x$y] [expr 0b$x] [expr 0b$y]"}
+  lappend numbers [expr 0b$x$y]
+  LWDAQ_support
+}
+LWDAQ_print -nonewline $t "Checking list..." brown
+set count 0
+for {set i 0} {$i < [llength $numbers]} {incr i} {
+	set x [lindex $numbers $i]
+	if {[lsearch -start [expr $i + 1] $numbers $x] >= 0} {
+		LWDAQ_print $t "Multiple occurances of $x" orange
+		incr count
+	}
+	if {$i % 1000 == 0} {LWDAQ_print -nonewline $t "." brown}
+	LWDAQ_support
+}
+LWDAQ_print $t "Found $count duplicates."
 </script>
 
 <script>
-#
-# SCT Label Generator. The SCT serial number consists of a series
-# number, which is three digits, and a channel number, which is one to
-# three digits. The channel number gives the first SCT communication
-# channel the labelled device uses, but does not give the subsequent
-# channel numbers. This generator skips the reserved SCT channel numbers,
-# which are those for which the remainder is zero or fifteen when divided
-# by sixteen. 
-#
-# [06-DEC-19] Generate 2000 labels starting with 215_69.
-# [07-JUN-22] Generate 2000 labels starting with 225_115
-#
-set f [open ~/Desktop/Labels.txt w]
-set set_num 225
-set id_num 115
-set num_labels 2000
-set count 0
-while {$count < $num_labels} {
-	if {($id_num % 16 > 0) && ($id_num % 16 < 15)} {
-		puts $f "$set_num $id_num"
-		incr count
-	} 
-	incr id_num
-	if {$id_num > 222} {
-		incr set_num
-		set id_num 1
+# Simulate a sixteen-bit Galois linear feedback shift register (LFSR) and check that it
+# produces no duplicate values.
+set x "10100001"
+set y "00100011"
+set print_num 1000
+set max_num 65536
+set numbers [list]
+
+LWDAQ_print $t "Generating numbers..." green
+for {set i 0} {$i < $max_num} {incr i} {
+	set c [string index $x end]
+  set x "0[string range $x 0 end-1]"
+	set cc [string index $y end]
+	set y "$c[string range $y 0 end-1]"
+  if {$cc} {
+		set xx [expr $cc ^ [string index $x 0]]
+		append xx [string index $x 1]
+		append xx [expr $cc ^ [string index $x 2]]
+		append xx [expr $cc ^ [string index $x 3]]
+		append xx [string index $x 4]
+		append xx [expr $cc ^ [string index $x 5]]
+		append xx [string index $x 6]
+		append xx [string index $x 7]
+	} {
+		set xx $x
 	}
+	set x $xx
+  if {$i < $print_num} {LWDAQ_print $t "$i [expr 0b$x$y] [expr 0b$x] [expr 0b$y]"}
+  lappend numbers [expr 0b$x$y]
+  LWDAQ_support
 }
-close $f
+LWDAQ_print -nonewline $t "Checking list..." brown
+set count 0
+for {set i 0} {$i < [llength $numbers]} {incr i} {
+	set x [lindex $numbers $i]
+	if {[lsearch -start [expr $i + 1] $numbers $x] >= 0} {
+		LWDAQ_print $t "Multiple occurances of $x" orange
+		incr count
+	}
+	if {$i % 1000 == 0} {LWDAQ_print -nonewline $t "." brown}
+	LWDAQ_support
+}
+LWDAQ_print $t "Found $count duplicates."
+</script>
+
+<script>
+# Simulate a sixteen-bit Galois linear feedback shift register (LFSR) and check that it
+# produces no duplicate values.
+set x "10100001"
+set y "00100011"
+set print_num 1000
+set max_num 65536
+set numbers [list]
+
+LWDAQ_print $t "Generating numbers..." green
+for {set i 0} {$i < $max_num} {incr i} {
+	set c [string index $x end]
+  set x "0[string range $x 0 end-1]"
+	set cc [string index $y end]
+	set y "$c[string range $y 0 end-1]"
+  if {$cc} {
+		set xx [expr $cc ^ [string index $x 0]]
+		append xx [string index $x 1]
+		append xx [expr $cc ^ [string index $x 2]]
+		append xx [expr $cc ^ [string index $x 3]]
+		append xx [string index $x 4]
+		append xx [expr $cc ^ [string index $x 5]]
+		append xx [string index $x 6]
+		append xx [string index $x 7]
+	} {
+		set xx $x
+	}
+	set x $xx
+  if {$i < $print_num} {LWDAQ_print $t "$i [expr 0b$x$y] [expr 0b$x] [expr 0b$y]"}
+  lappend numbers [expr 0b$x$y]
+  LWDAQ_support
+}
+LWDAQ_print -nonewline $t "Checking list..." brown
+set count 0
+for {set i 0} {$i < [llength $numbers]} {incr i} {
+	set x [lindex $numbers $i]
+	if {[lsearch -start [expr $i + 1] $numbers $x] >= 0} {
+		LWDAQ_print $t "Multiple occurances of $x" orange
+		incr count
+	}
+	LWDAQ_support
+}
+LWDAQ_print $t "Found $count duplicates."
+</script>
+
+<script>
+# Simulate a sixteen-bit Galois linear feedback shift register (LFSR) and check that it
+# produces no duplicate values.
+set x "10100001"
+set y "00100011"
+set print_num 1000
+set max_num 65535
+set numbers [list]
+
+LWDAQ_print $t "Generating numbers..." green
+for {set i 0} {$i < $max_num} {incr i} {
+	set c [string index $x end]
+  set x "0[string range $x 0 end-1]"
+	set cc [string index $y end]
+	set y "$c[string range $y 0 end-1]"
+  if {$cc} {
+		set xx [expr $cc ^ [string index $x 0]]
+		append xx [string index $x 1]
+		append xx [expr $cc ^ [string index $x 2]]
+		append xx [expr $cc ^ [string index $x 3]]
+		append xx [string index $x 4]
+		append xx [expr $cc ^ [string index $x 5]]
+		append xx [string index $x 6]
+		append xx [string index $x 7]
+	} {
+		set xx $x
+	}
+	set x $xx
+  if {$i < $print_num} {LWDAQ_print $t "$i [expr 0b$x$y] [expr 0b$x] [expr 0b$y]"}
+  lappend numbers [expr 0b$x$y]
+  LWDAQ_support
+}
+LWDAQ_print $t "Checking list..." brown
+set count 0
+for {set i 0} {$i < [llength $numbers]} {incr i} {
+	if {![winfo exists $t]} {break}
+	set x [lindex $numbers $i]
+	if {[lsearch -start [expr $i + 1] $numbers $x] >= 0} {
+		LWDAQ_print $t "Multiple occurances of $x" orange
+		incr count
+	}
+	LWDAQ_support
+}
+LWDAQ_print $t "Found $count duplicates."
 </script>
 
