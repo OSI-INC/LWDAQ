@@ -7097,6 +7097,7 @@ proc Neuroplayer_play {{command ""}} {
 		if {![file exists $config(processor_file)]} {
 			set result "ERROR: Processor script $config(processor_file) does not exist."
 		} {
+			set info(processor_file_tail) [file tail $config(processor_file)]
 			set f [open $config(processor_file) r]
 			set info(processor_script) [read $f]
 			close $f
