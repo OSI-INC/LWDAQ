@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "26"
+	LWDAQ_tool_init "Videoarchiver" "27"
 
 	# If a graphical tool window already exists, we abort our initialization.
 	if {[winfo exists $info(window)]} {
@@ -306,6 +306,13 @@ proc Videoarchiver_camera_init {n} {
 	# Compose the initialization command.
 	set command $info(camera_init)
 	set command [regsub -all {%Q} $command $info(tcl_port)]
+	
+	# Check that the key is present.
+	set key_file [file join $info(keys_dir) id_rsa]
+	if {![file exists $key_file]} {
+		error "$info(cam$n\_id) Cannot find encryption key,\
+			check Videoarchiver directory."
+	}
 
 	# Send the initialization command to the camera using a secure shell.
 	catch {[exec $info(ssh) \
@@ -313,7 +320,7 @@ proc Videoarchiver_camera_init {n} {
 		-o UserKnownHostsFile=/dev/null \
 		-o StrictHostKeyChecking=no \
 		-o LogLevel=error \
-		-i [file join $info(keys_dir) id_rsa] \
+		-i $key_file \
 		"$info(camera_login)@$ip" \
 		 $command]} message
 	if {[regexp "SUCCESS" $message]} {

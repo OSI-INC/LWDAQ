@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "2.2"
+	LWDAQ_tool_init "Stimulator" "2.3"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -40,6 +40,8 @@ proc Stimulator_init {} {
 	set config(spacing_delay_A2071E) "0.0014"
 	set config(spacing_delay_cmd) "0.0"
 	set config(byte_processing_time) "0.0002"
+	set config(identify_window) "1000"
+	set info(identify_time) 0
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
 	set config(checksum_preload) "1111111111111111"
@@ -498,9 +500,16 @@ proc Stimulator_identify {} {
 	
 	# Add the idenfity command.
 	lappend commands $info(op_identify)
+	
+	# Report to user.
+	LWDAQ_print $info(text) "Sending identification command."
 
 	# Transmit commands.
 	Stimulator_transmit $n $commands
+	
+	# Mark the time. We'll watch for identification messages for
+	# itentify_window milliseconds.
+	set info(identify_time) [clock milliseconds]
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -596,7 +605,8 @@ proc Stimulator_monitor {} {
 					if {($ack_id == $id) && ($ack_key == $db)} {
 						if {$config(verbose)} {
 							LWDAQ_print $info(text) "Acknowledgement Received:\
-								device=$n id=$ack_id type=$ack_type key=$ack_key time=$ack_time\."
+								device=$n id=$ack_id type=$ack_type\
+								key=$ack_key time=$ack_time\."
 						}
 						set match 1
 					} {
@@ -626,33 +636,28 @@ proc Stimulator_monitor {} {
 		set config(ack_pending) $new_acks
 	}
 
-	# Look for battery measurement reports in the auxiliary message list.
+	# Look for battery measurements and identification broadcasts in the
+	# auxiliary message list.
 	set new_aux [list]
 	set id_list [list]
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_pcn)"}
 	foreach am $aux {
 		scan $am %d%d%d%d id fa db ts
 
-		# The battery measurements have only the primary channel number to
-		# identify them, so we look for the first device entry with a matching
-		# id and assume this is the matching device. If we find no matching id,
-		# we move on to the next message.
-		set i [lsearch -index 1 $id_list $id]
-		if {$i >= 0} {
-			set n [lindex $id_list $i 0]
-		} else {
-			lappend new_aux $am	
-			continue
-		}
-		
 		# If an auxiliary message is a battery measurement, analyze and report.
 		if {$fa == $config(batt_at)} {
-			# Report the battery measurement if verbose flag is set.
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_pcn)\
-					value=$db time=$ts\."
+			# The battery measurements have only the primary channel number to
+			# identify them, so we look for the first device entry with a matching
+			# id and assume this is the matching device. If we find no matching id,
+			# we leave the battery measurement and move on to the next message.
+			set i [lsearch -index 1 $id_list $id]
+			if {$i >= 0} {
+				set n [lindex $id_list $i 0]
+			} else {
+				lappend new_aux $am
+				continue
 			}
-			
+		
 			# We interpret battery measurements in a manner particular to the
 			# various supported device versions.
 			set ver $info(dev$n\_ver)
@@ -663,6 +668,12 @@ proc Stimulator_monitor {} {
 				default {
 					set voltage "?"
 				}
+			}
+			
+			# Report the battery measurement if verbose flag is set.
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_pcn)\
+					value=$db time=$ts voltage=$voltage\."
 			}
 			
 			# Set the battery voltage indicator and set its background according
@@ -679,29 +690,21 @@ proc Stimulator_monitor {} {
 			} else {
 				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bempty_color)
 			}
+		} elseif {$fa == $config(id_at)} {
+		# If an auxiliary message is an identify measurement, check to see if
+		# we are within an identification window. If so, analyze and report.
+		# Otherwise discard the identification message.
+			if {[clock milliseconds] <= $config(identify_window) + $info(identify_time)} {
+				set device_id [format %04X [expr $id +  (256 * $db)]]
+				LWDAQ_print $info(text) "FOUND: Device $device_id, timestamp=$ts\." green
+			}
 		} {
+		# If neither type, append to our new list.
 			lappend new_aux $am
 		}
 	}
 	set aux $new_aux
 
-	# Look for identify messages.
-	set new_aux [list]
-	foreach am $aux {
-		scan $am %d%d%d%d id fa db ts
-
-		# If an auxiliary message is an identify measurement, analyze and report.
-		if {$fa == $config(id_at)} {
-			set device_id [format %04X [expr $id +  (256 * $db)]]
-			LWDAQ_print $info(text) "FOUND: Device $device_id at time=$ts\." green
-		} {
-		# Otherwise append it to our new list, which we will return to the
-		# Receiver Instrument.
-			lappend new_aux $am
-		}
-	}
-	set aux $new_aux
-	
 	# We post the monitor to the event queue and report success.
 	LWDAQ_post Stimulator_monitor
 	return "SUCCESS"

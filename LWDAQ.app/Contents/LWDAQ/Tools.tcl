@@ -489,7 +489,6 @@ proc LWDAQ_Toolmaker_execute {{save 1}} {
 	# Execute the script at the global scope. If the script generates
 	# an error, we catch the error and write it to the execution text
 	# widget.
-	LWDAQ_print $t "Start" purple
 	if {[catch {uplevel #0 $script} result]} {
 		LWDAQ_print $t "ERROR: $result" red
 		LWDAQ_print $t "Error Information:"
@@ -498,8 +497,6 @@ proc LWDAQ_Toolmaker_execute {{save 1}} {
 		} {
 			LWDAQ_print $t "No error information available." blue
 		}
-	} else {
-		LWDAQ_print $t "Done" purple
 	}
 
 	return 1
