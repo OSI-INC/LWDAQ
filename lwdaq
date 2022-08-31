@@ -161,7 +161,7 @@ then
 	then
 		echo "CONFIG_FILE: $CONFIG_FILE"
 	else
-		echo "ERROR: Configuration file '$CONFIG_FILE' does not exist."
+		echo "ERROR: Cannot find configuration file '$CONFIG_FILE'."
 		exit
 	fi
 else

@@ -27,7 +27,7 @@ set num_errors 0
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.4"
-set LWDAQ_Info(program_patchlevel) "10.4.5"
+set LWDAQ_Info(program_patchlevel) "10.4.6"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 set LWDAQ_Info(console_prompt) "LWDAQ% "
 	
@@ -98,7 +98,7 @@ foreach a $argv {
 				if {[file exists $a]} {
 					set LWDAQ_Info(configuration_file) $a
 				} {
-					puts "ERROR: File $a does not exist."
+					puts "ERROR: No such option or file \"$a\"."
 					incr num_errors
 				}
 			} {

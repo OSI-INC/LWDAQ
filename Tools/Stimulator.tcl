@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "2.3"
+	LWDAQ_tool_init "Stimulator" "2.4"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -74,7 +74,7 @@ proc Stimulator_init {} {
 	set config(default_ver) "A3041"
 	set config(default_id) "ABCD"
 	set config(verbose) "1"
-	
+	set config(default_current)	"8"
 	set info(op_stop_stim) "0"
 	set info(op_start_stim) "1"
 	set info(op_xmit) "2"
@@ -145,12 +145,14 @@ proc Stimulator_commands {n} {
 	set info(dev$n\_current) $current
 	lappend commands $current
 	
-	# Append the two bytes of the pulse length.
-	set len [expr round($config(device_rck_khz) * $info(dev$n\_pulse_ms))]
+	# Append the two bytes of the pulse length, which will prime a 
+	# countdown to zero, so we subtract one from the number of RCK
+	# periods we want the pulse to last for.
+	set len [expr round($config(device_rck_khz) * $info(dev$n\_pulse_ms)) - 1]
 	if {$len > $config(max_pulse_len)} {
-		set len $config(max_pulse_len)
 		LWDAQ_print $info(text) "WARNING: Pulses truncated to\
 			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
+		set len $config(max_pulse_len)
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
 
@@ -750,7 +752,7 @@ proc Stimulator_draw_list {} {
 			set info(dev$n\_sckt) "8"
 			set info(dev$n\_id) $config(default_id)
 			set info(dev$n\_pulse_ms) "10"
-			set info(dev$n\_current) "15"
+			set info(dev$n\_current) $config(default_current)
 			set info(dev$n\_period_ms) "100"
 			set info(dev$n\_num_pulses) "10"
 			set info(dev$n\_random) "0"
@@ -920,7 +922,7 @@ proc Stimulator_add_device {} {
 	set info(dev$n\_pulse_ms) "10"
 	set info(dev$n\_period_ms) "100"
 	set info(dev$n\_num_pulses) "10"
-	set info(dev$n\_current) "15"
+	set info(dev$n\_current) $config(default_current)
 	set info(dev$n\_pcn) [expr 0x$config(default_id) % 256]
 	set info(dev$n\_sps) "128"
 	set info(dev$n\_random) "0"
