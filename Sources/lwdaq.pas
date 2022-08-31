@@ -1643,13 +1643,20 @@ end;
 
 <p>The next parameter must be a real number, <i>e</i>, which specifies the maximum eccentricity of the spot, which is the maximum ratio of width to height, or height to width. Spots that have greater eccentricity will be rejected by the routine. The second parameter cannot be included without the first, but if you use 0 for the first, the routine ignores the first parameter and moves on to the second.</p>
 
-<p>The lwdaq_bcam routine identifies all distinct sets of contiguous pixels above threshold, eliminates those that do not meet the test criteria, determines the position and total net intensity of each remaining set, sorts them in order of decreasing total net intensity, and eliminates all but the first -num_spots sets. The <i>total net intensity</i> is the sum of the net intensities of all the pixels in the set. By default, the routine returns the position of each spot in microns with respect to the top-left corner of the image. To convert from pixels to microns, the routine uses -pixel_size_um, and assumes the pixels are square. There are several ways that lwdaq_bcam can calculate the spot position from the net intensity of its pixels.</p>
+<p>The lwdaq_bcam routine identifies all distinct sets of contiguous pixels above threshold, eliminates those that do not meet the test criteria, determines the position and total net intensity of each remaining set, sorts them in order of decreasing total net intensity, and eliminates all but the first -num_spots sets. The <i>total net intensity</i> is the sum of the net intensities of all the pixels in the set. By default, the routine returns the position of each spot in microns with respect to the top-left corner of the image. To convert from pixels to microns, the routine uses -pixel_size_um, and assumes the pixels are square.</p>
 
-<pre>spot_use_centroid=1;
-spot_use_ellipse=2;
-spot_use_vertical_line=3;</pre>
+<p>There are several ways that lwdaq_bcam can analyze an image. We can manipulate the image before analysis, or leave the image unchanged. We can find the weighted centroid of the pixels in the spot, fit an ellipse to the perimeter of the spot, or fit a straight line to the pixels in the spot. We specify a combination of manipulation and calculation with the analysis_type parameter, which correspond to the <i>spot_use</i> constants in <a href="http://www.bndhep.net/Software/Sources/spot.pas">spot.pas</a>.</p>
 
-<p>With analysis_type=1, which is the default, the position of the spot is the weighted centroid of its net intensity. With analysis_type=2, the routine fits an ellipse to the edge of the spot. The position is the center of the ellipse. With analysis_type=3 the routine fits a straight line to the net intensity of the spot and returns the intersection of this straight line with the top of the CCD instead of <i>x</i>, and the anti-clockwise rotation of this line in milliradians instead of <i>y</i>.</p>
+<center><table border=1>
+<tr><th>Value</th><th>Manipulation</th><th>Calculation</th><th>Description</th></tr>
+<tr><td>1</td><td>none</td><td>weighted centroid</td><td>Centroid of intensity for point source images</td></tr>
+<tr><td>2</td><td>none</td><td>elliptical edge</td><td>Perimiter fit for retroreflecting targets</td></tr>
+<tr><td>3</td><td>none</td><td>vertical stripe</td><td>Weighted fit to a vertical stripe</td></tr>
+<tr><td>4</td><td>negate</td><td>vertical shadow</td><td>Weighted fit to a vertical shadow</td></tr>
+<tr><td>5</td><td>grad_i</td><td>vertical edge</td><td>Weighted fit to edge pixels.</tr>
+</table><small><b>Table:</b> Analysis Types, Image Manipulations and Calculations</small></center>
+
+<p>With analysis_type=1, which is the default, the position of the spot is the weighted centroid of its net intensity. With analysis_type=2, the routine fits an ellipse to the edge of the spot. The position is the center of the ellipse. With analysis_type=3 the routine fits a straight line to the net intensity of a bright stripe and returns the intersection of this straight line with the top of the CCD instead of <i>x</i>, and the anti-clockwise rotation of this line in milliradians instead of <i>y</i>. With analysis_type=4, the routine negates the image, turning a dark shadow into a bright stripe, and then applies vertical stripe analysis to the negated image. With analysis_type=5, the routine obtains the absolute horizontal gradient of intensity and applies vertical stripe analyis to the gradient image. When the routine manipulates the image before analysis, it still draws the results of analysis on the original image.</p>
 
 <p>With return_threshold=1, the routine does no spot-finding, but instead returns a string of five values obtained by interpreting the threshold string and examining the image. These five values are four integers and one real. The integers are threshold intensity, background intensity, minimum numbser of pixels in a valid spot, maximum number of pixels in a valid spot, and maximum eccentricity of a valid spot. With return_bounds=1 and return_threshold=0, the routine returns as its result string the boundaries around the spots. It chooses the same boundaries it draws in the image overlay. Each spot boundary is given as four integers: left, top, right, and bottom. The left and right integers are column numbers. The top and bottom integers are row numbers. Each spot gets four numbers, and these make up the result string, separated by spaces. With return_intensity=1, return_bounds=0, and return_threshold=0, the routine returns only the total intensity above background of the spot for each spot. Note that this total intensity above background is not the same as the net intensity of the spot, which is the intensity above threshold. The centroid analysis uses the intensity above threshold, not the total intensity above background.</p>
 
@@ -1678,7 +1685,7 @@ const
 	min_pixels_for_cross=100;
 		
 var 
-	ip:image_ptr_type=nil;
+	ip,scratch_image,analysis_image:image_ptr_type;
 	image_name:string='';
 	result:string='';
 	option:string;
@@ -1703,8 +1710,8 @@ var
 	sort_code:integer=1;
 	slp:spot_list_ptr_type;
 	threshold_string:string='50';
+	i,j:integer;
 
-		
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
@@ -1755,9 +1762,26 @@ begin
 			exit;
 		end;
 	end;
+
+	start_timer('finding spots','lwdaq_bcam');
+
+	case analysis_type of
+		spot_use_vertical_shadow:begin
+			analysis_image:=image_negate(ip);		
+		end;
+		spot_use_vertical_edge:begin
+			scratch_image:=image_filter(ip,1,1,1,1,1,1,0);
+			analysis_image:=image_grad_i(scratch_image);
+			dispose_image(scratch_image);
+		end;
+		otherwise begin
+			analysis_image:=ip;
+		end;
+	end;
 		
 	if return_threshold then begin
-		spot_decode_command_string(ip,threshold_string,threshold,background,min_p,max_p,max_e);
+		spot_decode_command_string(analysis_image,
+			threshold_string,threshold,background,min_p,max_p,max_e);
 		writestr(result,threshold:1,' ',background:1,' ',min_p:1,' ',max_p:1,' ',max_e:1:2);
 		if error_string='' then Tcl_SetReturnString(interp,result)
 		else Tcl_SetReturnString(interp,error_string);
@@ -1765,37 +1789,55 @@ begin
 		exit;	
 	end;
 	
-	start_timer('finding spots','lwdaq_bcam');
-	clear_overlay(ip);
-	slp:=spot_list_find(ip,num_spots,threshold_string,pixel_size_um);
+	clear_overlay(analysis_image);
+	slp:=spot_list_find(analysis_image,num_spots,threshold_string,pixel_size_um);
 	if slp=nil then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Failed to allocate memory for spot list in '
 			+'lwdaq_bcam.');
 		exit;
 	end;
+	
+	if analysis_type=spot_use_vertical_edge then begin
+		mark_time('merging edge clusters','lwdaq_bcam');
+		spot_list_merge(analysis_image,slp,'vertical');
+	end;
 
 	mark_time('sorting spots','lwdaq_bcam');
 	for spot_num:=1 to slp^.num_selected_spots do
-		spot_centroid(ip,slp^.spots[spot_num]);
+		spot_centroid(analysis_image,slp^.spots[spot_num]);
 	spot_list_sort(slp,sort_code);
 
-	mark_time('displaying positions','lwdaq_bcam');
 	case analysis_type of 
-		spot_use_ellipse:begin
+		spot_use_ellipse: begin
+			mark_time('fitting ellipses','lwdaq_bcam');
 			for spot_num:=1 to slp^.num_selected_spots do
-				spot_ellipse(ip,slp^.spots[spot_num]);
-			if not show_pixels then clear_overlay(ip);
+				spot_ellipse(analysis_image,slp^.spots[spot_num]);
+		end;
+		spot_use_vertical_stripe,
+		spot_use_vertical_shadow,
+		spot_use_vertical_edge: begin
+			mark_time('fitting lines','lwdaq_bcam');
+			for spot_num:=1 to slp^.num_selected_spots do
+				spot_vertical_line(analysis_image,slp^.spots[spot_num]);
+		end;
+	end;
+
+	mark_time('displaying positions','lwdaq_bcam');
+	if show_pixels and (analysis_image<>ip) then
+		for j:=ip^.analysis_bounds.top to ip^.analysis_bounds.bottom do
+			for i:=ip^.analysis_bounds.left to ip^.analysis_bounds.right do 
+				set_ov(ip,j,i,get_ov(analysis_image,j,i));
+	if not show_pixels and (analysis_image=ip) then
+		clear_overlay(ip);	
+	case analysis_type of 
+		spot_use_ellipse:
 			spot_list_display_ellipses(ip,slp,overlay_color_from_integer(color));
-		end;
-		spot_use_vertical_line:begin
-			for spot_num:=1 to slp^.num_selected_spots do
-				spot_vertical_line(ip,slp^.spots[spot_num]);
-			if not show_pixels then clear_overlay(ip);
+		spot_use_vertical_stripe,
+		spot_use_vertical_shadow,
+		spot_use_vertical_edge:
 			spot_list_display_vertical_lines(ip,slp,overlay_color_from_integer(color));
-		end;
 		otherwise begin
-			if not show_pixels then clear_overlay(ip);
 			if num_spots>1 then 
 				spot_list_display_bounds(ip,slp,overlay_color_from_integer(color));
 			if num_spots=1 then 
@@ -1808,9 +1850,20 @@ begin
 	
 	mark_time('adjusting coordinates','lwdaq_bcam');
 	if (add_x_um<>0) or (add_y_um<>0) then begin
-		for spot_num:=1 to slp^.num_selected_spots do begin
-			slp^.spots[spot_num].x:=slp^.spots[spot_num].x+add_x_um;
-			slp^.spots[spot_num].y:=slp^.spots[spot_num].y+add_y_um;
+		case analysis_type of 
+			spot_use_vertical_stripe,
+			spot_use_vertical_shadow,
+			spot_use_vertical_edge: begin
+				for spot_num:=1 to slp^.num_selected_spots do begin
+					slp^.spots[spot_num].x:=slp^.spots[spot_num].x+add_x_um;
+				end;
+			end;
+			otherwise begin
+				for spot_num:=1 to slp^.num_selected_spots do begin
+					slp^.spots[spot_num].x:=slp^.spots[spot_num].x+add_x_um;
+					slp^.spots[spot_num].y:=slp^.spots[spot_num].y+add_y_um;
+				end;
+			end;
 		end;
 	end;
 	
@@ -1823,6 +1876,7 @@ begin
 	else 
 		result:=string_from_spot_list(slp);
 	dispose_spot_list_ptr(slp);
+	if analysis_image<>ip then dispose_image(analysis_image);
 	if num_spots=0 then result:='';
 	if show_timing then report_time_marks;
 	

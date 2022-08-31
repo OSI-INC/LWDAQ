@@ -41,7 +41,9 @@ const
 	spot_valid_first=100;
 	spot_use_centroid=1;
 	spot_use_ellipse=2;
-	spot_use_vertical_line=3;
+	spot_use_vertical_stripe=3;
+	spot_use_vertical_shadow=4;
+	spot_use_vertical_edge=5;
 	max_num_spots=1000;
 	
 type
@@ -1180,7 +1182,8 @@ end;
 
 {
 	spot_list_display_bounds displays the bounds of a list of spots. If the bounds
-	are too small to see, we increase them.
+	are too small to see, we increase them. If they reach the edge of the analysis
+	boundaries, we display them one pixel inbounds so they will be visible.
 }
 procedure spot_list_display_bounds(ip:image_ptr_type;slp:spot_list_ptr_type;
 	color:integer);
@@ -1197,6 +1200,10 @@ begin
 	if slp=nil then exit;
 	for spot_num:=1 to slp^.num_selected_spots do begin
 		r:=slp^.spots[spot_num].bounds;
+		if r.right>=ip^.analysis_bounds.right then r.right:=ip^.analysis_bounds.right-1;
+		if r.left<=ip^.analysis_bounds.left then r.left:=ip^.analysis_bounds.left+1;
+		if r.top<=ip^.analysis_bounds.top then r.top:=ip^.analysis_bounds.top+1;
+		if r.bottom>=ip^.analysis_bounds.bottom then r.bottom:=ip^.analysis_bounds.bottom-1;
 		if abs(r.right-r.left)<min_width then begin
 			i:=round(one_half*(r.right+r.left));
 			r.right:=i+extent;

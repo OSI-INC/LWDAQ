@@ -46,7 +46,6 @@ proc LWDAQ_init_BCAM {} {
 	set info(analysis_show_pixels) 0
 	set info(analysis_return_bounds) 0
 	set info(analysis_return_intensity) 0
-	set info(analysis_manipulation) "none"
 	set info(daq_extended) 0
 	set info(extended_parameters) "0.6 0.9 0 1"
 	set info(file_use_daq_bounds) 0
@@ -119,10 +118,6 @@ proc LWDAQ_analysis_BCAM {{image_name ""}} {
 	upvar #0 LWDAQ_config_BCAM config
 	upvar #0 LWDAQ_info_BCAM info
 	if {$image_name == ""} {set image_name $config(memory_name)}
-	foreach m $info(analysis_manipulation) {
-		lwdaq_image_manipulate $image_name $m -replace 1
-	}
-	lwdaq_image_manipulate $image_name none -clear 1
 	set l [LWDAQ_split $config(analysis_num_spots)]
 	set num_spots [lindex $l 0]
 	if {$num_spots == ""} {set num_spots 1}
