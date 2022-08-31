@@ -44,7 +44,7 @@ LWDAQ_DIR=`dirname $0`
 # Determine the architecture. We support only 64-bit.
 
 # Determine operating system. Default is Unix. 
-OS=UNIX
+OS=Linux
 if [ "`uname -a | grep -i Darwin`" != "" ]
 then 
 	OS=MacOS
@@ -118,14 +118,17 @@ fi
 if [ "$OPTION" == "--gui" ] 
 then 
 	GUI_ENABLED=1
-	if [ "$OS" == "Linux" ] | [ "$OS" == "Raspbian" ]
+	# On Linux and Raspbian we run in the foreground when we run with graphics
+	# because we want to use the terminal as our TCL console, and in any case
+	# the graphics will not show up on these systems if the application is running
+	# in the background. On Windows and MacOS we run in the background and free
+	# up the console.
+	if [ "$OS" == "Linux" ] 
 	then
-		# On Linux, run with graphics, with console, in foreground so that we 
-		# can use the terminal as our console.
+		RUN_IN_BACKGROUND=0
+	elif [ "$OS" == "Raspbian" ] 
 		RUN_IN_BACKGROUND=0
 	else
-		# On Windows and MacOS, run with graphics, with console, in background so
-		# that we can use the slave console.
 		RUN_IN_BACKGROUND=1
 	fi
 	OPTION_FOUND=1

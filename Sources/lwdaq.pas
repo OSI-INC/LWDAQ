@@ -1696,6 +1696,7 @@ var
 	return_bounds:boolean=false;
 	return_intensity:boolean=false;
 	return_threshold:boolean=false;
+	reference_um:real=-1;
 	pixel_size_um:real=10;
 	max_e:real=10;
 	add_x_um:real=0;
@@ -1751,13 +1752,15 @@ begin
 		else if (option='-show_pixels') then show_pixels:=Tcl_ObjBoolean(vp)
 		else if (option='-add_x_um') then add_x_um:=Tcl_ObjReal(vp)
 		else if (option='-add_y_um') then add_y_um:=Tcl_ObjReal(vp)
+		else if (option='-reference_um') then reference_um:=Tcl_ObjReal(vp)
 		else if (option='-color') then color:=Tcl_ObjInteger(vp)			
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
 				+'-threshold -pixel_size_um -show_timing -num_spots -color'
-				+'-analysis_type -sort_code -show_pixels '
-				+'-return_bounds -return_intensity -return_threshold" in '
+				+'-analysis_type -sort_code -show_pixels -reference_um'
+				+'-return_bounds -return_intensity -return_threshold'
+				+'-add_x_um -add_y_um" in '
 				+'lwdaq_bcam.');
 			exit;
 		end;
@@ -1854,14 +1857,22 @@ begin
 			spot_use_vertical_stripe,
 			spot_use_vertical_shadow,
 			spot_use_vertical_edge: begin
+				if reference_um<0 then 
+					reference_um:=one_half*ip^.j_size*pixel_size_um;
 				for spot_num:=1 to slp^.num_selected_spots do begin
-					slp^.spots[spot_num].x:=slp^.spots[spot_num].x+add_x_um;
+					with slp^.spots[spot_num] do begin
+						x:=x+add_x_um;
+						y:=y+add_y_um;
+						x:=x+reference_um*y/mrad_per_rad;
+					end;
 				end;
 			end;
 			otherwise begin
 				for spot_num:=1 to slp^.num_selected_spots do begin
-					slp^.spots[spot_num].x:=slp^.spots[spot_num].x+add_x_um;
-					slp^.spots[spot_num].y:=slp^.spots[spot_num].y+add_y_um;
+					with slp^.spots[spot_num] do begin
+						x:=x+add_x_um;
+						y:=y+add_y_um;
+					end;
 				end;
 			end;
 		end;
@@ -1879,7 +1890,7 @@ begin
 	if analysis_image<>ip then dispose_image(analysis_image);
 	if num_spots=0 then result:='';
 	if show_timing then report_time_marks;
-	
+
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
 	lwdaq_bcam:=Tcl_OK;
