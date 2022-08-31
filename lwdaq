@@ -45,18 +45,18 @@ LWDAQ_DIR=`dirname $0`
 
 # Determine operating system. Default is Unix. 
 OS=Linux
-if [ "`uname -a | grep -i Darwin`" != "" ]
+if [ "`uname -a | grep -i Darwin`" != "" ];
 then 
 	OS=MacOS
 fi
-if [ "`uname -a | grep -i Windows`" != "" ]
+if [ "`uname -a | grep -i Windows`" != "" ];
 then 
 	OS=Windows
 fi
-if [ "`uname -a | grep -i Linux`" != "" ]
+if [ "`uname -a | grep -i Linux`" != "" ];
 then 
 	OS=Linux
-	if [ "`cat /etc/os-release | grep -i Raspbian`" != "" ]
+	if [ "`cat /etc/os-release | grep -i Raspbian`" != "" ];
 	then
 		OS=Raspbian
 	fi 
@@ -77,7 +77,7 @@ echo "OS: $OS"
 # this script: the process runs in the foreground with no graphics. Inside the
 # LWDAQ process, however, the way the console is set up to receive console
 # commands is different.
-if [ `expr "$1" : "--"` -eq 2 ] 
+if [ `expr "$1" : "--"` -eq 2 ];
 then
 	OPTION=$1
 	CONFIG_FILE=$2
@@ -94,28 +94,28 @@ echo "OPTION: $OPTION"
 # dictate whether or not the console will be enabled, but this decision is made
 # inside LWDAQ, so we are going to pass the OPTION into LWDAQ when we run LWDAQ.
 OPTION_FOUND=0
-if [ "$OPTION" == "--pipe" ] 
+if [ "$OPTION" == "--pipe" ]; 
 then 
 	# Run without graphics, without console, in foreground.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
 	OPTION_FOUND=1
 fi
-if [ "$OPTION" == "--no-console" ] 
+if [ "$OPTION" == "--no-console" ]; 
 then 
 	# Run without graphics, without console, in the background.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=1
 	OPTION_FOUND=1
 fi
-if [ "$OPTION" == "--no-gui" ] 
+if [ "$OPTION" == "--no-gui" ]; 
 then 
 	# Run without graphics, with console, in the foreground.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
 	OPTION_FOUND=1
 fi
-if [ "$OPTION" == "--gui" ] 
+if [ "$OPTION" == "--gui" ]; 
 then 
 	GUI_ENABLED=1
 	# On Linux and Raspbian we run in the foreground when we run with graphics
@@ -131,7 +131,7 @@ then
 	fi
 	OPTION_FOUND=1
 fi
-if [ "$OPTION" == "--spawn" ] 
+if [ "$OPTION" == "--spawn" ]; 
 then 
 	# Run with graphics, with console, in background.
 	GUI_ENABLED=1
@@ -141,7 +141,7 @@ fi
 
 # If the option wass not found, we issue a warning and set the three
 # flags that need to be set.
-if [ $OPTION_FOUND == 0 ]
+if [ $OPTION_FOUND == 0 ];
 then
 	echo "WARNING: Unrecognised option '$OPTION', defaulting to --no-gui."
 	GUI_ENABLED=0
@@ -156,9 +156,9 @@ echo "RUN_IN_BACKGROUND: $RUN_IN_BACKGROUND"
 echo "LOCAL_DIR: `pwd`"
 
 # Check the configuration file.
-if [ "$CONFIG_FILE" != "" ]
+if [ "$CONFIG_FILE" != "" ];
 then 
-	if [ -f $CONFIG_FILE ]
+	if [ -f $CONFIG_FILE ];
 	then
 		echo "CONFIG_FILE: $CONFIG_FILE"
 	else
@@ -166,7 +166,7 @@ then
 		exit
 	fi
 else
-	if [ "$OPTION" == "--no-console" ]
+	if [ "$OPTION" == "--no-console" ];
 	then
 		echo "ERROR: No configuration file specified with no-console option."
 		exit
@@ -177,47 +177,47 @@ fi
 
 # Pick the TclTk shell based upon the options, operating system
 # and architecture.
-if [ $OS == Unknown ]
+if [ $OS == Unknown ];
 then
-	if [ $GUI_ENABLED == 1 ]
+	if [ $GUI_ENABLED == 1 ];
 	then
 		SHELL=wish
 	else
 		SHELL=tclsh
 	fi
 fi
-if [ $OS == Raspbian ]
+if [ $OS == Raspbian ];
 then
-	if [ $GUI_ENABLED == 1 ]
+	if [ $GUI_ENABLED == 1 ];
 	then
 		SHELL=wish
 	else
 		SHELL=tclsh
 	fi
 fi
-if [ $OS == Linux ]
+if [ $OS == Linux ];
 then
 	LD_LIBRARY_PATH="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/lib"
 	export LD_LIBRARY_PATH
-	if [ $GUI_ENABLED == 1 ] 
+	if [ $GUI_ENABLED == 1 ]; 
 	then
 		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/wish8.6"
 	else
 		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/tclsh8.6"
 	fi
 fi
-if [ $OS == MacOS ]
+if [ $OS == MacOS ];
 then
-	if [ $GUI_ENABLED == 1 ]
+	if [ $GUI_ENABLED == 1 ];
 	then
 		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/MacOS/Wish"
 	else
 		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/MacOS/tclsh"
 	fi
 fi
-if [ $OS == Windows ]
+if [ $OS == Windows ];
 then
-	if [ $GUI_ENABLED == 1 ]
+	if [ $GUI_ENABLED == 1 ];
 	then
 		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Windows/bin/wish86.exe"
 	else
@@ -235,7 +235,7 @@ INIT_FILE="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Init.tcl"
 
 # Launch the shell and pass to it the start-up script and any additional
 # parameters we may have passed to this bash script.
-if [ $RUN_IN_BACKGROUND == 1 ]
+if [ $RUN_IN_BACKGROUND == 1 ];
 then
 	$SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" &
 else

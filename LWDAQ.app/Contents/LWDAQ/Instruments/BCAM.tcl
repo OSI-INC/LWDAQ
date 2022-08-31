@@ -69,6 +69,7 @@ proc LWDAQ_init_BCAM {} {
 	set info(analysis_pixel_size_um) 10
 	set info(analysis_add_x_um) 0
 	set info(analysis_add_y_um) 0
+	set info(analysis_reference_um) 0
 	set info(daq_device_type) 2
 	set info(daq_source_device_type) 2
 	set info(daq_source_power) 7
@@ -132,6 +133,7 @@ proc LWDAQ_analysis_BCAM {{image_name ""}} {
 		-analysis_type $config(analysis_enable) \
 		-add_x_um $info(analysis_add_x_um) \
 		-add_y_um $info(analysis_add_y_um) \
+		-reference_um $info(analysis_reference_um) \
 		-sort_code $sort_code \
 		-return_bounds $info(analysis_return_bounds) \
 		-return_intensity $info(analysis_return_intensity)] 

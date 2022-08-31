@@ -1633,6 +1633,7 @@ end;
 <tr><td>-return_intensity</td><td>If 1, return spot intensity only, default 0.</td></tr>
 <tr><td>-add_x_um</td><td>Add this value in microns to the spot x-position, default 0.</td></tr>
 <tr><td>-add_y_um</td><td>Add this value in microns to the spot y-position, default 0</td></tr>
+<tr><td>-reference_um</td><td>Reference line y-position for line fits, default 0</td></tr>
 </table></center>
 
 <p>The lwdaq_bcam routine makes a list of spots in the image. The -threshold string tells lwdaq_bcam how to distinguish background pixels from spot pixels. At the very least, the -threshold string must specify a threshold intensity, or a means of calculating a threshold intensity. All the spot-locating routines called by lwdaq_bcam use the <i>net intensity</i> of pixels, which is the image intensity minus the threshold intensity, with negative values clipped to zero.</p>
@@ -1656,7 +1657,7 @@ end;
 <tr><td>5</td><td>grad_i</td><td>vertical edge</td><td>Weighted fit to edge pixels.</tr>
 </table><small><b>Table:</b> Analysis Types, Image Manipulations and Calculations</small></center>
 
-<p>With analysis_type=1, which is the default, the position of the spot is the weighted centroid of its net intensity. With analysis_type=2, the routine fits an ellipse to the edge of the spot. The position is the center of the ellipse. With analysis_type=3 the routine fits a straight line to the net intensity of a bright stripe and returns the intersection of this straight line with the top of the CCD instead of <i>x</i>, and the anti-clockwise rotation of this line in milliradians instead of <i>y</i>. With analysis_type=4, the routine negates the image, turning a dark shadow into a bright stripe, and then applies vertical stripe analysis to the negated image. With analysis_type=5, the routine obtains the absolute horizontal gradient of intensity and applies vertical stripe analyis to the gradient image. When the routine manipulates the image before analysis, it still draws the results of analysis on the original image.</p>
+<p>With analysis_type=1, which is the default, the position of the spot is the weighted centroid of its net intensity. With analysis_type=2, the routine fits an ellipse to the edge of the spot. The position is the center of the ellipse. With analysis_type=3 the routine fits a straight line to the net intensity of a bright stripe. The analysis returnsthe <i>x</i>-coordinate of the intersection of this straight line with a reference line. We specify the <i>y</i>-coordinate of a horizontal reference line with <i>reference_um</i>. In place of a <i>y</i>-coordinate of the line, the routine returns its anti-clockwise rotation in milliradians. With analysis_type=4, the routine negates the image, turning a dark shadow into a bright stripe, and then applies vertical stripe analysis to the negated image. With analysis_type=5, the routine obtains the absolute horizontal gradient of intensity and applies vertical stripe analyis to the gradient image. When the routine manipulates the image before analysis, it still draws the results of analysis on the original image.</p>
 
 <p>With return_threshold=1, the routine does no spot-finding, but instead returns a string of five values obtained by interpreting the threshold string and examining the image. These five values are four integers and one real. The integers are threshold intensity, background intensity, minimum numbser of pixels in a valid spot, maximum number of pixels in a valid spot, and maximum eccentricity of a valid spot. With return_bounds=1 and return_threshold=0, the routine returns as its result string the boundaries around the spots. It chooses the same boundaries it draws in the image overlay. Each spot boundary is given as four integers: left, top, right, and bottom. The left and right integers are column numbers. The top and bottom integers are row numbers. Each spot gets four numbers, and these make up the result string, separated by spaces. With return_intensity=1, return_bounds=0, and return_threshold=0, the routine returns only the total intensity above background of the spot for each spot. Note that this total intensity above background is not the same as the net intensity of the spot, which is the intensity above threshold. The centroid analysis uses the intensity above threshold, not the total intensity above background.</p>
 
@@ -1696,7 +1697,7 @@ var
 	return_bounds:boolean=false;
 	return_intensity:boolean=false;
 	return_threshold:boolean=false;
-	reference_um:real=-1;
+	reference_um:real=0;
 	pixel_size_um:real=10;
 	max_e:real=10;
 	add_x_um:real=0;
@@ -1857,8 +1858,6 @@ begin
 			spot_use_vertical_stripe,
 			spot_use_vertical_shadow,
 			spot_use_vertical_edge: begin
-				if reference_um<0 then 
-					reference_um:=one_half*ip^.j_size*pixel_size_um;
 				for spot_num:=1 to slp^.num_selected_spots do begin
 					with slp^.spots[spot_num] do begin
 						x:=x+add_x_um;
@@ -2343,7 +2342,7 @@ end;
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-approximate</td><td>Stop approximate shadow positions, default zero.</td></tr>
 <tr><td>-pixel_size_um</td><td>Width and height of image pixels in microns.</td></tr>
-<tr><td>-reference_um</td><td>Location of reference line in microns from top or left of image.</td></tr>
+<tr><td>-reference_um</td><td>Location of reference line in microns from top of image, default zero.</td></tr>
 <tr><td>-show_timinig</td><td>Print timing report to gui text window, default zero.</td></tr>
 <tr><td>-num_shadows</td><td>Number of shadows you want the routine to find.</td></tr>
 </table></center>
@@ -2370,7 +2369,7 @@ var
 	show_timing:boolean=false;
 	approximate:boolean=false;
 	pixel_size_um:real=10.0;
-	reference_um:real=0.0;
+	reference_um:real=0;
 	min_separation_um:real=500.0;
 	i:integer=1;
 	slp:shadow_list_ptr_type;
