@@ -123,10 +123,8 @@ then
 	# the graphics will not show up on these systems if the application is running
 	# in the background. On Windows and MacOS we run in the background and free
 	# up the console.
-	if [ "$OS" == "Linux" ] 
+	if [ "$OS" == "Linux" ] || [ "$OS" == "Raspbian" ];
 	then
-		RUN_IN_BACKGROUND=0
-	elif [ "$OS" == "Raspbian" ] 
 		RUN_IN_BACKGROUND=0
 	else
 		RUN_IN_BACKGROUND=1
