@@ -65,6 +65,7 @@ proc LWDAQ_init_BCAM {} {
 	set info(ambient_exposure_seconds) 0
 	set info(peak_max) 180
 	set info(peak_min) 100
+	set info(flash_soft_max) 0.01
 	set info(file_try_header) 1
 	set info(analysis_pixel_size_um) 10
 	set info(analysis_add_x_um) 0
@@ -300,7 +301,9 @@ proc LWDAQ_daq_BCAM {} {
 		if {[info exists sock_2]} {LWDAQ_socket_close $sock_2}
 		return "ERROR: $error_result"
 	}
-		
+	
+	# Create a LWDAQ image and load it with our acquired image contents. Give the 
+	# image its name and analysis boundaries.
 	set config(memory_name) [lwdaq_image_create \
 		-width $info(daq_image_width) \
 		-height $info(daq_image_height) \
@@ -311,6 +314,9 @@ proc LWDAQ_daq_BCAM {} {
 		-data $image_contents \
 		-name "$info(name)\_$info(counter)"]
 		
+	# If required, create a background image and load it with our acquired background
+	# image contents. Subtract this image from our main image to obtain the final
+	# background-subtracted image.
 	if {$config(daq_subtract_background)} {
 		set background_image_name [lwdaq_image_create \
 			-width $info(daq_image_width) \
@@ -325,18 +331,51 @@ proc LWDAQ_daq_BCAM {} {
 		lwdaq_image_destroy $background_image_name
 	}
 	
+	# If we are not adjusting the flash time, we are done.
 	if {!$config(daq_adjust_flash)} {return $config(memory_name)} 
 
-	set max [lindex [lwdaq_image_characteristics $config(memory_name)] 6]
+	# We want to increase the flash time when the image is not bright enough,
+	# and reduce the flash time when the image is too bright. We can use the
+	# maximum intensity as our measure of brightness, the average intensity, or
+	# the "soft maximum" intensity, which is the intensity for which only a
+	# fraction flash_soft_max pixels are as bright or brighter.
+	switch $config(daq_adjust_flash) {
+		"1" {
+			set brightness [lindex [lwdaq_image_characteristics $config(memory_name)] 6]
+		}
+		"2" {
+			set brightness [lindex [lwdaq_image_characteristics $config(memory_name)] 4]
+		}
+		"3" {
+			set histogram [lwdaq_image_histogram $config(memory_name)]
+			set num_pixels 0
+			foreach {b n} $histogram {
+				set num_pixels [expr $num_pixels + $n]
+			}
+			set num_below 0
+			foreach {b n} $histogram {
+				set num_below [expr $num_below + $n]
+				set brightness $b
+				if {$num_below >= $num_pixels * (1.0 - $info(flash_soft_max))} {break}
+			}
+		}
+		default {
+			set brightness [lindex [lwdaq_image_characteristics $config(memory_name)] 6]
+		}
+	}
+	
+	# Adjust the flash time as needed and decide if we must call the data
+	# acquisition routine again.
+	set call_self 0
 	set t $config(daq_flash_seconds)
-	if {$max < 1} {set max 1}
-	if {$max < $info(peak_min)} {
+	if {$brightness < 1} {set brightness 1}
+	if {$brightness < $info(peak_min)} {
 		if {$t < $info(flash_seconds_max)} {
 			if {$t < $info(flash_seconds_transition)} {
 				set t [expr $t + $info(flash_seconds_step) ]
 				set call_self 1
 			} {
-				set t [expr ($info(peak_min) + $info(peak_max)) * 0.5 * $t / $max ]
+				set t [expr ($info(peak_min) + $info(peak_max)) * 0.5 * $t / $brightness ]
 				if {$t > $info(flash_seconds_max)} {
 					set t $info(flash_seconds_max)
 					set call_self 1
@@ -348,7 +387,7 @@ proc LWDAQ_daq_BCAM {} {
 			set call_self 0
 		}
 	} {
-		if {$max > $info(peak_max)} {
+		if {$brightness > $info(peak_max)} {
 			if {$t > 0} {
 				if {$t <= $info(flash_seconds_transition)} {
 					set t [expr $t - $info(flash_seconds_step) ]
