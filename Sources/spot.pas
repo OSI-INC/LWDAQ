@@ -1100,15 +1100,15 @@ end;
 	into separate spots. We call spot_list_merge with the "vertical" command,
 	and we merge these separates spots into one spot whose pixels are not
 	connected, but which represent the same image feature.
-	
+
 	The merge routine compares all valid spots to all other valid spots, looking
 	for possible merges.
-	
-	When the routine merges two spots, it changes the color of all the pixels
-	in the overlay corresponding to the second spot so that they are the same
-	as the overlay color of the first spot. The routine expands the bounds 
+
+	When the routine merges two spots, it changes the color of all the pixels in
+	the overlay corresponding to the second spot so that they are the same as
+	the overlay color of the first spot. The routine expands the bounds
 	rectangle to include all the pixels.
-	
+
 	NOTE: At the moment, only vertical merging is supported.
 }
 procedure spot_list_merge(ip:image_ptr_type;slp:spot_list_ptr_type;command:string);

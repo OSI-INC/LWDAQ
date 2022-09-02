@@ -1712,20 +1712,30 @@ var
 	sort_code:integer=1;
 	slp:spot_list_ptr_type;
 	threshold_string:string='50';
+	saved_bounds:ij_rectangle_type;
+	ref_line:ij_line_type;
+	pp:x_graph_type;
 	i,j:integer;
 
 begin
+{
+	Prepare return values in case of sudden exit.
+}
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_bcam:=Tcl_Error;
-	
+{
+	Check for any obvious errors in command line.
+}
 	if (argc<2) or (odd(argc)) then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Wrong number of arguments, must be "'
 			+'lwdaq_bcam image ?option value?".');
 		exit;
 	end;
-	
+{
+	Connect to the image.
+}
 	image_name:=Tcl_ObjString(argv[1]);
 	ip:=image_ptr_from_name(image_name);
 	if not valid_image_ptr(ip) then begin
@@ -1734,7 +1744,9 @@ begin
 			+'lwdaq_bcam.');
 		exit;
 	end;
-	
+{
+	Decode the options.
+}
 	arg_index:=2;
 	while (arg_index<argc-1) do begin
 		option:=Tcl_ObjString(argv[arg_index]);
@@ -1766,14 +1778,23 @@ begin
 			exit;
 		end;
 	end;
-
-	start_timer('finding spots','lwdaq_bcam');
-
+{
+	Clear the image overlay. We need it clear so we can draw spots on it.
+}
+	start_timer('begin','lwdaq_bcam');
+	clear_overlay(ip);
+{
+	Perform any pre-filtering required by the analysis. We end up with either a
+	new image called analysis_image, or we just let analysis_image be equal to
+	the image passed into the routine.
+}
 	case analysis_type of
 		spot_use_vertical_shadow:begin
+			mark_time('negating image','lwdaq_bcam');
 			analysis_image:=image_negate(ip);		
 		end;
 		spot_use_vertical_edge:begin
+			mark_time('smoothing and differentiating image','lwdaq_bcam');
 			scratch_image:=image_filter(ip,1,1,1,1,1,1,0);
 			analysis_image:=image_grad_i(scratch_image);
 			dispose_image(scratch_image);
@@ -1782,7 +1803,10 @@ begin
 			analysis_image:=ip;
 		end;
 	end;
-		
+{
+	If all we want is to obtain the threshold intensity in the analysis image,
+	we calculate it and return it immediately.	
+}
 	if return_threshold then begin
 		spot_decode_command_string(analysis_image,
 			threshold_string,threshold,background,min_p,max_p,max_e);
@@ -1792,8 +1816,9 @@ begin
 		lwdaq_bcam:=Tcl_OK;
 		exit;	
 	end;
-	
-	clear_overlay(analysis_image);
+{
+	Find all the spots above threshold.
+}
 	slp:=spot_list_find(analysis_image,num_spots,threshold_string,pixel_size_um);
 	if slp=nil then begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -1801,17 +1826,28 @@ begin
 			+'lwdaq_bcam.');
 		exit;
 	end;
-	
+{
+	In some cases, we want to merge spots that are part of the same feature, which
+	is possible provided we know the size and direction of the feature. 
+}
 	if analysis_type=spot_use_vertical_edge then begin
 		mark_time('merging edge clusters','lwdaq_bcam');
 		spot_list_merge(analysis_image,slp,'vertical');
 	end;
-
+{
+	Sort the spots according to our sort code, which could be left to right or
+	top to bottom, or brightest to dimmest, and a few other possibilities as
+	specified by the sort_code.
+}
 	mark_time('sorting spots','lwdaq_bcam');
 	for spot_num:=1 to slp^.num_selected_spots do
 		spot_centroid(analysis_image,slp^.spots[spot_num]);
 	spot_list_sort(slp,sort_code);
-
+{
+	Now that we have the spots, we might re-analyze the spots to obtain some
+	measurement of their position other than the centroid that we obtained while
+	finding the spots. 
+}
 	case analysis_type of 
 		spot_use_ellipse: begin
 			mark_time('fitting ellipses','lwdaq_bcam');
@@ -1826,21 +1862,49 @@ begin
 				spot_vertical_line(analysis_image,slp^.spots[spot_num]);
 		end;
 	end;
-
-	mark_time('displaying positions','lwdaq_bcam');
-	if show_pixels and (analysis_image<>ip) then
-		for j:=ip^.analysis_bounds.top to ip^.analysis_bounds.bottom do
-			for i:=ip^.analysis_bounds.left to ip^.analysis_bounds.right do 
-				set_ov(ip,j,i,get_ov(analysis_image,j,i));
-	if not show_pixels and (analysis_image=ip) then
+{
+	Display the spots. We might put them all in boxes, draw an ellipse, or 
+	draw a line. And display profiles and reference lines as required.
+}
+	mark_time('drawing results of analysis','lwdaq_bcam');
+	if show_pixels then begin
+		if analysis_image<>ip then begin
+			for j:=ip^.analysis_bounds.top to ip^.analysis_bounds.bottom do
+				for i:=ip^.analysis_bounds.left to ip^.analysis_bounds.right do 
+					set_ov(ip,j,i,get_ov(analysis_image,j,i));
+		end;
+	end else begin
 		clear_overlay(ip);	
+	end;
 	case analysis_type of 
 		spot_use_ellipse:
 			spot_list_display_ellipses(ip,slp,overlay_color_from_integer(color));
 		spot_use_vertical_stripe,
-		spot_use_vertical_shadow,
-		spot_use_vertical_edge:
+		spot_use_vertical_shadow: begin
+			pp:=image_profile_row(ip);
+			display_profile_row(ip,pp,green_color);
 			spot_list_display_vertical_lines(ip,slp,overlay_color_from_integer(color));
+		end;
+		spot_use_vertical_edge: begin
+		
+			if not show_pixels then begin
+				saved_bounds:=ip^.analysis_bounds;
+				pp:=image_profile_row(analysis_image);
+				ip^.analysis_bounds:=analysis_image^.analysis_bounds;
+				display_profile_row(ip,pp,yellow_color);
+				ip^.analysis_bounds:=saved_bounds;
+				pp:=image_profile_row(ip);
+				display_profile_row(ip,pp,green_color);
+			end;
+						
+			ref_line.a.i:=ip^.analysis_bounds.left;
+			ref_line.a.j:=round(reference_um/pixel_size_um);
+			ref_line.b.i:=ip^.analysis_bounds.right;
+			ref_line.b.j:=round(reference_um/pixel_size_um);
+			display_ccd_line(ip,ref_line,blue_color);	
+
+			spot_list_display_vertical_lines(ip,slp,overlay_color_from_integer(color));
+		end;
 		otherwise begin
 			if num_spots>1 then 
 				spot_list_display_bounds(ip,slp,overlay_color_from_integer(color));
@@ -1851,7 +1915,14 @@ begin
 					spot_list_display_bounds(ip,slp,overlay_color_from_integer(color));
 		end;
 	end;
-	
+{
+	Adjust the coordinates of the spot to account for different ways of reading
+	out the same image sensor. For example, if we read out the ICX424 by binning
+	blocks of four pixels into one, which is the ICX424Q readout, we have to 
+	displace the coordinate to make them consistent with the coordinates we would
+	obtain with the single-pixel readout. This displacement is a result of pipelines
+	in the LWDAQ Driver, not due to any geometry on the image sensor.
+}	
 	mark_time('adjusting coordinates','lwdaq_bcam');
 	if (add_x_um<>0) or (add_y_um<>0) then begin
 		case analysis_type of 
@@ -1877,8 +1948,6 @@ begin
 		end;
 	end;
 	
-	mark_time('done','lwdaq_bcam');
-
 	if return_bounds then
 		result:=bounds_string_from_spot_list(slp)
 	else if return_intensity then
@@ -2651,7 +2720,6 @@ begin
 		mark_time('displaying intensity profile','lwdaq_wps');
 		pp:=image_profile_row(ip);
 		display_profile_row(ip,pp,green_color);
-		ip^.analysis_bounds:=saved_bounds;
 	end;
 	mark_time('displaying lines','lwdaq_wps');
 	spot_list_display_vertical_lines(ip,slp,red_color);
