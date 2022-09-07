@@ -193,6 +193,20 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			plot $display_min $display_max \
 			$info(display_mode) $id_list"]
 			
+		# We obtain a list of the channels with at least one message present
+		# in the image, and the number of messages for each of these channels.
+		set channels [lwdaq_receiver $image_name "-payload $config(payload_length) list"]
+		if {![LWDAQ_is_error_result $channels]} {
+			set ca ""
+			foreach {c a} $channels {
+				if {($a > $info(activity_threshold)) && ($c > 0)} {
+					append ca "$c\:$a "
+				}
+			}
+			set info(channel_activity) $ca
+		} {
+			error $channels
+		}
 	} error_result]} {return "ERROR: $error_result"}
 
 	# Handle the case where we have no messages at all.
