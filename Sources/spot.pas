@@ -44,6 +44,7 @@ const
 	spot_use_vertical_stripe=3;
 	spot_use_vertical_shadow=4;
 	spot_use_vertical_edge=5;
+	spot_use_ellipse_shadow=6;
 	max_num_spots=1000;
 	
 type
@@ -362,15 +363,14 @@ begin
 end;
 
 {
-	The spot_ellipse_error function we provide for the simplex fitter counts the number
-	of pixels in the image analysis bounds that are on the border of the
-	spot in the image and also on the border of the ellipse defined by
-	vertex "v". The error is the negative of the number of border-coincident
-	pixels. We took the idea for border-coincidence from "Robust Ellipse
-	Detection by Fitting Randomly Selected Edge Patches" by Watcharin
-	Kaewapichai, and Pakorn Kaewtrakulpong. We don't use their method, but
-	we take from it the one idea of matching edge pixels to determine
-	fitness of the ellipse.
+	The spot_ellipse_error function we provide for the simplex fitter counts the
+	number of pixels in the image analysis bounds that are on the border of the
+	spot in the image and also on the border of the ellipse defined by vertex
+	"v". The error is the negative of the number of border-coincident pixels. We
+	took the idea for border-coincidence from "Robust Ellipse Detection by
+	Fitting Randomly Selected Edge Patches" by Watcharin Kaewapichai, and Pakorn
+	Kaewtrakulpong. We don't use their method, but we take from it the one idea
+	of matching edge pixels to determine fitness of the ellipse.
 }
 function spot_ellipse_error(v:simplex_vertex_type;ep:pointer):real;
 var
@@ -409,6 +409,7 @@ const
 	num_parameters=5;
 	max_iterations=40;
 	bounds_extra=5;
+	report_progress=false;
 	
 var
 	simplex:simplex_type;
@@ -428,7 +429,7 @@ begin
 	dp^.ip:=ip;
 	dp^.th:=spot.threshold;
 {
-	We start with an ellipse that fills the spot bounds.
+	We generate an ellipse that fits the spot's rectangular boundaries.
 }
 	spot.ellipse:=xy_rectangle_ellipse(i_from_c_rectangle(spot.bounds));
 {
@@ -442,7 +443,7 @@ begin
 		vertices[1,3]:=b.x;
 		vertices[1,4]:=b.y;
 		vertices[1,5]:=axis_length;
-		construct_size:=1;
+		construct_size:=10;
 		done_counter:=0;
 		max_done_counter:=2;
 	end;
@@ -471,6 +472,12 @@ begin
 	repeat
 		simplex_step(simplex,spot_ellipse_error,dp);
 		inc(i);
+		if report_progress then with simplex,spot do begin
+			writestr(debug_string,i:1,' ',vertices[1,1]:0:1,' ',vertices[1,2]:0:1,' ',
+				vertices[1,3]:0:1,' ',vertices[1,4]:0:1,' ',vertices[1,5]:0:1,' ',
+				spot_ellipse_error(vertices[1],dp):0:1);
+			gui_writeln(debug_string);
+		end;	
 	until (simplex.done_counter>=simplex.max_done_counter) or (i>max_iterations);
 {
 	Restore the image bounds.
@@ -501,7 +508,7 @@ end;
 
 {
 	spot_eccentricity returns the elliptic eccentricity of a spot, which is its
-	maximum length divided by its minimum width.
+	maximum width divided by its minimum width.
 }
 function spot_eccentricity(s:spot_type):real;
 

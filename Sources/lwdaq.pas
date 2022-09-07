@@ -1646,18 +1646,19 @@ end;
 
 <p>The lwdaq_bcam routine identifies all distinct sets of contiguous pixels above threshold, eliminates those that do not meet the test criteria, determines the position and total net intensity of each remaining set, sorts them in order of decreasing total net intensity, and eliminates all but the first -num_spots sets. The <i>total net intensity</i> is the sum of the net intensities of all the pixels in the set. By default, the routine returns the position of each spot in microns with respect to the top-left corner of the image. To convert from pixels to microns, the routine uses -pixel_size_um, and assumes the pixels are square.</p>
 
-<p>There are several ways that lwdaq_bcam can analyze an image. We can manipulate the image before analysis, or leave the image unchanged. We can find the weighted centroid of the pixels in the spot, fit an ellipse to the perimeter of the spot, or fit a straight line to the pixels in the spot. We specify a combination of manipulation and calculation with the analysis_type parameter, which correspond to the <i>spot_use</i> constants in <a href="http://www.bndhep.net/Software/Sources/spot.pas">spot.pas</a>.</p>
+<p>There are several ways that lwdaq_bcam can analyze an image. We can manipulate the image before analysis, or we can operate on the original image. Regardless of what image the analysis works on, it still drawss the results of analysis in the overlay of the original image so that we will see the results when we display the image. We can find the weighted centroid of the pixels in the spot, fit an ellipse to the perimeter of the spot, or fit a straight line to the pixels in the spot. We specify a combination of manipulation and calculation with the analysis_type parameter, which correspond to the <i>spot_use</i> constants in <a href="http://www.bndhep.net/Software/Sources/spot.pas">spot.pas</a>.</p>
 
 <center><table border=1>
 <tr><th>Value</th><th>Manipulation</th><th>Calculation</th><th>Description</th></tr>
 <tr><td>1</td><td>none</td><td>weighted centroid</td><td>Centroid of intensity for point source images</td></tr>
-<tr><td>2</td><td>none</td><td>elliptical edge</td><td>Perimiter fit for retroreflecting targets</td></tr>
+<tr><td>2</td><td>none</td><td>edge of elliptical spot</td><td>Perimiter fit for retroreflecting targets</td></tr>
 <tr><td>3</td><td>none</td><td>vertical stripe</td><td>Weighted fit to a vertical stripe</td></tr>
 <tr><td>4</td><td>negate</td><td>vertical shadow</td><td>Weighted fit to a vertical shadow</td></tr>
 <tr><td>5</td><td>grad_i</td><td>vertical edge</td><td>Weighted fit to edge pixels.</tr>
+<tr><td>6</td><td>negate</td><td>edge of elliptical shadow</td><td>Weighted fit to edge pixels.</tr>
 </table><small><b>Table:</b> Analysis Types, Image Manipulations and Calculations</small></center>
 
-<p>With analysis_type=1, which is the default, the position of the spot is the weighted centroid of its net intensity. With analysis_type=2, the routine fits an ellipse to the edge of the spot. The position is the center of the ellipse. With analysis_type=3 the routine fits a straight line to the net intensity of a bright stripe. The analysis returnsthe <i>x</i>-coordinate of the intersection of this straight line with a reference line. We specify the <i>y</i>-coordinate of a horizontal reference line with <i>reference_um</i>. In place of a <i>y</i>-coordinate of the line, the routine returns its anti-clockwise rotation in milliradians. With analysis_type=4, the routine negates the image, turning a dark shadow into a bright stripe, and then applies vertical stripe analysis to the negated image. With analysis_type=5, the routine obtains the absolute horizontal gradient of intensity and applies vertical stripe analyis to the gradient image. When the routine manipulates the image before analysis, it still draws the results of analysis on the original image.</p>
+<p>With analysis_type=1, which is the default, the position of the spot is the weighted centroid of its net intensity. With analysis_type=2, the routine fits an ellipse to the edge of the spot. The position is the center of the ellipse. With analysis_type=3 the routine fits a straight line to the net intensity of a bright stripe. The analysis returnsthe <i>x</i>-coordinate of the intersection of this straight line with a reference line. We specify the <i>y</i>-coordinate of a horizontal reference line with <i>reference_um</i>. In place of a <i>y</i>-coordinate of the line, the routine returns its anti-clockwise rotation in milliradians. With analysis_type=4, the routine negates the image, turning a dark shadow into a bright stripe, and then applies vertical stripe analysis to the negated image. With analysis_type=5, the routine obtains the absolute horizontal gradient of intensity and applies vertical stripe analyis to the gradient image. With analysis_type=5, the routine negates the image, finds bright spots, and fits an ellipse to their edges.</p>
 
 <p>With return_threshold=1, the routine does no spot-finding, but instead returns a string of five values obtained by interpreting the threshold string and examining the image. These five values are four integers and one real. The integers are threshold intensity, background intensity, minimum numbser of pixels in a valid spot, maximum number of pixels in a valid spot, and maximum eccentricity of a valid spot. With return_bounds=1 and return_threshold=0, the routine returns as its result string the boundaries around the spots. It chooses the same boundaries it draws in the image overlay. Each spot boundary is given as four integers: left, top, right, and bottom. The left and right integers are column numbers. The top and bottom integers are row numbers. Each spot gets four numbers, and these make up the result string, separated by spaces. With return_intensity=1, return_bounds=0, and return_threshold=0, the routine returns only the total intensity above background of the spot for each spot. Note that this total intensity above background is not the same as the net intensity of the spot, which is the intensity above threshold. The centroid analysis uses the intensity above threshold, not the total intensity above background.</p>
 
@@ -1789,7 +1790,7 @@ begin
 	the image passed into the routine.
 }
 	case analysis_type of
-		spot_use_vertical_shadow:begin
+		spot_use_vertical_shadow,spot_use_ellipse_shadow:begin
 			mark_time('negating image','lwdaq_bcam');
 			analysis_image:=image_negate(ip);		
 		end;
@@ -1849,7 +1850,7 @@ begin
 	finding the spots. 
 }
 	case analysis_type of 
-		spot_use_ellipse: begin
+		spot_use_ellipse,spot_use_ellipse_shadow: begin
 			mark_time('fitting ellipses','lwdaq_bcam');
 			for spot_num:=1 to slp^.num_selected_spots do
 				spot_ellipse(analysis_image,slp^.spots[spot_num]);
@@ -1877,7 +1878,7 @@ begin
 		clear_overlay(ip);	
 	end;
 	case analysis_type of 
-		spot_use_ellipse:
+		spot_use_ellipse,spot_use_ellipse_shadow:
 			spot_list_display_ellipses(ip,slp,overlay_color_from_integer(color));
 		spot_use_vertical_stripe,
 		spot_use_vertical_shadow: begin
