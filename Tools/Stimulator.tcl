@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "2.4"
+	LWDAQ_tool_init "Stimulator" "3.1"
 	if {[winfo exists $info(window)]} {return 0}
 	
 	set config(ip_addr) "10.0.0.37"
