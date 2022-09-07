@@ -4,19 +4,19 @@
 #
 # Based upon the ISL_Controller Tool.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 proc Stimulator_init {} {
@@ -28,7 +28,8 @@ proc Stimulator_init {} {
 	if {[winfo exists $info(window)]} {return 0}
 	
 	set config(ip_addr) "10.0.0.37"
-
+	set config(driver_socket) "8"
+	
 	set config(device_rck_khz) "32.768"
 	set config(max_pulse_len) [expr (256 * 256) - 1]
 	set config(max_interval_len) [expr (256 * 256 * 256) - 1]
@@ -43,6 +44,7 @@ proc Stimulator_init {} {
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
 	set config(checksum_preload) "1111111111111111"
+	set config(commands) "255 255 1 5 1 71 0 12 205 0 10 0"
 	
 	set config(xon_color) "red"
 	set config(xtimeout_color) "orange"
@@ -61,8 +63,8 @@ proc Stimulator_init {} {
 	set config(blow) "2.3"
 	set config(bempty) "2.2"
 
-	set config(ack_enable) "0"
-	set config(ack_timeout_ms) "2000"
+	set config(ack_enable) "1"
+	set config(ack_timeout) "2"
 	set config(ack_key) "0"
 	set config(id_at) "0"
 	set config(ack_at) "1"
@@ -71,7 +73,6 @@ proc Stimulator_init {} {
 	set config(ack_pending) ""
 	set config(default_ver) "A3041"
 	set config(default_id) "ABCD"
-	set config(verbose) "1"
 	set config(default_current)	"8"
 	set info(op_stop_stim) "0"
 	set info(op_start_stim) "1"
@@ -97,20 +98,28 @@ proc Stimulator_init {} {
 }
 
 #
-# Stimulator_xmit takes a string of command bytes and transmits them through
-# a Command Transmitter such as the A3029A. The routine appends a sixteen-bit
+# Stimulator_transmit takes a string of command bytes and transmits them through a
+# Command Transmitter such as the A3029A. The routine appends a sixteen-bit
 # checksum. The checksum is the two bytes necessary to return a sixteen-bit
 # linear feedback shift register to all zeros, thus performing a sixteen-bit
 # cyclic redundancy check. We assume the destination shift register is preloaded
 # with the checksum_preload value. The shift register has taps at locations 16,
-# 14, 13, and 11. The routine selects the driver socket specified for device "n"
-# and transmits through that socket.
+# 14, 13, and 11.
 #
-proc Stimulator_xmit {n commands} {
+proc Stimulator_transmit {{commands ""}} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 	global LWDAQ_Driver
+	
+	# If we specify no commands, use those in the commands parameter.
+	if {$commands == ""} {
+		set commands $config(commands)
+	}
 
+	# Print the commands to the text window.
+	LWDAQ_print $info(text) "Transmitting: $commands"
+
+	# Append a two-byte checksum.
 	set checksum $config(checksum_preload)
 	foreach c "$commands 0 0" {
 		binary scan [binary format c $c] B8 bits
@@ -128,13 +137,11 @@ proc Stimulator_xmit {n commands} {
 			binary scan [binary format b16 $checksum] cu1cu1 d21 d22
 		}
 	}
-
 	append commands " $d22 $d21"
 		
-	if {$config(verbose)} {
-		LWDAQ_print $info(text) "Transmitting: $commands"
-	}
-
+	# Open a socket to the command transmitter's LWDAQ server, select the
+	# command transmitter, and instruct it to transmit each byte of the
+	# command, including the checksum.
 	if {[catch {
 		set sock [LWDAQ_socket_open $config(ip_addr)]
 		if {[LWDAQ_hardware_id $sock] == "37"} {
@@ -142,7 +149,7 @@ proc Stimulator_xmit {n commands} {
 		} {
 			set sd $config(spacing_delay_A2071E)
 		}
-		LWDAQ_set_driver_mux $sock $info(dev$n\_sckt) 1
+		LWDAQ_set_driver_mux $sock $config(driver_socket) 1
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		foreach c $commands {
@@ -159,6 +166,9 @@ proc Stimulator_xmit {n commands} {
 		return "FAIL"
 	}
 	
+	# If we get here, we have no reason to believe the transmission failed, although
+	# we could have instructed an empty driver socket or the stimulator could have
+	# failed to receive the command.
 	return "SUCCESS"
 }
 
@@ -183,8 +193,8 @@ proc Stimulator_id_bytes {n} {
 }
 
 # 
-# Stimulator_start_cmd generates a list of bytes to transmit to the device so as to
-# select, configure, and stimulate it according to the parameters in the
+# Stimulator_start_cmd generates a list of bytes to transmit to the device so as
+# to select, configure, and stimulate it according to the parameters in the
 # Stimulator window. It appends a two-byte checksum, which is necessary for the
 # device to accept the command. Each byte is expressed in the return string as a
 # decimal number between 0 and 255.
@@ -294,7 +304,7 @@ proc Stimulator_start {n} {
 	set config(ack_key) [expr $ack_time % 256]
 	
 	# Transmit the commands.
-	Stimulator_xmit $n [Stimulator_start_cmd $n]
+	Stimulator_transmit [Stimulator_start_cmd $n]
 
 	# Add the requested acknowledgement to the list of those we are expecting.
 	# Our list includes the device identifier, the command that asked for the
@@ -339,7 +349,7 @@ proc Stimulator_stop {n} {
 		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_pcn) Stop $ack_time"
 	}
-	Stimulator_xmit $n $commands
+	Stimulator_transmit $commands
 	
 	# Reset the stimulus end time
 	set info(dev$n\_end) 0
@@ -384,7 +394,7 @@ proc Stimulator_xon {n} {
 	}
 	
 	# Transmit the command.
-	Stimulator_xmit $n $commands
+	Stimulator_transmit $commands
 
 	# Set state variables.
 	LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
@@ -421,7 +431,7 @@ proc Stimulator_xoff {n} {
 		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_pcn) Xoff $ack_time"
 	}
-	Stimulator_xmit $n $commands
+	Stimulator_transmit $commands
 
 	# Set state variables.
 	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
@@ -460,7 +470,7 @@ proc Stimulator_battery {n} {
 	}
 	
 	# Transmit commands.
-	Stimulator_xmit $n $commands
+	Stimulator_transmit $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -494,7 +504,7 @@ proc Stimulator_identify {} {
 	LWDAQ_print $info(text) "Sending identification command."
 
 	# Transmit commands.
-	Stimulator_xmit $n $commands
+	Stimulator_transmit $commands
 	
 	# Set state variables.
 	set info(state) "Idle"
@@ -538,15 +548,15 @@ proc Stimulator_clear {n} {
 }
 
 #
-# A background routine, which keeps posting itself to the
-# Tcl event loop, which maintains the colors of the stimulator 
-# indicators in the tool window.
+# A background routine, which keeps posting itself to the Tcl event loop, which
+# maintains the colors of the stimulator indicators in the tool window.
 #
 proc Stimulator_monitor {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 	global LWDAQ_info_Receiver 
-	upvar #0 Neuroplayer_info(aux_messages) aux
+	upvar #0 Neuroplayer_info ninfo
+	upvar #0 Neuroplayer_config nconfig
 	global LWDAQ_Info
 	
 	if {![winfo exists $info(window)]} {return 0}
@@ -569,17 +579,22 @@ proc Stimulator_monitor {} {
 		}	
 	}
 	
-	# If acknowledgement monitoring is enabled, check for their arrival. The 
-	# acknowledgements we obtain from the Receiver Instrument's auxiliary
-	# message list, which is accessible here by the name "aux". This list will
-	# contain new acknowledgements only if the Receiver Instrument is downloading
-	# live data, either because it is Looping, or because the Neuroarchiver is
-	# calling it repeatedly to obtain and record the data.
+	# If the Neuroplayer's auxilliary message list does not exist, we have no
+	# hope of finding any auxilliary messages from our stimulators.
+	if {![info exists nconfig]} {
+		LWDAQ_post Stimulator_monitor
+		return "ABORT"
+	}
+	
+	# If acknowledgement monitoring is enabled, check for their arrival. The
+	# acknowledgements we obtain from the Neuroplayer's auxiliary message list,
+	# which is accessible here by the name "aux".
 	if {$config(ack_enable)} {
+	
 		# Look for acknowledgements. When we receive one, remove its pending
 		# acknowledgement entry from the pending acknowledgement list.
 		set new_aux [list]
-		foreach am $aux {
+		foreach am $ninfo(aux_messages) {
 			set match 0
 			scan $am %d%d%d%d id fa db ts
 			if {$fa == $config(ack_at)} {
@@ -588,11 +603,9 @@ proc Stimulator_monitor {} {
 					scan $ack %s%s%s%s n ack_id ack_type ack_time
 					set ack_key [expr $ack_time % 256]
 					if {($ack_id == $id) && ($ack_key == $db)} {
-						if {$config(verbose)} {
-							LWDAQ_print $info(text) "Acknowledgement Received:\
-								device=$n id=$ack_id type=$ack_type\
-								key=$ack_key time=$ack_time\."
-						}
+						LWDAQ_print $info(text) "Acknowledgement Received:\
+							device=$n id=$ack_id type=$ack_type\
+							key=$ack_key time=$ack_time\."
 						set match 1
 					} {
 						lappend new_acks $ack
@@ -602,23 +615,23 @@ proc Stimulator_monitor {} {
 			}
 			if {!$match} {lappend new_aux $am}
 		}
-		set aux $new_aux
+		set ninfo(aux_messages) $new_aux
 		
 		# If no acknowledgement has arrived within the acknowledgement timeout, issue
 		# a warning that it hs not been received.
-		set new_acks [list]
+		set new_acks_pending [list]
 		foreach ack $config(ack_pending) {
 			scan $ack %s%s%s%s n ack_id ack_type ack_time
 			set ack_key [expr $ack_time % 256]
-			if {$ack_time + $config(ack_timeout_ms) < $now_time} {
-				LWDAQ_print $info(text) "Acknowledgement Lost:\
+			if {$ack_time + ($config(ack_timeout) * 1000 * $nconfig(play_interval)) < $now_time} {
+				LWDAQ_print $info(text) "Missing acknowledgement:\
 					device=$n ch=$ack_id type=$ack_type key=$ack_key time=$ack_time\." \
 					$config(ack_lost_color)
 			} {
-				lappend new_acks $ack
+				lappend new_acks_pending $ack
 			}
 		}
-		set config(ack_pending) $new_acks
+		set config(ack_pending) $new_acks_pending
 	}
 
 	# Look for battery measurements and identification broadcasts in the
@@ -626,7 +639,7 @@ proc Stimulator_monitor {} {
 	set new_aux [list]
 	set id_list [list]
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_pcn)"}
-	foreach am $aux {
+	foreach am $ninfo(aux_messages) {
 		scan $am %d%d%d%d id fa db ts
 
 		# If an auxiliary message is a battery measurement, analyze and report.
@@ -655,11 +668,9 @@ proc Stimulator_monitor {} {
 				}
 			}
 			
-			# Report the battery measurement if verbose flag is set.
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_pcn)\
-					value=$db time=$ts voltage=$voltage\."
-			}
+			# Report the battery measurement.
+			LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_pcn)\
+				value=$db time=$ts voltage=$voltage\."
 			
 			# Set the battery voltage indicator and set its background according
 			# to the approximate state of the battery: okay, low, or empty. If
@@ -685,7 +696,7 @@ proc Stimulator_monitor {} {
 			lappend new_aux $am
 		}
 	}
-	set aux $new_aux
+	set ninfo(aux_messages) $new_aux
 
 	# We post the monitor to the event queue and report success.
 	LWDAQ_post Stimulator_monitor
@@ -729,7 +740,6 @@ proc Stimulator_draw_list {} {
 		# now, as well as other system parameters.
 		if {![info exists info(dev$n\_ver)]} {
 			set info(dev$n\_ver) $config(default_ver)
-			set info(dev$n\_sckt) "8"
 			set info(dev$n\_id) $config(default_id)
 			set info(dev$n\_pulse_ms) "10"
 			set info(dev$n\_current) $config(default_current)
@@ -756,7 +766,7 @@ proc Stimulator_draw_list {} {
 		LWDAQ_set_bg $info(dev$n\_state) $config(xoff_color)
 		LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 
-		foreach {a c} {sckt 2 pulse_ms 5 period_ms 5 num_pulses 5 current 3 ver 6} {
+		foreach {a c} {pulse_ms 5 period_ms 5 num_pulses 5 current 3 ver 6} {
 			set b [string tolower $a]
 			label $ff.l$b -text "$a\:" -fg $config(label_color)
 			entry $ff.$b -textvariable Stimulator_info(dev$n\_$b) -width $c
@@ -862,7 +872,6 @@ proc Stimulator_remove {n} {
 	set info(dev_list) [lreplace $info(dev_list) $index $index]
 	unset info(dev$n\_id)
 	unset info(dev$n\_ver)
-	unset info(dev$n\_sckt)
 	unset info(dev$n\_battery)
 	unset info(dev$n\_pulse_ms) 
 	unset info(dev$n\_period_ms) 
@@ -898,7 +907,6 @@ proc Stimulator_add_device {} {
 	# Configure the new sensor to default values.
 	set info(dev$n\_id) $config(default_id)
 	set info(dev$n\_ver) $config(default_ver)
-	set info(dev$n\_sckt) "8"
 	set info(dev$n\_pulse_ms) "10"
 	set info(dev$n\_period_ms) "100"
 	set info(dev$n\_num_pulses) "10"
@@ -1040,16 +1048,16 @@ proc Stimulator_refresh_list {{fn ""}} {
 }
 
 #
-# Stimulator_txcmd opens a new window and provides a button for transmitting 
+# Stimulator_transmit_panel opens a new window and provides a button for transmitting 
 # a string of command bytes, each expressed as a decimal value 0..255, to a
 # particular socket on the driver specified in the main window.
 #
-proc Stimulator_txcmd {} {
+proc Stimulator_transmit_panel {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 	
 	# Open the transmit panel.
-	set w $info(window)\.txcmd
+	set w $info(window)\.xmit_panel
 	if {[winfo exists $w]} {
 		raise $w
 		return "ABORT"
@@ -1060,19 +1068,12 @@ proc Stimulator_txcmd {} {
 	set f [frame $w.tx]
 	pack $f -side top -fill x
 
-	button $f.transmit -text "Transmit" \
-		-command [list LWDAQ_post "Stimulator_xmit 0"]
+	button $f.transmit -text "Transmit" -command {
+		LWDAQ_post "Stimulator_transmit"
+	}
 	pack $f.transmit -side left -expand yes
 	
-	# We will use the first device's data acquisition configuration
-	# as a starting point.
-	set n [lindex $info(dev_list) 0]
-
-	label $f.lsckt -text "sckt:" -fg $config(label_color)
-	entry $f.esckt -textvariable Stimulator_info(dev$n\_sckt) -width 3
-	pack $f.lsckt $f.esckt -side left -expand yes
-	
-	label $f.lcommands -text "command:" -fg $config(label_color)
+	label $f.lcommands -text "Commands:" -fg $config(label_color)
 	entry $f.commands -textvariable Stimulator_config(commands) -width 50
 	pack $f.lcommands $f.commands -side left -expand yes
 
@@ -1098,15 +1099,22 @@ proc Stimulator_open {} {
 	pack $f.state -side left -expand 1
 	
 	label $f.laddr -text "ip_addr:" -fg $config(label_color)
-	entry $f.eaddr -textvariable Stimulator_config(ip_addr) -width 14
+	entry $f.eaddr -textvariable Stimulator_config(ip_addr) -width 16
 	pack $f.laddr $f.eaddr -side left -expand yes
 
-	checkbutton $f.enack -text "Acknowledge" \
-		-variable Stimulator_config(ack_enable)
-	pack $f.enack -side left -expand yes
-	checkbutton $f.verbose -text "Verbose" \
-		-variable Stimulator_config(verbose) 
-	pack $f.verbose -side left -expand yes
+	label $f.lsckt -text "driver_socket:" -fg $config(label_color)
+	entry $f.esckt -textvariable Stimulator_config(driver_socket) -width 4
+	pack $f.lsckt $f.esckt -side left -expand yes
+
+	button $f.neuroplayer -text "Neuroplayer" -command {
+		LWDAQ_post "LWDAQ_run_tool Neuroplayer"
+	}
+	pack $f.neuroplayer -side left -expand yes
+
+	button $f.txcmd -text "Transmit Panel" -command {
+		LWDAQ_post "Stimulator_transmit_panel"
+	}
+	pack $f.txcmd -side left -expand yes
 
 	foreach a {Configure Help} {
 		set b [string tolower $a]
@@ -1156,7 +1164,7 @@ return 1
 
 ----------Begin Help----------
 
-http://www.opensourceinstruments.com/Electronics/A3030/ISL.html#Software
+http://www.opensourceinstruments.com/Electronics/A3041/Stimulator.html
 
 ----------End Help----------
 
