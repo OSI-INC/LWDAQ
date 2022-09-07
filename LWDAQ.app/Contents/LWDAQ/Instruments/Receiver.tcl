@@ -93,10 +93,6 @@ proc LWDAQ_init_Receiver {} {
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
 	set info(fv_range) 30
-	set info(aux_list_name) LWDAQ_aux_Receiver
-	global $info(aux_list_name)
-	set $info(aux_list_name) ""
-	set info(aux_list_length) 0
 	set info(set_size) "16"
 	set info(clock_id) 0
 	set info(aux_num_keep) 64
@@ -136,7 +132,6 @@ proc LWDAQ_init_Receiver {} {
 proc LWDAQ_analysis_Receiver {{image_name ""}} {
 	upvar #0 LWDAQ_config_Receiver config
 	upvar #0 LWDAQ_info_Receiver info
-	upvar #0 $info(aux_list_name) aux_messages
 
 	# By default, we use the image whose name we passed in to this routine,
 	# but if no such name was passed, we use the image named in the configuration
@@ -192,76 +187,12 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		# returned by this plot routine gives us the average and standard deviation
 		# of each channel, and the number of messages present. For the clock 
 		# channel, it gives the minimum and maximum timestamp values. This string is
-		# the result of analysis for printing in the instrument window.
+		# the analysis result.
 		set result [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) \
 			plot $display_min $display_max \
 			$info(display_mode) $id_list"]
 			
-		# We obtain a list of the channels with at least one message present
-		# in the image, and the number of messages for each of these channels.
-		set channels [lwdaq_receiver $image_name "-payload $config(payload_length) list"]
-		if {![LWDAQ_is_error_result $channels]} {
-			set ca ""
-			foreach {c a} $channels {
-				if {($a > $info(activity_threshold)) && ($c > 0)} {
-					append ca "$c\:$a "
-				}
-			}
-			set info(channel_activity) $ca
-		} {
-			error $channels
-		}
-
-		# We look for messages in the auxiliary channel.
-		set new_aux_messages ""
-		foreach {c a} $channels {
-			if {$c % $info(set_size) == $info(set_size) - 1} {
-				set messages [lwdaq_receiver $image_name \
-					"-payload $config(payload_length) extract $c"]
-				if {[LWDAQ_is_error_result $messages]} {error $messages}
-				foreach {mt md} $messages {
-					append new_aux_messages "$c $mt $md "
-				}
-			}
-		}
-
-		# We are going to calculate a timestamp, with resolution one clock tick, for
-		# each auxiliary message. The timestamps can be used as a form of addressing
-		# for slow data transmissions. To get the absolute timestamp, we get the
-		# time of the first clock message in the data. This time is a sixteen-bit
-		# value that has counted the number of 256-tick periods since the data receiver
-		# clock was last reset, wrapping around to zero every time it overflows.
-		scan [lwdaq_receiver $image_name \
-			"-payload $config(payload_length) get $first_index"] %d%d%d cid bts fvn
-
-		# We take each new auxiliary message and break it up into three parts. The
-		# first part is a four-bit ID, which in the case of subcutaneous transmitters
-		# would be the channel ID of the transmitter producing the auxiliary message.
-		# The second part is a four-bit field address. The third is eight bits of data.
-		# These sixteen bits are the contents of the auxiliary message. We add a fourth
-		# number, which is the timestamp of message reception. We give the timestamp
-		# modulo 2^16, which gives us sufficient precision to detect any time-based
-		# address encoding of auxiliary data. These four numbers make one entry in
-		# the auxiliary message list, so we append them to the existing list. If the
-		# four-bit ID is zero or fifteen, this is an error, so we don't store the 
-		# message.
-		foreach {cn mt md} $new_aux_messages {
-			set id [expr ($md / 4096)]
-			if {$id == $info(set_size) - 1} {continue}
-			set id [expr (($cn / $info(set_size)) * $info(set_size)) + $id]
-			set fa [expr ($md / 256) % 16]
-			set d [expr $md % 256]
-			set ts  [expr ($mt + $bts * 256) % (65536)]
-			lappend aux_messages "$id $fa $d $ts"
-		}
-		
-		# We keep only a finite number of the most recent auxiliary messages.
-		set k [expr $info(aux_num_keep) - 1]
-		if {[llength $aux_messages] >= $k} {
-			set aux_messages [lrange $aux_messages end-$k end]
-		}
-		set info(aux_list_length) [llength $aux_messages]
 	} error_result]} {return "ERROR: $error_result"}
 
 	# Handle the case where we have no messages at all.
@@ -290,12 +221,11 @@ proc LWDAQ_refresh_Receiver {} {
 # LWDAQ_reset_Receiver resets and configures a data receiver. It resets the data
 # receiver address and timestamp registers, thus emptying its message buffer and
 # resetting its clock. It destroys the receiver instrument's data buffer and
-# working image, and clears the auxiliary message list. It resets the acquired
-# data time, a parameter we use to stop the Receiver Instrument attempting
-# download too many messages from the data receiver. If the receiver is capable
-# of saving a list of enabled channels that it should select for recording, the
-# reset routine sends the daq_channels list to the receiver so as to select
-# them.
+# working image. It resets the acquired data time, a parameter we use to stop
+# the Receiver Instrument attempting download too many messages from the data
+# receiver. If the receiver is capable of saving a list of enabled channels that
+# it should select for recording, the reset routine sends the daq_channels list
+# to the receiver so as to select them.
 #
 proc LWDAQ_reset_Receiver {} {
 	upvar #0 LWDAQ_config_Receiver config
@@ -380,6 +310,13 @@ proc LWDAQ_reset_Receiver {} {
 						set channel_select_available 1
 						set send_all_sets_cmd 0
 					}
+					4  {
+						set info(receiver_type) "A3042"
+						set config(payload_length) 16
+						set info(daq_fifo_av) 1
+						set channel_select_available 1
+						set send_all_sets_cmd 0
+					}
 					default {
 						set info(receiver_type) "?"
 						set config(payload_length) 0
@@ -444,12 +381,9 @@ proc LWDAQ_reset_Receiver {} {
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 
-		# Destroy the buffer and memory images, clear the auxilliary message
-		# list.
+		# Destroy the buffer and memory imagest.
 		lwdaq_image_destroy $info(buffer_image)
 		lwdaq_image_destroy $config(memory_name)
-		global $info(aux_list_name)
-		set $info(aux_list_name) ""
 		
 		# Reset the acquired data time. We will use this end time to avoid 
 		# over-drawing from the data receiver. When we ask for more data than 

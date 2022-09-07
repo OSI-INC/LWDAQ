@@ -201,6 +201,12 @@ proc Neuroplayer_init {} {
 	set info(spectrum) "0 0"
 	set info(values) "0"
 #
+# Parameters that handle auxilliary messages.
+#
+	set info(aux_messages) ""
+	set config(aux_num_keep) 100
+	set config(aux_list_length) 0
+#
 # Any channel with a activity_threshold samples per second in the playback
 # interval will be considered active. 
 #
@@ -7017,6 +7023,55 @@ proc Neuroplayer_play {{command ""}} {
 		"-payload $info(player_payload) \
 			-size $info(data_size) list"]
 
+	# We look for messages in the auxiliary channel.
+	set new_aux_messages ""
+	foreach {c a} $all_message_channels {
+		if {$c % $info(set_size) == $info(set_size) - 1} {
+			set messages [lwdaq_receiver $info(data_image) \
+				"-payload $info(player_payload) extract $c"]
+			if {[LWDAQ_is_error_result $messages]} {error $messages}
+			foreach {mt md} $messages {
+				append new_aux_messages "$c $mt $md "
+			}
+		}
+	}
+
+	# We are going to calculate a timestamp, with resolution one clock tick, for
+	# each auxiliary message. The timestamps can be used as a form of addressing
+	# for slow data transmissions. To get the absolute timestamp, we get the
+	# time of the first clock message in the data. This time is a sixteen-bit
+	# value that has counted the number of 256-tick periods since the data receiver
+	# clock was last reset, wrapping around to zero every time it overflows.
+	scan [lwdaq_receiver $info(data_image) \
+		"-payload $info(player_payload) get $first_index"] %d%d%d cid bts fvn
+
+	# We take each new auxiliary message and break it up into three parts. The
+	# first part is a four-bit ID, which is the primary channel number of the
+	# device producing the auxiliary message. The second part is a four-bit
+	# field address. The third is eight bits of data. These sixteen bits are the
+	# contents of the auxiliary message. We add a fourth number, which is the
+	# timestamp of message reception. We give the timestamp modulo 2^16, which
+	# gives us sufficient precision to detect any time-based address encoding of
+	# auxiliary data. These four numbers make one entry in the auxiliary message
+	# list, so we append them to the existing list. If the four-bit ID is zero
+	# or fifteen, this is a bad message, so we don't store it.
+	foreach {cn mt md} $new_aux_messages {
+		set id [expr ($md / 4096)]
+		if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
+		set id [expr (($cn / $info(set_size)) * $info(set_size)) + $id]
+		set fa [expr ($md / 256) % 16]
+		set d [expr $md % 256]
+		set ts  [expr ($mt + $bts * 256) % (65536)]
+		lappend info(aux_messages) "$id $fa $d $ts"
+	}
+	
+	# We keep only a finite number of the most recent auxiliary messages.
+	set k [expr $config(aux_num_keep) - 1]
+	if {[llength $info(aux_messages)] >= $k} {
+		set info(aux_messages) [lrange $info(aux_messages) end-$k end]
+	}
+	set config(aux_list_length) [llength $info(aux_messages)]
+		
 	# We make a list of the active channels, in which channel numbers and numbers
 	# of samples are separated by colons as in 4:256 for channel four with two
 	# hundred and fifty six samples in the interval.
@@ -8123,6 +8178,10 @@ proc Neuroplayer_open {} {
 	pack $f.export -side left -expand yes
 	button $f.tb -text "Tracker" -command "LWDAQ_post Neurotracker_open"
 	pack $f.tb -side left -expand yes
+	button $f.stimb -text "Stimulator" -command {
+		LWDAQ_post "LWDAQ_run_tool Stimulator"
+	}
+	pack $f.stimb -side left -expand yes
 	checkbutton $f.verbose -variable Neuroplayer_config(verbose) -text "Verbose"
 	pack $f.verbose -side left -expand yes
 	button $f.conf -text "Configure" -command "Neuroplayer_configure"

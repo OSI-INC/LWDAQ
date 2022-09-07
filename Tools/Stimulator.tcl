@@ -40,8 +40,6 @@ proc Stimulator_init {} {
 	set config(spacing_delay_A2071E) "0.0014"
 	set config(spacing_delay_cmd) "0.0"
 	set config(byte_processing_time) "0.0002"
-	set config(identify_window) "1000"
-	set info(identify_time) 0
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
 	set config(checksum_preload) "1111111111111111"
@@ -99,6 +97,72 @@ proc Stimulator_init {} {
 }
 
 #
+# Stimulator_xmit takes a string of command bytes and transmits them through
+# a Command Transmitter such as the A3029A. The routine appends a sixteen-bit
+# checksum. The checksum is the two bytes necessary to return a sixteen-bit
+# linear feedback shift register to all zeros, thus performing a sixteen-bit
+# cyclic redundancy check. We assume the destination shift register is preloaded
+# with the checksum_preload value. The shift register has taps at locations 16,
+# 14, 13, and 11. The routine selects the driver socket specified for device "n"
+# and transmits through that socket.
+#
+proc Stimulator_xmit {n commands} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+	global LWDAQ_Driver
+
+	set checksum $config(checksum_preload)
+	foreach c "$commands 0 0" {
+		binary scan [binary format c $c] B8 bits
+		for {set i 0} {$i < 8} {set i [expr $i + 1]} {
+			set bit [string index $bits $i]
+			set fb [string index $checksum 15]
+			set new [string range $checksum 5 14]
+			set new "[expr [string index $checksum 4] ^ $fb]$new"
+			set new "[string index $checksum 3]$new"
+			set new "[expr [string index $checksum 2] ^ $fb]$new"
+			set new "[expr [string index $checksum 1] ^ $fb]$new"
+			set new "[string index $checksum 0]$new"
+			set new "[expr $fb ^ $bit]$new"
+			set checksum $new
+			binary scan [binary format b16 $checksum] cu1cu1 d21 d22
+		}
+	}
+
+	append commands " $d22 $d21"
+		
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "Transmitting: $commands"
+	}
+
+	if {[catch {
+		set sock [LWDAQ_socket_open $config(ip_addr)]
+		if {[LWDAQ_hardware_id $sock] == "37"} {
+			set sd $config(spacing_delay_A2037E)		
+		} {
+			set sd $config(spacing_delay_A2071E)
+		}
+		LWDAQ_set_driver_mux $sock $info(dev$n\_sckt) 1
+		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
+		LWDAQ_delay_seconds $sock $config(initiate_delay)
+		foreach c $commands {
+			LWDAQ_transmit_command_hex $sock "[format %02X $c]$config(rf_xmit_op)"
+			if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
+		}
+		LWDAQ_transmit_command_hex $sock "0000"
+		LWDAQ_delay_seconds $sock [expr $config(byte_processing_time)*[llength $commands]]
+		LWDAQ_wait_for_driver $sock
+		LWDAQ_socket_close $sock
+	} error_result]} {
+		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]"
+		if {[info exists sock]} {LWDAQ_socket_close $sock}
+		return "FAIL"
+	}
+	
+	return "SUCCESS"
+}
+
+#
 # Stimulator_id_bytes returns a list of two bytes as decimal numbers that represent
 # the identifier of the implant.
 #
@@ -118,15 +182,14 @@ proc Stimulator_id_bytes {n} {
 	}
 }
 
-
 # 
-# This procedure generates a list of bytes to transmit to the device so as to
+# Stimulator_start_cmd generates a list of bytes to transmit to the device so as to
 # select, configure, and stimulate it according to the parameters in the
 # Stimulator window. It appends a two-byte checksum, which is necessary for the
 # device to accept the command. Each byte is expressed in the return string as a
 # decimal number between 0 and 255.
 #
-proc Stimulator_commands {n} {
+proc Stimulator_start_cmd {n} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
@@ -196,82 +259,6 @@ proc Stimulator_commands {n} {
 }
 
 #
-# Takes a string of bytes and appends the two bytes necessary to return a
-# sixteen-bit linear feedback shift register to all zeros, thus performing a
-# sixteen-bit cyclic redundancy check. We assume the destination shift register
-# is preloaded with the checksum_preload value. The shift register has taps at
-# locations 16, 14, 13, and 11.
-#
-proc Stimulator_append_checksum {commands} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
-
-	set checksum $config(checksum_preload)
-	foreach c "$commands 0 0" {
-		binary scan [binary format c $c] B8 bits
-		for {set i 0} {$i < 8} {set i [expr $i + 1]} {
-			set bit [string index $bits $i]
-			set fb [string index $checksum 15]
-			set new [string range $checksum 5 14]
-			set new "[expr [string index $checksum 4] ^ $fb]$new"
-			set new "[string index $checksum 3]$new"
-			set new "[expr [string index $checksum 2] ^ $fb]$new"
-			set new "[expr [string index $checksum 1] ^ $fb]$new"
-			set new "[string index $checksum 0]$new"
-			set new "[expr $fb ^ $bit]$new"
-			set checksum $new
-			binary scan [binary format b16 $checksum] cu1cu1 d21 d22
-		}
-	}
-
-	return "$commands $d22 $d21"
-}
-
-#
-# The transmit routine takes a string of command bytes and transmits them
-# through a Command Transmitter such as the A3029A. The routine appends the
-# checksum to the commands, to fit their values, and it does select the driver
-# socket specified for device "n".
-#
-proc Stimulator_transmit {n commands} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
-	global LWDAQ_Driver
-
-	set commands [Stimulator_append_checksum $commands]
-	
-	if {$config(verbose)} {
-		LWDAQ_print $info(text) "Transmitting: $commands"
-	}
-
-	if {[catch {
-		set sock [LWDAQ_socket_open $config(ip_addr)]
-		if {[LWDAQ_hardware_id $sock] == "37"} {
-			set sd $config(spacing_delay_A2037E)		
-		} {
-			set sd $config(spacing_delay_A2071E)
-		}
-		LWDAQ_set_driver_mux $sock $info(dev$n\_sckt) 1
-		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
-		LWDAQ_delay_seconds $sock $config(initiate_delay)
-		foreach c $commands {
-			LWDAQ_transmit_command_hex $sock "[format %02X $c]$config(rf_xmit_op)"
-			if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
-		}
-		LWDAQ_transmit_command_hex $sock "0000"
-		LWDAQ_delay_seconds $sock [expr $config(byte_processing_time)*[llength $commands]]
-		LWDAQ_wait_for_driver $sock
-		LWDAQ_socket_close $sock
-	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]"
-		if {[info exists sock]} {LWDAQ_socket_close $sock}
-		return "FAIL"
-	}
-	
-	return "SUCCESS"
-}
-
-#
 # Stimulator_start transmits the stimulation commands defined in the tool
 # window. It opens a socket to the Command Transmitter, turns on the RF power
 # for the initiate delay, which activates all stimulators for command reception,
@@ -307,7 +294,7 @@ proc Stimulator_start {n} {
 	set config(ack_key) [expr $ack_time % 256]
 	
 	# Transmit the commands.
-	Stimulator_transmit $n [Stimulator_commands $n]
+	Stimulator_xmit $n [Stimulator_start_cmd $n]
 
 	# Add the requested acknowledgement to the list of those we are expecting.
 	# Our list includes the device identifier, the command that asked for the
@@ -352,7 +339,7 @@ proc Stimulator_stop {n} {
 		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_pcn) Stop $ack_time"
 	}
-	Stimulator_transmit $n $commands
+	Stimulator_xmit $n $commands
 	
 	# Reset the stimulus end time
 	set info(dev$n\_end) 0
@@ -397,7 +384,7 @@ proc Stimulator_xon {n} {
 	}
 	
 	# Transmit the command.
-	Stimulator_transmit $n $commands
+	Stimulator_xmit $n $commands
 
 	# Set state variables.
 	LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
@@ -434,7 +421,7 @@ proc Stimulator_xoff {n} {
 		lappend commands $info(op_ack) $config(ack_key)
 		lappend config(ack_pending) "$n $info(dev$n\_pcn) Xoff $ack_time"
 	}
-	Stimulator_transmit $n $commands
+	Stimulator_xmit $n $commands
 
 	# Set state variables.
 	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
@@ -473,7 +460,7 @@ proc Stimulator_battery {n} {
 	}
 	
 	# Transmit commands.
-	Stimulator_transmit $n $commands
+	Stimulator_xmit $n $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -507,12 +494,8 @@ proc Stimulator_identify {} {
 	LWDAQ_print $info(text) "Sending identification command."
 
 	# Transmit commands.
-	Stimulator_transmit $n $commands
+	Stimulator_xmit $n $commands
 	
-	# Mark the time. We'll watch for identification messages for
-	# itentify_window milliseconds.
-	set info(identify_time) [clock milliseconds]
-
 	# Set state variables.
 	set info(state) "Idle"
 	
@@ -563,7 +546,7 @@ proc Stimulator_monitor {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 	global LWDAQ_info_Receiver 
-	upvar #0 $LWDAQ_info_Receiver(aux_list_name) aux
+	upvar #0 Neuroplayer_info(aux_messages) aux
 	global LWDAQ_Info
 	
 	if {![winfo exists $info(window)]} {return 0}
@@ -693,14 +676,11 @@ proc Stimulator_monitor {} {
 				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bempty_color)
 			}
 		} elseif {$fa == $config(id_at)} {
-		# If an auxiliary message is an identify measurement, check to see if
-		# we are within an identification window. If so, analyze and report.
-		# Otherwise discard the identification message.
-			if {[clock milliseconds] <= $config(identify_window) + $info(identify_time)} {
+		# If an auxiliary message is an identify measurement, analyze and
+		# report.
 				set device_id [format %04X [expr $id +  (256 * $db)]]
 				LWDAQ_print $info(text) "FOUND: Device $device_id, timestamp=$ts\." green
-			}
-		} {
+		} else {
 		# If neither type, append to our new list.
 			lappend new_aux $am
 		}
@@ -1064,7 +1044,7 @@ proc Stimulator_refresh_list {{fn ""}} {
 # a string of command bytes, each expressed as a decimal value 0..255, to a
 # particular socket on the driver specified in the main window.
 #
-proc Stimulator_tx_cmd {} {
+proc Stimulator_txcmd {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 	
@@ -1081,7 +1061,7 @@ proc Stimulator_tx_cmd {} {
 	pack $f -side top -fill x
 
 	button $f.transmit -text "Transmit" \
-		-command [list LWDAQ_post "Stimulator_transmit 0"]
+		-command [list LWDAQ_post "Stimulator_xmit 0"]
 	pack $f.transmit -side left -expand yes
 	
 	# We will use the first device's data acquisition configuration
@@ -1144,7 +1124,7 @@ proc Stimulator_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	foreach a {Add_Device Save_List Load_List Refresh_List Identify Tx_Cmd} {
+	foreach a {Add_Device Save_List Load_List Refresh_List Identify TxCmd} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Stimulator_$b"
 		pack $f.$b -side left -expand 1
