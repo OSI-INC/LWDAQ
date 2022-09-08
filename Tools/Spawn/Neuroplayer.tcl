@@ -7044,6 +7044,12 @@ proc Neuroplayer_play {{command ""}} {
 	# clock was last reset, wrapping around to zero every time it overflows.
 	scan [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) get $first_index"] %d%d%d cid bts fvn
+		
+	# We clear the auxiliary message list. Our assumption is that tools like
+	# the Stimulator will be waiting for the Neuroplayer to complete a play
+	# interval and then do all the work they need to on the list before the
+	# next play interval.
+	set info(aux_messages) ""
 
 	# We take each new auxiliary message and break it up into three parts. The
 	# first part is a four-bit ID, which is the primary channel number of the

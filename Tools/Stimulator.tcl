@@ -64,13 +64,10 @@ proc Stimulator_init {} {
 	set config(bempty) "2.2"
 
 	set config(ack_enable) "1"
-	set config(ack_timeout) "2"
-	set config(ack_key) "0"
-	set config(id_at) "0"
-	set config(ack_at) "1"
-	set config(batt_at) "2"
-	set config(sync_at) "3"
-	set config(ack_pending) ""
+	set info(id_at) "0"
+	set info(ack_at) "1"
+	set info(batt_at) "2"
+	set info(sync_at) "3"
 	set config(default_ver) "A3041"
 	set config(default_id) "ABCD"
 	set config(default_current)	"8"
@@ -256,10 +253,12 @@ proc Stimulator_start_cmd {n} {
 	}
 	
 	# Request an acknowledgement. We specify a primary channel number for
-	# the acknowledgment to use.
+	# the acknowledgment to use. The acknowledgement key will contain 
+	# information that allows our monitor routine to figure out what 
+	# command has been acknowleged.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $config(ack_key)
+		lappend commands $info(op_ack) $info(op_stim_start)
 	}
 	
 	# We return the command string, which does not yet have the checksum
@@ -299,19 +298,8 @@ proc Stimulator_start {n} {
 			+ $info(dev$n\_period_ms) * $info(dev$n\_num_pulses)]
 	}
 	
-	# Determine the acknowledgement time and key.
-	set ack_time [clock milliseconds]
-	set config(ack_key) [expr $ack_time % 256]
-	
 	# Transmit the commands.
 	Stimulator_transmit [Stimulator_start_cmd $n]
-
-	# Add the requested acknowledgement to the list of those we are expecting.
-	# Our list includes the device identifier, the command that asked for the
-	# acknowledgement and the time.
-	if {$config(ack_enable)} {
-		lappend config(ack_pending) "$n $info(dev$n\_pcn) Start $ack_time"
-	}
 
 	# Set state variables.
 	LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
@@ -332,10 +320,6 @@ proc Stimulator_stop {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Set the acknowledgement time and key.
-	set ack_time [clock milliseconds]
-	set config(ack_key) [expr $ack_time % 256]
-	
 	# Select the device and specify a primary channel number for acknowledgement.
 	set commands [Stimulator_id_bytes $n]
 
@@ -346,8 +330,7 @@ proc Stimulator_stop {n} {
 	# request the acknowledgement.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_pcn) Stop $ack_time"
+		lappend commands $info(op_ack) $config(op_stim_stop)
 	}
 	Stimulator_transmit $commands
 	
@@ -374,10 +357,6 @@ proc Stimulator_xon {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Set the acknowledgement time and key.
-	set ack_time [clock milliseconds]
-	set config(ack_key) [expr $ack_time % 256]
-
 	# Select the device and specify a primary channel number for transmission.
 	set commands [Stimulator_id_bytes $n]
 	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
@@ -386,11 +365,9 @@ proc Stimulator_xon {n} {
 	lappend commands $info(op_xmit) \
 		[expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
 		
-	# We request an acknowledgement only when we are instructing one particular
-	# device.
+	# We request an acknowledgement.
 	if {$config(ack_enable)} {
-		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_pcn) Xon $ack_time"
+		lappend commands $info(op_ack) $config(op_xmit)
 	}
 	
 	# Transmit the command.
@@ -414,10 +391,6 @@ proc Stimulator_xoff {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Set the acknowledgement time and key.
-	set ack_time [clock milliseconds]
-	set config(ack_key) [expr $ack_time % 256]
-	
 	# Select device and specify primary channel number.
 	set commands [Stimulator_id_bytes $n]
 	
@@ -427,9 +400,8 @@ proc Stimulator_xoff {n} {
 	# If we want an acknowledgement, specify a primary channel number and
 	# an acknowledgement key.
 	if {$config(ack_enable)} {
-	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_pcn) Xoff $ack_time"
+		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
+		lappend commands $info(op_ack) $info(op_xmit)
 	}
 	Stimulator_transmit $commands
 
@@ -451,10 +423,6 @@ proc Stimulator_battery {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Set the acknowledgement time and key.
-	set ack_time [clock milliseconds]
-	set config(ack_key) [expr $ack_time % 256]
-	
 	# Select the device and specify a primary channel number for the
 	# battery report to use.
 	set commands [Stimulator_id_bytes $n]
@@ -465,8 +433,7 @@ proc Stimulator_battery {n} {
 	
 	# Add acknowledgement request if specified.
 	if {$config(ack_enable)} {
-		lappend commands $info(op_ack) $config(ack_key)
-		lappend config(ack_pending) "$n $info(dev$n\_pcn) Battery $ack_time"
+		lappend commands $info(op_ack) $info(op_battery)
 	}
 	
 	# Transmit commands.
@@ -581,118 +548,88 @@ proc Stimulator_monitor {} {
 	
 	# If the Neuroplayer's auxilliary message list does not exist, we have no
 	# hope of finding any auxilliary messages from our stimulators.
-	if {![info exists nconfig]} {
+	if {![info exists ninfo(aux_messages)]} {
 		LWDAQ_post Stimulator_monitor
-		return "ABORT"
+		LWDAQ_print $info(text) "No aux messages"
+		return "SUCCESS"
 	}
 	
-	# If acknowledgement monitoring is enabled, check for their arrival. The
-	# acknowledgements we obtain from the Neuroplayer's auxiliary message list,
-	# which is accessible here by the name "aux".
-	if {$config(ack_enable)} {
-	
-		# Look for acknowledgements. When we receive one, remove its pending
-		# acknowledgement entry from the pending acknowledgement list.
-		set new_aux [list]
-		foreach am $ninfo(aux_messages) {
-			set match 0
-			scan $am %d%d%d%d id fa db ts
-			if {$fa == $config(ack_at)} {
-				set new_acks [list]
-				foreach ack $config(ack_pending) {
-					scan $ack %s%s%s%s n ack_id ack_type ack_time
-					set ack_key [expr $ack_time % 256]
-					if {($ack_id == $id) && ($ack_key == $db)} {
-						LWDAQ_print $info(text) "Acknowledgement Received:\
-							device=$n id=$ack_id type=$ack_type\
-							key=$ack_key time=$ack_time\."
-						set match 1
-					} {
-						lappend new_acks $ack
-					}
-				}
-				set config(ack_pending) $new_acks
-			}
-			if {!$match} {lappend new_aux $am}
-		}
-		set ninfo(aux_messages) $new_aux
-		
-		# If no acknowledgement has arrived within the acknowledgement timeout, issue
-		# a warning that it hs not been received.
-		set new_acks_pending [list]
-		foreach ack $config(ack_pending) {
-			scan $ack %s%s%s%s n ack_id ack_type ack_time
-			set ack_key [expr $ack_time % 256]
-			if {$ack_time + ($config(ack_timeout) * 1000 * $nconfig(play_interval)) < $now_time} {
-				LWDAQ_print $info(text) "Missing acknowledgement:\
-					device=$n ch=$ack_id type=$ack_type key=$ack_key time=$ack_time\." \
-					$config(ack_lost_color)
-			} {
-				lappend new_acks_pending $ack
-			}
-		}
-		set config(ack_pending) $new_acks_pending
-	}
-
-	# Look for battery measurements and identification broadcasts in the
-	# auxiliary message list.
+	# Go through the Neuroplayer's auxiliary message list and find messages that
+	# could be from stimulators. Report them to the text window and delete them
+	# from the list so we don't double-report them.
 	set new_aux [list]
-	set id_list [list]
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_pcn)"}
 	foreach am $ninfo(aux_messages) {
 		scan $am %d%d%d%d id fa db ts
+		if {$fa == $info(ack_at)} {
 
-		# If an auxiliary message is a battery measurement, analyze and report.
-		if {$fa == $config(batt_at)} {
-			# The battery measurements have only the primary channel number to
-			# identify them, so we look for the first device entry with a matching
-			# id and assume this is the matching device. If we find no matching id,
-			# we leave the battery measurement and move on to the next message.
+			# Acknowledgements encode the type of command in their data byte.
+			switch $db {
+				$info(op_stop_stim) {set type "stop_stim"}
+				$info(op_start_stim) {set type "start_stim"}
+				$info(op_xmit) {set type "xmit"}
+				$info(op_ack) {set type "ack"}
+				$info(op_battery) {set type "battery"}
+				$info(op_identify) {set type "identify"}
+				$info(op_setpcn) {set type "setpcn"}
+				default {set type $db}
+			}
+			LWDAQ_print $info(text) "Command Acknowledgement:\
+				pcn=$id type=$type time=$ts\."
+		} elseif {$fa == $info(batt_at)} {
+			
+			# Battery measurements may correspond to a stimulator in our
+			# list, and if so we want to update its battery measurement. The
+			# measurement is identified only by its primary channel number,
+			# so we look for the first device entry with a matching id and
+			# assume this is the matching device.
+			set voltage "?"
 			set i [lsearch -index 1 $id_list $id]
 			if {$i >= 0} {
 				set n [lindex $id_list $i 0]
-			} else {
-				lappend new_aux $am
-				continue
+				
+				# We interpret battery measurements in a manner particular to the
+				# various supported device versions.
+				set ver $info(dev$n\_ver)
+				switch $ver {
+					"A3041" {
+						set voltage [format %.1f [expr 255.0/$db*1.2]]
+					}
+					default {
+						set voltage [format %.1f [expr 255.0/$db*1.2]]
+					}
+				}
+				
+				# Set the battery voltage indicator and set its background according
+				# to the approximate state of the battery: okay, low, or empty. If
+				# we were unable to interpret the battery voltage, we leave it as a
+				# question mark.
+				set info(dev$n\_battery) $voltage	
+				if {$voltage == "?"} {
+					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bnone_color)
+				} elseif {$voltage > $config(blow)} {
+					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bokay_color)
+				} elseif {$voltage > $config(bempty)} {
+					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(blow_color)
+				} else {
+					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bempty_color)
+				}
 			}
 		
-			# We interpret battery measurements in a manner particular to the
-			# various supported device versions.
-			set ver $info(dev$n\_ver)
-			switch $ver {
-				"A3041" {
-					set voltage [format %.1f [expr 255.0/$db*1.2]]
-				}
-				default {
-					set voltage "?"
-				}
-			}
-			
 			# Report the battery measurement.
-			LWDAQ_print $info(text) "Battery: device=$n ch=$info(dev$n\_pcn)\
-				value=$db time=$ts voltage=$voltage\."
-			
-			# Set the battery voltage indicator and set its background according
-			# to the approximate state of the battery: okay, low, or empty. If
-			# we were unable to interpret the battery voltage, we leave it as a
-			# question mark.
-			set info(dev$n\_battery) $voltage	
-			if {$voltage == "?"} {
-				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bnone_color)
-			} elseif {$voltage > $config(blow)} {
-				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bokay_color)
-			} elseif {$voltage > $config(bempty)} {
-				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(blow_color)
-			} else {
-				LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bempty_color)
-			}
-		} elseif {$fa == $config(id_at)} {
-		# If an auxiliary message is an identify measurement, analyze and
-		# report.
-				set device_id [format %04X [expr $id +  (256 * $db)]]
-				LWDAQ_print $info(text) "FOUND: Device $device_id, timestamp=$ts\." green
+			LWDAQ_print $info(text) "Battery Measurement:\
+				pcn=$id value=$db time=$ts voltage=$voltage."
+		} elseif {$fa == $info(sync_at)} {
+		
+			# Report a synchronizing mark.
+			LWDAQ_print $info(text) "Synchronizing Mark: pcn=$id times=$ts\."
+		} elseif {$fa == $info(id_at)} {
+		
+			# Report identity broadcast.
+			set device_id [format %04X [expr $id +  (256 * $db)]]
+			LWDAQ_print $info(text) "Identification Broadcast: pcn=$id times=$ts\."
 		} else {
-		# If neither type, append to our new list.
+			# Add unrecognised auxiliary message to new list.
 			lappend new_aux $am
 		}
 	}
