@@ -60,7 +60,7 @@ proc Stimulator_init {} {
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 
-	set config(blow) "2.3"
+	set config(blow) "2.5"
 	set config(bempty) "2.2"
 
 	set config(ack_enable) "1"
@@ -71,13 +71,21 @@ proc Stimulator_init {} {
 	set config(default_ver) "A3041"
 	set config(default_id) "ABCD"
 	set config(default_current)	"8"
-	set info(op_stop_stim) "0"
-	set info(op_start_stim) "1"
+	set info(op_stim_stop) "0"
+	set info(op_stim_start) "1"
 	set info(op_xmit) "2"
 	set info(op_ack) "3"
 	set info(op_battery) "4"
 	set info(op_identify) "5"
 	set info(op_setpcn) "6"
+	set info(ack_stim_stop) "16"
+	set info(ack_stim_start) "17"
+	set info(ack_xon) "18"
+	set info(ack_xoff) "19"
+	set info(ack_ack) "20"
+	set info(ack_battery) "21"
+	set info(ack_identify) "22"
+	set info(ack_setpcn) "23"
 	
 	set info(state) "Idle"
 	set info(monitor_interval_ms) "100"
@@ -206,7 +214,7 @@ proc Stimulator_start_cmd {n} {
 	set commands [Stimulator_id_bytes $n]
 
 	# Append the stimulus start command.
-	lappend commands $info(op_start_stim)
+	lappend commands $info(op_stim_start)
 	
 	# Append the current.
 	set current [expr round($info(dev$n\_current))]
@@ -220,9 +228,9 @@ proc Stimulator_start_cmd {n} {
 	# periods we want the pulse to last for.
 	set len [expr round($config(device_rck_khz) * $info(dev$n\_pulse_ms)) - 1]
 	if {$len > $config(max_pulse_len)} {
+		set len $config(max_pulse_len)
 		LWDAQ_print $info(text) "WARNING: Pulses truncated to\
 			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
-		set len $config(max_pulse_len)
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
 
@@ -258,7 +266,7 @@ proc Stimulator_start_cmd {n} {
 	# command has been acknowleged.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $info(op_stim_start)
+		lappend commands $info(op_ack) $info(ack_stim_start)
 	}
 	
 	# We return the command string, which does not yet have the checksum
@@ -324,13 +332,13 @@ proc Stimulator_stop {n} {
 	set commands [Stimulator_id_bytes $n]
 
 	# Send the stimulus stop command, which is just a zero.
-	lappend commands $info(op_stop_stim)
+	lappend commands $info(op_stim_stop)
 	
 	# If we want an acknowledgement, specify a primary channel number and
 	# request the acknowledgement.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $config(op_stim_stop)
+		lappend commands $info(op_ack) $info(ack_stim_stop)
 	}
 	Stimulator_transmit $commands
 	
@@ -367,7 +375,7 @@ proc Stimulator_xon {n} {
 		
 	# We request an acknowledgement.
 	if {$config(ack_enable)} {
-		lappend commands $info(op_ack) $config(op_xmit)
+		lappend commands $info(op_ack) $info(ack_xon)
 	}
 	
 	# Transmit the command.
@@ -401,7 +409,7 @@ proc Stimulator_xoff {n} {
 	# an acknowledgement key.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $info(op_xmit)
+		lappend commands $info(op_ack) $info(ack_xoff)
 	}
 	Stimulator_transmit $commands
 
@@ -433,7 +441,7 @@ proc Stimulator_battery {n} {
 	
 	# Add acknowledgement request if specified.
 	if {$config(ack_enable)} {
-		lappend commands $info(op_ack) $info(op_battery)
+		lappend commands $info(op_ack) $info(ack_battery)
 	}
 	
 	# Transmit commands.
@@ -550,7 +558,6 @@ proc Stimulator_monitor {} {
 	# hope of finding any auxilliary messages from our stimulators.
 	if {![info exists ninfo(aux_messages)]} {
 		LWDAQ_post Stimulator_monitor
-		LWDAQ_print $info(text) "No aux messages"
 		return "SUCCESS"
 	}
 	
@@ -564,16 +571,15 @@ proc Stimulator_monitor {} {
 		if {$fa == $info(ack_at)} {
 
 			# Acknowledgements encode the type of command in their data byte.
-			switch $db {
-				$info(op_stop_stim) {set type "stop_stim"}
-				$info(op_start_stim) {set type "start_stim"}
-				$info(op_xmit) {set type "xmit"}
-				$info(op_ack) {set type "ack"}
-				$info(op_battery) {set type "battery"}
-				$info(op_identify) {set type "identify"}
-				$info(op_setpcn) {set type "setpcn"}
+			switch $db \
+				$info(ack_stim_stop) {set type "stop"} \
+				$info(ack_stim_start) {set type "start"} \
+				$info(ack_xon) {set type "xon"} \
+				$info(ack_xoff) {set type "xoff"} \
+				$info(ack_battery) {set type "battery"} \
+				$info(ack_identify) {set type "identify"} \
+				$info(ack_setpcn) {set type "setpcn"} \
 				default {set type $db}
-			}
 			LWDAQ_print $info(text) "Command Acknowledgement:\
 				pcn=$id type=$type time=$ts\."
 		} elseif {$fa == $info(batt_at)} {
@@ -618,16 +624,17 @@ proc Stimulator_monitor {} {
 		
 			# Report the battery measurement.
 			LWDAQ_print $info(text) "Battery Measurement:\
-				pcn=$id value=$db time=$ts voltage=$voltage."
+				pcn=$id value=$db time=$ts voltage=$voltage." brown
 		} elseif {$fa == $info(sync_at)} {
 		
 			# Report a synchronizing mark.
-			LWDAQ_print $info(text) "Synchronizing Mark: pcn=$id times=$ts\."
+			LWDAQ_print $info(text) "Synchronizing Mark: pcn=$id time=$ts\."
 		} elseif {$fa == $info(id_at)} {
 		
 			# Report identity broadcast.
 			set device_id [format %04X [expr $id +  (256 * $db)]]
-			LWDAQ_print $info(text) "Identification Broadcast: pcn=$id times=$ts\."
+			LWDAQ_print $info(text) "Identification Broadcast:\
+				device_id=$device_id time=$ts\." green
 		} else {
 			# Add unrecognised auxiliary message to new list.
 			lappend new_aux $am
