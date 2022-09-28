@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "157"
+	LWDAQ_tool_init "Neurorecorder" "158"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -64,11 +64,7 @@ proc Neurorecorder_init {} {
 #
 # Recording data acquisition parameters.
 #
-	set info(receiver_options) "A3018 A3027 A3032 A3038"
-	set info(alt_options) "A3032 A3038"
-#
-# Payload lengths for various receivers.
-#
+	set info(alt_options) "A3032 A3038 A3042"
 	set info(A3032_payload) "16"
 	set info(A3038_payload) "16"
 	set info(A3038_coordinates) "\
@@ -574,9 +570,17 @@ proc Neurorecorder_set_receiver {version} {
 				No need to specify driver socket, channel selection supported."
 			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
+		"A3042" {
+			set iconfig(payload_length) $info(A3038_payload)
+			set config(tracker_coordinates) $info(A3038_coordinates)
+			Neurorecorder_print "Receiver $version\:\
+				No need to specify driver socket, channel selection supported."
+			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+		}
 		default {
 			set iconfig(payload_length) 0
 			set config(tracker_coordinates) ""
+			Neurorecorder_print "WARNING: Unknown receiver version \"$version\"."
 			set config(tracker_background) ""
 		}
 	}
@@ -747,7 +751,7 @@ proc Neurorecorder_record {{command ""}} {
 			}
 			Neurorecorder_print "Detected $iinfo(receiver_type)\
 				data receiver, reconfiguring for the $iinfo(receiver_type)."
-			Neurorecorder_set_receiver $iinfo(receiver_type)	
+			Neurorecorder_set_receiver $iinfo(receiver_type)
 		}
 		set ms_reset [clock milliseconds]		
 
@@ -886,7 +890,7 @@ proc Neurorecorder_record {{command ""}} {
 			set info(recorder_message_interval) $info(initial_message_interval)
 		}
 		
-		# Check the block of data for errors. If there are errors, we 
+		# Check the block of data for errors. If there are errors, we print a warning.
 		scan [lwdaq_receiver $iconfig(memory_name) \
 			"-payload $iconfig(payload_length) clocks 0"] %d%d%d%d \
 			num_errors num_clocks num_messages first_index

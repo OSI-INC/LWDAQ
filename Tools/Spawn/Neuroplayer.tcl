@@ -56,7 +56,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "159"
+	LWDAQ_tool_init "Neuroplayer" "160"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -68,12 +68,6 @@ proc Neuroplayer_init {} {
 #
 	set info(play_control) "Idle"
 	set info(play_control_label) "none"
-#
-# Recording data acquisition parameters.
-#
-	set config(receiver_type) "?"
-	set info(receiver_options) "A3018 A3027 A3032 A3038"
-	set info(alt_options) "A3032 A3038"
 #
 # The Neuroplayer uses four LWDAQ images to hold data. The vt_image and
 # af_image are those behind the display of the signal trace and the signal
@@ -4107,7 +4101,7 @@ proc Neurotracker_extract {} {
 	# final tracker slice.
 	set final_slice [lindex $history end]
 	Neuroplayer_print "Tracker: [lrange $final_slice 0 2]\
-		[lrange $final_slice 7 end]" verbose	
+		[lrange $final_slice 7 end]" verbose
 	
 	# Return a success flag.
 	if {$error_flag} {
@@ -4264,8 +4258,7 @@ proc Neurotracker_fresh_graphs {} {
 
 #
 # Neurotracker_plot plots the locus of the current transmitter channel centroid
-# in the tracker
-# window. 
+# in the tracker window. 
 #
 proc Neurotracker_plot {} {
 	upvar #0 Neuroplayer_info info
@@ -7167,7 +7160,6 @@ proc Neuroplayer_play {{command ""}} {
 		}
 	}
 	
-	
 	# We apply processing to each channel for this interval, plot the signal,
 	# and plot the spectrum, as enabled by the user.
 	foreach info(channel_code) $selected_channels {
@@ -7206,7 +7198,9 @@ proc Neuroplayer_play {{command ""}} {
 		}
 		if {![LWDAQ_is_error_result $result] && $en_proc} {
 			if {[catch {eval $info(processor_script)} error_result]} {
-				set result "ERROR: $error_result"
+				set result "ERROR: In $info(processor_file_tail)\
+					for channel $info(channel_num),\
+					$error_result"
 				if {[regexp -nocase {ABORTING} $error_result]} {
 					set info(play_control) "Stop"
 					break

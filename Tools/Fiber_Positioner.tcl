@@ -30,7 +30,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.10"
+	LWDAQ_tool_init "Fiber_Positioner" "1.11"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -893,13 +893,13 @@ proc Fiber_Positioner_open {} {
 	label $f.image -image $info(photo) 
 	pack $f.image -side top -expand yes
 
-	set info(data) [LWDAQ_text_widget $f 60 15 1 1]
+	set info(data) [LWDAQ_text_widget $f 60 5 1 1]
 	LWDAQ_print $info(data) "Fiber Positioner Data" purple
 
 	set f [frame $w.log]
 	pack $f -side right -fill both -expand yes
 	
-	set info(log) [LWDAQ_text_widget $f 30 60 1 1]
+	set info(log) [LWDAQ_text_widget $f 30 50 1 1]
 	LWDAQ_print $info(log) "Fiber Positioner Log" purple
 	
 	return 1
