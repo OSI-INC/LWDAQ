@@ -77,9 +77,9 @@ proc Fiber_Positioner_init {} {
 	# Parameters that set up the fiber image capture and analysis.
 	set config(fiber_type) "9"
 	set config(fiber_sock) "3"
-	set config(fiber_elements) "A1 A2 A3"
+	set config(fiber_elements) "A1 A2 A3 A4"
 	set config(camera_sock) "4"
-	set config(flash_seconds) "0.0003"
+	set config(flash_seconds) "0.003"
 	set config(sort_code) "8"
 	
 	# The north, south, east, and west control values. Set them to produce zero

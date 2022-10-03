@@ -789,14 +789,14 @@ end;
 	signal identifier, a sixteen-bit sample value, an eight-bit time stamp, and
 	zero or more bytes of payload. The routine will return the sixteen-bit
 	sample values, or various characteristics of the data block, depending upon
-	the options passed in through the command string. 
-	
+	the options passed in through the command string.
+
 	The routine does not return the payload directly, but instead uses the
 	global electronics_trace to store indices that allow another routine to
 	extract payload values from the image data. The electronics trace is filled
 	with message indices when we execute the "extract" or "reconstruct"
 	instructions.
-	
+
 	The only command that alters the image data is "purge", which eliminates
 	duplicate messages. All other commands leave the image data untouched. Some
 	commands alter the image result string.
@@ -805,8 +805,8 @@ end;
 	data block to be aligned incorrectly, so that the first byte of the block is
 	not the first byte of a message, but instead the second, third, or fourth
 	byte of an incomplete message. The routine does not handle such exceptions.
-	If we want to deal with such corruption, we must shift the image data one byte 
-	to the left and try again until we meet with success.
+	If we want to deal with such corruption, we must shift the image data one
+	byte to the left and try again until we meet with success.
 
 	The command string passed into this routine begins with options and values,
 	followed by an instruction and parameters. We present the options and
@@ -840,13 +840,13 @@ end;
 	messages and returning the number of messages in the purged data.
 
 	The "plot" instruction tells the routine to plot all messages received from
-	the channel numbers you specify, or all channels if you specify a "*"
+	the channel numbers we specify, or all channels if we specify a "*"
 	character. Glitches caused by bad messages will be plotted also. No
 	elimination of messages nor reconstruction is performed prior to plotting.
 	The two parameters after the plot instruction specify the minimum and
 	maximum values of the signal in the interval. The next parameter is either
-	AC or DC, to specify the display coupling. After these three, you add the
-	identifiers of the signals you want to plot. To specify all signals except
+	AC or DC, to specify the display coupling. After these three, we add the
+	identifiers of the signals we want to plot. To specify all signals except
 	the clock signal, use a "*". The routine returns a summary result of the
 	form "id_num num_message ave stdev" for each selected channel. For the clock
 	channel signal, which is channel number zero, the routine gives the start
@@ -883,19 +883,19 @@ end;
 	time. The result of reconstruction is a sequence of messages with none
 	missing and none extra. The instruction string for the "reconstruct"
 	instruction begins with the word "reconstruct" and is followed by several
-	paramters. The first parameter is the identifier of the signal you want to
+	paramters. The first parameter is the identifier of the signal we want to
 	reconstruct. The second parameter is its nominal sampling period in clock
 	ticks. The third parameter is the the signal's most recent correct sample
-	value, which we call the "standing value" of the signal. If you don't
-	specify this parameter, "reconstruct" assumes it to be zero. After the
-	third parameter, you have the option of specifying any unaccepted samples
-	from previous data acquisitions. These you describe each with one number
-	giving their sample number. The reconstruct routine assumes their timestamps
-	are zero ticks. The result string contains the reconstructed message stream
-	with one message per line. Each message is represented by the time it
-	occured, in ticks after the first clock in the image time interval, and the
-	message data value. The "reconstruct" command writes the following numbers
-	into ip^.results: the number of clock messages in the image, the number of
+	value, which we call the "standing value" of the signal. If we don't specify
+	this parameter, "reconstruct" assumes it to be zero. After the third
+	parameter, we have the option of specifying any unaccepted samples from
+	previous data acquisitions. These we describe each with one number giving
+	their sample value. The reconstruct routine assumes their timestamps are
+	zero. The result string contains the reconstructed message stream with one
+	message per line. Each message is represented by the time it occured, in
+	ticks after the first clock in the image time interval, and the message data
+	value. The "reconstruct" command writes the following numbers into
+	ip^.results: the number of clock messages in the image, the number of
 	messages in the reconstructed messages stream, the number of bad messages,
 	the number of substitute messages, and any unaccepted message values it
 	found in a transmission window that overlaps the end of the image time
@@ -941,7 +941,6 @@ const
 	clock_period=256;
 	min_period=16;
 	max_period=2048;
-	window_border=0.125;
 	max_print_length=long_string_length;
 	min_reconstruct_clocks=8;
 	id_offset=0;
@@ -973,6 +972,7 @@ var
 	message_index:integer=0;
 	max_index:integer=0;
 	num_bad_messages:integer=0;
+	window_border:real=0.125;
 	mp,msp:message_array_type;
 	result:string;
 	error_report:string;
@@ -1088,6 +1088,7 @@ begin
 		option:=read_word(command);
 		if option='-payload' then payload_size:=read_integer(command)
 		else if option='-size' then data_size:=read_integer(command)
+		else if option='-window_border' then window_border:=read_real(command)
 		else done_with_options:=true;
 	until done_with_options;
 {
@@ -1536,7 +1537,9 @@ begin
 	that is closest to the standing value, and we leave the standing value as it
 	is. There may be no messages, in which case we insert a substitute message
 	with the standing value at the center of the window. By this procedure, we
-	also eliminate messages that fall outside the windows.
+	also eliminate messages that fall outside the windows. The number of "bad
+	messages" is the number that lie outside the windows plus the number that we
+	reject despite lying inside the windows.
 }		
 		setlength(msp,max_num_selected);
 		stack_height:=0;
@@ -1551,6 +1554,8 @@ begin
 				if abs(mp[message_num].time-window_time)<=window_extent then begin
 					candidate_list[num_candidates]:=mp[message_num];
 					inc(num_candidates);
+				end else begin
+					inc(num_bad);
 				end;
 				inc(message_num);
 			end;
@@ -1642,7 +1647,8 @@ begin
 					if length(result)>0 then message_string:=eol+message_string;
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
-						report_error('Too many messages for result string in lwdaq_sct_receiver');
+						report_error('Too many messages for result string'
+							+'in lwdaq_sct_receiver');
 						exit;
 					end;
 				end;

@@ -258,6 +258,8 @@ proc Neuroplayer_init {} {
 		set info(status_$id) "None"
 	}
 	set config(min_reception) 0.8
+	set config(max_rejection) 0.2
+	set config(max_window) 0.5
 	set config(extra_fraction) 1.1
 	set config(calibration_include) "Okay Loss Extra"
 	set info(calibration_selected) ""
@@ -1698,23 +1700,24 @@ proc Neuroplayer_command {action} {
 # data image. It updates config(unaccepted_values), updates info(num_received)
 # config(standing_values), sets info(frequency), sets info(num_messages), and
 # returns the extracted or reconstructed signal. The signal is a sequence of
-# messsages. Each message is a timestamp followed by a sample value. The timestamp
-# is an integer number of clock ticks from the beginning of the playback interval.
-# The timestamps and vsample alues alternate in the return string, separated by
-# single spaces. The "extracted" signal is a list of messages that exist in the
-# data image. The "reconstructed" signal is the extracted signal with substitute
-# messages inserted and bad messages removed, so as to create a signal with
-# info(frequency) messages. To perform extraction and reconstruction, the routine
-# calls lwdaq_receiver from the lwdaq library. See the Receiver Manual for more
-# information, and also the LWDAQ Command Reference. The routine takes a single
-# parameter: a channel code, which is of the form "id" or "id:f" or "id:f" where
-# "id" is the channel number and "f" is its nominal message rate per second. Once 
-# the signal is reconstructed or extracted, we apply a glitch filter. The 
-# glitch_threshold is the value set below the value versus time plot. When the 
-# value is zero, the filter is disabled. Values greater than zero enable the filter, 
-# so that any sample that stands out by more than the threshold from the surrounding 
-# samples will be removed from the data and replaced by the previous valid sample.
-# If status_only is set, we don't reconstruct, but return after determining if 
+# messsages. Each message is a timestamp followed by a sample value. The
+# timestamp is an integer number of clock ticks from the beginning of the
+# playback interval. The timestamps and vsample alues alternate in the return
+# string, separated by single spaces. The "extracted" signal is a list of
+# messages that exist in the data image. The "reconstructed" signal is the
+# extracted signal with substitute messages inserted and bad messages removed,
+# so as to create a signal with info(frequency) messages. To perform extraction
+# and reconstruction, the routine calls lwdaq_receiver from the lwdaq library.
+# See the Receiver Manual for more information, and also the LWDAQ Command
+# Reference. The routine takes a single parameter: a channel code, which is of
+# the form "id" or "id:f" or "id:f" where "id" is the channel number and "f" is
+# its nominal message rate per second. Once the signal is reconstructed or
+# extracted, we apply a glitch filter. The glitch_threshold is the value set
+# below the value versus time plot. When the value is zero, the filter is
+# disabled. Values greater than zero enable the filter, so that any sample that
+# stands out by more than the threshold from the surrounding samples will be
+# removed from the data and replaced by the previous valid sample. If
+# status_only is set, we don't reconstruct, but return after determining if
 # there is loss, extra, or okay reception.
 # 
 proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
@@ -1834,6 +1837,31 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			-size $info(data_size) \
 			reconstruct $id $period $standing_value \
 			$unaccepted_values"]
+		
+		# Check for an error in reconstruction.
+		if {[LWDAQ_is_error_result $signal]} {
+			Neuroplayer_print $signal
+			set signal "0 0"
+			return $signal
+		}
+		
+		# Reconstruction can fail if the transmit frequency is slightly too high
+		# or too low as a result of a fault in the on-board oscillator. We check
+		# for this mode of failure now, and if we find it, we reconstruct once 
+		# again, but this time with a larger "window size", so that we can accept
+		# all messages.
+		scan [lwdaq_image_results $info(data_image)] %d%d%d%d \
+			num_clocks num_ideal num_bad num_missing
+		if {$num_received + $num_missing > ($config(max_rejection)+1)*$num_ideal} {
+			Neuroplayer_print "Channel [format %2d $id],\
+				sample rate out of range, adapting reconstruction." verbose
+			set signal [lwdaq_receiver $info(data_image) \
+				"-payload $info(player_payload) \
+				-size $info(data_size) \
+				-window_border $config(max_window) \
+				reconstruct $id $period $standing_value \
+				$unaccepted_values"]
+		}
 	} {
 		# Extraction returns the messages with matching id in the recording.
 		# There is no detection of duplicate of bad messages, no filling in
@@ -1842,12 +1870,13 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set signal [lwdaq_receiver $info(data_image) \
 			"-payload $info(player_payload) -size $info(data_size) extract $id $period"]
 	}
+	
+	# Check for an error in reconstruction or extraction.
 	if {[LWDAQ_is_error_result $signal]} {
 		Neuroplayer_print $signal
 		set signal "0 0"
 		return $signal
 	}
-	
 	
 	# Check the glitch threshold.
 	if {![string is double -strict $config(glitch_threshold)]} {
@@ -1888,17 +1917,20 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set info(loss) [expr 100.0 * $num_missing / $num_expected]
 		Neuroplayer_print "Channel [format %2d $id],\
 			[format %4.1f $info(loss)]% loss,\
-			[format %4d $num_messages] reconstructed,\
+			$num_messages reconstructed,\
+			$num_received received,\
 			$num_bad bad,\
-			removed $num_glitches glitches." verbose
+			$num_missing missing,\
+			$num_glitches glitches." verbose
 	} {
 		scan $results %d%d num_clocks num_messages
 		lset config(unaccepted_values) $unaccepted_value_index 1 [lrange $results 4 end]
 		set info(loss) [expr 100.0 - 100.0 * $num_messages / $num_expected]
 		Neuroplayer_print "Channel [format %2d $id],\
 			[format %4.1f $info(loss)]% loss,\
-			[format %4d $num_messages] extracted,\
-			removed $num_glitches glitches." verbose
+			$num_messages extracted,\
+			$num_received received,\
+			$num_glitches glitches." verbose
 	}
 	
 	set info(num_messages) $num_messages
@@ -4728,7 +4760,7 @@ proc Neuroexporter_edf_setup {} {
 		if {![string is integer -strict $sps]} {
 			Neuroplayer_print "ERROR: Bad sample rate \"$sps\" for channel $id\
 				in EDF setup, try Autofill."
-			raise $info(export_panel)
+			raise $info(export)
 			break
 		}
 		if {$config(export_signal)} {
