@@ -125,9 +125,11 @@ proc Neuroplayer_init {} {
 # When we read data from disk, we want to be sure that we will never read more
 # data than our image can hold, but at the same time as much data as we can. We
 # set the block size for reads from disk to be a fraction of the size of the
-# data and buffer images.
+# data and buffer images. When we read from disk, we must read a whole number
+# of messages. If the block size specified below is not a whole number of messages,
+# the read from disk will adjust its value.
 #
-	set info(block_size) [expr round($width * $width / 10) ]
+	set info(block_size) [expr $width * $width / 10]
 #
 # Properties of data messages.
 #
@@ -737,6 +739,7 @@ proc Neuroplayer_print {line {color "black"}} {
 		append line " ([Neuroplayer_clock_convert [clock seconds]]\)"
 		if {[regexp -nocase [file tail $config(play_file)] $line]} {
 			set line [regsub "^WARNING: " $line "WARNING: $info(datetime_play_time) "]
+			set line [regsub "^ERROR: " $line "ERROR: $info(datetime_play_time) "]
 		} 
 		if {$config(log_warnings)} {
 			LWDAQ_print $config(log_file) "$line"
@@ -6775,13 +6778,13 @@ proc Neuroplayer_play {{command ""}} {
 	scan $clocks %d%d%d%d%d num_buff_errors num_clocks num_messages start_index end_index
 
 	# We read more data from the file until we have enough to make an entire playback
-	# interval. If the file ends, we set a flag.
+	# interval. If the file ends, we set a flag. Our NDF read routine handles the end
+	# of the file by returning all bytes available.
 	set end_of_file 0
 	set message_length [expr $info(core_message_length) + $info(player_payload)]
 	while {($num_clocks < $play_num_clocks) && !$end_of_file} {
 		if {[catch {
-			set data [LWDAQ_ndf_data_read \
-				$config(play_file) \
+			set data [LWDAQ_ndf_data_read $config(play_file) \
 				[expr $message_length * ($config(play_index) + $info(buffer_size))] \
 				$info(block_size)]} error_message]} {
 			Neuroplayer_print "ERROR: $error_message."
@@ -6789,21 +6792,47 @@ proc Neuroplayer_play {{command ""}} {
 			set info(play_control) "Idle"
 			return "FAIL"			
 		}
-		set num_messages_read [expr [string length $data] / $message_length ]
+		set num_bytes_read [string length $data]
+		set num_messages_read [expr $num_bytes_read / $message_length ]
+		set num_stray_bytes [expr $num_bytes_read % $message_length ]
 		if {$num_messages_read > 0} {
 			Neuroplayer_print "Read $num_messages_read messages from\
 				[file tail $config(play_file)]." verbose
-			if { $info(max_buffer_bytes) <= \
+
+			if {$info(max_buffer_bytes) <= \
 					($info(buffer_size) * $message_length) + [string length $data]} {
+				# If we have not accumulated enough clock messages so far,
+				# either our buffer is not big enough to handle the message rate
+				# in the telemetry system for our chosen interval, or the file
+				# is corrupted. It is the corruption possibility that dominates
+				# our response to the overflow. We discard the existing buffer
+				# data and replace it with our new buffer data. We move the play
+				# index to the first message of the newly-read data. Then we
+				# try to play the file again.
+				Neuroplayer_print "WARNING: Corruption or overflow\
+					at $config(play_time) s, index $config(play_index)\
+					in [file tail $config(play_file)]."
+				set config(play_index) [expr $config(play_index) + $info(buffer_size)]
 				lwdaq_data_manipulate $info(buffer_image) clear
-				set info(buffer_size) 0
-				Neuroplayer_print "WARNING: Data buffer overflow\
-					at $config(play_time) s in [file tail $config(play_file)]."
+				lwdaq_data_manipulate $info(buffer_image) write 0 $data
+				set info(buffer_size) $num_messages_read
+				set config(standing_values) "" 
+				set config(unaccepted_values) ""
+			
+				if {$config(show_messages) && $config(verbose)} {
+					Neuroplayer_print [lwdaq_receiver $info(buffer_image) \
+						"-payload $info(player_payload) \
+							-size $info(data_size) print \
+							0 $config(show_messages)"]
+				}
+
+				LWDAQ_post Neuroplayer_play
+				return "ERROR"
 			}
+			
 			lwdaq_data_manipulate $info(buffer_image) write \
 				[expr $info(buffer_size) * $message_length] $data
-			set info(buffer_size) [expr $info(buffer_size) \
-				+ ([string length $data] / $message_length)]
+			set info(buffer_size) [expr $info(buffer_size) + $num_messages_read]
 			set clocks [lwdaq_receiver $info(buffer_image) \
 				"-payload $info(player_payload) \
 					-size $info(buffer_size) clocks 0 $play_num_clocks"]

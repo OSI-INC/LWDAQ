@@ -1000,7 +1000,8 @@ proc LWDAQ_ndf_data_append {file_name data} {
 # LWDAQ_ndf_data_read reads num_bytes of data out of an NDF file data block,
 # starting at byte start_addr. The first byte in the data block is byte zero. If
 # you specify * for num_bytes, the routine reads all available data bytes from
-# the file.
+# the file. If the file does not contain the bytes requested, the routine returns
+# all the bytes that can be read.
 #
 proc LWDAQ_ndf_data_read {file_name start_addr num_bytes} {
 	scan [LWDAQ_ndf_data_check $file_name] %d%d d l
