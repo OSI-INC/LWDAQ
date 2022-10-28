@@ -63,7 +63,6 @@ const
 }
 var
 	gui_photo_name:string='none';
-	gui_zoom:real=1.0;
 	gui_display_zoom:real=1.0;
 	gui_intensify:string='exact';
 	gui_text_name:string='stdout';
@@ -137,7 +136,7 @@ begin
 		saved_error_string:=error_string;
 		c:=' lwdaq_draw '+s+' '+gui_photo_name 
 			+' -intensify '+gui_intensify
-			+' -zoom '+string_from_real(gui_zoom,1,2);
+			+' -zoom '+string_from_real(gui_display_zoom,1,2);
 		lwdaq_tcl_eval(c);
 		lwdaq_tcl_eval('LWDAQ_update');
 		error_string:=saved_error_string;
@@ -250,7 +249,7 @@ end;
 
 <p>The lwdaq library routines can write to Tk text windows through -text_name and -photo_name. The -text_name should specify a Tk text widget (such as .text), <i>stdout</i>, or a file name. The default is <i>stdout</i>. If the -text_name does not begin with a period, indicating a text window, nor is it <i>stdout</i>, we assume it is the name of a file. File names cannot be numbers. If the file name contains a path, that path must exist. The -show_details option is used by some library routines to generate additional exectution details that will be printed to the text window specified by -text_name.</p>
 
-<p>The library routines can draw an image in a Tk photo by calling <i>gui_draw</i> and specifying the name of the image. The photo that will receive the image is the one named by a global variable we set with the -photo_name option. The -photo_name must be an existing Tk photo (such as bcam_photo), and has default value "none", which disables the drawing. By default, <i>gui_draw</i> is set to <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>. The -zoom option allows us to set the global <i>gui_zoom</i> value, which lwdaq_gui_draw will use, and -intensify specifies <i>gui_intensification</i>, which lwdaq_gui_draw also uses. The -display_zoom option specifies <i>gui_display_zoom</i>, which applies an additional scaling to all images. The <a href=#lwdaq_draw">lwdaq_draw</a> routine multiplies its image-specific zoom value by the global display_zoom to obtain a total zoom value. The -display_zoom is designed to accommodate different computer display resolutions, which sometimes result in lwdaq images being too large or too small. The <a href="http://www.cgsd.com/papers/gamma.html">gamma correction</a></td> sets the gray scale image display gamma correction used by lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear relationship between the image pixel intensity and the display pixel intensity. The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we increase the brightness of the red and blue component of the display pixel with respect to the green component. By default, these are also 1.0.
+<p>The library routines can draw an image in a Tk photo by calling <i>gui_draw</i> and specifying the name of the image. The photo that will receive the image is the one named by a global variable we set with the -photo_name option. The -photo_name must be an existing Tk photo (such as bcam_photo), and has default value "none", which disables the drawing. By default, <i>gui_draw</i> is set to <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>. The -intensify specifies <i>gui_intensification</i> for lwdaq_gui_draw. The -display_zoom option specifies <i>gui_display_zoom</i>, which applies an additional scaling to all images drawn by <i>lwdaq_draw</i> or by <i>gui_draw</i>. The <a href=#lwdaq_draw">lwdaq_draw</a> routine multiplies its image-specific zoom value by the global gui_display_zoom to obtain a total scaling value. The -display_zoom option is designed to accommodate different computer display resolutions, which sometimes result in lwdaq images being too large or too small. The <a href="http://www.cgsd.com/papers/gamma.html">gamma correction</a></td> sets the gray scale image display gamma correction used by lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear relationship between the image pixel intensity and the display pixel intensity. The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we increase the brightness of the red and blue component of the display pixel with respect to the green component. By default, these are also 1.0.
 
 <p>During execution, analysis routines can pause to allow us to view intermediate drarwing results by means of the -wait_ms option. If we set -wait_ms to 1000, the analysis routine will pause for one second. If we set -wait_ms to -1, Tk will open a window with a <i>Continue</i> button in it, which we click before the analysis proceeds.</p>
 
@@ -288,7 +287,6 @@ begin
 			+' -text_name '+gui_text_name
 			+' -show_details '+string_from_boolean(show_details)
 			+' -photo_name '+gui_photo_name
-			+' -zoom '+string_from_real(gui_zoom,1,2)
 			+' -display_zoom '+string_from_real(gui_display_zoom,1,2)
 			+' -intensify '+gui_intensify
 			+' -wait_ms '+string_from_integer(gui_wait_ms,0)
@@ -312,7 +310,6 @@ begin
 			else if (option='-text_name') then gui_text_name:=Tcl_ObjString(vp)
 			else if (option='-show_details') then show_details:=Tcl_ObjBoolean(vp)
 			else if (option='-photo_name') then gui_photo_name:=Tcl_ObjString(vp)
-			else if (option='-zoom') then gui_zoom:=Tcl_ObjReal(vp)
 			else if (option='-display_zoom') then gui_display_zoom:=Tcl_ObjReal(vp)
 			else if (option='-intensify') then gui_intensify:=Tcl_ObjString(vp)
 			else if (option='-wait_ms') then gui_wait_ms:=Tcl_ObjInteger(vp)
