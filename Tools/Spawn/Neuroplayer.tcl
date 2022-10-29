@@ -436,7 +436,6 @@ proc Neuroplayer_init {} {
 	set config(channel_selector) "*"
 	set config(default_frequency) "128 256 512 1024 2048 4096"
 	set config(standing_values) ""
-	set config(unaccepted_values) ""
 #
 # We save the last clock message value in each message block so we can compare it 
 # to the first message in the next message block. If the two are not consecutive,
@@ -1691,21 +1690,21 @@ proc Neuroplayer_command {action} {
 
 #
 # Neuroplayer_signal extracts or reconstructs the signal from one channel in the
-# data image. It updates config(unaccepted_values), updates info(num_received)
-# config(standing_values), sets info(frequency), sets info(num_messages), and
-# returns the extracted or reconstructed signal. The signal is a sequence of
-# messsages. Each message is a timestamp followed by a sample value. The
-# timestamp is an integer number of clock ticks from the beginning of the
-# playback interval. The timestamps and vsample alues alternate in the return
-# string, separated by single spaces. The "extracted" signal is a list of
-# messages that exist in the data image. The "reconstructed" signal is the
-# extracted signal with substitute messages inserted and bad messages removed,
-# so as to create a signal with info(frequency) messages. To perform extraction
-# and reconstruction, the routine calls lwdaq_receiver from the lwdaq library.
-# See the Receiver Manual for more information, and also the LWDAQ Command
-# Reference. The routine takes a single parameter: a channel code, which is of
-# the form "id" or "id:f" or "id:f" where "id" is the channel number and "f" is
-# its nominal message rate per second. If status_only is set, we don't
+# data image. It updates info(num_received) and config(standing_values). It
+# info(frequency) and info(num_messages). It returns the extracted or
+# reconstructed signal. The returned signal format is a space-delimited string
+# giving a sequence of messages. Each message is a timestamp followed by a
+# sample value. The timestamp is an integer number of clock ticks from the
+# beginning of the playback interval. The timestamps and vsample alues alternate
+# in the return string, separated by single spaces. The "extracted" signal is a
+# list of messages that exist in the data image. The "reconstructed" signal is
+# the extracted signal with substitute messages inserted and bad messages
+# removed, so as to create a signal with info(frequency) messages. To perform
+# extraction and reconstruction, the routine calls lwdaq_receiver from the lwdaq
+# library. See the Receiver Manual for more information, and also the LWDAQ
+# Command Reference. The routine takes a single parameter: a channel code, which
+# is of the form "id" or "id:f" or "id:f" where "id" is the channel number and
+# "f" is its nominal message rate per second. If status_only is set, we don't
 # reconstruct, but return after determining if there is loss, extra, or okay
 # reception.
 # 
@@ -1804,15 +1803,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set standing_value_index [expr [llength $config(standing_values)] - 1]
 	}
 	set standing_value [lindex $config(standing_values) $standing_value_index 1]
-	
-	# Obtain the unaccepted value list for this channel.
-	set unaccepted_value_index [lsearch -index 0 $config(unaccepted_values) $id]
-	if {$unaccepted_value_index < 0} {
-		lappend config(unaccepted_values) "$id {}"
-		set unaccepted_value_index [expr [llength $config(unaccepted_values)] - 1]
-	}		
-	set unaccepted_values [lindex $config(unaccepted_values) $unaccepted_value_index 1]
-	
+		
 	# Reconstruct or extract the signal.	
 	if {$config(enable_reconstruct)} {
 		# Reconstruction involves extraction, then filling in missing
@@ -1824,8 +1815,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set signal [lwdaq_receiver $info(data_image) \
 			"-payload $info(player_payload) \
 			-size $info(data_size) \
-			reconstruct $id $period $standing_value \
-			$unaccepted_values"]
+			reconstruct $id $period $standing_value"]
 		
 		# Check for an error in reconstruction.
 		if {[LWDAQ_is_error_result $signal]} {
@@ -1847,9 +1837,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			set signal [lwdaq_receiver $info(data_image) \
 				"-payload $info(player_payload) \
 				-size $info(data_size) \
-				-window_border $config(max_window) \
-				reconstruct $id $period $standing_value \
-				$unaccepted_values"]
+				reconstruct $id $period $standing_value"]
 		}
 	} {
 		# Extraction returns the messages with matching id in the recording.
@@ -1867,13 +1855,12 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		return $signal
 	}
 	
-	# Set the unaccepted values, standing values, and the result string. Print a message
-	# if we are set to verbose output, summarizing the reconstruction.
+	# Set the standing values and image result string. Print a message if we are
+	# set to verbose output, summarizing the reconstruction.
 	lset config(standing_values) $standing_value_index 1 [lindex $signal end]
 	set results [lwdaq_image_results $info(data_image)]
 	if {$config(enable_reconstruct)} {
 		scan $results %d%d%d%d num_clocks num_messages num_bad num_missing
-		lset config(unaccepted_values) $unaccepted_value_index 1 [lrange $results 4 end]
 		set info(loss) [expr 100.0 * $num_missing / $num_expected]
 		Neuroplayer_print "Channel [format %2d $id],\
 			[format %4.1f $info(loss)]% loss,\
@@ -1883,7 +1870,6 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			$num_missing missing." verbose
 	} {
 		scan $results %d%d num_clocks num_messages
-		lset config(unaccepted_values) $unaccepted_value_index 1 [lrange $results 4 end]
 		set info(loss) [expr 100.0 - 100.0 * $num_messages / $num_expected]
 		Neuroplayer_print "Channel [format %2d $id],\
 			[format %4.1f $info(loss)]% loss,\
@@ -6576,7 +6562,6 @@ proc Neuroplayer_play {{command ""}} {
 		lwdaq_data_manipulate $info(buffer_image) clear
 		set info(buffer_size) 0
 		set config(standing_values) ""
-		set config(unaccepted_values) ""
 	}
 
 	# We update the player's file end-time when the play file has been
@@ -6702,14 +6687,12 @@ proc Neuroplayer_play {{command ""}} {
 		set config(play_time) $new_play_time
 		set config(play_index) $new_play_index
 
-		# Set the saved play time and clear the data buffer and reset the
-		# unaccepted value list.
+		# Set the saved play time and clear the data buffer standing value list.
 		set info(saved_play_time) $config(play_time)
 		Neuroplayer_clock_update	
 		lwdaq_data_manipulate $info(buffer_image) clear
 		set info(buffer_size) 0
 		set config(standing_values) "" 
-		set config(unaccepted_values) ""
 	}
 
 	# At the start of an archive, we might have to reset baseline powers and read new
@@ -6772,7 +6755,6 @@ proc Neuroplayer_play {{command ""}} {
 				lwdaq_data_manipulate $info(buffer_image) write 0 $data
 				set info(buffer_size) $num_messages_read
 				set config(standing_values) "" 
-				set config(unaccepted_values) ""
 			
 				if {$config(show_messages) && $config(verbose)} {
 					Neuroplayer_print [lwdaq_receiver $info(buffer_image) \

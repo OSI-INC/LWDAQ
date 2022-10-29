@@ -972,7 +972,7 @@ var
 	message_index:integer=0;
 	max_index:integer=0;
 	num_bad_messages:integer=0;
-	window_border:real=0.125;
+	window_fraction:real=0.125;
 	mp,msp:message_array_type;
 	gp:x_graph_type;
 	result:string;
@@ -1089,7 +1089,6 @@ begin
 		option:=read_word(command);
 		if option='-payload' then payload_size:=read_integer(command)
 		else if option='-size' then data_size:=read_integer(command)
-		else if option='-window_border' then window_border:=read_real(command)
 		else done_with_options:=true;
 	until done_with_options;
 {
@@ -1444,6 +1443,11 @@ begin
 			report_error('Invalid standing_value in lwdaq_sct_receiver');
 			exit;
 		end;
+		window_fraction:=read_real(command);
+		if (window_fraction<0) or (window_fraction>1) then begin
+			report_error('Invalid window_fraction in lwdaq_sct_receiver');
+			exit;
+		end;
 {
 	Determine the transmission scatter_extent and window extent. Transmitters
 	displaces delay transmission by +-scatter_extent clock ticks so as to avoid
@@ -1456,7 +1460,7 @@ begin
 	clocks. Over a 16-s interval, a 20 ppm disagreement is 0.32 ms, or 10 clock
 	ticks at 32.768 kHz. So we need to add 10 to the window extent. If the
 	period of the messages is small enough, we will be unable to accommodate
-	such a disagreement over a 16-s interval. The window_border parameter is the
+	such a disagreement over a 16-s interval. The window_fraction parameter is the
 	fraction of a period we want to add to the window extent so as to
 	accommodate clock disagreement. When the disagreement is severe, due to a
 	faulty transmitter clock, we can increase the window border so that the
@@ -1464,7 +1468,7 @@ begin
 }
 		scatter_extent:=period div scatter_divisor;
 		if scatter_extent>max_scatter_extent then scatter_extent:=max_scatter_extent;
-		window_extent:=scatter_extent+round(window_border*period);
+		window_extent:=scatter_extent+round(window_fraction*period);
 {
 	Create a message stack.
 }
