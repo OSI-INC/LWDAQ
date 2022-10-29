@@ -173,7 +173,6 @@ proc Neuroplayer_init {} {
 		-height $info(overview_height) \
 		-name $info(overview_image)
 	set info(overview_fsd) 2
-	set config(overview_glitch) 0
 #
 # During play-back and processing, we step through each channel selected by the
 # user with the channel_selector parameter. For each channel we create a graph
@@ -262,7 +261,8 @@ proc Neuroplayer_init {} {
 	}
 	set config(min_reception) 0.8
 	set config(max_rejection) 0.2
-	set config(max_window) 0.5
+	set config(glitch_threshold) 1000
+	set info(max_window_fraction) 0.5
 	set config(extra_fraction) 1.1
 	set config(calibration_include) "Okay Loss Extra"
 	set info(calibration_selected) ""
@@ -1815,7 +1815,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set signal [lwdaq_receiver $info(data_image) \
 			"-payload $info(player_payload) \
 			-size $info(data_size) \
-			reconstruct $id $period $standing_value"]
+			reconstruct $id $period $standing_value \
+			$config(glitch_threshold)"]
 		
 		# Check for an error in reconstruction.
 		if {[LWDAQ_is_error_result $signal]} {
@@ -1827,8 +1828,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		# Reconstruction can fail if the transmit frequency is slightly too high
 		# or too low as a result of a fault in the on-board oscillator. We check
 		# for this mode of failure now, and if we find it, we reconstruct once 
-		# again, but this time with a larger "window size", so that we can accept
-		# all messages.
+		# again, but this time with the "divergent_clocks" option set true.
 		scan [lwdaq_image_results $info(data_image)] %d%d%d%d \
 			num_clocks num_ideal num_bad num_missing
 		if {$num_received + $num_missing > ($config(max_rejection)+1)*$num_ideal} {
@@ -1837,7 +1837,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			set signal [lwdaq_receiver $info(data_image) \
 				"-payload $info(player_payload) \
 				-size $info(data_size) \
-				reconstruct $id $period $standing_value"]
+				reconstruct $id $period $standing_value \
+				$config(glitch_threshold) 1"]
 		}
 	} {
 		# Extraction returns the messages with matching id in the recording.
@@ -2370,13 +2371,13 @@ proc Neuroplayer_overview_plot {} {
 	}	
 	
 	# Apply a glitch filter to the graphs of values and check their lengths.
-	if {$config(overview_glitch) > 0} {
+	if {$config(glitch_threshold) > 0} {
 		set saved_config [lwdaq_config]
 		lwdaq_config -fsd $info(overview_fsd)
 		for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
 			if {[info exists graph($id)]} {
 				set filtered_graph [lwdaq glitch_filter_y \
-					$config(overview_glitch) $graph($id)]
+					$config(glitch_threshold) $graph($id)]
 				if {![LWDAQ_is_error_result $filtered_graph]} {
 					set graph($id) $filtered_graph
 				}
@@ -7986,6 +7987,9 @@ proc Neuroplayer_open {} {
 	label $f.lv_range -text "v_range:" -fg $info(label_color)
 	entry $f.ev_range -textvariable Neuroplayer_config(v_range) -width 5
 	pack $f.lv_range $f.ev_range -side left -expand yes
+	label $f.l_glitch -text "glitch_threshold:" -fg $info(label_color)
+	entry $f.e_glitch -textvariable Neuroplayer_config(glitch_threshold) -width 5
+	pack $f.l_glitch $f.e_glitch -side left -expand yes	
 	label $f.lt_left -text "t_min:" -fg $info(label_color)
 	label $f.et_left -textvariable Neuroplayer_info(t_min) -width 7
 	pack $f.lt_left $f.et_left -side left -expand yes

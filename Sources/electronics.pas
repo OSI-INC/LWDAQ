@@ -876,30 +876,29 @@ end;
 	clock messages in the image and the number of samples it extracted.
 
 	The "reconstruct" instruction tells the routine to reconstruct a particular
-	signal, with the assumption that the transmission is periodic with some
-	scattering of transmission instants to avoid systematic collisions. Where
-	messages are missing from the data, the routine adds substitute messages. It
-	removes duplicate messages and messages that occur at invalid moments in
-	time. The result of reconstruction is a sequence of messages with none
-	missing and none extra. The instruction string for the "reconstruct"
-	instruction begins with the word "reconstruct" and is followed by several
-	paramters. The first parameter is the identifier of the signal we want to
-	reconstruct. The second parameter is its nominal sampling period in clock
-	ticks. The third parameter is the the signal's most recent correct sample
-	value, which we call the "standing value" of the signal. If we don't specify
-	this parameter, "reconstruct" assumes it to be zero. After the third
-	parameter, we have the option of specifying any unaccepted samples from
-	previous data acquisitions. These we describe each with one number giving
-	their sample value. The reconstruct routine assumes their timestamps are
-	zero. The result string contains the reconstructed message stream with one
-	message per line. Each message is represented by the time it occured, in
-	ticks after the first clock in the image time interval, and the message data
-	value. The "reconstruct" command writes the following numbers into
-	ip^.results: the number of clock messages in the image, the number of
-	messages in the reconstructed messages stream, the number of bad messages,
-	the number of substitute messages, and any unaccepted message values it
-	found in a transmission window that overlaps the end of the image time
-	interval.
+	signal with the assumption that the transmission is periodic with temporal
+	scattering of transmission to avoid systematic collisions between
+	transmitters. Where messages are missing from the data, the routine adds
+	substitute messages. It removes duplicate messages and messages that occur
+	at invalid moments in time. The result of reconstruction is a sequence of
+	messages with none missing and none extra. The instruction string for the
+	"reconstruct" instruction begins with the word "reconstruct" and is followed
+	by several paramters. The first parameter is the identifier of the signal we
+	want to reconstruct. The second parameter is its nominal sampling period in
+	clock ticks. The third parameter is "standing_value", the signal's most
+	recent correct sample value. The fourth parameter "glitch_threshold", a
+	threshold for a glitch filter the routine can apply after reconstruction is
+	complete. If the glitch threshold is zero, the glitch filters is disabled.
+	The fifth parameter is "divergent_clocks", a binary value that we set when
+	we want to accommodate greater disagreement between the transmitter and
+	receiver clocks. By default, standing_value, glitch_threshold, and
+	divent_clocks are all zero. The result string contains the reconstructed
+	message stream with one message per line. Each message is represented by the
+	time it occured, in ticks after the first clock in the image time interval,
+	and the message data value. The "reconstruct" command writes the following
+	numbers into ip^.results: the number of clock messages in the image, the
+	number of messages in the reconstructed messages stream, the number of bad
+	messages, and the number of substituted messages.
 
 	The "clocks" instruction returns a the number of errors in the sequence of
 	clock messages, the number of clock messages, the total number of messages
@@ -950,6 +949,8 @@ const
 	id_bits=4;
 	max_scatter_extent=8;
 	scatter_divisor=4;
+	default_window_fraction=0.125;
+	max_window_fraction=0.5;
 	
 type
 	message_type=record
@@ -972,7 +973,6 @@ var
 	message_index:integer=0;
 	max_index:integer=0;
 	num_bad_messages:integer=0;
-	window_fraction:real=0.125;
 	mp,msp:message_array_type;
 	gp:x_graph_type;
 	result:string;
@@ -993,7 +993,11 @@ var
 	clock_num:integer=0;
 	clock_index:integer=0;
 	num_errors:integer=0;
-	id_num,reconstruct_id,extract_id,standing_value,period:integer;
+	id_num,reconstruct_id,extract_id:integer;
+	standing_value:integer=0;
+	period:integer=64;
+	glitch_threshold:real=0;
+	divergent_clocks:boolean=false;
 	id_valid:array [min_id..max_id] of boolean;
 	id_qty:array [min_id..max_id] of integer;
 	id_previous:array [min_id..max_id] of message_type;
@@ -1010,7 +1014,6 @@ var
 	window_time,num_candidates:integer;
 	start_index,end_index:integer;
 	receiver_version:integer;	
-	unaccepted:string;
 	payload_index:integer=0;
 	done_with_options:boolean=false;
 
@@ -1417,17 +1420,20 @@ begin
 		end;
 	end;
 {
-	If "reconstruct" then read a message identifier and period from 
-	the command string. Select all messages from this signal. Any
-	messages occurring outside the transmission windows, or any 
-	message that is farther from the previous sample than another
-	sample in the same window, will be removed.
+	If "reconstruct" then read a message identifier and period from the command
+	string. Select all messages from this signal. Any messages occurring outside
+	the transmission windows, or any message that is farther from the previous
+	sample than another sample in the same window, will be removed.
 }
 	if instruction='reconstruct' then begin
 		if (num_clocks<min_reconstruct_clocks) then begin
 			report_error('Too few clock messages for reconstruction in lwdaq_sct_receiver');
 			exit;
 		end;
+		
+		{
+			We must specify the reconstruct_id and the period.
+		}
 		reconstruct_id:=read_integer(command);
 		if (reconstruct_id<min_id) or (reconstruct_id>max_id) then begin
 			report_error('Invalid reconstruct_id in lwdaq_sct_receiver');
@@ -1438,62 +1444,53 @@ begin
 			report_error('Invalid period in lwdaq_sct_receiver');
 			exit;
 		end;
-		standing_value:=read_integer(command);
-		if (standing_value<min_sample) or (standing_value>max_sample) then begin
-			report_error('Invalid standing_value in lwdaq_sct_receiver');
-			exit;
+		
+		{
+			The standing_value, glitch_threshold, and divergent_clocks
+			parameters are optional, in that when the command string is
+			exhausted, they will assume their default values.
+		}
+		word:=read_word(command);
+		if (word<>'') then begin
+			standing_value:=read_integer(word);
+			if (standing_value<min_sample) or (standing_value>max_sample) then begin
+				report_error('Invalid standing_value in lwdaq_sct_receiver');
+				exit;
+			end;
 		end;
-		window_fraction:=read_real(command);
-		if (window_fraction<0) or (window_fraction>1) then begin
-			report_error('Invalid window_fraction in lwdaq_sct_receiver');
-			exit;
-		end;
+		word:=read_word(command);
+		if (word<>'') then glitch_threshold:=read_real(word);
+		word:=read_word(command);
+		if (word<>'') then divergent_clocks:=read_boolean(word);
 {
-	Determine the transmission scatter_extent and window extent. Transmitters
-	displaces delay transmission by +-scatter_extent clock ticks so as to avoid
-	systematic collisions with other transmitters. The scatter_extent is a
-	fraction of the period for small periods, and a constant value for larger
-	periods. The value we use here should match the transmitter firmware. During
-	reconstruction, we assume all valid messages lie in a uniformly-spaced
-	sequence of windows. The windows must be large enough to contain the scatter
-	and also accommodate disagreement between the transmitter and receiver
-	clocks. Over a 16-s interval, a 20 ppm disagreement is 0.32 ms, or 10 clock
-	ticks at 32.768 kHz. So we need to add 10 to the window extent. If the
-	period of the messages is small enough, we will be unable to accommodate
-	such a disagreement over a 16-s interval. The window_fraction parameter is the
-	fraction of a period we want to add to the window extent so as to
-	accommodate clock disagreement. When the disagreement is severe, due to a
-	faulty transmitter clock, we can increase the window border so that the
-	windows are contiguous.
+	Determine the transmission scatter_extent and window_extent. Transmitters
+	displace transmission by +-scatter_extent ticks so as to avoid systematic
+	collisions with other transmitters. The scatter_extent is a fraction of the
+	sample period for small periods, and a constant value for larger periods.
+	The value we use here should match the transmitter firmware. 
 }
 		scatter_extent:=period div scatter_divisor;
 		if scatter_extent>max_scatter_extent then scatter_extent:=max_scatter_extent;
-		window_extent:=scatter_extent+round(window_fraction*period);
+	
+{
+	During reconstruction, we assume all valid messages lie in a uniformly
+	spaced temporal windows. The windows must be large enough to contain the
+	scatter and disagreement between the transmitter and receiver clocks. Over a
+	16-s interval, a 20 ppm disagreement is 0.32 ms, or 10 clock ticks at 32.768
+	kHz. If the period of the messages is small enough, we will be unable to
+	accommodate such a disagreement over a 16-s interval. The window_extent is
+	the half-width of the windows we use in reconstruction. If divergent_clocks
+	is false, we use a smaller window. But with divergent_clocks true, we use
+	the largest possible window, which is half the period.
+}
+		if divergent_clocks then
+			window_extent:=round(max_window_fraction*period)
+		else
+			window_extent:=scatter_extent+round(default_window_fraction*period);
 {
 	Create a message stack.
 }
 		setlength(msp,max_num_selected);
-{
-	We extract unaccepted values from the command string and place them at
-	the front of the new message stack.
-}
-		stack_height:=0;	
-		word:=read_word(command);
-		while word<>'' do begin
-			with msp[stack_height] do begin
-				id:=reconstruct_id;
-				timestamp:=0;
-				time:=0;
-				index:=-1;
-				sample:=read_integer(word);
-				if (sample<min_sample) or (sample>max_sample) then begin
-					report_error('Invalid sample in lwdaq_sct_receiver');
-					exit;
-				end;
-			end;
-			inc(stack_height);
-			word:=read_word(command);
-		end;
 {
 	Take messages from the reconstruct signal and put them in the
 	message stack. We assume the messages are in chronological order.
@@ -1608,23 +1605,6 @@ begin
 			window_time:=window_time+period;
 		end;
 {
-	If the next transmission window lies across the end-point of this time
-	interval, we save any messages from this window as unaccepted values. Right
-	now, message_num points either to a non-existent message past the end of the
-	message list, or to the first of one or more messages that lie within a
-	window that overlaps the end of the time interval. We will not accept these
-	messages into the reconstructed signal because we must first compare them to
-	any messages that occur during the later part of the window. Thus we take
-	these messages and put their sample values into a list of "unaccepted
-	values" which we will write to the image results string for the next call to
-	"reconstruct".
-}
-		unaccepted:='';
-		while message_num<num_selected do begin
-			writestr(unaccepted,unaccepted,mp[message_num].sample,' ');
-			inc(message_num);
-		end;
-{
 	We correct invalid indices, which are marked with the value -1. If there are
 	no valid messages in this interval, all the indices will be left as -1, so
 	any routine that uses the indices left in the electronics_trace must check
@@ -1651,11 +1631,9 @@ begin
 	Apply a glitch filter to the signal.
 }
 	setlength(gp,num_selected);
-	for message_num:=0 to num_selected-1 do 
-		gp[message_num]:=mp[message_num].sample;
-	glitch_filter(gp,2*stdev_x_graph(gp));
-	for message_num:=0 to num_selected-1 do 
-		mp[message_num].sample:=round(gp[message_num]);	
+	for message_num:=0 to num_selected-1 do gp[message_num]:=mp[message_num].sample;
+	glitch_filter(gp,glitch_threshold);
+	for message_num:=0 to num_selected-1 do mp[message_num].sample:=round(gp[message_num]);	
 {
 	Return the reconstructed message list in a string. Each line gives the time
 	and value of a message, in order of increasing time. In an x-y graph we
@@ -1683,7 +1661,7 @@ begin
 	Record the meta-data.
 }
 		writestr(ip^.results,num_clocks:1,' ',num_selected:1,' ',
-			num_bad:1,' ',num_missing:1,' ',unaccepted);
+			num_bad:1,' ',num_missing:1);
 	end;
 {
 	If "plot", we plot them on the screen and return a summary result for each
