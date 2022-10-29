@@ -1631,9 +1631,11 @@ begin
 	Apply a glitch filter to the signal.
 }
 	setlength(gp,num_selected);
-	for message_num:=0 to num_selected-1 do gp[message_num]:=mp[message_num].sample;
+	for message_num:=0 to num_selected-1 do 
+		gp[message_num]:=mp[message_num].sample;
 	glitch_filter(gp,glitch_threshold);
-	for message_num:=0 to num_selected-1 do mp[message_num].sample:=round(gp[message_num]);	
+	for message_num:=0 to num_selected-1 do 
+		mp[message_num].sample:=round(gp[message_num]);	
 {
 	Return the reconstructed message list in a string. Each line gives the time
 	and value of a message, in order of increasing time. In an x-y graph we
@@ -1658,10 +1660,11 @@ begin
 			end;
 		end;
 {
-	Record the meta-data.
+	Record the meta-data, which ends with the new "standing value", this being the final
+	sample value in the signal.
 }
 		writestr(ip^.results,num_clocks:1,' ',num_selected:1,' ',
-			num_bad:1,' ',num_missing:1);
+			num_bad:1,' ',num_missing:1,' ',mp[num_selected-1].sample:1);
 	end;
 {
 	If "plot", we plot them on the screen and return a summary result for each

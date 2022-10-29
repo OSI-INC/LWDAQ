@@ -1273,7 +1273,8 @@ proc Neuroplayer_sequential_time {fn payload seek_time {lo_time 0.0} {lo_index 0
 
 		set clocks [lwdaq_receiver $image_name \
 			"-payload $info(player_payload) \
-			-size [expr $data_size / $message_length] clocks $target_lo $target_hi -1"]
+			-size [expr $data_size / $message_length] \
+			clocks $target_lo $target_hi -1"]
 		scan $clocks %d%d%d%d%d%d num_errors num_clocks num_messages \
 			local_lo_index local_hi_index last_index
 		set block_end_time [expr $clock_time \
@@ -1786,11 +1787,11 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	set period [expr round(1.0 * $info(ticks_per_clock) \
 		* $info(clocks_per_second) / $frequency)]
 	
-	# Determine the standing value of the signal from its previous interval. 
-	# If the first message in the interval is missing, we will use this standing
-	# value as a substitute. If there is no standing value, we extract the signal 
-	# and use the first extracted value as our standing value. We add the new 
-	# standing value to our standing value list.
+	# Determine the standing value of the signal from its previous interval. If
+	# the first message in the interval is missing, we will use this standing
+	# value as a substitute. If there is no standing value, we extract the
+	# signal and use the first extracted value as our standing value. We add the
+	# new standing value to our standing value list.
 	set standing_value_index [lsearch -index 0 $config(standing_values) $id]
 	if {$standing_value_index < 0} {
 		set signal [lwdaq_receiver $info(data_image) \
