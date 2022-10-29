@@ -948,7 +948,7 @@ const
 	timestamp_offset=3;
 	report_timestamp_error=true;
 	id_bits=4;
-	max_scatter=8;
+	max_scatter_extent=8;
 	scatter_divisor=4;
 	
 type
@@ -974,6 +974,7 @@ var
 	num_bad_messages:integer=0;
 	window_border:real=0.125;
 	mp,msp:message_array_type;
+	gp:x_graph_type;
 	result:string;
 	error_report:string;
 	instruction:string='';
@@ -1000,7 +1001,7 @@ var
 	display_mode:string;
 	display_min,display_max:real;
 	phase_histogram:array [0..max_period-1] of integer;
-	phase_index,window_index,scatter:integer;
+	phase_index,window_index,scatter_extent:integer;
 	window_extent,window_score,winning_window_score,window_phase:integer;
 	candidate_list:array [0..max_num_candidates-1] of message_type;
 	best_num,num_missing,num_bad,num_extracted:integer;
@@ -1444,15 +1445,26 @@ begin
 			exit;
 		end;
 {
-	Determine the transmission scatter. The signal's transmission scatter is the 
-	number of clock ticks over which the transmitter randomly displaces the moment
-	of transmission to avoid systematic collision with other transmitters. By default,
-	the scatter is 8 ticks, but will be no more than one quarter of the sample period,
-	which also has units of clock ticks.
+	Determine the transmission scatter_extent and window extent. Transmitters
+	displaces delay transmission by +-scatter_extent clock ticks so as to avoid
+	systematic collisions with other transmitters. The scatter_extent is a
+	fraction of the period for small periods, and a constant value for larger
+	periods. The value we use here should match the transmitter firmware. During
+	reconstruction, we assume all valid messages lie in a uniformly-spaced
+	sequence of windows. The windows must be large enough to contain the scatter
+	and also accommodate disagreement between the transmitter and receiver
+	clocks. Over a 16-s interval, a 20 ppm disagreement is 0.32 ms, or 10 clock
+	ticks at 32.768 kHz. So we need to add 10 to the window extent. If the
+	period of the messages is small enough, we will be unable to accommodate
+	such a disagreement over a 16-s interval. The window_border parameter is the
+	fraction of a period we want to add to the window extent so as to
+	accommodate clock disagreement. When the disagreement is severe, due to a
+	faulty transmitter clock, we can increase the window border so that the
+	windows are contiguous.
 }
-		scatter:=period div scatter_divisor;
-		if scatter>max_scatter then scatter:=max_scatter;
-		window_extent:=scatter+round(window_border*period);
+		scatter_extent:=period div scatter_divisor;
+		if scatter_extent>max_scatter_extent then scatter_extent:=max_scatter_extent;
+		window_extent:=scatter_extent+round(window_border*period);
 {
 	Create a message stack.
 }
@@ -1631,6 +1643,15 @@ begin
 }
 		mp:=msp;
 		num_selected:=stack_height;
+{
+	Apply a glitch filter to the signal.
+}
+	setlength(gp,num_selected);
+	for message_num:=0 to num_selected-1 do 
+		gp[message_num]:=mp[message_num].sample;
+	glitch_filter(gp,2*stdev_x_graph(gp));
+	for message_num:=0 to num_selected-1 do 
+		mp[message_num].sample:=round(gp[message_num]);	
 {
 	Return the reconstructed message list in a string. Each line gives the time
 	and value of a message, in order of increasing time. In an x-y graph we

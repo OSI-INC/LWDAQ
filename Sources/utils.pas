@@ -2889,16 +2889,13 @@ end;
 
 {
 	glitch_filter_xy attempts to remove glitches from a signal. A "glitch" is a
-	one-point disturbance due to corruption of one of the signal's sample
-	values. Any point whose xy distance is more than the "threshold" from the
-	point before is a potential glitch. If, by removing this point and the
-	subsequent two points, we cause a factor of glitch_reduction drop in the
-	xy-coastline of the signal within coastline_extent samples of the first
-	point, we classify the point as a glitch. Once we find a glitch, we remove
-	and replace every sample after the glitch until the samples return to within
-	glitch_threshold of the sample just before the first glitch. Thus we can
-	remove large two-point or three-point glitches in one pass. The routine
-	returns the number of glitches it finds.
+	disturbance due to corruption of one of the signal's sample values, possibly
+	followed by repetition of the glitch value in place of missing genuine data
+	values. Any point whose separation from its predecessor exceeds the
+	threshold is a candidate glitch. If its separation from its successor also
+	exceeds the threshold, or if the successor is exactly equal to the
+	candidate, we declear the sample a glitch. Once we find a glitch, we remove
+	it. The routine returns the number of glitches it eliminated.
 }
 function glitch_filter_xy(var gp:xy_graph_type;threshold:real):integer;
 
@@ -2909,8 +2906,8 @@ const
 	min_length=coastline_extent*2+1;
 	
 var
-	n,m,c_start,c_end,count:integer;
-	coastline_with,coastline_without,separation:real;
+	n,count:integer;
+	s1,s2:real;
 	inertial_point:xy_point_type;
 	glitch:boolean;
 	
@@ -2929,15 +2926,17 @@ begin
 	inertial_point:=gp[0];
 {
 	Go through the sequence of points until we come to three that are within one
-	threshold of one another, and take the middle one as our inertial point. If
-	no such point exists, we will be using the first point as our inertial point.
+	threshold of one another, but not equal, and take the middle one as our
+	inertial point. If no such point exists, we will be using the first point as
+	our inertial point.
 }
 	n:=1;
 	while (n<length(gp)-1) do begin				
 		if (xy_separation(gp[n-1],gp[n])<threshold) 
 			and (xy_separation(gp[n-1],gp[n])>0.0) 
 			and (xy_separation(gp[n+1],gp[n])<threshold) 
-			and (xy_separation(gp[n+1],gp[n])>0.0) then begin
+			and (xy_separation(gp[n+1],gp[n])>0.0) 
+			and (xy_separation(gp[n+1],gp[n-1])>0.0) then begin
 			inertial_point:=gp[n];
 			n:=length(gp);
 		end else inc(n);
@@ -2945,55 +2944,28 @@ begin
 {
 	Apply the absolute deviation limit required by the glitch filter, starting
 	the comparison with our inertial point. When we come to a point that is
-	farther than threshold from the inertial point, we check to see if removing
-	this point and glitch_length-1 subsequent points will cause a significant
-	reduction in the local coastline. If so, we remove all glitch_length points
-	by replacing them with the inertial point.
+	farther than threshold from the inertial point, we regard it as a candidate
+	glitch. We check to see if the separation between the candidate and the next
+	point exceeds the threshold, and also if the next point is exactly equal to
+	the candidate. If either condition is met, we declare the candidate a glitch.
+	Any glitch we overwrite with the inertial point. Any non-glitch we use to
+	update the inertial point.
 }
 	count:=0;
 	for n:=0 to length(gp)-1 do begin
 		glitch:=false;
-		separation:=xy_separation(gp[n],inertial_point);
-		if separation>threshold then begin
-			c_start:=n-coastline_extent;
-			if c_start<0 then c_start:=0;
-			c_end:=c_start+2*coastline_extent;
-			if c_end>length(gp)-1 then c_end:=length(gp)-1;
-			if c_end-c_start<2*coastline_extent then c_start:=c_end-2*coastline_extent;
-			if c_start<0 then c_start:=0;
-
-			coastline_with:=0;
-			for m:=c_start+1 to c_end do 
-				coastline_with:=coastline_with+xy_separation(gp[m],gp[m-1]);
-
-			coastline_without:=0;
-			if n=c_start then begin
-				for m:=c_start+glitch_length+1 to c_end do begin
-					coastline_without:=coastline_without+xy_separation(gp[m],gp[m-1]);
-				end;
-			end else begin
-				for m:=c_start+1 to c_end do begin
-					if m<n then begin
-						coastline_without:=coastline_without+xy_separation(gp[m],gp[m-1]);
-					end else if m=n+glitch_length then begin
-						coastline_without:=coastline_without+xy_separation(gp[m],gp[n-1]);
-					end else if m>n+glitch_length then begin
-						coastline_without:=coastline_without+xy_separation(gp[m],gp[m-1]);
-					end;
-				end;
-			end;
-
-			if coastline_with>glitch_reduction*coastline_without then glitch:=true;
+		s1:=xy_separation(gp[n],inertial_point);
+		if s1>threshold then begin
+			s2:=xy_separation(gp[n],gp[n+1]);
+			if n=length(gp)-1 then glitch:=true
+			else if s2=0 then glitch:=true
+			else if s2>threshold then glitch:=true;
 		end;
 		
-		if glitch then begin
-			for m:=n to n+glitch_length-1 do
-				if m<length(gp)-1 then
-					if xy_separation(gp[m],inertial_point)>threshold then
-						gp[m]:=inertial_point;
+		if glitch then begin 
+			gp[n]:=inertial_point;
 			inc(count);
-		end else 
-			inertial_point:=gp[n];
+		end else inertial_point:=gp[n];
 	end;
 	
 	glitch_filter_xy:=count;

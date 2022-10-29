@@ -173,6 +173,7 @@ proc Neuroplayer_init {} {
 		-height $info(overview_height) \
 		-name $info(overview_image)
 	set info(overview_fsd) 2
+	set config(overview_glitch) 0
 #
 # During play-back and processing, we step through each channel selected by the
 # user with the channel_selector parameter. For each channel we create a graph
@@ -515,16 +516,6 @@ proc Neuroplayer_init {} {
 #
 	set config(vt_view_zoom) 2
 	set config(af_view_zoom) 2
-#
-# When glitch_threshold is greater than zero, the glitch threshold is enabled. A
-# threshold equal to the baseline amplitude is a good choice.
-#
-	set config(glitch_threshold) 200
-#
-# The glitch_count parameter is for counting how many glitches the glitch filter
-# removes from the data.
-#
-	set config(glitch_count) 0
 # 
 # The Event Classifier default settings. 
 #
@@ -1714,14 +1705,9 @@ proc Neuroplayer_command {action} {
 # See the Receiver Manual for more information, and also the LWDAQ Command
 # Reference. The routine takes a single parameter: a channel code, which is of
 # the form "id" or "id:f" or "id:f" where "id" is the channel number and "f" is
-# its nominal message rate per second. Once the signal is reconstructed or
-# extracted, we apply a glitch filter. The glitch_threshold is the value set
-# below the value versus time plot. When the value is zero, the filter is
-# disabled. Values greater than zero enable the filter, so that any sample that
-# stands out by more than the threshold from the surrounding samples will be
-# removed from the data and replaced by the previous valid sample. If
-# status_only is set, we don't reconstruct, but return after determining if
-# there is loss, extra, or okay reception.
+# its nominal message rate per second. If status_only is set, we don't
+# reconstruct, but return after determining if there is loss, extra, or okay
+# reception.
 # 
 proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	upvar #0 Neuroplayer_info info
@@ -1881,35 +1867,6 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		return $signal
 	}
 	
-	# Check the glitch threshold.
-	if {![string is double -strict $config(glitch_threshold)]} {
-		Neuroplayer_print "WARNING: Invalid glitch threshold\
-			\"$config(glitch_threshold)\",\
-			clearing to zero at $config(play_time) s [file tail $config(play_file)]."
-		set config(glitch_threshold) 0
-	}
-
-	# Apply the glitch filter. We pass the negative of the absolute threshold value 
-	# so as to instruct the glitch filter to add to the end of the returned values an
-	# integer that is the number of glitches removed. In order to allow us to apply
-	# the glitch filter to the longest possible interval, we temporarily configure 
-	# the lwdaq library routines to return no digits after the decimal place.
-	set num_glitches 0
-	if {$config(glitch_threshold) > 0} {
-		set saved_config [lwdaq_config]
-		lwdaq_config -fsd 0
-		set filtered_signal \
-			[lwdaq glitch_filter_y [expr -abs($config(glitch_threshold))] $signal]
-		eval lwdaq_config $saved_config
-		if {![LWDAQ_is_error_result $filtered_signal]} {
-			set num_glitches [lindex $filtered_signal end]
-			set config(glitch_count) [expr $config(glitch_count) + $num_glitches]
-			set signal [lrange $filtered_signal 0 end-1]
-		} {
-			Neuroplayer_print $filtered_signal
-		}
-	}
-	
 	# Set the unaccepted values, standing values, and the result string. Print a message
 	# if we are set to verbose output, summarizing the reconstruction.
 	lset config(standing_values) $standing_value_index 1 [lindex $signal end]
@@ -1923,8 +1880,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			$num_messages reconstructed,\
 			$num_received received,\
 			$num_bad bad,\
-			$num_missing missing,\
-			$num_glitches glitches." verbose
+			$num_missing missing." verbose
 	} {
 		scan $results %d%d num_clocks num_messages
 		lset config(unaccepted_values) $unaccepted_value_index 1 [lrange $results 4 end]
@@ -1932,8 +1888,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		Neuroplayer_print "Channel [format %2d $id],\
 			[format %4.1f $info(loss)]% loss,\
 			$num_messages extracted,\
-			$num_received received,\
-			$num_glitches glitches." verbose
+			$num_received received." verbose
 	}
 	
 	set info(num_messages) $num_messages
@@ -2152,7 +2107,7 @@ proc Neuroplayer_overview {{fn ""} } {
 		set f $w.time
 		frame $f 
 		pack $f -side top -fill x
-		label $f.tfn -text "Archive::"
+		label $f.tfn -text "Archive:"
 		label $f.lfn -textvariable Neuroplayer_overview(fn_tail) -width 14
 		pack $f.tfn $f.lfn -side left -expand yes
 		label $f.lt_min -text "t_min"
@@ -2428,14 +2383,14 @@ proc Neuroplayer_overview_plot {} {
 		}
 	}	
 	
-	# Apply the glitch filter to the graphs of values and check their lengths.
-	if {$config(glitch_threshold) > 0} {
+	# Apply a glitch filter to the graphs of values and check their lengths.
+	if {$config(overview_glitch) > 0} {
 		set saved_config [lwdaq_config]
 		lwdaq_config -fsd $info(overview_fsd)
 		for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
 			if {[info exists graph($id)]} {
-				set filtered_graph [lwdaq glitch_filter_y\
-					$config(glitch_threshold) $graph($id)]
+				set filtered_graph [lwdaq glitch_filter_y \
+					$config(overview_glitch) $graph($id)]
 				if {![LWDAQ_is_error_result $filtered_graph]} {
 					set graph($id) $filtered_graph
 				}
@@ -8049,9 +8004,6 @@ proc Neuroplayer_open {} {
 	label $f.lv_range -text "v_range:" -fg $info(label_color)
 	entry $f.ev_range -textvariable Neuroplayer_config(v_range) -width 5
 	pack $f.lv_range $f.ev_range -side left -expand yes
-	label $f.l_glitch -text "glitch_threshold:" -fg $info(label_color)
-	entry $f.e_glitch -textvariable Neuroplayer_config(glitch_threshold) -width 5
-	pack $f.l_glitch $f.e_glitch -side left -expand yes
 	label $f.lt_left -text "t_min:" -fg $info(label_color)
 	label $f.et_left -textvariable Neuroplayer_info(t_min) -width 7
 	pack $f.lt_left $f.et_left -side left -expand yes
