@@ -19,7 +19,7 @@
 # The Neuroplayer records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
 #
-# http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html
+# http://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
 #
 # The Neuroplayer reads NDF (Neuroscience Data Format) files from disk. It
 # provides play-back of data stored on file, with signal plotting and
@@ -586,7 +586,7 @@ proc Neuroplayer_init {} {
 # Export settings.
 #
 	set info(export_help_url) \
-		"http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html#Exporting%20Data"
+		"http://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html#Exporting%20Data"
 	set info(export_panel) $info(window)\.export
 	set info(export_text) $info(window)\.export.text
 	set info(edf_panel) $info(export_panel)\.edf
@@ -8239,6 +8239,6 @@ return "SUCCESS"
 
 ----------Begin Help----------
 
-http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html
+http://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
 
 ----------End Help----------

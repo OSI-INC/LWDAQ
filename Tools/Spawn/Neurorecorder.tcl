@@ -19,7 +19,7 @@
 # The Neurorecorder records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
 #
-# http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html
+# http://www.opensourceinstruments.com/Electronics/A3018/Neurorecorder.html
 #
 # The Neurorecorder stores telemetry data to NDF (Neuroscience Data Format) files.
 #
@@ -1092,6 +1092,6 @@ return "SUCCESS"
 
 ----------Begin Help----------
 
-http://www.opensourceinstruments.com/Electronics/A3018/Neuroarchiver.html
+http://www.opensourceinstruments.com/Electronics/A3018/Neurorecorder.html
 
 ----------End Help----------
