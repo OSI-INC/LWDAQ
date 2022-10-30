@@ -997,6 +997,7 @@ var
 	standing_value:integer=0;
 	period:integer=64;
 	glitch_threshold:real=0;
+	num_glitches:integer;
 	divergent_clocks:boolean=false;
 	id_valid:array [min_id..max_id] of boolean;
 	id_qty:array [min_id..max_id] of integer;
@@ -1395,7 +1396,8 @@ begin
 	the number missing and the number of bad messages, so as to maintain the same
 	format as the results string produced by the reconstruct instruction.
 }
-		writestr(ip^.results,num_clocks:1,' ',num_extracted:1,' 0 0 ',standing_value:1);
+		writestr(ip^.results,num_clocks:1,' ',num_extracted:1,
+			' 0 0 ',standing_value:1,' 0');
 	end;
 {
 	If "clocks" then we return the number of errors, the number of clock
@@ -1638,7 +1640,7 @@ begin
 		setlength(gp,num_selected);
 		for message_num:=0 to num_selected-1 do 
 			gp[message_num]:=mp[message_num].sample;
-		glitch_filter(gp,glitch_threshold);
+		num_glitches:=glitch_filter(gp,glitch_threshold);
 		for message_num:=0 to num_selected-1 do 
 			mp[message_num].sample:=round(gp[message_num]);	
 {
@@ -1668,7 +1670,8 @@ begin
 	Record the meta-data in the image result string.
 }
 		writestr(ip^.results,num_clocks:1,' ',num_selected:1,' ',
-			num_bad:1,' ',num_missing:1,' ',standing_value:1);
+			num_bad:1,' ',num_missing:1,' ',standing_value:1,' ',
+			num_glitches:1);
 	end;
 {
 	If "plot", we plot them on the screen and return a summary result for each

@@ -2900,10 +2900,7 @@ end;
 function glitch_filter_xy(var gp:xy_graph_type;threshold:real):integer;
 
 const
-	glitch_length=2;
-	coastline_extent=4;
-	glitch_reduction=5;
-	min_length=coastline_extent*2+1;
+	min_length=4;
 	
 var
 	n,count:integer;

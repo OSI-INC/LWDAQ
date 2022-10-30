@@ -262,6 +262,7 @@ proc Neuroplayer_init {} {
 	set config(min_reception) 0.8
 	set config(max_rejection) 0.2
 	set config(glitch_threshold) 1000
+	set config(glitch_count) 0
 	set info(max_window_fraction) 0.5
 	set config(extra_fraction) 1.1
 	set config(calibration_include) "Okay Loss Extra"
@@ -1830,8 +1831,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		# or too low as a result of a fault in the on-board oscillator. We check
 		# for this mode of failure now, and if we find it, we reconstruct once 
 		# again, but this time with the "divergent_clocks" option set true.
-		scan [lwdaq_image_results $info(data_image)] %d%d%d%d%d \
-			num_clocks num_ideal num_bad num_missing standing_value
+		scan [lwdaq_image_results $info(data_image)] %d%d%d%d%d%d \
+			num_clocks num_ideal num_bad num_missing standing_value num_glitches
 		if {$num_received + $num_missing > ($config(max_rejection)+1)*$num_ideal} {
 			Neuroplayer_print "Channel [format %2d $id],\
 				sample rate out of range, adapting reconstruction." verbose
@@ -1860,7 +1861,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	# Set the standing values and image result string. Print a message if we are
 	# set to verbose output, summarizing the reconstruction.
 	set results [lwdaq_image_results $info(data_image)]
-		scan $results %d%d%d%d%d num_clocks num_messages num_bad num_missing standing_value
+	scan [lwdaq_image_results $info(data_image)] %d%d%d%d%d%d \
+		num_clocks num_messages num_bad num_missing standing_value num_glitches
 	if {$config(enable_reconstruct)} {
 		set info(loss) [expr 100.0 * $num_missing / $num_expected]
 		Neuroplayer_print "Channel [format %2d $id],\
@@ -1878,6 +1880,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	}
 	lset info(standing_values) $standing_value_index 1 $standing_value
 	set info(num_messages) $num_messages
+	set config(glitch_count) [expr $config(glitch_count) + $num_glitches]
 
 	return $signal
 }

@@ -4944,16 +4944,16 @@ lwdaq window_function 5 "0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
 	end 
 	else if option='glitch_filter' then begin
 {
-<p>Applies a glitch filter to a sequence of real-valued samples. The glitch filter takes a real-valued threshold as its first parameter, followed by a list of real-valued samples. The routine calls <i>glitch_filter</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. A "glitch" is a corruption of one or more adjacent points in a signal. When the absolute change in value from sample n-1 to sample n exceeds the threshold, we look at how much the coastline in the immediate neighborhood of sample n (from n-4 to n+4) will be reduced if we replace samples n and n+1 with sample n-1. If this reduction is dramatic (a factor of 5), we classify sample n as a glitch. Once we find a glitch, we replace it with sample n-1. If sample n+1 is also more than one threshold from sample n-1, we replace it as well. A threshold of 0 disables the filter. As an example, we could have:</p>
+<p>Applies a glitch filter to a sequence of real-valued samples. The glitch filter takes a real-valued threshold as its first parameter, followed by a list of real-valued samples. The routine calls <i>glitch_filter</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. A "glitch" is a corruption of one or more adjacent points in a signal. Our implementation of the glitch filter is designed to eliminate glitches that arise from missing samples being replaced by corrupt or interference samples in telemetry systems. When the absolute change in value from sample n-1 to sample n exceeds the threshold, we look to see if there is another threshold-exceeding change from sample n to n+1. If so, we replace sample n with sample n-1. Otherwise, we check to see if sample n+1 has exactly the same value as sample n, and if so, we replace sample n with sample n-1. Thus a jump up or down by more than the threshold, followed by any number of identical samples, will be treated as a glitch and eliminated entirely, replaced by the sample before the jump. A threshold of 0 disables the filter. As an example, we could have:</p>
 
-<pre>lwdaq_config -fsd 2 -fsr 1
+<pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
-0.00 1.00 1.00 1.00 0.00 3.00 1.00 2.00 3.00 2.00 2.00 0.00 8.00 6.00 7.00 0.00 0.00</pre>
+0 1 1 1 0 3 1 2 3 2 2 0 8 6 7 7 7 </pre>
 
-<p>Here we see a glitch in the third sample being removed. Larger variations later in the data are not removed because they are consistent with the fluctuations in neighboring points. If we want to know how many glitches the glitch filter removed, we make the glitch threshold negative, and the routine will append an integer to the end of the string of data values. This integer is the number of glitches removed.</p>
+<p>Here we see a glitch in the third sample being removed, and later we have another glitch: a jump downwards of 7 when our threshold is 3, followed by two zeros. The repetition of the exact same value is a signature of glitches in unreliable signals. When several samples go missing, and the first is a corrupted sample, the reconstruction routine we apply to the raw telemetry signal will fill in the missing samples with the value of the corrupted sample. If we specify a negative threshold, the routine still uses its absolute value, but in addition it will append to the end of the output string the number of glitches removed.</p>
 
-<pre>lwdaq glitch_filter -1.0 "0 0 0 0 10 0 1 2 0 0 0 0 0"
-0.00 0.00 0.00 0.00 0.00 0.00 1.00 2.00 0.00 0.00 0.00 0.00 0.00 1</pre>
+<pre>lwdaq glitch_filter -3.0 "0 0 0 0 10 0 1 2 0 0 0 0 0"
+0 0 0 0 0 0 1 2 0 0 0 0 0 1</pre>
 
 <p>The last number in the string is the number removed.</p>
 }
@@ -4967,7 +4967,9 @@ lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
 		result:=Tcl_ObjString(argv[3]);
 		gpx:=read_x_graph(result);
 		if abs(threshold)>0 then 
-			num_glitches:=glitch_filter(gpx,abs(threshold));
+			num_glitches:=glitch_filter(gpx,abs(threshold))
+		else
+			num_glitches:=0;
 		result:=string_from_x_graph(gpx);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
@@ -4977,13 +4979,13 @@ lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
 	end 
 	else if option='glitch_filter_y' then begin
 {
-<p>Applies a glitch filter to the y-values of a sequence of x-y points. The routine calls <i>glitch_filter_y</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The result is equivalent to taking the y-values, passing them through the one-dimensional <a href="#glitch_filter">glitch_filter</a> and re-combining the result with their x-values. We replace the glitch point in the data sequence with a point whose y-coordinate is the same as the previous point's y-coordinate. We continue after the glitch until the y-coordinate once again lies within <i>threshold</i> of the y-coordinate before the glitch. A threshold of 0 disables the filter.</p>
+<p>Applies a glitch filter to the y-values of a sequence of x-y points. The routine calls <i>glitch_filter_y</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The result is equivalent to taking the y-values, passing them through the one-dimensional <a href="#glitch_filter">glitch_filter</a> and re-combining the result with their x-values. We replace the glitch point in the data sequence with a point whose y-coordinate is the same as the previous point's y-coordinate. A threshold of 0 disables the filter. A negative threshold causes the number of glitches to be appended to the signal values.</p>
 
-<pre>lwdaq_config -fsd 1 -fsr 1
+<pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 13 0"
-1.0 0.0 2.0 0.0 3.0 0.0 4.0 0.0 5.0 0.0 6.0 0.0 7.0 5.0 8.0 5.0 9.0 0.0 10.0 0.0 11.0 0.0 12.0 0.0 13.0 0.0 1</pre>
+1 0 2 0 3 0 4 0 5 0 6 0 7 0 8 0 9 0 10 0 11 0 12 0 13 0 3</pre>
 
-<p>A negative threshold causes the number of glitches to be appended to the signal values. In the example above, the final number in the output is the number of glitches removed.</p>
+<p>In the example above, the final number in the output is the number of glitches removed.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -4994,7 +4996,10 @@ lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 
 		threshold:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
 		gp:=read_xy_graph(result);
-		num_glitches:=glitch_filter_y(gp,abs(threshold));
+		if abs(threshold)>0 then
+			num_glitches:=glitch_filter_y(gp,abs(threshold))
+		else
+			num_glitches:=0;
 		result:=string_from_xy_graph(gp);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
@@ -5004,13 +5009,18 @@ lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 
 	end 
 	else if option='glitch_filter_xy' then begin
 {
-<p>Applies a glitch filter to the a sequence of x-y points. The routine calls <i>glitch_filter_xy</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The distance between consecutive points is their two-dimensional separation. The routine works in the same way as the one-dimensional <a href="#glitch_filter">glitch_filter</a> except it uses the separation of consecutive points rather than the absolute change in the value of a one-dimensional data point. A threshold of 0 disables the filter.</p>
+<p>Applies a glitch filter to the a sequence of x-y points. The routine calls <i>glitch_filter_xy</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The distance between consecutive points is their two-dimensional separation. The routine works in the same way as the one-dimensional <a href="#glitch_filter">glitch_filter</a> except it uses the separation of consecutive two-dimentional points rather than the absolute change in the value of a one-dimensional coordinate. A threshold of 0 disables the filter.</p>
 
-<pre>lwdaq_config -fsd 1 -fsr 1
-lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
+<pre>lwdaq_config -fsd 0 -fsr 1
+lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
+0 0 1 0 0 2 3 2 3 2 2 2 1 4 3 3</pre>
+
+<p>A negative threshold causes the number of glitches to be appended to the end of the return string.</p>
+
+<pre>lwdaq glitch_filter_xy -10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 0 0 1 0 0 2 3 2 3 2 2 2 1 4 3 3 1</pre>
 
-<p>The last number is the number of glitches removed, which the routine adds to the output string when the threshold is negative.</p>
+<p>The last number in the example above is not a sample, it is the number of glitches removed.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5021,7 +5031,10 @@ lwdaq glitch_filter_xy -1.0 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 		threshold:=Tcl_ObjReal(argv[2]);
 		result:=Tcl_ObjString(argv[3]);
 		gp:=read_xy_graph(result);
-		num_glitches:=glitch_filter_xy(gp,abs(threshold));
+		if abs(threshold)>0 then
+			num_glitches:=glitch_filter_xy(gp,abs(threshold))
+		else
+			num_glitches:=0;
 		result:=string_from_xy_graph(gp);
 		if threshold<0 then begin
 			writestr(s,num_glitches:1);
