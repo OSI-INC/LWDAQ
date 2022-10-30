@@ -1363,6 +1363,7 @@ begin
 }
 		setlength(trace,num_selected);
 		num_extracted:=0;
+		standing_value:=0;
 		for message_num:=0 to num_selected-1 do begin
 			with mp[message_num] do begin
 				if id=extract_id then begin
@@ -1377,20 +1378,24 @@ begin
 							+'lwdaq_sct_receiver');
 						exit;
 					end;
+					standing_value:=sample;
 				end;
 			end;
 		end;
 {
-		We create an xy-graph of the correct length and containing for x the
-		time values and for y the message indices.
+		We create an xy-graph of the correct length and containing the
+		time values in x and the message indicese in y.
 }
 		setlength(electronics_trace,num_extracted);	
 		for message_num:=0 to num_extracted-1 do
 			electronics_trace[message_num]:=trace[message_num];
 {
-	Record number of clocks and number extracted to the image result string.
+	Record number of clocks and number extracted to the image result string, along
+	with the standing value, which is the final sample. We include two zeros for
+	the number missing and the number of bad messages, so as to maintain the same
+	format as the results string produced by the reconstruct instruction.
 }
-		writestr(ip^.results,num_clocks:1,' ',num_extracted:1);
+		writestr(ip^.results,num_clocks:1,' ',num_extracted:1,' 0 0 ',standing_value:1);
 	end;
 {
 	If "clocks" then we return the number of errors, the number of clock
@@ -1630,12 +1635,12 @@ begin
 {
 	Apply a glitch filter to the signal.
 }
-	setlength(gp,num_selected);
-	for message_num:=0 to num_selected-1 do 
-		gp[message_num]:=mp[message_num].sample;
-	glitch_filter(gp,glitch_threshold);
-	for message_num:=0 to num_selected-1 do 
-		mp[message_num].sample:=round(gp[message_num]);	
+		setlength(gp,num_selected);
+		for message_num:=0 to num_selected-1 do 
+			gp[message_num]:=mp[message_num].sample;
+		glitch_filter(gp,glitch_threshold);
+		for message_num:=0 to num_selected-1 do 
+			mp[message_num].sample:=round(gp[message_num]);	
 {
 	Return the reconstructed message list in a string. Each line gives the time
 	and value of a message, in order of increasing time. In an x-y graph we
@@ -1660,11 +1665,10 @@ begin
 			end;
 		end;
 {
-	Record the meta-data, which ends with the new "standing value", this being the final
-	sample value in the signal.
+	Record the meta-data in the image result string.
 }
 		writestr(ip^.results,num_clocks:1,' ',num_selected:1,' ',
-			num_bad:1,' ',num_missing:1,' ',mp[num_selected-1].sample:1);
+			num_bad:1,' ',num_missing:1,' ',standing_value:1);
 	end;
 {
 	If "plot", we plot them on the screen and return a summary result for each
