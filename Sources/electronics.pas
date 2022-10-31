@@ -1085,6 +1085,7 @@ begin
 	lwdaq_sct_receiver:=result;
 	if ip=nil then exit;
 	ip^.results:='';
+	mark_time('entered routine','lwdaq_sct_receiver');
 {
 	Read options out of the command string.
 }
@@ -1191,6 +1192,7 @@ begin
 	data acquisition software will attempt to correct the errors and restore the
 	integrity of the data.
 }
+	mark_time('creating message array','lwdaq_sct_receiver');
 	for id_num:=min_id to max_id do id_qty[id_num]:=0;
 	num_errors:=0;
 	error_report:='';
@@ -1362,6 +1364,7 @@ begin
 		We go through the messages looking for those with the extract_id and count them.
 		We write the time and sample to the return string.
 }
+		mark_time('extracting messages','lwdaq_sct_receiver');
 		setlength(trace,num_selected);
 		num_extracted:=0;
 		standing_value:=0;
@@ -1478,7 +1481,6 @@ begin
 }
 		scatter_extent:=period div scatter_divisor;
 		if scatter_extent>max_scatter_extent then scatter_extent:=max_scatter_extent;
-	
 {
 	During reconstruction, we assume all valid messages lie in a uniformly
 	spaced temporal windows. The windows must be large enough to contain the
@@ -1526,6 +1528,7 @@ begin
 	into the windows. The phase that gives us the largest number of messages is
 	our best guess at the message source's nominal transmit time.
 }
+		mark_time('determine window phase','lwdaq_sct_receiver');
 		for phase_index:=0 to period-1 do phase_histogram[phase_index]:=0;
 		for message_num:=0 to num_selected-1 do
 			inc(phase_histogram[mp[message_num].time mod period]);
@@ -1561,6 +1564,7 @@ begin
 	messages" is the number that lie outside the windows plus the number that we
 	reject despite lying inside the windows.
 }		
+		mark_time('selecting samples','lwdaq_sct_receiver');
 		setlength(msp,max_num_selected);
 		stack_height:=0;
 		num_missing:=0;
@@ -1637,12 +1641,14 @@ begin
 {
 	Apply a glitch filter to the signal.
 }
+		mark_time('applying glitch filter','lwdaq_sct_receiver');
 		setlength(gp,num_selected);
 		for message_num:=0 to num_selected-1 do 
 			gp[message_num]:=mp[message_num].sample;
 		num_glitches:=glitch_filter(gp,glitch_threshold);
 		for message_num:=0 to num_selected-1 do 
 			mp[message_num].sample:=round(gp[message_num]);	
+		mark_time('creating electronics trace','lwdq_sct_receiver');
 {
 	Return the reconstructed message list in a string. Each line gives the time
 	and value of a message, in order of increasing time. In an x-y graph we

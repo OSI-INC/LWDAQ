@@ -1815,9 +1815,9 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		# We have a standing value in case the first message is missing.
 		# The reconstruction always returns the nominal number of messages.
 		set signal [lwdaq_receiver $info(data_image) \
-			"-payload $info(player_payload) \
-			-size $info(data_size) \
-			reconstruct $id $period $standing_value \
+			"-payload $info(player_payload)\
+			-size $info(data_size)\
+			reconstruct $id $period $standing_value\
 			$config(glitch_threshold)"]
 		
 		# Check for an error in reconstruction.
@@ -1837,9 +1837,9 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			Neuroplayer_print "Channel [format %2d $id],\
 				sample rate out of range, adapting reconstruction." verbose
 			set signal [lwdaq_receiver $info(data_image) \
-				"-payload $info(player_payload) \
-				-size $info(data_size) \
-				reconstruct $id $period $standing_value \
+				"-payload $info(player_payload)\
+				-size $info(data_size)\
+				reconstruct $id $period $standing_value\
 				$config(glitch_threshold) 1"]
 		}
 	} {

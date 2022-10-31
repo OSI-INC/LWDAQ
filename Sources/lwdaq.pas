@@ -3307,6 +3307,7 @@ var
 	image_name:string='';
 	result:string='';
 	command:string='';
+	show_timing:boolean=false;
 
 begin
 	error_string:='';
@@ -3330,8 +3331,11 @@ begin
 	end;
 	command:=Tcl_ObjString(argv[2]);
 	
+	start_timer('starting '+command,'lwdaq_receiver');
 	result:=lwdaq_sct_receiver(ip,command);
-	
+	mark_time('done','lwdaq_receiver');
+	if show_timing then report_time_marks;
+		
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
 	lwdaq_receiver:=Tcl_OK;
