@@ -261,7 +261,7 @@ proc Neuroplayer_init {} {
 	}
 	set config(min_reception) 0.8
 	set config(max_rejection) 0.2
-	set config(glitch_threshold) 1000
+	set config(glitch_threshold) 500
 	set config(glitch_count) 0
 	set info(max_window_fraction) 0.5
 	set config(extra_fraction) 1.1

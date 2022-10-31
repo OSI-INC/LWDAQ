@@ -2893,9 +2893,10 @@ end;
 	followed by repetition of the glitch value in place of missing genuine data
 	values. Any point whose separation from its predecessor exceeds the
 	threshold is a candidate glitch. If its separation from its successor also
-	exceeds the threshold, or if the successor is exactly equal to the
-	candidate, we declear the sample a glitch. Once we find a glitch, we remove
-	it. The routine returns the number of glitches it eliminated.
+	exceeds the threshold and is at least slightly in the opposite direction, or
+	if the successor is exactly equal to the candidate, we declear the sample a
+	glitch. Once we find a glitch, we remove it. The routine returns the number
+	of glitches it eliminated.
 }
 function glitch_filter_xy(var gp:xy_graph_type;threshold:real):integer;
 
@@ -2904,7 +2905,7 @@ const
 	
 var
 	n,count:integer;
-	s1,s2:real;
+	s1,s2,d1:real;
 	inertial_point:xy_point_type;
 	glitch:boolean;
 	
@@ -2943,10 +2944,10 @@ begin
 	the comparison with our inertial point. When we come to a point that is
 	farther than threshold from the inertial point, we regard it as a candidate
 	glitch. We check to see if the separation between the candidate and the next
-	point exceeds the threshold, and also if the next point is exactly equal to
-	the candidate. If either condition is met, we declare the candidate a glitch.
-	Any glitch we overwrite with the inertial point. Any non-glitch we use to
-	update the inertial point.
+	point exceeds the threshold and is in the opposite direction, and also if
+	the next point is exactly equal to the candidate. If either condition is
+	met, we declare the candidate a glitch. Any glitch we overwrite with the
+	inertial point. Any non-glitch we use to update the inertial point.
 }
 	count:=0;
 	for n:=0 to length(gp)-1 do begin
@@ -2956,7 +2957,12 @@ begin
 			s2:=xy_separation(gp[n],gp[n+1]);
 			if n=length(gp)-1 then glitch:=true
 			else if s2=0 then glitch:=true
-			else if s2>threshold then glitch:=true;
+			else begin
+				d1:=xy_dot_product(
+					xy_difference(gp[n],inertial_point),
+					xy_difference(gp[n+1],gp[n]));
+				if (s2>threshold) and (d1<0) then glitch:=true;
+			end;
 		end;
 		
 		if glitch then begin 
@@ -5225,8 +5231,8 @@ function xy_difference(p,q:xy_point_type):xy_point_type;
 var d:xy_point_type;
 begin
 	d.x:=p.x-q.x;
-		d.y:=p.y-q.y;
-		xy_difference:=d;
+	d.y:=p.y-q.y;
+	xy_difference:=d;
 end;
 
 function xy_dot_product(p,q:xy_point_type):real;
