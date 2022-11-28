@@ -940,11 +940,14 @@ const
 	clock_period=256;
 	min_period=16;
 	max_period=2048;
+	max_duplicate_separation=2;
 	max_print_length=long_string_length;
 	min_reconstruct_clocks=8;
 	id_offset=0;
 	sample_offset=1;
 	timestamp_offset=3;
+	tcb_payload_size=2;
+	tcb_pwr_offset=0;
 	report_timestamp_error=true;
 	id_bits=4;
 	max_scatter_extent=8;
@@ -993,6 +996,7 @@ var
 	clock_num:integer=0;
 	clock_index:integer=0;
 	num_errors:integer=0;
+	num_duplicates:integer=0;
 	id_num,reconstruct_id,extract_id:integer;
 	standing_value:integer=0;
 	period:integer=64;
@@ -1001,7 +1005,7 @@ var
 	divergent_clocks:boolean=false;
 	id_valid:array [min_id..max_id] of boolean;
 	id_qty:array [min_id..max_id] of integer;
-	id_previous:array [min_id..max_id] of message_type;
+	id_previous:array [min_id..max_id] of integer;
 	display_active:boolean;
 	display_mode:string;
 	display_min,display_max:real;
@@ -1019,8 +1023,12 @@ var
 	done_with_options:boolean=false;
 
 	{
-		image_message reads the core of a message from the image data
-		and keeps track of the original location of the message.
+		image_message reads the core of a message from the image data. We
+		specify the message with its message index. The first message in the
+		image is index zero. The second message is index one. The routine
+		multiplies the index by message_length to get the byte address of the
+		first byte of the message within the image. The routine returns an image
+		record. The image record contains the index.
 	}
 	function image_message(ip:image_ptr_type;n:integer):message_type;
 	var 
@@ -1040,7 +1048,8 @@ var
 	
 	{
 		write_image_message writes the core of a message into a message location
-		in the image data, leaving the payload untouched.
+		in the image data, leaving the payload untouched. We specify the
+		location with an image index.
 	}
 	procedure write_image_message(ip:image_ptr_type;m:message_type;n:integer);
 	var byte_num:integer;
@@ -1179,10 +1188,17 @@ begin
 	duplicate. Sometimes the data receiver does not eliminate duplicate messages
 	itself, because of the large number of possible channels upon which
 	duplication can occur, and the limited logic resources in its firmware. The
-	id_previous array contains the previous messages for all possible channels.
-	When a new, valid message has an identical sample value to the previous
-	message in the same channel, and the message times are no more than one
-	clock tick apart, we don't transfer the new message to our message array.
+	id_previous array contains for all channels the index of the previous
+	message from that channel in the message array. When a new, valid message
+	has an identical sample value to the previous message in the same channel,
+	and the message times are no more than max_sample_separation clock ticks
+	apart, we don't transfer the new message to our message array. If the
+	payload size is tcb_payload_size, we have in the payload the power of the
+	message and the number of the antenna input that provided the message. Of
+	the duplicate messages, we want to save the one with the highest power. The
+	antenna number of this message gives us an estimate of the location of the
+	transmitter, and also presents to us the best antenna to use for
+	transmitting commands to implantable stimulators.
 
 	We count the number of messages for each signal identifier with the id_qty
 	array. We do not count duplicate messages, but we do count bad messages in
@@ -1206,6 +1222,7 @@ begin
 	previous_clock:=0;
 	previous_timestamp:=0;
 	receiver_version:=-1;
+	num_duplicates:=0;
 	while (num_messages<=max_index) and ((null_block_length=0) or (data_size>0)) do begin
 		message_string:='';
 		m:=image_message(ip,num_messages);
@@ -1250,12 +1267,20 @@ begin
 				null_block_length:=0;
 			end;
 			with m do begin
-				if (id_qty[id]=0) or (sample<>id_previous[id].sample) 
-						or (time-id_previous[id].time>1) then begin
+				if (id_qty[id]=0) or (sample<>mp[id_previous[id]].sample) 
+						or (time-mp[id_previous[id]].time
+								>max_duplicate_separation) then begin
 					id_qty[id]:=id_qty[id]+1;
-					id_previous[id]:=m;
+					id_previous[id]:=num_selected;
 					mp[num_selected]:=m;
 					inc(num_selected);
+				end else begin
+					inc(num_duplicates);
+					if (payload_size=tcb_payload_size) and 
+						(payload_byte(ip,m.index,tcb_pwr_offset) >
+							payload_byte(ip,mp[id_previous[id]].index,
+								tcb_pwr_offset)) then 
+						mp[id_previous[id]].index:=m.index;
 				end;
 			end;
 		end;

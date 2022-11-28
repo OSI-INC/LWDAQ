@@ -67,6 +67,7 @@ proc Neurorecorder_init {} {
 	set info(alt_options) "A3032 A3038 A3042"
 	set info(A3032_payload) "16"
 	set info(A3038_payload) "16"
+	set info(A3042_payload) "2"
 	set info(A3038_coordinates) "\
 		0  0 2 0  12 2  0 24 2 \
 		12 0 2 12 12 2 12 24 2 \
@@ -571,7 +572,7 @@ proc Neurorecorder_set_receiver {version} {
 			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
 		"A3042" {
-			set iconfig(payload_length) $info(A3038_payload)
+			set iconfig(payload_length) $info(A3042_payload)
 			set config(tracker_coordinates) $info(A3038_coordinates)
 			Neurorecorder_print "Receiver $version\:\
 				No need to specify driver socket, channel selection supported."

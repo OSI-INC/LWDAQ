@@ -550,21 +550,6 @@ proc Neuroplayer_init {} {
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
 	set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
-	set info(A3038_payload) "16"
-	set info(A3038_coordinates) "\
-		0  0 2 0  12 2  0 24 2 \
-		12 0 2 12 12 2 12 24 2 \
-		24 0 2 24 12 2 24 24 2 \
-		36 0 2 36 12 2 36 24 2 \
-		48 0 2 48 12 2 48 24 2 \
-		-1 -1 -1"
-	set info(A3032_payload) "16"
-	set info(A3032_coordinates) "\
-		0 0 2  0 8 2  0 16 2 \
-		8  0 2  8 8 2  8 16 2 \
-		16 0 2 16 8 2 16 16 2 \
-		24 0 2 24 8 2 24 16 2 \
-		32 0 2 32 8 2 32 16 2"
 	set config(tracker_coordinates) ""
 	set info(tracker_range_border) "1.0"
 	set info(tracker_range) "-1.0 -1.0 +49.0 +25.0"
@@ -1862,7 +1847,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	# set to verbose output, summarizing the reconstruction.
 	set results [lwdaq_image_results $info(data_image)]
 	scan [lwdaq_image_results $info(data_image)] %d%d%d%d%d%d \
-		num_clocks num_messages num_bad num_missing standing_value num_glitches
+		num_clocks num_messages num_bad num_missing \
+			standing_value num_glitches
 	if {$config(enable_reconstruct)} {
 		set info(loss) [expr 100.0 * $num_missing / $num_expected]
 		Neuroplayer_print "Channel [format %2d $id],\
