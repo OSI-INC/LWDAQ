@@ -3342,11 +3342,11 @@ begin
 end;
 
 {
-<p>lwdaq_alt extracts power measurements from data recorded in an Animal Location Tracker (ALT), such as the <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>, so as to measure the location of Subcutaneous Transmitters (SCTs), such as the <a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>. The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
+<p>lwdaq_alt extracts power measurements from data recorded by an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of Subcutaneous Transmitters (SCTs), such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), or Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
 
 <p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements.</p>
 
-<p>The second parameter is a list of locations of detector coils, given as a sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces. When calculating the location of a transmitter, lwdaq_alt will center each detector on these coordinates. All coordinates are assumed to be greater than or equal to zero, so that (-1,-1,-1) will be recognised as an invalid location. When we pass "-1 -1 -1" as the coordinate of a coil, lwdaq_alt does not include the coil in its position calculation. We use position "-1 -1 -1" for auxilliary antenna coils in animal location trackers. The A3038C, for example, provides fifteen tracker coils and a sixteenth auxilliary antenna input that may be used for reception of telemetry signals and for measuring background power. We use any position (-1,y,z) for coils we want to ignore. We might have sixteen detector antennas divided into two sets of eight for monitoring the location of animals in two habitats. When we calculate position in the first habitat, we ignore the coils arranged in the second habitat. We set the coordinates of the coils we want to ignore to "-1 y z", where <i>y</i> and <i>z</i> can be anything. In a two-dimensional tracker platform such as the A3028C, the value of the <i>z</i>-coordinate will be shared by all coils, but we don't set it to zero so that zero may be used by our software to indicate the absence of samples. For the A3028C we set the <i>z</i>-coordinage to 2.0, the approximate distance from the center of its detector coils to a transmitter sitting on the platform.</p>
+<p>The second parameter is a list of locations of detector coils, given as a sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces. When calculating the location of a transmitter, lwdaq_alt will center each detector on these coordinates. All coordinates are assumed to be greater than or equal to zero, so that (-1,-1,-1) will be recognised as an invalid location. When we pass "-1 -1 -1" as the coordinate of a coil, lwdaq_alt does not include the coil in its position calculation. We use position "-1 -1 -1" for auxilliary antenna coils in animal location trackers. The A3038C, for example, provides fifteen tracker coils and a sixteenth auxilliary antenna input that may be used for reception of telemetry signals and for measuring background power. We use any position (-1,y,z) for coils we want to ignore. We might have sixteen detector antennas divided into two sets of eight for monitoring the location of animals in two habitats. When we calculate position in the first habitat, we ignore the coils arranged in the second habitat. We set the coordinates of the coils we want to ignore to "-1 y z", where <i>y</i> and <i>z</i> can be anything. In a two-dimensional tracker platform such as the A3038C, the value of the <i>z</i>-coordinate will be shared by all coils. Regardless of the arrangent of antennas, all <i>z</i>-coordinates must be greater than zero. We must make it impossible for the measured position of the transmitter to come out as "0.0 0.0 0.0" because we use this origin position to indicate "no position measurement obtained in this interval". For the A3038C we set the <i>z</i>-coordinage to 2.0, the approximate distance from the center of its detector coils to a transmitter sitting on the platform.</p>
 
 <p>The lwdaq_alt routine supports the following options:</p>
 
@@ -3360,9 +3360,9 @@ end;
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
 </table></center>
 
-<p>The output contains <i>x</i>, <i>y</i>, and <i>z</i> in whatever units we used to specify the coil centers, followed by a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the positions, activity and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period. The unit of activity is coil center units per slice interval. If we have break the interval into eight slices and specify coil positions in centimeters, the activity will be centimeters per eighth of a second.</p>
+<p>The output contains <i>x</i>, <i>y</i>, and <i>z</i> in whatever units we used to specify the coil centers, followed by a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the position and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period. The unit of activity is coil center units per slice interval. If we have break the interval into eight slices and specify coil positions in centimeters, the activity will be centimeters per eighth of a second.</p>
 
-<p>The -background option allows us to specify background power levels for all detector coils, in anticipation of a need to calibrate detectors. By default, these background powers are all zero. The -extent value sets a maximum distance from the location of the transmitter to a coil used to calculate the transmitter location. The -payload value is the number of bytes added to the core four-byte message in order to accommodate the power values. A fifteen-coil tracker has payload sixteen and returns sixteen power values. The first fifteen are the powers from the coils, in the order defined by the tracker's geometry map. The sixteenth value is either zero or the power we obtain from an auxilliary detector module.</p>
+<p>The -background option allows us to specify background power levels for all detector coils, in anticipation of a need to calibrate detectors. By default, these background powers are all zero. If we pass an empty string for the background powers, lwdaq_alt will use zeros. The -extent value sets a maximum distance from the location of the transmitter to a coil used to calculate the transmitter location. The -payload value is the number of bytes added to the core four-byte message in order to accommodate the power values. A fifteen-coil tracker has payload sixteen and returns sixteen power values. The first fifteen are the powers from the coils, in the order defined by the tracker's geometry map. The sixteenth value is either zero or the power we obtain from an auxilliary detector module.</p>
 }
 function lwdaq_alt(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3371,8 +3371,6 @@ const
 	error_value=-1;
 	power_hi=255;
 	power_lo=0;
-	num_coordinates=2;
-	max_iterations=100;
 
 var 
 {
@@ -3431,7 +3429,6 @@ var
 			power_measurement:=0;
 	end;
 	
-
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
@@ -3474,6 +3471,9 @@ begin
 		exit;
 	end;
 	
+	{
+		Handle options.
+	}
 	arg_index:=3;
 	while (arg_index<argc-1) do begin
 		option:=Tcl_ObjString(argv[arg_index]);
@@ -3562,7 +3562,6 @@ begin
 			if (detector_coordinates[detector_num].x <> -1)
 				and (detector_powers[detector_num]<min_power) then 
 				min_power:=detector_powers[detector_num];
-			gui_support('');
 		end;
 		
 		{
@@ -3621,11 +3620,197 @@ begin
 	end;
 	
 	{
-		Assign and dispose of the output string copy, handle error conditions.
+		Return the result string or, if we have one, an error string.
 	}
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
 	lwdaq_alt:=Tcl_OK;
+end;
+
+{
+<p>lwdaq_tcb extracts the top antenna and top power from data recorded by a Telemetry Control Box (TCB, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</a>. The top antenna is a number specifying one of the antennas connected to the TCB. Each of these antennas is capable of receiving telemetry messages from devices such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), or Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). For each message it receives, the TCB adds a payload of two bytes to the core four-byte telemetry message. The first payload byte is the maximum power with which this message was received by any of the TCB's antennas. The second payload byte is a number identifying this antenna. We call this antenna the <i>top</i> antenna and its received power is the <i>top</i> power. The TCB-A16 antenna inputs are numbered 1-16 on the connectors on the back of the box. The top antenna number provided by the TCB-A16 gives us the antenna input to which the top antenna is connected.</p>
+
+<p>If we know where our antennas are located in our recording system, the top antenna number gives us an approximate measurement of the transmitter's location. Most likely, the transmitter is nearer to the top antenna than to any other. If the transmitter is half-way between two antennas, we may see the top antenna number varying from one received message to the next. The lwdaq_tcb routine returns the median antenna number and the median power. Our assumption is that these two median values correspond to one another. We convert the antenna number into a three-dimensional position with a string of three-dimensional points, each point representing the location of an antenna in an arbitrary three-dimensional coordinate system with arbitrary units. The lwdaq_tcb routine picks the point corresponding to the top antenna and returns its three coordinates <i>x</i>, <i>y</i>, and <i>z</i>. We must choose the coordinate system for the antennas such that all <i>z</i>-coordinates are positive and non-zero. By this means, we allow our analysis of animal movement, which we apply to a history of animal position, to use coordinate "0.0 0.0 0.0" as a marker for "no measurement in this interval".</p>
+
+<p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements. The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions. The second parameter is a list of locations of antennas, given as a sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces.</p>
+
+<p>The lwdaq_tcb routine supports the following options:</p>
+
+<center><table border>
+<tr><th>Option</th><th>Function</th></tr>
+<tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
+</table></center>
+
+<p>The lwdaq_tcb output is compatible with that of <a href="#lwdaq_alt">lwdaq_alt</a>. The first three values returned are <i>x</i>, <i>y</i>, and <i>z</i> of the top antenna. Next comes one power value for each antenna. These are all zero except for that of the top antenna, for which the power is the value recorded by the TCB. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the position and power for a fraction of the interval represented by the data image.</p>
+}
+function lwdaq_tcb(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
+
+const
+	core_message_length=4;
+	error_value=-1;
+	power_hi=255;
+	power_lo=0;
+	payload=2;
+	percentile=50;
+
+var 
+{
+	Input and output vehicles.
+}
+	ip:image_ptr_type=nil;
+	image_name:string='';
+	field,result:string;
+	option:string='';
+	arg_index:integer;
+	vp:pointer;
+{
+	Default option values.
+}
+	num_slices:integer=1; {default one}
+{
+	Result variables.
+}
+	location:xyz_point_type;
+{
+	Variables for position calculations.
+}
+	num_samples,sample_num:integer;
+	num_antennas,antenna_num:integer;
+	slice_num,slice_size:integer;
+	antenna_coordinates:xyz_graph_type;
+	top_powers,top_antennas:x_graph_type;
+	top_power,top_antenna:real;
+
+	{
+		A function to extract the bn'th payload byte of the sn'th sample. We use
+		the index stored in the electronics trace to find the message and its
+		payload in the image. If the index is -1, we set the power
+		measurement to zero.
+	}
+	function payload_byte(sn,bn:integer):integer;
+	var i:integer;
+	begin
+		i:=round(electronics_trace[sn].y);
+		if i>=0 then begin
+			payload_byte:=image_data_byte(ip,
+				i*(payload+core_message_length)+core_message_length+bn);
+		end else 
+			payload_byte:=0;
+	end;
+
+begin
+	error_string:='';
+	gui_interp_ptr:=interp;
+	lwdaq_tcb:=Tcl_Error;
+
+	if (argc<3) or (not odd(argc)) then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Wrong number of arguments, must be "'
+			+'lwdaq_tcb image xycoordinates ?option value?".');
+		exit;
+	end;
+
+	image_name:=Tcl_ObjString(argv[1]);
+	ip:=image_ptr_from_name(image_name);
+	if not valid_image_ptr(ip) then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Image "'+image_name+'" does not exist in lwdaq_tcb.');
+		exit;
+	end;
+	
+	num_samples:=length(electronics_trace);
+	if num_samples=0 then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Number of samples is zero in lwdaq_tcb.');
+		exit;
+	end;
+
+	{
+		We must have the antenna coordinates, or else we cannot use power values to
+		determine location. From the antenna coordinates, we deduce the number of
+		antennas.
+	}
+	field:=Tcl_ObjString(argv[2]);
+	antenna_coordinates:=read_xyz_graph(field);
+	num_antennas:=length(antenna_coordinates);
+	if num_antennas=0 then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Number of antennas is zero in lwdaq_tcb.');
+		exit;
+	end;
+	
+	{
+		Handle options.
+	}
+	arg_index:=3;
+	while (arg_index<argc-1) do begin
+		option:=Tcl_ObjString(argv[arg_index]);
+		inc(arg_index);
+		vp:=argv[arg_index];
+		inc(arg_index);
+		if (option='-slices') then num_slices:=Tcl_ObjInteger(vp)			
+		else begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Bad option "'+option+'", must be one of '
+				+'"image -payload -extent -scale -background -percentile -slices'
+				+'-previous -filter" in lwdaq_tcb.');
+			exit;
+		end;
+	end;
+
+	{
+		We are going to calculate the location of the transmitter in each of
+		one or more slices, so prepare result arrays.
+	}
+	slice_size:=num_samples div num_slices;
+	if slice_size < 1 then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Fewer than one message per slice in lwdaq_tcb.');
+		exit;
+	end;
+
+	{
+		Create arrays for antenna powers and samples.
+	}
+	setlength(top_powers,slice_size);
+	setlength(top_antennas,slice_size);
+
+	{
+		Obtain the median top antenna number and top power value. Use the top antenna
+		number to extract the top antenna location and construct an array of power
+		measurements that are all zeros except for that of the top antenna. We do 
+		this for each slice, returning a separate line for each slice in our result
+		string.
+	}
+	result:='';
+	for slice_num:=0 to num_slices-1 do begin
+		for sample_num:=0 to slice_size-1 do begin
+			top_powers[sample_num]:=payload_byte(sample_num,0);
+			top_antennas[sample_num]:=payload_byte(sample_num,1);
+		end;
+		
+		top_power:=percentile_x_graph(top_powers,percentile);
+		top_antenna:=percentile_x_graph(top_antennas,percentile);
+		location:=antenna_coordinates[round(top_antenna)];
+		
+		field:='';
+		writestr(field,location.x:1:1,' ',location.y:1:1,' ',location.z:1:1,' ');
+		for antenna_num:=0 to num_antennas-1 do
+			if antenna_num=top_antenna then
+				writestr(field,field,top_power:1:1,' ')
+			else
+				writestr(field,field,'0.0 ');
+		insert(field,result,length(result)+1);			
+		if slice_num<num_slices-1 then
+			insert(eol,result,length(result)+1);
+	end;
+	
+	{
+		Return the result string or, if we have one, an error string.
+	}
+	if error_string='' then Tcl_SetReturnString(interp,result)
+	else Tcl_SetReturnString(interp,error_string);
+	lwdaq_tcb:=Tcl_OK;
 end;
 
 
@@ -5252,6 +5437,7 @@ begin
 	tcl_createobjcommand(interp,'lwdaq_inclinometer',lwdaq_inclinometer,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_receiver',lwdaq_receiver,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_alt',lwdaq_alt,0,nil);
+	tcl_createobjcommand(interp,'lwdaq_tcb',lwdaq_tcb,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_metrics',lwdaq_metrics,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_calibration',lwdaq_calibration,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_simplex',lwdaq_simplex,0,nil);

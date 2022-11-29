@@ -59,25 +59,6 @@ function lwdaq_A3008_rfpm(ip:image_ptr_type;
 
 implementation
 
-
-{
-	image_byte returns the n'th byte after the first byte in the
-	second row.
-}
-function image_byte(ip:image_ptr_type;n:integer):integer;
-begin
-	image_byte:=get_px(ip,(n div ip^.i_size)+1,(n mod ip^.i_size));
-end;
-
-{
-	write_image_byte writes to the n'th byte after the first byte
-	in the second row.
-}
-procedure write_image_byte(ip:image_ptr_type;b:byte;n:integer);
-begin
-	set_px(ip,(n div ip^.i_size)+1,(n mod ip^.i_size),b);
-end;
-
 {
 	sample_A2037E_adc16 returns the voltage seen at the input of the
 	sixteen-bit ACD of an A2037E for a given channel number and sample
@@ -1036,11 +1017,11 @@ var
 		byte_num:integer;
 	begin
 		byte_num:=n*message_length;
-		m.id:=image_byte(ip,byte_num+id_offset);
+		m.id:=image_data_byte(ip,byte_num+id_offset);
 		m.sample:=
-			 $0100*image_byte(ip,byte_num+sample_offset)
-			+$0001*image_byte(ip,byte_num+sample_offset+1);
-		m.timestamp:=image_byte(ip,byte_num+timestamp_offset);
+			 $0100*image_data_byte(ip,byte_num+sample_offset)
+			+$0001*image_data_byte(ip,byte_num+sample_offset+1);
+		m.timestamp:=image_data_byte(ip,byte_num+timestamp_offset);
 		m.time:=0;
 		m.index:=n;
 		image_message:=m;
@@ -1055,10 +1036,10 @@ var
 	var byte_num:integer;
 	begin
 		byte_num:=n*message_length;
-		write_image_byte(ip,m.id,byte_num+id_offset);
-		write_image_byte(ip,m.sample div $100,byte_num+sample_offset);
-		write_image_byte(ip,m.sample mod $100,byte_num+sample_offset+1);
-		write_image_byte(ip,m.timestamp,byte_num+timestamp_offset)
+		write_image_data_byte(ip,m.id,byte_num+id_offset);
+		write_image_data_byte(ip,m.sample div $100,byte_num+sample_offset);
+		write_image_data_byte(ip,m.sample mod $100,byte_num+sample_offset+1);
+		write_image_data_byte(ip,m.timestamp,byte_num+timestamp_offset)
 	end;
 	
 	{
@@ -1068,7 +1049,7 @@ var
 	function payload_byte(ip:image_ptr_type;n,m:integer):integer;
 	begin
 		if m<payload_size then 
-			payload_byte:=image_byte(ip,n*message_length+core_message_length+m)
+			payload_byte:=image_data_byte(ip,n*message_length+core_message_length+m)
 		else 
 			payload_byte:=0;
 	end;

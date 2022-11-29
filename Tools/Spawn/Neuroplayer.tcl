@@ -56,7 +56,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "160"
+	LWDAQ_tool_init "Neuroplayer" "161"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -549,7 +549,8 @@ proc Neuroplayer_init {} {
 	set config(tracker_persistence) "None"
 	set config(tracker_mark_cm) "0.1"
 	set config(tracker_show_coils) "0"
-	set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+	set config(tracker_background) ""
+	set info(tracker_tcb_payload) "2"
 	set config(tracker_coordinates) ""
 	set info(tracker_range_border) "1.0"
 	set info(tracker_range) "-1.0 -1.0 +49.0 +25.0"
@@ -3946,13 +3947,12 @@ proc Neurotracker_extract {} {
 	# Determine the number of detectors.
 	set num_detectors [expr [llength $config(tracker_coordinates)]/3]
 	
-	# If the playload length does not match the number of detector coils, we
-	# abort, because we are not playing a tracker archive. We fill the tracker
-	# history with zeros for raw x, y, and z, filtered x, y, and z and activity,
-	# but no entries for coil powers. The fake history contains num_slices + 1
-	# entries, because the history usually contains the final slice from the
-	# previous interval as the first entry.
-	if {($info(player_payload) < 1) || ($info(player_payload) < $num_detectors)} {
+	# If the playload length is zero, we have no tracking information. We fill
+	# the tracker history with zeros for raw x, y, and z, filtered x, y, and z,
+	# and activity, but no entries for coil powers. The fake history contains
+	# num_slices + 1 entries, because the history usually contains the final
+	# slice from the previous interval as the first entry.
+	if {$info(player_payload) < 1} {
 		set history [list]
 		for {set slice_num 0} {$slice_num <= $num_slices} {incr slice_num} {
 			lappend history "0.0 0.0 0.0 0.0 0.0 0.0 0.0"
@@ -3974,14 +3974,20 @@ proc Neurotracker_extract {} {
 	# which will be one line per slice. 
 	if {($info(signal) != "0 0") && !$lossy} {
 		if {[catch {
-			set alt_result [lwdaq_alt $info(data_image) \
-				$config(tracker_coordinates) \
-				-payload $info(player_payload) \
-				-scale $config(tracker_decade_scale) \
-				-extent $config(tracker_extent_radius) \
-				-slices $num_slices \
-				-background $config(tracker_background)]
-			} error_result]} {
+			if {$info(player_payload) == $info(tracker_tcb_payload)} {
+				set alt_result [lwdaq_tcb $info(data_image) \
+					$config(tracker_coordinates) \
+					-slices $num_slices]
+			} {
+				set alt_result [lwdaq_alt $info(data_image) \
+					$config(tracker_coordinates) \
+					-payload $info(player_payload) \
+					-scale $config(tracker_decade_scale) \
+					-extent $config(tracker_extent_radius) \
+					-slices $num_slices \
+					-background $config(tracker_background)]
+			}
+		} error_result]} {
 			Neuroplayer_print $error_result
 			set error_flag 1
 		}
@@ -3989,9 +3995,9 @@ proc Neurotracker_extract {} {
 	
 	# If we don't have a signal, perhaps because of reception loss, or we have
 	# encountered an error, we leave the existing tracker history in place by
-	# simply exiting this routine now. If we have no history, we make a fake
-	# one. Each history entry contains raw x, y, and z, filtered x, y, and z and
-	# activity.
+	# simply exiting this routine now. This history will be used again for the
+	# current interval. If we have no history, we make a fake one. Each history
+	# entry contains raw x, y, and z, filtered x, y, and z and activity.
 	if {($info(signal) == "0 0") || $lossy || $error_flag} {
 		if {![info exists history]} {
 			set history [list]

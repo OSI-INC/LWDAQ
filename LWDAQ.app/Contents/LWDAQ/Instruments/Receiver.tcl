@@ -89,11 +89,10 @@ proc LWDAQ_init_Receiver {} {
 	set info(max_time_fetch) 2.0
 	set info(acquire_end_ms) 0
 	set info(purge_duplicates) 1
-	set info(payload_options) "0 16"
+	set info(payload_options) "0 2 16"
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
 	set info(fv_range) 30
-	set info(set_size) "16"
 	set info(clock_id) 0
 	set info(aux_num_keep) 64
 	set info(show_errors) 0
@@ -362,7 +361,7 @@ proc LWDAQ_reset_Receiver {} {
 		}
 	
 		# Provided that channel selection is available with this data receiver,
-		# Send a list of channels to select for recording. If the list is simply
+		# send a list of channels to select for recording. If the list is simply
 		# a wildcard, we configure the receiver to record all channels. If the
 		# list contains only integers, we first instruct the receiver to accept
 		# no channels, then to accept the channels listed. 

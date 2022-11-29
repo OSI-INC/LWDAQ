@@ -122,6 +122,8 @@ function get_px(ip:image_ptr_type;j,i:integer):intensity_pixel_type;
 procedure set_px(ip:image_ptr_type;j,i:integer;value:intensity_pixel_type);
 function get_ov(ip:image_ptr_type;j,i:integer):overlay_pixel_type;
 procedure set_ov(ip:image_ptr_type;j,i:integer;value:overlay_pixel_type);
+function image_data_byte(ip:image_ptr_type;n:integer):integer;
+procedure write_image_data_byte(ip:image_ptr_type;b:byte;n:integer);
 procedure paint_image(ip:image_ptr_type;shade:intensity_pixel_type);
 procedure clear_image(ip:image_ptr_type);
 procedure paint_overlay(ip:image_ptr_type;color:overlay_pixel_type);
@@ -205,6 +207,25 @@ end;
 procedure set_ov(ip:image_ptr_type;j,i:integer;value:overlay_pixel_type);
 begin
 	ip^.overlay[j*ip^.i_size+i]:=value;
+end;
+
+{
+	image_data_byte returns the n'th byte after the first byte in the second row of an
+	image. We use images for one-dimensional data as well as two-dimensional. In the
+	one-dimensional case, we reserve the first row for metadata. 
+}
+function image_data_byte(ip:image_ptr_type;n:integer):integer;
+begin
+	image_data_byte:=get_px(ip,(n div ip^.i_size)+1,(n mod ip^.i_size));
+end;
+
+{
+	write_image_data_byte writes to the n'th byte after the first byte in the
+	second row.
+}
+procedure write_image_data_byte(ip:image_ptr_type;b:byte;n:integer);
+begin
+	set_px(ip,(n div ip^.i_size)+1,(n mod ip^.i_size),b);
 end;
 
 {

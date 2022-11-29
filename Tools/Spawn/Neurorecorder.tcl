@@ -68,6 +68,12 @@ proc Neurorecorder_init {} {
 	set info(A3032_payload) "16"
 	set info(A3038_payload) "16"
 	set info(A3042_payload) "2"
+	set info(A3032_coordinates) "\
+		0 0 2  0 8 2  0 16 2 \
+		8  0 2  8 8 2  8 16 2 \
+		16 0 2 16 8 2 16 16 2 \
+		24 0 2 24 8 2 24 16 2 \
+		32 0 2 32 8 2 32 16 2"
 	set info(A3038_coordinates) "\
 		0  0 2 0  12 2  0 24 2 \
 		12 0 2 12 12 2 12 24 2 \
@@ -75,12 +81,11 @@ proc Neurorecorder_init {} {
 		36 0 2 36 12 2 36 24 2 \
 		48 0 2 48 12 2 48 24 2 \
 		-1 -1 -1"
-	set info(A3032_coordinates) "\
-		0 0 2  0 8 2  0 16 2 \
-		8  0 2  8 8 2  8 16 2 \
-		16 0 2 16 8 2 16 16 2 \
-		24 0 2 24 8 2 24 16 2 \
-		32 0 2 32 8 2 32 16 2"
+	set info(A3042_coordinates) "\
+		0 0  2 16  0 2 32  0 2 48  0 2 \
+		0 8  2 16  8 2 32  8 2 48  8 2 \
+		0 16 2 16 16 2 32 16 2 48 16 2 \
+		0 24 2 16 24 2 32 24 2 48 24 2"
 	set config(tracker_coordinates) ""
 	set config(tracker_background) ""
 #
@@ -348,10 +353,7 @@ proc Neurorecorder_pick {name {post 0}} {
 # pressing the header button and entering and saving the string. This string
 # might contain a description of our experiment, and it will be added to all
 # archives we create as we record. If the receiver is an animal location
-# tracker, we write to the metadata the positions of its detector coils. For
-# backward compatibility with earlier versions of the Neurorecorder, we write
-# these as two-dimensional coordinates in a "coordinates" field, and also as
-# three-dimensional coordinates in an "alt" field.
+# tracker, we write to the metadata the positions of its detector coils.
 #
 proc Neurorecorder_metadata_header {} {
 	upvar #0 Neurorecorder_info info
@@ -370,13 +372,10 @@ proc Neurorecorder_metadata_header {} {
 			\nPlatform: $LWDAQ_Info(os).</c>\n"
 	append header "<payload>$iconfig(payload_length)</payload>\n"
 	if {[lsearch $info(alt_options) $iinfo(receiver_type)] >= 0} {
-		set xy ""
 		set xyz ""
 		foreach {x y z} $config(tracker_coordinates) {
-			append xy "$x $y "
 			append xyz "$x $y $z "
 		}
-		append header "<coordinates>[string trim $xy]</coordinates>\n"
 		append header "<alt>[string trim $xyz]</alt>\n"
 		append header "<alt_bg>[string trim $config(tracker_background)]</alt_bg>\n"
 	}
@@ -573,10 +572,9 @@ proc Neurorecorder_set_receiver {version} {
 		}
 		"A3042" {
 			set iconfig(payload_length) $info(A3042_payload)
-			set config(tracker_coordinates) $info(A3038_coordinates)
+			set config(tracker_coordinates) $info(A3042_coordinates)
 			Neurorecorder_print "Receiver $version\:\
 				No need to specify driver socket, channel selection supported."
-			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
 		default {
 			set iconfig(payload_length) 0
@@ -602,7 +600,7 @@ proc Neurorecorder_set_receiver {version} {
 				incr count
 			}
 			if {$count != $iconfig(payload_length)} {
-				error "found $count coordinate, need $iconfig(payload_length)"
+				error "found $count coordinates, need $iconfig(payload_length)"
 			}		
 			Neurorecorder_print "Will write custom coil coordinates to metadata."
 			set config(tracker_coordinates) $alt
