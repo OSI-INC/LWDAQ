@@ -3992,6 +3992,7 @@ proc Neurotracker_extract {} {
 			set error_flag 1
 		}
 	} 
+
 	
 	# If we don't have a signal, perhaps because of reception loss, or we have
 	# encountered an error, we leave the existing tracker history in place by
