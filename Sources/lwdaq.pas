@@ -3679,8 +3679,9 @@ var
 	slice_num,slice_size:integer;
 	antenna_coordinates:xyz_graph_type;
 	top_powers,top_antennas:x_graph_type;
-	top_power,top_antenna:integer;
-
+	top_antenna:integer;
+	top_power:real;
+	
 	{
 		A function to extract the bn'th payload byte of the sn'th sample. We use
 		the index stored in the electronics trace to find the message and its
@@ -3789,7 +3790,7 @@ begin
 			top_antennas[sample_num]:=payload_byte(sample_num,1);
 		end;
 		
-		top_power:=round(percentile_x_graph(top_powers,percentile));
+		top_power:=percentile_x_graph(top_powers,percentile);
 		top_antenna:=round(percentile_x_graph(top_antennas,percentile));
 		if (top_antenna>=1) and (top_antenna<=num_antennas) then
 			location:=antenna_coordinates[top_antenna-1]
@@ -3800,7 +3801,7 @@ begin
 		writestr(field,location.x:1:1,' ',location.y:1:1,' ',location.z:1:1,' ');
 		for antenna_num:=1 to num_antennas do
 			if antenna_num=top_antenna then
-				writestr(field,field,top_power:1,' ')
+				writestr(field,field,top_power:1:1,' ')
 			else
 				writestr(field,field,'0.0 ');
 		insert(field,result,length(result)+1);			
