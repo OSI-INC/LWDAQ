@@ -736,18 +736,30 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 			}
 		}
 	}
-	
 	LWDAQ_post "LWDAQ_scheduler [expr $next_check + $LWDAQ_Info(scheduler_increment)]"
 	return "Run"
 }
 
 #
-# LWDAQ_schedule_task adds a new task to the schedule list. If the name conflicts
-# with an existing task, we replace that task with the new definition. If the 
-# scheduler is not running, this routine starts the scheduler.
+# LWDAQ_schedule_task adds a new task to the schedule list. If the name
+# conflicts with an existing task, we replace that task with the new definition.
+# If the scheduler is not running, this routine starts the scheduler. The
+# routine checks the format of the task schedule to make sure all five
+# constraints are specified either with an integer value or a wild card. If the
+# task does not conform to our required format, we return an error.
 #
 proc LWDAQ_schedule_task {name schedule command} {
 	global LWDAQ_Info
+	
+	if {[llength $schedule] != [llength "* * * * *"]} {
+		error "invalid schedule \"$schedule\""
+	} {
+		foreach s $schedule {
+			if {($s != "*") && ![string is integer -strict $s]} {
+				error "invalid schedule constraint \"$s\""
+			}
+		}
+	}
 	
 	set index [lsearch -index 0 $LWDAQ_Info(scheduled_tasks) $name]
 	if {$index < 0} {

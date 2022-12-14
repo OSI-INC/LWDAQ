@@ -2465,7 +2465,6 @@ proc Videoarchiver_remove {n} {
 	unset info(cam$n\_rot)
 	unset info(cam$n\_os)
 	unset info(cam$n\_sat)
-	unset info(cam$n\_sat)
 	unset info(cam$n\_ec)
 	unset info(cam$n\_file)
 	unset info(cam$n\_state)
@@ -2801,22 +2800,25 @@ proc Videoarchiver_scheduler {} {
 }
 
 #
-# Videoarchiver_schedule_start schedules all Videoarchiver scheduled tasks.
+# Videoarchiver_schedule_start schedules all Videoarchiver scheduled tasks. We direct
+# the scheduler output to the videoarchiver text window.
 #
 proc Videoarchiver_schedule_start {} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
+	global LWDAQ_Info
 
+	set LWDAQ_Info(scheduler_log) $info(text)
 	foreach a {white_on white_off infrared_on infrared_off} {
 		set schedule "$info($a\_min) $info($a\_hr) $info($a\_dymo)\
 			$info($a\_mo) $info($a\_dywk)"
+		LWDAQ_schedule_task $a $schedule \
+			"Videoarchiver_lamps_adjust [regsub {_.*} $a ""]\
+				$info($a\_int) $info($a\_step)"
 		LWDAQ_print $info(text) "Scheduled task $a\
 			with schedule \"$schedule\"\
 			intensity $info($a\_int)\
 			and step interval $info($a\_step) s."
-		LWDAQ_schedule_task $a $schedule \
-			"Videoarchiver_lamps_adjust [regsub {_.*} $a ""]\
-				$info($a\_int) $info($a\_step)"
 	}
 	set info(scheduler_state) "Run"
 }
