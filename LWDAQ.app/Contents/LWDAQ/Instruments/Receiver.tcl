@@ -96,7 +96,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(clock_id) 0
 	set info(aux_num_keep) 64
 	set info(show_errors) 0
-	set info(show_error_extent) 20
+	set info(show_messages) 0
 	
 	set info(buffer_image) "_receiver_buffer_image_"
 	catch {lwdaq_image_destroy $info(buffer_image)}
@@ -205,6 +205,13 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			set info(channel_activity) $ca
 		} {
 			error $channels
+		}
+		
+		# If requested, we print the first block of raw message data to the screen.
+		 if {$info(show_messages) > 0} {
+			set raw_data [lwdaq_receiver $image_name \
+				"-payload $config(payload_length) print 0 $info(show_messages)"]
+			LWDAQ_print $info(text) $raw_data
 		}
 	} error_result]} {return "ERROR: $error_result"}
 
@@ -663,8 +670,8 @@ proc LWDAQ_daq_Receiver {} {
 				if {[regexp {index=([0-9]+)} $result match index]} {
 					set result [lwdaq_receiver $info(scratch_image) \
 						"-payload $config(payload_length) print \
-						[expr $index-$info(show_error_extent)] \
-						[expr $index+$info(show_error_extent)]"]
+						[expr $index-$info(show_errors)] \
+						[expr $index+$info(show_errors)]"]
 					LWDAQ_print $info(text) $result purple
 				} {
 					LWDAQ_print $info(text) $result purple

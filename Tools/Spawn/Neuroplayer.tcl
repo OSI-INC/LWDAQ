@@ -56,7 +56,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "161"
+	LWDAQ_tool_init "Neuroplayer" "162"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -4498,6 +4498,9 @@ proc Neuroexporter_open {} {
 	entry $f.echannels -textvariable Neuroplayer_config(channel_selector) -width 70	
 	button $f.auto -text "Autofill" -command {
 		set Neuroplayer_config(channel_selector) "*"
+		for {set id $Neuroplayer_info(min_id)} \
+			{$id <= $Neuroplayer_info(max_id)} \
+			{incr id} {set Neuroplayer_info(status_$id) "None"}
 		LWDAQ_post [list Neuroplayer_play "Repeat"]
 		LWDAQ_post Neuroplayer_autofill
 	}
@@ -4666,6 +4669,9 @@ proc Neuroexporter_edf_setup {} {
 	entry $f.echannels -textvariable Neuroplayer_config(channel_selector) -width 80	
 	button $f.auto -text "Autofill" -command {
 		set Neuroplayer_config(channel_selector) "*"
+		for {set id $Neuroplayer_info(min_id)} \
+			{$id <= $Neuroplayer_info(max_id)} \
+			{incr id} {set Neuroplayer_info(status_$id) "None"}
 		LWDAQ_post [list Neuroplayer_play "Repeat"]
 		LWDAQ_post Neuroplayer_autofill
 	}
@@ -5861,7 +5867,7 @@ proc Neuroplayer_activity {} {
 	pack $ff.update -side left -expand yes
 	button $ff.reset -text "Reset States" -command {
 		for {set id $Neuroplayer_info(min_id)} \
-			{$id < $Neuroplayer_info(max_id)} \
+			{$id <= $Neuroplayer_info(max_id)} \
 			{incr id} {
 			set Neuroplayer_info(status_$id) "None"
 		}
@@ -7069,7 +7075,7 @@ proc Neuroplayer_play {{command ""}} {
 	# of samples are separated by colons as in 4:256 for channel four with two
 	# hundred and fifty six samples in the interval.
 	if {![LWDAQ_is_error_result $all_message_channels]} {
-		for {set id $info(min_id)} {$id < $info(max_id)} {incr id} {
+		for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
 			set info(qty_$id) 0
 		}
 		set info(active_channels) ""
@@ -8128,6 +8134,9 @@ proc Neuroplayer_open {} {
 	pack $f.lchannels $f.echannels -side left -expand yes
 	button $f.autofill -text "Autofill" -command {
 		set Neuroplayer_config(channel_selector) "*"
+		for {set id $Neuroplayer_info(min_id)} \
+			{$id <= $Neuroplayer_info(max_id)} \
+			{incr id} {set Neuroplayer_info(status_$id) "None"}
 		LWDAQ_post [list Neuroplayer_play "Repeat"]
 		LWDAQ_post Neuroplayer_autofill
 	}

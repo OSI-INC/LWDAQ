@@ -1,8 +1,4 @@
 <script>
-
-</script>
-
-<script>
 # We used this script to align circular survey targets with the 
 # field of view of a BCAM. The script opens a canvas widget in
 # the TK master window (the funny little window with the quit
