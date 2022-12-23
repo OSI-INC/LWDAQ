@@ -954,6 +954,7 @@ var
 	num_messages:integer=0;
 	num_selected:integer=0;
 	message_num:integer=0;
+	i:integer=0;
 	message_index:integer=0;
 	end_message_num:integer=0;
 	num_bad_messages:integer=0;
@@ -1270,11 +1271,10 @@ begin
 					and (payload_byte(ip,m.index,tcb_pwr_offset) >
 						payload_byte(ip,mp[id_previous[id]].index,
 							tcb_pwr_offset)) then begin
-					{Not sure what to do here. We would like to discard the
-					previous message. We could mark it as invalid and later
-					ignore it. But if we do that, num_selected will no longer be
-					the number of unique messages selected, but the number
-					selected plus the number of less powerful duplicates.}
+						for i:=id_previous[id] to num_selected-2 do
+							mp[i]:=mp[i+1];
+						id_previous[id]:=num_selected-1;
+						mp[num_selected-1]:=m;
 					end;
 				end;
 			end;
