@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "159"
+	LWDAQ_tool_init "Neurorecorder" "160"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -944,16 +944,8 @@ proc Neurorecorder_record {{command ""}} {
 		LWDAQ_set_bg $info(record_control_label) white
 		
 		# We continue recording by posting the record process to the LWDAQ event queue.
-		# If we are lagging behind in our recording, we post the recording process to
-		# second place in the queue so we don't have to wait for playback. Otherwise we post
-		# to the back of the queue.
-		if {$iinfo(acquire_end_ms) < [clock milliseconds] - 1000*$config(record_lag)} {		
-			LWDAQ_post Neurorecorder_record front		
-			return "SUCCESS"
-		} {
-			LWDAQ_post Neurorecorder_record end
-			return "SUCCESS"
-		}
+		LWDAQ_post Neurorecorder_record end
+		return "SUCCESS"
 	}
 
 	# We are done and Idle.

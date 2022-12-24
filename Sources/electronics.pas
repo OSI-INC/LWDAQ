@@ -921,7 +921,7 @@ const
 	clock_period=256;
 	min_period=16;
 	max_period=2048;
-	max_duplicate_separation=4;
+	max_duplicate_separation=2;
 	max_print_length=long_string_length;
 	min_reconstruct_clocks=8;
 	id_offset=0;
@@ -950,13 +950,13 @@ var
 	message_length:integer=4;
 	data_size:integer=0;
 	payload_size:integer=0;
-	max_num_messages:integer=0;
+	max_num_selected:integer=0;
 	num_messages:integer=0;
 	num_selected:integer=0;
 	message_num:integer=0;
-	i:integer=0;
 	message_index:integer=0;
-	end_message_num:integer=0;
+	max_index:integer=0;
+	i:integer=0;
 	num_bad_messages:integer=0;
 	mp,msp:message_array_type;
 	gp:x_graph_type;
@@ -1009,8 +1009,8 @@ var
 		specify the message with its message index. The first message in the
 		image is index zero. The second message is index one. The routine
 		multiplies the index by message_length to get the byte address of the
-		first byte of the message within the image. The routine returns a
-		message record. The message record contains the index.
+		first byte of the message within the image. The routine returns an image
+		record. The image record contains the index.
 	}
 	function image_message(ip:image_ptr_type;n:integer):message_type;
 	var 
@@ -1056,22 +1056,10 @@ var
 	end;
 	
 	{
-		write_payload_byte writes m'th payload byte of message n, where the first
-		payload byte is the number 0 and the last is number payload-1.
-	}
-	procedure write_payload_byte(ip:image_ptr_type;value,n,m:integer);
-	begin
-		if m<payload_size then
-			write_image_data_byte(ip,value,n*message_length+core_message_length+m);
-	end;
-	
-	{
 		copy_message overwrites the n'th message with the m'th message.
 	}
 	procedure copy_message(ip:image_ptr_type;m,n:integer);
-	var 
-		pm,pn:pointer;
-		mm,nn:integer;
+	var pm,pn:pointer;mm,nn:integer;
 	begin
 		mm:=m*message_length;
 		pm:=@ip^.intensity[mm+ip^.i_size];
@@ -1108,10 +1096,9 @@ begin
 }
 	instruction:=option;
 {
-	Put a limit on the number of messages we can select: its the maximum number
-	of messages this image could possibly contain.
+	Put a limit on the number of messages and create the message array.
 }
-	max_num_messages:=trunc((length(ip^.intensity)-ip^.i_size)/message_length)-1;
+	max_num_selected:=trunc((length(ip^.intensity)-ip^.i_size)/message_length)-1;
 {
 	The get instruction does not need a message array or any analysis. We 
 	execute the instruction and then exit the receiver procedure. The get
@@ -1123,7 +1110,7 @@ begin
 		word:=read_word(command);
 		while word<>'' do begin
 			message_index:=read_integer(word);
-			if (message_index<0) or (message_index>=max_num_messages) then begin
+			if (message_index<0) or (message_index>=max_num_selected) then begin
 				insert('0 0 0 ',result,length(result)+1);
 			end else begin
 				m:=image_message(ip,message_index);
@@ -1143,24 +1130,25 @@ begin
 	those that are missing or corrupted, this index will be carried over, so
 	that the array keeps track of where the data for each message originated.
 }
-	setlength(mp,max_num_messages);
+	setlength(mp,max_num_selected);
 {
 	We scan through the messages in the image and construct an array that is
 	easier for us to manipulate. If we have specified data_size = n, we go
 	through exactly n messages. We select all non-null messages and copy their
-	first four bytes into another array. A null message is one for which the
-	first four bytes are zero. Null messages arise only in corrupted data. We
-	count null messages, and note the length of each block of null messages we
-	encounter on our way to reading all n message. In the new message list, we
-	keep track of where each message came from in the original image data. If
-	size = 0, on the other hand, we stop going through the data as soon as we
-	see a null message. The null message acts as a terminating message.
+	first four bytes into another array, which we can manipulate more
+	efficiently during reconstruction. A null message is one for which the first
+	four bytes are zero. Null messages arise only in corrupted data. We keep
+	track of where each message comes from in the image data. If size = 0, we
+	stop going through the data as soon as we see a null message, which acts as
+	a terminating message. If our data contains null messages because of
+	corruption, we will not find non-null messages following the first null
+	message.
 
-	We assign each messages in our new array a time of occurance in units of
+	We assign each messages in our new array a time of occurance, in units of
 	clock ticks. Time zero occurs at the first clock message. A clock message is
-	a messages with identifier zero. Messages that occur before that have
-	negative time. We assume that the first byte of the first message is at byte
-	zero in the image data.
+	a messages with ID zero. Messages that occur before that have a negative
+	time. We assume that the first byte of the first message is at byte zero in
+	the image data.
 
 	While we are going through the messages, we look for corruption of the image
 	data. The value of the clock should increment from one message to the next,
@@ -1174,14 +1162,14 @@ begin
 	timestamp error is almost always serious because it indicates a loss of one
 	or more bytes of data from the receiver. The four-byte messages become
 	misaligned with respect to the four-byte boundaries in the image. A
-	timestamp error can also indicate actual corruption of data bits. We have
-	observed timestamp errors during electrical events like static discharge and
-	power failure.
+	timestamp error can also indicate actual corruption of data bits. We observe
+	timestamp errors during electrical events like static discharge and power
+	failure.
 
 	When it appears that a message is valid, we check to see if it is a
 	duplicate. Sometimes the data receiver does not eliminate duplicate messages
 	itself, because of the large number of possible channels upon which
-	duplication can occur, and the limited resources of its firmware. The
+	duplication can occur, and the limited logic resources in its firmware. The
 	id_previous array contains for all channels the index of the previous
 	message from that channel in the message array. When a new, valid message
 	has an identical sample value to the previous message in the same channel,
@@ -1194,9 +1182,13 @@ begin
 	transmitter, and also presents to us the best antenna to use for
 	transmitting commands to implantable stimulators.
 
-	We count the number of messages for each channel identifier with the id_qty
-	array. We count the total number of duplicate messages. We report on the
-	first max_num_reports errors in detail.
+	We count the number of messages for each signal identifier with the id_qty
+	array. We do not count duplicate messages, but we do count bad messages in
+	the signal.
+
+	We report on the first max_num_reports errors in detail and trust that the
+	data acquisition software will attempt to correct the errors and restore the
+	integrity of the data.
 }
 	mark_time('creating message array','lwdaq_sct_receiver');
 	for id_num:=min_id to max_id do id_qty[id_num]:=0;
@@ -1204,25 +1196,25 @@ begin
 	error_report:='';
 	null_block_length:=0;
 	null_count:=0;
-	if data_size>0 then end_message_num:=data_size-1
-	else end_message_num:=max_num_messages-1;
+	if data_size>0 then max_index:=data_size-1
+	else max_index:=max_num_selected-1;
 	num_selected:=0;
-	message_num:=0;
+	num_messages:=0;
 	num_clocks:=0;
 	previous_clock:=0;
 	previous_timestamp:=0;
 	receiver_version:=-1;
 	num_duplicates:=0;
-	while (message_num<=end_message_num) and ((null_block_length=0) or (data_size>0)) do begin
+	while (num_messages<=max_index) and ((null_block_length=0) or (data_size>0)) do begin
 		message_string:='';
-		m:=image_message(ip,message_num);
+		m:=image_message(ip,num_messages);
 		if (m.id=0) and (m.sample=0) and (m.timestamp=0) then inc(null_block_length)
 		else begin
 			if m.id=clock_id then begin 
 				if (m.sample <> (previous_clock+1) mod (max_sample+1))
 						and (num_clocks > 0) then
 					writestr(message_string,
-						'Clock Error: index=',message_num:1,
+						'Clock Error: index=',num_messages:1,
 						' current=',m.sample:1,
 						' previous=',previous_clock:1,
 						eol)
@@ -1240,7 +1232,7 @@ begin
 				end else begin
 					if report_timestamp_error then 
 						writestr(message_string,
-							'Timestamp Error: index=',message_num:1,
+							'Timestamp Error: index=',num_messages:1,
 							' current=',m.timestamp:1,
 							' previous=',previous_timestamp:1,
 							eol);
@@ -1250,27 +1242,26 @@ begin
 			end;
 			if null_block_length>0 then begin
 				writestr(message_string,
-					'Null Message Block: index=',message_num-null_block_length:1,
+					'Null Message Block: index=',num_messages-null_block_length:1,
 					' length=',null_block_length:1,
 					eol);
 				null_count:=null_count+null_block_length;
 				null_block_length:=0;
 			end;
 			with m do begin
-				if (id_qty[id]=0) 
-				or (sample <> mp[id_previous[id]].sample) 
-				or (time-mp[id_previous[id]].time
-					> max_duplicate_separation) then begin
+				if (id_qty[id]=0) or (sample<>mp[id_previous[id]].sample) 
+						or (time-mp[id_previous[id]].time
+								>max_duplicate_separation) then begin
 					id_qty[id]:=id_qty[id]+1;
 					id_previous[id]:=num_selected;
 					mp[num_selected]:=m;
 					inc(num_selected);
 				end else begin
 					inc(num_duplicates);
-					if (payload_size=tcb_payload_size) 
-					and (payload_byte(ip,m.index,tcb_pwr_offset) >
-						payload_byte(ip,mp[id_previous[id]].index,
-							tcb_pwr_offset)) then begin
+					if (payload_size=tcb_payload_size) and 
+						(payload_byte(ip,m.index,tcb_pwr_offset) >
+							payload_byte(ip,mp[id_previous[id]].index,
+								tcb_pwr_offset)) then begin
 						for i:=id_previous[id] to num_selected-2 do
 							mp[i]:=mp[i+1];
 						id_previous[id]:=num_selected-1;
@@ -1287,7 +1278,7 @@ begin
 				insert('No report on remaining errors.'+eol,
 					error_report,length(error_report)+1);
 		end;
-		inc(message_num);
+		inc(num_messages);
 	end;
 {
 	If the final message we looked at was a null message, and data_size = 0, then this
@@ -1303,7 +1294,7 @@ begin
 }
 	if instruction='purge' then begin
 		for message_num:=0 to num_selected-1 do
-			if (message_num<>mp[message_num].index) then
+			if message_num<>mp[message_num].index then
 				copy_message(ip,mp[message_num].index,message_num);
 		m.id:=0;
 		m.sample:=0;
@@ -1312,13 +1303,12 @@ begin
 		writestr(result,num_selected:1);
 	end;
 {
-	If "print" then we print the a summary of errors and message counts,
-	followed by raw message contents to the result string. We do not abort just
-	because the data in the image is corrupted. The print command always returns
-	a string describing the data. If the data contains an invalid sequence of
-	clock messages, the print command declares this in its first line. If there
-	are payload bytes, these follow the hexadecimal printing of the core message
-	bytes, separated by a space.
+	If "print" then we print the raw message contents to the screen. We do not
+	abort the print instruction just because the data in the image is corrupted.
+	The print command always returns a string describing the data. If the data
+	contains an invalid sequence of clock messages, the print command declares
+	this in its first line. If there are payload bytes, these follow the
+	hexadecimal printing of the core message bytes, separated by a space.
 }
 	if instruction='print' then begin
 		writestr(result,'Total ',num_messages:1,' messages, ',
@@ -1329,12 +1319,12 @@ begin
 		if error_report<>'' then insert(error_report,result,length(result)+1);
 			
 		start_index:=read_integer(command);
-		if (start_index>end_message_num) then start_index:=num_messages;			
+		if (start_index>max_index) then start_index:=num_messages;			
 		if (start_index<0) then start_index:=0;
 
 		end_index:=read_integer(command);
 		if (end_index<start_index) then end_index:=start_index;
-		if (end_index>=max_num_messages) then end_index:=max_num_messages-1;
+		if (end_index>num_messages) then end_index:=num_messages;
 		if (end_index<0) then end_index:=0;
 
 		writestr(message_string,
@@ -1521,7 +1511,7 @@ begin
 {
 	Create a message stack.
 }
-		setlength(msp,max_num_messages);
+		setlength(msp,max_num_selected);
 {
 	Take messages from the reconstruct signal and put them in the
 	message stack. We assume the messages are in chronological order.
@@ -1587,7 +1577,7 @@ begin
 	reject despite lying inside the windows.
 }		
 		mark_time('selecting samples','lwdaq_sct_receiver');
-		setlength(msp,max_num_messages);
+		setlength(msp,max_num_selected);
 		stack_height:=0;
 		num_missing:=0;
 		num_bad:=0;

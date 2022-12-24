@@ -88,7 +88,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(min_time_fetch) 0.2
 	set info(max_time_fetch) 2.0
 	set info(acquire_end_ms) 0
-	set info(purge_duplicates) 1
+	set info(purge_duplicates) 0
 	set info(payload_options) "0 2 16"
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
@@ -97,6 +97,9 @@ proc LWDAQ_init_Receiver {} {
 	set info(aux_num_keep) 64
 	set info(show_errors) 0
 	set info(show_messages) 0
+	set info(min_id) 0
+	set info(max_id) 255
+	set info(activity_rows) 32
 	
 	set info(buffer_image) "_receiver_buffer_image_"
 	catch {lwdaq_image_destroy $info(buffer_image)}
@@ -195,11 +198,20 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		# We obtain a list of the channels with at least one message present
 		# in the image, and the number of messages for each of these channels.
 		set channels [lwdaq_receiver $image_name "-payload $config(payload_length) list"]
+		if {[winfo exists $info(window)\.activity]} {
+			for {set c $info(min_id)} {$c < $info(max_id)} {incr c} {
+				global LWDAQ_id$c\_Receiver
+				set LWDAQ_id$c\_Receiver 0
+			}
+		}
 		if {![LWDAQ_is_error_result $channels]} {
 			set ca ""
 			foreach {c a} $channels {
-				if {($a > $info(activity_threshold)) && ($c > 0)} {
+				if {$a > $info(activity_threshold)} {
 					append ca "$c\:$a "
+				}
+				if {[winfo exists $info(window)\.activity]} {
+					set LWDAQ_id$c\_Receiver $a
 				}
 			}
 			set info(channel_activity) $ca
@@ -316,7 +328,7 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 1
-						set info(purge_duplicates) 1
+						set info(purge_duplicates) 0
 					}
 					2 {
 						set info(receiver_type) "A3032"
@@ -433,6 +445,50 @@ proc LWDAQ_reset_Receiver {} {
 	return 1
 }
 
+# LWDAQ_activity_Receiver opens a new panel that shows a table of telemetry 
+# channels and the number of samples received per second from each in the 
+# most recent acquisition.
+proc LWDAQ_activity_Receiver {} {
+	upvar #0 LWDAQ_config_Receiver config
+	upvar #0 LWDAQ_info_Receiver info
+
+	set w $info(window)\.activity
+	if {[winfo exists $w]} {
+		raise $w
+		return "ABORT"
+	}
+	toplevel $w
+	scan [wm maxsize .] %d%d x y
+	wm maxsize $w [expr $x*4] [expr $y*1]
+	wm title $w "Receiver Instrument Activity Panel"
+	
+	# Make large frame for the activity columns.
+	set ff [frame $w.activity]
+	pack $ff -side top -fill x -expand 1
+
+	# Make entries for every channel number with their plot colors.
+	set count 0
+	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {		
+		if {$count % $info(activity_rows) == 0} {
+			set f [frame $ff.column_$count -relief groove -border 4]
+			pack $f -side left -fill y -expand 1
+			label $f.id -text "ID" -fg purple
+			label $f.cc -text "   " -fg purple
+			label $f.csps -text "Qty" -fg purple
+			grid $f.id $f.cc $f.csps -sticky ew
+		}
+
+		label $f.id_$count -text $id -anchor w
+		set color [lwdaq tkcolor $id]
+		label $f.cc_$count -text " " -bg $color
+		global LWDAQ_id$count\_Receiver
+		set LWDAQ_id$count\_Receiver 0
+		label $f.csps_$count -textvariable LWDAQ_id$count\_Receiver -width 4
+		grid $f.id_$count $f.cc_$count $f.csps_$count -sticky ew
+		incr count
+	}
+}
+
 #
 # LWDAQ_controls_Receiver creates secial controls for the Receiver instrument.
 #
@@ -465,7 +521,8 @@ proc LWDAQ_controls_Receiver {} {
 		pack $g.$b -side left -expand 0
 	}
 	
-	button $g.reset -text "Reset and Configure" -command "LWDAQ_post LWDAQ_reset_Receiver"
+	button $g.reset -text "Reset and Configure" \
+		-command "LWDAQ_post LWDAQ_reset_Receiver"
 	pack $g.reset -side left -expand 1
 
 	label $g.lrv -text "Receiver:" 
@@ -481,10 +538,11 @@ proc LWDAQ_controls_Receiver {} {
 	pack $g -side top -fill x
 
 	label $g.l -text "Activity (id:qty) "
-	pack $g.l -side left
-	label $g.c -textvariable LWDAQ_info_Receiver(channel_activity) \
-		-relief sunken -anchor w -width 90
-	pack $g.c -side left -expand yes
+	entry $g.c -textvariable LWDAQ_info_Receiver(channel_activity) \
+		-relief sunken -width 70
+	button $g.panel -text "Panel" \
+		-command "LWDAQ_post LWDAQ_activity_Receiver"
+	pack $g.l $g.c $g.panel -side left -expand yes
 }
 
 #
@@ -712,17 +770,6 @@ proc LWDAQ_daq_Receiver {} {
 				continue
 			}
 			
-			# If purge_duplicates is set, we remove duplicate messages from the 
-			# block before we do any processing.
-			if {$info(purge_duplicates)} {
-				set num_unique_messages \
-					[lwdaq_receiver $info(scratch_image) \
-						"-payload $config(payload_length) purge"]
-				set data [lwdaq_data_manipulate $info(scratch_image) read \
-					0 [expr $num_unique_messages * $message_length]]
-				set num_new_messages $num_unique_messages
-			}
-
 			# Adjust the number of messages per clock we expect in our next
 			# download, making sure we count the duplicate messages that may
 			# have existed before we purged the data.
@@ -888,6 +935,11 @@ proc LWDAQ_daq_Receiver {} {
 	}
 	lwdaq_data_manipulate $config(memory_name) write 0 $data
 	
+	# If purge_duplicates, we remove duplicate messages from the block before.
+	if {$info(purge_duplicates)} {
+		lwdaq_receiver $config(memory_name) "-payload $config(payload_length) purge"
+	}
+
 	return $config(memory_name) 
 } 
 
