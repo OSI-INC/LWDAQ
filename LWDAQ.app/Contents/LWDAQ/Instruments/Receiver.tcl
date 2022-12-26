@@ -88,7 +88,6 @@ proc LWDAQ_init_Receiver {} {
 	set info(min_time_fetch) 0.2
 	set info(max_time_fetch) 2.0
 	set info(acquire_end_ms) 0
-	set info(purge_duplicates) 0
 	set info(payload_options) "0 2 16"
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
@@ -320,7 +319,6 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
 					}
 					1 {
 						set info(receiver_type) "A3027"
@@ -328,7 +326,6 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 1
-						set info(purge_duplicates) 0
 					}
 					2 {
 						set info(receiver_type) "A3032"
@@ -336,7 +333,6 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
 					}
 					3 {
 						set info(receiver_type) "A3038"
@@ -344,7 +340,6 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_fifo_av) 1
 						set channel_select_available 1
 						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
 					}
 					4  {
 						set info(receiver_type) "A3042"
@@ -352,7 +347,6 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_fifo_av) 1
 						set channel_select_available 1
 						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
 					}
 					default {
 						set info(receiver_type) "?"
@@ -360,7 +354,6 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_fifo_av) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
 					}					
 				}
 				break
@@ -539,7 +532,7 @@ proc LWDAQ_controls_Receiver {} {
 
 	label $g.l -text "Activity (id:qty) "
 	entry $g.c -textvariable LWDAQ_info_Receiver(channel_activity) \
-		-relief sunken -width 70
+		-relief sunken -width 80
 	button $g.panel -text "Panel" \
 		-command "LWDAQ_post LWDAQ_activity_Receiver"
 	pack $g.l $g.c $g.panel -side left -expand yes
@@ -771,8 +764,7 @@ proc LWDAQ_daq_Receiver {} {
 			}
 			
 			# Adjust the number of messages per clock we expect in our next
-			# download, making sure we count the duplicate messages that may
-			# have existed before we purged the data.
+			# download.
 			set saved_messages_per_clock $info(messages_per_clock)
 			if {$num_new_clocks > 1} {
 				set info(messages_per_clock) [expr \
@@ -841,8 +833,7 @@ proc LWDAQ_daq_Receiver {} {
 				break
 			}
 			
-			# Append the new messages to buffer image. If we purged the data,
-			# the purged data has already been copied back into the data array.
+			# Append the new messages to buffer image. 
 			lwdaq_data_manipulate $info(buffer_image) write \
 				[expr $num_messages * $message_length] $data
 
@@ -902,8 +893,7 @@ proc LWDAQ_daq_Receiver {} {
 		return "ERROR: $error_result"
 	}
 	
-	# Create the new data image, storing extra data in the Receiver
-	# Instruments's buffer image.
+	# Create the new data image.
 	set config(memory_name) [lwdaq_image_create \
 		-width $info(daq_image_width) \
 		-height $info(daq_image_height) \
@@ -934,11 +924,6 @@ proc LWDAQ_daq_Receiver {} {
 		set data [string range $data 0 [expr $max_length - 1]]
 	}
 	lwdaq_data_manipulate $config(memory_name) write 0 $data
-	
-	# If purge_duplicates, we remove duplicate messages from the block before.
-	if {$info(purge_duplicates)} {
-		lwdaq_receiver $config(memory_name) "-payload $config(payload_length) purge"
-	}
 
 	return $config(memory_name) 
 } 

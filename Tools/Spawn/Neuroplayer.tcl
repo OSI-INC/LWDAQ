@@ -158,6 +158,8 @@ proc Neuroplayer_init {} {
 	set info(buffer_size) 0
 	set info(data_size) 0
 	set info(max_buffer_bytes) [expr $width * $width]
+	set config(purge_duplicates) 0
+
 #
 # The file overview window is an extension of the Neuroplayer that allows us
 # to work with an overview of a file's contents to select sections for
@@ -6897,6 +6899,16 @@ proc Neuroplayer_play {{command ""}} {
 	lwdaq_data_manipulate $info(buffer_image) shift $end_addr
 	set info(buffer_size) [expr $info(buffer_size) - $end_index]
 
+	# Purge duplicate messages from the image data if we want to. We change the
+	# size of the data to the size of the purged data. Note that purging should
+	# have no affect upon subsequent analysis. All it does is allow us to see
+	# how the lwdaq_receiver routine's duplicate elimination is performing, by
+	# using show_messages to look at the data with and without purging.
+	if {$config(purge_duplicates)} {
+		set info(data_size) [lwdaq_receiver $info(data_image) \
+			"-payload $info(player_payload) -size $info(data_size) purge"]	
+	}
+
 	# We count the number of clocks and determine the index, within the 
 	# interval data, of the first and last clocks. We use these indices to
 	# obtain the value of the first and last clocks as well. In the process
@@ -7008,7 +7020,7 @@ proc Neuroplayer_play {{command ""}} {
 	
 	# Clear the Neurotracker graphs.
 	Neurotracker_fresh_graphs
-
+	
 	# Get a list of the available channel numbers and message counts. The list
 	# includes any channel in which we have at least one message. It takes the
 	# form of a space-delimited string of channel numbers and message counts.

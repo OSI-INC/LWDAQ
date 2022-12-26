@@ -818,7 +818,9 @@ end;
 	duplicates have been removed.
 
 	The "purge" instruction re-writes the image data, eliminating duplicate
-	messages and returning the number of messages in the purged data.
+	messages and returning the number of messages in the purged data. This 
+	instruction is for diagnostic purposes only: we do not eliminate messages
+	from the raw data before writing to disk.
 
 	The "plot" instruction tells the routine to plot all messages received from
 	the channel numbers we specify, or all channels if we specify a "*"
@@ -921,7 +923,7 @@ const
 	clock_period=256;
 	min_period=16;
 	max_period=2048;
-	max_duplicate_separation=2;
+	max_duplicate_separation=16;
 	max_print_length=long_string_length;
 	min_reconstruct_clocks=8;
 	id_offset=0;
@@ -956,7 +958,6 @@ var
 	message_num:integer=0;
 	message_index:integer=0;
 	max_index:integer=0;
-	i:integer=0;
 	num_bad_messages:integer=0;
 	mp,msp:message_array_type;
 	gp:x_graph_type;
@@ -1056,16 +1057,17 @@ var
 	end;
 	
 	{
-		copy_message overwrites the n'th message with the m'th message.
+		copy_payload overwrites the n'th message payload with the m'th message
+		payload
 	}
-	procedure copy_message(ip:image_ptr_type;m,n:integer);
+	procedure copy_payload(ip:image_ptr_type;m,n:integer);
 	var pm,pn:pointer;mm,nn:integer;
 	begin
-		mm:=m*message_length;
+		mm:=m*message_length+core_message_length;
 		pm:=@ip^.intensity[mm+ip^.i_size];
-		nn:=n*message_length;
+		nn:=n*message_length+core_message_length;
 		pn:=@ip^.intensity[nn+ip^.i_size];
-		block_move(pm,pn,message_length);
+		block_move(pm,pn,payload_size);
 	end;
 	
 begin
@@ -1174,13 +1176,18 @@ begin
 	message from that channel in the message array. When a new, valid message
 	has an identical sample value to the previous message in the same channel,
 	and the message times are no more than max_sample_separation clock ticks
-	apart, we don't transfer the new message to our message array. If the
-	payload size is tcb_payload_size, we have in the payload the power of the
-	message and the number of the antenna input that provided the message. Of
-	the duplicate messages, we want to save the one with the highest power. The
-	antenna number of this message gives us an estimate of the location of the
-	transmitter, and also presents to us the best antenna to use for
-	transmitting commands to implantable stimulators.
+	apart, we don't transfer the new message to our message array. 
+	
+	If the payload size is tcb_payload_size, we have in the payload the power of
+	the message and the number of the antenna input that provided the message.
+	We want to identify the antenna that received the most powerful signal from
+	the transmitter. If the TCB provides duplicates, we must pick out the top
+	antenna by comparing the power of the duplicates. We don't over-write the
+	earliest duplicate in our message list. Instead we alter the index field of
+	the earliest duplicate so that it points into the image data to the later
+	duplicate. When we look up the power and antenna number we will use this
+	later duplicate's power and antenna number instead of the values that
+	accompany the earliest duplicate.
 
 	We count the number of messages for each signal identifier with the id_qty
 	array. We do not count duplicate messages, but we do count bad messages in
@@ -1262,10 +1269,7 @@ begin
 						(payload_byte(ip,m.index,tcb_pwr_offset) >
 							payload_byte(ip,mp[id_previous[id]].index,
 								tcb_pwr_offset)) then begin
-						for i:=id_previous[id] to num_selected-2 do
-							mp[i]:=mp[i+1];
-						id_previous[id]:=num_selected-1;
-						mp[num_selected-1]:=m;
+						mp[id_previous[id]].index:=m.index;
 					end;
 				end;
 			end;
@@ -1281,7 +1285,7 @@ begin
 		inc(num_messages);
 	end;
 {
-	If the final message we looked at was a null message, and data_size = 0, then this
+	If the final message we looked at was a null message, and data_size = 0, this
 	final message is the terminating null message, and we don't want to count it
 	as an actual message.
 }
@@ -1289,13 +1293,16 @@ begin
 {
 	If "purge", we will re-write the image data using the message array we have
 	just composed, which does not contain duplicate messages. The resulting
-	image data is the same as the original, but with duplicates removed. Following
-	the last unique message, insert a null message to act as a terminator.
+	image data has had all duplicates removed. Following the last unique
+	message, insert a null message to act as a terminator. We use the purge
+	instruction to help us examine the performance of the duplicate elimination
+	implemented above.
 }
 	if instruction='purge' then begin
-		for message_num:=0 to num_selected-1 do
-			if message_num<>mp[message_num].index then
-				copy_message(ip,mp[message_num].index,message_num);
+		for message_num:=0 to num_selected-1 do begin
+			write_image_message(ip,mp[message_num],message_num);
+			copy_payload(ip,mp[message_num].index,message_num);
+		end;
 		m.id:=0;
 		m.sample:=0;
 		m.time:=0;
