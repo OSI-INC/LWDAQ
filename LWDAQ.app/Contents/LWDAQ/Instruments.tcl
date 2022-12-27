@@ -245,12 +245,11 @@ proc LWDAQ_instrument_print {instrument s {color black}} {
 }
 
 #
-# LWDAQ_instrument_analyze calls an instrument's analysis 
-# routine after checking its analysis_enable flag, and catches errors 
-# from the analysis routine. It assumes that the image it is to analyze
-# is the image named in the instrument's memory_name parameter. The 
-# routine places an identifier in the result, as provided by
-# the id parameter. By default, id becomes the memory name. The 
+# LWDAQ_instrument_analyze calls an instrument's analysis routine after checking
+# its analysis_enable flag, and catches errors from the analysis routine. It
+# assumes that the image it is to analyze is the image named in the instrument's
+# memory_name parameter. The routine places an identifier in the result, as
+# provided by the id parameter. By default, id becomes the memory name. The
 # routine also prints the result to the panel text window.
 #
 proc LWDAQ_instrument_analyze {instrument {id ""}} {
@@ -296,9 +295,9 @@ proc LWDAQ_instrument_analyze {instrument {id ""}} {
 }
 
 #
-# LWDAQ_acquire acquires data for the instrument called $instrument
-# from either a file, or an existing image in memory, or 
-# directly from the daq. It returns a result string.
+# LWDAQ_acquire acquires data for the instrument called $instrument from either
+# a file, or an existing image in memory, or directly from the daq. After
+# acquiring, it applies analysis if enabled and returns a result string.
 #
 proc LWDAQ_acquire {instrument} {
 	global LWDAQ_Info LWDAQ_Driver
@@ -453,7 +452,8 @@ proc LWDAQ_acquire {instrument} {
 	}
 	
 	if {!$match} {
-		LWDAQ_print $info(text) "ERROR: no such image source, \"$config(image_source)\"." red	
+		LWDAQ_print $info(text) "ERROR: no such image source,\
+			\"$config(image_source)\"." red	
 	}
 	
 	LWDAQ_update

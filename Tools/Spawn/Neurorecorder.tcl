@@ -91,11 +91,9 @@ proc Neurorecorder_init {} {
 #
 # The recorder buffer variable holds data that we download from the 
 # receiver but are unable to write to disk because the recording file
-# is locked. The player buffer contains the results of processing for
-# times when the characteristics file is locked.
+# is locked. 
 #
 	set info(recorder_buffer) ""
-	set info(player_buffer) ""
 #
 # Properties of data messages.
 #
@@ -678,6 +676,10 @@ proc Neurorecorder_record {{command ""}} {
 	
 	# If Stop, we move to Idle and return.
 	if {$info(record_control) == "Stop"} {
+		Neurorecorder_print "Stopped recording at\
+			[Neurorecorder_clock_convert [clock seconds]]."
+		Neurorecorder_print "Press Resume within the next few seconds to\
+			re-start without loss."
 		set info(record_control) "Idle"
 		return "SUCCESS"
 	}
@@ -692,6 +694,15 @@ proc Neurorecorder_record {{command ""}} {
 		LWDAQ_update
 	}
 	
+	# The Resume instruction is the same as Record, apart from the fact that we
+	# announce the resumption of recording. We update the control variable, but
+	# this will not immediately be visible.
+	if {$info(record_control) == "Resume"} {
+		Neurorecorder_print "Resumed recording at\
+			[Neurorecorder_clock_convert [clock seconds]]."
+		set info(record_control) "Record"
+	}
+	
 	# If we are going to interact with the data receiver at all, apply the
 	# Neurorecorder's receiver settings.
 	if {($info(record_control) == "Start") \
@@ -702,12 +713,12 @@ proc Neurorecorder_record {{command ""}} {
 	}
 
 
-	# If reset or autocreate, we create a new archive using the record start clock
+	# If Start or upon autocreate, we create a new archive using the record start clock
 	# value as the timestamp in the file name, and the ndf_prefix as the the beginning
 	# of the name.
 	if {($info(record_control) == "Start") || \
-		(($config(record_end_time) \
-			>= $config(autocreate)) && ($config(autocreate) > 0))} {
+		(($config(record_end_time) >= $config(autocreate)) \
+			&& ($config(autocreate) > 0))} {
 
 		# Turn the recording label red,
 		LWDAQ_set_bg $info(record_control_label) red
@@ -785,6 +796,8 @@ proc Neurorecorder_record {{command ""}} {
 		set config(record_end_time) 0
 		
 		set info(record_control) "Record"
+		Neurorecorder_print "Started recording at\
+			[Neurorecorder_clock_convert [clock seconds]]."
 	}
 
 	# If Record, we download data from the data receiver and write it to the
@@ -857,11 +870,11 @@ proc Neurorecorder_record {{command ""}} {
 		# Instrument will have tried to reset the data receiver. If successful,
 		# the reset will clear the data receiver's memory. The Receiver
 		# Instrument will set its acquire_end_ms parameter accordingly. We post
-		# the Neurorecorder_record command again, so we can make another
-		# attempt. The Neurorecorder will never give up trying to download data
-		# until the user presses the Stop button. In this case, we post the
-		# recording process to the end of the event queue because our recovery
-		# is not urgent.
+		# Neurorecorder_record again, so we can make another attempt. The
+		# Neurorecorder will never give up trying to download data until the
+		# user presses the Stop button. In this case, we post the recording
+		# process to the end of the event queue because our recovery is not
+		# urgent.
 		if {[LWDAQ_is_error_result $daq_result]} {
 			if {($info(recorder_error_time) == 0)} {
 				Neurorecorder_print "$daq_result"
@@ -985,7 +998,7 @@ proc Neurorecorder_open {} {
 	set info(record_control_label) $f.control
 	pack $f.control -side left
 
-	foreach a {Start Stop PickDir} {
+	foreach a {Start Resume Stop PickDir} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Neurorecorder_command $a"
 		pack $f.$b -side left -expand yes
@@ -1055,7 +1068,7 @@ proc Neurorecorder_open {} {
 	entry $f.ee -textvariable Neurorecorder_config(autocreate) -width 6
 	pack $f.ee -side left -expand yes
 
-	set info(text) [LWDAQ_text_widget $w 80 5 1 1]
+	set info(text) [LWDAQ_text_widget $w 80 7 1 1]
 	
 	return "SUCCESS"
 }

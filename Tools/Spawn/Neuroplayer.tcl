@@ -1784,7 +1784,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	set standing_value_index [lsearch -index 0 $info(standing_values) $id]
 	if {$standing_value_index < 0} {
 		set signal [lwdaq_receiver $info(data_image) \
-			"-payload $info(player_payload) -size $info(data_size) extract $id"]
+			"-payload $info(player_payload) -size $info(data_size) \
+				extract $id"]
 		if {![LWDAQ_is_error_result $signal] && ([llength $signal] > 0)} {
 			lappend info(standing_values) "$id [lindex $signal 1]"
 		} {
@@ -1803,10 +1804,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		# We have a standing value in case the first message is missing.
 		# The reconstruction always returns the nominal number of messages.
 		set signal [lwdaq_receiver $info(data_image) \
-			"-payload $info(player_payload)\
-			-size $info(data_size)\
-			reconstruct $id $period $standing_value\
-			$config(glitch_threshold)"]
+			"-payload $info(player_payload) -size $info(data_size) \
+				reconstruct $id $period $standing_value $config(glitch_threshold)"]
 		
 		# Check for an error in reconstruction.
 		if {[LWDAQ_is_error_result $signal]} {
@@ -1825,10 +1824,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			Neuroplayer_print "Channel [format %2d $id],\
 				sample rate out of range, adapting reconstruction." verbose
 			set signal [lwdaq_receiver $info(data_image) \
-				"-payload $info(player_payload)\
-				-size $info(data_size)\
-				reconstruct $id $period $standing_value\
-				$config(glitch_threshold) 1"]
+				"-payload $info(player_payload) -size $info(data_size) \
+					reconstruct $id $period $standing_value $config(glitch_threshold) 1"]
 		}
 	} {
 		# Extraction returns the messages with matching id in the recording.
@@ -1836,7 +1833,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		# of missing messages. Thus we may get more or fewer messages than
 		# the nominal number.
 		set signal [lwdaq_receiver $info(data_image) \
-			"-payload $info(player_payload) -size $info(data_size) extract $id $period"]
+			"-payload $info(player_payload) -size $info(data_size) \
+				extract $id $period"]
 	}
 	
 	# Check for an error in reconstruction or extraction.
@@ -6715,8 +6713,8 @@ proc Neuroplayer_play {{command ""}} {
 	# file reads if we are simply moving on through the same file.
 	set play_num_clocks [expr round($info(play_interval_copy) * $info(clocks_per_second))]
 	set clocks [lwdaq_receiver $info(buffer_image) \
-		"-payload $info(player_payload) \
-			-size $info(buffer_size) clocks 0 $play_num_clocks"]
+		"-payload $info(player_payload) -size $info(buffer_size) \
+			clocks 0 $play_num_clocks"]
 	scan $clocks %d%d%d%d%d num_buff_errors num_clocks num_messages start_index end_index
 
 	# We read more data from the file until we have enough to make an entire playback
@@ -6762,9 +6760,8 @@ proc Neuroplayer_play {{command ""}} {
 			
 				if {$config(show_messages) && $config(verbose)} {
 					Neuroplayer_print [lwdaq_receiver $info(buffer_image) \
-						"-payload $info(player_payload) \
-							-size $info(data_size) print \
-							0 $config(show_messages)"]
+						"-payload $info(player_payload) -size $info(data_size) \
+							print 0 $config(show_messages)"]
 				}
 
 				LWDAQ_post Neuroplayer_play
@@ -6775,8 +6772,8 @@ proc Neuroplayer_play {{command ""}} {
 				[expr $info(buffer_size) * $message_length] $data
 			set info(buffer_size) [expr $info(buffer_size) + $num_messages_read]
 			set clocks [lwdaq_receiver $info(buffer_image) \
-				"-payload $info(player_payload) \
-					-size $info(buffer_size) clocks 0 $play_num_clocks"]
+				"-payload $info(player_payload) -size $info(buffer_size) \
+					clocks 0 $play_num_clocks"]
 			scan $clocks %d%d%d%d%d num_buff_errors \
 				num_clocks num_messages start_index end_index
 		} {
@@ -6918,12 +6915,12 @@ proc Neuroplayer_play {{command ""}} {
 	# We set the num_errors variable so it contains the number of clock 
 	# message errors in the interval data.
 	set clocks [lwdaq_receiver $info(data_image) \
-		"-payload $info(player_payload) \
-			-size $info(data_size) clocks 0 -1"]
+		"-payload $info(player_payload) -size $info(data_size) \
+			clocks 0 -1"]
 	scan $clocks %d%d%d%d%d num_errors num_clocks num_messages first_index last_index
 	set indices [lwdaq_receiver $info(data_image) \
-		"-payload $info(player_payload) \
-			-size $info(data_size) get $first_index $last_index"]
+		"-payload $info(player_payload) -size $info(data_size) \
+			get $first_index $last_index"]
 	set first_clock [lindex $indices 1]
 	set last_clock [lindex $indices 4]
 
@@ -6984,8 +6981,8 @@ proc Neuroplayer_play {{command ""}} {
 	# it in verbose mode, or if we have encountered an error in verbose mode.
 	if {($config(show_messages) || ($num_errors > 0)) && $config(verbose)} {
 		set report [lwdaq_receiver $info(data_image) \
-			"-payload $info(player_payload) \
-				-size $info(data_size) print 0 1"]
+			"-payload $info(player_payload) -size $info(data_size) \
+				print 0 1"]
 		if {[regexp {index=([0-9]*) } $report match index]} {
 			if {$config(show_messages) > $info(min_show_messages)} {
 				set extent [expr $config(show_messages)/2]
@@ -6998,12 +6995,12 @@ proc Neuroplayer_play {{command ""}} {
 			if {$hi_index < $lo_index + 2*$extent} \
 				{set hi_index [expr $lo_index + 2*$extent]}
 			Neuroplayer_print [lwdaq_receiver $info(data_image) \
-				"-payload $info(player_payload) \
-					-size $info(data_size) print $lo_index $hi_index"]
+				"-payload $info(player_payload) -size $info(data_size) \
+					print $lo_index $hi_index"]
 		} {
 			Neuroplayer_print [lwdaq_receiver $info(data_image) \
-				"-payload $info(player_payload) \
-					-size $info(data_size) print 0 $config(show_messages)"]
+				"-payload $info(player_payload) -size $info(data_size) \
+					print 0 $config(show_messages)"]
 		}
 	}
 	
@@ -7025,15 +7022,14 @@ proc Neuroplayer_play {{command ""}} {
 	# includes any channel in which we have at least one message. It takes the
 	# form of a space-delimited string of channel numbers and message counts.
 	set all_message_channels [lwdaq_receiver $info(data_image) \
-		"-payload $info(player_payload) \
-			-size $info(data_size) list"]
+		"-payload $info(player_payload) -size $info(data_size) list"]
 
 	# We look for messages in the auxiliary channel.
 	set new_aux_messages ""
 	foreach {c a} $all_message_channels {
 		if {$c % $info(set_size) == $info(set_size) - 1} {
 			set messages [lwdaq_receiver $info(data_image) \
-				"-payload $info(player_payload) extract $c"]
+				"-payload $info(player_payload) -size $info(data_size) extract $c"]
 			if {[LWDAQ_is_error_result $messages]} {error $messages}
 			foreach {mt md} $messages {
 				append new_aux_messages "$c $mt $md "

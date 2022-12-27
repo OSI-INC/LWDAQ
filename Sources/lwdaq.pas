@@ -770,6 +770,8 @@ begin
 		cp:=@ip^.intensity[0];
 	end;
 	
+	if copy_size<0 then copy_size:=0;
+	
 	if record_size>1 then
 		if (copy_size mod record_size) > 0 then
 			copy_size:=copy_size+record_size-(copy_size mod record_size);

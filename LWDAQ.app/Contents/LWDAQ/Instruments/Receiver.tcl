@@ -54,7 +54,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(daq_image_bottom) -1
 	set info(daq_device_type) 3
 	set info(daq_password) "no_password"
-	set info(daq_fifo_av) 0
+	set info(daq_block_cntr) 0
 	set info(daq_fifo_unit) 512
 	set info(verbose_description) "{Channel Number} \
 		{Number of Samples Recorded} \
@@ -89,6 +89,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(max_time_fetch) 2.0
 	set info(acquire_end_ms) 0
 	set info(payload_options) "0 2 16"
+	set info(purge_duplicates) 1
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
 	set info(fv_range) 30
@@ -316,42 +317,42 @@ proc LWDAQ_reset_Receiver {} {
 					0 {
 						set info(receiver_type) "A3018"
 						set config(payload_length) 0
-						set info(daq_fifo_av) 0
+						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
 					}
 					1 {
 						set info(receiver_type) "A3027"
 						set config(payload_length) 0
-						set info(daq_fifo_av) 0
+						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 1
 					}
 					2 {
 						set info(receiver_type) "A3032"
 						set config(payload_length) 16
-						set info(daq_fifo_av) 0
+						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
 					}
 					3 {
 						set info(receiver_type) "A3038"
 						set config(payload_length) 16
-						set info(daq_fifo_av) 1
+						set info(daq_block_cntr) 1
 						set channel_select_available 1
 						set send_all_sets_cmd 0
 					}
 					4  {
 						set info(receiver_type) "A3042"
 						set config(payload_length) 2
-						set info(daq_fifo_av) 1
+						set info(daq_block_cntr) 1
 						set channel_select_available 1
 						set send_all_sets_cmd 0
 					}
 					default {
 						set info(receiver_type) "?"
 						set config(payload_length) 0
-						set info(daq_fifo_av) 0
+						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
 					}					
@@ -614,9 +615,9 @@ proc LWDAQ_daq_Receiver {} {
 			# Configure the data receiver for data download.
 			LWDAQ_transmit_command_hex $sock $info(upload_cmd)
 
-			# If we have a fifo block counter, read the number of bytes
-			# available.
-			if {$info(daq_fifo_av)} {
+			# If we have a fifo block counter in the receiver, read the number
+			# of bytes available.
+			if {$info(daq_block_cntr)} {
 				set ac [expr [LWDAQ_byte_read $sock $LWDAQ_Driver(fifo_av_addr)] & 0xFF]
 				set block_length [expr \
 					($info(daq_fifo_unit) / $message_length) * $message_length * $ac \
@@ -632,7 +633,7 @@ proc LWDAQ_daq_Receiver {} {
 			# update our acquire time, allows us to overcome a systematic error
 			# in our acquire time estimate, in which we think we have advanced
 			# farther in the data receiver buffer than is actually the case.
-			if {!$info(daq_fifo_av)} {
+			if {!$info(daq_block_cntr)} {
 				set time_fetch [expr 0.001 * ([clock milliseconds] - $info(acquire_end_ms))]
 				if {$time_fetch < $info(min_time_fetch)} {
 					set time_fetch $info(min_time_fetch)
@@ -662,34 +663,28 @@ proc LWDAQ_daq_Receiver {} {
 			LWDAQ_set_repeat_counter $sock [expr $block_length - 1]			
 			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
 			
-			# Wait for the driver to complete the transfer. If we have asked
-			# for too much data, we will get a TCPIP timeout. The socket will
-			# be closed either by the driver or by the LWDAQ process, whichever
-			# has the shortest timeout. Once a timeout has occurred, the socket
-			# will almost certainly be closed, but we make sure it is closed 
-			# so we can open a new one to the same driver. Between closing one 
-			# socket and opening another, the driver could serve any number of
-			# other clients, so there will be no way to recover the data in its 
-			# memory. We must open another socket, reset the data receiver, close 
-			# the socket, and break out of data acquisition. This error occurs
-			# most easily when we disconnect the source of messages from the
-			# data receiver, such as when we unplug a single antenna that is
-			# receiving from a dozen channels.
+			# Wait for the driver to complete the transfer. If we have asked for
+			# too much data, we will get a TCPIP timeout. This error occurs when
+			# our data receiver does not provide an available block counter, we
+			# are recording from a large number of transmitters with a single
+			# antenna, and we disconnect this antenna from our receiver. The
+			# error can also occur when we disconnect the cable between a data
+			# receiver and a LWDAQ driver. We are waiting for ten thousand
+			# messages, which is what we estimated will arrive in the next
+			# second, but instead the data receiver generates only one hundred
+			# and twenty eight messages, so we are left hanging. We close any
+			# residual socket to the driver, open a new socket, reset the data
+			# receiver and generate an error to abort this acquisition.
 			if {[catch {LWDAQ_wait_for_driver $sock} read_error]} {
 				if {[info exists sock]} {LWDAQ_socket_close $sock}
-				LWDAQ_print $info(text) "WARNING: Timeout awaiting transfer\
-					from receiver to driver. Resetting receiver."
-				LWDAQ_update
 				set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 				LWDAQ_login $sock $info(daq_password)
 				LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
 				LWDAQ_wait_for_driver $sock
 				LWDAQ_socket_close $sock
-				set start_index 0
-				set end_index [expr $num_messages - 1]
-				set info(messages_per_clock) $info(min_messages_per_clock)
-				break
+				error "Timeout during transfer from data receiver.\
+					Resetting data receiver."
 			}
 			
 			# Calculate the block transfer time. If the data was waiting in the
@@ -729,38 +724,38 @@ proc LWDAQ_daq_Receiver {} {
 				}
 			}
 				
-			# If we see errors in the new data, we check to see if this is
-			# because we are using the wrong payload length. If so, we throw
-			# away the data we just downloaded, reset the data receiver, close
-			# the socket, and abandon this acquisition. If not, we throw away
-			# the data, reset the receiver, close the socket, and keep trying.
-			# We throw away the data and reset the receiver because all
-			# algorithms for trying to recover from data errors without
-			# resetting the receiver are vulnerable to rare error sources that
-			# cause disastrous loss of data. By resetting the data receiver, we
-			# make sure that it is in a known state for our next download. But
-			# we lose continuity of clock messages within the data buffer.
-			if {$num_errors > 0} {
+			# If we see errors in the new data, we throw away the data we just
+			# downloaded, reset the data receiver, close the socket, abandon
+			# this acquisition, and generate an error. One likely source of 
+			# errors the wrong value for payload length, so we check to see if
+			# one of the other possible payload lengths will reduce the number of
+			# errors to zero, and suggest this value in our error message should
+			# it exist.
+			if {$num_errors > 0} {	
+				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
+				LWDAQ_wait_for_driver $sock
 				foreach pl $info(payload_options) {
 					scan [lwdaq_receiver $info(scratch_image) \
 						"-payload $pl clocks"] %d%d%d ne nc nm
 					if {$ne == 0} {break}
 				}
-				
 				if {$ne == 0} {
-					LWDAQ_print $info(text) \
-						"WARNING: Suspect payload length $config(payload_length)\
-							is wrong. Resetting data receiver and trying again."
+					error "Bad payload length \"$config(payload_length)\",\
+						try \"$pl\" instead. Resetting data receiver."
 				} {
-					LWDAQ_print $info(text) \
-						"WARNING: Received corrupted data. Resetting data receiver\
-							and trying again."
+					error "Corrupted data. Resetting data receiver."
 				}
-
-				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
-				LWDAQ_wait_for_driver $sock
-				LWDAQ_socket_close $sock
-				continue
+			}
+			
+			# If purge_duplicates is set, we remove duplicate messages from the 
+			# block before we do any processing.
+			if {$info(purge_duplicates)} {
+				set num_unique_messages \
+					[lwdaq_receiver $info(scratch_image) \
+						"-payload $config(payload_length) purge"]
+				set data [lwdaq_data_manipulate $info(scratch_image) read \
+					0 [expr $num_unique_messages * $message_length]]
+				set num_new_messages $num_unique_messages
 			}
 			
 			# Adjust the number of messages per clock we expect in our next
@@ -798,15 +793,14 @@ proc LWDAQ_daq_Receiver {} {
 			# acquire time suggests. At that point, we will reset the acquire
 			# time to the current time because we detect the empty buffer with
 			# the block transfer time.
-			if {!$info(daq_fifo_av)} {
+			if {!$info(daq_block_cntr)} {
 				set clock_ms [clock milliseconds]
 				set acquired_ms [expr round( \
 					1000.0 * ($num_new_clocks + 1) / $info(clock_frequency) )]
 				if {$block_ms > 1000.0 * $info(empty_fraction) * $time_fetch} {
 					set info(acquire_end_ms) $clock_ms
 					set lag_ms 0
-					# Un-comment to report when we detect an empty receiver buffer.
-					# LWDAQ_print $info(text) "Empty buffer detected." purple
+					# LWDAQ_print $info(text) "Empty buffer detected."
 
 				} {
 					set info(acquire_end_ms) [expr $info(acquire_end_ms) + $acquired_ms]
@@ -815,9 +809,8 @@ proc LWDAQ_daq_Receiver {} {
 					}
 					set lag_ms [expr $clock_ms - $info(acquire_end_ms)]
 				}	
-				# LWDAQ_print $info(text) "$time_fetch $acquired_ms $lag_ms $block_ms" orange
+				# LWDAQ_print $info(text) "$time_fetch $acquired_ms $lag_ms $block_ms"
 			}
-
 
 			# Check that we can fit the existing data in the buffer image. If not,
 			# discard the data instead of adding it to the buffer, stop this 
@@ -825,8 +818,8 @@ proc LWDAQ_daq_Receiver {} {
 			# of data.
 			if {($num_new_messages + $num_messages) * $message_length > \
 					[expr $info(daq_buffer_width) * ($info(daq_buffer_width) - 1)]} {
-				LWDAQ_print $info(text) "ERROR: Buffer overflow,\
-					abandoning this acquisition."
+				LWDAQ_print $info(text) "WARNING: Buffer overflow,\
+					too many messages per interval."
 				LWDAQ_socket_close $sock
 				set start_index 0
 				set end_index [expr $num_messages - 1]
@@ -847,47 +840,31 @@ proc LWDAQ_daq_Receiver {} {
 			# and break out of the acquisition loop, returning the entire
 			# message buffer as data.
 			if {$num_errors > $info(errors_for_stop)} {
-				LWDAQ_print $info(text) \
-					"ERROR: Severely corrupted data.\
-						resetting data receiver and\
-						abandoning this acquisition."
 				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
-				LWDAQ_wake $sock
 				LWDAQ_wait_for_driver $sock
-				LWDAQ_socket_close $sock
-				set start_index 0
-				set end_index [expr $num_messages - 1]
-				set info(messages_per_clock) $info(min_messages_per_clock)
-				break
+				error "Corrupted data. Resetting data receiver."
 			}
 
 			# Check the block counter to see if we have made too many attempts
-			# to get our data. 
+			# to get our data. If so, reset the data receiver and abandon
+			# acquisition.
 			incr block_counter
 			if {$block_counter > $info(max_block_reads)} {
-				LWDAQ_print $info(text) \
-					"ERROR: Failed to accumulate clock messages,\
-						resetting data receiver and\
-						abandoning this acquisition."
 				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
-				LWDAQ_wake $sock
 				LWDAQ_wait_for_driver $sock
-				LWDAQ_socket_close $sock
-				set start_index 0
-				set end_index [expr $num_messages - 1]
-				set info(messages_per_clock) $info(min_messages_per_clock)
-				break
+				error "Failed to accumulate clock messages. Resetting data receiver."
 			}
 			
 			# Disable data upload from data receiver and close socket.
-			LWDAQ_wake $sock
 			LWDAQ_wait_for_driver $sock
 			LWDAQ_socket_close $sock
 		}
 	} error_result]} { 
-		# To get here, we have encountered a TCPIP communication error other than
-		# a timeout waiting for the data receiver to supply data. We don't attempt
-		# to reset the data receiver, but we reset the block size.
+		# To get here, we have encountered an error that causes us to abandon our
+		# acquisition. We don't attempt to reset the data receiver, because the 
+		# error could be a communication failure. But we do reset the number of
+		# messages we expect per clock to its minimum, and if the socket is still
+		# open, we close it.
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		set info(messages_per_clock) $info(min_messages_per_clock)
 		return "ERROR: $error_result"
