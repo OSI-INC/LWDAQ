@@ -320,6 +320,7 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
+						set info(purge_duplicates) 0
 					}
 					1 {
 						set info(receiver_type) "A3027"
@@ -327,6 +328,7 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 1
+						set info(purge_duplicates) 1
 					}
 					2 {
 						set info(receiver_type) "A3032"
@@ -334,6 +336,7 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
+						set info(purge_duplicates) 0
 					}
 					3 {
 						set info(receiver_type) "A3038"
@@ -341,6 +344,7 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_block_cntr) 1
 						set channel_select_available 1
 						set send_all_sets_cmd 0
+						set info(purge_duplicates) 0
 					}
 					4  {
 						set info(receiver_type) "A3042"
@@ -348,6 +352,7 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_block_cntr) 1
 						set channel_select_available 1
 						set send_all_sets_cmd 0
+						set info(purge_duplicates) 1
 					}
 					default {
 						set info(receiver_type) "?"
@@ -355,6 +360,7 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 0
+						set info(purge_duplicates) 0
 					}					
 				}
 				break

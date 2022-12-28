@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "160"
+	LWDAQ_tool_init "Neurorecorder" "161"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -855,6 +855,14 @@ proc Neurorecorder_record {{command ""}} {
 		# LWDAQ_Info(max_daq_attempts).
 		set saved_max_daq_attempts $LWDAQ_Info(max_daq_attempts)
 		set LWDAQ_Info(max_daq_attempts) 1	
+		
+		# If the Receiver Panel is not open, we disable Receiver Instrument
+		# analysis. We don't want to use processing time drawing the signals
+		# in the Receiver Instrument image when the image is not being 
+		# displayed.
+		if {![winfo exists ".receiver"]} {
+			set iconfig(analysis_enable) 0
+		}
 	
 		# Download a block of messages from the data receiver into a LWDAQ
 		# image, the name of which is $iconfig(memory_name). The Receiver
@@ -1004,7 +1012,10 @@ proc Neurorecorder_open {} {
 		pack $f.$b -side left -expand yes
 	}
 	
-	button $f.signals -text "Receiver" -command "LWDAQ_open Receiver"
+	button $f.signals -text "Receiver" -command {
+		LWDAQ_open Receiver
+		set LWDAQ_config_Receiver(analysis_enable) 1
+	}
 	pack $f.signals -side left -expand yes
 
 	button $f.conf -text "Configure" -command "Neurorecorder_configure"
