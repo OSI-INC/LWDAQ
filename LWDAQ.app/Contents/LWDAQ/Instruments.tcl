@@ -55,17 +55,15 @@ proc LWDAQ_reset_instrument_counters {{value 0}} {
 }
 
 #
-# LWDAQ_info_button makes a new toplevel window with
-# a button that lets you see the instrument script. Below
-# the button are the elements of the instrument's info
-# array. You can change the elements by typing in the
-# entry boxes.
+# LWDAQ_info_button makes a new toplevel window with a button that lets you see
+# the instrument script. Below the button are the elements of the instrument's
+# info array. You can change the elements by typing in the entry boxes.
 #
 proc LWDAQ_info_button {name} {
 	upvar #0 LWDAQ_info_$name info
 	global LWDAQ_Info
 	
-	# Create the info windoe.
+	# Create the info window.
 	set w $info(window)\.info
 	if {[winfo exists $w]} {destroy $w}
 	toplevel $w
@@ -75,10 +73,12 @@ proc LWDAQ_info_button {name} {
 	frame $w.buttons
 	pack $w.buttons -side top -fill x
 	
-	# Make the script button
-	button $w.buttons.script -text "Script" -command \
-		[list LWDAQ_view_text_file [file join $LWDAQ_Info(instruments_dir) $info(name)\.tcl]]
-	pack $w.buttons.script -side left -expand 1
+	# Make buttons to save and unsave the instrument settings.
+	button $w.buttons.save -text "Save Settings" \
+		-command "LWDAQ_instrument_save $name"
+	button $w.buttons.unsave -text "Unsave Settings" \
+		-command "LWDAQ_instrument_unsave $name"
+	pack $w.buttons.save $w.buttons.unsave -side left -expand 1
 	
 	# Call the info buttons creation routine, if it exists, passing it
 	# the name of the buttons frame.
@@ -568,23 +568,25 @@ proc LWDAQ_close {name} {
 # LWDAQ configuration directory, so they will be loaded automatically when LWDAQ is
 # next launched, or when a new LWDAQ is spawned.
 #
-proc LWDAQ_instrument_save {} {
+proc LWDAQ_instrument_save {name} {
 	global LWDAQ_Info 
+	upvar LWDAQ_info_$name info
+	upvar LWDAQ_config_$name config
 
-	set fn [file join $LWDAQ_Info(config_dir) "Instrument_Settings.tcl"]
+	if {![info exists info]} {error "No such instrument \"$name\"."}
+	
+	set fn [file join $LWDAQ_Info(config_dir) "$name\_Settings.tcl"]
 	set f [open $fn w]
-	foreach i $LWDAQ_Info(instruments) {
-		upvar LWDAQ_info_$i info
-		set vlist [array names info]
-		foreach v $vlist {
-			puts $f "set LWDAQ_info_$i\($v) \"$info($v)\""
-		}
-		upvar LWDAQ_config_$i config
-		set vlist [array names config]
-		foreach v $vlist {
-			puts $f "set LWDAQ_config_$i\($v) \"$config($v)\""
-		}
+
+	set vlist [array names info]
+	foreach v $vlist {
+		puts $f "set LWDAQ_info_$name\($v) \"$info($v)\""
 	}
+	set vlist [array names config]
+	foreach v $vlist {
+		puts $f "set LWDAQ_config_$name\($v) \"$config($v)\""
+	}
+
 	close $f
 	return $fn
 }
@@ -593,10 +595,10 @@ proc LWDAQ_instrument_save {} {
 # LWDAQ_instrument_unsave deletes a perviously-saved instrument settings file, if one
 # exists.
 #
-proc LWDAQ_instrument_unsave {} {
+proc LWDAQ_instrument_unsave {name} {
 	global LWDAQ_Info 
 
-	set fn [file join $LWDAQ_Info(config_dir) "Instrument_Settings.tcl"]
+	set fn [file join $LWDAQ_Info(config_dir) "$name_Settings.tcl"]
 	if {[file exists $fn]} {
 		file delete $fn
 		return $fn

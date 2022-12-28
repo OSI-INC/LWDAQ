@@ -22,8 +22,8 @@
 
 #
 # LWDAQ_interface_init initializes the interface routines, installs
-# operating-system dependent event handlers, and configures the default
-# fonts for the graphical user interface.
+# operating-system dependent event handlers, and configures the default fonts
+# for the graphical user interface.
 #
 proc LWDAQ_interface_init {} {
 	global LWDAQ_Info LWDAQ_server_line
@@ -89,7 +89,6 @@ proc LWDAQ_interface_init {} {
 	LWDAQ_init_main_window	
 	LWDAQ_bind_command_key all q [list exit]
 	LWDAQ_bind_command_key all w "destroy \[winfo toplevel %W\]"
-	LWDAQ_bind_command_key all r "LWDAQ_reset"
 	
 	return 1
 }
@@ -142,6 +141,8 @@ proc LWDAQ_init_main_window {} {
 	$info(file_menu) add command -label "System Server" -command LWDAQ_server_open
 	$info(file_menu) add command -label "System Monitor" -command LWDAQ_monitor_open
 	$info(file_menu) add command -label "System Reset" -command LWDAQ_reset
+	$info(file_menu) add command -label "Save Settings" -command LWDAQ_save_settings
+	$info(file_menu) add command -label "Unsave Settings" -command LWDAQ_unsave_settings
 
 	# Create the Instrument menu
 	LWDAQ_make_instrument_menu
@@ -272,6 +273,36 @@ proc LWDAQ_preferences {} {
 }
 
 #
+# LWDAQ_save_settings saves the library settings and a selection of other core 
+# LWDAQ settings to disk.
+#
+proc LWDAQ_save_settings {} {
+	upvar #0 LWDAQ_Info info
+
+	set f [open [file join $info(config_dir) "Core_Settings.tcl"] w]
+	foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms \
+			blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms \
+			lwdaq_client_port default_to_stdout server_address_filter \
+			server_listening_port close_delay_ms scheduler_increment \
+			scheduler_log scheduler_window" {
+		puts $f "set LWDAQ_Info($i) \"[set info($i)]\""
+	}
+	puts $f "lwdaq_config [lwdaq_config]"
+	close $f
+}
+
+#
+# LWDAQ_unsave_settings deletes any existing core settings file.
+#
+proc LWDAQ_unsave_settings {} {
+	upvar #0 LWDAQ_Info info
+
+	set fn [file join $info(config_dir) "Core_Settings.tcl"]
+	if {[file exists $fn]} {file delete $fn}
+}
+
+
+#
 # LWDAQ_make_tool_menu destroys the current tool menu and makes a new one that
 # matches the current selection of tools in the Tools, More, and Spawn
 # directories.
@@ -367,21 +398,23 @@ proc LWDAQ_make_tool_menu {} {
 #
 proc LWDAQ_make_instrument_menu {} {
 	upvar #0 LWDAQ_Info info
-# Install the instrument menu in the menu bar.
+	
+	# Install the instrument menu in the menu bar.
 	set info(instrument_menu) $info(menubar).instruments
 	set m $info(instrument_menu)
 	catch {destroy $m}
 	menu $m -tearoff 0
 	$info(menubar) add cascade -menu $m -label "Instrument"
-# Add entries for each instrument in the instrument folder.
+	
+	# Add entries for each instrument in the instrument folder.
 	foreach i $info(instruments) {$m add command -label $i \
 		-command [list LWDAQ_post [list LWDAQ_open $i] front]}
-# Add entry to stop all instruments from looping.
+		
+	# Add entry to stop all instruments from looping.
 	$m add separator
 	$m add command -label "Reset Counters" -command LWDAQ_reset_instrument_counters
-	$m add command -label "Save Settings" -command {LWDAQ_post LWDAQ_instrument_save}
-	$m add command -label "Unsave Settings" -command {LWDAQ_post LWDAQ_instrument_unsave}
-# Done.
+	
+	# Done.
 	return 1
 }
 
@@ -959,6 +992,7 @@ proc LWDAQ_view_array {array_name} {
 #
 proc LWDAQ_monitor_open {} {
 	global LWDAQ_Info
+	global LWDAQ_lwdaq_config
 
 	if {!$LWDAQ_Info(gui_enabled)} {return 0}
 
@@ -974,29 +1008,18 @@ proc LWDAQ_monitor_open {} {
 	set f [frame $w.b]
 	pack $f -side top -fill x
 	
-	foreach n "Queue_Start Queue_Stop Queue_Clear Reset" {
+	foreach n "Queue_Start Queue_Stop Queue_Clear" {
 		set m [string tolower $n]
 		set p [string map {_ \ } $n]
 		button $f.$m -text $p -command LWDAQ_$m
 		pack $f.$m -side left -expand 1
 	}
 	
-	button $f.ssf -text "Save Settings" -command {
-		set f [open [file join $LWDAQ_Info(config_dir) "Core_Settings.tcl"] w]
-		foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms \
-				blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms \
-				lwdaq_client_port default_to_stdout server_address_filter \
-				server_listening_port close_delay_ms scheduler_increment \
-				scheduler_log scheduler_window" {
-			puts $f "set LWDAQ_Info($i) \"[set LWDAQ_Info($i)]\""
-		}
-		close $f
-	}
-	button $f.csf -text "Unsave Settings" -command {
-		set fn [file join $LWDAQ_Info(config_dir) "Core_Settings.tcl"]
-		if {[file exists $fn]} {file delete $fn}
-	}
-	pack $f.ssf $f.csf -side left -expand yes
+	button $f.reset -text "System Reset" -command LWDAQ_reset
+	pack $f.reset -side left -expand 1
+
+	button $f.ls -text "Library Settings" -command {LWDAQ_library_settings}
+	pack $f.ls -side left -expand yes
 	
 	frame $w.v
 	pack $w.v -side top -fill x
@@ -1024,7 +1047,7 @@ proc LWDAQ_monitor_open {} {
 		entry $f.e$i -textvariable LWDAQ_Info($i) -relief sunken -bd 1 -width 10
 		grid $f.l$i $f.e$i -sticky news
 	}
-
+	
 	frame $w.current
 	pack $w.current
 	LWDAQ_text_widget $w.current 90 2 0
@@ -1040,6 +1063,58 @@ proc LWDAQ_monitor_open {} {
 		
 	after $LWDAQ_Info(monitor_ms) LWDAQ_monitor_refresh
 	return 1
+}
+
+#
+# LWDAQ_library_settings allows us to edit the settings used by the analysis
+# libraries. These are accessible through the lwdaq_config command. We make
+# an array of options and values which the user can edit and then apply.
+#
+proc LWDAQ_library_settings {} {
+	global LWDAQ_Info
+	global LWDAQ_lwdaq_config
+
+	set w ".lwdaqconfig"
+	if {[winfo exists $w]} {
+		raise $w
+		return 0
+	}
+	
+	toplevel $w
+	wm title $w "Analysis Library Settings"
+	
+	set f [frame $w.buttons]
+	pack $f -side top -fill x
+	
+	button $f.lca -text "Apply" -command {
+		set settings ""
+		foreach {op val} [lwdaq_config] {
+			append settings " $op $LWDAQ_lwdaq_config([string map {- ""} $op])"
+		}
+		eval lwdaq_config $settings
+		foreach {op val} [lwdaq_config] {
+			set op [string map {- ""} $op]
+			set LWDAQ_lwdaq_config($op) $val
+		}
+		LWDAQ_print .lwdaqconfig.text "Applied library settings at [LWDAQ_time_stamp],\
+			make permanent with Save Settings."
+	}
+	pack $f.lca -side left -expand 1
+
+	set f [frame $w.parameters]
+	pack $f -side top -fill x
+	
+	set f [frame $w.lwdaq]
+	pack $f
+	foreach {op val} [lwdaq_config] {
+		set op [string map {- ""} $op]
+		label $f.l$op -text $op
+		entry $f.e$op -textvariable LWDAQ_lwdaq_config($op)
+		set LWDAQ_lwdaq_config($op) $val
+		grid $f.l$op $f.e$op -sticky nsew
+	}
+	
+	LWDAQ_text_widget $w 90 4 0
 }
 
 #

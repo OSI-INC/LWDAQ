@@ -41,7 +41,7 @@ proc LWDAQ_utils_init {} {
 	set info(scheduler_control) "Stop"
 	set info(scheduler_increment) "5"
 	set info(scheduler_window) "60"
-	set info(scheduler_log) ""
+	set info(scheduler_log) "none"
 	set info(scheduler_format) {%d-%b-%Y %H:%M:%S}
 	
 	set info(reset) 0
@@ -679,7 +679,7 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 	} elseif {$next_check == 0} {
 		if {$LWDAQ_Info(scheduler_control) == "Stop"} {
 			set next_check $now
-			if {$LWDAQ_Info(scheduler_log) != ""} {
+			if {$LWDAQ_Info(scheduler_log) != "none"} {
 				LWDAQ_print $LWDAQ_Info(scheduler_log) "Started scheduler at\
 					[clock format [clock seconds] \
 					-format $LWDAQ_Info(scheduler_format)]."
@@ -689,7 +689,7 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 			return "Run"
 		}
 	} elseif {$LWDAQ_Info(scheduler_control) == "Stop"} {
-		if {$LWDAQ_Info(scheduler_log) != ""} {
+		if {$LWDAQ_Info(scheduler_log) != "none"} {
 			LWDAQ_print $LWDAQ_Info(scheduler_log) "Stopped scheduler at\
 					[clock format [clock seconds] \
 					-format $LWDAQ_Info(scheduler_format)]."
@@ -727,7 +727,7 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 				&& ($now - $scheduled_time <= $LWDAQ_Info(scheduler_window)) \
 				&& (($scheduled_time - $previous) > $LWDAQ_Info(scheduler_window))} {
 				lset LWDAQ_Info(scheduled_tasks) $index 3 $now
-				if {$LWDAQ_Info(scheduler_log) != ""} {
+				if {$LWDAQ_Info(scheduler_log) != "none"} {
 					LWDAQ_print $LWDAQ_Info(scheduler_log) "Running task $name at\
 						[clock format [clock seconds] \
 						-format $LWDAQ_Info(scheduler_format)]."
@@ -767,7 +767,7 @@ proc LWDAQ_schedule_task {name schedule command} {
 	} {
 		lset LWDAQ_Info(scheduled_tasks) $index [list $name $schedule $command 0]
 	}
-	if {$LWDAQ_Info(scheduler_log) != ""} {
+	if {$LWDAQ_Info(scheduler_log) != "none"} {
 		if {$index < 0} {
 			LWDAQ_print $LWDAQ_Info(scheduler_log) "Added task $name with schedule\
 				\"$schedule\" at [clock format [clock seconds] \
@@ -799,7 +799,7 @@ proc LWDAQ_unschedule_task {name} {
 	if {[llength $LWDAQ_Info(scheduled_tasks)] == 0} {
 		LWDAQ_scheduler -1
 	}
-	if {$LWDAQ_Info(scheduler_log) != ""} {
+	if {$LWDAQ_Info(scheduler_log) != "none"} {
 		if {$index < 0} {
 			LWDAQ_print $LWDAQ_Info(scheduler_log) "Unknown task \"$name\" at \
 				[clock format [clock seconds] -format $LWDAQ_Info(scheduler_format)]."
