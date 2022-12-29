@@ -185,7 +185,6 @@ proc LWDAQ_analysis_Rasnik {{image_name ""}} {
 		set pixel_size $info(analysis_pixel_size_um)
 		set zoom $info(zoom)
 	}
-	lwdaq_config -zoom $zoom -intensify $config(intensify)
 	
 	if {abs($info(analysis_rotation_mrad))>1570.8} {
 		return "ERROR: Analysis rotation greater than 1570.8 mrad (90 deg) limit."

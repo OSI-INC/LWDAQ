@@ -539,8 +539,7 @@ proc Neuroplayer_init {} {
 	set info(tracker_window) $info(window)\.tracker
 	set info(tracker_width) 640
 	set info(tracker_height) 320
-	set info(tracker_border) 10
-	set info(tracker_zoom) 2
+	set info(tracker_border) 4
 #
 # Neurotracker calculation settings.
 #
@@ -2030,9 +2029,10 @@ proc Neuroplayer_overview {{fn ""} } {
 		# Create graph display. We create a canvas widget and display a lwdaq
 		# image in the widget.
 		set plot $f.canvas
+		set zoom [LWDAQ_get_lwdaq_config display_zoom]
 		canvas $plot -bd 2 -relief sunken \
-			-width [expr $info(overview_width) + 1] \
-			-height [expr $info(overview_height) + 1]
+			-width [expr round($zoom*$info(overview_width)) + 1] \
+			-height [expr round($zoom*$info(overview_height)) + 1]
 		pack $plot -side top -expand 1
 		$plot create image 0 0 -anchor nw -image $ov_config(photo)
 		bind $plot <Double-Button-1> \
@@ -2651,10 +2651,9 @@ proc Neuroclassifier_open {} {
 	frame $w.data.metrics
 	pack $w.data.metrics -side left
 	
-	set c [canvas $w.data.metrics.map \
-		-height $info(classifier_map_size) \
-		-width $info(classifier_map_size) \
-		-bd 2 -relief sunken]
+	set zoom [LWDAQ_get_lwdaq_config display_zoom]
+	set size [expr round($zoom*$info(classifier_map_size))]
+	set c [canvas $w.data.metrics.map -height $size -width  $size -bd 2 -relief sunken]
 	set info(classifier_map) $c
 	pack $c -side left -fill y
 	
@@ -2707,8 +2706,11 @@ proc Neuroclassifier_plot {tag event} {
 	# Abort if running in no-graphics mode.
 	if {![winfo exists $info(window)]} {return "ABORT"}
 	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
-	
-	set pointsize $info(classifier_point_size)
+
+	# Set up scaling.	
+	set zoom [LWDAQ_get_lwdaq_config display_zoom]
+	set pointsize [expr round($zoom*$info(classifier_point_size))]
+	set size [expr round($zoom*$info(classifier_map_size))]
 	set c $info(classifier_map)
 
 	set x 0
@@ -2718,10 +2720,10 @@ proc Neuroclassifier_plot {tag event} {
 		set m [lindex $event $metric_index]
 		if {$m == ""} {break}
 		if {[string match -nocase $metric $config(classifier_x_metric)]} {
-			set x [expr $m * $info(classifier_map_size)]
+			set x [expr $m * $size]
 		}
 		if {[string match -nocase $metric $config(classifier_y_metric)]} {
-			set y [expr $info(classifier_map_size) * (1 - $m)]
+			set y [expr $size * (1 - $m)]
 		}
 		incr metric_index
 	}
@@ -2998,7 +3000,7 @@ proc Neuroclassifier_display {event_list} {
 	$c delete event
 	
 	# Plot grid lines in map.
-	set b $info(classifier_map_size)
+	set b [expr round([LWDAQ_get_lwdaq_config display_zoom]*$info(classifier_map_size))]
 	set s [expr $b * 0.1]
 	for {set a [expr $b + 4]} {$a >= 0.0} {set a [expr $a - $s]} {
 		$c create line 0.0 $a $b $a -fill gray
@@ -4149,14 +4151,13 @@ proc Neurotracker_open {} {
 	
 	# Create the map photo and canvas widget.
 	set bd $info(tracker_border)
-	set info(tracker_zoom) [LWDAQ_get_lwdaq_config display_zoom]
-	set zoom $info(tracker_zoom)
+	set zoom [LWDAQ_get_lwdaq_config display_zoom]
    	set info(tracker_photo) [image create photo "_neurotracker_photo_"]
 	set f [frame $w.graph -relief groove -border 4]
 	pack $f -side top -fill x
 	set info(tracker_plot) [canvas $f.track \
-		-height [expr round($zoom*($info(tracker_height) + 2*$bd))] \
-		-width [expr round($zoom*($info(tracker_width) + 2*$bd))]]
+		-height [expr round($zoom*$info(tracker_height)+2*$bd)] \
+		-width [expr round($zoom*$info(tracker_width)+2*$bd)]]
 	pack $info(tracker_plot) -side top
 	$info(tracker_plot) create image $bd $bd -anchor nw -image $info(tracker_photo)
 
@@ -4206,7 +4207,7 @@ proc Neurotracker_fresh_graphs {} {
 	# Return now if the tracker window is unavailable.
 	if {![winfo exists $info(tracker_window)]} {return "FAIL"}
 	
-	# Clear canvass widget.
+	# Clear canvas widget.
 	$info(tracker_plot) delete location
 	$info(tracker_plot) delete power
 
@@ -4273,13 +4274,15 @@ proc Neurotracker_plot {} {
 				[expr $x+$w] [expr $y+$w] [expr $x+$w]\
 				[expr $y-$w] [expr $x-$w] [expr $y-$w]" \
 				$info(tracker_image) \
-				-y_min $y_min -y_max $y_max -x_min $x_min -x_max $x_max -color $color
+				-y_min $y_min -y_max $y_max \
+				-x_min $x_min -x_max $x_max \
+				-color $color
 		} 
 	}
 
 	# Determine border, color and zoom.
 	set bd $info(tracker_border)
-	set zoom $info(tracker_zoom)
+	set zoom [LWDAQ_get_lwdaq_config display_zoom]
 	set tkc [lwdaq tkcolor $color]
 
 	# Mark the coil powers.
@@ -4298,11 +4301,9 @@ proc Neurotracker_plot {} {
 			if {($coil_x < 0) || ($coil_y < 0)} {continue}
 			set coil_p [lindex $tracker_powers $i]
 			set x [expr round( \
-				1.0*$info(tracker_width)*($coil_x-$x_min)/($x_max-$x_min)) \
-				+ $bd]
+				1.0*$info(tracker_width)*($coil_x-$x_min)/($x_max-$x_min))]
 			set y [expr round($info(tracker_height) \
-				-1.0*$info(tracker_height)*($coil_y-$y_min)/($y_max-$y_min)) \
-				+ $bd]
+				-1.0*$info(tracker_height)*($coil_y-$y_min)/($y_max-$y_min))]
 			if {$min_p < $max_p} {
 				set a [expr round(255.0*($coil_p-$min_p)/($max_p-$min_p))]
 			} {
@@ -4311,28 +4312,26 @@ proc Neurotracker_plot {} {
 			if {$a>255} {set a 255}
 			set a [format %02x $a]
 			set pw [expr round($zoom*10)]
-			set x [expr round($zoom*$x)]
-			set y [expr round($zoom*$y)]
+			set x [expr round($zoom*$x+$bd)]
+			set y [expr round($zoom*$y+$bd)]
 			$info(tracker_plot) create oval \
 				[expr $x-$pw] [expr $y-$pw] \
 				[expr $x+$pw] [expr $y+$pw] \
 				-outline $tkc -fill "#$a$a$a" -tag power
 		}
 	}
-
+	
 	# Place a circle on the most recent position.
 	if {[llength $history] >= 1} {
 		set tracker_x [lindex $history end 3]
 		set tracker_y [lindex $history end 4]
 		set x [expr round( \
-			1.0*$info(tracker_width)*($tracker_x-$x_min)/($x_max-$x_min)) \
-			+ $bd]
+			1.0*$info(tracker_width)*($tracker_x-$x_min)/($x_max-$x_min))]
 		set y [expr round($info(tracker_height) \
-			-1.0*$info(tracker_height)*($tracker_y-$y_min)/($y_max-$y_min)) \
-			+ $bd]
+			-1.0*$info(tracker_height)*($tracker_y-$y_min)/($y_max-$y_min))]
 		set pw [expr round($zoom*4)]
-		set x [expr round($zoom*$x)]
-		set y [expr round($zoom*$y)]
+		set x [expr round($zoom*$x+$bd)]
+		set y [expr round($zoom*$y+$bd)]
 		$info(tracker_plot) create oval \
 			[expr $x-$pw] [expr $y-$pw] \
 			[expr $x+$pw] [expr $y+$pw] \

@@ -326,8 +326,8 @@ begin
 					+'"-stdout_available ? -stdin_available ? -append_errors ?'
 					+' -track_ptrs ? -text_name ? -show_details ? -photo_name ?'
 					+' -wait_ms ? -gamma_correction ? -rggb_red_scale ?'
-					+'-rggb_blue_scale ? -fsr ? -fsd ? -eol ? -zoom ? -display_zoom ?'
-					+'-intensify ? -log_name ? -log_errors ?".'); 
+					+' -rggb_blue_scale ? -fsr ? -fsd ? -eol ? -display_zoom ?'
+					+' -intensify ? -log_name ? -log_errors ?".'); 
 				exit;
 			end;
 		end;

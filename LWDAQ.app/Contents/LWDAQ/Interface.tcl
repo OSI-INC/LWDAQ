@@ -1081,7 +1081,7 @@ proc LWDAQ_library_settings {} {
 	}
 	
 	toplevel $w
-	wm title $w "Analysis Library Settings"
+	wm title $w "Library Settings"
 	
 	set f [frame $w.buttons]
 	pack $f -side top -fill x
