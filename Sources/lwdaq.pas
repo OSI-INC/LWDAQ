@@ -240,11 +240,11 @@ end;
 <tr><td>-rggb_blue_scale</td><td>Real</td><td>image drawing blue brightness, default 1.0</td></tr>
 <tr><td>-fsr</td><td>Integer</td><td>field size for real numbers returned in strings, default 1</td></tr>
 <tr><td>-fsd</td><td>Integer</td><td>decimal places for real numbers returned in strings, default 6</td></tr>
-<tr><td>-eol</td><td>String</td><td>end of line characters for text windows and files, default chr(10)</td>
-<tr><td>-append_errors</td><td>Boolean</td><td>Append errors to global error string, default 0</td>
-<tr><td>-log_name</td><td>String</td><td>Name of debugging log file, default "lwdaq_log.txt"</td>
-<tr><td>-log_errors</td><td>Boolean</td><td>Write errors to log file, default 0</td>
-<tr><td>-show_details</td><td>Boolean</td><td>Write execution details to text window, default 0</td>
+<tr><td>-eol</td><td>String</td><td>end of line characters for text windows and files, default chr(10)</td></tr>
+<tr><td>-append_errors</td><td>Boolean</td><td>Append errors to global error string, default 0</td></tr>
+<tr><td>-log_name</td><td>String</td><td>Name of debugging log file, default "lwdaq_log.txt"</td></tr>
+<tr><td>-log_errors</td><td>Boolean</td><td>Write errors to log file, default 0</td></tr>
+<tr><td>-show_details</td><td>Boolean</td><td>Write execution details to text window, default 0</td></tr>
 </table></center>
 
 <p>The lwdaq library routines can write to Tk text windows through -text_name and -photo_name. The -text_name should specify a Tk text widget (such as .text), <i>stdout</i>, or a file name. The default is <i>stdout</i>. If the -text_name does not begin with a period, indicating a text window, nor is it <i>stdout</i>, we assume it is the name of a file. File names cannot be numbers. If the file name contains a path, that path must exist. The -show_details option is used by some library routines to generate additional exectution details that will be printed to the text window specified by -text_name.</p>

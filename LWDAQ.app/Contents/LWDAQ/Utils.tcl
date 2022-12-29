@@ -76,8 +76,6 @@ proc LWDAQ_utils_init {} {
 	set info(lwdaq_long_string_capacity) 300000
 	
 	set info(debug_log) "debug_log.txt"
-	
-	set info(display_zoom) "1.0"
 }
 
 #
@@ -88,6 +86,24 @@ proc LWDAQ_quit {} {
 	LWDAQ_close_all_sockets
 	set LWDAQ_Info(quit) 1
 	exit
+}
+
+#
+# LWDAQ_get_lwdaq_config takes a lwdaq_config option name and returns
+# its value. We can get all the values of all options with "lwdaq_config",
+# but this routine extracts one particular option value for the convenience
+# of the calling routine. When we specify the option, we must not include
+# the dash suffix. 
+#
+proc LWDAQ_get_lwdaq_config {option} {
+	set cg [lwdaq_config]
+	set index [lsearch $cg "-$option"]
+	if {$index >= 0} {
+		set value [lindex $cg [expr $index + 1]]
+	} {
+		error "Unrecognised option \"$option\"/"
+	}
+	return $value
 }
 
 #
@@ -1168,16 +1184,14 @@ proc LWDAQ_read_image_file {infile_name {image_name ""}} {
 }
 
 #
-# LWDAQ_image_bounds returns a string containing the analysis
-# bounds of an image. You can specify new bounds with four numbers
-# in the order left, top, right, bottom. If you specify zero (0) 
-# for the right or bottom bounds, the routine sets them
-# to their maximum values. You can save the result of this routine
-# in a string, change the bounds by calling the routine again, and
-# then restore the earlier values by passing the saved string as its
-# argument. But you have to do this with "eval" so that the TCL 
-# interpreter will break the string into four elements before passing
-# it to LWDAQ_image_bounds.
+# LWDAQ_image_bounds returns a string containing the analysis bounds of an
+# image. You can specify new bounds with four numbers in the order left, top,
+# right, bottom. If you specify zero (0) for the right or bottom bounds, the
+# routine sets them to their maximum values. You can save the result of this
+# routine in a string, change the bounds by calling the routine again, and then
+# restore the earlier values by passing the saved string as its argument. But
+# you have to do this with "eval" so that the TCL interpreter will break the
+# string into four elements before passing it to LWDAQ_image_bounds.
 #
 proc LWDAQ_image_bounds {image {left ""} {top ""} {right ""} {bottom ""}} {
 	set s [lwdaq_image_characteristics $image]
@@ -1217,12 +1231,11 @@ proc LWDAQ_image_bounds {image {left ""} {top ""} {right ""} {bottom ""}} {
 }
 
 #
-# LWDAQ_image_pixels returns a string containing the intensities
-# of all pixels in the analysis boundaries of an image. The pixels
-# form an array by use of spaces and line breaks. There is a line
-# break at the end of each row of pixels and a space between each 
-# column. You can paste the output from this routine directly into
-# Excel and obtain a two-dimensional intensity array.
+# LWDAQ_image_pixels returns a string containing the intensities of all pixels
+# in the analysis boundaries of an image. The pixels form an array by use of
+# spaces and line breaks. There is a line break at the end of each row of pixels
+# and a space between each column. You can paste the output from this routine
+# directly into a spreadsheet and obtain a two-dimensional intensity array.
 #
 proc LWDAQ_image_pixels {image_name} {
 	set binary_pixels [lwdaq_image_contents $image_name]
@@ -1254,14 +1267,13 @@ proc LWDAQ_image_pixels {image_name} {
 }
 
 #
-# LWDAQ_get_file_name opens a file browser window and allows the user
-# to select one or more files in the file system. The user can 
-# select multiple files when multiple is one (1). By default, multiple
-# is zero (0). The routine starts in the LWDAQ working directory, and
-# when the user selects a file, it sets the working directory to the
-# directory containing the file. If the user selects no file, or presses
-# the cancel button in the pop-up window, the routine does nothing.
-# We can specify an initial directory for the file search. By default
+# LWDAQ_get_file_name opens a file browser window and allows the user to select
+# one or more files in the file system. The user can select multiple files when
+# multiple is one (1). By default, multiple is zero (0). The routine starts in
+# the LWDAQ working directory, and when the user selects a file, it sets the
+# working directory to the directory containing the file. If the user selects no
+# file, or presses the cancel button in the pop-up window, the routine does
+# nothing. We can specify an initial directory for the file search. By default
 # the search begins in the LWDAQ working directory.
 #
 proc LWDAQ_get_file_name { {multiple 0} {initialdir ""} } {
@@ -1287,10 +1299,9 @@ proc LWDAQ_get_file_name { {multiple 0} {initialdir ""} } {
 }
 
 #
-# LWDAQ_get_dir_name opens a file browser and allows you to
-# select a directory. We can specify an initial directory for 
-# the file search. By default the search begins in the LWDAQ 
-# working directory.
+# LWDAQ_get_dir_name opens a file browser and allows you to select a directory.
+# We can specify an initial directory for the file search. By default the search
+# begins in the LWDAQ working directory.
 #
 proc LWDAQ_get_dir_name { {initialdir ""} } {
 	global LWDAQ_Info
@@ -1311,12 +1322,11 @@ proc LWDAQ_get_dir_name { {initialdir ""} } {
 }
 
 #
-# LWDAQ_put_file_name opens a file browser window and allows the user
-# to specify an output file. The browser allows the user to select an
-# existing directory in the file system, and to type in a name for the
-# file within that directory. If the "name" parameter is set when this
-# procedure is called, the value of "name" will be the default file name
-# in the browser window.
+# LWDAQ_put_file_name opens a file browser window and allows the user to specify
+# an output file. The browser allows the user to select an existing directory in
+# the file system, and to type in a name for the file within that directory. If
+# the "name" parameter is set when this procedure is called, the value of "name"
+# will be the default file name in the browser window.
 #
 proc LWDAQ_put_file_name { {name ""} } {
 	global LWDAQ_Info
@@ -1336,11 +1346,10 @@ proc LWDAQ_put_file_name { {name ""} } {
 }
 
 #
-# LWDAQ_find_files takes a directory and a glob matching pattern 
-# to produce a list of all matching files in the directory and
-# its sub-directories. It assembles the list by calling itself
-# recursively. The routine is not sensitive to case in the matching
-# pattern. The list is not sorted. 
+# LWDAQ_find_files takes a directory and a glob matching pattern to produce a
+# list of all matching files in the directory and its sub-directories. It
+# assembles the list by calling itself recursively. The routine is not sensitive
+# to case in the matching pattern. The list is not sorted. 
 #
 proc LWDAQ_find_files {directory pattern} {
 	set ffl [list]
@@ -1359,9 +1368,8 @@ proc LWDAQ_find_files {directory pattern} {
 }
 
 #
-# LWDAQ_sort_files takes a list of file names and sorts them by
-# the file name without directory name, which in Tcl we call the
-# file tail. 
+# LWDAQ_sort_files takes a list of file names and sorts them by the file name
+# without directory name, which in Tcl we call the file tail. 
 #
 proc LWDAQ_sort_files {fnl} {
 	proc LWDAQ_sort_files_command {a b} {
@@ -1371,9 +1379,9 @@ proc LWDAQ_sort_files {fnl} {
 }
 
 #
-# LWDAQ_split takes a list of parameters delimited by white space,
-# colons, commas, equal-signs, semi-colons, and null characters. It
-# returns a list containing no empty elements.
+# LWDAQ_split takes a list of parameters delimited by white space, colons,
+# commas, equal-signs, semi-colons, and null characters. It returns a list
+# containing no empty elements.
 #
 proc LWDAQ_split {s} {
 	set a [string map {; \  , \  \0 \  = \ } $s]
@@ -1384,14 +1392,13 @@ proc LWDAQ_split {s} {
 }
 
 #
-# LWDAQ_decimal_to_binary takes a decimal integer, $decimal, and returns
-# the least significant $length digits of its binary representation as a string
-# of ones and zeros. By default, $length is 32, which is also the maximum
-# value of $length supported by the routine. We include comment in the code 
-# to explain our use of binary format and binary scan. It turns out that 
-# we have to use both these routines to achieve our end. First we format 
-# the integer as a binary object, then we scan this binary object for its 
-# bits.
+# LWDAQ_decimal_to_binary takes a decimal integer, $decimal, and returns the
+# least significant $length digits of its binary representation as a string of
+# ones and zeros. By default, $length is 32, which is also the maximum value of
+# $length supported by the routine. We include comment in the code to explain
+# our use of binary format and binary scan. It turns out that we have to use
+# both these routines to achieve our end. First we format the integer as a
+# binary object, then we scan this binary object for its bits.
 #
 proc LWDAQ_decimal_to_binary {decimal {length 32}} {
 	# Convert $i into a four-byte binary object in memory.
@@ -1406,18 +1413,17 @@ proc LWDAQ_decimal_to_binary {decimal {length 32}} {
 }
 
 #
-# LWDAQ_set_bit takes a string of ones and zeros, called binary_string, and 
-# sets bit number $bit_num to $value. By default, $value is 1, in keeping 
-# with the electrical engineer's meaning of the word "set".
+# LWDAQ_set_bit takes a string of ones and zeros, called binary_string, and sets
+# bit number $bit_num to $value. By default, $value is 1, in keeping with the
+# electrical engineer's meaning of the word "set".
 #
 proc LWDAQ_set_bit {binary_string bit_num {value 1}} {
 	return [string replace $binary_string end-$bit_num end-$bit_num $value]
 }
 
 #
-# LWDAQ_time_stamp returns a year, month, date, hour, seconds
-# time-stamp string for record keeping, or converts a [clock seconds] 
-# result into a time-stamp.
+# LWDAQ_time_stamp returns a year, month, date, hour, seconds time-stamp string
+# for record keeping, or converts a [clock seconds] result into a time-stamp.
 #
 proc LWDAQ_time_stamp { {s ""} } {
 	if {$s == ""} {set s [clock seconds]}
@@ -1425,19 +1431,18 @@ proc LWDAQ_time_stamp { {s ""} } {
 }
 
 #
-# LWDAQ_is_error_result returns 1 if and only if the first string
-# begins with "ERROR: " (case sensitive).
+# LWDAQ_is_error_result returns 1 if and only if the first string begins with
+# "ERROR: " (case sensitive).
 #
 proc LWDAQ_is_error_result {s} {
 	return [string match "ERROR: *" $s]
 }
 
 #
-# LWDAQ_vwait_var_name will return a unique name for a global 
-# vwait variable. All LWDAQ routines that call TCL's vwait routine
-# use a global timeout variable assigned by this routine, so that
-# its partner routine LWDAQ_stop_vwaits can go through all existing
-# timeout variables and set them, which aborts the vwaits.
+# LWDAQ_vwait_var_name will return a unique name for a global vwait variable.
+# All LWDAQ routines that call TCL's vwait routine use a global timeout variable
+# assigned by this routine, so that its partner routine LWDAQ_stop_vwaits can go
+# through all existing timeout variables and set them, which aborts the vwaits.
 #
 proc LWDAQ_vwait_var_name {} {
 	global LWDAQ_Info
@@ -1453,9 +1458,8 @@ proc LWDAQ_vwait_var_name {} {
 }
 
 #
-# LWDAQ_vwait calls vwait, but also keeps a list of the current
-# vwait variable stack, which the System Monitor uses to keep 
-# track of LWDAQ vwaits.
+# LWDAQ_vwait calls vwait, but also keeps a list of the current vwait variable
+# stack, which the System Monitor uses to keep track of LWDAQ vwaits.
 #
 proc LWDAQ_vwait {var_name} {
 	global LWDAQ_Info $var_name
@@ -1491,10 +1495,10 @@ proc LWDAQ_vwait {var_name} {
 }
 
 #
-# LWDAQ_stop_vwaits sets all vwait variables generated by the above 
-# routine, which aborts all the current LWDAQ vwaits. Because TCL 
-# vwaits are nested, LWDAQ_stop_vwaits will cause any depth of nesting 
-# to terminate, even it the nesting is in deadlock.
+# LWDAQ_stop_vwaits sets all vwait variables generated by the above routine,
+# which aborts all the current LWDAQ vwaits. Because TCL vwaits are nested,
+# LWDAQ_stop_vwaits will cause any depth of nesting to terminate, even it the
+# nesting is in deadlock.
 #
 proc LWDAQ_stop_vwaits {} {
 	global LWDAQ_Info
@@ -1510,13 +1514,13 @@ proc LWDAQ_stop_vwaits {} {
 }
 
 #
-# LWDAQ_wait_ms waits for the specified time. By default, the routine 
-# assigns a unique global name of its own. But it allows you to specify
-# the name of the variable that will be used to control the delay. In this
-# way, you can abort the waiting period by setting the variable from a 
-# button or some other event command. When the waiting is done, we unset
-# the waiting variable. When the waiting is aborted, we cancel the waiting 
-# command so that the waiting variable will not be set later.
+# LWDAQ_wait_ms waits for the specified time. By default, the routine assigns a
+# unique global name of its own. But it allows you to specify the name of the
+# variable that will be used to control the delay. In this way, you can abort
+# the waiting period by setting the variable from a button or some other event
+# command. When the waiting is done, we unset the waiting variable. When the
+# waiting is aborted, we cancel the waiting command so that the waiting variable
+# will not be set later.
 #
 proc LWDAQ_wait_ms {time_ms {vwait_var_name ""}} {
 	if {![string is integer -strict $time_ms]} {
@@ -1547,11 +1551,10 @@ proc LWDAQ_wait_seconds {t {vwait_var_name ""}} {
 }
 
 #
-# LWDAQ_watch waits for a global variable to aquire a particular
-# value, at which point it executes a command. We give the name
-# of the global variable and the awaited value. When the condition
-# is met, the procedure executes the command, otherwise it posts
-# itself to the event queue. The command is a script.
+# LWDAQ_watch waits for a global variable to aquire a particular value, at which
+# point it executes a command. We give the name of the global variable and the
+# awaited value. When the condition is met, the procedure executes the command,
+# otherwise it posts itself to the event queue. The command is a script.
 #
 proc LWDAQ_watch {watch_var watch_val command} {
 	upvar #0 $watch_var wv
@@ -1563,9 +1566,9 @@ proc LWDAQ_watch {watch_var watch_val command} {
 }
 
 #
-# LWDAQ_update passes control to the TclTk event handler for update_ms.
-# During this time, the event handler can perform window updates, respond to
-# mouse clicks, and service TCPIP sockets.
+# LWDAQ_update passes control to the TclTk event handler for update_ms. During
+# this time, the event handler can perform window updates, respond to mouse
+# clicks, and service TCPIP sockets.
 #
 proc LWDAQ_update {} {
 	global LWDAQ_Info
@@ -1592,8 +1595,7 @@ proc LWDAQ_support {} {
 }
 
 #
-# LWDAQ_global_var_name will return a unique name for a global 
-# variable.
+# LWDAQ_global_var_name will return a unique name for a global variable.
 #
 proc LWDAQ_global_var_name {} {
 	set count 0
@@ -1607,9 +1609,9 @@ proc LWDAQ_global_var_name {} {
 }
 
 # 
-# LWDAQ_process_exists checks if an operating system process exists. We pass 
-# the routine an id number and the routine returns 0 for false (does not exist) 
-# and 1 for true (exists). If the id is zero, we always return false. 
+# LWDAQ_process_exists checks if an operating system process exists. We pass the
+# routine an id number and the routine returns 0 for false (does not exist) and
+# 1 for true (exists). If the id is zero, we always return false. 
 #
 proc LWDAQ_process_exists {id} {
 	global LWDAQ_Info
@@ -1702,11 +1704,10 @@ proc LWDAQ_url_open {url} {
 }
 
 #
-# LWDAQ_random returns a number between min and max. If both
-# min and max are integers, then the number returned is also
-# and integer. If either min or max is real, then the number
-# returned is real. The random calculation we take from Practical
-# Programming in TCL and TK by Brent Welch et al. 
+# LWDAQ_random returns a number between min and max. If both min and max are
+# integers, then the number returned is also and integer. If either min or max
+# is real, then the number returned is real. The random calculation we take from
+# Practical Programming in TCL and TK by Brent Welch et al. 
 #
 proc LWDAQ_random {{min 0.0} {max 1.0}} {
 	global LWDAQ_random_seed
@@ -1723,9 +1724,9 @@ proc LWDAQ_random {{min 0.0} {max 1.0}} {
 }
 
 #
-# LWDAQ_random_wait_ms waits for a random number of milliseconds between
-# min and max. During the wait, it passes control to the TCL/TK event loop
-# so that idle tasks can be executed.
+# LWDAQ_random_wait_ms waits for a random number of milliseconds between min and
+# max. During the wait, it passes control to the TCL/TK event loop so that idle
+# tasks can be executed.
 #
 proc LWDAQ_random_wait_ms {{min 0} {max 1000}} {
 	set time [LWDAQ_random [expr round($min)] [expr round($max)]]
@@ -1747,11 +1748,10 @@ proc LWDAQ_debug_log {s} {
 }
 
 #
-# LWDAQ_proc_list returns a list of all procedures declared in
-# the specified file that match the proc_name string. The proc_name
-# can contain wild cards * and ?. Each procedure must be declared
-# on a new line that begins with "proc " followed by the procedure
-# name.
+# LWDAQ_proc_list returns a list of all procedures declared in the specified
+# file that match the proc_name string. The proc_name can contain wild cards *
+# and ?. Each procedure must be declared on a new line that begins with "proc "
+# followed by the procedure name.
 #
 proc LWDAQ_proc_list {{proc_name "LWDAQ_*"} {file_name ""} } {
 	if {$file_name == ""} {
@@ -1773,15 +1773,15 @@ proc LWDAQ_proc_list {{proc_name "LWDAQ_*"} {file_name ""} } {
 }
 
 #
-# LWDAQ_proc_description returns a list of procedure descriptions,
-# such as this one, as exctracted from the TCL/TK script that defines
-# the procedure. If there are procedures in the script that match the
-# proc_name parameter, but do not have their own descriptions, the
-# routine returns an empty element in its list. The script must indicate
-# the description by quoting the procedure name after "# " on a new line.
-# If you pass keep_breaks=1, the procedure will retain the original 
-# line breaks, which can be useful for printing directly to the TCL 
+# LWDAQ_proc_description returns a list of procedure descriptions, such as this
+# one, as exctracted from the TCL/TK script that defines the procedure. If there
+# are procedures in the script that match the proc_name parameter, but do not
+# have their own descriptions, the routine returns an empty element in its list.
+# The script must indicate the description by quoting the procedure name after
+# "# " on a new line. If you pass keep_breaks=1, the procedure will retain the
+# original line breaks, which can be useful for printing directly to the TCL
 # console.
+#
 proc LWDAQ_proc_description {{proc_name "LWDAQ_*"} {file_name ""} {keep_breaks 0} } {
 	if {$file_name == ""} {
 		set file_name [LWDAQ_get_file_name]
@@ -2104,21 +2104,19 @@ proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
 }	
 
 #
-# LWDAQ_html_split takes a long file with h2-level chapters
-# and splits it into chapter files. It puts the chapter files in
-# a new directory. If the original file is called A.html, the
-# directory is A, and the chapters are named A_1.html to A_n.html,
-# where n is the number of chapters. There will be another file
-# called index.html, which is the table of contents. Each chapter
-# provides a link to the table of contents, to the previous chapter,
-# and to the next chapter. Each preserves the header and stylsheets
-# used in the original file. All local html links get displaced
-# downwards by one level in order to account for the chapters being
-# buried in a new directory. Internal links in the document are
-# broken, so you will have to go in and fix them by hand. Any h2-level
-# heading called "Contents" will be removed from the list of chapter,
-# because we assume it's a table of contents generated by 
-# the routine LWDAQ_html_contents.
+# LWDAQ_html_split takes a long file with h2-level chapters and splits it into
+# chapter files. It puts the chapter files in a new directory. If the original
+# file is called A.html, the directory is A, and the chapters are named A_1.html
+# to A_n.html, where n is the number of chapters. There will be another file
+# called index.html, which is the table of contents. Each chapter provides a
+# link to the table of contents, to the previous chapter, and to the next
+# chapter. Each preserves the header and stylsheets used in the original file.
+# All local html links get displaced downwards by one level in order to account
+# for the chapters being buried in a new directory. Internal links in the
+# document are broken, so you will have to go in and fix them by hand. Any
+# h2-level heading called "Contents" will be removed from the list of chapter,
+# because we assume it's a table of contents generated by the routine
+# LWDAQ_html_contents.
 #
 proc LWDAQ_html_split {{file_name ""}} {
 	# Find the input file.
@@ -2219,15 +2217,14 @@ proc LWDAQ_html_split {{file_name ""}} {
 		close $f
 	}
 
-
 	return 1
 }
 
 #
-# LWDAQ_html_tables extracts all the tables from an HTML document and
-# writes them to a new HTML document with Tables_ added to the beginning of
-# the original document's file root. The routine takes one optional 
-# parameter: the name of the HTML document.
+# LWDAQ_html_tables extracts all the tables from an HTML document and writes
+# them to a new HTML document with Tables_ added to the beginning of the
+# original document's file root. The routine takes one optional parameter: the
+# name of the HTML document.
 #
 proc LWDAQ_html_tables { {file_name ""} } {
 	# Find the input file.

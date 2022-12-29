@@ -537,9 +537,10 @@ proc Neuroplayer_init {} {
 # Neurotracker panel configuration.
 #
 	set info(tracker_window) $info(window)\.tracker
-	set info(tracker_width) [expr round(640 * $LWDAQ_Info(display_zoom))]
-	set info(tracker_height) [expr round(320 * $LWDAQ_Info(display_zoom))]
-	set info(tracker_image_border_pixels) 10
+	set info(tracker_width) 640
+	set info(tracker_height) 320
+	set info(tracker_border) 10
+	set info(tracker_zoom) 2
 #
 # Neurotracker calculation settings.
 #
@@ -4146,14 +4147,16 @@ proc Neurotracker_open {} {
 	entry $f.ei -textvariable Neuroplayer_config(play_time) -width 8
 	pack $f.li $f.ei -side left -expand yes
 	
-	# Create the map photo and canvass widget.
-	set bd $info(tracker_image_border_pixels)
+	# Create the map photo and canvas widget.
+	set bd $info(tracker_border)
+	set info(tracker_zoom) [LWDAQ_get_lwdaq_config display_zoom]
+	set zoom $info(tracker_zoom)
    	set info(tracker_photo) [image create photo "_neurotracker_photo_"]
 	set f [frame $w.graph -relief groove -border 4]
 	pack $f -side top -fill x
 	set info(tracker_plot) [canvas $f.track \
-		-height [expr $info(tracker_height) + 2*$bd] \
-		-width [expr $info(tracker_width) + 2*$bd]]
+		-height [expr round($zoom*($info(tracker_height) + 2*$bd))] \
+		-width [expr round($zoom*($info(tracker_width) + 2*$bd))]]
 	pack $info(tracker_plot) -side top
 	$info(tracker_plot) create image $bd $bd -anchor nw -image $info(tracker_photo)
 
@@ -4274,8 +4277,9 @@ proc Neurotracker_plot {} {
 		} 
 	}
 
-	# Determine border and color.
-	set bd $info(tracker_image_border_pixels)
+	# Determine border, color and zoom.
+	set bd $info(tracker_border)
+	set zoom $info(tracker_zoom)
 	set tkc [lwdaq tkcolor $color]
 
 	# Mark the coil powers.
@@ -4293,11 +4297,12 @@ proc Neurotracker_plot {} {
 			set coil_y [lindex $config(tracker_coordinates) [expr 3*$i+1]]
 			if {($coil_x < 0) || ($coil_y < 0)} {continue}
 			set coil_p [lindex $tracker_powers $i]
-			set x [expr round(1.0*($coil_x-$x_min)*$info(tracker_width) \
-				/($x_max-$x_min)) + $bd]
+			set x [expr round( \
+				1.0*$info(tracker_width)*($coil_x-$x_min)/($x_max-$x_min)) \
+				+ $bd]
 			set y [expr round($info(tracker_height) \
-				-1.0*($coil_y-$y_min)*$info(tracker_height) \
-				/($y_max-$y_min)) + $bd]
+				-1.0*$info(tracker_height)*($coil_y-$y_min)/($y_max-$y_min)) \
+				+ $bd]
 			if {$min_p < $max_p} {
 				set a [expr round(255.0*($coil_p-$min_p)/($max_p-$min_p))]
 			} {
@@ -4305,7 +4310,9 @@ proc Neurotracker_plot {} {
 			}
 			if {$a>255} {set a 255}
 			set a [format %02x $a]
-			set pw 10
+			set pw [expr round($zoom*10)]
+			set x [expr round($zoom*$x)]
+			set y [expr round($zoom*$y)]
 			$info(tracker_plot) create oval \
 				[expr $x-$pw] [expr $y-$pw] \
 				[expr $x+$pw] [expr $y+$pw] \
@@ -4317,12 +4324,15 @@ proc Neurotracker_plot {} {
 	if {[llength $history] >= 1} {
 		set tracker_x [lindex $history end 3]
 		set tracker_y [lindex $history end 4]
-		set x [expr round(1.0*($tracker_x-$x_min)*$info(tracker_width) \
-			/($x_max-$x_min)) + $bd]
+		set x [expr round( \
+			1.0*$info(tracker_width)*($tracker_x-$x_min)/($x_max-$x_min)) \
+			+ $bd]
 		set y [expr round($info(tracker_height) \
-			-1.0*($tracker_y-$y_min)*$info(tracker_height) \
-			/($y_max-$y_min)) + $bd]
-		set pw 4
+			-1.0*$info(tracker_height)*($tracker_y-$y_min)/($y_max-$y_min)) \
+			+ $bd]
+		set pw [expr round($zoom*4)]
+		set x [expr round($zoom*$x)]
+		set y [expr round($zoom*$y)]
 		$info(tracker_plot) create oval \
 			[expr $x-$pw] [expr $y-$pw] \
 			[expr $x+$pw] [expr $y+$pw] \
