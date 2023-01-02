@@ -18,7 +18,7 @@
 #
 
 #
-# Fiber_Positioner_init creates and initializes the tools' configuration
+# Fiber_Positioner_init creates and initializes the tool's configuration
 # (config) and information (info) arrays. It reads saved configuration (but not
 # information) parameters from disk if we have previously saved our
 # configuration to disk. All the configuration parameters are visible in the
@@ -30,7 +30,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "1.11"
+	LWDAQ_tool_init "Fiber_Positioner" "2.0"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -55,29 +55,13 @@ proc Fiber_Positioner_init {} {
 	# The control value for which the control voltages are closest to zero.
 	set config(dac_zero) "133"
 	
-	# We assume only one driver in the test stand.
-	set config(daq_ip_addr) "10.0.0.40"
-	
-	# The driver sockets and device elements for the analog outputs and inputs.
-	set config(ns_sock) 1
-	set config(n_out_ch) 1
-	set config(n_in_ch) 1
-	set config(s_out_ch) 2
-	set config(s_in_ch) 2
-	set config(ew_sock) 2
-	set config(e_out_ch) 1
-	set config(e_in_ch) 1
-	set config(w_out_ch) 2
-	set config(w_in_ch) 2
-	
-	# The factor by which the analog inputs are divided on their way from the 
-	# connector to the input amplifier.
-	set config(input_divisor) "32.0"
-	
-	# Parameters that set up the fiber image capture and analysis.
+	# Data acquisition addresses.
+	set config(ip_addr) "192.168.1.11"
+	set config(dfps_sock) "8"
 	set config(fiber_type) "9"
-	set config(fiber_sock) "3"
-	set config(fiber_elements) "A1 A2 A3 A4"
+	set config(injector_sock) "3"
+	set config(injector_leds) "A1 A2"
+	set config(dfps_ids) "A123 B341"
 	set config(camera_sock) "4"
 	set config(flash_seconds) "0.003"
 	set config(sort_code) "8"
@@ -89,12 +73,15 @@ proc Fiber_Positioner_init {} {
 	set config(e_out) $config(dac_zero) 
 	set config(w_out) $config(dac_zero) 
 	
-	# The measurements we make of the electrode voltages, have to set them to 
-	# something, assume zero.
-	set info(n_in) "0"
-	set info(s_in) "0"
-	set info(e_in) "0"
-	set info(w_in) "0"
+	# Command transmission values.
+	set config(initiate_delay) "0.010"
+	set config(spacing_delay_A2037E) "0.0000"
+	set config(spacing_delay_A2071E) "0.0014"
+	set config(spacing_delay_cmd) "0.0"
+	set config(byte_processing_time) "0.0002"
+	set config(rf_on_op) "0081"
+	set config(rf_xmit_op) "82"
+	set config(checksum_preload) "1111111111111111"	
 	
 	# The history of spot positions for the tracing.
 	set info(trace_history) [list]
@@ -102,6 +89,7 @@ proc Fiber_Positioner_init {} {
 	set config(trace_persistence) "1000"
 	set config(repeat) "0"
 	set info(travel_wait) "0"
+	set info(spot_positions) ""
 	
 	# Travel configuration.
 	set config(travel_index) "0"
@@ -110,7 +98,7 @@ proc Fiber_Positioner_init {} {
 	set config(travel_file) [file normalize ~/Desktop/Travel.txt]
 	
 	# Waiting time after setting control voltages before we make measurements.
-	set config(settling_ms) "100"
+	set config(settling_ms) "500"
 	
 	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
@@ -121,79 +109,111 @@ proc Fiber_Positioner_init {} {
 }
 
 #
-# A2057_set_out sets the output of one digital to analog converter (DAC) on an
-# Input-Output Head (A2057). We pass the routine driver address (ip), a driver
-# socket number (dsock), a multiplexer socket number (msock), a device element
-# number (dac) and an eight-bit value (value). The routine opens a socket,
-# selects the Input-Output Head and sends a string of thirty-five commands to to
-# set one of its DAC outputs.
+# Fiber_Positioner_transmit takes a string of command bytes and transmits them through a
+# Command Transmitter such as the A3029A. The routine appends a sixteen-bit
+# checksum. The checksum is the two bytes necessary to return a sixteen-bit
+# linear feedback shift register to all zeros, thus performing a sixteen-bit
+# cyclic redundancy check. We assume the destination shift register is preloaded
+# with the checksum_preload value. The shift register has taps at locations 16,
+# 14, 13, and 11.
 #
-proc A2057_set_out {ip dsock msock dac value} {
+proc Fiber_Positioner_transmit {{commands ""}} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
-
-	# Construct the sixteen bit value we must send to the DAC.
-	if {![string is integer -strict $value]} {
-		error "value \"$value\" not an integer."
+	global LWDAQ_Driver
+	
+	# If we specify no commands, use those in the commands parameter.
+	if {$commands == ""} {
+		set commands $config(commands)
 	}
-	if {($value>255) || ($value<0)} {
-		error "value \"$value\" must be 0..255."
-	}
-	set bits 0000[LWDAQ_decimal_to_binary $value 8]0000
 
-	if {[catch {
-		# Open a socket to the driver and select the A2057.
-		set sock [LWDAQ_socket_open $ip]
-		LWDAQ_set_driver_mux $sock $dsock $msock
+	# Print the commands to the text window.
+	LWDAQ_print $info(log) "Transmitting: $commands"
 
-		# Assert the frame sync bit.
-		LWDAQ_transmit_command_hex $sock "6C80"
-
-		# Select DAC1 or DAC2.
-		if {$dac == 1} {set c "480"} else {set c "880"}
-		LWDAQ_transmit_command_hex $sock "6$c"
-
-		# Transmit sixteen bits. Each bit requires two command words, one
-		# to present the bit value and raise the clock, another to continue
-		# the bit value while dropping the clock.
-		for {set i 0} {$i < [string length $bits]} {incr i} {
-			set b [string index $bits $i]
-			if {$b} {
-				LWDAQ_transmit_command_hex $sock "C$c"
-				LWDAQ_transmit_command_hex $sock "8$c"
-			} else {
-				LWDAQ_transmit_command_hex $sock "4$c"
-				LWDAQ_transmit_command_hex $sock "0$c"
-			}
+	# Append a two-byte checksum.
+	set checksum $config(checksum_preload)
+	foreach c "$commands 0 0" {
+		binary scan [binary format c $c] B8 bits
+		for {set i 0} {$i < 8} {set i [expr $i + 1]} {
+			set bit [string index $bits $i]
+			set fb [string index $checksum 15]
+			set new [string range $checksum 5 14]
+			set new "[expr [string index $checksum 4] ^ $fb]$new"
+			set new "[string index $checksum 3]$new"
+			set new "[expr [string index $checksum 2] ^ $fb]$new"
+			set new "[expr [string index $checksum 1] ^ $fb]$new"
+			set new "[string index $checksum 0]$new"
+			set new "[expr $fb ^ $bit]$new"
+			set checksum $new
+			binary scan [binary format b16 $checksum] cu1cu1 d21 d22
 		}
-
-		# End the transmission by deselecting both DACs.
-		LWDAQ_transmit_command_hex $sock "4080"
-
-		# Close the socket to the driver, freeing it for other activity.
+	}
+	append commands " $d22 $d21"
+		
+	# Open a socket to the command transmitter's LWDAQ server, select the
+	# command transmitter, and instruct it to transmit each byte of the
+	# command, including the checksum.
+	if {[catch {
+		set sock [LWDAQ_socket_open $config(ip_addr)]
+		if {[LWDAQ_hardware_id $sock] == "37"} {
+			set sd $config(spacing_delay_A2037E)		
+		} {
+			set sd $config(spacing_delay_A2071E)
+		}
+		LWDAQ_set_driver_mux $sock $config(dfps_sock) 1
+		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
+		LWDAQ_delay_seconds $sock $config(initiate_delay)
+		foreach c $commands {
+			LWDAQ_transmit_command_hex $sock "[format %02X $c]$config(rf_xmit_op)"
+			if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
+		}
+		LWDAQ_transmit_command_hex $sock "0000"
+		LWDAQ_delay_seconds $sock [expr $config(byte_processing_time)*[llength $commands]]
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 	} error_result]} {
-		catch {LWDAQ_socket_close $sock}
+		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		error $error_result
 	}
 	
+	# If we get here, we have no reason to believe the transmission failed, although
+	# we could have instructed an empty driver socket or the positioner could have
+	# failed to receive the command.
 	return "SUCCESS"
 }
 
 #
-# Fiber_Positioner_set_nsew takes the north, south, east and west control values and
-# writes them to their digital to analog converters. One after the other. The routine
-# does not catch errors, so if something goes wrong, the routine aborts with an error.
+# Fiber_Positioner_id_bytes returns a list of two bytes as decimal numbers that represent
+# the identifier of the implant.
 #
-proc Fiber_Positioner_set_nsew {} {
+proc Fiber_Positioner_id_bytes {id_hex} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
 
-	A2057_set_out $config(daq_ip_addr) $config(ns_sock) 1 $config(n_out_ch) $config(n_out)
-	A2057_set_out $config(daq_ip_addr) $config(ns_sock) 1 $config(s_out_ch) $config(s_out)
-	A2057_set_out $config(daq_ip_addr) $config(ew_sock) 1 $config(e_out_ch) $config(e_out)
-	A2057_set_out $config(daq_ip_addr) $config(ew_sock) 1 $config(w_out_ch) $config(w_out)
+	set id [string trim $id_hex]
+	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
+		return "[expr 0x$b1] [expr 0x$b2]"
+	} elseif {$id == "*"} {
+		return "255 255"
+	} else {
+		LWDAQ_print $info(log) "ERROR: Bad device identifier \"$id\",\
+			defaulting to null identifier."
+		return "0 0"
+	}
+}
+
+#
+# Fiber_Positioner_set_nsew takes the north, south, east and west control values and
+# instructs the named positioner to set its converters accordingly.
+#
+proc Fiber_Positioner_set_nsew {id} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
+
+	set command [Fiber_Positioner_id_bytes $id]
+	append command " 1 $config(n_out) 0 2 $config(s_out) 0\
+		3 $config(e_out) 0 4 $config(w_out) 0"
+	Fiber_Positioner_transmit $command
 }
 
 #
@@ -209,28 +229,26 @@ proc Fiber_Positioner_spot_position {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
-	set iconfig(daq_ip_addr) $config(daq_ip_addr)
-	set iconfig(daq_source_driver_socket) $config(fiber_sock)
-	set iconfig(daq_source_device_element) $config(fiber_elements)
+	set info(spot_positions) ""
+	set iconfig(daq_ip_addr) $config(ip_addr)
+	set iconfig(daq_source_driver_socket) $config(injector_sock)
+	set iconfig(daq_source_device_element) $config(injector_leds)
 	set iinfo(daq_source_device_type) $config(fiber_type)
-	set iconfig(daq_driver_socket) $config(camera_sock)
+	set iconfig(dfps_socket) $config(camera_sock)
 	set iconfig(daq_flash_seconds) $config(flash_seconds)
 	set iconfig(analysis_num_spots) \
-		"[llength $config(fiber_elements)] $config(sort_code)"
+		"[llength $config(injector_leds)] $config(sort_code)"
 	LWDAQ_set_image_sensor $config(image_sensor) BCAM
 	
 	set result [LWDAQ_acquire BCAM]
 	
 	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(log) $result
-		set info(control) "Stop"
-		return "ERROR"
+		error $result
 	}
 	
 	set result [lreplace $result 0 0]	
-	set info(spot_positions) ""
 	set index 0
-	foreach fiber $config(fiber_elements) {
+	foreach fiber $config(injector_leds) {
 		incr index
 		set x [format %.1f [lindex $result 0]]
 		set y [format %.1f [lindex $result 1]]
@@ -256,67 +274,6 @@ proc Fiber_Positioner_spot_position {} {
 	lwdaq_draw $iconfig(memory_name) $info(photo) \
 		-zoom $config(zoom) \
 		-intensify $config(intensify)
-	
-	return "SUCCESS"
-}
-
-#
-# Fiber_Positioner_Voltages uses the Voltmeter to read the four electrode
-# voltages from two Input-Output Heads (A2057H). The routine checks for errors
-# in data acquisition and instructs the Fiber Positioner to stop any long-term
-# operation if it does encounter an error
-#
-proc Fiber_Positioner_voltages {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
-	upvar #0 LWDAQ_config_Voltmeter iconfig
-	upvar #0 LWDAQ_info_Voltmeter iinfo
-	
-	set iconfig(analysis_auto_calib) 1
-	set iconfig(daq_no_sleep) 1
-	set iconfig(daq_ip_addr) $config(daq_ip_addr)
-	
-	# Read the North electrode voltage.
-	set iconfig(daq_driver_socket) $config(ns_sock)
-	set iconfig(daq_device_element) $config(n_in_ch)
-	set result [LWDAQ_acquire Voltmeter]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(log) $result
-		set info(control) "Stop"
-		return "ERROR"
-	}
-	set info(n_in) [format %.1f [expr $config(input_divisor) * [lindex $result 1]]]
-
-	# Read the South electrode voltage.
-	set iconfig(daq_device_element) $config(s_in_ch)
-	set result [LWDAQ_acquire Voltmeter]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(log) $result
-		set info(control) "Stop"
-		return "ERROR"
-	}
-	set info(s_in) [format %.1f [expr $config(input_divisor) * [lindex $result 1]]]
-
-	# Read the East electrode voltage.
-	set iconfig(daq_driver_socket) $config(ew_sock)
-	set iconfig(daq_device_element) $config(e_in_ch)
-	set result [LWDAQ_acquire Voltmeter]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(log) $result
-		set info(control) "Stop"
-		return "ERROR"
-	}
-	set info(e_in) [format %.1f [expr $config(input_divisor) * [lindex $result 1]]]
-	
-	# Read the West electrode voltage.
-	set iconfig(daq_device_element) $config(w_in_ch)
-	set result [LWDAQ_acquire Voltmeter]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(log) $result
-		set info(control) "Stop"
-		return "ERROR"
-	}
-	set info(w_in) [format %.1f [expr $config(input_divisor) * [lindex $result 1]]]
 	
 	return "SUCCESS"
 }
@@ -373,10 +330,6 @@ proc Fiber_Positioner_report {{t ""}} {
 		[format %.0f $config(s_out)]\
 		[format %.0f $config(e_out)]\
 		[format %.0f $config(w_out)] " green
-	LWDAQ_print -nonewline $t "[format %6.1f $info(n_in)]\
-		[format %.1f $info(s_in)]\
-		[format %.1f $info(e_in)]\
-		[format %.1f $info(w_in)] " brown
 	LWDAQ_print $t "$info(spot_positions)" black
 	return "SUCCESS"
 }
@@ -395,17 +348,17 @@ proc Fiber_Positioner_move {} {
 	}
 	
 	if {[catch {
-		Fiber_Positioner_set_nsew
+		foreach id $config(dfps_ids) {
+			Fiber_Positioner_set_nsew $id
+		}
+		LWDAQ_wait_ms $config(settling_ms)
+		Fiber_Positioner_spot_position
+		Fiber_Positioner_report
 	} error_result]} {
 		LWDAQ_print $info(log) "ERROR: $error_result"
 		set info(control) "Idle"
 		return "ERROR"
 	}
-	
-	LWDAQ_wait_ms $config(settling_ms)
-	Fiber_Positioner_voltages	
-	Fiber_Positioner_spot_position
-	Fiber_Positioner_report
 	
 	if {$info(control) == "Move"} {
 		set info(control) "Idle"
@@ -428,18 +381,18 @@ proc Fiber_Positioner_zero {} {
 	}
 	
 	if {[catch {
-		Fiber_Positioner_set_nsew
+		foreach id $config(dfps_ids) {
+			Fiber_Positioner_set_nsew $id
+		}
+		LWDAQ_wait_ms $config(settling_ms)	
+		Fiber_Positioner_spot_position
+		Fiber_Positioner_report
 	} error_result]} {
 		LWDAQ_print $info(log) "ERROR: $error_result"
 		set info(control) "Idle"
 		return "ERROR"
 	}
 
-	LWDAQ_wait_ms $config(settling_ms)
-	Fiber_Positioner_voltages	
-	Fiber_Positioner_spot_position
-	Fiber_Positioner_report
-		
 	if {$info(control) == "Zero"} {
 		set info(control) "Idle"
 	}
@@ -453,10 +406,16 @@ proc Fiber_Positioner_zero {} {
 proc Fiber_Positioner_check {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
-
-	Fiber_Positioner_voltages	
-	Fiber_Positioner_spot_position
-	Fiber_Positioner_report
+	
+	
+	if {[catch {
+		Fiber_Positioner_spot_position
+		Fiber_Positioner_report
+	} error_result]} {
+		LWDAQ_print $info(log) "ERROR: $error_result"
+		set info(control) "Idle"
+		return "ERROR"
+	}
 	
 	if {$info(control) == "Check"} {
 		set info(control) "Idle"
@@ -473,7 +432,7 @@ proc Fiber_Positioner_clear {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 
 	set index 0
-	foreach fiber $config(fiber_elements) {
+	foreach fiber $config(injector_leds) {
 		incr index
 		set info(trace_history_$index) [list]
 	}
@@ -484,6 +443,7 @@ proc Fiber_Positioner_clear {} {
 			-zoom $config(zoom) \
 			-intensify $config(intensify)
 	}
+	
 	if {$info(control) == "Clear"} {
 		set info(control) "Idle"
 	}
@@ -729,7 +689,7 @@ proc Fiber_Positioner_travel {} {
 	
 			# Apply the new control values to all four electrodes.
 			if {[catch {
-				Fiber_Positioner_set_nsew
+				foreach id $config(dfps_ids) {Fiber_Positioner_set_nsew $id}
 			} error_result]} {
 				LWDAQ_print $info(log) "ERROR: $error_result"
 				set info(control) "Idle"
@@ -738,8 +698,7 @@ proc Fiber_Positioner_travel {} {
 	
 			# Wait for the fiber to settle, then measure voltages, spot position, and
 			# report to text window.
-			LWDAQ_wait_ms $config(settling_ms)
-			Fiber_Positioner_voltages	
+			LWDAQ_wait_ms $config(settling_ms)	
 			Fiber_Positioner_spot_position
 			Fiber_Positioner_report
 		}
@@ -829,7 +788,7 @@ proc Fiber_Positioner_open {} {
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
 
-	foreach a {daq_ip_addr fiber_sock fiber_elements \
+	foreach a {ip_addr injector_sock injector_leds \
 			flash_seconds camera_sock settling_ms} {
 		label $f.l$a -text $a -fg green
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
@@ -840,10 +799,14 @@ proc Fiber_Positioner_open {} {
 	set f [frame $ff.pz]
 	pack $f -side top -fill x
 
-	foreach a {ns_sock n_out_ch n_in_ch s_out_ch s_in_ch ew_sock \
-			e_out_ch e_in_ch w_out_ch w_in_ch} {
+	foreach a {dfps_sock} {
 		label $f.l$a -text $a -fg green
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 2
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	foreach a {dfps_ids} {
+		label $f.l$a -text $a -fg green
+		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 60
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -854,12 +817,6 @@ proc Fiber_Positioner_open {} {
 		set a [string tolower $d]
 		label $f.l$a -text $d -fg green
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 5
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-	foreach d {n_in s_in e_in w_in} {
-		set a [string tolower $d]
-		label $f.l$a -text $d -fg green
-		label $f.e$a -textvariable Fiber_Positioner_info($a) -width 5
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
