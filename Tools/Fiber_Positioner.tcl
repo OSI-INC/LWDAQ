@@ -98,7 +98,7 @@ proc Fiber_Positioner_init {} {
 	set config(travel_file) [file normalize ~/Desktop/Travel.txt]
 	
 	# Waiting time after setting control voltages before we make measurements.
-	set config(settling_ms) "500"
+	set config(settling_ms) "1000"
 	
 	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
@@ -788,25 +788,29 @@ proc Fiber_Positioner_open {} {
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
 
-	foreach a {ip_addr injector_sock injector_leds \
-			flash_seconds camera_sock settling_ms} {
+	foreach a {ip_addr dfps_sock injector_sock camera_sock \
+			flash_seconds settling_ms} {
 		label $f.l$a -text $a -fg green
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
 			-width [expr [string length $config($a)] + 2]
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	set f [frame $ff.pz]
+	set f [frame $ff.leds]
 	pack $f -side top -fill x
 
-	foreach a {dfps_sock} {
+	foreach a {injector_leds} {
 		label $f.l$a -text $a -fg green
-		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 2
+		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 100
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
+
+	set f [frame $ff.positioners]
+	pack $f -side top -fill x
+
 	foreach a {dfps_ids} {
 		label $f.l$a -text $a -fg green
-		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 60
+		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 100
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -850,7 +854,7 @@ proc Fiber_Positioner_open {} {
 	label $f.image -image $info(photo) 
 	pack $f.image -side top -expand yes
 
-	set info(data) [LWDAQ_text_widget $f 60 5 1 1]
+	set info(data) [LWDAQ_text_widget $f 80 5 1 1]
 	LWDAQ_print $info(data) "Fiber Positioner Data" purple
 
 	set f [frame $w.log]
