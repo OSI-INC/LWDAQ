@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "27"
+	LWDAQ_tool_init "Videoarchiver" "28"
 
 	# If a graphical tool window already exists, we abort our initialization.
 	if {[winfo exists $info(window)]} {
@@ -106,6 +106,7 @@ proc Videoarchiver_init {} {
 	set info(default_rot) "0"
 	set info(default_sat) "0.5"
 	set info(default_ec) "0.5"
+	set config(awb) "indoor"
 		
 	# In the following paragraphs, we define shell commands that we pass via
 	# secure shell (ssh) to the camera, where we can run the libcamera-vid or
@@ -147,7 +148,8 @@ echo "SUCCESS"
 	# can reboot with the reboot command, running the command in the background
 	# allows us to send back a success word before the reboot completes.
 	set info(reboot) {
-sudo reboot &
+cd Videoarchiver
+sudo reboot >& reboot_log.txt &
 echo "SUCCESS"
 }
 
@@ -947,6 +949,7 @@ proc Videoarchiver_stream {n} {
 			LWDAQ_socket_write $sock "exec libcamera-vid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
+				--awb $config(awb) \
 				--flush \
 				--width $width --height $height \
 				--rotation $rot \
@@ -2955,9 +2958,19 @@ foreach {option value} $argv {
 	}
 }
 
+# Determine the operating system version.
+set f [open videoarchiver.config r]
+set contents [read $f]
+close $f
+if {[regexp "os Bullseye" $contents]} {
+	set os "Bullseye"
+} else {
+	set os "Stretch"
+}
+			
 # Announce the start of interface in stdout.
 puts "Starting interface process at [clock format [clock seconds]] with:"
-puts "verbose = $verbose, port = $port, maxshow = $maxshow."
+puts "verbose = $verbose, port = $port, maxshow = $maxshow, os = $os."
 
 # The socket acceptor receives a connection, sets up a socket channel, and
 # configures it so that every time it is readable, the incoming data is passed
@@ -2980,7 +2993,7 @@ proc accept {sock addr port} {
 # The interpreter implements a set of commands for the Videoarchiver. We call
 # this procedure whenever the socket is readable.
 proc interpreter {sock} {
-	global verbose maxshow
+	global verbose maxshow os
 
 	# If the client closes the socket, we do the same.
 	if {[eof $sock]} {
@@ -3179,17 +3192,36 @@ proc interpreter {sock} {
 			set D1 [string index $bits 6]
 			set D0 [string index $bits 7]
 			
-			# Set the white or infrared lamp intensity.
-			if {$color == "white"} {
-				exec gpio -g write 2 $D0
-				exec gpio -g write 3 $D1
-				exec gpio -g write 4 $D2
-				exec gpio -g write 14 $D3				
+			# Set the white or infrared lamp intensity. We use a different
+			# input-ouput routine depending upon the operating system.
+			if {$os == "Bullseye"} {
+				if {$D3 == "1"} {set D3 "dh"} {set D3 "dl"}
+				if {$D2 == "1"} {set D2 "dh"} {set D2 "dl"}
+				if {$D1 == "1"} {set D1 "dh"} {set D1 "dl"}
+				if {$D0 == "1"} {set D0 "dh"} {set D0 "dl"}
+				if {$color == "white"} {
+					exec raspi-gpio set 2 op $D0
+					exec raspi-gpio set 3 op $D1
+					exec raspi-gpio set 4 op $D2
+					exec raspi-gpio set 14 op $D3
+				} else {
+					exec raspi-gpio set 16 op $D0
+					exec raspi-gpio set 26 op $D1
+					exec raspi-gpio set 20 op $D2
+					exec raspi-gpio set 21 op $D3
+				}
 			} else {
-				exec gpio -g write 16 $D0
-				exec gpio -g write 26 $D1
-				exec gpio -g write 20 $D2
-				exec gpio -g write 21 $D3				
+				if {$color == "white"} {
+					exec gpio -g write 2 $D0
+					exec gpio -g write 3 $D1
+					exec gpio -g write 4 $D2
+					exec gpio -g write 14 $D3				
+				} else {
+					exec gpio -g write 16 $D0
+					exec gpio -g write 26 $D1
+					exec gpio -g write 20 $D2
+					exec gpio -g write 21 $D3				
+				}
 			}
 			
 			# Return the intensity as confirmation.
