@@ -97,7 +97,7 @@ proc Videoarchiver_init {} {
 	# constant rate factor crf. The image will be x * y pixels with fr frames
 	# per second, and the H264 compression will be greater as the crf is lower.
 	# Standard crf is 23. The crf of 15 gives a particularly sharp image.
-	set config(versions) [list {A3034-HR 820 616 20 23} {A3034-LR 410 308 30 15}]
+	set config(versions) [list {A3034-HR 820 616 20 23} ]
 	
 	# The rotation of the image readout.
 	set info(rotation_options) "0 90 180 270"
@@ -106,7 +106,8 @@ proc Videoarchiver_init {} {
 	set info(default_rot) "0"
 	set info(default_sat) "0.5"
 	set info(default_ec) "0.5"
-	set config(awb) "indoor"
+	set config(awb_red) "1"
+	set config(awb_blue) "1"
 		
 	# In the following paragraphs, we define shell commands that we pass via
 	# secure shell (ssh) to the camera, where we can run the libcamera-vid or
@@ -192,7 +193,6 @@ echo "SUCCESS"
 	set info(monitor_cam) "0"
 	set config(monitor_longevity) "30"
 	set info(monitor_start) "0"
-	
 	
 	# Lag thresholds and restart log.
 	set config(lag_warning) "10.0"
@@ -921,13 +921,6 @@ proc Videoarchiver_stream {n} {
 	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
 		version width height framerate crf
 		
-	# Print notification.
-	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
-		$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
-		saturation $info(cam$n\_sat), compensation $info(cam$n\_ec), \
-		crf $crf."
-	LWDAQ_update
-
 	if {[catch {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
@@ -946,10 +939,15 @@ proc Videoarchiver_stream {n} {
 				270 {set rot 180}
 				default {set rot 0}
 			}
+			LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
+				$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
+				sat $info(cam$n\_sat), exp $info(cam$n\_ec), red $config(awb_red), \
+				blue $config(awb_blue), crf $crf."
+			LWDAQ_update
 			LWDAQ_socket_write $sock "exec libcamera-vid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
-				--awb $config(awb) \
+				--awbgains $config(awb_red),$config(awb_blue) \
 				--flush \
 				--width $width --height $height \
 				--rotation $rot \
@@ -960,6 +958,10 @@ proc Videoarchiver_stream {n} {
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
 				>& stream_log.txt & \n"
 		} else {
+			LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
+				$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
+				sat $info(cam$n\_sat), exp $info(cam$n\_ec), crf $crf."
+			LWDAQ_update
 			LWDAQ_socket_write $sock "exec raspivid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
