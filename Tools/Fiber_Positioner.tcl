@@ -66,8 +66,7 @@ proc Fiber_Positioner_init {} {
 	set config(flash_seconds) "0.003"
 	set config(sort_code) "8"
 	
-	# The north, south, east, and west control values. Set them to produce zero
-	# control voltages.
+	# Default north, south, east, and west control values.
 	set config(n_out) $config(dac_zero) 
 	set config(s_out) $config(dac_zero) 
 	set config(e_out) $config(dac_zero) 
@@ -82,6 +81,7 @@ proc Fiber_Positioner_init {} {
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
 	set config(checksum_preload) "1111111111111111"	
+	set config(commands) "255 255 8"
 	
 	# The history of spot positions for the tracing.
 	set info(trace_history) [list]
@@ -96,6 +96,9 @@ proc Fiber_Positioner_init {} {
 	set config(loop_counter) "0"
 	set config(pass_counter) "0"
 	set config(travel_file) [file normalize ~/Desktop/Travel.txt]
+	
+	# Panel appearance.
+	set config(label_color) "green"
 	
 	# Waiting time after setting control voltages before we make measurements.
 	set config(settling_ms) "1000"
@@ -180,6 +183,39 @@ proc Fiber_Positioner_transmit {{commands ""}} {
 	# we could have instructed an empty driver socket or the positioner could have
 	# failed to receive the command.
 	return "SUCCESS"
+}
+
+#
+# Fiber_Positioner_transmit_panel opens a new window and provides a button for transmitting 
+# a string of command bytes, each expressed as a decimal value 0..255, to a
+# particular socket on the driver specified in the main window.
+#
+proc Fiber_Positioner_transmit_panel {} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
+	
+	# Open the transmit panel.
+	set w $info(window)\.xmit_panel
+	if {[winfo exists $w]} {
+		raise $w
+		return "ABORT"
+	}
+	toplevel $w
+	wm title $w "Fiber_Positioner $info(version) Transmit Command Panel"
+
+	set f [frame $w.tx]
+	pack $f -side top -fill x
+
+	button $f.transmit -text "Transmit" -command {
+		LWDAQ_post "Fiber_Positioner_transmit"
+	}
+	pack $f.transmit -side left -expand yes
+	
+	label $f.lcommands -text "Commands:" -fg $config(label_color)
+	entry $f.commands -textvariable Fiber_Positioner_config(commands) -width 50
+	pack $f.lcommands $f.commands -side left -expand yes
+
+	return "SUCCESS" 
 }
 
 #
@@ -774,7 +810,7 @@ proc Fiber_Positioner_open {} {
 	
 	label $f.state -textvariable Fiber_Positioner_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
-	foreach a {Zero Move Check Travel Step Stop Clear Reset} {
+	foreach a {Travel Step Stop Clear Reset} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Fiber_Positioner_cmd $a"
 		pack $f.$b -side left -expand 1
@@ -790,7 +826,7 @@ proc Fiber_Positioner_open {} {
 
 	foreach a {ip_addr dfps_sock injector_sock camera_sock \
 			flash_seconds settling_ms} {
-		label $f.l$a -text $a -fg green
+		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
 			-width [expr [string length $config($a)] + 2]
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -800,7 +836,7 @@ proc Fiber_Positioner_open {} {
 	pack $f -side top -fill x
 
 	foreach a {injector_leds} {
-		label $f.l$a -text $a -fg green
+		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 100
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
@@ -809,7 +845,7 @@ proc Fiber_Positioner_open {} {
 	pack $f -side top -fill x
 
 	foreach a {dfps_ids} {
-		label $f.l$a -text $a -fg green
+		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 100
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
@@ -819,18 +855,27 @@ proc Fiber_Positioner_open {} {
 	
 	foreach d {n_out s_out e_out w_out} {
 		set a [string tolower $d]
-		label $f.l$a -text $d -fg green
+		label $f.l$a -text $d -fg $config(label_color)
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 5
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
+	foreach a {Zero Move Check} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "Fiber_Positioner_cmd $a"
+		pack $f.$b -side left -expand 1
+	}
+	button $f.txcmd -text "Transmit Panel" -command {
+		LWDAQ_post "Fiber_Positioner_transmit_panel"
+	}
+	pack $f.txcmd -side left -expand yes
 
 	set f [frame $ff.travel]
 	pack $f -side top -fill x
 
-	label $f.til -text "travel_index" -fg green
+	label $f.til -text "travel_index" -fg $config(label_color)
 	entry $f.tie -textvariable Fiber_Positioner_config(travel_index) -width 4
 	pack $f.til $f.tie -side left -expand yes
-	label $f.tl -text "travel_file" -fg green
+	label $f.tl -text "travel_file" -fg $config(label_color)
 	entry $f.tlf -textvariable Fiber_Positioner_config(travel_file) -width 40
 	pack $f.tl $f.tlf -side left -expand yes
 	button $f.browse -text "Browse" -command Fiber_Positioner_travel_browse
@@ -840,10 +885,10 @@ proc Fiber_Positioner_open {} {
 	pack $f.repeat -side left -expand yes
 	checkbutton $f.trace -text "Trace" -variable Fiber_Positioner_config(trace_enable)
 	pack $f.trace -side left -expand yes
-	label $f.tpl -text "pass" -fg green
+	label $f.tpl -text "pass" -fg $config(label_color)
 	entry $f.tpe -textvariable Fiber_Positioner_config(pass_counter) -width 4
 	pack $f.tpl $f.tpe -side left -expand yes
-	label $f.tll -text "loop" -fg green
+	label $f.tll -text "loop" -fg $config(label_color)
 	entry $f.tle -textvariable Fiber_Positioner_config(loop_counter) -width 4
 	pack $f.tll $f.tle -side left -expand yes
 	
