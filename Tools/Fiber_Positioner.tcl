@@ -53,7 +53,7 @@ proc Fiber_Positioner_init {} {
 		* $config(zoom)]
 	
 	# The control value for which the control voltages are closest to zero.
-	set config(dac_zero) "133"
+	set config(dac_zero) "125"
 	
 	# Data acquisition addresses.
 	set config(ip_addr) "192.168.1.11"
@@ -859,7 +859,7 @@ proc Fiber_Positioner_open {} {
 		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 5
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
-	foreach a {Zero Move Check} {
+	foreach a {Move Zero Check} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Fiber_Positioner_cmd $a"
 		pack $f.$b -side left -expand 1
@@ -872,9 +872,6 @@ proc Fiber_Positioner_open {} {
 	set f [frame $ff.travel]
 	pack $f -side top -fill x
 
-	label $f.til -text "travel_index" -fg $config(label_color)
-	entry $f.tie -textvariable Fiber_Positioner_config(travel_index) -width 4
-	pack $f.til $f.tie -side left -expand yes
 	label $f.tl -text "travel_file" -fg $config(label_color)
 	entry $f.tlf -textvariable Fiber_Positioner_config(travel_file) -width 40
 	pack $f.tl $f.tlf -side left -expand yes
@@ -885,10 +882,13 @@ proc Fiber_Positioner_open {} {
 	pack $f.repeat -side left -expand yes
 	checkbutton $f.trace -text "Trace" -variable Fiber_Positioner_config(trace_enable)
 	pack $f.trace -side left -expand yes
-	label $f.tpl -text "pass" -fg $config(label_color)
+	label $f.til -text "index:" -fg $config(label_color)
+	entry $f.tie -textvariable Fiber_Positioner_config(travel_index) -width 4
+	pack $f.til $f.tie -side left -expand yes
+	label $f.tpl -text "pass:" -fg $config(label_color)
 	entry $f.tpe -textvariable Fiber_Positioner_config(pass_counter) -width 4
 	pack $f.tpl $f.tpe -side left -expand yes
-	label $f.tll -text "loop" -fg $config(label_color)
+	label $f.tll -text "loop:" -fg $config(label_color)
 	entry $f.tle -textvariable Fiber_Positioner_config(loop_counter) -width 4
 	pack $f.tll $f.tle -side left -expand yes
 	
