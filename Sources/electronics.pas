@@ -808,6 +808,16 @@ end;
 	instruction. Otherwise, payload data is accessible through a list of indices
 	passed back by the "extract" and "reconstruct" instructions.
 
+	The "-glitch x" option enables a glitch filter where applicable, as described
+	below, the value x being the maximum absolute change in sample value that 
+	will be left intact without an attempt to over-write and remove with previous
+	sample values. But default x is zero and the filter is disabled.
+	
+	The "-divergent b" option enables tolerance of a sample clock that diverges
+	significantly from that of the data receiver. This option affects the
+	reconstruction instruction only. We use zero and one to indicate false and
+	true.
+
 	Because of limitations in their logic, some data receivers may be unable to
 	eliminate duplicate messages from their data stream. The same signal message
 	received on two or more antennas may appear two or more times in the data.
@@ -824,8 +834,9 @@ end;
 
 	The "plot" instruction tells the routine to plot all messages received from
 	the channel numbers we specify, or all channels if we specify a "*"
-	character. Glitches caused by bad messages will be plotted also. No
-	elimination of messages nor reconstruction is performed prior to plotting.
+	character. No elimination of messages nor reconstruction is performed prior
+	to plotting, but if we use the -glitch option to enable a glitch filter,
+	this filter will be applied to the signals before plotting and summarizing.
 	The two parameters after the plot instruction specify the minimum and
 	maximum values of the signal in the interval. The next parameter is either
 	AC or DC, to specify the display coupling. After these three, we add the
@@ -869,11 +880,10 @@ end;
 	by several paramters. The first parameter is the identifier of the signal we
 	want to reconstruct. The second parameter is its nominal sampling period in
 	clock ticks. The third parameter is "standing_value", the signal's most
-	recent correct sample value. The fourth parameter "glitch_threshold", a
-	threshold for a glitch filter the routine can apply after reconstruction is
-	complete. If the glitch threshold is zero, the glitch filters is disabled.
-	The fifth parameter is "divergent_clocks", a binary value that we set when
-	we want to accommodate greater disagreement between the transmitter and
+	recent correct sample value. If the -glitch option has been used to set a
+	non-zero glitch threshold, the routine applies this filter after
+	reconstruction is complete. If the -divergent option has been enabled, the
+	reconstruction permits greater disagreement between the transmitter and
 	receiver clocks. By default, standing_value, glitch_threshold, and
 	divent_clocks are all zero. The result string contains the reconstructed
 	message stream with one message per line. Each message is represented by the
@@ -1087,7 +1097,8 @@ begin
 		option:=read_word(command);
 		if option='-payload' then payload_size:=read_integer(command)
 		else if option='-size' then data_size:=read_integer(command)
-		else if option='-glitch' then glitch_threshold:=read_real(word)
+		else if option='-glitch' then glitch_threshold:=read_real(command)
+		else if option='-divergent' then divergent_clocks:=read_boolean(command)
 		else done_with_options:=true;
 	until done_with_options;
 {
@@ -1492,10 +1503,6 @@ begin
 				exit;
 			end;
 		end;
-		word:=read_word(command);
-		if (word<>'') then glitch_threshold:=read_real(word);
-		word:=read_word(command);
-		if (word<>'') then divergent_clocks:=read_boolean(word);
 {
 	Determine the transmission scatter_extent and window_extent. Transmitters
 	displace transmission by +-scatter_extent ticks so as to avoid systematic

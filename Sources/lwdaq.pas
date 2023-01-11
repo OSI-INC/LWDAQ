@@ -3179,133 +3179,158 @@ paragraphs below are the comments from the head of this lwdaq_sct_receiver funct
 describe how to compose the command string we pass through lwdaq_receiver to
 lwdaq_sct_receiver.</p>
 
-<p>lwdaq_sct_receiver analyzes receiver messages. These messages have a four-byte core,
-and may be accompanied by one or more bytes of payload data. The routine assumes that the
-first byte of the second image row is the first byte of a message. Each message takes the
-following form: an eight-bit signal identifier, a sixteen-bit sample value, an eight-bit
-time stamp, and zero or more bytes of payload. The routine will return the sixteen-bit
-sample values, or various characteristics of the data block, depending upon the options
-passed in through the command string.</p>
+<p>lwdaq_sct_receiver analyzes receiver messages. These messages have a four-byte
+core, and may be accompanied by one or more bytes of payload data. The routine
+assumes that the first byte of the second image row is the first byte of a
+message. Each message takes the following form: an eight-bit signal identifier,
+a sixteen-bit sample value, an eight-bit time stamp, and zero or more bytes of
+payload. The routine will return the sixteen-bit sample values, or various
+characteristics of the data block, depending upon the options passed in through
+the command string.</p>
 
 <p>The routine does not return the payload directly, but instead uses the global
-electronics_trace to store indices that allow another routine to extract payload values
-from the image data. The electronics trace is filled with message indices when we execute
-the "extract" or "reconstruct" instructions.</p>
+electronics_trace to store indices that allow another routine to extract payload
+values from the image data. The electronics trace is filled with message indices
+when we execute the "extract" or "reconstruct" instructions.</p>
 
-<p>The only command that alters the image data is "purge", which eliminates duplicate
-messages. All other commands leave the image data untouched. Some commands alter the image
-result string.</p>
+<p>The only command that alters the image data is "purge", which eliminates
+duplicate messages. All other commands leave the image data untouched. Some
+commands alter the image result string.</p>
 
-<p>In some cases, following aborted data acquisition, it is possible for the data block to
-be aligned incorrectly, so that the first byte of the block is not the first byte of a
-message, but instead the second, third, or fourth byte of an incomplete message. The
-routine does not handle such exceptions. If we want to deal with such corruption, we must
-shift the image data one byte to the left and try again until we meet with success.</p>
+<p>In some cases, following aborted data acquisition, it is possible for the data
+block to be aligned incorrectly, so that the first byte of the block is not the
+first byte of a message, but instead the second, third, or fourth byte of an
+incomplete message. The routine does not handle such exceptions. If we want to
+deal with such corruption, we must shift the image data one byte to the left and
+try again until we meet with success.</p>
 
-<p>The command string passed into this routine begins with options and values, followed by
-an instruction and parameters. We present the options and instructions in the comments
-below. Each option must be accompanied by an option value.</p>
+<p>The command string passed into this routine begins with options and values,
+followed by an instruction and parameters. We present the options and
+instructions in the comments below. Each option must be accompanied by an option
+value.</p>
 
-<p>The "-size n" option tells the routine how many messages are in the image. The default
-value is 0, in which case the routine scans through the entire image looking until it
-encounters a null message or the end of the image. A null message is any one for which the
-first four bytes are zero. Such messages arise in corrupted recordings, but are also used
-to fill in the remainder of the image after the last valid message. If n > 0, the routine
-reads n messages even if there are null messages in the block it reads.</p>
+<p>The "-size n" option tells the routine how many messages are in the image. The
+default value is 0, in which case the routine scans through the entire image
+looking until it encounters a null message or the end of the image. A null
+message is any one for which the first four bytes are zero. Such messages arise
+in corrupted recordings, but are also used to fill in the remainder of the image
+after the last valid message. If n > 0, the routine reads n messages even if
+there are null messages in the block it reads.</p>
 
-<p>The "-payload n" option indicates that the four-byte core of each message is followed
-by n bytes of payload data. The default value of n is zero. The only instruction that
-returns the payload data directly is the "print" instruction. Otherwise, payload data is
-accessible through a list of indices passed back by the "extract" and "reconstruct"
-instructions.</p>
+<p>The "-payload n" option indicates that the four-byte core of each message is
+followed by n bytes of payload data. The default value of n is zero. The only
+instruction that returns the payload data directly is the "print" instruction.
+Otherwise, payload data is accessible through a list of indices passed back by
+the "extract" and "reconstruct" instructions.</p>
 
-<p>Because of limitations in their logic, some data receivers may be unable to eliminate
-duplicate messages from their data stream. The same signal message received on two or more
-antennas may appear two or more times in the data. This routine eliminates these
-duplicates when it copies the messages from the image block into a separate message array.
-We will see the duplicates with the "print" and "get" instructions, which operate on the
-original image data. But all other instructions operate upon the message array, from which
-duplicates have been removed.</p>
+<p>The "-glitch x" option enables a glitch filter where applicable, as described
+below, the value x being the maximum absolute change in sample value that will
+be left intact without an attempt to over-write and remove with previous sample
+values. But default x is zero and the filter is disabled.</p>
 
-<p>The "purge" instruction re-writes the image data, eliminating duplicate messages and
-returning the number of messages in the purged data.</p>
+<p>The "-divergent b" option enables tolerance of a sample clock that diverges
+significantly from that of the data receiver. This option affects the
+reconstruction instruction only. We use zero and one to indicate false and true.</p>
 
-<p>The "plot" instruction tells the routine to plot all messages received from the channel
-numbers you specify, or all channels if you specify a "*" character. Glitches caused by
-bad messages will be plotted also. No elimination of messages nor reconstruction is
-performed prior to plotting. The two parameters after the plot instruction specify the
-minimum and maximum values of the signal in the interval. The next parameter is either AC
-or DC, to specify the display coupling. After these three, you add the identifiers of the
-signals you want to plot. To specify all signals except the clock signal, use a "*". The
-routine returns a summary result of the form "id_num num_message ave stdev" for each
-selected channel. For the clock channel signal, which is channel number zero, the routine
-gives the start and end clock samples. The final two numbers in the summary result are the
-invalid_id code followed by the number of messages the routine did not plot.</p>
+<p>Because of limitations in their logic, some data receivers may be unable to
+eliminate duplicate messages from their data stream. The same signal message
+received on two or more antennas may appear two or more times in the data. This
+routine eliminates these duplicates when it copies the messages from the image
+block into a separate message array. We will see the duplicates with the "print"
+and "get" instructions, which operate on the original image data. But all other
+instructions operate upon the message array, from which duplicates have been
+removed.</p>
 
-<p>The "print" instruction returns the error_report string followed by the content of all
-messages, or a subrange of messages. In the event of analysis failure, "print" will assume
-messages are aligned with the first data byte in the image, and print out the contents of
-all messages, regardless of errors found. When analysis fails because there are too many
-messages in the image, the result string returned by print is likely to be cut off at the
-end. The "print" instruction tries to read first_message and last_message out of the
-command string. If they are present, the routine uses these as the first and last message
-numbers it writes to its return string. Otherwise it returns all messages.</p>
+<p>The "purge" instruction re-writes the image data, eliminating duplicate messages
+and returning the number of messages in the purged data. This instruction is for
+diagnostic purposes only: we do not eliminate messages from the raw data before
+writing to disk.</p>
 
-<p>The "extract" instruction tells the routine to return a string containing all messages
-from a specified signal, but rejecting duplicates. A duplicate is any message with the
-same value as the previous message, and a timestamp that is at most one later than the
-previous message. The routine takes two parameters. The first is the identifier of the
-signal we want to extract. The second is the sampling period in clock ticks. The routine
-returns each message on a separate line. On each line is the time of the message in ticks
-from the beginning of the image time interval, followed by the sample value. The command
-writes the following numbers into ip^.results: the number of clock messages in the image
+<p>The "plot" instruction tells the routine to plot all messages received from the
+channel numbers we specify, or all channels if we specify a "*" character. No
+elimination of messages nor reconstruction is performed prior to plotting, but
+if we use the -glitch option to enable a glitch filter, this filter will be
+applied to the signals before plotting and summarizing. The two parameters after
+the plot instruction specify the minimum and maximum values of the signal in the
+interval. The next parameter is either AC or DC, to specify the display
+coupling. After these three, we add the identifiers of the signals we want to
+plot. To specify all signals except the clock signal, use a "*". The routine
+returns a summary result of the form "id_num num_message ave stdev" for each
+selected channel. For the clock channel signal, which is channel number zero,
+the routine gives the start and end clock samples. The final two numbers in the
+summary result are the invalid_id code followed by the number of messages the
+routine did not plot.</p>
+
+<p>The "print" instruction returns the error_report string followed by the content
+of all messages, or a subrange of messages. In the event of analysis failure,
+"print" will assume messages are aligned with the first data byte in the image,
+and print out the contents of all messages, regardless of errors found. When
+analysis fails because there are too many messages in the image, the result
+string returned by print is likely to be cut off at the end. The "print"
+instruction tries to read first_message and last_message out of the command
+string. If they are present, the routine uses these as the first and last
+message numbers it writes to its return string. Otherwise it returns all
+messages.</p>
+
+<p>The "extract" instruction tells the routine to return a string containing all
+messages from a specified signal, but rejecting duplicates. A duplicate is any
+message with the same value as the previous message, and a timestamp that is at
+most one later than the previous message. The routine takes two parameters. The
+first is the identifier of the signal we want to extract. The second is the
+sampling period in clock ticks. The routine returns each message on a separate
+line. On each line is the time of the message in ticks from the beginning of the
+image time interval, followed by the sample value. The command writes the
+following numbers into ip^.results: the number of clock messages in the image
 and the number of samples it extracted.</p>
 
-<p>The "reconstruct" instruction tells the routine to reconstruct a particular signal,
-with the assumption that the transmission is periodic with some scattering of transmission
-instants to avoid systematic collisions. Where messages are missing from the data, the
-routine adds substitute messages. It removes duplicate messages and messages that occur at
-invalid moments in time. The result of reconstruction is a sequence of messages with none
-missing and none extra. The instruction string for the "reconstruct" instruction begins
-with the word "reconstruct" and is followed by several paramters. The first parameter is
-the identifier of the signal you want to reconstruct. The second parameter is its nominal
-sampling period in clock ticks. The third parameter is the the signal's most recent
-correct sample value, which we call the "standing value" of the signal. If you don't
-specify this parameter, "reconstruct" assumes it to be zero. After the third parameter,
-you have the option of specifying any unaccepted samples from previous data acquisitions.
-These you describe each with one number giving their sample number. The reconstruct
-routine assumes their timestamps are zero ticks. The result string contains the
-reconstructed message stream with one message per line. Each message is represented by the
-time it occured, in ticks after the first clock in the image time interval, and the
+<p>The "reconstruct" instruction tells the routine to reconstruct a particular
+signal with the assumption that the transmission is periodic with temporal
+scattering of transmission to avoid systematic collisions between transmitters.
+Where messages are missing from the data, the routine adds substitute messages.
+It removes duplicate messages and messages that occur at invalid moments in
+time. The result of reconstruction is a sequence of messages with none missing
+and none extra. The instruction string for the "reconstruct" instruction begins
+with the word "reconstruct" and is followed by several paramters. The first
+parameter is the identifier of the signal we want to reconstruct. The second
+parameter is its nominal sampling period in clock ticks. The third parameter is
+"standing_value", the signal's most recent correct sample value. If the -glitch
+option has been used to set a non-zero glitch threshold, the routine applies
+this filter after reconstruction is complete. If the -divergent option has been
+enabled, the reconstruction permits greater disagreement between the transmitter
+and receiver clocks. By default, standing_value, glitch_threshold, and
+divent_clocks are all zero. The result string contains the reconstructed message
+stream with one message per line. Each message is represented by the time it
+occured, in ticks after the first clock in the image time interval, and the
 message data value. The "reconstruct" command writes the following numbers into
-ip^.results: the number of clock messages in the image, the number of messages in the
-reconstructed messages stream, the number of bad messages, the number of substitute
-messages, and any unaccepted message values it found in a transmission window that
-overlaps the end of the image time interval.</p>
+ip^.results: the number of clock messages in the image, the number of messages
+in the reconstructed messages stream, the number of bad messages, and the number
+of substituted messages.</p>
 
 <p>The "clocks" instruction returns a the number of errors in the sequence of clock
-messages, the number of clock messages, the total number of messages from all signals, and
-the byte location of clock messages specified by a list of integers. The command "clocks 0
-100" might return "0 128 640 0 500" when passed a 2560-byte block of messages containing
-128 valid clocks and 512 messages from non-clock signals. The last two numbers are the
-byte location of the 1st clock message and the byte location of the 101st clock message. A
-negative index specifies a clock message with respect to the end of the message block.
-Thus "-1" specifies the last clock message.</p>
+messages, the number of clock messages, the total number of messages from all
+signals, and the byte location of clock messages specified by a list of
+integers. The command "clocks 0 100" might return "0 128 640 0 500" when passed
+a 2560-byte block of messages containing 128 valid clocks and 512 messages from
+non-clock signals. The last two numbers are the byte location of the 1st clock
+message and the byte location of the 101st clock message. A negative index
+specifies a clock message with respect to the end of the message block. Thus
+"-1" specifies the last clock message.</p>
 
-<p>The "list" instruction returns a list of signal identifiers and the number of samples
-in the signal. Signals with no samples are omitted from the list. The list takes the form
-of the identifiers sample quantities separated by spaces.</p>
+<p>The "list" instruction returns a list of signal identifiers and the number of
+samples in the signal. Signals with no samples are omitted from the list. The
+list takes the form of channel identifier followed by number of samples
+separated by spaces.</p>
 
-<p>The "get" instruction performs no analysis of messages, but instead returns only the
-id, value, and timestamp of a list of messages. We Specify each message with its index.
-The first message it message zero. A message index greater than the maximum number of
-messages the image can hold, or less than zero, will return zero values for all
-parameters.</p>
+<p>The "get" instruction performs no analysis of messages, but instead returns only
+the id, value, and timestamp of a list of messages. We Specify each message with
+its index. The first message it message zero. A message index greater than the
+maximum number of messages the image can hold, or less than zero, will return
+zero values for all parameters.</p>
 }
 function lwdaq_receiver(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 const
-	show_timing=true;
+	show_timing=false;
 	
 var 
 	ip:image_ptr_type=nil;
@@ -3335,9 +3360,9 @@ begin
 	end;
 	command:=Tcl_ObjString(argv[2]);
 	
-	start_timer('starting '+command,'lwdaq_receiver');
+	start_timer('starting '''+command+'''','lwdaq_receiver');
 	result:=lwdaq_sct_receiver(ip,command);
-	mark_time('done','lwdaq_receiver');
+	mark_time('done with '''+command+'''','lwdaq_receiver');
 	if show_timing then report_time_marks;
 		
 	if error_string='' then Tcl_SetReturnString(interp,result)

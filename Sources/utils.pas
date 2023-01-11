@@ -100,7 +100,7 @@ unit utils;
 	start_time from the current time. The routines create a list of elapsed time
 	strings which you display later with report_time_marks. By this means, you
 	do not slow down your execution with text display. The mark_time routine
-	takes roughly 100 us to executte on a 1.3 GHz G4 iBook, so you can use it to
+	takes roughly 100 us to execute on a 1.3 GHz G4 iBook, so you can use it to
 	measure execution times of 1 ms with good precision. That's not to say that
 	the elapsed time measured by mark_time corresponds exactly to the time used
 	by your process. We observe frequent jumps of tens of milliseconds. We
@@ -3132,7 +3132,8 @@ end;
 	start_timer sets the utility timer equal to the current time in
 	milliseconds, and clears the mark_time_list. The "id" string identifies a
 	point in execution, the "caller" string identifies the routine containing
-	the execution point.
+	the execution point. We find that we cannot include double quotes in our id
+	string. We use single quotes instead.
 }
 procedure start_timer(id,caller:string);
 
@@ -3159,7 +3160,8 @@ begin
 end;
 
 {
-	mark_time adds an entry to the mark_time_list.
+	mark_time adds an entry to the mark_time_list. We find that we cannot
+	include double quotes in our id string. We use single quotes instead.
 }
 procedure mark_time(id,caller:string);
 
