@@ -1087,6 +1087,7 @@ begin
 		option:=read_word(command);
 		if option='-payload' then payload_size:=read_integer(command)
 		else if option='-size' then data_size:=read_integer(command)
+		else if option='-glitch' then glitch_threshold:=read_real(word)
 		else done_with_options:=true;
 	until done_with_options;
 {
@@ -1108,6 +1109,7 @@ begin
 	image data.
 }
 	if instruction='get' then begin
+		mark_time('get','lwdaq_sct_receiver');
 		result:='';
 		word:=read_word(command);
 		while word<>'' do begin
@@ -1299,6 +1301,7 @@ begin
 	implemented above.
 }
 	if instruction='purge' then begin
+		mark_time('purge','lwdaq_sct_receiver');
 		for message_num:=0 to num_selected-1 do begin
 			write_image_message(ip,mp[message_num],message_num);
 			copy_payload(ip,mp[message_num].index,message_num);
@@ -1318,6 +1321,7 @@ begin
 	hexadecimal printing of the core message bytes, separated by a space.
 }
 	if instruction='print' then begin
+		mark_time('print','lwdaq_sct_receiver');
 		writestr(result,'Total ',num_messages:1,' messages, ',
 			num_clocks:1,' clocks, ',
 			num_errors:1,' errors, ',
@@ -1373,6 +1377,7 @@ begin
 	the messages from the specified signal.
 }
 	if instruction='extract' then begin
+		mark_time('extracting messages','lwdaq_sct_receiver');
 		extract_id:=read_integer(command);
 		if (extract_id<min_id) or (extract_id>max_id) then begin
 			report_error('Invalid extract_id in lwdaq_sct_receiver');
@@ -1383,7 +1388,6 @@ begin
 		We go through the messages looking for those with the extract_id and count them.
 		We write the time and sample to the return string.
 }
-		mark_time('extracting messages','lwdaq_sct_receiver');
 		setlength(trace,num_selected);
 		num_extracted:=0;
 		standing_value:=0;
@@ -1455,6 +1459,7 @@ begin
 	sample than another sample in the same window, will be removed.
 }
 	if instruction='reconstruct' then begin
+		mark_time('reconstruct','lwdaq_sct_receiver');
 		if (num_clocks<min_reconstruct_clocks) then begin
 			report_error('Too few clock messages for reconstruction in lwdaq_sct_receiver');
 			exit;
@@ -1706,6 +1711,7 @@ begin
 	signals regardless of the state of the data.
 }
  	if instruction='plot' then begin
+		mark_time('plot','lwdaq_sct_receiver');
 		draw_oscilloscope_scale(ip,num_divisions);
  		display_min:=read_real(command);
  		display_max:=read_real(command);
@@ -1740,6 +1746,7 @@ begin
  		
 		num_bad_messages:=0;
 		
+		mark_time('plotting','lwdaq_sct_receiver');
 		result:='';
 		for id_num:=min_id to max_id do begin
 			if id_valid[id_num] then begin
@@ -1754,6 +1761,7 @@ begin
 								inc(sample_num);
 							end;
 						end;
+					num_glitches:=glitch_filter_xy(trace,glitch_threshold);
 					ave:=average_y_xy_graph(trace);
 					stdev:=stdev_y_xy_graph(trace);
 					min:=min_y_xy_graph(trace);
@@ -1801,14 +1809,16 @@ begin
 	of samples in each of these signals.
 }
  	if instruction='list' then begin		
+		mark_time('list','lwdaq_sct_receiver');
 		result:='';
 		for id_num:=min_id to max_id do
 			if id_qty[id_num]>0 then 
 				writestr(result,result,id_num:1,' ',id_qty[id_num]:1,' ');
- 	end;	
+	end;	
 {
  	Clean up.
 }
+	mark_time('done','lwdaq_sct_receiver');
 	lwdaq_sct_receiver:=result;
 end;
 

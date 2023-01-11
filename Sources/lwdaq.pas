@@ -3304,12 +3304,14 @@ parameters.</p>
 }
 function lwdaq_receiver(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
+const
+	show_timing=true;
+	
 var 
 	ip:image_ptr_type=nil;
 	image_name:string='';
 	result:string='';
 	command:string='';
-	show_timing:boolean=false;
 
 begin
 	error_string:='';

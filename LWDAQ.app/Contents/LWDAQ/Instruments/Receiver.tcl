@@ -90,6 +90,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(acquire_end_ms) 0
 	set info(payload_options) "0 2 16"
 	set info(purge_duplicates) 1
+	set info(glitch_threshold) 0
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
 	set info(fv_range) 30
@@ -192,6 +193,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		# the analysis result.
 		set result [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) \
+			-glitch $info(glitch_threshold) \
 			plot $display_min $display_max \
 			$info(display_mode) $id_list"]
 			
