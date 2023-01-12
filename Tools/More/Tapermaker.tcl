@@ -1,7 +1,7 @@
 # Tapermaker, a tool for producing tapers for the ISL.
 
 # Copyright (C) 2011-2014 Michael Collins, Open Source Instruments
-# Copyright (C) 2014-2022 Kevan Hashemi, Open Source Instruments
+# Copyright (C) 2014-2023 Kevan Hashemi, Open Source Instruments
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License

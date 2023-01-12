@@ -1,7 +1,7 @@
 # Function Generator, A LWDAQ Tool.
 #
 # Copyright (C) 2015 Michael Bradshaw, Open Source Instruments Inc.
-# Copyright (C) 2015-2022 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2015-2023 Kevan Hashemi, Open Source Instruments Inc.
 
 #Version 1.1 Fixes:  
 #removed Recorder ip address/driversocket/mux socket initialization on startup
@@ -33,6 +33,7 @@
 # Version 3.4 Fix repeat frequency value in 512 SPS sweep.
 # Version 3.5 Add autofill for channel numbers.
 # Version 3.6 Add Receiver button.
+# Version 3.7 Add glitch threshold for Receiver.
 
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
@@ -47,7 +48,7 @@ proc Function_Generator_init {} {
 	global LWDAQ_Driver
 
 	
-	LWDAQ_tool_init "Function_Generator" "3.6"
+	LWDAQ_tool_init "Function_Generator" "3.7"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -78,6 +79,7 @@ proc Function_Generator_init {} {
 	set config(setup_delay_ms) 1000
 	set config(min_id) 1
 	set config(max_id) 254
+	set config(glitch_threshold) "0"
 
 	#These values reflect the RC filters components installed on pcb.
 	set info(rcval,r8) 330.0
@@ -595,6 +597,7 @@ proc Function_Generator_frequency_sweep {{index "-1"}} {
 
 		LWDAQ_reset_Receiver
 		set iconfig(analysis_channels) $config(channels)
+		set iinfo(glitch_threshold) $config(glitch_threshold)
 		set result [LWDAQ_acquire Receiver]
 		set iconfig(analysis_channels) "*"
 		if {[LWDAQ_is_error_result $result]} {

@@ -1,7 +1,7 @@
 # Open-Source Reconfigurable Eight-Bit Central Porocessing Unit Assembler and
 # Dis-Assembler, a LWDAQ Tool.
 #
-# Copyright (C) 2020-2022 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2020-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
 # A LWDAQ Tool that converts text Open-Source, Reconfigurable,
 # Eight-Bit Central Processing Unit (OSR8 CPU) assembler source code

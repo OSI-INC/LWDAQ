@@ -1,6 +1,6 @@
 # Stimulator, a Standard and Polite LWDAQ Tool
 #
-# Copyright (C) 2014-2022 Kevan Hashemi, Open Source Instruments
+# Copyright (C) 2014-2023 Kevan Hashemi, Open Source Instruments
 #
 # Based upon the ISL_Controller Tool.
 #

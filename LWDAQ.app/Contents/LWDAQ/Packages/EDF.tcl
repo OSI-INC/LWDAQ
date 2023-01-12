@@ -1,4 +1,4 @@
-# LWDAQ EDF Package, (c) 2015-2022 Kevan Hashemi, Open Source Instruments Inc.
+# LWDAQ EDF Package, (c) 2015-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
 # A library of routines to create and add to EDF (European Data Format) files
 # for neuroscience research, in which we assume all signals are are derived from

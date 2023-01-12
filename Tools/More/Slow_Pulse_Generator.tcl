@@ -1,7 +1,7 @@
 #
 # Slow Pulse Generator, a LWDAQ Tool
 #
-# Copyright (C) 2014-2022 Kevan Hashemi, Open Source Instruments
+# Copyright (C) 2014-2023 Kevan Hashemi, Open Source Instruments
 #
 # The Slow_Pulse_Generator Tool uses LWDAQ command transmissions to generate a sequence
 # of pulses.
