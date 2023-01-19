@@ -34,6 +34,7 @@
 # Version 3.5 Add autofill for channel numbers.
 # Version 3.6 Add Receiver button.
 # Version 3.7 Add glitch threshold for Receiver.
+# Version 3.8 Double the setup delay.
 
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
@@ -48,7 +49,7 @@ proc Function_Generator_init {} {
 	global LWDAQ_Driver
 
 	
-	LWDAQ_tool_init "Function_Generator" "3.7"
+	LWDAQ_tool_init "Function_Generator" "3.8"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -76,7 +77,7 @@ proc Function_Generator_init {} {
 	set config(input_frequency) 1000
 	set config(min_num_clocks) 32
 	set config(max_num_clocks) 512
-	set config(setup_delay_ms) 1000
+	set config(setup_delay_ms) 2000
 	set config(min_id) 1
 	set config(max_id) 254
 	set config(glitch_threshold) "0"

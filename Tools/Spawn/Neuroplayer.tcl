@@ -437,7 +437,7 @@ proc Neuroplayer_init {} {
 # be used if we do not specify values.
 #
 	set config(channel_selector) "*"
-	set config(default_frequency) "128 256 512 1024 2048 4096"
+	set config(default_frequency) "64 128 256 512 1024 2048 4096"
 	set info(standing_values) ""
 #
 # We save the last clock message value in each message block so we can compare it 
