@@ -566,7 +566,9 @@ proc LWDAQ_close {name} {
 #
 # LWDAQ_instrument_save saves instrument settings to a settings file in the
 # LWDAQ configuration directory, so they will be loaded automatically when LWDAQ is
-# next launched, or when a new LWDAQ is spawned.
+# next launched, or when a new LWDAQ is spawned. There is one parameter we don't
+# want to save or read back: the name of the data image, which is something that
+# cannot persist from one launch of LWDAQ to the next.
 #
 proc LWDAQ_instrument_save {name} {
 	global LWDAQ_Info 
@@ -584,6 +586,7 @@ proc LWDAQ_instrument_save {name} {
 	}
 	set vlist [array names config]
 	foreach v $vlist {
+		if {$v == "memory_name"} {continue}
 		puts $f "set LWDAQ_config_$name\($v) \"$config($v)\""
 	}
 
@@ -598,7 +601,7 @@ proc LWDAQ_instrument_save {name} {
 proc LWDAQ_instrument_unsave {name} {
 	global LWDAQ_Info 
 
-	set fn [file join $LWDAQ_Info(config_dir) "$name_Settings.tcl"]
+	set fn [file join $LWDAQ_Info(config_dir) "$name\_Settings.tcl"]
 	if {[file exists $fn]} {
 		file delete $fn
 		return $fn

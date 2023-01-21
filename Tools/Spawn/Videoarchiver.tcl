@@ -106,9 +106,7 @@ proc Videoarchiver_init {} {
 	set info(default_rot) "0"
 	set info(default_sat) "0.5"
 	set info(default_ec) "0.5"
-	set config(awb_red) "1"
-	set config(awb_blue) "1"
-		
+	
 	# In the following paragraphs, we define shell commands that we pass via
 	# secure shell (ssh) to the camera, where we can run the libcamera-vid or
 	# raspivid utilities to operate the camera, of control input and output
@@ -158,7 +156,7 @@ echo "SUCCESS"
 	set script_list [LWDAQ_xml_get_list [LWDAQ_tool_data $info(name)] script]
 	set n 0
 	foreach a {interface manager compressor dhcpcd init \
-			stream segment framerate single compress} {
+			stream segment framerate single compress colors} {
 		set info($a\_script) [lindex $script_list $n]
 		incr n
 	}
@@ -177,7 +175,7 @@ echo "SUCCESS"
 	# and output segment names to their log files. With two-second segments, we
 	# will have thirty lines added to the log files per minute, or 1.3 million
 	# lines per month. The log files will be too long to view in the Query
-	# window. So we will print only the last log_max lines of the file.
+	# Window. So we will print only the last log_max lines of the file.
 	set config(verbose_compressors) "0"
 	set config(log_max) "100"
 	
@@ -195,7 +193,7 @@ echo "SUCCESS"
 	set info(monitor_start) "0"
 	
 	# Lag thresholds and restart log.
-	set config(lag_warning) "10.0"
+	set config(lag_warning) "15.0"
 	set config(lag_alarm) "30.0"
 	set config(lag_reset) "40.0"
 	set config(restart_log) [file join $info(scratch_dir) restart_log.txt]
@@ -476,6 +474,12 @@ proc Videoarchiver_query {n} {
 		LWDAQ_print $t "Number of compressed video segments\
 			on $info(cam$n\_id): $len" purple
 
+		LWDAQ_socket_write $sock "llength \[glob -nocomplain tmp/S*.mp4\]\n"
+		set len [LWDAQ_socket_read $sock line]
+		if {[LWDAQ_is_error_result $len]} {error $len}
+		LWDAQ_print $t "Number video segments awaiting compression\
+			on $info(cam$n\_id): $len" purple
+
 		LWDAQ_socket_write $sock "gettemp\n"
 		set temp [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $temp]} {error $temp}
@@ -720,7 +724,8 @@ proc Videoarchiver_update {n} {
 				segment test/segment.sh \
 				framerate test/framerate.tcl \
 				single test/single.tcl \
-				compress test/compress.tcl} {
+				compress test/compress.tcl \
+				colors colors.json} {
 			LWDAQ_print $info(text) "$info(cam$n\_id) Updating $fn..."
 			LWDAQ_update
 			set size [string length $info($sn\_script)]
@@ -941,20 +946,19 @@ proc Videoarchiver_stream {n} {
 			}
 			LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
 				$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
-				sat $info(cam$n\_sat), exp $info(cam$n\_ec), red $config(awb_red), \
-				blue $config(awb_blue), crf $crf."
+				sat $info(cam$n\_sat), exp $info(cam$n\_ec), crf $crf."
 			LWDAQ_update
 			LWDAQ_socket_write $sock "exec libcamera-vid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
-				--awbgains $config(awb_red),$config(awb_blue) \
 				--flush \
 				--width $width --height $height \
 				--rotation $rot \
-				--saturation [format %.1f $info(cam$n\_sat)] \
+				--saturation [format %.1f [expr 2.0*$info(cam$n\_sat)]] \
 				--ev [format %.1f [expr 2.0*($info(cam$n\_ec)-0.5)]] \
 				--nopreview \
 				--framerate $framerate \
+				--tuning-file /home/pi/Videoarchiver/colors.json \
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
 				>& stream_log.txt & \n"
 		} else {
@@ -1155,7 +1159,10 @@ proc Videoarchiver_live {n} {
 
 #
 # Videoarchiver_live_watchdog check the status of the live view process running
-# for camera "n". If it disappears, execute a stop on the same camera.
+# for camera "n". If the viewer process disappears, execute a stop on the same 
+# camera. The routine also checks to see if any error occurred when starting
+# up the streaming, by reading the stream log file. We read the log file only 
+# occasionaly, at random.
 #
 proc Videoarchiver_live_watchdog {n} {
 	upvar #0 Videoarchiver_config config
@@ -1173,14 +1180,34 @@ proc Videoarchiver_live_watchdog {n} {
 
 	if {$info(cam$n\_state) != "Live"} {
 		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live watchdog." $config(v_col)
+		return "STOP"
 	} elseif {$LWDAQ_Info(reset)} {
 		Videoarchiver_stop $n
+		return "STOP"
 	} elseif {![LWDAQ_process_exists $info(cam$n\_lproc)]} {
 		LWDAQ_print $info(text) "$info(cam$n\_id) Live view has stopped running." \
 			$config(v_col)
 		Videoarchiver_stop $n
+		return "STOP"
 	} else {
+		if {rand()<0.1} {
+			set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
+			LWDAQ_socket_write $sock "getfile stream_log.txt\n"
+			set size [LWDAQ_socket_read $sock line]
+			if {[LWDAQ_is_error_result $size]} {error $size}
+			set contents [LWDAQ_socket_read $sock $size]	
+			LWDAQ_socket_close $sock
+			if {[regexp "ERROR: (.+?)\n" $contents match message]} {
+				set message [string trim [regsub -all {\*} $message ""]]
+				LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
+				LWDAQ_print $info(text) "SUGGESTION: $info(cam$n\_id)\
+					Reboot camera repeatedly until live view works."
+				Videoarchiver_stop $n
+				return "ERROR"
+			} 
+		}
 		LWDAQ_post [list Videoarchiver_live_watchdog $n]
+		return "LIVE"
 	}
 }
 
@@ -1545,8 +1572,7 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 		video recording after fatal error."
 	set result [Videoarchiver_record $n]
 	
-	# If the recording process returned an error, we try to restart
-	# again.
+	# If the recording process returned an error, we try again later.
 	if {$result == "ERROR"} {
 		set info(cam$n\_state) "Stalled"
 		LWDAQ_post [list Videoarchiver_restart_recording $n [clock seconds]]
@@ -1594,6 +1620,32 @@ proc Videoarchiver_transfer {n {init 0}} {
 	# because its interface will have been stopped too. Instead, we will skip
 	# the downloading and transfer all remaining segments, then stop.
 	if {$info(cam$n\_state) == "Record"} {
+	
+		# Occasionally, we read the streaming log file and check that
+		# the video stream is active.
+		if {rand()<0.1} {
+			set when "checking streaming"
+			if {[catch {
+				set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
+				LWDAQ_socket_write $sock "getfile stream_log.txt\n"
+				set size [LWDAQ_socket_read $sock line]
+				if {[LWDAQ_is_error_result $size]} {error $size}
+				set contents [LWDAQ_socket_read $sock $size]	
+				LWDAQ_socket_close $sock
+				if {[regexp "ERROR: (.+?)\n" $contents match message]} {
+					set message [string trim [regsub -all {\*} $message ""]]
+					error "$message"
+				} 
+			} message]} {
+				set error_description "ERROR: $message while $when for $info(cam$n\_id)."
+				LWDAQ_print $info(text) $error_description
+				LWDAQ_print $config(restart_log) $error_description
+				catch {LWDAQ_socket_close $sock}
+				LWDAQ_post [list Videoarchiver_restart_recording $n]
+				return "FAIL"
+			}
+		}
+
 		# Get a list of segments that are available for download on the camera. 
 		set when "fetching segment list"
 		if {[catch {
@@ -2290,7 +2342,6 @@ proc Videoarchiver_draw_list {} {
 			set info(cam$n\_lproc) "0"
 			set info(cam$n\_rstart) "0"
 			set info(cam$n\_prevseg) "V0000000000.mp4"
-			set info(cam$n\_ver) "A3034-HR"
 			set info(cam$n\_white) "0"
 			set info(cam$n\_infrared) "0"
 			set info(cam$n\_lag) "?"
@@ -2324,14 +2375,6 @@ proc Videoarchiver_draw_list {} {
 	
 		entry $ff.addr_value -textvariable Videoarchiver_info(cam$n\_addr) -width 14
 		pack $ff.addr_value -side left -expand 0
-
-		set m [tk_optionMenu $ff.verm Videoarchiver_info(cam$n\_ver) none]
-		$m delete 0 end
-		foreach version $config(versions) {
-			$m add command -label [lindex $version 0] \
-				-command [list set Videoarchiver_info(cam$n\_ver) [lindex $version 0]]
-		}	
-		pack $ff.verm -side left -expand 1
 
 		label $ff.rotl -text "Rot:" -fg brown -justify right
 		pack $ff.rotl -side left -expand 0
@@ -3837,6 +3880,285 @@ if {[llength $fnl] > 0} {
 	set tt $t
 }
 puts "Done in $t seconds, [format %.2f $tt] per segment." 
+</script>
+
+<script>
+{
+    "rpi.black_level":
+    {
+        "black_level": 4096
+    },
+    "rpi.dpc":
+    {
+
+    },
+    "rpi.lux":
+    {
+        "reference_shutter_speed": 27685,
+        "reference_gain": 1.0,
+        "reference_aperture": 1.0,
+        "reference_lux": 998,
+        "reference_Y": 12744
+    },
+    "rpi.noise":
+    {
+        "reference_constant": 0,
+        "reference_slope": 3.67
+    },
+    "rpi.geq":
+    {
+        "offset": 204,
+        "slope": 0.01633
+    },
+    "rpi.sdn":
+    {
+
+    },
+    "rpi.awb":
+    {
+	"bayes": 0
+    },
+    "rpi.agc":
+    {
+        "metering_modes":
+        {
+            "centre-weighted":
+            {
+                "weights":
+                [
+                    3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0
+                ]
+            },
+            "spot":
+            {
+                "weights":
+                [
+                    2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                ]
+            },
+            "matrix":
+            {
+                "weights":
+                [
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+                ]
+            }
+        },
+        "exposure_modes":
+        {
+            "normal":
+            {
+                "shutter":
+                [
+                    100, 10000, 30000, 60000, 66666
+                ],
+                "gain":
+                [
+                    1.0, 2.0, 4.0, 6.0, 8.0
+                ]
+            },
+            "short":
+            {
+                "shutter":
+                [
+                    100, 5000, 10000, 20000, 33333
+                ],
+                "gain":
+                [
+                    1.0, 2.0, 4.0, 6.0, 8.0
+                ]
+            },
+            "long":
+            {
+                "shutter":
+                [
+                    100, 10000, 30000, 60000, 120000
+                ],
+                "gain":
+                [
+                    1.0, 2.0, 4.0, 6.0, 12.0
+                ]
+            }
+        },
+        "constraint_modes":
+        {
+            "normal":
+            [
+                {
+                    "bound": "LOWER", "q_lo": 0.98, "q_hi": 1.0, "y_target":
+                    [
+                        0, 0.5, 1000, 0.5
+                    ]
+                }
+            ],
+            "highlight":
+            [
+                {
+                    "bound": "LOWER", "q_lo": 0.98, "q_hi": 1.0, "y_target":
+                    [
+                        0, 0.5, 1000, 0.5
+                    ]
+                },
+                {
+                    "bound": "UPPER", "q_lo": 0.98, "q_hi": 1.0, "y_target":
+                    [
+                        0, 0.8, 1000, 0.8
+                    ]
+                }
+            ],
+	    "shadows":
+	    [
+		{
+		    "bound": "LOWER", "q_lo": 0.0, "q_hi": 0.5, "y_target":
+                    [
+                        0, 0.17, 1000, 0.17
+                    ]
+                }
+            ]
+        },
+        "y_target":
+        [
+            0, 0.16, 1000, 0.165, 10000, 0.17
+        ]
+    },
+    "rpi.alsc":
+    {
+        "omega": 1.3,
+        "n_iter": 100,
+        "luminance_strength": 0.7,
+        "calibrations_Cr":
+        [
+            {
+                "ct": 3000, "table":
+                [
+                    1.584, 1.574, 1.568, 1.569, 1.584, 1.599, 1.624, 1.634, 1.634, 1.634, 1.624, 1.613, 1.603, 1.596, 1.596, 1.609,
+                    1.574, 1.544, 1.555, 1.568, 1.591, 1.616, 1.658, 1.681, 1.681, 1.677, 1.634, 1.615, 1.596, 1.578, 1.567, 1.585,
+                    1.529, 1.519, 1.539, 1.557, 1.611, 1.658, 1.721, 1.759, 1.759, 1.739, 1.677, 1.629, 1.578, 1.564, 1.539, 1.539,
+                    1.493, 1.494, 1.506, 1.557, 1.637, 1.721, 1.773, 1.851, 1.851, 1.785, 1.739, 1.651, 1.578, 1.525, 1.514, 1.503,
+                    1.466, 1.478, 1.492, 1.564, 1.664, 1.773, 1.851, 1.899, 1.911, 1.856, 1.785, 1.674, 1.581, 1.514, 1.496, 1.478,
+                    1.452, 1.458, 1.488, 1.565, 1.673, 1.791, 1.891, 1.928, 1.928, 1.906, 1.806, 1.684, 1.582, 1.509, 1.477, 1.464,
+                    1.452, 1.457, 1.487, 1.564, 1.673, 1.791, 1.891, 1.907, 1.911, 1.905, 1.806, 1.684, 1.582, 1.508, 1.471, 1.464,
+                    1.466, 1.476, 1.488, 1.556, 1.649, 1.755, 1.818, 1.891, 1.901, 1.823, 1.769, 1.666, 1.576, 1.508, 1.487, 1.473,
+                    1.492, 1.492, 1.501, 1.544, 1.616, 1.688, 1.755, 1.818, 1.818, 1.769, 1.702, 1.634, 1.566, 1.515, 1.508, 1.498,
+                    1.525, 1.506, 1.521, 1.536, 1.583, 1.617, 1.688, 1.721, 1.721, 1.702, 1.634, 1.606, 1.559, 1.544, 1.524, 1.528,
+                    1.564, 1.533, 1.534, 1.558, 1.563, 1.585, 1.615, 1.635, 1.635, 1.631, 1.606, 1.591, 1.582, 1.559, 1.546, 1.567,
+                    1.586, 1.564, 1.558, 1.559, 1.563, 1.574, 1.587, 1.601, 1.602, 1.602, 1.597, 1.591, 1.583, 1.583, 1.587, 1.603
+                ]
+            }
+        ],
+        "calibrations_Cb":
+        [
+            {
+                "ct": 3000, "table":
+                [
+                    1.217, 1.221, 1.229, 1.235, 1.243, 1.251, 1.257, 1.258, 1.257, 1.249, 1.234, 1.222, 1.207, 1.191, 1.177, 1.172,
+                    1.217, 1.221, 1.226, 1.233, 1.241, 1.251, 1.258, 1.259, 1.257, 1.248, 1.228, 1.211, 1.194, 1.178, 1.169, 1.159,
+                    1.214, 1.219, 1.226, 1.233, 1.241, 1.251, 1.259, 1.263, 1.262, 1.248, 1.228, 1.205, 1.185, 1.169, 1.159, 1.149,
+                    1.214, 1.219, 1.226, 1.233, 1.241, 1.255, 1.267, 1.275, 1.274, 1.258, 1.231, 1.204, 1.179, 1.162, 1.149, 1.145,
+                    1.217, 1.219, 1.227, 1.237, 1.249, 1.267, 1.279, 1.293, 1.285, 1.274, 1.241, 1.206, 1.179, 1.161, 1.145, 1.141,
+                    1.219, 1.225, 1.234, 1.242, 1.258, 1.276, 1.297, 1.299, 1.297, 1.285, 1.249, 1.211, 1.181, 1.161, 1.145, 1.142,
+                    1.222, 1.226, 1.236, 1.246, 1.261, 1.277, 1.298, 1.305, 1.305, 1.285, 1.252, 1.215, 1.186, 1.164, 1.148, 1.144,
+                    1.226, 1.229, 1.238, 1.249, 1.261, 1.277, 1.295, 1.299, 1.296, 1.284, 1.252, 1.221, 1.193, 1.171, 1.161, 1.148,
+                    1.229, 1.233, 1.242, 1.251, 1.262, 1.274, 1.287, 1.293, 1.289, 1.277, 1.253, 1.224, 1.202, 1.184, 1.171, 1.161,
+                    1.233, 1.238, 1.246, 1.253, 1.263, 1.274, 1.284, 1.289, 1.287, 1.276, 1.254, 1.232, 1.213, 1.195, 1.184, 1.172,
+                    1.235, 1.238, 1.246, 1.253, 1.263, 1.273, 1.282, 1.284, 1.282, 1.274, 1.257, 1.241, 1.222, 1.205, 1.191, 1.183,
+                    1.235, 1.235, 1.244, 1.251, 1.259, 1.268, 1.277, 1.282, 1.278, 1.271, 1.257, 1.242, 1.222, 1.205, 1.191, 1.185
+                ]
+            }
+        ],
+        "luminance_lut":
+        [
+            1.843, 1.786, 1.715, 1.646, 1.567, 1.475, 1.433, 1.431, 1.431, 1.437, 1.498, 1.586, 1.664, 1.758, 1.844, 1.914,
+            1.843, 1.792, 1.702, 1.587, 1.502, 1.397, 1.315, 1.289, 1.289, 1.335, 1.407, 1.519, 1.607, 1.721, 1.829, 1.914,
+            1.853, 1.793, 1.677, 1.535, 1.397, 1.304, 1.197, 1.161, 1.161, 1.203, 1.331, 1.407, 1.546, 1.689, 1.817, 1.914,
+            1.864, 1.791, 1.647, 1.479, 1.315, 1.197, 1.118, 1.059, 1.059, 1.134, 1.203, 1.331, 1.497, 1.667, 1.816, 1.916,
+            1.873, 1.791, 1.629, 1.442, 1.261, 1.118, 1.056, 1.011, 1.017, 1.059, 1.134, 1.275, 1.462, 1.648, 1.814, 1.919,
+            1.888, 1.799, 1.629, 1.437, 1.246, 1.102, 1.017, 1.001, 1.001, 1.019, 1.108, 1.249, 1.449, 1.646, 1.821, 1.919,
+            1.905, 1.807, 1.634, 1.437, 1.246, 1.102, 1.018, 1.011, 1.015, 1.019, 1.108, 1.249, 1.449, 1.649, 1.827, 1.932,
+            1.908, 1.856, 1.669, 1.476, 1.289, 1.145, 1.098, 1.019, 1.021, 1.098, 1.145, 1.285, 1.472, 1.669, 1.839, 1.935,
+            1.911, 1.873, 1.716, 1.541, 1.366, 1.272, 1.145, 1.099, 1.099, 1.145, 1.269, 1.364, 1.535, 1.708, 1.855, 1.939,
+            1.917, 1.873, 1.769, 1.625, 1.514, 1.366, 1.272, 1.234, 1.234, 1.269, 1.364, 1.492, 1.616, 1.757, 1.872, 1.947,
+            1.932, 1.922, 1.873, 1.769, 1.625, 1.514, 1.438, 1.398, 1.398, 1.424, 1.492, 1.616, 1.757, 1.872, 1.953, 1.957,
+            2.059, 2.009, 1.943, 1.857, 1.783, 1.721, 1.679, 1.672, 1.672, 1.672, 1.694, 1.754, 1.828, 1.912, 1.991, 2.062
+        ],
+        "sigma": 0.00381,
+        "sigma_Cb": 0.00216
+    },
+    "rpi.contrast":
+    {
+        "ce_enable": 1,
+        "gamma_curve":
+        [
+            0, 0, 1024, 5040, 2048, 9338, 3072, 12356, 4096, 15312, 5120, 18051, 6144, 20790, 7168, 23193,
+            8192, 25744, 9216, 27942, 10240, 30035, 11264, 32005, 12288, 33975, 13312, 35815, 14336, 37600, 15360, 39168,
+            16384, 40642, 18432, 43379, 20480, 45749, 22528, 47753, 24576, 49621, 26624, 51253, 28672, 52698, 30720, 53796,
+            32768, 54876, 36864, 57012, 40960, 58656, 45056, 59954, 49152, 61183, 53248, 62355, 57344, 63419, 61440, 64476,
+            65535, 65535
+        ]
+    },
+    "rpi.ccm":
+    {
+        "ccms":
+        [
+            {
+                "ct": 2498, "ccm":
+                [
+                    1.58731, -0.18011, -0.40721, -0.60639, 2.03422, -0.42782, -0.19612, -1.69203, 2.88815
+                ]
+            },
+            {
+                "ct": 2811, "ccm":
+                [
+                    1.61593, -0.33164, -0.28429, -0.55048, 1.97779, -0.42731, -0.12042, -1.42847, 2.54889
+                ]
+            },
+            {
+                "ct": 2911, "ccm":
+                [
+                    1.62771, -0.41282, -0.21489, -0.57991, 2.04176, -0.46186, -0.07613, -1.13359, 2.20972
+                ]
+            },
+            {
+                "ct": 2919, "ccm":
+                [
+                    1.62661, -0.37736, -0.24925, -0.52519, 1.95233, -0.42714, -0.10842, -1.34929, 2.45771
+                ]
+            },
+            {
+                "ct": 3627, "ccm":
+                [
+                    1.70385, -0.57231, -0.13154, -0.47763, 1.85998, -0.38235, -0.07467, -0.82678, 1.90145
+                ]
+            },
+            {
+                "ct": 4600, "ccm":
+                [
+                    1.68486, -0.61085, -0.07402, -0.41927, 2.04016, -0.62089, -0.08633, -0.67672, 1.76305
+                ]
+            },
+            {
+                "ct": 5716, "ccm":
+                [
+                    1.80439, -0.73699, -0.06739, -0.36073, 1.83327, -0.47255, -0.08378, -0.56403, 1.64781
+                ]
+            },
+            {
+                "ct": 8575, "ccm":
+                [
+                    1.89357, -0.76427, -0.12931, -0.27399, 2.15605, -0.88206, -0.12035, -0.68256, 1.80292
+                ]
+            }
+        ]
+    },
+    "rpi.sharpen":
+    {
+
+    },
+    "rpi.dpc":
+    {
+
+    }
+}
 </script>
 
 ----------End Data----------
