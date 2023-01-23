@@ -926,6 +926,22 @@ proc Videoarchiver_stream {n} {
 	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
 		version width height framerate crf
 		
+	# Report what we are doing.
+	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
+		$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
+		sat $info(cam$n\_sat), exp $info(cam$n\_ec), crf $crf."
+	LWDAQ_update
+
+	# Determine the rotation we want from the camera. Some rotations we begin
+	# in the camera and complete during compression.
+	switch $info(cam$n\_rot) {
+		0 {set rot 0}
+		90 {set rot 0}
+		180 {set rot 180}
+		270 {set rot 180}
+		default {set rot 0}
+	}
+
 	if {[catch {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
@@ -937,17 +953,6 @@ proc Videoarchiver_stream {n} {
 		# final command to echo the word SUCCESS is to allow our secure shell to
 		# return a success code. Any error will cause the echo to be skipped.
 		if {$info(cam$n\_os) == "Bullseye"} {
-			switch $info(cam$n\_rot) {
-				0 {set rot 0}
-				90 {set rot 0}
-				180 {set rot 180}
-				270 {set rot 180}
-				default {set rot 0}
-			}
-			LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
-				$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
-				sat $info(cam$n\_sat), exp $info(cam$n\_ec), crf $crf."
-			LWDAQ_update
 			LWDAQ_socket_write $sock "exec libcamera-vid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
@@ -962,10 +967,6 @@ proc Videoarchiver_stream {n} {
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
 				>& stream_log.txt & \n"
 		} else {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
-				$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
-				sat $info(cam$n\_sat), exp $info(cam$n\_ec), crf $crf."
-			LWDAQ_update
 			LWDAQ_socket_write $sock "exec raspivid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
@@ -973,7 +974,7 @@ proc Videoarchiver_stream {n} {
 				--width $width --height $height \
 				--saturation [expr round(200*$info(cam$n\_sat)-100)] \
 				--ev [expr round(20.0*($info(cam$n\_ec)-0.5))] \
-				--rotation $info(cam$n\_rot) \
+				--rotation $rot \
 				--nopreview \
 				--framerate $framerate \
 				--listen --output tcp://0.0.0.0:$info(tcp_port) \
@@ -1135,11 +1136,9 @@ proc Videoarchiver_live {n} {
 		-fps [expr 2*$framerate]]
 
 	# Determine the rotation command, if any.
-	if {$info(cam$n\_os) == "Bullseye"} {
-		switch $info(cam$n\_rot) {
-			90 {lappend cmd -vf rotate=1}
-			270 {lappend cmd -vf rotate=1}
-		}
+	switch $info(cam$n\_rot) {
+		90 {lappend cmd -vf rotate=1}
+		270 {lappend cmd -vf rotate=1}
 	}
 	
 	# Add stream source.
@@ -1323,11 +1322,9 @@ proc Videoarchiver_compress {n} {
 	# Determine if the compressors should rotate the images by ninety 
 	# degrees.
 	set rotation 0
-	if {$info(cam$n\_os) == "Bullseye"} {
-		switch $info(cam$n\_rot) {
-			90 {set rotation 90}
-			270 {set rotation 90}
-		}
+	switch $info(cam$n\_rot) {
+		90 {set rotation 90}
+		270 {set rotation 90}
 	}
 			
 	if {[catch {
