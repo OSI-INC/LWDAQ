@@ -92,12 +92,14 @@ proc Videoarchiver_init {} {
 	set info(tcl_port) "2223"
 	set info(library_archive) "http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
 
-	# These are the camera versions, each version accompanied by four numbers:
-	# the horizontal resolution x, vertical resolution y, frame rate fr, and
-	# constant rate factor crf. The image will be x * y pixels with fr frames
-	# per second, and the H264 compression will be greater as the crf is lower.
+	# These are the camera versions, each version accompanied by five numbers:
+	# the width x, height y, frame rate fr, constant rate factor crf, and
+	# segment length sl in seconds. The image will be x * y pixels with fr frames per
+	# second, and the H264 compression will be greater as the crf is lower.
 	# Standard crf is 23. The crf of 15 gives a particularly sharp image.
-	set config(versions) [list {A3034-HR 820 616 20 23} ]
+	set config(versions) [list \
+		{A3034C1 820 616 20 23 1} \
+		{A3034C2 820 616 20 27 2} ]
 	
 	# The rotation of the image readout.
 	set info(rotation_options) "0 90 180 270"
@@ -179,10 +181,6 @@ echo "SUCCESS"
 	set config(verbose_compressors) "0"
 	set config(log_max) "100"
 	
-	# The segment length. Video will be saved on the camera and transferred to
-	# the data acquisition computer in segments.
-	set info(segment_len) "1"
-
 	# Monitor parameters
 	set config(monitor_speed) "1.0"
 	set config(display_zoom) "1.0"
@@ -343,14 +341,11 @@ proc Videoarchiver_camera_init {n} {
 		if {[LWDAQ_is_error_result $size]} {error $size}
 		set configuration [LWDAQ_socket_read $sock $size]
 		if {[regexp "os Bullseye" $configuration]} {
-			set info(segment_len) "2.0"
-			set info(cam$n\_os) "Bullseye"
+			set info(cam$n\_ver) "A3034C2"
 		} else {
-			set info(segment_len) "1.0"
-			set info(cam$n\_os) "Stretch"
+			set info(cam$n\_ver) "A3034C1"
 		}
-		LWDAQ_print $info(text) "$info(cam$n\_id) Using segment length\
-			$info(segment_len) s."
+		LWDAQ_print $info(text) "$info(cam$n\_id) is version [set info(cam$n\_ver)]."
 		LWDAQ_socket_close $sock
 	} message]} {
 		error $message	
@@ -901,6 +896,10 @@ proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 }
 
 #
+# 
+#
+
+#
 # Videoarchiver_stream start streaming of video from the camera.
 #
 proc Videoarchiver_stream {n} {
@@ -923,13 +922,13 @@ proc Videoarchiver_stream {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
-		version width height framerate crf
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
+		version width height framerate crf sl
 		
 	# Report what we are doing.
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
 		$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
-		sat $info(cam$n\_sat), exp $info(cam$n\_ec), crf $crf."
+		sat $info(cam$n\_sat), exp $info(cam$n\_ec)."
 	LWDAQ_update
 
 	# Determine the rotation we want from the camera. Some rotations we begin
@@ -952,7 +951,7 @@ proc Videoarchiver_stream {n} {
 		# resolution, compensation, rotation and saturation of the video. The
 		# final command to echo the word SUCCESS is to allow our secure shell to
 		# return a success code. Any error will cause the echo to be skipped.
-		if {$info(cam$n\_os) == "Bullseye"} {
+		if {$info(cam$n\_ver) == "A3034C2"} {
 			LWDAQ_socket_write $sock "exec libcamera-vid \
 				--codec $config(stream_codec) \
 				--timeout 0 \
@@ -1122,8 +1121,8 @@ proc Videoarchiver_live {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
-		version width height framerate crf
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
+		version width height framerate crf sl
 		
 	# Construct mplayer command.
 	set cmd [list $info(mplayer) \
@@ -1200,7 +1199,7 @@ proc Videoarchiver_live_watchdog {n} {
 				set message [string trim [regsub -all {\*} $message ""]]
 				LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
 				LWDAQ_print $info(text) "SUGGESTION: $info(cam$n\_id)\
-					Reboot camera repeatedly until live view works."
+					Try live view a few times, then try rebooting."
 				Videoarchiver_stop $n
 				return "ERROR"
 			} 
@@ -1316,8 +1315,8 @@ proc Videoarchiver_compress {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
-		version width height framerate crf
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
+		version width height framerate crf sl
 	
 	# Determine if the compressors should rotate the images by ninety 
 	# degrees.
@@ -1326,7 +1325,7 @@ proc Videoarchiver_compress {n} {
 		90 {set rotation 90}
 		270 {set rotation 90}
 	}
-			
+				
 	if {[catch {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
@@ -1346,10 +1345,11 @@ proc Videoarchiver_compress {n} {
 			set message [regsub "ERROR: " $result ""]
 			error $message
 		}
-		LWDAQ_print $info(text) "$info(cam$n\_id) Started compression manager on camera."
 
-		# Close socket.
+		# Close socket and report.
 		LWDAQ_socket_close $sock
+		LWDAQ_print $info(text) "$info(cam$n\_id) Started compression manager\
+			on camera with crf $crf."
 	} message]} {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
 		catch {LWDAQ_socket_close $sock}
@@ -1378,8 +1378,8 @@ proc Videoarchiver_segment {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
-		version width height framerate crf
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
+		version width height framerate crf sl
 	
 	if {[catch {
 		# Open a socket to the interface.
@@ -1394,7 +1394,7 @@ proc Videoarchiver_segment {n} {
 			-framerate $framerate \
 			-f segment \
 			-segment_atclocktime 1 \
-			-segment_time $info(segment_len) \
+			-segment_time $sl \
 			-reset_timestamps 1 \
 			-codec copy \
 			-segment_list segment_list.txt \
@@ -1407,8 +1407,10 @@ proc Videoarchiver_segment {n} {
 			error $message
 		}
 
-		# Close socket.
+		# Close socket and report.
 		LWDAQ_socket_close $sock
+		LWDAQ_print $info(text) "$info(cam$n\_id) Started segmentation process\
+			on camera with segment length $sl s."
 	} message]} {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
 		catch {LWDAQ_socket_close $sock}
@@ -2508,7 +2510,6 @@ proc Videoarchiver_remove {n} {
 	unset info(cam$n\_ver)
 	unset info(cam$n\_addr)
 	unset info(cam$n\_rot)
-	unset info(cam$n\_os)
 	unset info(cam$n\_sat)
 	unset info(cam$n\_ec)
 	unset info(cam$n\_file)
@@ -2546,10 +2547,9 @@ proc Videoarchiver_add_camera {} {
 	
 	# Configure the new sensor to default values.
 	set info(cam$n\_id) "Z000$n"
-	set info(cam$n\_ver) "A3034-HR"
+	set info(cam$n\_ver) "unknown"
 	set info(cam$n\_addr) $info(default_ip_addr)
 	set info(cam$n\_rot) $info(default_rot)
-	set info(cam$n\_os) "unknown"
 	set info(cam$n\_sat) $info(default_sat)
 	set info(cam$n\_ec) $info(default_ec)
 	set info(cam$n\_dir) [file normalize "~/Desktop"]
@@ -2880,7 +2880,6 @@ proc Videoarchiver_schedule_stop {} {
 	LWDAQ_unschedule_task "white_off"
 	LWDAQ_unschedule_task "infrared_on"
 	LWDAQ_unschedule_task "infrared_off"
-	LWDAQ_queue_clear "Videoarchiver*"
 	set info(scheduler_state) "Stop"
 	LWDAQ_print $info(text) "Unscheduled all tasks, aborted all tasks,\
 		aborted tasks remain incomplete."
