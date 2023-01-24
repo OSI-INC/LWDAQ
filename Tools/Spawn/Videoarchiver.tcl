@@ -166,7 +166,7 @@ echo "SUCCESS"
 	# The following parameters will appear in the configuration panel, so the
 	# user can modify them by hand.
 	set config(transfer_period_s) "60"
-	set config(transfer_max_files) "10"
+	set config(transfer_max_files) "20"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
 	set config(restart_wait_s) "30"
@@ -1769,6 +1769,11 @@ proc Videoarchiver_transfer {n {init 0}} {
 						error "Lagging by $lag seconds"
 					} elseif {$lag > $config(lag_alarm)} {
 						LWDAQ_set_fg $info(cam$n\_laglabel) red
+						if {$config(verbose)} {
+							LWDAQ_print $info(text) "WARNING: Turning off verbose\
+								reporting in an effort to reduce camera lag."
+							set config(verbose) 0
+						}
 					} elseif {$lag > $config(lag_warning)} {
 						LWDAQ_set_fg $info(cam$n\_laglabel) orange
 					} else {
@@ -2587,14 +2592,9 @@ proc Videoarchiver_save_list {{fn ""}} {
 	set f [open $fn w]
 	puts $f "set Videoarchiver_info(cam_list) \"$info(cam_list)\""
 	puts $f "set Videoarchiver_config(recording_dir) \"$config(recording_dir)\""
-	foreach p [lsort -dictionary [array names info]] {
-		if {[regexp {cam[0-9]+_} $p]} {
-			puts $f "set Videoarchiver_info($p) \"[set info($p)]\"" 
-		}
-		foreach a {white_on white_off infrared_on infrared_off} {
-			if {[regexp $a $p]} {
-				puts $f "set Videoarchiver_info($p) \"[set info($p)]\"" 
-			}
+	foreach n $info(cam_list) {
+		foreach a {id ver addr rot sat ec} {
+			puts $f "set Videoarchiver_info(cam$n\_$a) \"[set info(cam$n\_$a)]\"" 
 		}
 	}
 	close $f
@@ -2880,6 +2880,7 @@ proc Videoarchiver_schedule_stop {} {
 	LWDAQ_unschedule_task "white_off"
 	LWDAQ_unschedule_task "infrared_on"
 	LWDAQ_unschedule_task "infrared_off"
+	LWDAQ_queue_clear "Videoarchiver_lamps_*"
 	set info(scheduler_state) "Stop"
 	LWDAQ_print $info(text) "Unscheduled all tasks, aborted all tasks,\
 		aborted tasks remain incomplete."
