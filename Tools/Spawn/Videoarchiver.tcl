@@ -94,9 +94,9 @@ proc Videoarchiver_init {} {
 
 	# These are the camera versions, each version accompanied by five numbers:
 	# the width x, height y, frame rate fr, constant rate factor crf, and
-	# segment length sl in seconds. The image will be x * y pixels with fr frames per
-	# second, and the H264 compression will be greater as the crf is lower.
-	# Standard crf is 23. The crf of 15 gives a particularly sharp image.
+	# segment length sl in seconds. The image will be x * y pixels with fr
+	# frames per second, and the H264 compression will be greater as the crf is
+	# lower. Standard crf is 23. The crf of 15 gives a particularly sharp image.
 	set config(versions) [list \
 		{A3034C1 820 616 20 23 1} \
 		{A3034C2 820 616 20 27 2} ]
@@ -289,9 +289,13 @@ proc Videoarchiver_segdir {n} {
 }
 
 #
-# Videoarchiver_camera_init initializes a camera by stopping all ffmpeg
-# and tclsh processes, deleting old files, and starting up the interface
-# process on the camera.
+# Videoarchiver_camera_init initializes a camera by stopping all ffmpeg and
+# tclsh processes, deleting old files, and starting up the interface process on
+# the camera. The routine determines the camera version so we can set the
+# segment length, image dimensions, and any other version-specific parameters.
+# The routine checks that the firmware on the camera is compatible with this
+# version of the Videoarchiver, and if not it generates an error and advises the
+# user to update the camera.
 #
 proc Videoarchiver_camera_init {n} {
 	upvar #0 Videoarchiver_config config
@@ -331,11 +335,13 @@ proc Videoarchiver_camera_init {n} {
 	# Wait for the tcpip interface to start up.
 	LWDAQ_wait_ms $info(pi_start_ms)
 	
-	# Try out the interface. Read configuration file and adjust the segment length to
-	# match.
+	# Use the interface to determine the camera version and check compatibility of
+	# its firmwarwe.
 	if {[catch {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 
+		# We look at the configuration file on the camera to determine the
+		# version.
 		LWDAQ_socket_write $sock "getfile videoarchiver.config\n"
 		set size [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $size]} {error $size}
@@ -346,8 +352,23 @@ proc Videoarchiver_camera_init {n} {
 			set info(cam$n\_ver) "A3034C1"
 		}
 		LWDAQ_print $info(text) "$info(cam$n\_id) is version [set info(cam$n\_ver)]."
+		
+		# We look for the manager.tcl file. If it's not present, the camera must
+		# be updated.
+		LWDAQ_socket_write $sock "getfile manager.tcl\n"
+		set size [LWDAQ_socket_read $sock line]
+		if {[LWDAQ_is_error_result $size]} {
+			error $size
+		}		
+		if {$size == 0} {
+			error "Camera firmware incompatible with Videoarchiver $info(version);\
+				update with \"U\" button."
+		}
+		set manager [LWDAQ_socket_read $sock $size]
+		
 		LWDAQ_socket_close $sock
 	} message]} {
+		catch {LWDAQ_socket_close $sock}
 		error $message	
 	}
 
@@ -1189,12 +1210,18 @@ proc Videoarchiver_live_watchdog {n} {
 		return "STOP"
 	} else {
 		if {rand()<0.1} {
-			set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
-			LWDAQ_socket_write $sock "getfile stream_log.txt\n"
-			set size [LWDAQ_socket_read $sock line]
-			if {[LWDAQ_is_error_result $size]} {error $size}
-			set contents [LWDAQ_socket_read $sock $size]	
-			LWDAQ_socket_close $sock
+			if {[catch {
+				set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
+				LWDAQ_socket_write $sock "getfile stream_log.txt\n"
+				set size [LWDAQ_socket_read $sock line]
+				if {[LWDAQ_is_error_result $size]} {error $size}
+				set contents [LWDAQ_socket_read $sock $size]	
+				LWDAQ_socket_close $sock
+			} message]} {
+				LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
+				catch {LWDAQ_socket_close $sock}
+				return "ERROR"
+			}
 			if {[regexp "ERROR: (.+?)\n" $contents match message]} {
 				set message [string trim [regsub -all {\*} $message ""]]
 				LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
