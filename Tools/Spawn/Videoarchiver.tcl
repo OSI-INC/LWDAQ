@@ -3212,7 +3212,7 @@ proc interpreter {sock} {
 			puts $sock [format %.2f $frequency]
 	
 		# The setip command sets the static IP address of the camera by
-		# re-writing the dhcpcd.conf file. It then shuts off the ethernet
+		# re-writing the dhcpcd.conf file. It then shuts off the Ethernet
 		# interface and turns it on again, which closes the socket.
 		} elseif {$cmd == "setip"} {
 			set new_ip [lindex $argv 0]
@@ -3626,7 +3626,7 @@ if {[catch {file delete $infile} message]} {
 #
 
 # We assign a static IP address with subnet mask 255.255.255.0 to the wired
-# ethernet interface, which the operating system calls "eth0". Do not change the 
+# Ethernet interface, which the operating system calls "eth0". Do not change the 
 # static IP address in this file unless you are prepared to change it in the 
 # Videoarchiver's set_ip routine as well. We disable routers for this interface
 # with router address 0.0.0.0, which is a null address. The operating system

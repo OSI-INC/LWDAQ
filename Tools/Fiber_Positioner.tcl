@@ -57,12 +57,12 @@ proc Fiber_Positioner_init {} {
 	
 	# Data acquisition addresses.
 	set config(ip_addr) "192.168.1.11"
-	set config(dfps_sock) "8"
+	set config(dfps_sock) "8 14"
 	set config(fiber_type) "9"
-	set config(injector_sock) "3"
+	set config(injector_sock) "8 1"
 	set config(injector_leds) "A1 A2"
 	set config(dfps_ids) "A123 B341"
-	set config(camera_sock) "4"
+	set config(camera_sock) "8 8"
 	set config(flash_seconds) "0.003"
 	set config(sort_code) "8"
 	
@@ -163,7 +163,8 @@ proc Fiber_Positioner_transmit {{commands ""}} {
 		} {
 			set sd $config(spacing_delay_A2071E)
 		}
-		LWDAQ_set_driver_mux $sock $config(dfps_sock) 1
+		LWDAQ_set_driver_mux $sock \
+			[lindex $config(dfps_sock) 0] [lindex $config(dfps_sock) 1]
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		foreach c $commands {
@@ -267,10 +268,12 @@ proc Fiber_Positioner_spot_position {} {
 	
 	set info(spot_positions) ""
 	set iconfig(daq_ip_addr) $config(ip_addr)
-	set iconfig(daq_source_driver_socket) $config(injector_sock)
+	set iconfig(daq_source_driver_socket) [lindex $config(injector_sock) 0]
+	set iconfig(daq_source_mux_socket) [lindex $config(injector_sock) 1]
 	set iconfig(daq_source_device_element) $config(injector_leds)
 	set iinfo(daq_source_device_type) $config(fiber_type)
-	set iconfig(dfps_socket) $config(camera_sock)
+	set iconfig(daq_driver_socket) [lindex $config(camera_sock) 0]
+	set iconfig(daq_mux_socket) [lindex $config(camera_sock) 1]
 	set iconfig(daq_flash_seconds) $config(flash_seconds)
 	set iconfig(analysis_num_spots) \
 		"[llength $config(injector_leds)] $config(sort_code)"
