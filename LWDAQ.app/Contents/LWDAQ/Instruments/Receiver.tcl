@@ -75,7 +75,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(sel_none_cmd) "0084"
 	set info(all_sets_cmd) "1F04"
 	set info(sleep_cmd) "0000"
-	set info(config_size) 64
+	set info(config_size) "64"
 	set info(channel_activity) ""
 	set info(activity_threshold) "10"
 	set info(errors_for_stop) 10
@@ -273,7 +273,7 @@ proc LWDAQ_reset_Receiver {} {
 		
 		# Start the reset and configure.
 		LWDAQ_print -nonewline $info(text) "Resetting receiver, "
-		LWDAQ_update
+		if {[winfo exists $info(text)]} {LWDAQ_update}
 
 		# Open a socket and log in to the driver.
 		set sock [LWDAQ_socket_open $config(daq_ip_addr)]
@@ -285,12 +285,11 @@ proc LWDAQ_reset_Receiver {} {
 		
 		# Reset the receiver message buffer and message detectors.
 		LWDAQ_transmit_command_hex $sock $info(reset_cmd)
-		LWDAQ_wait_for_driver $sock
 		
 		# Read a few clock messages from the receiver and try to identify
 		# what type of receiver it is, and determine its message payload.
 		LWDAQ_print -nonewline $info(text) "detecting type, "
-		LWDAQ_update
+		if {[winfo exists $info(text)]} {LWDAQ_update}
 		
 		# Download a small block of messages from the receiver.
 		LWDAQ_transmit_command_hex $sock $info(upload_cmd)
@@ -403,6 +402,7 @@ proc LWDAQ_reset_Receiver {} {
 				}
 				if {[llength $ch_list] > 0} {
 					LWDAQ_print -nonewline $info(text) "selecting channels $ch_list, "
+					if {[winfo exists $info(text)]} {LWDAQ_update}
 					LWDAQ_transmit_command_hex $sock $info(sel_none_cmd)
 					foreach cmd $cmd_list {
 						LWDAQ_transmit_command_hex $sock $cmd
@@ -437,6 +437,7 @@ proc LWDAQ_reset_Receiver {} {
 
 		# Notification to user.		
 		LWDAQ_print $info(text) "done."
+		if {[winfo exists $info(text)]} {LWDAQ_update}
 	} error_result]} { 
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		incr LWDAQ_Info(num_daq_errors)

@@ -491,11 +491,11 @@ proc LWDAQ_enable_text_undo {t} {
 # appends the string to the file, or creates the file if the file does not
 # exist. The routine will not accept any file name that contains a space, is an
 # empty string, or is a real number. If the routine cannot find any valid device
-# that matches the device name, it will write the print string to stdout when
-# the global default_to_stdout flag is set. Another service provided by the
-# routine is to replace any double occurrances of ERROR: or WARNING: that might
-# arise as we pass error and warning strings through various routines before
-# they are printed.
+# that matches the device name, it will write the string to stdout provided the
+# default_to_stdout flag is set. Otherwise the routine does nothing. Another
+# service provided by the routine is to replace any double occurrances of ERROR:
+# or WARNING: that might arise as we pass error and warning strings through
+# various routines before they are printed.
 #
 proc LWDAQ_print {args} {
 	global LWDAQ_Info

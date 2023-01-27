@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "161"
+	LWDAQ_tool_init "Neurorecorder" "162"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -544,35 +544,35 @@ proc Neurorecorder_set_receiver {version} {
 			set iconfig(payload_length) 0
 			set config(tracker_coordinates) ""
 			set config(tracker_background) ""
-			Neurorecorder_print "Receiver $version\:\
-				Specify driver socket, channel select not supported."
+			Neurorecorder_print "Detected: Data Receiver (A3018),\
+				applying driver socket, ignoring channel selection."
 		}
 		"A3027" {
 			set iconfig(payload_length) 0
 			set config(tracker_coordinates) ""
-			Neurorecorder_print "Receiver $version\:\
-				Specify driver socket, channel select not supported."
+			Neurorecorder_print "Detected: Octal Data Receiver (A3027),\
+				applying driver socket, ignoring channel selection."
 			set config(tracker_background) ""
 		}
 		"A3032" {
 			set iconfig(payload_length) $info(A3032_payload)
 			set config(tracker_coordinates) $info(A3032_coordinates)
-			Neurorecorder_print "Receiver $version\:\
-				Specify driver socket, channel select not supported."
+			Neurorecorder_print "Detected: Animal Location Tracker (A3032),\
+				applying driver socket, ignoring channel selection."
 			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
 		"A3038" {
 			set iconfig(payload_length) $info(A3038_payload)
 			set config(tracker_coordinates) $info(A3038_coordinates)
-			Neurorecorder_print "Receiver $version\:\
-				No need to specify driver socket, channel selection supported."
+			Neurorecorder_print "Detected: Animal Location Tracker (A3038),\
+				applying channel selection, ignoring driver socket."
 			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
 		"A3042" {
 			set iconfig(payload_length) $info(A3042_payload)
 			set config(tracker_coordinates) $info(A3042_coordinates)
-			Neurorecorder_print "Receiver $version\:\
-				No need to specify driver socket, channel selection supported."
+			Neurorecorder_print "Detected: Telemetry Control Box (A3042),\
+				applying channel selection, ignoring driver socket."
 		}
 		default {
 			set iconfig(payload_length) 0
@@ -753,17 +753,15 @@ proc Neurorecorder_record {{command ""}} {
 			set info(recorder_error_time) 0
 			set info(recorder_message_interval) $info(initial_message_interval)
 			set result [LWDAQ_reset_Receiver]
+			set ms_reset [clock milliseconds]		
 			if {[LWDAQ_is_error_result $result]} {
 				Neurorecorder_print "$result"
 				set info(record_control) "Idle"
 				LWDAQ_set_bg $info(record_control_label) white
 				return "ERROR"
 			}
-			Neurorecorder_print "Detected $iinfo(receiver_type)\
-				data receiver, reconfiguring for the $iinfo(receiver_type)."
 			Neurorecorder_set_receiver $iinfo(receiver_type)
 		}
-		set ms_reset [clock milliseconds]		
 
 		# Restore the recording label to white.
 		LWDAQ_set_bg $info(record_control_label) white
@@ -785,19 +783,20 @@ proc Neurorecorder_record {{command ""}} {
 		LWDAQ_ndf_create $config(record_file) $config(ndf_metadata_size)	
 		LWDAQ_ndf_string_write $config(record_file) [Neurorecorder_metadata_header] 
 		if {($info(record_control) == "Start") || $config(synchronize)} {
-			Neurorecorder_print "Created synchronized NDF file\
-				[file tail $config(record_file)],\
-				reset delay [expr $ms_reset-$ms_stop] ms,\
-				sync wait [expr $ms_stop-$ms_start] ms."
+			Neurorecorder_print "Synchronization:\
+				Waiting period [expr $ms_stop-$ms_start] ms,\
+				reset delay [expr $ms_reset-$ms_stop] ms."
+			Neurorecorder_print "Created: Synchronized archive\
+				[file tail $config(record_file)] at\
+				[Neurorecorder_clock_convert [clock seconds]]." purple
 		} {
-			Neurorecorder_print "Created unsynchronized NDF file\
-				[file tail $config(record_file)]."
+			Neurorecorder_print "Created: Unsynchronized archive\
+				[file tail $config(record_file)] at\
+				[Neurorecorder_clock_convert [clock seconds]]." purple
 		}
 		set config(record_end_time) 0
 		
 		set info(record_control) "Record"
-		Neurorecorder_print "Started recording at\
-			[Neurorecorder_clock_convert [clock seconds]]."
 	}
 
 	# If Record, we download data from the data receiver and write it to the
@@ -1079,7 +1078,7 @@ proc Neurorecorder_open {} {
 	entry $f.ee -textvariable Neurorecorder_config(autocreate) -width 6
 	pack $f.ee -side left -expand yes
 
-	set info(text) [LWDAQ_text_widget $w 80 7 1 1]
+	set info(text) [LWDAQ_text_widget $w 90 7 1 1]
 	
 	return "SUCCESS"
 }
