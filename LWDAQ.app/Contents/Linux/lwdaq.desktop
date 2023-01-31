@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=true
+Exec=/home/kevan/Desktop/Active/LWDAQ/lwdaq
+Name=LWDAQ
+GenericName=Data Acquisition Program
+Path=/home/kevan/Desktop/Active/LWDAQ/
+Icon=/home/kevan/Desktop/Active/LWDAQ/LWDAQ.app/Contents/Linux/LWDAQ.png
