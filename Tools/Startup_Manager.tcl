@@ -25,7 +25,7 @@ proc Startup_Manager_init {} {
 	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Startup_Manager" 1.4
+	LWDAQ_tool_init "Startup_Manager" 1.5
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -34,7 +34,7 @@ proc Startup_Manager_init {} {
 	set info(step) 0
 	set info(num_steps) 1
 
-	set config(daq_script) [file join $info(data_dir) Starter_Script.tcl]
+	set config(daq_script) [file join $info(data_dir) Startup_Script.tcl]
 	set config(auto_load) 0
 	set config(auto_run) 0
 	set config(auto_quit) 0
@@ -105,9 +105,9 @@ proc Startup_Manager_browse_daq_script {} {
 }
 
 #
-# Startup_Manager_get_param_index returns the list-style index of the value of the
-# parameter named $param_name in step number $step_num in the current
-# starter script. This script is stored in info(steps). Thus the value of
+# Startup_Manager_get_param_index returns the list-style index of the value of
+# the parameter named $param_name in step number $step_num in the current
+# startup script. This script is stored in info(steps). Thus the value of
 # parameter $param_name in step number $step_num is the N'th list element in the
 # string that defines step number $step_num, where N is the value returned by
 # this routine. If N=0, there is no such parameter named in the script.
@@ -120,8 +120,8 @@ proc Startup_Manager_get_param_index {step_num param_name} {
 }
 
 #
-# Startup_Manager_get_param returns the value of the parameter named param_name in step
-# step_num of the current starter script. If there is no such parameter,
+# Startup_Manager_get_param returns the value of the parameter named param_name
+# in step step_num of the current startup script. If there is no such parameter,
 # the routine returns and empty string.
 #
 proc Startup_Manager_get_param {step_num param_name} {
@@ -145,8 +145,8 @@ proc Startup_Manager_put_param {step_num param_name value} {
 }
 
 #
-# Startup_Manager_get_field returns the value of the field named field_name in step
-# step_num of the current starter script. If there is no such field, the
+# Startup_Manager_get_field returns the value of the field named field_name in
+# step step_num of the current startup script. If there is no such field, the
 # routine returns and empty string.
 #
 proc Startup_Manager_get_field {step_num field_name} {
@@ -193,7 +193,7 @@ proc Startup_Manager_script_print {} {
 			[format {%-20s} Tool]" $config(title_color)
 	for {set step_num 1} {$step_num <= $info(num_steps)} {incr step_num} {
 		set type [string replace [lindex $info(steps) $step_num 0] end end ""]
-		if {[lsearch {starter startup default communal standalone run spawn} $type] < 0} {
+		if {[lsearch {startup default communal standalone} $type] < 0} {
 			set type "UNKNOWN"
 		}
 		set name [Startup_Manager_get_field $step_num "name"]
@@ -380,7 +380,7 @@ proc Startup_Manager_execute {} {
 	# Obtain the step type from the script. We take some trouble to remove the 
 	# trailing colon from the first word in the step script.
 	set step_type [string replace [lindex $info(steps) $info(step) 0] end end ""]
-	if {[lsearch {default standalone communal spawn run starter startup} $step_type] < 0} {
+	if {[lsearch {default standalone communal startup} $step_type] < 0} {
 		LWDAQ_print $info(text) "ERROR: Unrecognised step type \"$step_type\"."
 		set info(control) "Idle"
 		return "ERROR"
@@ -434,11 +434,11 @@ proc Startup_Manager_execute {} {
 		}
 	}
 
-	# A communal step runs a tool within the same LWDAQ process as the Tool Starter,
-	# configures the tool, and executes the step's commands in the TCL interpreter.
-	# These commands may start the tool doing something, or just complete its
-	# configuration.
-	if {($step_type == "communal") || ($step_type == "run")} {
+	# A communal step runs a tool within the same LWDAQ process as the Startup
+	# Manager, configures the tool, and executes the step's commands in the TCL
+	# interpreter. These commands may start the tool doing something, or just
+	# complete its configuration.
+	if {$step_type == "communal"} {
 
 		# Run the tool.
 		if {[catch {LWDAQ_run_tool $tool} error_result]} {
@@ -499,15 +499,15 @@ proc Startup_Manager_execute {} {
 		}				
 	}
 	
-	if {($step_type == "standalone") || ($step_type == "spawn")} {
+	if {$step_type == "standalone"} {
 		# To launch a standalone a tool, we will launch a separate LWDAQ and
 		# configure it with a configuration file that instructs the new process
 		# to run the tool. We trust that that the tool script exists somewhere
-		# that LWDAQ can find it. We beging by composing the spawned process
+		# that LWDAQ can find it. We beging by composing the standalone process
 		# configuration file name.		
 		set cfn [file join $LWDAQ_Info(temporary_dir) $tool\_$info(step).tcl]
 		
-		# Initialized the command string. We want the spawned process to have 
+		# Initialized the command string. We want the standalone process to have 
 		# access to the tool configuration and information arrays through 
 		# variables tconfig and tinfo, for consistency with command execution
 		# in run steps. 
@@ -576,7 +576,7 @@ proc Startup_Manager_execute {} {
 		}
 	}
 	
-	if {($step_type == "starter") || ($step_type == "startup")} {
+	if {$step_type == "startup"} {
 		set commands [Startup_Manager_get_field $info(step) "commands"]
 		if {[catch {eval $commands} error_result]} {
 			LWDAQ_print $info(text) "ERROR: $error_result"

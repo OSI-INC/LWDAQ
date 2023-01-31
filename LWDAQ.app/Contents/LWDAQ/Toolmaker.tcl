@@ -1,117 +1,124 @@
 <script>
-# Toolmaker script that flashes all LEDs on a thirty-size way injector (A2080B)
-# and checks their power dissipation. The power level to which they are each
-# turned on is the final digit in the command, and varies from 0 to A (zero to
-# ten) in the P2080A03 firmware. The script starts by turning on LED 1, then
-# goes through to LED 58. The script uses the Diagnostic Instrument to flash the
-# LEDs so that it can measure current consumption from +15V and -15V. Specify
-# the driver address and socket number in the fields provided by this tool.
-
-set max_power 2000 
-set min_power 1400
-set run_injector_test 0
-
-foreach {c} {go stop} {
-	button $f.$c -text $c -command $c\_injector_test
-	pack $f.$c -side left
-}
-foreach {element} {daq_ip_addr daq_driver_socket daq_mux_socket} {
-	label $f.lbl$element -text $element 
-	entry $f.ety$element -textvariable LWDAQ_config_Diagnostic($element) \
-		-width [expr [string length [set LWDAQ_config_Diagnostic($element)]] + 4]
-	pack $f.lbl$element $f.ety$element -side left
-}
-
-proc go_injector_test {{start 1}} {
-	global t run_injector_test 
-	global max_power min_power 
-	global LWDAQ_info_Diagnostic LWDAQ_config_Diagnostic
-
-	set LWDAQ_config_Diagnostic(daq_actions) "transmit"
-	
-	if {$start} {
-		if {$run_injector_test} {
-			return
-		} else {
-			set run_injector_test 1
-		}
-	} 
-
-	set count 0
-	set okay 1
-	foreach i {1 2 3 4 5 6 7 8 \
-		17 18 19 20 21 22 23 24 \
-		33 34 35 36 37 38 39 40 41 42 \
-		49 50 51 52 53 54 55 56 57 58} {
-		set LWDAQ_info_Diagnostic(commands) "0000"
-		set result [LWDAQ_acquire Diagnostic]
-		if {[LWDAQ_is_error_result $result]} {
-			LWDAQ_print $t $result
-			break
-		}
-		if {![winfo exists $t]} {break}
-		if {!$run_injector_test} {
-			LWDAQ_print $t "Test aborted.\n" purple
-			return
-		}
-		set P15V [lindex $result 8]
-		set N15V [lindex $result 12]
-		set command [format %02X $i]87
-		set LWDAQ_info_Diagnostic(commands) $command
-		set result [LWDAQ_acquire Diagnostic]
-		set P15V [format %.1f [expr [lindex $result 8] - $P15V]]
-		set N15V [format %.1f [expr [lindex $result 12] - $N15V]]
-		set power [format %.1f [expr $N15V * 15.0 + $N15V * 15.0]]
-		incr count
-		if {($power <= $max_power) && ($power >= $min_power)} {
-			LWDAQ_print $t "LED $count okay, $power mW."
-		} {
-			LWDAQ_print $t "LED $count faulty, $power mW." orange
-			set okay 0
-		}
-	}
-	
-	set LWDAQ_info_Diagnostic(commands) "0000"
-	set result [LWDAQ_acquire Diagnostic]
-	if {$okay} {
-		LWDAQ_print $t "All $count LEDs okay.\n" green
-	} else {
-		LWDAQ_print $t "One or more faulty LEDs.\n" red
-	}
-	set run_injector_test 0
-}
-
-proc stop_injector_test {} {
-	global run_injector_test
-	set run_injector_test 0
-}
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for $fn..."
 </script>
 
 <script>
-set sock [LWDAQ_socket_open 10.0.0.28:2223 basic]
-
-		set lfn "stream_log.txt"
-		LWDAQ_socket_write $sock "getfile $lfn\n"
-		set size [LWDAQ_socket_read $sock line]
-		if {[LWDAQ_is_error_result $size]} {error $size}
-		set contents [LWDAQ_socket_read $sock $size]	
-		LWDAQ_print $t "$lfn $size"
-		LWDAQ_print $t "$contents" orange
-
-		LWDAQ_socket_close $sock
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for $dfn..."
 </script>
 
 <script>
-set sock [LWDAQ_socket_open 10.0.0.28:2223 basic]
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for [file tail $dfn]."
+set f [file open $dfn r]
+set contents [read $f]
+close $f
+LWDAQ_print $t "Read contents of [file tail $dfn]."
+set contents [regsub -all "%P" $contents $LWDAQ_Info(program_dir)]
+LWDAQ_print $t $contents
+</script>
 
-		set lfn "stream_log.txt"
-		LWDAQ_socket_write $sock "getfile $lfn\n"
-		set size [LWDAQ_socket_read $sock line]
-		if {[LWDAQ_is_error_result $size]} {error $size}
-		set contents [LWDAQ_socket_read $sock $size]	
-		LWDAQ_print $t "$lfn $size"
-		LWDAQ_print $t "$contents" orange
+<script>
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for [file tail $dfn]."
+set f [open $dfn r]
+set contents [read $f]
+close $f
+LWDAQ_print $t "Read contents of [file tail $dfn]."
+set contents [regsub -all "%P" $contents $LWDAQ_Info(program_dir)]
+LWDAQ_print $t $contents
+</script>
 
-		LWDAQ_socket_close $sock
+<script>
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for [file tail $dfn]." purple
+set f [open $dfn r]
+set contents [read $f]
+close $f
+LWDAQ_print $t "Read contents of [file tail $dfn]." purple
+LWDAQ_print $t "Configuring desktop file for local installation." purple
+set contents [regsub -all "%P" $contents $LWDAQ_Info(program_dir)]
+LWDAQ_print $t $contents
+LWDAQ_print $t "Writing desktop file to ~/Desktop."
+set f [open ~/Desktop/lwdaq.desktop w]
+puts $f $contents
+close $f
+</script>
+
+<script>
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for [file tail $dfn]." purple
+set f [open $dfn r]
+set contents [read $f]
+close $f
+LWDAQ_print $t "Read contents of [file tail $dfn]." purple
+LWDAQ_print $t "Configuring desktop file for local installation." purple
+set contents [regsub -all "%P" $contents $LWDAQ_Info(program_dir)]
+set contents [string trim $contents]
+LWDAQ_print $t $contents
+LWDAQ_print $t "Writing desktop file to ~/Desktop."
+set f [open ~/Desktop/lwdaq.desktop w]
+puts $f $contents
+close $f
+</script>
+
+<script>
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for [file tail $dfn]." purple
+set f [open $dfn r]
+set contents [read $f]
+close $f
+LWDAQ_print $t "Read contents of [file tail $dfn]." purple
+LWDAQ_print $t "Configuring desktop file for local installation." purple
+set contents [regsub -all "%P" $contents $LWDAQ_Info(program_dir)]
+set contents [string trim $contents]
+LWDAQ_print $t $contents
+LWDAQ_print $t "Writing desktop file to ~/Desktop." purple
+set f [open ~/Desktop/lwdaq.desktop w]
+puts $f $contents
+close $f
+LWDAQ_print $t "Installing desktop file in desktop database." purple
+exec "sudo desktop-file-install ~/Desktop/lwdaq.desktop"
+</script>
+
+<script>
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for [file tail $dfn]." purple
+set f [open $dfn r]
+set contents [read $f]
+close $f
+LWDAQ_print $t "Read contents of [file tail $dfn]." purple
+LWDAQ_print $t "Configuring desktop file for local installation." purple
+set contents [regsub -all "%P" $contents $LWDAQ_Info(program_dir)]
+set contents [string trim $contents]
+LWDAQ_print $t $contents
+set dfn ~/Desktop/lwdaq.desktop
+LWDAQ_print $t "Writing desktop file to $dfn" purple
+set f [open $dfn w]
+puts $f $contents
+close $f
+LWDAQ_print $t "Installing desktop file in database." purple
+exec "sudo desktop-file-install $dfn"
+</script>
+
+<script>
+set dfn [file join $LWDAQ_Info(program_dir) LWDAQ.app Contents Linux lwdaq.desktop]
+LWDAQ_print $t "Looking for [file tail $dfn]." purple
+set f [open $dfn r]
+set contents [read $f]
+close $f
+LWDAQ_print $t "Read contents of [file tail $dfn]." purple
+LWDAQ_print $t "Configuring desktop file for local installation." purple
+set contents [regsub -all "%P" $contents $LWDAQ_Info(program_dir)]
+set contents [string trim $contents]
+LWDAQ_print $t $contents
+set dfn [file normalize ~/Desktop/lwdaq.desktop]
+LWDAQ_print $t "Writing desktop file to $dfn" purple
+set f [open $dfn w]
+puts $f $contents
+close $f
+LWDAQ_print $t "Installing desktop file in database." purple
+exec "sudo desktop-file-install $dfn"
 </script>
 

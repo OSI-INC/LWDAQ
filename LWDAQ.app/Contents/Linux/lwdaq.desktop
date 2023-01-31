@@ -2,8 +2,8 @@
 Version=1.0
 Type=Application
 Terminal=true
-Exec=/home/kevan/Desktop/Active/LWDAQ/lwdaq
+Exec=%P/lwdaq
 Name=LWDAQ
 GenericName=Data Acquisition Program
-Path=/home/kevan/Desktop/Active/LWDAQ/
-Icon=/home/kevan/Desktop/Active/LWDAQ/LWDAQ.app/Contents/Linux/LWDAQ.png
+Path=%P
+Icon=%P/LWDAQ.app/Contents/Linux/LWDAQ.png
