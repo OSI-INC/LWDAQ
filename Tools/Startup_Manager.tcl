@@ -25,7 +25,7 @@ proc Startup_Manager_init {} {
 	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Startup_Manager" 1.5
+	LWDAQ_tool_init "Startup_Manager" 1.6
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -37,7 +37,7 @@ proc Startup_Manager_init {} {
 	set config(daq_script) [file join $info(data_dir) Startup_Script.tcl]
 	set config(auto_load) 0
 	set config(auto_run) 0
-	set config(auto_quit) 0
+	set config(auto_close) 0
 	set config(forgetful) 0
 	set config(title_color) purple
 	set config(analysis_color) brown
@@ -601,9 +601,12 @@ proc Startup_Manager_execute {} {
 		return $result
 	}
 	if {$info(step) == $info(num_steps)} {
-		if {$config(auto_quit)} {exit}
 		LWDAQ_print $info(text) "\nReached end of startup script." $config(title_color)
-		LWDAQ_print $info(text) "Feel free to close this window."
+		if {$config(auto_close)} {
+			destroy $info(window)
+		} else {
+			LWDAQ_print $info(text) "Feel free to close this window."
+		}
 	}
 	
 	set info(control) "Idle"
@@ -657,7 +660,7 @@ proc Startup_Manager_open {} {
 	set f $w.checkbuttons
 	frame $f
 	pack $f -side top -fill x
-	foreach a {Auto_Quit Auto_Run Auto_Load Forgetful} {
+	foreach a {Auto_Close Auto_Run Auto_Load Forgetful} {
 		set b [string tolower $a]
 		checkbutton $f.c$b -text $a -variable Startup_Manager_config($b)
 		pack $f.c$b -side left -expand 1

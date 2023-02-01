@@ -279,7 +279,7 @@ proc LWDAQ_preferences {} {
 proc LWDAQ_save_settings {} {
 	upvar #0 LWDAQ_Info info
 
-	set f [open [file join $info(config_dir) "Core_Settings.tcl"] w]
+	set f [open [file join $info(settings_dir) "Core_Settings.tcl"] w]
 	foreach i "max_daq_attempts num_daq_errors num_lines_keep queue_ms daq_wait_ms \
 			blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms \
 			lwdaq_client_port default_to_stdout server_address_filter \
@@ -297,7 +297,7 @@ proc LWDAQ_save_settings {} {
 proc LWDAQ_unsave_settings {} {
 	upvar #0 LWDAQ_Info info
 
-	set fn [file join $info(config_dir) "Core_Settings.tcl"]
+	set fn [file join $info(settings_dir) "Core_Settings.tcl"]
 	if {[file exists $fn]} {file delete $fn}
 }
 

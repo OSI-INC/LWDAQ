@@ -27,7 +27,7 @@ set num_errors 0
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.5"
-set LWDAQ_Info(program_patchlevel) "10.5.1"
+set LWDAQ_Info(program_patchlevel) "10.5.2"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 set LWDAQ_Info(console_prompt) "LWDAQ% "
 	
@@ -189,7 +189,7 @@ if {[catch {
 	set LWDAQ_Info(sources_dir)  [file join $LWDAQ_Info(program_dir) Sources]
 	set LWDAQ_Info(instruments_dir) [file join $LWDAQ_Info(scripts_dir) Instruments]
 	set LWDAQ_Info(temporary_dir) [file join $LWDAQ_Info(scripts_dir) Temporary]
-	set LWDAQ_Info(config_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Configuration]
+	set LWDAQ_Info(settings_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Settings]
 	set LWDAQ_Info(working_dir) $LWDAQ_Info(program_dir)
 	
 	# Add the LWDAQ's package directory to the auto_path for library searches.
@@ -206,7 +206,7 @@ if {[catch {
 	set LWDAQ_Info(settings) [file join $LWDAQ_Info(scripts_dir) Settings.tcl]
 	set LWDAQ_Info(startup_scripts) \
 			[lsort -dictionary \
-				[glob -nocomplain [file join $LWDAQ_Info(config_dir) *.tcl]]]
+				[glob -nocomplain [file join $LWDAQ_Info(settings_dir) *.tcl]]]
 
 	# For our help routines, we construct a list of all the TCL/TK script
 	# files that define the LWDAQ routines.
