@@ -577,7 +577,7 @@ proc LWDAQ_instrument_save {name} {
 
 	if {![info exists info]} {error "No such instrument \"$name\"."}
 	
-	set fn [file join $LWDAQ_Info(settings_dir) "$name\_Settings.tcl"]
+	set fn [file join $LWDAQ_Info(config_dir) "$name\_Settings.tcl"]
 	set f [open $fn w]
 
 	set vlist [array names info]
@@ -601,7 +601,7 @@ proc LWDAQ_instrument_save {name} {
 proc LWDAQ_instrument_unsave {name} {
 	global LWDAQ_Info 
 
-	set fn [file join $LWDAQ_Info(settings_dir) "$name\_Settings.tcl"]
+	set fn [file join $LWDAQ_Info(config_dir) "$name\_Settings.tcl"]
 	if {[file exists $fn]} {
 		file delete $fn
 		return $fn

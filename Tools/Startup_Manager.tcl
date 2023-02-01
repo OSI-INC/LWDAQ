@@ -38,6 +38,7 @@ proc Startup_Manager_init {} {
 	set config(auto_load) 0
 	set config(auto_run) 0
 	set config(auto_close) 0
+	set config(auto_quit) 0
 	set config(forgetful) 0
 	set config(title_color) purple
 	set config(analysis_color) brown
@@ -602,6 +603,9 @@ proc Startup_Manager_execute {} {
 	}
 	if {$info(step) == $info(num_steps)} {
 		LWDAQ_print $info(text) "\nReached end of startup script." $config(title_color)
+		if {$config(auto_quit)} {
+			exit
+		}
 		if {$config(auto_close)} {
 			destroy $info(window)
 		} else {
@@ -660,7 +664,7 @@ proc Startup_Manager_open {} {
 	set f $w.checkbuttons
 	frame $f
 	pack $f -side top -fill x
-	foreach a {Auto_Close Auto_Run Auto_Load Forgetful} {
+	foreach a {Auto_Load Auto_Run Auto_Close Auto_Quit Forgetful} {
 		set b [string tolower $a]
 		checkbutton $f.c$b -text $a -variable Startup_Manager_config($b)
 		pack $f.c$b -side left -expand 1

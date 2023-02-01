@@ -106,12 +106,7 @@ if [%script%]==[] (
 		goto donescript
 	)
 )
-if not exist %script% (
-  echo ERROR: Bad option or script %script%.
-  goto done
-) else (
-  echo Configuration: %script%
-)
+echo Configuration: %script%
 :donescript
 
 REM ------------------------------------------

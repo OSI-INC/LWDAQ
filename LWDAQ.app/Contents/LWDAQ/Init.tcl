@@ -51,6 +51,54 @@ if {[regexp -nocase "Darwin" $tcl_platform(os)]} {
 	set LWDAQ_Info(os) "Unknown"
 }
 
+# Determine the contents directory name. On MacOS, Linux, and Windows we
+# have our bundled TclTk executable as a reference point. For Raspbian, we
+# assume we are calling wish or tclsh with this file as the initialization 
+# script, so we use argv0 to obtain the contents directory. By default we
+# use argv0 also, as for unix.
+set LWDAQ_Info(exec_dir) [file dirname [info nameofexecutable]]
+switch $LWDAQ_Info(os) {
+	"MacOS" {
+		set LWDAQ_Info(contents_dir) [file normalize \
+			[file join $LWDAQ_Info(exec_dir) ..]]
+		set LWDAQ_Info(stdout_available) 1
+	}
+	"Linux" {
+		set LWDAQ_Info(contents_dir) [file normalize [file join \
+			$LWDAQ_Info(exec_dir) .. ..]]
+		set LWDAQ_Info(stdout_available) 1
+	}
+	"Raspbian" {
+		set LWDAQ_Info(contents_dir) [file normalize \
+			[file join [file dirname $argv0] ..]]
+		set LWDAQ_Info(stdout_available) 1
+	}
+	"Windows" {
+		set LWDAQ_Info(contents_dir) [file normalize [file join \
+			$LWDAQ_Info(exec_dir) .. ..]]
+		set LWDAQ_Info(stdout_available) 0
+	}
+	default {
+		set LWDAQ_Info(contents_dir) [file normalize \
+			[file join [file dirname $argv0] ..]]
+		set LWDAQ_Info(stdout_available) 1
+	}
+}
+
+# Set the platform-dependent names for LWDAQ's directories.
+set LWDAQ_Info(program_dir) [file normalize [file join $LWDAQ_Info(contents_dir) .. ..]]
+set LWDAQ_Info(lib_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
+set LWDAQ_Info(package_dir) [file join $LWDAQ_Info(lib_dir) Packages]
+set LWDAQ_Info(scripts_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
+set LWDAQ_Info(tools_dir) [file join $LWDAQ_Info(program_dir) Tools]
+set LWDAQ_Info(spawn_dir) [file join $LWDAQ_Info(tools_dir) Spawn]
+set LWDAQ_Info(sources_dir)  [file join $LWDAQ_Info(program_dir) Sources]
+set LWDAQ_Info(instruments_dir) [file join $LWDAQ_Info(scripts_dir) Instruments]
+set LWDAQ_Info(temporary_dir) [file join $LWDAQ_Info(scripts_dir) Temporary]
+set LWDAQ_Info(config_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Configuration]
+set LWDAQ_Info(modes_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Modes]
+set LWDAQ_Info(working_dir) $LWDAQ_Info(program_dir)
+
 # Set the user-defined flags to their default values.
 set LWDAQ_Info(run_mode) "--gui"
 set LWDAQ_Info(console_enabled) "0"
@@ -97,7 +145,10 @@ foreach a $argv {
 			if {$LWDAQ_Info(configuration_file) == ""} {
 				if {[file exists $a]} {
 					set LWDAQ_Info(configuration_file) $a
-				} {
+				} elseif {[file exists [set mfn \
+						[file join $LWDAQ_Info(modes_dir) $a]]]} {
+					set LWDAQ_Info(configuration_file) $mfn
+				} else {
 					puts "ERROR: No such option or file \"$a\"."
 					incr num_errors
 				}
@@ -145,74 +196,29 @@ if {[catch {
 			$LWDAQ_Info(program_patchlevel) on $LWDAQ_Info(os)"
 	}
 	
-	# Determine the contents directory name. On MacOS, Linux, and Windows we
-	# have our bundled TclTk executable as a reference point. For Raspbian, we
-	# assume we are calling wish or tclsh with this file as the initialization 
-	# script, so we use argv0 to obtain the contents directory. By default we
-	# use argv0 also, as for unix.
-	set LWDAQ_Info(exec_dir) [file dirname [info nameofexecutable]]
-	switch $LWDAQ_Info(os) {
-		"MacOS" {
-			set LWDAQ_Info(contents_dir) [file normalize \
-				[file join $LWDAQ_Info(exec_dir) ..]]
-			set LWDAQ_Info(stdout_available) 1
-		}
-		"Linux" {
-			set LWDAQ_Info(contents_dir) [file normalize [file join \
-				$LWDAQ_Info(exec_dir) .. ..]]
-			set LWDAQ_Info(stdout_available) 1
-		}
-		"Raspbian" {
-			set LWDAQ_Info(contents_dir) [file normalize \
-				[file join [file dirname $argv0] ..]]
-			set LWDAQ_Info(stdout_available) 1
-		}
-		"Windows" {
-			set LWDAQ_Info(contents_dir) [file normalize [file join \
-				$LWDAQ_Info(exec_dir) .. ..]]
-			set LWDAQ_Info(stdout_available) 0
-		}
-		default {
-			set LWDAQ_Info(contents_dir) [file normalize \
-				[file join [file dirname $argv0] ..]]
-			set LWDAQ_Info(stdout_available) 1
-		}
-	}
+	# Make a list of settings scripts we must run to configure the program to
+	# the user's liking.
+	set LWDAQ_Info(settings_scripts) \
+			[lsort -dictionary \
+				[glob -nocomplain [file join $LWDAQ_Info(config_dir) *.tcl]]]
 
-	# Set the platform-dependent names for LWDAQ's directories.
-	set LWDAQ_Info(program_dir) [file normalize [file join $LWDAQ_Info(contents_dir) .. ..]]
-	set LWDAQ_Info(lib_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
-	set LWDAQ_Info(package_dir) [file join $LWDAQ_Info(lib_dir) Packages]
-	set LWDAQ_Info(scripts_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ]
-	set LWDAQ_Info(tools_dir) [file join $LWDAQ_Info(program_dir) Tools]
-	set LWDAQ_Info(spawn_dir) [file join $LWDAQ_Info(tools_dir) Spawn]
-	set LWDAQ_Info(sources_dir)  [file join $LWDAQ_Info(program_dir) Sources]
-	set LWDAQ_Info(instruments_dir) [file join $LWDAQ_Info(scripts_dir) Instruments]
-	set LWDAQ_Info(temporary_dir) [file join $LWDAQ_Info(scripts_dir) Temporary]
-	set LWDAQ_Info(settings_dir) [file join $LWDAQ_Info(contents_dir) LWDAQ/Settings]
-	set LWDAQ_Info(working_dir) $LWDAQ_Info(program_dir)
-	
+	# For our help routines, we construct a list of all the TCL/TK script
+	# files that define the LWDAQ routines.
+	set LWDAQ_Info(scripts) [glob -nocomplain \
+		[file join $LWDAQ_Info(scripts_dir) *.tcl]]
+	append LWDAQ_Info(scripts) " "
+	append LWDAQ_Info(scripts) [glob -nocomplain \
+		[file join $LWDAQ_Info(instruments_dir) *.tcl]]	
+
 	# Add the LWDAQ's package directory to the auto_path for library searches.
 	global auto_path
 	lappend auto_path $LWDAQ_Info(package_dir)
 
- 	# Make an index of packages in the package directory. This command will
- 	# produce an error if there are no packages in the directory, but does not
- 	# produce an error if there are corrupted packages in the directory. Thus
- 	# we catch whatever error it produces and move on regardless.
- 	catch {pkg_mkIndex $LWDAQ_Info(package_dir)}
-
-	# Set file variabls
-	set LWDAQ_Info(settings) [file join $LWDAQ_Info(scripts_dir) Settings.tcl]
-	set LWDAQ_Info(startup_scripts) \
-			[lsort -dictionary \
-				[glob -nocomplain [file join $LWDAQ_Info(settings_dir) *.tcl]]]
-
-	# For our help routines, we construct a list of all the TCL/TK script
-	# files that define the LWDAQ routines.
-	set LWDAQ_Info(scripts) [glob -nocomplain [file join $LWDAQ_Info(scripts_dir) *.tcl]]
-	append LWDAQ_Info(scripts) " "
-	append LWDAQ_Info(scripts) [glob -nocomplain [file join $LWDAQ_Info(instruments_dir) *.tcl]]	
+	# Make an index of packages in the package directory. This command will
+	# produce an error if there are no packages in the directory, but does not
+	# produce an error if there are corrupted packages in the directory. Thus
+	# we catch whatever error it produces and move on regardless.
+	catch {pkg_mkIndex $LWDAQ_Info(package_dir)}
 
 	# set up LWDAQ event queue and load utility routines.
 	source [file join $LWDAQ_Info(scripts_dir) Utils.tcl]
@@ -290,16 +296,16 @@ if {[pwd] == "/"} {
 # Run startup scripts. Let them know that they are operating as startup scripts,
 # and which one they are in the order of execution, too. They will execute in
 # alphabetical order.
-set LWDAQ_Info(num_startup_scripts_loaded) 0
-set LWDAQ_Info(loading_startup_scripts) 1
-foreach s $LWDAQ_Info(startup_scripts) {
+set LWDAQ_Info(num_settings_scripts_loaded) 0
+set LWDAQ_Info(loading_settings_scripts) 1
+foreach s $LWDAQ_Info(settings_scripts) {
 	if {[catch {source $s} error_message]} {
 		puts "ERROR: $error_message in startup script \"[file tail $s]\"."
 		incr num_errors
 	}
-	incr LWDAQ_Info(num_startup_scripts_loaded)
+	incr LWDAQ_Info(num_settings_scripts_loaded)
 }
-set LWDAQ_Info(loading_startup_scripts) 0
+set LWDAQ_Info(loading_settings_scripts) 0
 
 # Run the configuration script, if it exists.
 if {$LWDAQ_Info(configuration_file) != ""} {

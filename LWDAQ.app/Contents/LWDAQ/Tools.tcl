@@ -151,10 +151,23 @@ proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 	# Spawn a standalone LWDAQ process and give it the configuration file, which
 	# will cause our chosen tool to start up and take over the root window.
 	switch $LWDAQ_Info(os) {
-		"MacOS" {exec ./lwdaq --spawn $cfn &}
-		"Windows" {exec ./LWDAQ.bat --spawn $cfn &}
-		"Linux" {exec ./lwdaq --spawn $cfn &}
-		default {exec ./lwdaq --spawn $cfn &}
+		"MacOS" {
+			exec ./lwdaq --spawn $cfn &
+		}
+		"Windows" {
+			exec ./LWDAQ.bat --spawn $cfn &
+		}
+		"Linux" {
+			set lfn [file join $LWDAQ_Info(temporary_dir) spawn_log.txt]
+			exec ./lwdaq --spawn $cfn >& $lfn < /dev/null &
+		}
+		"Raspbian" {
+			set lfn [file join $LWDAQ_Info(temporary_dir) spawn_log.txt]
+			exec ./lwdaq --spawn $cfn >& $lfn < /dev/null &
+		}
+		default {
+			exec ./lwdaq --spawn $cfn >& $lfn < /dev/null &
+		}
 	}
 	
 	# Return a success flag.
