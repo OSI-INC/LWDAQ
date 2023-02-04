@@ -28,9 +28,11 @@
 proc Fiber_Positioner_init {} {
 	upvar #0 Fiber_Positioner_info info
 	upvar #0 Fiber_Positioner_config config
+	upvar #0 LWDAQ_info_BCAM iinfo
+	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "2.0"
+	LWDAQ_tool_init "Fiber_Positioner" "2.1"
 	if {[winfo exists $info(window)]} {return 0}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -45,12 +47,14 @@ proc Fiber_Positioner_init {} {
 	# These numbers are used only when we open the Fiber Positioner panel for the 
 	# first time, and need to allocate space for the fiber image.
 	set config(image_sensor) "ICX424"
-	set config(image_width) [expr \
-		[lindex $LWDAQ_Driver($config(image_sensor)\_details) 2] \
-		* $config(zoom)]
-	set config(image_height) [expr \
-		[lindex $LWDAQ_Driver($config(image_sensor)_details) 1] \
-		* $config(zoom)]
+	set config(image_width) "700"
+	set config(image_height) "520"
+	set config(daq_image_bottom) "516"
+	set config(daq_image_right) "695"
+	set config(analysis_threshold) "50 #"
+	
+	# We configure the BCAM image sensor and adjust analysis bounds.
+	LWDAQ_set_image_sensor $config(image_sensor) BCAM
 	
 	# The control value for which the control voltages are closest to zero.
 	set config(dac_zero) "125"
@@ -60,8 +64,8 @@ proc Fiber_Positioner_init {} {
 	set config(dfps_sock) "8 14"
 	set config(fiber_type) "9"
 	set config(injector_sock) "8 1"
-	set config(injector_leds) "A1 A2"
-	set config(dfps_ids) "A123 B341"
+	set config(injector_leds) "A1"
+	set config(dfps_ids) "A123"
 	set config(camera_sock) "8 8"
 	set config(flash_seconds) "0.003"
 	set config(sort_code) "8"
@@ -81,7 +85,8 @@ proc Fiber_Positioner_init {} {
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
 	set config(checksum_preload) "1111111111111111"	
-	set config(commands) "255 255 8"
+	set config(id) "FFFF"
+	set config(commands) "8"
 	
 	# The history of spot positions for the tracing.
 	set info(trace_history) [list]
@@ -112,6 +117,26 @@ proc Fiber_Positioner_init {} {
 }
 
 #
+# Fiber_Positioner_id_bytes returns a list of two bytes as decimal numbers that represent
+# the identifier of the implant.
+#
+proc Fiber_Positioner_id_bytes {id_hex} {
+	upvar #0 Fiber_Positioner_config config
+	upvar #0 Fiber_Positioner_info info
+
+	set id [string trim $id_hex]
+	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
+		return "[expr 0x$b1] [expr 0x$b2]"
+	} elseif {$id == "*"} {
+		return "255 255"
+	} else {
+		LWDAQ_print $info(log) "ERROR: Bad device identifier \"$id\",\
+			defaulting to null identifier."
+		return "0 0"
+	}
+}
+
+#
 # Fiber_Positioner_transmit takes a string of command bytes and transmits them through a
 # Command Transmitter such as the A3029A. The routine appends a sixteen-bit
 # checksum. The checksum is the two bytes necessary to return a sixteen-bit
@@ -127,7 +152,9 @@ proc Fiber_Positioner_transmit {{commands ""}} {
 	
 	# If we specify no commands, use those in the commands parameter.
 	if {$commands == ""} {
-		set commands $config(commands)
+		set commands [Fiber_Positioner_id_bytes $config(id)]
+		append commands " "
+		append commands $config(commands)
 	}
 
 	# Print the commands to the text window.
@@ -187,15 +214,17 @@ proc Fiber_Positioner_transmit {{commands ""}} {
 }
 
 #
-# Fiber_Positioner_transmit_panel opens a new window and provides a button for transmitting 
-# a string of command bytes, each expressed as a decimal value 0..255, to a
-# particular socket on the driver specified in the main window.
+# Fiber_Positioner_transmit_panel opens a new window and provides a button for
+# transmitting a string of command bytes to a device. There are two entry boxes.
+# One for the device identifier, another for the command bytes. The identifier
+# is a four-hex value. The command bytes are each decimal values 0..255
+# separated by spaces. The routine parses the identifier into two bytes,
+# transmits all the command bytes, and appends the correct checksum on the end.
 #
 proc Fiber_Positioner_transmit_panel {} {
 	upvar #0 Fiber_Positioner_config config
 	upvar #0 Fiber_Positioner_info info
 	
-	# Open the transmit panel.
 	set w $info(window)\.xmit_panel
 	if {[winfo exists $w]} {
 		raise $w
@@ -212,31 +241,13 @@ proc Fiber_Positioner_transmit_panel {} {
 	}
 	pack $f.transmit -side left -expand yes
 	
+	label $f.lid -text "ID:" -fg $config(label_color) -width 4
+	entry $f.id -textvariable Fiber_Positioner_config(id) -width 6
 	label $f.lcommands -text "Commands:" -fg $config(label_color)
 	entry $f.commands -textvariable Fiber_Positioner_config(commands) -width 50
-	pack $f.lcommands $f.commands -side left -expand yes
+	pack $f.lid $f.id $f.lcommands $f.commands -side left -expand yes
 
 	return "SUCCESS" 
-}
-
-#
-# Fiber_Positioner_id_bytes returns a list of two bytes as decimal numbers that represent
-# the identifier of the implant.
-#
-proc Fiber_Positioner_id_bytes {id_hex} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
-
-	set id [string trim $id_hex]
-	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
-		return "[expr 0x$b1] [expr 0x$b2]"
-	} elseif {$id == "*"} {
-		return "255 255"
-	} else {
-		LWDAQ_print $info(log) "ERROR: Bad device identifier \"$id\",\
-			defaulting to null identifier."
-		return "0 0"
-	}
 }
 
 #
@@ -266,6 +277,7 @@ proc Fiber_Positioner_spot_position {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
+	# Prepare the BCAM Instrument.
 	set info(spot_positions) ""
 	set iconfig(daq_ip_addr) $config(ip_addr)
 	set iconfig(daq_source_driver_socket) [lindex $config(injector_sock) 0]
@@ -277,14 +289,18 @@ proc Fiber_Positioner_spot_position {} {
 	set iconfig(daq_flash_seconds) $config(flash_seconds)
 	set iconfig(analysis_num_spots) \
 		"[llength $config(injector_leds)] $config(sort_code)"
-	LWDAQ_set_image_sensor $config(image_sensor) BCAM
-	
+	set iinfo(daq_image_bottom) $config(daq_image_bottom)
+	set iinfo(daq_image_right) $config(daq_image_right)
+	set iconfig(analysis_threshold) $config(analysis_threshold)
+
+	# Acquire from BCAM Instrument.	
 	set result [LWDAQ_acquire BCAM]
-	
 	if {[LWDAQ_is_error_result $result]} {
-		error $result
+		LWDAQ_print $info(log) "$result"
+		return "ERROR"
 	}
 	
+	# Parse result string.
 	set result [lreplace $result 0 0]	
 	set index 0
 	foreach fiber $config(injector_leds) {
@@ -310,6 +326,7 @@ proc Fiber_Positioner_spot_position {} {
 		}
 	}
 
+	# Draw the BCAM image in the Fiber Positioner window.
 	lwdaq_draw $iconfig(memory_name) $info(photo) \
 		-zoom $config(zoom) \
 		-intensify $config(intensify)

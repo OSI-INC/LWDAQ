@@ -3647,8 +3647,8 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 			}
 		}
 		pack $f.cl $f.go $f.stop $f.allt $f.not -side left -expand yes
-		label $f.ssl -text "Channels Numbers:"
-		set nbc(channel_selector) "1 2 3 4 5 6 7 8 9 10 11 12 13 14"
+		label $f.ssl -text "Channel Numbers:"
+		set nbc(processing_channels) "1 2 3 4"
 		entry $f.sse -textvariable nbc(processing_channels) -width 35
 		pack $f.ssl $f.sse -side left
 		label $f.ll -text "Limit:" -fg blue

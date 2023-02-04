@@ -383,6 +383,14 @@ proc Startup_Manager_execute {} {
 	set step_type [string replace [lindex $info(steps) $info(step) 0] end end ""]
 	if {[lsearch {default standalone communal startup} $step_type] < 0} {
 		LWDAQ_print $info(text) "ERROR: Unrecognised step type \"$step_type\"."
+		if {$step_type == "spawn"} {
+			LWDAQ_print $info(text) "SUGGESTION: Type \"spawn\"\
+				has been replaced by \"standalone\"."
+		}
+		if {$step_type == "run"} {
+			LWDAQ_print $info(text) "SUGGESTION: Type \"run\"\
+				has been replaced by \"communal\"."
+		}
 		set info(control) "Idle"
 		return "ERROR"
 	}
