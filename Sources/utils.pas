@@ -3172,7 +3172,8 @@ var
 	s:string;
 	
 begin
-	if mark_time_index>=max_num_time_marks then exit;
+	if mark_time_index>=max_num_time_marks then 
+		mark_time_index:=0;
 	
 	tdt:=Now;
 	tts:=DateTimeToTimeStamp(tdt);

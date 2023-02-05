@@ -2080,11 +2080,11 @@ proc Neuroplayer_overview {{fn ""} } {
 			$Neuroplayer_overview(cursor_label) configure -bg $color
 			$Neuroplayer_overview(plot) itemconfigure "cursor" -fill $color
 		}
-		button $f.nf -text "Next_NDF" -command \
-			[list LWDAQ_post [list Neuroplayer_overview_newndf +1]]
 		button $f.pf -text "Prev_NDF" -command \
 			[list LWDAQ_post [list Neuroplayer_overview_newndf -1]]
-		pack $f.nf $f.pf -side left -expand yes
+		button $f.nf -text "Next_NDF" -command \
+			[list LWDAQ_post [list Neuroplayer_overview_newndf +1]]
+		pack $f.pf $f.nf -side left -expand yes
 
 		# Create time controls
 		set f $w.time
