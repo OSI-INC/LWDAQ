@@ -49,7 +49,7 @@ proc Function_Generator_init {} {
 	global LWDAQ_Driver
 
 	
-	LWDAQ_tool_init "Function_Generator" "3.8"
+	LWDAQ_tool_init "Function_Generator" "4.1"
 	if {[winfo exists $info(window)]} {return 0}
 
 	set info(control) "Idle"
@@ -124,42 +124,48 @@ proc Function_Generator_init {} {
 			set i [expr $i + 1] 
 		}
 	}
+	
+	set config(sample_rates) "64 128 256 512 1024 2048"
+	
+	set config(frequencies_shared) "0.25 0.5 1.0 2.5 5.0 10.0\
+		25.0 50.0 100.0 250.0 500.0 1000.0"
 
-	set config(frequencies_2048) "0.25 0.5 1.0 5.0\
-		10.0 20.0 50.0 100.0 200.0 300.0 400.0 450.0\
-		500.0 530.0 570.0 615.0 670.0 730.0\
-		800.0 900.0 1000.0 2000.0"
+	set config(frequencies_2048) "200.0 300.0 400.0 450.0\
+		500.0 530.0 570.0 615.0 670.0 730.0 800.0 900.0 1200.0 1500.0\
+		2500.0 5000.0 10000.0"
 	set config(min_num_clocks_2048) 32
-	set config(frequencies_1024) "0.25 0.5 1.0 2.0 5.0\
-		10.0 20.0 50.0 100.0 120.0 150.0 170.0 200.0 250.0\
+	set config(en_2048) 0
+	
+	set config(frequencies_1024) "100.0 120.0 150.0 170.0 200.0 250.0\
 		260.0 270.0 280.0 290.0 300.0 310.0 320.0\
-		330.0 340.0 350.0 370.0 400.0 500.0 600.0\
-		700.0 800.0 1000.0"
+		330.0 340.0 350.0 370.0"
 	set config(min_num_clocks_1024) 32
-	set config(frequencies_512) "0.25 0.5 1.0 2.0 5.0\
-		10.0 20.0 30.0 50.0 70.0 80.0 90.0 95.0 100.0 105.0\
+	set config(en_1024) 0
+	
+	set config(frequencies_512) "30.0 60.0 70.0 80.0 90.0 95.0 105.0\
 		110.0 120.0 125.0 130.0 135.0 140.0 145.0\
 		150.0 155.0 160.0 170.0 180.0 190.0 200.0\
-		220.0 240.0 260.0 280.0 300.0 350.0 400.0 1000.0"
+		220.0 240.0 260.0 280.0"
 	set config(min_num_clocks_512) 32
-	set config(frequencies_256) "0.25 0.5 1.0 2.0 5.0 10.0\
-		20.0 30.0 50.0 55.0 57.0 60.0 63.0 65.0 67.0 70.0\
-		73.0 75.0 78.0 80.0 90.0 95.0 100.0 105.0\
-		110.0 130.0 150.0 200.0 300.0 500.0 1000.0"
-	set config(min_num_clocks_256) 64
-	set config(frequencies_128) "0.25 0.5 1.0 2.0 5.0 10.0\
-		13.0 16.0 20.0 22.0 26.0 28.0 30.0 32.0 34.0 36.0\
-		38.0 40.0 42.0 44.0 45.0 50.0 55.0 60.0\
-		80.0 100.0 150.0 200.0 300.0 500.0 1000.0"
-	set config(min_num_clocks_128) 64
-	set config(frequencies_16) "1.0 5.0\
-		10.0 20.0 30.0 60.0 100.0 175.0 230.0 250.0\
-		270.0 290.0 310.0 330.0 350.0 370.0 450.0\
-		500.0 630.0 700.0 900.0 1000.0"
-	set config(min_num_clocks_16) 128
-	set config(frequencies) $config(frequencies_512)
-	set config(min_num_clocks) $config(min_num_clocks_512)
+	set config(en_512) 1
 	
+	set config(frequencies_256) "30.0 50.0 55.0 57.0 60.0 63.0 65.0\
+		67.0 70.0 73.0 75.0 78.0 80.0 90.0 95.0 100.0 105.0\
+		110.0 130.0 150.0"
+	set config(min_num_clocks_256) 64
+	set config(en_256) 0
+	
+	set config(frequencies_128) "13.0 16.0 20.0 22.0 26.0 28.0\
+		30.0 32.0 34.0 36.0 38.0 40.0 42.0 44.0 45.0 50.0 55.0 60.0 80.0"
+	set config(min_num_clocks_128) 64
+	set config(en_128) 0
+	
+	set config(frequencies_64) "13.0 15.0 17.0 21.0 23.0 27.0 33.0 41.0"
+	set config(min_num_clocks_64) 128
+	set config(en_64) 0
+	
+	set config(frequencies) "$config(frequencies_512)"
+	set config(min_num_clocks) $config(min_num_clocks_512)
 	
 	set info(record_yn) "0"
 	set info(image_name) "Transmit Waveform"
@@ -178,11 +184,35 @@ proc Function_Generator_init {} {
 	return 1	
 }
 
-proc Function_Generator_set_frequencies {sps} {
+proc Function_Generator_set_frequencies {{print 0}} {
 	upvar #0 Function_Generator_config config
-
-	set config(frequencies) [set config(frequencies_$sps)]
-	set config(min_num_clocks) [set config(min_num_clocks_$sps)]
+	upvar #0 Function_Generator_info info
+	
+	set frequencies "$config(frequencies_shared) "
+	set config(min_num_clocks) 32
+	foreach sps $config(sample_rates) {
+		if {$config(en_$sps)} {
+			append frequencies "$config(frequencies_$sps) "
+			if {$config(min_num_clocks_$sps) > $config(min_num_clocks)} {
+				set config(min_num_clocks) $config(min_num_clocks_$sps)
+			}
+		}
+	}
+	set frequencies [lsort -increasing -real $frequencies]
+	set config(frequencies) [list]
+	set previous "-1"
+	foreach f $frequencies {
+		if {$f != $previous} {
+			lappend config(frequencies) $f
+			set previous $f
+		}
+	}
+	
+	if {$print} {
+		foreach f $config(frequencies) {
+			LWDAQ_print $info(text) "$f" green
+		}
+	}
 }
 
 proc Function_Generator_browse {} {
@@ -528,6 +558,8 @@ proc Function_Generator_frequency_sweep {{index "-1"}} {
 	upvar #0 LWDAQ_info_Receiver iinfo
 	global LWDAQ_Info	
 	
+	Function_Generator_set_frequencies	
+
 	if {$index < 0} {
 		if {$info(control) == "Sweep"} {return "0"}
 
@@ -1106,7 +1138,6 @@ proc Function_Generator_open {} {
 	grid $c.l_amplitude $c.e_amplitude -sticky news
 	grid $c.upload $c.viewwv -sticky news
 	grid $c.receiver $c.spectrometer -sticky news
-
 		
 	label $c2.l_Rdriverip -text "Receiver IP Address" -anchor w 
 	entry $c2.e_Rdriverip -textvariable LWDAQ_config_Receiver(daq_ip_addr) \
@@ -1143,19 +1174,22 @@ proc Function_Generator_open {} {
 		$e1.config $e1.help \
 		-side left -fill x -expand yes
 
-	label $e2.l_fset -text "Frequencies" -anchor w -justify right
-	entry $e2.e_fset -textvariable Function_Generator_config(frequencies) \
-		-justify left -width 80
+	button $e2.l_fset -text "Frequencies" -command {
+		Function_Generator_set_frequencies 1
+	}
+	entry $e2.e_fset -textvariable Function_Generator_config(frequencies) -width 80 
 	
-	pack $e2.l_fset $e2.e_fset -side left -fill x -expand yes
+	pack $e2.l_fset $e2.e_fset -side left -expand yes
 	
 	set f $bf.spsbuttons 
 	frame $f
 	pack $f -fill x
 	
-	foreach sps {16 128 256 512 1024 2048} {
-		button $f.sps$sps -text "$sps SPS" -command "Function_Generator_set_frequencies $sps"
-		pack $f.sps$sps -side left -fill x -expand yes
+	label $f.spsl -text "Corner Frequencies:" 
+	pack $f.spsl -side left -expand yes
+	foreach sps $config(sample_rates) {
+		checkbutton $f.sps$sps -text $sps -variable Function_Generator_config(en_$sps)
+		pack $f.sps$sps -side left -expand yes
 	}
 	
 	set f $bf.textwindow
@@ -1164,6 +1198,8 @@ proc Function_Generator_open {} {
 	
 	set info(text) [LWDAQ_text_widget $f 90 20]
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n" purple
+	
+	Function_Generator_set_frequencies
 	
 	return 1
 	
