@@ -827,6 +827,12 @@ end;
 	data. But all other instructions operate upon the message array, from which
 	duplicates have been removed.
 
+	The "get" instruction performs no analysis of messages, but instead returns
+	only the id, value, and timestamp of a list of messages. We specify each
+	message with its index. The first message it message zero. A message index
+	greater than the maximum number of messages the image can hold, or less than
+	zero, will return zero values for all parameters.
+
 	The "purge" instruction re-writes the image data, eliminating duplicate
 	messages and returning the number of messages in the purged data. This 
 	instruction is for diagnostic purposes only: we do not eliminate messages
@@ -907,12 +913,18 @@ end;
 	of samples in the signal. Signals with no samples are omitted from the list.
 	The list takes the form of channel identifier followed by number of samples
 	separated by spaces.
-
-	The "get" instruction performs no analysis of messages, but instead returns
-	only the id, value, and timestamp of a list of messages. We Specify each
-	message with its index. The first message it message zero. A message index
-	greater than the maximum number of messages the image can hold, or less than
-	zero, will return zero values for all parameters.
+	
+	The "auxiliary" instruction extracts and returns all auxiliary messages in a
+	string. An auxiliary message is one in which the lower four bits are equal
+	to fifteen. The instruction returns one message per line. For each message
+	it writes the eight-bit channel number, the sixteen-bit timestamp, and the
+	sixteen-bit contents.
+	
+	The "system" instruction extracts and returns all system messages in a
+	string, excluding the clock messages. An system message is one in which the
+	lower four bits are equal to zero. The instruction returns one message per
+	line. For each message it writes the eight-bit channel number, the
+	sixteen-bit timestamp, and the sixteen-bit contents.
 }
 function lwdaq_sct_receiver(ip:image_ptr_type;command:string):string;
 	
@@ -969,7 +981,7 @@ var
 	message_index:integer=0;
 	max_index:integer=0;
 	num_bad_messages:integer=0;
-	map1,map2:message_array_type;
+	mlp,msp:message_array_type;
 	gp:x_graph_type;
 	result:string;
 	error_report:string;
@@ -1141,17 +1153,18 @@ begin
 		exit;
 	end;
 {
-	Create a message array for use in analysis. The message array does not
-	contain any payload data that may exist in the image data. The array
-	contains only the core bytes of the messages, but does retain the index of
-	the message in the original image. When we copy messages to fill in for
-	those that are missing or corrupted, this index will be carried over, so
-	that the array keeps track of where the data for each message originated.
+	Create a message array large enough for us to make a list of all the
+	available messages. The array contains only the core bytes of the messages,
+	but does retain the index of the message in the original image. The message
+	array does not contain any payload data that may exist in the image data.
+	When we copy messages to fill in for those that are missing or corrupted,
+	this index will be carried over, so that the array keeps track of where the
+	data for each message originated.
 }
 	writestr(debug_string,'allocating ',max_num_selected*sizeof(message_type):1,
-		' bytes for map1');
+		' bytes for mlp');
 	mark_time(debug_string,'lwdaq_sct_receiver');
-	setlength(map1,max_num_selected);
+	setlength(mlp,max_num_selected);
 {
 	We scan through the messages in the image and construct an array that is
 	easier for us to manipulate. If we have specified data_size = n, we go
@@ -1191,12 +1204,12 @@ begin
 	duplicate. Sometimes the data receiver does not eliminate duplicate messages
 	itself, because of the large number of possible channels upon which
 	duplication can occur, and the limited logic resources in its firmware. The
-	id_previous array contains for all channels the index of the previous
-	message from that channel in the message array. When a new, valid message
-	has an identical sample value to the previous message in the same channel,
-	and the message times are no more than max_sample_separation clock ticks
-	apart, we don't transfer the new message to our message array. 
-	
+	id_previous list contains for all channels the index of the previous message
+	from that channel in the message list. When a new, valid message has an
+	identical sample value to the previous message in the same channel, and the
+	message times are no more than max_sample_separation clock ticks apart, we
+	don't transfer the new message to our message list.
+
 	If the payload size is tcb_payload_size, we have in the payload the power of
 	the message and the number of the antenna input that provided the message.
 	We want to identify the antenna that received the most powerful signal from
@@ -1209,14 +1222,14 @@ begin
 	accompany the earliest duplicate.
 
 	We count the number of messages for each signal identifier with the id_qty
-	array. We do not count duplicate messages, but we do count bad messages in
+	list. We do not count duplicate messages, but we do count bad messages in
 	the signal.
 
 	We report on the first max_num_reports errors in detail and trust that the
 	data acquisition software will attempt to correct the errors and restore the
 	integrity of the data.
 }
-	mark_time('constructing message array','lwdaq_sct_receiver');
+	mark_time('constructing message list','lwdaq_sct_receiver');
 	for id_num:=min_id to max_id do id_qty[id_num]:=0;
 	num_errors:=0;
 	error_report:='';
@@ -1274,20 +1287,20 @@ begin
 				null_block_length:=0;
 			end;
 			with m do begin
-				if (id_qty[id]=0) or (sample<>map1[id_previous[id]].sample) 
-						or (time-map1[id_previous[id]].time
+				if (id_qty[id]=0) or (sample<>mlp[id_previous[id]].sample) 
+						or (time-mlp[id_previous[id]].time
 								>max_duplicate_separation) then begin
 					id_qty[id]:=id_qty[id]+1;
 					id_previous[id]:=num_selected;
-					map1[num_selected]:=m;
+					mlp[num_selected]:=m;
 					inc(num_selected);
 				end else begin
 					inc(num_duplicates);
 					if (payload_size=tcb_payload_size) and 
 						(payload_byte(ip,m.index,tcb_pwr_offset) >
-							payload_byte(ip,map1[id_previous[id]].index,
+							payload_byte(ip,mlp[id_previous[id]].index,
 								tcb_pwr_offset)) then begin
-						map1[id_previous[id]].index:=m.index;
+						mlp[id_previous[id]].index:=m.index;
 					end;
 				end;
 			end;
@@ -1309,7 +1322,7 @@ begin
 }
 	if (null_block_length>0) and (data_size=0) then dec(num_messages);
 {
-	If "purge", we will re-write the image data using the message array we have
+	If "purge", we will re-write the image data using the message list we have
 	just composed, which does not contain duplicate messages. The resulting
 	image data has had all duplicates removed. Following the last unique
 	message, insert a null message to act as a terminator. We use the purge
@@ -1319,8 +1332,8 @@ begin
 	if instruction='purge' then begin
 		mark_time('purge','lwdaq_sct_receiver');
 		for message_num:=0 to num_selected-1 do begin
-			write_image_message(ip,map1[message_num],message_num);
-			copy_payload(ip,map1[message_num].index,message_num);
+			write_image_message(ip,mlp[message_num],message_num);
+			copy_payload(ip,mlp[message_num].index,message_num);
 		end;
 		m.id:=0;
 		m.sample:=0;
@@ -1401,14 +1414,17 @@ begin
 		end;
 		result:='';
 {
-		We go through the messages looking for those with the extract_id and count them.
-		We write the time and sample to the return string.
+		We go through the messages looking for those with the extract_id and
+		count them. We write the time and sample to the return string. We keep
+		note of the timestamp and index of each extracted message so we can save
+		these in the electroincs trace as a means for other routines to find the
+		messages and read their payloads.
 }
 		setlength(trace,num_selected);
 		num_extracted:=0;
 		standing_value:=0;
 		for message_num:=0 to num_selected-1 do begin
-			with map1[message_num] do begin
+			with mlp[message_num] do begin
 				if id=extract_id then begin
 					trace[num_extracted].x:=time;
 					trace[num_extracted].y:=index;
@@ -1457,7 +1473,7 @@ begin
 			message_index:=-1;
 			message_num:=0;
 			while (message_index<0) and (message_num<num_selected) do begin
-				m:=map1[message_num];
+				m:=mlp[message_num];
 				if m.id=clock_id then begin
 					if clock_index=clock_num then message_index:=m.index;
 					inc(clock_index);
@@ -1536,31 +1552,31 @@ begin
 	Create a new message stack.
 }
 		writestr(debug_string,'allocating ',max_num_selected*sizeof(message_type):1,
-			' bytes for map2');
+			' bytes for msp');
 		mark_time(debug_string,'lwdaq_sct_receiver');
-		setlength(map2,max_num_selected);
+		setlength(msp,max_num_selected);
 {
 	Take messages from the reconstruct signal and put them in the
 	message stack. We assume the messages are in chronological order.
 }
 		for message_num:=0 to num_selected-1 do begin
-			with map1[message_num] do begin
+			with mlp[message_num] do begin
 				if (id=reconstruct_id) then begin 
-					map2[stack_height]:=map1[message_num];
+					msp[stack_height]:=mlp[message_num];
 					inc(stack_height);
 				end;
 			end;
 		end;
 {
-	We replace the old message array with the newly-created message stack, which
+	We replace the old message list with the newly-created message stack, which
 	contains only messages from the reconstruct signal.
 }
-		map1:=map2;
+		mlp:=msp;
 		num_selected:=stack_height;
 {
 	Determine the phase of the transmission window. Each transmission window is
 	window_extent*2+1 ticks wide, and separated by period ticks from its
-	neighboring windows. We take an array of windows separated by the transmit
+	neighboring windows. We take a list of windows separated by the transmit
 	period and offset by phase_index clock ticks from the time of the first
 	clock message in the message block. As we increase phase_index from zero to
 	one less than the transmit period, we count the number of messages that fall
@@ -1570,7 +1586,7 @@ begin
 		mark_time('determine window phase','lwdaq_sct_receiver');
 		for phase_index:=0 to period-1 do phase_histogram[phase_index]:=0;
 		for message_num:=0 to num_selected-1 do
-			inc(phase_histogram[map1[message_num].time mod period]);
+			inc(phase_histogram[mlp[message_num].time mod period]);
 		winning_window_score:=0;
 		window_phase:=0;
 		for phase_index:=0 to period-1 do begin
@@ -1604,9 +1620,9 @@ begin
 	reject despite lying inside the windows.
 }		
 		writestr(debug_string,'allocating ',max_num_selected*sizeof(message_type):1,
-			' bytes for map2');
+			' bytes for msp');
 		mark_time(debug_string,'lwdaq_sct_receiver');
-		setlength(map2,max_num_selected);
+		setlength(msp,max_num_selected);
 		stack_height:=0;
 		num_missing:=0;
 		num_bad:=0;
@@ -1615,10 +1631,10 @@ begin
 		while window_time<num_clocks*clock_period-window_extent do begin
 			num_candidates:=0;
 			while (message_num<num_selected) and
-					(map1[message_num].time-window_time<=window_extent) and
+					(mlp[message_num].time-window_time<=window_extent) and
 					(num_candidates<max_num_candidates) do begin
-				if abs(map1[message_num].time-window_time)<=window_extent then begin
-					candidate_list[num_candidates]:=map1[message_num];
+				if abs(mlp[message_num].time-window_time)<=window_extent then begin
+					candidate_list[num_candidates]:=mlp[message_num];
 					inc(num_candidates);
 				end else begin
 					inc(num_bad);
@@ -1632,7 +1648,7 @@ begin
 					id:=reconstruct_id;
 					sample:=standing_value;
 					time:=window_time;
-					if stack_height>0 then index:=map2[stack_height-1].index
+					if stack_height>0 then index:=msp[stack_height-1].index
 					else index:=-1;
 				end;
 			end;
@@ -1653,7 +1669,7 @@ begin
 				m:=candidate_list[best_num];
 				num_bad:=num_bad+num_candidates-1;
 			end;
-			map2[stack_height]:=m;
+			msp[stack_height]:=m;
 			inc(stack_height);
 			window_time:=window_time+period;
 		end;
@@ -1666,19 +1682,19 @@ begin
 		valid_index:=-1;
 		message_num:=0;
 		while (message_num<stack_height) and (valid_index=-1) do begin
-			valid_index:=map2[message_num].index;
+			valid_index:=msp[message_num].index;
 			inc(message_num);
 		end;
 		message_num:=0;
-		while (message_num<stack_height) and (map2[message_num].index=-1) do begin
-			map2[message_num].index:=valid_index;
+		while (message_num<stack_height) and (msp[message_num].index=-1) do begin
+			msp[message_num].index:=valid_index;
 			inc(message_num);
 		end;
 {
 	We are now finished with the previous message list, so we dispose of it and
 	replace it with our message stack.
 }
-		map1:=map2;
+		mlp:=msp;
 		num_selected:=stack_height;
 {
 	Apply a glitch filter to the signal.
@@ -1686,10 +1702,10 @@ begin
 		mark_time('applying glitch filter','lwdaq_sct_receiver');
 		setlength(gp,num_selected);
 		for message_num:=0 to num_selected-1 do 
-			gp[message_num]:=map1[message_num].sample;
+			gp[message_num]:=mlp[message_num].sample;
 		num_glitches:=glitch_filter(gp,glitch_threshold);
 		for message_num:=0 to num_selected-1 do 
-			map1[message_num].sample:=round(gp[message_num]);	
+			mlp[message_num].sample:=round(gp[message_num]);	
 		mark_time('creating electronics trace','lwdq_sct_receiver');
 {
 	Return the reconstructed message list in a string. Each line gives the time
@@ -1700,7 +1716,7 @@ begin
 		setlength(electronics_trace,num_selected);		
 		if num_selected>0 then begin
 			for message_num:=0 to num_selected-1 do begin
-				with map1[message_num] do begin
+				with mlp[message_num] do begin
 					electronics_trace[message_num].x:=time;
 					electronics_trace[message_num].y:=index;				
 					writestr(message_string,time:1,' ',sample:1);
@@ -1760,7 +1776,7 @@ begin
  		
  		if num_errors>0 then
 			for message_num:=0 to num_selected-1 do
-				map1[message_num].time:=message_num;
+				mlp[message_num].time:=message_num;
  		
 		num_bad_messages:=0;
 		
@@ -1772,7 +1788,7 @@ begin
 					setlength(trace,id_qty[id_num]);
 					sample_num:=0;
 					for message_num:=0 to num_selected-1 do
-						with map1[message_num] do begin
+						with mlp[message_num] do begin
 							if id=id_num then begin
 								trace[sample_num].x:=time;
 								trace[sample_num].y:=sample;
@@ -1787,17 +1803,17 @@ begin
 					if display_mode='CP' then 
 						display_real_graph(ip,trace,
 							overlay_color_from_integer(id_num),
-							map1[0].time,map1[num_selected-1].time,
+							mlp[0].time,mlp[num_selected-1].time,
 							display_min+ave,display_max+ave,0,0)
 					else if display_mode='NP' then
 						display_real_graph(ip,trace,
 							overlay_color_from_integer(id_num),
-							map1[0].time,map1[num_selected-1].time,
+							mlp[0].time,mlp[num_selected-1].time,
 							0,0,0,0)
 					else 
 						display_real_graph(ip,trace,
 							overlay_color_from_integer(id_num),
-							map1[0].time,map1[num_selected-1].time,
+							mlp[0].time,mlp[num_selected-1].time,
 							display_min,display_max,0,0);
 				end else begin
 					ave:=0;
@@ -1824,14 +1840,66 @@ begin
 	end;
 {
 	If "list", we list the signals that contain more than one sample, and the number
-	of samples in each of these signals.
+	of samples in each of these signals. We do not list auxilliary or system channels,
+	only the signal channels.
 }
  	if instruction='list' then begin		
 		mark_time('list','lwdaq_sct_receiver');
 		result:='';
 		for id_num:=min_id to max_id do
-			if id_qty[id_num]>0 then 
+			if (id_qty[id_num]>0) 
+			and (id_num mod set_size <> sys_reserve_ids)
+			and (id_num mod set_size <> aux_reserve_ids) then
 				writestr(result,result,id_num:1,' ',id_qty[id_num]:1,' ');
+	end;	
+{
+	If "auxiliary", we return all auxiliary messages in the message list. These 
+	are all those for which the lower four bits of the channel identifier are equal
+	to fifteen. For each message we return the 
+}
+ 	if instruction='auxiliary' then begin		
+		mark_time('auxiliary','lwdaq_sct_receiver');
+		result:='';
+		for message_num:=0 to num_selected-1 do begin
+			with mlp[message_num] do begin
+				if (id mod set_size = aux_reserve_ids) then begin
+					writestr(message_string,id:1,' ',time:1,' ',sample:1);
+					if length(result)>0 then message_string:=eol+message_string;
+					insert(message_string,result,length(result)+1);
+					if length(result)>max_print_length then begin
+						report_error('Too many messages for result string in '
+							+'lwdaq_sct_receiver');
+						exit;
+					end;
+				end;
+			end;
+		end;
+	end;	
+{
+	If "system", we return all system messages in the message list. These are
+	all those for which the lower four bits of the channel identifier are equal
+	to zero, but excluding the zero channel, which is the clock channel. We
+	exclude the clock channel because it will always contain many messages, and
+	the system instruction is for extracting infrequent messages from receivers.
+	
+}
+ 	if instruction='system' then begin		
+		mark_time('system','lwdaq_sct_receiver');
+		result:='';
+		for message_num:=0 to num_selected-1 do begin
+			with mlp[message_num] do begin
+				if (id <> 0)  and (id mod set_size = sys_reserve_ids) then begin
+					writestr(message_string,id:1,' ',time:1,' ',sample:1);
+					if length(result)>0 then message_string:=eol+message_string;
+					insert(message_string,result,length(result)+1);
+					if length(result)>max_print_length then begin
+						report_error('Too many messages for result string in '
+							+'lwdaq_sct_receiver');
+						exit;
+					end;
+				end;
+			end;
+		end;
 	end;	
 {
  	Clean up.

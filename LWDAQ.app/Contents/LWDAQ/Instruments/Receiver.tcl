@@ -95,7 +95,6 @@ proc LWDAQ_init_Receiver {} {
 	set info(receiver_type) "?"
 	set info(fv_range) 30
 	set info(clock_id) 0
-	set info(aux_num_keep) 64
 	set info(show_errors) 0
 	set info(show_messages) 0
 	set info(min_id) 0

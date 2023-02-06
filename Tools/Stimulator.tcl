@@ -554,8 +554,8 @@ proc Stimulator_monitor {} {
 		}	
 	}
 	
-	# If the Neuroplayer's auxilliary message list does not exist, we have no
-	# hope of finding any auxilliary messages from our stimulators.
+	# If the Neuroplayer's auxiliary message list does not exist, we have no
+	# hope of finding any auxiliary messages from our stimulators.
 	if {![info exists ninfo(aux_messages)]} {
 		LWDAQ_post Stimulator_monitor
 		return "SUCCESS"
