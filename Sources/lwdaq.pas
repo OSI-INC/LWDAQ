@@ -3234,6 +3234,9 @@ significantly from that of the data receiver. This option affects the
 reconstruction instruction only. We use zero and one to indicate false and
 true.</p>
 
+<p>	The "-activity n" option sets the minimum number of samples a signal
+channel must contain for either plotting or listing.</p>
+
 <p>Because of limitations in their logic, some data receivers may be unable to
 eliminate duplicate messages from their data stream. The same signal message
 received on two or more antennas may appear two or more times in the data.

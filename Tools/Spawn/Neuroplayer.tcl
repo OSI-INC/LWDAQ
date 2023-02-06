@@ -7038,11 +7038,17 @@ proc Neuroplayer_play {{command ""}} {
 	# Clear the Neurotracker graphs.
 	Neurotracker_fresh_graphs
 	
-	# Get a list of the available channel numbers and message counts. The list
-	# includes any channel in which we have at least one message. It takes the
-	# form of a space-delimited string of channel numbers and message counts.
+	# Get a list of the active signal channels and message counts. The list
+	# includes any channel in which we have a minimum activity, as specified by
+	# the activity threshold. The list takes the form of a space-delimited
+	# string of channel numbers and message counts. The list will not include
+	# auxiliary or system messages.
+	set min_activity [expr $config(activity_threshold) * $info(play_interval_copy)]
 	set all_signal_channels [lwdaq_receiver $info(data_image) \
-		"-payload $info(player_payload) -size $info(data_size) list"]
+		"-payload $info(player_payload)\
+		-size $info(data_size)\
+		-activity $min_activity\
+		 list"]
 
 	# We make a list of the active channels, in which channel numbers and numbers
 	# of samples are separated by colons as in 4:256 for channel four with two
