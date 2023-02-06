@@ -974,6 +974,7 @@ var
 	message_length:integer=4;
 	data_size:integer=0;
 	payload_size:integer=0;
+	activity_threshold:integer=0;
 	max_num_selected:integer=0;
 	num_messages:integer=0;
 	num_selected:integer=0;
@@ -1111,6 +1112,7 @@ begin
 		else if option='-size' then data_size:=read_integer(command)
 		else if option='-glitch' then glitch_threshold:=read_real(command)
 		else if option='-divergent' then divergent_clocks:=read_boolean(command)
+		else if option='-activity' then activity_threshold:=read_integer(command)
 		else done_with_options:=true;
 	until done_with_options;
 {
@@ -1755,7 +1757,7 @@ begin
  		if word='*' then begin
  			display_active:=true;
 			for id_num:=min_id to max_id do 
-				id_valid[id_num]:= ((id_qty[id_num] > 0) 
+				id_valid[id_num]:= ((id_qty[id_num] >= activity_threshold) 
 					and (id_num mod set_size <> sys_reserve_ids)
 					and (id_num mod set_size <> aux_reserve_ids))
 					or (id_num = clock_id);
@@ -1847,7 +1849,7 @@ begin
 		mark_time('list','lwdaq_sct_receiver');
 		result:='';
 		for id_num:=min_id to max_id do
-			if (id_qty[id_num]>0) 
+			if (id_qty[id_num]>activity_threshold) 
 			and (id_num mod set_size <> sys_reserve_ids)
 			and (id_num mod set_size <> aux_reserve_ids) then
 				writestr(result,result,id_num:1,' ',id_qty[id_num]:1,' ');

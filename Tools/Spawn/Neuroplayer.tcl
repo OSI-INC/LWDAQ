@@ -123,12 +123,13 @@ proc Neuroplayer_init {} {
 	lwdaq_image_create -name $info(data_image) -width $width -height $width
 # 
 # When we read data from disk, we read a block of data containing a certain
-# number of messages. The size of the block will be proportional to message length.
-# But in all cases, we must be sure that the block will be less than half the
-# size of our buffer image, so as to avoid overflowing the buffer. We choose
-# a block size that contains a significant number of messages, but not so large
-# a number that reconstruction has to spend more than a millisecond to allocate
-# space for its message list.
+# number of messages. The size of the block will be proportional to message
+# length. We must be sure that the block will be a fraction of the size of our
+# buffer image, so as to avoid overflowing the buffer. We must be sure the block
+# is small enough that checking and counting message in the block takes less
+# than a millisecond. On the other hand, we must be sure that the block contains
+# enough messages that the number of times we have to read from disk and count
+# messages in each interval is almost always less than ten.
 #
 	set info(block_size) 10000
 # 
@@ -189,13 +190,7 @@ proc Neuroplayer_init {} {
 # give time and value or frequency and amplitude. Note that the info(signal) and
 # info(spectrum) elements are strings of characters. Their x-y values are
 # represented as characters giving each number, with each number separated from
-# its neighbors by spaces. On the one hand, handling numbers as strings is
-# computationally intensive. On the other hand, the string-handling routines
-# provided by TCL make it easy for us to write code that handles numbers in
-# strings. As computers have become more powerful, passing numbers around in
-# strings has become more practical. On a 1-GHz or faster computer, the
-# Neuroplayer Version can perform its most extensive signal processing on
-# fourteen 512 SPS message streams faster than the messages come in.
+# its neighbors by spaces. 
 #
 	set info(channel_code) "0"
 	set info(channel_num) "0"
@@ -1762,8 +1757,8 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	}
 	set info(sps_$id) $frequency
 	
-	# If we are here only to the status and nominal sample rate of the transmitter,
-	# we return now with an empty signal string.
+	# If we are here only to determine the status and nominal sample rate of the
+	# transmitter, we return now with an empty signal string.
 	if {$status_only} {
 		return "0 0"
 	}
@@ -1786,8 +1781,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	set standing_value_index [lsearch -index 0 $info(standing_values) $id]
 	if {$standing_value_index < 0} {
 		set signal [lwdaq_receiver $info(data_image) \
-			"-payload $info(player_payload) -size $info(data_size) \
-				extract $id"]
+			"-payload $info(player_payload) -size $info(data_size) extract $id"]
 		if {![LWDAQ_is_error_result $signal] && ([llength $signal] > 0)} {
 			lappend info(standing_values) "$id [lindex $signal 1]"
 		} {
@@ -1809,7 +1803,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			"-payload $info(player_payload)\
 			-size $info(data_size)\
 			-glitch $config(glitch_threshold)\
-			reconstruct $id $period $standing_value "]
+			reconstruct $id $period $standing_value"]
 		
 		# Check for an error in reconstruction.
 		if {[LWDAQ_is_error_result $signal]} {
@@ -4184,7 +4178,7 @@ proc Neurotracker_open {} {
 
 #
 # Neurotracker_fresh_graphs prepares for tracking of available channels. When
-# graphics are avaialable, the routine also clears the overlay of the 
+# graphics are available, the routine also clears the overlay of the 
 # tracker plot and draws the grid.
 #
 proc Neurotracker_fresh_graphs {} {
@@ -4366,6 +4360,8 @@ proc Neurotracker_draw_graphs {} {
 
 	# Draw the tracker picture.
 	lwdaq_draw $info(tracker_image) $info(tracker_photo)
+	
+	# Return.
 	return "SUCCESS"
 }
 
@@ -6009,7 +6005,7 @@ proc Neuroplayer_frequency_reset {} {
 # Neuroplayer_fresh_graphs clears the graph images in memory. If you pass it a
 # "1" as a parameter, it will clear the graphs from the screen as well. It calls
 # lwdaq_graph to create an empty graph in the overlay area of the graph images,
-# and lwdaq_draw to draw the empty graph on the screen.
+# and lwdaq_draw to draw the empty graph on the screen. 
 #
 proc Neuroplayer_fresh_graphs {{clear_screen 0}} {
 	upvar #0 Neuroplayer_info info
@@ -6074,8 +6070,8 @@ proc Neuroplayer_fresh_graphs {{clear_screen 0}} {
 }
 
 #
-# Neuroplayer_draw_graphs draws the vt and af graphs in the two view windows
-# in the Neuroplayer, and in the separate view windows, if they exist.
+# Neuroplayer_draw_graphs draws the vt and af graphs in the two view windows in
+# the Neuroplayer, and in the separate view windows, if they exist.
 #
 proc Neuroplayer_draw_graphs {} {
 	upvar #0 Neuroplayer_info info
@@ -6083,7 +6079,7 @@ proc Neuroplayer_draw_graphs {} {
 	global LWDAQ_Info	
 
 	if {!$info(gui)} {return "ABORT"}
-
+	
 	lwdaq_draw $info(vt_image) $info(vt_photo)
 	if {[winfo exists $info(vt_view)]} {
 		lwdaq_draw $info(vt_image) $info(vt_view_photo) -zoom $config(vt_view_zoom)
@@ -6178,15 +6174,15 @@ proc Neuroplayer_magnified_view {figure} {
 
 
 #
-# Neuroplayer_plot_signal plots the a signal on the screen. It uses lwdaq_graph
-# to plot data in the vt_image overlay. The procedure does not draw the graph on
-# the screen. We leave the drawing until all the signals have been plotted in
-# the vt_image overlay by successive calls to this procedure. For more
-# information about lwdaw_graph, see the LWDAQ Command Reference. If we don't
-# pass a signal to the routine, it uses $info(signal). The signal string must be
-# a list of time and sample values "t v ". If we don't specify a color, the
-# routine uses the info(channel_num) as the color code. If we don't specify a
-# signal, the routine uses the $info(signal).
+# Neuroplayer_plot_signal plots a signal in off-screen drawing area, which is
+# called vt_image. The procedure does not draw the graph on the screen. We leave
+# the drawing until all the signals have been plotted in the vt_image overlay by
+# successive calls to this procedure. For more information about lwdaw_graph,
+# see the LWDAQ Command Reference. If we don't pass a signal to the routine, it
+# uses $info(signal). The signal string must be a list of time and sample values
+# "t v ". If we don't specify a color, the routine uses the info(channel_num) as
+# the color code. If we don't specify a signal, the routine uses the
+# $info(signal).
 #
 proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 	upvar #0 Neuroplayer_info info
@@ -7034,8 +7030,10 @@ proc Neuroplayer_play {{command ""}} {
 	Neuroplayer_print "Using $num_messages messages,\
 		including $num_clocks clocks." verbose
 
-	# Clear the Neuroplayer graphs in preparation for new data.
-	Neuroplayer_fresh_graphs		
+	# Clear the Neuroplayer graphs in preparation for new data. Do  not clear the
+	# display, because we want to refresh the display only when we have the new
+	# set of graphs ready.
+	Neuroplayer_fresh_graphs
 	
 	# Clear the Neurotracker graphs.
 	Neurotracker_fresh_graphs
@@ -7046,6 +7044,77 @@ proc Neuroplayer_play {{command ""}} {
 	set all_signal_channels [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) -size $info(data_size) list"]
 
+	# We make a list of the active channels, in which channel numbers and numbers
+	# of samples are separated by colons as in 4:256 for channel four with two
+	# hundred and fifty six samples in the interval.
+	if {![LWDAQ_is_error_result $all_signal_channels]} {
+		for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
+			set info(qty_$id) 0
+		}
+		set info(active_channels) ""
+		foreach {id qty} $all_signal_channels {
+			set info(qty_$id) $qty
+			if {$qty > $config(activity_threshold) * $info(play_interval_copy)} {
+				if {($id >= $info(min_id)) && ($id <= $info(max_id))} {
+					lappend info(active_channels) "$id:$qty"
+				}
+			}
+		}
+	} {
+		Neuroplayer_print $all_signal_channels
+		set info(active_channels) ""
+		set all_signal_channels ""
+	}
+
+	# We select all active channels or all channels specified by the channel
+	# selector string directly. The selected_channels elements either take the
+	# form of "id:sps" or just "id", where "sps" is the nominal sample rate of
+	# the channel, as specified by the use. The active_channels elements are
+	# "id:qty", where qty is the actual number of samples received, as opposed
+	# to the nominal sample rate.
+	if {[string trim $config(channel_selector)] == "*"} {
+		set selected_channels ""
+		foreach code $info(active_channels) {
+			set id [lindex [split $code :] 0]
+			lappend selected_channels $id
+		}
+	} {
+		set selected_channels $config(channel_selector)
+	}
+	
+	# Some active channels may be ignored by a user-specified channel list. We
+	# will determine quality of reception for these now, before moving on to
+	# processing the selected channels. We pass a status-only flag to the signal
+	# procedure, which causes it to return before performing any reconstruction.
+	foreach code $info(active_channels) {
+		set id [lindex [split $code :] 0]
+		if {([lsearch $selected_channels "$id"] < 0) \
+				&& ([lsearch $selected_channels "$id\:*"] < 0)} {
+			Neuroplayer_signal $id 1
+		}
+	}
+	
+	# If the activity or calibration panels are open, we change channel alerts to
+	# "None" for channels that are not active.
+	if {[winfo exists $info(window)\.activity]} {
+		foreach id $info(activity_selected) {
+			if {[set info(status_$id)] != "None"} {
+				if {[lsearch $info(active_channels) "$id\:*"] < 0} {
+					set info(status_$id) "Off"
+				}
+			}
+		}
+	}
+	if {[winfo exists $info(window)\.calibration]} {
+		foreach id $info(calibration_selected) {
+			if {[set info(status_$id)] != "None"} {
+				if {[lsearch $info(active_channels) "$id\:*"] < 0} {
+					set info(status_$id) "Off"
+				}
+			}
+		}
+	}
+	
 	# We clear the auxiliary message list. Our assumption is that tools like
 	# the Stimulator will be waiting for the Neuroplayer to complete a play
 	# interval and then do all the work they need to on the list before the
@@ -7085,77 +7154,6 @@ proc Neuroplayer_play {{command ""}} {
 		lappend info(aux_messages) "$id $fa $d $ts"
 	}
 		
-	# We make a list of the active channels, in which channel numbers and numbers
-	# of samples are separated by colons as in 4:256 for channel four with two
-	# hundred and fifty six samples in the interval.
-	if {![LWDAQ_is_error_result $all_signal_channels]} {
-		for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
-			set info(qty_$id) 0
-		}
-		set info(active_channels) ""
-		foreach {id qty} $all_signal_channels {
-			set info(qty_$id) $qty
-			if {$qty > $config(activity_threshold) * $info(play_interval_copy)} {
-				if {($id >= $info(min_id)) && ($id <= $info(max_id))} {
-					lappend info(active_channels) "$id:$qty"
-				}
-			}
-		}
-	} {
-		Neuroplayer_print $all_signal_channels
-		set info(active_channels) ""
-		set all_signal_channels ""
-	}
-
-	# If the activity or calibration panels are open, we change channel alerts to
-	# "None" for channels that are not active.
-	if {[winfo exists $info(window)\.activity]} {
-		foreach id $info(activity_selected) {
-			if {[set info(status_$id)] != "None"} {
-				if {[lsearch $info(active_channels) "$id\:*"] < 0} {
-					set info(status_$id) "Off"
-				}
-			}
-		}
-	}
-	if {[winfo exists $info(window)\.calibration]} {
-		foreach id $info(calibration_selected) {
-			if {[set info(status_$id)] != "None"} {
-				if {[lsearch $info(active_channels) "$id\:*"] < 0} {
-					set info(status_$id) "Off"
-				}
-			}
-		}
-	}
-	
-	# We select all active channels or all channels specied by the channel
-	# selector string directly. The selected_channels elements either take the
-	# form of "id:sps" or just "id", where "sps" is the nominal sample rate of
-	# the channel, as specified by the use. The active_channels elements are
-	# "id:qty", where qty is the actual number of samples received, as opposed
-	# to the nominal sample rate.
-	if {[string trim $config(channel_selector)] == "*"} {
-		set selected_channels ""
-		foreach code $info(active_channels) {
-			set id [lindex [split $code :] 0]
-			lappend selected_channels $id
-		}
-	} {
-		set selected_channels $config(channel_selector)
-	}
-	
-	# Some active channels may be ignored by a user-specified channel list. We
-	# will determine quality of reception for these now, before moving on to
-	# processing the selected channels. We pass a status-only flag to the signal
-	# procedure, which causes it to return before performing any reconstruction.
-	foreach code $info(active_channels) {
-		set id [lindex [split $code :] 0]
-		if {([lsearch $selected_channels "$id"] < 0) \
-				&& ([lsearch $selected_channels "$id\:*"] < 0)} {
-			Neuroplayer_signal $id 1
-		}
-	}
-	
 	# We read the processor script from disk. We replace "Neuroarchiver" with
 	# "Neuroplayer" for backward compatibility with old processors, prior to the
 	# partition of the Neuroarchiver into two parts, player and recorder.

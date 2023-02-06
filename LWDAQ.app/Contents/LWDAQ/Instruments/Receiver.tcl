@@ -193,6 +193,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		set result [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) \
 			-glitch $info(glitch_threshold) \
+			-activity $info(activity_threshold) \
 			plot $display_min $display_max \
 			$info(display_mode) $id_list"]
 			
