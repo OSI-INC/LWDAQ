@@ -1185,7 +1185,7 @@ proc Function_Generator_open {} {
 	frame $f
 	pack $f -fill x
 	
-	label $f.spsl -text "Corner Frequencies:" 
+	label $f.spsl -text "Sample Rates:" 
 	pack $f.spsl -side left -expand yes
 	foreach sps $config(sample_rates) {
 		checkbutton $f.sps$sps -text $sps -variable Function_Generator_config(en_$sps)

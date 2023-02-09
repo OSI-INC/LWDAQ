@@ -1763,7 +1763,7 @@ begin
 				id_valid[id_num]:= ((id_qty[id_num] >= activity_threshold) 
 					and (id_num mod set_size <> sys_reserve_ids)
 					and (id_num mod set_size <> aux_reserve_ids))
-					or (id_num = clock_id);
+					and (id_num <> clock_id);
  		end else begin
  			display_active:=false;
  			for id_num:=min_id to max_id do 

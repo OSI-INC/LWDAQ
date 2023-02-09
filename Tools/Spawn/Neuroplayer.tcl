@@ -56,7 +56,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "163"
+	LWDAQ_tool_init "Neuroplayer" "164"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -4719,7 +4719,7 @@ proc Neuroexporter_edf_setup {} {
 		if {![string is integer -strict $sps]} {
 			Neuroplayer_print "ERROR: Bad sample rate \"$sps\" for channel $id\
 				in EDF setup, try Autofill."
-			raise $info(export)
+			raise $info(export_panel)
 			break
 		}
 		if {$config(export_signal)} {
