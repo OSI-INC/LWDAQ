@@ -284,7 +284,8 @@ proc LWDAQ_save_settings {} {
 			blocking_sockets lazy_flush tcp_timeout_ms support_ms update_ms \
 			lwdaq_client_port default_to_stdout server_address_filter \
 			server_listening_port close_delay_ms scheduler_increment \
-			scheduler_log scheduler_window" {
+			scheduler_log scheduler_window debug_log instrument_counter_max \
+			line_purge_period" {
 		puts $f "set LWDAQ_Info($i) \"[set info($i)]\""
 	}
 	puts $f "lwdaq_config [lwdaq_config]"

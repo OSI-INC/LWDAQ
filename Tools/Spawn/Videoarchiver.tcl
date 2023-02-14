@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "28"
+	LWDAQ_tool_init "Videoarchiver" "29"
 
 	# If a graphical tool window already exists, we abort our initialization.
 	if {[winfo exists $info(window)]} {
@@ -120,14 +120,14 @@ proc Videoarchiver_init {} {
 	# files, killing all videoarchiver-generated processes, video processes, and
 	# image capture processes, and starting the TCPIP interface.
 	set info(camera_init) {
-cd Videoarchiver
-rm -f *_log.txt
-rm -f tmp/*.mp4
-rm -f *.gif
 killall -9 tclsh 
 killall -9 ffmpeg 
 killall -9 raspivid 
 killall -9 libcamera-vid
+cd Videoarchiver
+rm -f *_log.txt
+rm -f tmp/*.mp4
+rm -f *.gif
 tclsh interface.tcl -port %Q >& interface_log.txt &
 echo "SUCCESS"
 }	
@@ -1556,8 +1556,8 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 		return "STOP"
 	}
 
-	# If the camera state is Record, set it to Stalled and reset the
-	# lag indicator.
+	# If the camera state is Record, set it to Stalled and reset the lag
+	# indicator.
 	if {$info(cam$n\_state) == "Record"} {
 		set info(cam$n\_state) "Stalled"
 		LWDAQ_set_bg $info(cam$n\_state_label) red
@@ -1565,16 +1565,15 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 		LWDAQ_set_fg $info(cam$n\_laglabel) gray
 	}
 	
-	# Check the camera state. If the state is no longer Stalled, 
-	# don't try to restart.
+	# Check the camera state. If the state is no longer Stalled, don't try to
+	# restart.
 	if {$info(cam$n\_state) != "Stalled"} {
 		return "STOP"
 	}
 	
-	# If we don't pass a value for the start time, this is because the
-	# restart has been requested by one of the recording processes.
-	# We set the start time to the current time and write a message
-	# to the screen and log.
+	# If we did not pass a value for the start time, the restart was requested
+	# by one of the recording processes. So we set the start time to the current
+	# time and write a message to the screen and the restart log.
 	if {$start_time == ""} {
 		set start_time [clock seconds]
 		LWDAQ_print $info(text) "$info(cam$n\_id) Will try to restart recording every\
@@ -1583,17 +1582,17 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 			"$info(cam$n\_id) Recording stalled at [clock format $start_time]."
 	}
 
-	# If restart_wait_s seconds have not yet passed since start time, post the 
-	# restart operation to the queue. We don't want to try too often to
-	# restart or else we will slow the other cameras down.
+	# If restart_wait_s seconds have not yet passed since start time, post the
+	# restart operation to the queue. We don't want to try too often to restart
+	# or else we will slow the other cameras down.
 	if {[clock seconds] - $start_time < $config(restart_wait_s)} {
 		LWDAQ_post [list Videoarchiver_restart_recording $n $start_time]
 		return "WAITING"
 	}
 	
-	# To re-start, we stop the camera and then try to start recording
-	# using existing routines that catch their own errors and return
-	# the ERROR word when they fail. 
+	# To re-start, we stop the camera and then try to start recording using
+	# existing routines that catch their own errors and return the ERROR word
+	# when they fail. 
 	LWDAQ_print $info(text) "$info(cam$n\_id) Trying to re-start\
 		video recording after fatal error."
 	set result [Videoarchiver_record $n]
@@ -2538,22 +2537,24 @@ proc Videoarchiver_remove {n} {
 	
 	catch {destroy $info(window).cam_list.cam$n}
 	set info(cam_list) [lreplace $info(cam_list) $index $index]
-	unset info(cam$n\_id)
-	unset info(cam$n\_ver)
-	unset info(cam$n\_addr)
-	unset info(cam$n\_rot)
-	unset info(cam$n\_sat)
-	unset info(cam$n\_ec)
-	unset info(cam$n\_file)
-	unset info(cam$n\_state)
-	unset info(cam$n\_ttime)
-	unset info(cam$n\_lproc)
-	unset info(cam$n\_rstart)
-	unset info(cam$n\_prevseg)
-	unset info(cam$n\_white)
-	unset info(cam$n\_infrared)
-	unset info(cam$n\_lag)
-	unset info(cam$n\_laglabel)
+	catch {
+		unset info(cam$n\_id)
+		unset info(cam$n\_ver)
+		unset info(cam$n\_addr)
+		unset info(cam$n\_rot)
+		unset info(cam$n\_sat)
+		unset info(cam$n\_ec)
+		unset info(cam$n\_file)
+		unset info(cam$n\_state)
+		unset info(cam$n\_ttime)
+		unset info(cam$n\_lproc)
+		unset info(cam$n\_rstart)
+		unset info(cam$n\_prevseg)
+		unset info(cam$n\_white)
+		unset info(cam$n\_infrared)
+		unset info(cam$n\_lag)
+		unset info(cam$n\_laglabel)
+	}
 	
 	return "SUCCESS"
 }

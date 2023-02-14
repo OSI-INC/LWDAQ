@@ -979,6 +979,7 @@ var
 	payload_size:integer=0;
 	activity_threshold:integer=0;
 	max_num_selected:integer=0;
+	reconstruct_size:integer=0;
 	num_messages:integer=0;
 	num_selected:integer=0;
 	message_num:integer=0;
@@ -1554,7 +1555,9 @@ begin
 		else
 			window_extent:=scatter_extent+round(default_window_fraction*period);
 {
-	Create a new message stack.
+	Create a new message stack. We will transfer all messages with matching
+	identifier into this stack, then over-write the original message stack with
+	our reduced list.
 }
 		writestr(debug_string,'allocating ',max_num_selected*sizeof(message_type):1,
 			' bytes for msp');
@@ -1613,6 +1616,17 @@ begin
 		else 
 			window_time:=window_phase;
 {
+	Allocate space for a new message stack, large enough to hold all messages in
+	the reconstructed signal. This number, the reconstruct_size, can be larger
+	than max_num_selected, as would be the case when we have a single recording
+	channel with significant loss.
+}
+		reconstruct_size:=round(num_clocks*clock_period/period)+1;
+		writestr(debug_string,'allocating ',reconstruct_size*sizeof(message_type):1,
+			' bytes for msp');
+		mark_time(debug_string,'lwdaq_sct_receiver');
+		setlength(msp,reconstruct_size);
+{
 	Run through transmission windows. In each window, make a list of available
 	samples. Ideally, there will be only one, and we accept it into our new
 	list, which we are forming in the message stack. We set the standing value
@@ -1624,10 +1638,6 @@ begin
 	messages" is the number that lie outside the windows plus the number that we
 	reject despite lying inside the windows.
 }		
-		writestr(debug_string,'allocating ',max_num_selected*sizeof(message_type):1,
-			' bytes for msp');
-		mark_time(debug_string,'lwdaq_sct_receiver');
-		setlength(msp,max_num_selected);
 		stack_height:=0;
 		num_missing:=0;
 		num_bad:=0;
@@ -1646,7 +1656,6 @@ begin
 				end;
 				inc(message_num);
 			end;
-			
 			if num_candidates=0 then begin
 				inc(num_missing);
 				with m do begin
@@ -1661,6 +1670,7 @@ begin
 				m:=candidate_list[0];
 				standing_value:=m.sample;
 			end;
+
 			if num_candidates>1 then begin
 				best_num:=0;
 				smallest_deviation:=max_sample-min_sample+1;
@@ -1674,6 +1684,7 @@ begin
 				m:=candidate_list[best_num];
 				num_bad:=num_bad+num_candidates-1;
 			end;
+
 			msp[stack_height]:=m;
 			inc(stack_height);
 			window_time:=window_time+period;
@@ -1909,7 +1920,6 @@ begin
 {
  	Clean up.
 }
-	mark_time('done','lwdaq_sct_receiver');
 	lwdaq_sct_receiver:=result;
 end;
 
