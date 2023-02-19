@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "29"
+	LWDAQ_tool_init "Videoarchiver" "30"
 
 	# If a graphical tool window already exists, we abort our initialization.
 	if {[winfo exists $info(window)]} {
@@ -1739,6 +1739,18 @@ proc Videoarchiver_transfer {n {init 0}} {
 					fconfigure $f -translation binary
 					puts -nonewline $f $contents
 					close $f
+					
+					# Determine the duration of the segment using ffmpeg.
+					catch {[exec $info(ffmpeg) -i $sf]} answer
+					if {[regexp {Duration: ([0-9]*):([0-9]*):([0-9\.]*)} \
+							$answer match hr min sec]} {
+						scan $hr %d hr
+						scan $min %d min
+						scan $sec %f sec
+						set duration [format %.2f [expr $hr*3600+$min*60+$sec]]
+					} else {
+						set duration "0.00"
+					}
 
 					# When verbose, issue a warning if the size is below a minimum.
 					if {$config(verbose)} {		
@@ -1763,9 +1775,9 @@ proc Videoarchiver_transfer {n {init 0}} {
 					# If verbose, report to text window.
 					if {$config(verbose)} {
 						LWDAQ_print $info(text) "$info(cam$n\_id)\
-							Downloaded $sf,\
-							[format %.1f [expr 0.001*$size]] kByte in $download_ms ms,\
-							lag $lag s, $freq GHz, $temp C, time [clock seconds] s."
+							Downloaded $sf in $download_ms ms,\
+							[format %.1f [expr 0.001*$size]] kByte, $duration s,\
+							lag $lag s, $freq GHz, $temp C."
 					}				
 				}
 				

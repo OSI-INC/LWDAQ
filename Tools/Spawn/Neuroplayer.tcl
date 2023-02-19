@@ -56,7 +56,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "164"
+	LWDAQ_tool_init "Neuroplayer" "165"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -622,7 +622,7 @@ proc Neuroplayer_init {} {
 	set info(video_process) "0"
 	set info(video_channel) "file1"
 	set info(video_file_cache) [list]
-	set info(max_video_files) "100"
+	set info(max_video_files) "1000"
 	set os_dir [file join $config(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
 		set info(ssh) [file join $os_dir ssh/ssh.exe]	
@@ -780,10 +780,11 @@ proc Neuroplayer_play_time_format {play_time} {
 	return $play_time
 }
 
-
+#
 # Neuroplayer_pick allows the user to pick a new play_file, processor_file,
-# event_file, play_dir, or video_dir.
-
+# event_file, play_dir, or video_dir. In the special case of the video_dir
+# we clear the video file cache when we select a new video directory.
+#
 proc Neuroplayer_pick {name {post 0}} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
@@ -814,6 +815,9 @@ proc Neuroplayer_pick {name {post 0}} {
 			return $dn
 		}
 		set config($name) $dn
+		if {$name == "video_dir"} {
+			set info(video_file_cache) [list]
+		}
 		return $dn
 	}
 	return ""
@@ -4482,7 +4486,7 @@ proc Neuroexporter_open {} {
 	pack $f -side top -fill x
 	
 	label $f.sl -text "Start:" -anchor w -fg $info(label_color) 
-	label $f.slv -textvariable Neuroplayer_config(export_start) -anchor w
+	entry $f.slv -textvariable Neuroplayer_config(export_start) -width 20
 	pack $f.sl $f.slv -side left -expand yes 
 	
 	label $f.dl -text "Duration (s):" -anchor w -fg $info(label_color) 
@@ -5093,21 +5097,20 @@ proc Neuroexporter_export {{cmd "Start"}} {
 
 		# Start the one or two extractions we may need to perform on video files
 		# to get the start and end segments aligned with the start and end
-		# export times. Make a list of the segments we want to concatinate
-		# together later.
+		# export times. Make a list of the segments we want to concatinate.
 		if {$config(export_video)} {
-			LWDAQ_print $t "Looking for video files\
-				in $config(video_dir)."
+			LWDAQ_print $t "Looking for video files in $config(video_dir)."
 			set vt $info(export_start_s)
 			while {$vt < $info(export_end_s)} {
 				set vfi [Neuroplayer_video_action "Seek" $vt 0]
 				if {$vfi == ""} {
-					LWDAQ_print $t "ERROR: Cannot find video for $vt s,\
+					LWDAQ_print $t "ERROR: Cannot find video for time $vt s,\
 						aborting export."
 					LWDAQ_post "Neuroexporter_export Stop"
 					return "ERROR"
 				}
-				scan $vfi %s%d%f vfn vsk vlen
+				scan $vfi %s%d%f%f vfn vsk vlen clen
+LWDAQ_print $t "[file tail $vfn] $vsk $vlen $clen" green
 				if {$info(export_end_s) - $vt > round($vlen - $vsk)} {
 					set vdur [expr round($vlen - $vsk)]
 				} {
@@ -5473,7 +5476,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}
 	}
 
-	# At the end of an export, we check to see if we should repeat the export strating
+	# At the end of an export, we check to see if we should repeat the export starting
 	# from the point immediately after the end of the previous export.
 	if {$cmd == "Repeat"} {
 		if {$info(export_state) != "Wait"} {
@@ -5548,11 +5551,11 @@ proc Neuroplayer_clock_jump {} {
 }
 
 #
-# We convert between integer seconds to the datetime format given in the 
+# We convert between integer seconds to the datetime format given in the
 # configuration array. If the input is in integer seconds, it gets converted
-# into our datetime format. Otherwise, we convert it from datetime format
-# into integer seconds if possible. We issue an error in the Neuroplayer
-# window if the format is incorrect, and return the value zero.
+# into our datetime format. Otherwise, we convert it from datetime format into
+# integer seconds. We issue an error in the Neuroplayer window if the format is
+# incorrect, and return the value zero.
 #
 proc Neuroplayer_clock_convert {datetime} {
 	upvar #0 Neuroplayer_config config
@@ -7777,9 +7780,10 @@ proc Neuroplayer_video_watchdog {pid} {
 # parameters to the routine: a command "cmd", a Unix time in seconds "datetime",
 # and an interval length in seconds "length". The command must be "Seek" or
 # "Play". The Seek command returns the name of the video containing the
-# datetime, the time within the video that corresponds to the datetime, and the
-# duration of the video. The Play command plays the video starting at datetime
-# and going on for length seconds.
+# datetime, the time within the video that corresponds to the datetime, the
+# duration of the video, and the duration that would match the end of the video
+# exactly with the start of the next video file in the video directory. The Play
+# command plays the video starting at datetime and going on for length seconds.
 # 
 proc Neuroplayer_video_action {cmd datetime length} {
 	upvar #0 Neuroplayer_config config
@@ -7794,7 +7798,8 @@ proc Neuroplayer_video_action {cmd datetime length} {
 	}
 
 	# Look in our video file cache to see if the start and end of the 
-	# requested interval is contained in a video we have already used.
+	# requested interval is contained in a video we have already read
+	# from the video directory and assessed previously.
 	set vf ""
 	set min_length [format %.1f [expr $info(video_min_interval)*0.5]]
 	set camera_id [file tail $config(video_dir)]
@@ -7802,6 +7807,7 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		set fn [lindex $entry 0]
 		set vtime [lindex $entry 1]
 		set vlen [lindex $entry 2]
+		set clen [lindex $entry 3]
 		set id [file tail [file dirname $fn]]
 		if {($id == $camera_id) \
 			&& ($vtime <= $datetime) \
@@ -7824,14 +7830,17 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		set fl [LWDAQ_find_files $config(video_dir) V??????????.mp4]
 		set fl [LWDAQ_sort_files $fl]
 	
-		# Find the newest file that begins before the start of our interval.
+		# Find the newest file that begins before the start of our interval. Determine
+		# the start time of the next file in the list.
 		set vtime 0
+		set ntime 0
 		foreach fn $fl {
 			if {[regexp {([0-9]{10})\.mp4$} [file tail $fn] match newtime]} {
 				if {($newtime <= $datetime)} {
 					set vf $fn
 					set vtime $newtime
 				} else {
+					set ntime $newtime
 					break
 				}
 			}
@@ -7860,9 +7869,18 @@ proc Neuroplayer_video_action {cmd datetime length} {
 			Neuroplayer_print "WARNING: File [file tail $vf], length $vlen s,\
 				ends $missing s before end of requested interval."
 		}
+		
+		# Calculate the correct length of the video file to match up with the
+		# start date of the next video file, using zero as a flag for when
+		# there is no next file.
+		if {$ntime > 0} {
+			set clen [expr $ntime - $vtime]
+		} {
+			set clen 0
+		}
 
-		# Add the video file to the cache. Keep the cache of finite length.
-		lappend info(video_file_cache) [list $vf $vtime $vlen]
+		# Add the video file to the cache. Curtail the cache to a finite length.
+		lappend info(video_file_cache) [list $vf $vtime $vlen $clen]
 		if {[llength $info(video_file_cache)] > $info(max_video_files)} {
 			set info(video_file_cache) [lrange $info(video_file_cache) 1 end]
 		}
@@ -7879,7 +7897,7 @@ proc Neuroplayer_video_action {cmd datetime length} {
 	# If we just want to find this point in the video, we exit now giving the
 	# file name, seek position, and file length.
 	if {$cmd == "Seek"} {
-		return [list $vf $vseek $vlen]
+		return [list $vf $vseek $vlen $clen]
 	}
 	
 	# If no video player window is open, we create a new one. If we
@@ -7944,8 +7962,8 @@ proc Neuroplayer_video_action {cmd datetime length} {
 	LWDAQ_set_bg $info(play_control_label) cyan
 	set info(video_state) "Play"
 	
-	# Return the file name, seek time and file duration.
-	return [list $vf $vseek $vlen]
+	# Return the file name, seek time, file duration, and correct length.
+	return [list $vf $vseek $vlen $clen]
 }
 
 #
