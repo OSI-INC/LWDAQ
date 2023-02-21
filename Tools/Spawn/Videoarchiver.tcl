@@ -81,6 +81,7 @@ proc Videoarchiver_init {} {
 	set config(compression_codec) "libx264"
 	set config(stream_codec) "MJPEG"
 	set config(compression_num_cpu) "3"
+	set config(segment_length) "2"
 
 	# Fixed IP addresses for default configurations and camera streaming.
 	set info(local_ip_addr) "127.0.0.1"
@@ -93,13 +94,13 @@ proc Videoarchiver_init {} {
 	set info(library_archive) "http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
 
 	# These are the camera versions, each version accompanied by five numbers:
-	# the width x, height y, frame rate fr, constant rate factor crf, and
-	# segment length sl in seconds. The image will be x * y pixels with fr
-	# frames per second, and the H264 compression will be greater as the crf is
-	# lower. Standard crf is 23. The crf of 15 gives a particularly sharp image.
+	# the width x, height y, frame rate fr, and constant rate factor crf. The
+	# image will be x * y pixels with fr frames per second, and the H264
+	# compression will be greater as the crf is lower. Standard crf is 23. The
+	# crf of 15 gives a particularly sharp image.
 	set config(versions) [list \
-		{A3034C1 820 616 20 23 1} \
-		{A3034C2 820 616 20 27 2} ]
+		{A3034C1 820 616 20 23} \
+		{A3034C2 820 616 20 27} ]
 	
 	# The rotation of the image readout.
 	set info(rotation_options) "0 90 180 270"
@@ -170,7 +171,6 @@ echo "SUCCESS"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
 	set config(restart_wait_s) "30"
-	set config(del_first_seg) "1"
 	set config(min_seg_size) "1.0"
 	
 	# Set the verbose compressor argument to have the compressors print input
@@ -1405,8 +1405,8 @@ proc Videoarchiver_segment {n} {
 	# Obtain the height and width size of the image we want, and the frame rate.
 	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
 	if {$sensor_index < 0} {set sensor_index 0}
-	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
-		version width height framerate crf sl
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d \
+		version width height framerate crf
 	
 	if {[catch {
 		# Open a socket to the interface.
@@ -1421,7 +1421,7 @@ proc Videoarchiver_segment {n} {
 			-framerate $framerate \
 			-f segment \
 			-segment_atclocktime 1 \
-			-segment_time $sl \
+			-segment_time $config(segment_length) \
 			-reset_timestamps 1 \
 			-codec copy \
 			-segment_list segment_list.txt \
@@ -1437,7 +1437,7 @@ proc Videoarchiver_segment {n} {
 		# Close socket and report.
 		LWDAQ_socket_close $sock
 		LWDAQ_print $info(text) "$info(cam$n\_id) Started segmentation process\
-			on camera with segment length $sl s."
+			on camera with segment length $config(segment_length) s."
 	} message]} {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
 		catch {LWDAQ_socket_close $sock}
@@ -1615,7 +1615,7 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 # being compressed. Keeps the camera clock synchronized. Arranges video segments in 
 # correct order adds to recording file. The first time we call the routine to start
 # a transfer process, we pass a 1 for the init parameter. This allows the routine
-# to delete the first segment in a stream when config(del_first_seg) is set.
+# to delete the first segment in a stream and clear the camera's segment time to zero.
 #
 proc Videoarchiver_transfer {n {init 0}} {
 	upvar #0 Videoarchiver_config config
@@ -1670,7 +1670,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 				return "FAIL"
 			}
 		}
-
+		
 		# Get a list of segments that are available for download on the camera. 
 		set when "fetching segment list"
 		if {[catch {
@@ -1733,8 +1733,18 @@ proc Videoarchiver_transfer {n {init 0}} {
 					set result [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $result]} {error $result}
 					
+					# If we are initializing, don't save this segment to disk. Clear
+					# the initialize flag, clear the most recent segment name, set
+					# the lag to a question mark and continue.
+					if {$init} {
+						set config(cam$n\_stime) 0
+						set lag "?"
+						set init 0
+						continue
+					}
+					
 					# Write the segment to disk.
-					set when "saving copy $sf"
+					set when "saving $sf to disk"
 					set f [open $sf w]
 					fconfigure $f -translation binary
 					puts -nonewline $f $contents
@@ -1837,17 +1847,6 @@ proc Videoarchiver_transfer {n {init 0}} {
 	set seg_list [lsort -dictionary [glob -nocomplain V*.mp4]]
 	
 	if {[catch {
-		# If we are initializing, we delete the first segment.
-		if {$init && ([llength $seg_list] > 0) && $config(del_first_seg)} {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "$info(cam$n\_id) Deleting initial segment\
-					[lindex $seg_list 0]."
-			}
-			file delete [lindex $seg_list 0]
-			set seg_list [lrange $seg_list 1 end]
-			set init 0
-		}
-		
 		# If we have one or more segments available for transfer, calculate the
 		# time remaining to complete the existing recording file. If this time
 		# is zero or less, or if there is no recording file created yet, we copy

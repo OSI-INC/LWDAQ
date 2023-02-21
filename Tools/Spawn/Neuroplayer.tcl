@@ -434,7 +434,7 @@ proc Neuroplayer_init {} {
 # be used if we do not specify values.
 #
 	set config(channel_selector) "*"
-	set config(default_frequency) "64 128 256 512 1024 2048 4096"
+	set config(default_frequencies) "64 128 256 512 1024 2048 4096"
 	set info(standing_values) ""
 #
 # We save the last clock message value in each message block so we can compare it 
@@ -622,7 +622,7 @@ proc Neuroplayer_init {} {
 	set info(video_process) "0"
 	set info(video_channel) "file1"
 	set info(video_file_cache) [list]
-	set info(max_video_files) "1000"
+	set info(max_video_files) "100"
 	set os_dir [file join $config(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
 		set info(ssh) [file join $os_dir ssh/ssh.exe]	
@@ -1732,7 +1732,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	# be picked. If our search for a good frequency fails because there are too
 	# many messages, we use the highest frequency in the default list.
 	if {![string is integer -strict $frequency]} {
-		set fl [lsort -integer -decreasing [string trim $config(default_frequency)]]
+		set fl [lsort -integer -decreasing [string trim $config(default_frequencies)]]
 		set frequency [lindex $fl 0]
 		foreach f $fl {
 			if {![string is integer -strict $f]} {
@@ -4454,7 +4454,7 @@ proc Neuroexporter_open {} {
 	pack $f -side top -fill x
 	label $f.state -textvariable Neuroplayer_info(export_state) -fg blue -width 10
 	button $f.export -text "Start" -command "LWDAQ_post Neuroexporter_export"
-	button $f.stop -text "Abort" -command {Neuroexporter_export "Stop"}
+	button $f.stop -text "Abort" -command {Neuroexporter_export "Abort"}
 	pack $f.state $f.export $f.stop -side left -expand yes
 	
 	label $f.lformat -text "File:" -anchor w -fg $info(label_color)
@@ -4843,7 +4843,7 @@ proc Neuroexporter_txt_save {w} {
 #
 # Neuroexporter_export manages the exporting of recorded signals to files,
 # tracker signals to files, and the creation of simultaneous video to
-# concatinated video files. that match the export intervals.
+# concatinated video files. that match the export intervals. 
 #
 proc Neuroexporter_export {{cmd "Start"}} {
 	upvar #0 Neuroplayer_info info
@@ -4857,14 +4857,24 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		set t $info(text)
 	}
 	
-	# Establish file extension, which is the file format in lower case.
+	# Establish file extension, which is the file format in lower case, and load
+	# any packages particular to the export format.
 	set ext [string tolower $config(export_format)]
 	if {$config(export_format) == "EDF"} {
 		package require EDF 1.2
 	}	
 	
-	# If the command is stop, abort all export processes.
-	if {$cmd == "Stop"} {
+	# Set a flag to indicate that NDF export is requested. We might be exporting
+	# only video.
+	if {$config(export_signal) || $config(export_centroid) \
+		|| $config(export_activity) || $config(export_powers)} {
+		set play_ndf 1
+	} {
+		set play_ndf 0
+	}
+	
+	# If the command is abort, abort all export processes.
+	if {$cmd == "Abort"} {
 		if {$info(export_state) != "Idle"} {
 			LWDAQ_print $t "Aborting export at\
 				$config(play_time) s in archive\
@@ -4924,169 +4934,174 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
 			return "ERROR"
 		}
-		
-		# Check the channel select string and clean up existing export files.
-		set config(channel_selector) [string trim $config(channel_selector)]
-		set signals [list]
-		foreach channel $config(channel_selector) {
-			if {$channel == "*"} {
-				LWDAQ_print $t \
-					"ERROR: Cannot use wildcard channel select, aborting export.\
-						Use Autofill or enter select string by hand."
-				LWDAQ_post "Neuroexporter_export Stop"
-				return "ERROR"
-			}
-			set id [lindex [split $channel :] 0]		
-			if {![string is integer -strict $id] \
-					|| ($id < $info(clock_id)) \
-					|| ($id > $info(max_id))} {
-				LWDAQ_print $t \
-					"ERROR: Invalid channel id \"$id\", aborting export."
-				LWDAQ_post "Neuroexporter_export Stop"
-				return "ERROR"
-			}
-			set sps [lindex [split $channel :] 1]
-			if {$sps == ""} {
-				LWDAQ_print $t \
-					"ERROR: No sample rate specified for channel $id, aborting export."
-				LWDAQ_post "Neuroexporter_export Stop"
-				return "ERROR"
-			}
-			if {[lsearch "16 32 64 128 256 512 1024 2048 4096" $sps] < 0} {
-				LWDAQ_print $t \
-					"ERROR: Invalid sample rate \"$sps\", aborting export."
-				LWDAQ_post "Neuroexporter_export Stop"
-				return "ERROR"
-			}
-			lappend signals $id $sps
-						
-			if {$config(export_signal)} {
-				if {$config(export_combine)} {
-					set sfn [file join $config(export_dir) \
-						"E$info(export_start_s).$ext"]
-				} {
-					set sfn [file join $config(export_dir) \
-						"E$info(export_start_s)\_$id\.$ext"]
-				}
-				LWDAQ_print $t "Exporting signal of channel\
-					$id at $sps SPS to $sfn."
-				if {[file exists $sfn]} {
+
+		# If we are playing an NDF, not just exporting video, we set up the playback
+		# and export.		
+		if {$play_ndf} {
+
+			# Check the channel select string and clean up existing export files.
+			set config(channel_selector) [string trim $config(channel_selector)]
+			set signals [list]
+			foreach channel $config(channel_selector) {
+				if {$channel == "*"} {
 					LWDAQ_print $t \
-						"WARNING: Deleting existing [file tail $sfn]."
-					file delete $sfn
+						"ERROR: Cannot use wildcard channel select, aborting export.\
+							Use Autofill or enter select string by hand."
+					LWDAQ_post "Neuroexporter_export Abort"
+					return "ERROR"
 				}
-				if {!$config(export_combine) && ($config(export_format) == "EDF")} {
+				set id [lindex [split $channel :] 0]		
+				if {![string is integer -strict $id] \
+						|| ($id < $info(clock_id)) \
+						|| ($id > $info(max_id))} {
+					LWDAQ_print $t \
+						"ERROR: Invalid channel id \"$id\", aborting export."
+					LWDAQ_post "Neuroexporter_export Abort"
+					return "ERROR"
+				}
+				set sps [lindex [split $channel :] 1]
+				if {$sps == ""} {
+					LWDAQ_print $t \
+						"ERROR: No sample rate specified for channel $id, aborting export."
+					LWDAQ_post "Neuroexporter_export Abort"
+					return "ERROR"
+				}
+				if {[lsearch $config(default_frequencies) $sps] < 0} {
+					LWDAQ_print $t \
+						"ERROR: Invalid sample rate \"$sps\", aborting export."
+					LWDAQ_post "Neuroexporter_export Abort"
+					return "ERROR"
+				}
+				lappend signals $id $sps
+						
+				if {$config(export_signal)} {
+					if {$config(export_combine)} {
+						set sfn [file join $config(export_dir) \
+							"E$info(export_start_s).$ext"]
+					} {
+						set sfn [file join $config(export_dir) \
+							"E$info(export_start_s)\_$id\.$ext"]
+					}
+					LWDAQ_print $t "Exporting signal of channel\
+						$id at $sps SPS to $sfn."
+					if {[file exists $sfn]} {
+						LWDAQ_print $t \
+							"WARNING: Deleting existing [file tail $sfn]."
+						file delete $sfn
+					}
+					if {!$config(export_combine) && ($config(export_format) == "EDF")} {
+						LWDAQ_print $t "Creating EDF file [file tail $sfn]."
+						EDF_create $sfn $config(play_interval) \
+							"$id $sps" $info(export_start_s)
+					}
+					if {!$config(export_combine) \
+						&& ($config(export_format) == "TXT") \
+						&& ($config(export_txt_header) != "")} {
+						LWDAQ_print $t "Creating TXT file [file tail $sfn]."
+						LWDAQ_print $sfn $config(export_txt_header)
+					}
+				}
+			
+				if {$config(export_centroid) || $config(export_powers)} {
+					if {$config(export_combine)} {
+						set tfn [file join $config(export_dir) \
+							"T$info(export_start_s).$ext"]
+					} {
+						set tfn [file join $config(export_dir) \
+							"T$info(export_start_s)\_$id\.$ext"]
+					}
+					LWDAQ_print $t "Exporting tracker data of channel\
+						$id at $config(tracker_sample_rate) SPS to $tfn."
+					if {[file exists $tfn]} {
+						LWDAQ_print $t \
+							"WARNING: Deleting existing [file tail $tfn]."
+						file delete $tfn
+					}
+					if {!$config(export_combine) \
+						&& ($config(export_format) == "TXT") \
+						&& ($config(export_txt_header) != "")} {
+						LWDAQ_print $t "Creating TXT file [file tail $tfn]."
+						LWDAQ_print $tfn $config(export_txt_header)
+					}
+				}		
+			
+				if {$config(export_activity)} {
+					if {$config(export_combine)} {
+						set afn [file join $config(export_dir) \
+							"A$info(export_start_s).$ext"]
+					} {
+						set afn [file join $config(export_dir) \
+							"A$info(export_start_s)\_$id\.$ext"]
+					}
+					LWDAQ_print $t "Exporting activity of channel\
+						$id at $sps SPS to $afn."
+					if {[file exists $afn]} {
+						LWDAQ_print $t \
+							"WARNING: Deleting existing [file tail $afn]."
+						file delete $afn
+					}
+					if {!$config(export_combine) && ($config(export_format) == "EDF")} {
+						LWDAQ_print $t "Creating EDF file [file tail $afn]."
+						EDF_create $afn $config(play_interval) \
+							"[set id]a $config(tracker_sample_rate)" $info(export_start_s)
+					}
+					if {!$config(export_combine) \
+						&& ($config(export_format) == "TXT") \
+						&& ($config(export_txt_header) != "")} {
+						LWDAQ_print $t "Creating TXT file [file tail $afn]."
+						LWDAQ_print $afn $config(export_txt_header)
+					}
+				}
+			}
+		
+			# If we are exporting to one EDF file, create the header for all signals now.
+			if {$config(export_combine) && ($config(export_format) == "EDF")} {
+				if {$config(export_signal)} {
 					LWDAQ_print $t "Creating EDF file [file tail $sfn]."
-					EDF_create $sfn $config(play_interval) \
-						"$id $sps" $info(export_start_s)
+					EDF_create $sfn $config(play_interval) $signals $info(export_start_s)
 				}
-				if {!$config(export_combine) \
+				if {$config(export_activity)} {
+					LWDAQ_print $t "Creating EDF file [file tail $afn]."
+					set headings ""
+					foreach {id sps} $signals {
+						append headings "[set id]a $config(tracker_sample_rate) "
+					}
+					EDF_create $afn $config(play_interval) $headings $info(export_start_s)
+				}
+			}
+
+			# If we are exporting to one TXT file, create the header for all signals now.
+			if {$config(export_combine) \
 					&& ($config(export_format) == "TXT") \
 					&& ($config(export_txt_header) != "")} {
+				if {$config(export_signal)} {
 					LWDAQ_print $t "Creating TXT file [file tail $sfn]."
 					LWDAQ_print $sfn $config(export_txt_header)
 				}
-			}
-			
-			if {$config(export_centroid) || $config(export_powers)} {
-				if {$config(export_combine)} {
-					set tfn [file join $config(export_dir) \
-						"T$info(export_start_s).$ext"]
-				} {
-					set tfn [file join $config(export_dir) \
-						"T$info(export_start_s)\_$id\.$ext"]
-				}
-				LWDAQ_print $t "Exporting tracker data of channel\
-					$id at $config(tracker_sample_rate) SPS to $tfn."
-				if {[file exists $tfn]} {
-					LWDAQ_print $t \
-						"WARNING: Deleting existing [file tail $tfn]."
-					file delete $tfn
-				}
-				if {!$config(export_combine) \
-					&& ($config(export_format) == "TXT") \
-					&& ($config(export_txt_header) != "")} {
-					LWDAQ_print $t "Creating TXT file [file tail $tfn]."
-					LWDAQ_print $tfn $config(export_txt_header)
-				}
-			}		
-			
-			if {$config(export_activity)} {
-				if {$config(export_combine)} {
-					set afn [file join $config(export_dir) \
-						"A$info(export_start_s).$ext"]
-				} {
-					set afn [file join $config(export_dir) \
-						"A$info(export_start_s)\_$id\.$ext"]
-				}
-				LWDAQ_print $t "Exporting activity of channel\
-					$id at $sps SPS to $afn."
-				if {[file exists $afn]} {
-					LWDAQ_print $t \
-						"WARNING: Deleting existing [file tail $afn]."
-					file delete $afn
-				}
-				if {!$config(export_combine) && ($config(export_format) == "EDF")} {
-					LWDAQ_print $t "Creating EDF file [file tail $afn]."
-					EDF_create $afn $config(play_interval) \
-						"[set id]a $config(tracker_sample_rate)" $info(export_start_s)
-				}
-				if {!$config(export_combine) \
-					&& ($config(export_format) == "TXT") \
-					&& ($config(export_txt_header) != "")} {
+				if {$config(export_activity)} {
 					LWDAQ_print $t "Creating TXT file [file tail $afn]."
 					LWDAQ_print $afn $config(export_txt_header)
 				}
-			}
-		}
-		
-		# If we are exporting to one EDF file, create the header for all signals now.
-		if {$config(export_combine) && ($config(export_format) == "EDF")} {
-			if {$config(export_signal)} {
-				LWDAQ_print $t "Creating EDF file [file tail $sfn]."
-				EDF_create $sfn $config(play_interval) $signals $info(export_start_s)
-			}
-			if {$config(export_activity)} {
-				LWDAQ_print $t "Creating EDF file [file tail $afn]."
-				set headings ""
-				foreach {id sps} $signals {
-					append headings "[set id]a $config(tracker_sample_rate) "
+				if {$config(export_centroid) || $config(export_powers)} {
+					LWDAQ_print $t "Creating TXT file [file tail $tfn]."
+					LWDAQ_print $tfn $config(export_txt_header)
 				}
-				EDF_create $afn $config(play_interval) $headings $info(export_start_s)
 			}
-		}
-
-		# If we are exporting to one TXT file, create the header for all signals now.
-		if {$config(export_combine) \
-				&& ($config(export_format) == "TXT") \
-				&& ($config(export_txt_header) != "")} {
-			if {$config(export_signal)} {
-				LWDAQ_print $t "Creating TXT file [file tail $sfn]."
-				LWDAQ_print $sfn $config(export_txt_header)
-			}
-			if {$config(export_activity)} {
-				LWDAQ_print $t "Creating TXT file [file tail $afn]."
-				LWDAQ_print $afn $config(export_txt_header)
-			}
-			if {$config(export_centroid) || $config(export_powers)} {
-				LWDAQ_print $t "Creating TXT file [file tail $tfn]."
-				LWDAQ_print $tfn $config(export_txt_header)
-			}
+		
+			# Enable position calculation if required, and close the tracker window
+			# if its open. 
+			if {$config(export_activity) \
+					|| $config(export_centroid) \
+					|| $config(export_powers)} {
+				set config(alt_calculate) "1"
+				if {[winfo exists $info(tracker_window)]} {
+					LWDAQ_print $t "WARNING: Closing the Neurotracker\
+						panel to accelerate export."
+					destroy $info(tracker_window)
+				}
+			} 
 		}
 		
-		# Enable position calculation if required, and close the tracker window
-		# if its open. 
-		if {$config(export_activity) \
-				|| $config(export_centroid) \
-				|| $config(export_powers)} {
-			set config(alt_calculate) "1"
-			if {[winfo exists $info(tracker_window)]} {
-				LWDAQ_print $t "WARNING: Closing the Neurotracker\
-					panel to accelerate export."
-				destroy $info(tracker_window)
-			}
-		} 
-	
 		# Stop stray left-over processes, then clear the process list and the
 		# video file list.
 		foreach pid $info(export_epl) {
@@ -5101,74 +5116,79 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		if {$config(export_video)} {
 			LWDAQ_print $t "Looking for video files in $config(video_dir)."
 			set vt $info(export_start_s)
+			set tclen 0
+			set tvlen 0
 			while {$vt < $info(export_end_s)} {
-				set vfi [Neuroplayer_video_action "Seek" $vt 0]
+				set vfi [Neuroplayer_video_action "Seek" $vt 1]
 				if {$vfi == ""} {
 					LWDAQ_print $t "ERROR: Cannot find video for time $vt s,\
 						aborting export."
-					LWDAQ_post "Neuroexporter_export Stop"
+					LWDAQ_post "Neuroexporter_export Abort"
 					return "ERROR"
 				}
-				scan $vfi %s%d%f%f vfn vsk vlen clen
-LWDAQ_print $t "[file tail $vfn] $vsk $vlen $clen" green
-				if {$info(export_end_s) - $vt > round($vlen - $vsk)} {
-					set vdur [expr round($vlen - $vsk)]
+				scan $vfi %s%d%f%f vfn tseek vlen clen
+				if {$info(export_end_s) - $vt > $clen - $tseek} {
+					set vdur [expr round($clen - $tseek)]
 				} {
-					set vdur [expr $info(export_end_s) - $vt]
+					set vdur [expr round($info(export_end_s) - $vt)]
 				}
 				if {$vdur <= 0} {
-					LWDAQ_print $t "ERROR: Internal problem\
-						vdur=$vdur vsk=$vsk vlen=$vlen\
-						vt=$vt end_s=$info(export_end_s)\
-						vf=[file tail $vfn], aborting export."
-					LWDAQ_post "Neuroexporter_export Stop"
-					return "ERROR"
+					LWDAQ_print $t "WARNING: Only $tclen s of video available,\
+						requested [expr $config(export_duration)] s,\
+						proceeding anyway."
+					break
 				}
+				set tclen [expr $tclen + $vdur]
 
-				if {$vdur < round($vlen)} {
+				if {$vdur < $clen} {
 					cd $config(export_dir)
 					set nvfn [file join $config(export_dir) V$vt\.mp4]
 					if {[file exists $nvfn]} {
-						LWDAQ_print $t \
-							"Deleting existing [file tail $nvfn]."				
+						LWDAQ_print $t "Deleting existing [file tail $nvfn]."				
 						file delete $nvfn
 					}
-					if {$vsk > 0} {
-						LWDAQ_print $t "Will include final $vdur s of\
-							[file tail $vfn] in export video."
-					} {
-						LWDAQ_print $t "Will include first $vdur s of\
-							[file tail $vfn] in export video."
+					if {$tseek > 0} {
+						set tseek [expr $vlen - $vdur]
+					}
+					if {$tseek < 0} {
+						set tseek 0
 					}
 					set pid [exec $info(ffmpeg) -nostdin -loglevel error \
-						-ss $vsk -t $vdur -i [file nativename $vfn] \
-						[file nativename $nvfn] > export_log.txt &]
+						-ss $tseek -t $vdur -i [file nativename $vfn] \
+						-c:v copy [file nativename $nvfn] > export_log.txt &]
 					lappend info(export_epl) $pid
-					LWDAQ_print $t "Process $pid is copying these\
-						$vdur s to [file tail $nvfn] in export directory."
 					lappend info(export_vfl) $nvfn
+					set tvlen [expr $tvlen + $vlen - $tseek]
 				} {
-					LWDAQ_print $t "Will include all\
-						[format %.2f $vlen] s of [file tail $vfn] in export video."	
 					lappend info(export_vfl) $vfn
+					set tvlen [expr $tvlen + $vlen]
 				}			
+				LWDAQ_print $t "[file tail $vfn]: Using $tseek s to\
+					[expr $tseek + $vdur] s = $vdur s,\
+					vlen=[format %.2f $vlen],\
+					tvlen=[format %.2f $tvlen],\
+					clen=[format %.0f $clen],\
+					tclen=[format %.0f $tclen]."
 				set vt [expr $vt + $vdur]
 				LWDAQ_support
 			}
-			LWDAQ_print $t "Video file list complete,\
-				copying start and end segments in background."
 		}
 	
-		LWDAQ_print $t "Starting export of\
-			[expr $config(export_duration)] s from NDF archives."
-		if {$config(video_enable)} {
-			LWDAQ_print $t "WARNING: Disabling video playback to accelerate export."
-			set config(video_enable) 0
-		}
+		if {$play_ndf} {
+			LWDAQ_print $t "Starting export of\
+				[expr $config(export_duration)] s from NDF archives."
+			if {$config(video_enable)} {
+				LWDAQ_print $t "WARNING: Disabling video playback to accelerate export."
+				set config(video_enable) 0
+			}
 		
-		set info(export_state) "Play"	
-		set config(play_time) $archive_start_time
-		Neuroplayer_command "Play"
+			set info(export_state) "Play"	
+			set config(play_time) $archive_start_time
+			Neuroplayer_command "Play"
+		} {
+			set info(export_state) "Wait"
+			LWDAQ_post "Neuroexporter_export Video"
+		}
 
 		return "SUCCESS"
 	}
@@ -5413,7 +5433,8 @@ LWDAQ_print $t "[file tail $vfn] $vsk $vlen $clen" green
 				}
 			}
 			
-			LWDAQ_print $t "Video extractions complete."
+			LWDAQ_print $t "Concatinating [llength $info(export_vfl)] video files,\
+				please wait..."
 
 			set info(export_state) "Concat"
 			cd $config(export_dir)
@@ -5427,25 +5448,29 @@ LWDAQ_print $t "[file tail $vfn] $vsk $vlen $clen" green
 				-nostdin -f concat -safe 0 -loglevel error \
 				-i concat_list.txt -c copy \
 				[file nativename $tempfile] > concat_log.txt &]
-			LWDAQ_print $t "Process $info(export_epl) performing\
-				video concatination into temporary file."
 			LWDAQ_post "Neuroexporter_export Video"
 			return "SUCCESS"
 		}
 
-		# If we are concatinating, we are waiting for the concatination to complete.
+		# In the concatination state, we are watching the concatination process. When
+		# it completes, we clean up.
 		if {$info(export_state) == "Concat"} {
 			if {[LWDAQ_process_exists $info(export_epl)]} {
 				LWDAQ_post "Neuroexporter_export Video"
 				return "SUCCESS"
 			}
-			set efn [lindex $info(export_vfl) 0]
+			set first_file [file join $config(export_dir) \
+				[file tail [lindex $info(export_vfl) 0]]]
 			set tempfile [file join $config(export_dir) temp.mp4]
-			catch {file delete $efn}
-			catch {file delete [lindex $info(export_vfl) end]}
-			file rename $tempfile $efn
-			LWDAQ_print $t "Concatination of [llength $info(export_vfl)]\
-				video files into [file tail $efn] complete."
+			catch {file delete $first_file}
+			file rename $tempfile $first_file
+			
+			set last_file [file join $config(export_dir) \
+				[file tail [lindex $info(export_vfl) end]]]
+			catch {file delete $last_file}
+			
+			LWDAQ_print $t "Created [file tail $first_file],\
+				actual length [Neuroplayer_video_duration $first_file] s."
 
 			cd $config(export_dir)
 			catch {file delete concat_list.txt}
@@ -5566,7 +5591,8 @@ proc Neuroplayer_clock_convert {datetime} {
 		if {[catch {
 			set newformat [clock scan $datetime -format $config(datetime_format)]
 		} error_result]} {
-			Neuroplayer_print "ERROR: Invalid clock string, \"$datetime\"."
+			Neuroplayer_print "ERROR: Invalid clock string, \"$datetime\".\
+				Must be \"DD-MMM-YYYY HH:MM:SS\"."
 			set newformat 0
 		}
 	}
@@ -7677,14 +7703,14 @@ proc Neuroplayer_video_duration {{fn ""}} {
 		if {![file exists $fn]} {return -1}
 	}
 	
-	catch {[exec $info(ffmpeg) -i $fn]} answer
+	catch {[exec $info(ffmpeg) -i [file normalize $fn]]} answer
 	if {[regexp {Duration: ([0-9]*):([0-9]*):([0-9\.]*)} $answer match hr min sec]} {
 		scan $hr %d hr
 		scan $min %d min
 		scan $sec %f sec
 		set duration [expr $hr*3600+$min*60+$sec]
 	} else {
-		return -1
+		set duration -1
 	}
 	
 	return $duration
@@ -7801,18 +7827,9 @@ proc Neuroplayer_video_action {cmd datetime length} {
 	# requested interval is contained in a video we have already read
 	# from the video directory and assessed previously.
 	set vf ""
-	set min_length [format %.1f [expr $info(video_min_interval)*0.5]]
-	set camera_id [file tail $config(video_dir)]
 	foreach entry $info(video_file_cache) {
-		set fn [lindex $entry 0]
-		set vtime [lindex $entry 1]
-		set vlen [lindex $entry 2]
-		set clen [lindex $entry 3]
-		set id [file tail [file dirname $fn]]
-		if {($id == $camera_id) \
-			&& ($vtime <= $datetime) \
-			&& ($vtime + $vlen >= $datetime + $length) \
-			&& ($vtime + $vlen - $datetime >= $min_length)} {
+		scan $entry %s%d%f%f fn vtime vlen clen
+		if {($vtime <= $datetime) && ($vtime + $clen >= $datetime + $length)} {
 			set vf $fn
 			break
 		}
@@ -7822,16 +7839,17 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		Neuroplayer_print "Using cached video file $vf." verbose
 	}
 	
-	# If we have not found a file that includes the start of the requested interval, 
-	# look for one in the file system.
+	# If we have not found a file that includes the start of the requested
+	# interval, look for one in the file system.
 	if {$vf == ""} {
 	
-		# Make a list of video files in the camera directory.
+		# Make a list of video files in the camera directory and sort them
+		# in chronological order.
 		set fl [LWDAQ_find_files $config(video_dir) V??????????.mp4]
 		set fl [LWDAQ_sort_files $fl]
 	
-		# Find the newest file that begins before the start of our interval. Determine
-		# the start time of the next file in the list.
+		# Find the newest file that begins before or at the start of our
+		# interval. Determine the start time of the next file in the list.
 		set vtime 0
 		set ntime 0
 		foreach fn $fl {
@@ -7853,39 +7871,42 @@ proc Neuroplayer_video_action {cmd datetime length} {
 			return ""
 		}
 
-		# Calculate the video file length.
+		# Calculate the actual video file length.
 		set vlen [Neuroplayer_video_duration $vf]
 
-		# Check that the video file includes the start of the requested interval.
-		set gap [expr $datetime - ($vtime + $vlen)]
+		# Calculate the length of time between the start of this video file and
+		# the start of the next video file, if one exists. We call this length
+		# the "correct length" of the video. If there is no subsequent file, set
+		# set the correct length equal to the duration, rounded to the nearest
+		# second.
+		if {$ntime > 0} {
+			set clen [expr $ntime - $vtime]
+		} {
+			set clen [expr round($vlen)]
+		}
+		
+		# Check that the video file includes the interval start.
+		set gap [expr $datetime - ($vtime + $clen)]
 		if {$gap > 0} {
-			Neuroplayer_print "WARNIMG: File [file tail $vf], length $vlen s,\
+			Neuroplayer_print "WARNIMG: File [file tail $vf], length $clen s,\
 				ends $gap s before start of requested interval."
 		}
 		
 		# Check that the video file contains the interval end.
-		set missing [expr ($datetime + $length) - ($vtime + $vlen)]
-		if {$missing > $info(video_frame_time)} {
-			Neuroplayer_print "WARNING: File [file tail $vf], length $vlen s,\
+		set missing [expr ($datetime + $length) - ($vtime + $clen)]
+		if {$missing > 0} {
+			Neuroplayer_print "WARNING: File [file tail $vf], length $clen s,\
 				ends $missing s before end of requested interval."
 		}
 		
-		# Calculate the correct length of the video file to match up with the
-		# start date of the next video file, using zero as a flag for when
-		# there is no next file.
-		if {$ntime > 0} {
-			set clen [expr $ntime - $vtime]
-		} {
-			set clen 0
-		}
-
 		# Add the video file to the cache. Curtail the cache to a finite length.
-		lappend info(video_file_cache) [list $vf $vtime $vlen $clen]
-		if {[llength $info(video_file_cache)] > $info(max_video_files)} {
-			set info(video_file_cache) [lrange $info(video_file_cache) 1 end]
+		if {($gap <= 0) && ($missing <= 0)} {
+			lappend info(video_file_cache) "$vf $vtime $vlen $clen"
+			if {[llength $info(video_file_cache)] > $info(max_video_files)} {
+				set info(video_file_cache) [lrange $info(video_file_cache) 10 end]
+			}
+			Neuroplayer_print "Added $vf to video cache." verbose
 		}
-
-		Neuroplayer_print "Adding video file $vf to video cache." verbose
 	}
 
 	# We calculate the time within the video recording that corresponds to the 
@@ -7914,7 +7935,9 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		catch {close $info(video_channel)}
 		
 		# Create Mplayer window with channel to write in commands and
-		# read back answers.
+		# read back answers. For a camera identifier, we are going to 
+		# use the video directory tail.
+		set camera_id [file tail $config(video_dir)]
 		if {[winfo parent $info(window)] == ""} {
 			set title "Camera $camera_id in [wm title .]"
 		} {
