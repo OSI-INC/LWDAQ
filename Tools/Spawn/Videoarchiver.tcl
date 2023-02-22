@@ -82,7 +82,7 @@ proc Videoarchiver_init {} {
 	set config(stream_codec) "MJPEG"
 	set config(compression_num_cpu) "3"
 	set config(seg_length_s) "2"
-	set config(min_seg_frac) "0.9"
+	set config(min_seg_frac) "0.95"
 
 	# Fixed IP addresses for default configurations and camera streaming.
 	set info(local_ip_addr) "127.0.0.1"
@@ -168,7 +168,7 @@ echo "SUCCESS"
 	# The following parameters will appear in the configuration panel, so the
 	# user can modify them by hand.
 	set config(transfer_period_s) "60"
-	set config(sync_period_s) "600"
+	set config(sync_period_s) "3600"
 	set info(prev_sync_time) "0"
 	set config(transfer_max_files) "20"
 	set config(record_length_s) "600"
@@ -1633,6 +1633,13 @@ proc Videoarchiver_transfer {n {init 0}} {
 	# Get IP address and open an interface socket.
 	set ip [Videoarchiver_ip $n]
 
+	# Get particulars of camera. We rarely need to use them, but we deduce
+	# them here to make sure we have them.
+	set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
+	if {$sensor_index < 0} {set sensor_index 0}
+	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
+		version width height framerate crf sl
+
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
 		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
@@ -1736,25 +1743,29 @@ proc Videoarchiver_transfer {n {init 0}} {
 					set result [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $result]} {error $result}
 					
-					# If we are initializing, don't save this segment to disk. Clear
-					# the initialize flag, clear the most recent segment name, set
-					# the lag to a question mark and continue.
+					# If we are initializing, don't save this segment to disk. Instead
+					# we create a blank image, clear the file time to zero, set the
+					# lag to unknown, and clear the init flat.
 					if {$init} {
-						set lag "?"
-						set init 0
 						set info(cam$n\_ftime) 0
+						set lag "?"
+						exec $info(ffmpeg) -loglevel error -f lavfi \
+							-i color=size=$width\x$height\:rate=$framerate\:color=black \
+							-c:v libx264 -t $config(seg_length_s) Blank.mp4 \
+							> transfer_log.txt					
+						set init 0
 						continue
 					}
 
-					# Initialize the file time and the number of segments that have been
-					# transferred into the file.
+					# If the file time is zero, set it to the segment file time and reset
+					# the number of segments loaded into the recording file.
 					set when "checking segment"
 					if {$info(cam$n\_ftime) == 0} {
 						set info(cam$n\_fsegs) 0
 						if {[regexp {V([0-9]{10})} $sf match ftime]} {
 							set info(cam$n\_ftime) $ftime
 						} {
-							error "Unexpected file \"$sf\""					
+							error "$info(cam$n\_id) Unexpected file \"$sf\""					
 						}
 					}
 					
@@ -1777,21 +1788,6 @@ proc Videoarchiver_transfer {n {init 0}} {
 						set duration "0.00"
 					}
 					
-					# Issue a warning if the segment length is less too short or too
-					# long.
-					if {$duration < $config(seg_length_s)*$config(min_seg_frac)} {
-						LWDAQ_print $info(text) "$info(cam$n\_id)\
-							Segment $sf duration $duration s,\
-							extending to $config(seg_length_s),\
-							[clock format [clock seconds]]."					
-					} 
-					if {$duration > $config(seg_length_s)/$config(min_seg_frac)} {
-						LWDAQ_print $info(text) "$info(cam$n\_id)\
-							Segment $sf duration $duration s,\
-							shortening to $config(seg_length_s),\
-							[clock format [clock seconds]]."					
-					}	
-					
 					# Calculate the time lag between the current time and the
 					# timestamp of the last segment we downloaded and saved.
 					set when "reporting"
@@ -1809,6 +1805,53 @@ proc Videoarchiver_transfer {n {init 0}} {
 							[format %.1f [expr 0.001*$size]] kByte, $duration s,\
 							lag $lag s, $freq GHz, $temp C."
 					}				
+
+					# If a segment is too short, we append the blank video to
+					# the end, then extract a segment-length video from the
+					# result, with which we replace the original segment. We
+					# find that ffmpeg adds two frames to the video it extracts,
+					# so we reduce time value we pass to ffmpeg for the
+					# extraction by two frames. The result is a segment of the
+					# correct length.
+					if {$duration < $config(seg_length_s)*$config(min_seg_frac)} {
+						set st [clock milliseconds]
+						set ifl [open transfer_list.txt w]
+						puts $ifl "file $sf"
+						puts $ifl "file Blank.mp4"
+						close $ifl
+						exec $info(ffmpeg) -nostdin -loglevel error \
+							-f concat -safe 0 -i transfer_list.txt -c copy \
+							Long_$sf > transfer_log.txt
+						file delete $sf
+						set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
+						exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
+							-i Long_$sf -c copy Lengthened_$sf > transfer_log.txt
+						file delete Long_$sf
+						file rename Lengthened_$sf $sf
+						if {$config(verbose)} {
+							LWDAQ_print $info(text) "$info(cam$n\_id)\
+								Extended segment $sf duration from\
+								$duration s to [format %.2f $config(seg_length_s)] s,\
+								in [expr [clock milliseconds] - $st] ms."
+						}
+					} 
+
+					# If a segment is too long, we extract the correct length and
+					# use this to replace the original segment.
+					if {$duration > $config(seg_length_s)/$config(min_seg_frac)} {
+						set st [clock milliseconds]
+						set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
+						exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
+							-i $sf -c copy Shortened_$sf > transfer_log.txt
+						file delete $sf
+						file rename Shortened_$sf $sf
+						if {$config(verbose)} {
+							LWDAQ_print $info(text) "$info(cam$n\_id)\
+								Shortened segment $sf duration from\
+								$duration s to [format %.2f $config(seg_length_s)] s,\
+								in [expr [clock milliseconds] - $st] ms."
+						}
+					}	
 				}
 				
 				# Close the socket.
