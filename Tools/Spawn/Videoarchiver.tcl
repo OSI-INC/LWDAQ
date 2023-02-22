@@ -81,7 +81,8 @@ proc Videoarchiver_init {} {
 	set config(compression_codec) "libx264"
 	set config(stream_codec) "MJPEG"
 	set config(compression_num_cpu) "3"
-	set config(segment_length) "2"
+	set config(seg_length_s) "2"
+	set config(min_seg_frac) "0.9"
 
 	# Fixed IP addresses for default configurations and camera streaming.
 	set info(local_ip_addr) "127.0.0.1"
@@ -167,11 +168,12 @@ echo "SUCCESS"
 	# The following parameters will appear in the configuration panel, so the
 	# user can modify them by hand.
 	set config(transfer_period_s) "60"
+	set config(sync_period_s) "600"
+	set info(prev_sync_time) "0"
 	set config(transfer_max_files) "20"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
 	set config(restart_wait_s) "30"
-	set config(min_seg_size) "1.0"
 	
 	# Set the verbose compressor argument to have the compressors print input
 	# and output segment names to their log files. With two-second segments, we
@@ -459,7 +461,7 @@ proc Videoarchiver_query {n} {
 	if {[catch {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 			
-		foreach log {interface stream segmentation manager compression} {
+		foreach log {interface stream segmentation manager compressor} {
 			set lfn "$log\_log.txt"
 			LWDAQ_socket_write $sock "getfile $lfn\n"
 			set size [LWDAQ_socket_read $sock line]
@@ -1360,6 +1362,7 @@ proc Videoarchiver_compress {n} {
 		# Start the compression manager.
 		LWDAQ_socket_write $sock "exec /usr/bin/tclsh manager.tcl \
 			-framerate $framerate \
+			-seglen $config(seg_length_s) \
 			-codec $config(compression_codec) \
 			-crf $crf \
 			-preset veryfast \
@@ -1414,14 +1417,16 @@ proc Videoarchiver_segment {n} {
 		
 		# Start the ffmpeg segmenter as a background process. We assume the segmenter 
 		# will be started after streaming and compression engines are already running. 
+		# We don't specify a frame rate for the incoming stream: we want ffmpeg to take
+		# however many frames arrive in each segment time and write them to disk with 
+		# a new time-stamped file name.
 		LWDAQ_socket_write $sock "exec ffmpeg \
 			-nostdin \
 			-loglevel error \
 			-i tcp://$info(local_ip_addr)\:$info(tcp_port) \
-			-framerate $framerate \
 			-f segment \
 			-segment_atclocktime 1 \
-			-segment_time $config(segment_length) \
+			-segment_time $config(seg_length_s) \
 			-reset_timestamps 1 \
 			-codec copy \
 			-segment_list segment_list.txt \
@@ -1437,7 +1442,7 @@ proc Videoarchiver_segment {n} {
 		# Close socket and report.
 		LWDAQ_socket_close $sock
 		LWDAQ_print $info(text) "$info(cam$n\_id) Started segmentation process\
-			on camera with segment length $config(segment_length) s."
+			on camera with segment length $config(seg_length_s) s."
 	} message]} {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
 		catch {LWDAQ_socket_close $sock}
@@ -1532,8 +1537,6 @@ proc Videoarchiver_record {n} {
 	# Start transfer of files from camera with concatination.
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting remote transfer process\
 		 with period $config(transfer_period_s) s." 
-	set info(cam$n\_ttime) [clock seconds]
-	set info(cam$n\_file) [file join $info(cam$n\_dir) V0000000000.mp4]
 	LWDAQ_post [list Videoarchiver_transfer $n 1]
 
 	# We can now say that we are recording, and return a success flag.
@@ -1737,10 +1740,22 @@ proc Videoarchiver_transfer {n {init 0}} {
 					# the initialize flag, clear the most recent segment name, set
 					# the lag to a question mark and continue.
 					if {$init} {
-						set config(cam$n\_stime) 0
 						set lag "?"
 						set init 0
+						set info(cam$n\_ftime) 0
 						continue
+					}
+
+					# Initialize the file time and the number of segments that have been
+					# transferred into the file.
+					set when "checking segment"
+					if {$info(cam$n\_ftime) == 0} {
+						set info(cam$n\_fsegs) 0
+						if {[regexp {V([0-9]{10})} $sf match ftime]} {
+							set info(cam$n\_ftime) $ftime
+						} {
+							error "Unexpected file \"$sf\""					
+						}
 					}
 					
 					# Write the segment to disk.
@@ -1761,16 +1776,21 @@ proc Videoarchiver_transfer {n {init 0}} {
 					} else {
 						set duration "0.00"
 					}
-
-					# When verbose, issue a warning if the size is below a minimum.
-					if {$config(verbose)} {		
-						set size_kb [format %.1f [expr $size*0.001]]
-						if {$size_kb < $config(min_seg_size)} {
-							LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-								$sf size $size_kb kByte < $config(min_seg_size) kByte,\
-								[clock format [clock seconds]]."
-						}
-					}
+					
+					# Issue a warning if the segment length is less too short or too
+					# long.
+					if {$duration < $config(seg_length_s)*$config(min_seg_frac)} {
+						LWDAQ_print $info(text) "$info(cam$n\_id)\
+							Segment $sf duration $duration s,\
+							extending to $config(seg_length_s),\
+							[clock format [clock seconds]]."					
+					} 
+					if {$duration > $config(seg_length_s)/$config(min_seg_frac)} {
+						LWDAQ_print $info(text) "$info(cam$n\_id)\
+							Segment $sf duration $duration s,\
+							shortening to $config(seg_length_s),\
+							[clock format [clock seconds]]."					
+					}	
 					
 					# Calculate the time lag between the current time and the
 					# timestamp of the last segment we downloaded and saved.
@@ -1842,55 +1862,49 @@ proc Videoarchiver_transfer {n {init 0}} {
 			}
 		}
 	}
-	
+
 	# Compose a list of local segments in order oldest to newest.
-	set seg_list [lsort -dictionary [glob -nocomplain V*.mp4]]
-	
+	set seg_list [lsort -dictionary [glob -nocomplain V*.mp4]]	
+
 	if {[catch {
-		# If we have one or more segments available for transfer, calculate the
-		# time remaining to complete the existing recording file. If this time
-		# is zero or less, or if there is no recording file created yet, we copy
-		# the first available segment into the recording directory to act as the
-		# new recording file.
-		if {[llength $seg_list] > 0} {
+		# If we have two or more segments, it might be time to create a new recording
+		# file by moving this segment into the recording directory.
+		if {[llength $seg_list] > 1} {
+
 			# Flash the background of the state label.
 			LWDAQ_set_bg $info(cam$n\_state_label) yellow
 			
-			# We look at the first file in the list, which is the oldest file.
-			# We want to know how much video time remains to complete the
-			# current recording file from the start time of this oldest segment. 
-			set when "calculating time remaining"
-			set infile [lindex $seg_list 0]
-			if {![regexp {V([0-9]{10})} $infile match segment_time]} {
-				catch {file delete $infile}
-				error "Unexpected file \"$infile\""
+			# Calculate the number of segments to be included in each recording
+			# file, and form the name of the current recording file. Determine
+			# the minumum number of segments we need to transfer later on.
+			set when "calculating constants"
+			set fsegs_full [expr $config(record_length_s) / $config(seg_length_s)]
+			set fname [file join $info(cam$n\_dir) V$info(cam$n\_ftime)\.mp4]
+			set min_transfer_segs [expr \
+				$config(transfer_period_s) / $config(seg_length_s)]
+				
+			# If the existing recording file is complete, increment the
+			# recording file time by the recording length and reset the file
+			# segment counter.
+			if {$info(cam$n\_fsegs) == $fsegs_full} {
+				set info(cam$n\_ftime) [expr $info(cam$n\_ftime) \
+					+ $config(record_length_s)]
+				set info(cam$n\_fsegs) 0
 			}
-			set time_remaining [expr $config(record_length_s) \
-				- $segment_time + $info(cam$n\_rstart)]
-				
-			# If the recording file does not exist, or the time remaining in the
-			# existing recording file is zero or less, we create a new file in
-			# the recording directory by moving the first segment into the
-			# recording directory.
-			if {![file exists $info(cam$n\_file)] || ($time_remaining <= 0)} {
+			set fname [file join $info(cam$n\_dir) V$info(cam$n\_ftime)\.mp4]
 			
+			# If the recording file does not exist, create it out of the oldest
+			# segment.
+			if {![file exists $fname]} {			
+				set when "creating recording file"
 				if {$config(verbose)} {
-					LWDAQ_print $info(text) "$info(cam$n\_id) Creating $infile,\
-						time [clock format $segment_time]."
+					LWDAQ_print $info(text) "$info(cam$n\_id)\
+						Creating [file tail $fname],\
+						start [clock format $info(cam$n\_ftime)]."
 				}
-				set info(cam$n\_file) [file join $info(cam$n\_dir) $infile]
-				set info(cam$n\_rstart) $segment_time
-				set info(cam$n\_prevseg) $infile
-				file rename $infile $info(cam$n\_file)
-				set info(cam$n\_ttime) [clock seconds]
+				file rename [lindex $seg_list 0] $fname
+				set info(cam$n\_fsegs) 1
 				
-				# If we are still recording, we take take this opportunity to
-				# synchronize the camera clock. Otherwise, don't bother because
-				# we have stopped transferring segments, and this may be because
-				# of a communication problem, which would result in the
-				# synchronization failing.
-				if {$info(cam$n\_state) == "Record"} {Videoarchiver_synchronize $n}
-	
 				# Delete the first segment from the segment list, now that it
 				# has been moved.
 				set seg_list [lrange $seg_list 1 end]
@@ -1902,13 +1916,12 @@ proc Videoarchiver_transfer {n {init 0}} {
 		# attempt a transfer if there is only one segment available, because
 		# this segment may be loaded into the recording monitor play list.
 		if {[llength $seg_list] > 1} {
-								
-			# If the time since our previous transfer is greater than or equal
-			# to transfer_period_s, we transfer segments into the recording
-			# file. And if the state of the camera is no longer Record, we
-			# finish up by transferring segments. 
-			if {([clock seconds] - $info(cam$n\_ttime) > $config(transfer_period_s)) \
-				|| ($info(cam$n\_state) != "Record")} {
+		
+			# If we have the minimum number of segments to make up the transfer period,
+			# or if we have stopped recording, transfer all available segments into the
+			# recording file until it is complete or we run out of segments.
+			if { ($info(cam$n\_state) != "Record") \
+				|| ([llength $seg_list] > $min_transfer_segs)} {
 	
 				# Open a text file into which we are going to write a list of
 				# segments to transfer to the recording file.
@@ -1917,13 +1930,12 @@ proc Videoarchiver_transfer {n {init 0}} {
 	
 				# Here we must make sure that we give ffmpeg a native-format
 				# file path to the recording directory. We have to specify
-				# backslashes with double- backslashes in ffmpeg file lists, so
+				# backslashes with double-backslashes in ffmpeg file lists, so
 				# here we replace each backslash in the native name with two
 				# backslashes. We have to specify each backslash in the regsub
 				# command with two backslashes, so the resulting regular
 				# expression is as follows.
-				puts $ifl \
-					"file [regsub -all {\\} [file nativename $info(cam$n\_file)] {\\\\}]"
+				puts $ifl "file [regsub -all {\\} [file nativename $fname] {\\\\}]"
 				
 				# We go through the available segments, up to but not including
 				# the most recent segment, and check to see if it belongs in the
@@ -1931,23 +1943,10 @@ proc Videoarchiver_transfer {n {init 0}} {
 				# because this one may be loaded into the monitor.
 				set transfer_segments [list]
 				foreach infile [lrange $seg_list 0 end-1] {
-					if {![regexp {V([0-9]{10})} $infile match segment_time]} {
-						LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-							Deleting unexpected segment \"$infile\"."
-						catch {file delete $infile}
-						LWDAQ_post [list Videoarchiver_transfer $ip $init]
-						return "FAIL"	
-					}
-					set time_remaining [expr $config(record_length_s) \
-						- ($segment_time - $info(cam$n\_rstart))]
-					if {$time_remaining > 0} {
-						if {$info(cam$n\_prevseg) == $infile} {
-							LWDAQ_print $info(text) "WARNING: $info(cam$n\_id)\
-								Duplicate segment \"$infile\"."
-						}
+					if {$info(cam$n\_fsegs) < $fsegs_full} {
 						puts $ifl "file $infile"
 						lappend transfer_segments $infile
-						set info(cam$n\_prevseg) $infile						
+						incr info(cam$n\_fsegs)
 					} else {
 						break
 					}
@@ -1963,7 +1962,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 				if {$num_segments > 0} {
 					if {$config(verbose)} {
 						LWDAQ_print $info(text) "$info(cam$n\_id) Adding $num_segments\
-							segments to [file tail $info(cam$n\_file)]."
+							segments to [file tail $fname]."
 					}
 	
 					# We take this opportunity to remove excess lines from the
@@ -2004,21 +2003,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 					foreach infile $transfer_segments {
 						file delete $infile
 					}
-					file delete $info(cam$n\_file)
-					file rename $tempfile $info(cam$n\_file)
-					
-					# We mark this transfer time.
-					set info(cam$n\_ttime) [clock seconds]
-					
-					# Some code that allows us to study how long it takes to
-					# copy the existing file and concatinate new segments,
-					# delete the old file.
-					if {0} {
-						set duration_ms [expr [clock milliseconds] - $start_ms]
-						LWDAQ_print $info(text) "$num_segments\
-							[format %.2f [expr 0.000001*[file size $info(cam$n\_file)]]]\
-							$duration_ms"
-					}
+					file delete $fname
+					file rename $tempfile $fname
 				} else {
 					# We don't expect to end up here. If we have more than one
 					# segment, we must have at least one that we can transfer.
@@ -2027,6 +2013,15 @@ proc Videoarchiver_transfer {n {init 0}} {
 				}
 			}
 		} 
+		
+		# If we are still recording, and enough time has passed, re-synchronize the
+		# camera clock.		
+		if {($info(cam$n\_state) == "Record") \
+			&& ([clock seconds] >= $info(prev_sync_time) + $config(sync_period_s))} {
+			Videoarchiver_synchronize $n
+			set info(prev_sync_time) [clock seconds]
+		}
+
 	} message]} {
 		set error_description "ERROR: $message while $when for $info(cam$n\_id)."
 		LWDAQ_print $info(text) $error_description
@@ -2379,7 +2374,6 @@ proc Videoarchiver_draw_list {} {
 		# as other system parameters.
 		if {![info exists info(cam$n\_state)]} {
 			set info(cam$n\_state) "Idle"
-			set info(cam$n\_ttime) "0"
 			set info(cam$n\_lproc) "0"
 			set info(cam$n\_rstart) "0"
 			set info(cam$n\_prevseg) "V0000000000.mp4"
@@ -2555,9 +2549,7 @@ proc Videoarchiver_remove {n} {
 		unset info(cam$n\_rot)
 		unset info(cam$n\_sat)
 		unset info(cam$n\_ec)
-		unset info(cam$n\_file)
 		unset info(cam$n\_state)
-		unset info(cam$n\_ttime)
 		unset info(cam$n\_lproc)
 		unset info(cam$n\_rstart)
 		unset info(cam$n\_prevseg)
@@ -2597,9 +2589,7 @@ proc Videoarchiver_add_camera {} {
 	set info(cam$n\_sat) $info(default_sat)
 	set info(cam$n\_ec) $info(default_ec)
 	set info(cam$n\_dir) [file normalize "~/Desktop"]
-	set info(cam$n\_file) [file join $info(cam$n\_dir) V0000000000.mp4]
 	set info(cam$n\_state) "Idle"
-	set info(cam$n\_ttime) "0"
 	set info(cam$n\_lproc) "0"
 	set info(cam$n\_rstart) "0"
 	set info(cam$n\_prevseg) "V0000000000.mp4"
@@ -3351,6 +3341,7 @@ set verbose "0"
 set loopwait "100"
 set segdir "tmp"
 set maxage "40"
+set seglen "2"
 foreach {option value} $argv {
 	switch $option {
 		"-framerate" {
@@ -3385,6 +3376,9 @@ foreach {option value} $argv {
 		}
 		"-maxage" {
 			set maxage $value
+		}
+		"-seglen" {
+			set seglen $value
 		}
 		default {
 			puts "ERROR: Unknown option \"$option\"."
@@ -3469,6 +3463,7 @@ while {1} {
 			set pid [exec tclsh compressor.tcl \
 				-infile $tfn \
 				-framerate $framerate \
+				-seglen $seglen \
 				-codec $codec \
 				-crf $crf \
 				-preset $preset \
@@ -3552,6 +3547,9 @@ foreach {option value} $argv {
 		"-framerate" {
 			set framerate $value
 		}
+		"-seglen" {
+			set seglen $value
+		}
 		"-codec" {
 			set codec $value
 		}
@@ -3589,11 +3587,6 @@ if {![file exists $infile]} {
 # Use the timestamp to construct a working file name.
 set outfile [file dirname $infile]/W$timestamp\.mp4
 
-# Verbose reporting.
-if {$verbose} {
-	puts "Compressing $infile to $outfile..." 
-}
-
 # Compose the ffmpeg command.
 set cmd [list /usr/bin/ffmpeg \
 	-nostdin -loglevel error \
@@ -3613,6 +3606,7 @@ lappend cmd -force_key_frames "expr:eq(mod(n,20),0)" $outfile
 set start [clock milliseconds]
 if {[catch {exec {*}$cmd} message]} {
 	puts "ERROR: $message during compression of [file tail $infile]."
+	exit
 }
 set duration [expr [clock milliseconds] - $start]
 	
@@ -3815,7 +3809,7 @@ fi
 # 
 # Videoarchiver/test/segment.sh
 #
-# Take video stream and divide into one-second segments.
+# Take video stream and divide into segments.
 #
 ffmpeg -nostdin \
 	-loglevel error \
