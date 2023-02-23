@@ -600,9 +600,9 @@ proc Neuroplayer_init {} {
 #
 	set info(video_library_archive) \
 		"http://www.opensourceinstruments.com/ACC/Videoarchiver.zip"
-	set config(videoarchiver_dir) [file join $LWDAQ_Info(program_dir) Videoarchiver]
-	if {![file exists $config(videoarchiver_dir)]} {
-		set config(videoarchiver_dir) \
+	set info(videoarchiver_dir) [file join $LWDAQ_Info(program_dir) Videoarchiver]
+	if {![file exists $info(videoarchiver_dir)]} {
+		set info(videoarchiver_dir) \
 			[file normalize [file join $LWDAQ_Info(program_dir) .. Videoarchiver]]
 	}
 	set config(video_dir) $LWDAQ_Info(working_dir)
@@ -616,14 +616,15 @@ proc Neuroplayer_init {} {
 	set config(video_speed) "1.0"
 	set config(video_zoom) "1.0"
 	set info(video_state) "Idle"
-	set info(video_log) [file join $config(videoarchiver_dir) \
-		Scratch Neuroplayer_video_log.txt]
+	set info(video_scratch) [file join $info(videoarchiver_dir) Scratch]
+	set info(video_log) [file join $info(videoarchiver_dir) \
+		Scratch Neuroplayer_log.txt]
 	set config(video_enable) "0"
 	set info(video_process) "0"
 	set info(video_channel) "file1"
 	set info(video_file_cache) [list]
 	set info(max_video_files) "100"
-	set os_dir [file join $config(videoarchiver_dir) $LWDAQ_Info(os)]
+	set os_dir [file join $info(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
 		set info(ssh) [file join $os_dir ssh/ssh.exe]	
 		set info(ffmpeg) [file join $os_dir ffmpeg/bin/ffmpeg.exe]
@@ -5121,26 +5122,72 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			while {$vt < $info(export_end_s)} {
 				set vfi [Neuroplayer_video_action "Seek" $vt 1]
 				if {$vfi == ""} {
-					LWDAQ_print $t "ERROR: Cannot find video for time $vt s,\
-						aborting export."
+					LWDAQ_print $t "ERROR: Cannot find video for time $vt s."
 					LWDAQ_post "Neuroexporter_export Abort"
 					return "ERROR"
 				}
 				scan $vfi %s%d%f%f vfn tseek vlen clen
+				
 				if {$info(export_end_s) - $vt > $clen - $tseek} {
-					set vdur [expr round($clen - $tseek)]
+					set cdur [expr round($clen - $tseek)]
+				} {
+					set cdur [expr round($info(export_end_s) - $vt)]
+				}
+				if {$cdur <= 0} {
+					LWDAQ_print $t "ERROR: Cannot find video for time $vt s.
+					LWDAQ_post "Neuroexporter_export Abort"
+					return "ERROR"
+				}
+				set tclen [expr $tclen + $cdur]
+				
+				if {$info(export_end_s) - $vt > $vlen - $tseek} {
+					set vdur [expr round($vlen - $tseek)]
 				} {
 					set vdur [expr round($info(export_end_s) - $vt)]
 				}
-				if {$vdur <= 0} {
-					LWDAQ_print $t "WARNING: Only $tclen s of video available,\
-						requested [expr $config(export_duration)] s,\
-						proceeding anyway."
-					break
+				
+				if {$vdur < $cdur} {
+					set missing [expr $cdur - $vdur]
+					LWDAQ_print $t "[file tail $vfn]: Missing $missing s of video,\
+						will pad with blank frames."
+					LWDAQ_update
+					set width 820
+					set height 616
+					set duration 60
+					set framerate 20
+					set bfn [file join $info(video_scratch) \
+						B_$width\x$height\_$duration\s.mp4]
+					if {![file exists $bfn]} {
+						LWDAQ_print $t "[file tail $vfn]: Generating blank video to\
+							pad video files."
+						LWDAQ_update
+						exec $info(ffmpeg) -loglevel error -f lavfi \
+							-i color=size=$width\x$height\:rate=$framerate\:color=black \
+							-c:v libx264 -t $duration $bfn \
+							>> $info(video_log)	
+					}
+					cd $config(export_dir)
+					set clf [open concat_list.txt w]
+					puts $clf "file [regsub -all {\\} [file nativename $vfn] {\\\\}]"
+					while {$missing > 0} {
+						puts $clf "file [regsub -all {\\} [file nativename $bfn] {\\\\}]"
+						set missing [expr $missing - $duration]
+					}
+					close $clf			
+					LWDAQ_print $t "[file tail $vfn]: Padding video file."
+					LWDAQ_update
+					exec $info(ffmpeg) \
+						-nostdin -f concat -safe 0 -loglevel error \
+						-i concat_list.txt -c copy \
+						Padded_[file tail $vfn] > concat_log.txt
+					exec $info(ffmpeg) -nostdin -loglevel error \
+						-t $cdur \
+						-i Padded_[file tail $vfn] \
+						-c:v copy [file tail $vfn]
+					
 				}
-				set tclen [expr $tclen + $vdur]
 
-				if {$vdur < $clen} {
+				if {$cdur < $clen} {
 					cd $config(export_dir)
 					set nvfn [file join $config(export_dir) V$vt\.mp4]
 					if {[file exists $nvfn]} {
@@ -5148,13 +5195,13 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						file delete $nvfn
 					}
 					if {$tseek > 0} {
-						set tseek [expr $vlen - $vdur]
+						set tseek [expr $vlen - $cdur]
 					}
 					if {$tseek < 0} {
 						set tseek 0
 					}
 					set pid [exec $info(ffmpeg) -nostdin -loglevel error \
-						-ss $tseek -t $vdur -i [file nativename $vfn] \
+						-ss $tseek -t $cdur -i [file nativename $vfn] \
 						-c:v copy [file nativename $nvfn] > export_log.txt &]
 					lappend info(export_epl) $pid
 					lappend info(export_vfl) $nvfn
@@ -5163,13 +5210,12 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					lappend info(export_vfl) $vfn
 					set tvlen [expr $tvlen + $vlen]
 				}			
-				LWDAQ_print $t "[file tail $vfn]: Using $tseek s to\
-					[expr $tseek + $vdur] s = $vdur s,\
+				LWDAQ_print $t "[file tail $vfn]: Using $cdur s,\
+					tseek=$tseek,\
 					vlen=[format %.2f $vlen],\
-					tvlen=[format %.2f $tvlen],\
-					clen=[format %.0f $clen],\
-					tclen=[format %.0f $tclen]."
-				set vt [expr $vt + $vdur]
+					vdur=[format %.2f $vdur],\
+					clen=[format %.0f $clen]."
+				set vt [expr $vt + $cdur]
 				LWDAQ_support
 			}
 		}
@@ -7797,19 +7843,27 @@ proc Neuroplayer_video_watchdog {pid} {
 }
 
 #
-# Neuroplayer_video_action finds the video file and video internal time that
-# corresponds to the specified Unix time. The routine uses a cache of
-# recently-used video files to save time when searching for the correct file,
-# because the search requires that we get the length of the video calculated by
-# ffmpeg, and this calculation is time-consuming. If the video is not in the
-# cache, we use the video directory as a source of video files. We pass three
-# parameters to the routine: a command "cmd", a Unix time in seconds "datetime",
-# and an interval length in seconds "length". The command must be "Seek" or
-# "Play". The Seek command returns the name of the video containing the
-# datetime, the time within the video that corresponds to the datetime, the
-# duration of the video, and the duration that would match the end of the video
-# exactly with the start of the next video file in the video directory. The Play
-# command plays the video starting at datetime and going on for length seconds.
+# Neuroplayer_video_action looks for an entire video interval within a single
+# video file in the video cirectory. In response to the "Seek" command, the
+# routine returns the name of the video file containing the entire interval
+# (vf), the video time at which the interval begins (vseek), the length of video
+# in the file (vlen), and the length of video we expect the file to contain
+# given the timestamp in the name of the next file in the video directory
+# (clen). When we pass the "Play" command, the routine opens an MPlayer window
+# and plays the video interval. When we pass "Seek", the routine merely returns
+# the avormentioned values. If no such video containing the absolute time
+# exists, the routine returns an error. We specify the absolute time as a whole
+# number of Unix seconds. We specify the length of the interval in seconds. If
+# the video does not contain the entire video length, the routine returns an
+# error. When choosing the video time, the routine assumes that the start of the
+# video always corresponds to the absolute time specified in the video file
+# name. If the length of the video in the file is less than the correct length,
+# and the interval extends past the available video, the routine returns an
+# error. The routine uses a cache of recently-used video files to save time when
+# searching for the correct file, because the search requires that we get the
+# length of the video calculated by ffmpeg, and this calculation is
+# time-consuming. If the video is not in the cache, we use the video directory
+# as a source of video files.
 # 
 proc Neuroplayer_video_action {cmd datetime length} {
 	upvar #0 Neuroplayer_config config
@@ -7885,28 +7939,35 @@ proc Neuroplayer_video_action {cmd datetime length} {
 			set clen [expr round($vlen)]
 		}
 		
-		# Check that the video file includes the interval start.
+		# Add the video to our cache.
+		lappend info(video_file_cache) "$vf $vtime $vlen $clen"
+		if {[llength $info(video_file_cache)] > $info(max_video_files)} {
+			set info(video_file_cache) [lrange $info(video_file_cache) 10 end]
+		}
+		Neuroplayer_print "Added $vf to video cache." verbose
+		
+		# Check that the video file's correct length includes the interval start.
 		set gap [expr $datetime - ($vtime + $clen)]
 		if {$gap > 0} {
-			Neuroplayer_print "WARNIMG: File [file tail $vf], length $clen s,\
+			Neuroplayer_print "ERROR: File [file tail $vf], correct length $clen s,\
 				ends $gap s before start of requested interval."
+			return ""
 		}
 		
-		# Check that the video file contains the interval end.
+		# Check that the video file's correct length contains the interval end.
 		set missing [expr ($datetime + $length) - ($vtime + $clen)]
 		if {$missing > 0} {
-			Neuroplayer_print "WARNING: File [file tail $vf], length $clen s,\
+			Neuroplayer_print "ERROR: File [file tail $vf], correct length $clen s,\
 				ends $missing s before end of requested interval."
+			return ""
 		}
 		
-		# Add the video file to the cache. Curtail the cache to a finite length.
-		if {($gap <= 0) && ($missing <= 0)} {
-			lappend info(video_file_cache) "$vf $vtime $vlen $clen"
-			if {[llength $info(video_file_cache)] > $info(max_video_files)} {
-				set info(video_file_cache) [lrange $info(video_file_cache) 10 end]
-			}
-			Neuroplayer_print "Added $vf to video cache." verbose
-		}
+		# Check that the video's video actual length contains the interval end.
+		set missing [expr ($datetime + $length) - ($vtime + $vlen)]
+		if {$missing > 0} {
+			Neuroplayer_print "WARNING: File [file tail $vf], video length $clen s,\
+				ends $missing s before end of requested interval."
+		}		
 	}
 
 	# We calculate the time within the video recording that corresponds to the 
