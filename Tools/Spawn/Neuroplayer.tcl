@@ -561,7 +561,8 @@ proc Neuroplayer_init {} {
 #
 # The Playback Clock default settings.
 #
-	set config(datetime_format) {%d-%b-%Y %H:%M:%S}
+	set info(datetime_format) {%d-%b-%Y %H:%M:%S}
+	set info(datetime_error) "dd-mmm-yyyy hh:mm:ss"
 	set info(datetime_play_time) [Neuroplayer_clock_convert [clock seconds]]
 	set config(datetime_jump_to) [Neuroplayer_clock_convert [clock seconds]]
 	set info(datetime_start_time) [Neuroplayer_clock_convert [clock seconds]]
@@ -694,6 +695,31 @@ proc Neuroplayer_configure {} {
 }
 
 #
+# Neuroplayer_clock_convert converts between integer seconds and the datetime
+# format given in the configuration array. If the input is in integer seconds,
+# it gets converted into our datetime format. If the input is in the datetime
+# format, it gets converted into integer seconds. If the format is incorrect,
+# we return the value zero.
+#
+proc Neuroplayer_clock_convert {datetime} {
+	upvar #0 Neuroplayer_config config
+	upvar #0 Neuroplayer_info info
+	
+	if {[string is integer $datetime]} {
+		set newformat [clock format $datetime -format $info(datetime_format)]
+	} {
+		if {[catch {
+			set newformat [clock scan $datetime -format $info(datetime_format)]
+		} error_result]} {
+			set newformat 0
+			Neuroplayer_print "ERROR: Invalid time \"$datetime\",\
+				should be $info(datetime_error)."
+		}
+	}
+	return $newformat
+}
+
+#
 # Neuroplayer_print writes a line to the text window. If the color specified
 # is "verbose", the message prints only when the verbose flag is set, and in
 # black. Warnings and errors are always printed in the warning and error colors.
@@ -761,8 +787,6 @@ proc Neuroplayer_print_event {{event ""}} {
 
 	return $event
 }
-
-
 
 #
 # Neuroplayer_play_time_format stops the play time from becoming corrupted
@@ -4394,8 +4418,8 @@ proc Neurotracker_clear {} {
 }
 
 #
-# Neuroplayer_clock opens the Clock Panel, or raises it to the top 
-# for viewing if it already exists.
+# Neuroplayer_clock opens the Clock Panel, or raises it to the top for viewing
+# if it already exists.
 #
 proc Neuroplayer_clock {} {
 	upvar #0 Neuroplayer_info info
@@ -4918,7 +4942,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		# seconds in a day.
 		set info(export_state) "Start"
 		set info(export_run_start) [clock seconds]	
-		set info(export_start_s) [Neuroplayer_clock_convert $config(export_start)]
+		set start_s [Neuroplayer_clock_convert $config(export_start)]
+		if {$start_s == 0} {
+			LWDAQ_print $t "ERROR: Invalid time \"$config(export_start),\
+				should be $info(datetime_error)."
+			LWDAQ_post "Neuroexporter_export Abort"
+			return "ERROR"
+		}
+		set info(export_start_s) $start_s
 		set info(export_end_s) [expr $info(export_start_s) \
 			+ [expr $config(export_duration)]]
 		LWDAQ_print $t "\nStarting export of\
@@ -4934,6 +4965,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		LWDAQ_print $t "Export directory \"$config(export_dir)\"."		
 		if {![file exists $config(export_dir)]} {
 			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
+			LWDAQ_post "Neuroexporter_export Abort"
 			return "ERROR"
 		}
 
@@ -4964,7 +4996,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				set sps [lindex [split $channel :] 1]
 				if {$sps == ""} {
 					LWDAQ_print $t \
-						"ERROR: No sample rate specified for channel $id, aborting export."
+						"ERROR: No sample rate specified for channel $id,\
+							aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
 					return "ERROR"
 				}
@@ -5118,24 +5151,56 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			cd $info(video_export_scratch)
 			file delete -- {*}[glob -nocomplain *.mp4]
 			file delete -- {*}[glob -nocomplain *.txt]
-			
+							
 			# Search through video directory.
 			LWDAQ_print $t "Looking for video files in $config(video_dir)."
 			set vt $info(export_start_s)
 			set tclen 0
 			set tvlen 0
+			
+			# Search through the video directory for files that we can use to 
+			# construct the export video.
 			while {$vt < $info(export_end_s)} {
 			
+				# Break out of the loop if the state is forced to Idle by an
+				# abort command.
+				if {$info(export_state) == "Idle"} {
+					return "ABORT"
+				}
+			
 				# Try to find a file containing time vt.
-				set vfi [Neuroplayer_video_action "Seek" $vt 1]
-				if {$vfi == ""} {
-					LWDAQ_print $t "ERROR: Video stops at $vt,\
-						leaving [expr $info(export_end_s)-$vt] s missing,\
-						aborting export."
+				set result [Neuroplayer_video_seek $vt 1]
+				if {[LWDAQ_is_error_result $result]} {
+					if {$vt == $info(export_start_s)} {
+						LWDAQ_print $t "ERROR: Video does not exist for start of export,\
+							aborting export."
+					} {
+						LWDAQ_print $t "ERROR: Video does not extend to end of export,\
+							aborting export."
+					}
 					LWDAQ_post "Neuroexporter_export Abort"
 					return "ERROR"
 				}
-				scan $vfi %s%d%f%f vfn tseek vlen clen
+				scan $result %s%d%f%f vfn tseek vlen clen
+				
+				# Determine the dimensions and frame rate of our video, using
+				# the first file. We assume all the files are the same.
+				if {$tclen == 0} {
+					catch {[exec $info(ffmpeg) -i [file normalize $fn]]} answer
+					if {[regexp {Duration: ([0-9]*):([0-9]*):([0-9\.]*)} $answer match hr min sec]} {
+						scan $hr %d hr
+						scan $min %d min
+						scan $sec %f sec
+						set duration [expr $hr*3600+$min*60+$sec]
+					} else {
+						set duration -1
+					}
+					
+					set width 820
+					set height 616
+					set duration 60
+					set framerate 20
+				}
 				
 				# Determine how much of the correct length of this file we need for
 				# the export.
@@ -5145,8 +5210,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					set cdur [expr round($info(export_end_s) - $vt)]
 				}
 				if {$cdur <= 0} {
-					LWDAQ_print $t "ERROR: Video stops at $vt,\
-						leaving [expr $info(export_end_s)-$vt] s missing,\
+					LWDAQ_print $t "ERROR: Video does not extend to end of export,\
 						aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
 					return "ERROR"
@@ -5158,7 +5222,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				# the padded file in our scratch directory.
 				if {round($vlen) < $clen} {
 					# There is a limit to how much padding we are prepared to do.
-					set missing [expr $clen - $vlen]
+					set missing [expr round($clen - $vlen)]
 					if {$missing > $config(video_pad_max)} {
 						LWDAQ_print $t "ERROR: Missing $missing s from video record,\
 							exceeds video_pad_max=$config(video_pad_max),\
@@ -5171,12 +5235,12 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						will pad with blank frames to correct length $clen s."
 					LWDAQ_update
 					
-					# Determine dimensions and framerate of video.
-					set width 820
-					set height 616
-					set duration 60
-					set framerate 20
-					
+					# When we extract our replacement video with ffmpeg, we find by
+					# observation that we see two extra frames in the output. So we
+					# reduce the duration we pass to ffmpeg by the length of two 
+					# frames.
+					set dur [format %.3f [expr $clen-2.0/$framerate]]
+
 					# Check to see if the blank file exists. If not, create the blank
 					# file and store it in the scratch area.
 					if {![file exists Blank.mp4]} {
@@ -5206,9 +5270,9 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						
 					# Extract the correct length from the padded video into a
 					# new segment in the scratch area. Use this file instead of
-					# the original.
+					# the original. 
 					exec $info(ffmpeg) -nostdin -loglevel error \
-						-t $clen -i Padded.mp4 -c:v copy \
+						-t $dur -i Padded.mp4 -c:v copy \
 						[file tail $vfn] >> $info(video_export_log)
 					set vfn [file tail $vfn]
 					file delete Padded.mp4
@@ -5223,36 +5287,57 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						will trim to correct length $clen."
 					LWDAQ_update
 
+					# Calculate duration that corrects for ffmpeg adding two frames
+					# to extracted video.
+					set dur [format %.3f [expr $clen-2.0/$framerate]]
+
 					# Copy the correct length into a new segment in the scratch
 					# area. Use this file instead of the original.
 					exec $info(ffmpeg) -nostdin -loglevel error \
-						-t $clen -i $vfn -c:v copy \
+						-t $dur -i [file nativename $vfn] -c:v copy \
 						Trimmed.mp4 >> $info(video_export_log)	
 					file rename Trimmed.mp4 [file tail $vfn]
 					set vfn [file tail $vfn]
 				}
 
-				# We are either going to use a portion of the file, or the entire
-				# file. If we use only a portion, we make a new segment in the
-				# scratch area.
+				# We are either going to use a portion of the file, or the
+				# entire file. If we use only a portion, we make a new segment
+				# in the scratch area. Such partial segments are either at the
+				# beginning or end of our export, so we call them "boundary
+				# segments".
 				if {$cdur < $clen} {
-					set nvfn V$vt\.mp4
-					if {$tseek > 0} {
-						set tseek [expr $vlen - $cdur]
+					set nvfn Boundary_V$vt\.mp4
+					if {round($tseek) > 0} {
+						set tseek [expr $clen - $cdur]
 					}
-					if {$tseek < 0} {
+					if {round($tseek) <= 0} {
 						set tseek 0
 					}
+					LWDAQ_print $t "[file tail $vfn]: Using $cdur s,\
+						from $tseek s to [expr $tseek + $cdur] s,\
+						vlen=$vlen, clen=$clen, tclen=$tclen\."
+					set dur [format %.3f [expr $cdur-2.0/$framerate]]
 					exec $info(ffmpeg) -nostdin -loglevel error \
-						-ss $tseek -t $cdur -i [file nativename $vfn] \
-						-c:v copy $nvfn >> $info(video_export_log)	
-					lappend info(export_vfl) $nvfn
+						-ss $tseek -t $dur -i [file nativename $vfn] \
+						-c:v copy $nvfn >> $info(video_export_log)
+						
+					# We now have a file Extracted_V$vt\.mp4. We want to change
+					# the name to V$vt\.mp4 in the scratch directory. But we may
+					# have created V$vt\.mp4 with a previous extraction, and
+					# just now extracted our boundary segment from this file. So
+					# we delete V$vt.\mp4 if it exists, and only then do we
+					# rename our boundary segment to a proper timestamp video
+					# name.
+					set vfn V$vt\.mp4
+					catch {file delete $vfn}
+					file rename $nvfn $vfn
+					lappend info(export_vfl) $vfn
 				} {
+					LWDAQ_print $t "[file tail $vfn]: Using $cdur s,\
+						from $tseek s to [expr $tseek + $cdur] s,\
+						vlen=$vlen, clen=$clen, tclen=$tclen\."
 					lappend info(export_vfl) $vfn
 				}			
-				LWDAQ_print $t "[file tail $vfn]: Using $cdur s,\
-					from $tseek s to [expr $tseek + $cdur] s,\
-					vlen=$vlen, clen=$clen, tclen=$tclen\."
 				set vt [expr $vt + $cdur]
 				LWDAQ_support
 			}
@@ -5649,30 +5734,6 @@ proc Neuroplayer_clock_jump {} {
 		set config(datetime_jump_to) [Neuroplayer_clock_convert $jump_time]
 		Neuroplayer_jump "$jump_time 0.0 ? \"$config(datetime_jump_to)\"" 0
 	}
-}
-
-#
-# We convert between integer seconds to the datetime format given in the
-# configuration array. If the input is in integer seconds, it gets converted
-# into our datetime format. Otherwise, we convert it from datetime format into
-# integer seconds. We issue an error in the Neuroplayer window if the format is
-# incorrect, and return the value zero.
-#
-proc Neuroplayer_clock_convert {datetime} {
-	upvar #0 Neuroplayer_config config
-	
-	if {[string is integer $datetime]} {
-		set newformat [clock format $datetime -format $config(datetime_format)]
-	} {
-		if {[catch {
-			set newformat [clock scan $datetime -format $config(datetime_format)]
-		} error_result]} {
-			Neuroplayer_print "ERROR: Invalid clock string, \"$datetime\".\
-				Must be \"DD-MMM-YYYY HH:MM:SS\"."
-			set newformat 0
-		}
-	}
-	return $newformat
 }
 
 #
@@ -7394,8 +7455,7 @@ proc Neuroplayer_play {{command ""}} {
 	# Play any video that needs to be played, specifying the current play time as a
 	# Unix time, and the current interval length.
 	if {$config(video_enable)} {
-		Neuroplayer_video_action \
-			"Play" \
+		Neuroplayer_video_play \
 			[Neuroplayer_clock_convert $info(datetime_play_time)] \
 			$info(play_interval_copy)		
 	} 
@@ -7873,29 +7933,22 @@ proc Neuroplayer_video_watchdog {pid} {
 }
 
 #
-# Neuroplayer_video_action looks for an entire video interval within a single
-# video file in the video cirectory. In response to the "Seek" command, the
-# routine returns the name of the video file containing the entire interval
-# (vf), the video time at which the interval begins (vseek), the length of video
-# in the file (vlen), and the length of video we expect the file to contain
-# given the timestamp in the name of the next file in the video directory
-# (clen). When we pass the "Play" command, the routine opens an MPlayer window
-# and plays the video interval. When we pass "Seek", the routine merely returns
-# the avormentioned values. If no such video containing the absolute time
-# exists, the routine returns an error. We specify the absolute time as a whole
-# number of Unix seconds. We specify the length of the interval in seconds. If
-# the video does not contain the entire video length, the routine returns an
-# error. When choosing the video time, the routine assumes that the start of the
-# video always corresponds to the absolute time specified in the video file
-# name. If the length of the video in the file is less than the correct length,
-# and the interval extends past the available video, the routine returns an
-# error. The routine uses a cache of recently-used video files to save time when
-# searching for the correct file, because the search requires that we get the
-# length of the video calculated by ffmpeg, and this calculation is
-# time-consuming. If the video is not in the cache, we use the video directory
-# as a source of video files.
+# Neuroplayer_video_seek looks for an entire video interval within a single
+# video file in the video cirectory. The routine returns the name of the video
+# file containing the entire interval (vf), the video time at which the interval
+# begins (vseek), the length of video in the file (vlen), and the length of
+# video we expect the file to contain given the timestamp in the name of the
+# next file in the video directory (clen). When choosing the video time, the
+# routine assumes that the start of the video always corresponds to the absolute
+# time specified in the video file name. If the length of the video in the file
+# is less than the correct length, and the interval extends past the available
+# video, the routine returns an error. The routine uses a cache of recently-used
+# video files to save time when searching for the correct file, because the
+# search requires that we get the length of the video calculated by ffmpeg, and
+# this calculation is time-consuming. If the video is not in the cache, we use
+# the video directory as a source of video files.
 # 
-proc Neuroplayer_video_action {cmd datetime length} {
+proc Neuroplayer_video_seek {datetime length} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 	
@@ -7948,11 +8001,10 @@ proc Neuroplayer_video_action {cmd datetime length} {
 			}
 		}
 		
-		# If we still have no file, issue an error and exit.
+		# If we still have no file return an error.
 		if {$vf == ""} {
-			Neuroplayer_print "ERROR: No video in [file tail $config(video_dir)]\
+			return "ERROR: No video in [file tail $config(video_dir)]\
 				begins before $datetime s."
-			return ""
 		}
 
 		# Calculate the actual video file length.
@@ -7977,27 +8029,18 @@ proc Neuroplayer_video_action {cmd datetime length} {
 		Neuroplayer_print "Added $vf to video cache." verbose
 		
 		# Check that the video file's correct length includes the interval start.
-		set gap [expr $datetime - ($vtime + $clen)]
-		if {$gap > 0} {
-			Neuroplayer_print "ERROR: File [file tail $vf], correct length $clen s,\
-				ends $gap s before start of requested interval."
-			return ""
+		set missing [expr $datetime - ($vtime + $clen)]
+		if {$missing > 0} {
+			return "ERROR: File [file tail $vf], correct length $clen s,\
+				missing $missing s of requested interval."
 		}
 		
 		# Check that the video file's correct length contains the interval end.
 		set missing [expr ($datetime + $length) - ($vtime + $clen)]
 		if {$missing > 0} {
-			Neuroplayer_print "ERROR: File [file tail $vf], correct length $clen s,\
-				ends $missing s before end of requested interval."
-			return ""
+			return "ERROR: File [file tail $vf], correct length $clen s,\
+				missing $missing s of requested interval."
 		}
-		
-		# Check that the video's video actual length contains the interval end.
-		set missing [expr ($datetime + $length) - ($vtime + $vlen)]
-		if {$missing > 0} {
-			Neuroplayer_print "WARNING: File [file tail $vf], video length $clen s,\
-				ends $missing s before end of requested interval."
-		}		
 	}
 
 	# We calculate the time within the video recording that corresponds to the 
@@ -8006,11 +8049,42 @@ proc Neuroplayer_video_action {cmd datetime length} {
 	set vseek [expr $datetime - $vtime]
 	if {$vseek < 0.0} {set vseek 0.0}
 	
-	# If we just want to find this point in the video, we exit now giving the
-	# file name, seek position, and file length.
-	if {$cmd == "Seek"} {
-		return [list $vf $vseek $vlen $clen]
+	# Return the file name, seek position, and file length.
+	return [list $vf $vseek $vlen $clen]
+}
+
+#
+# Neuroplayer_video_play first seeks for the interval in one of the video
+# files in the video directory tree. When it finds the interval it opens
+# an mplayer window and plays the interval. We specify the absolute time as a whole
+# number of Unix seconds. We specify the length of the interval in seconds. If
+# the video does not contain the entire video length, the routine returns an
+# error. 
+#
+proc Neuroplayer_video_play {datetime length} {
+	upvar #0 Neuroplayer_config config
+	upvar #0 Neuroplayer_info info
+	
+	# Check to see if ffmpeg and mplayer are available. If not, we suggest
+	# downloading the Videoarchiver package and go to idle state.
+	if {![file exists $info(ffmpeg)] || ![file exists $info(mplayer)]} {
+		Neuroplayer_video_suggest
+		set info(video_state) "Idle"
+		return ""
 	}
+
+	# Seek the interval in the video directory.
+	set result [Neuroplayer_video_seek $datetime $length]
+	if {[LWDAQ_is_error_result $result]} {
+		Neuroplayer_print $result
+		return "ERROR"
+	}
+	
+	# Extract the file name, seek time, length of the video existsing in the
+	# file and the correct length of the file, which is the length of video that
+	# fills the time between the start of this file and the next file in the
+	# recording directory, if it exists.
+	scan $vfi %s%d%f%f vfn tseek vlen clen
 	
 	# If no video player window is open, we create a new one. If we
 	# are loading a new video file, destroy the old process and create
