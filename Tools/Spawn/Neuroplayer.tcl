@@ -621,6 +621,7 @@ proc Neuroplayer_init {} {
 	set info(video_export_scratch) [file join $info(video_scratch) Exporter]
 	set info(video_export_log) [file join $info(video_export_scratch) export_log.txt]
 	set config(video_export_clean) "1"
+	set config(video_pad_max) "3600"
 	set config(video_enable) "0"
 	set info(video_process) "0"
 	set info(video_channel) "file1"
@@ -5144,7 +5145,9 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					set cdur [expr round($info(export_end_s) - $vt)]
 				}
 				if {$cdur <= 0} {
-					LWDAQ_print $t "ERROR: Cannot find video for time $vt s.
+					LWDAQ_print $t "ERROR: Video stops at $vt,\
+						leaving [expr $info(export_end_s)-$vt] s missing,\
+						aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
 					return "ERROR"
 				}
@@ -5154,11 +5157,20 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				# length of the file, we pad the video to the correct length and save
 				# the padded file in our scratch directory.
 				if {round($vlen) < $clen} {
+					# There is a limit to how much padding we are prepared to do.
 					set missing [expr $clen - $vlen]
+					if {$missing > $config(video_pad_max)} {
+						LWDAQ_print $t "ERROR: Missing $missing s from video record,\
+							exceeds video_pad_max=$config(video_pad_max),\
+							aborting export."
+						LWDAQ_post "Neuroexporter_export Abort"
+						return "ERROR"
+					}
+
 					LWDAQ_print $t "[file tail $vfn]: Missing $missing s,\
 						will pad with blank frames to correct length $clen s."
 					LWDAQ_update
-
+					
 					# Determine dimensions and framerate of video.
 					set width 820
 					set height 616
