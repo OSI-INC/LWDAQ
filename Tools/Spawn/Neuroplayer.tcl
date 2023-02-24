@@ -617,8 +617,10 @@ proc Neuroplayer_init {} {
 	set config(video_zoom) "1.0"
 	set info(video_state) "Idle"
 	set info(video_scratch) [file join $info(videoarchiver_dir) Scratch]
-	set info(video_log) [file join $info(videoarchiver_dir) \
-		Scratch Neuroplayer_log.txt]
+	set info(video_log) [file join $info(video_scratch) Neuroplayer_log.txt]
+	set info(video_export_scratch) [file join $info(video_scratch) Exporter]
+	set info(video_export_log) [file join $info(video_export_scratch) export_log.txt]
+	set config(video_export_clean) "1"
 	set config(video_enable) "0"
 	set info(video_process) "0"
 	set info(video_channel) "file1"
@@ -4878,13 +4880,11 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	if {$cmd == "Abort"} {
 		if {$info(export_state) != "Idle"} {
 			LWDAQ_print $t "Aborting export at\
-				$config(play_time) s in archive\
+				play time $config(play_time) s in archive\
 				[file tail $config(play_file)].\n" purple
 		}
 		Neuroplayer_command "Stop"
-		foreach pid $info(export_epl) {
-			LWDAQ_process_stop $pid
-		}
+		foreach pid $info(export_epl) {LWDAQ_process_stop $pid}
 		set info(export_state) "Idle"
 		return "SUCCESS"
 	}
@@ -5103,31 +5103,41 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			} 
 		}
 		
-		# Stop stray left-over processes, then clear the process list and the
-		# video file list.
-		foreach pid $info(export_epl) {
-			LWDAQ_process_stop $pid
-		}
-		set info(export_vfl) [list]
-		set info(export_epl) [list]
-
-		# Start the one or two extractions we may need to perform on video files
-		# to get the start and end segments aligned with the start and end
-		# export times. Make a list of the segments we want to concatinate.
+		# Prepare video segments for concatination. We pad segments that are too short.
+		# We trim segments that are too long.
 		if {$config(export_video)} {
+
+			# Stop stray processes, clear the process list, clear the video file
+			# list. Make sure the exporter scratch directory exists and clear up
+			# existing log files and video segments.
+			foreach pid $info(export_epl) {LWDAQ_process_stop $pid}
+			set info(export_epl) [list]
+			set info(export_vfl) [list]
+			file mkdir $info(video_export_scratch)
+			cd $info(video_export_scratch)
+			file delete -- {*}[glob -nocomplain *.mp4]
+			file delete -- {*}[glob -nocomplain *.txt]
+			
+			# Search through video directory.
 			LWDAQ_print $t "Looking for video files in $config(video_dir)."
 			set vt $info(export_start_s)
 			set tclen 0
 			set tvlen 0
 			while {$vt < $info(export_end_s)} {
+			
+				# Try to find a file containing time vt.
 				set vfi [Neuroplayer_video_action "Seek" $vt 1]
 				if {$vfi == ""} {
-					LWDAQ_print $t "ERROR: Cannot find video for time $vt s."
+					LWDAQ_print $t "ERROR: Video stops at $vt,\
+						leaving [expr $info(export_end_s)-$vt] s missing,\
+						aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
 					return "ERROR"
 				}
 				scan $vfi %s%d%f%f vfn tseek vlen clen
 				
+				# Determine how much of the correct length of this file we need for
+				# the export.
 				if {$info(export_end_s) - $vt > $clen - $tseek} {
 					set cdur [expr round($clen - $tseek)]
 				} {
@@ -5140,81 +5150,97 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				}
 				set tclen [expr $tclen + $cdur]
 				
-				if {$info(export_end_s) - $vt > $vlen - $tseek} {
-					set vdur [expr round($vlen - $tseek)]
-				} {
-					set vdur [expr round($info(export_end_s) - $vt)]
-				}
-				
-				if {$vdur < $cdur} {
-					set missing [expr $cdur - $vdur]
-					LWDAQ_print $t "[file tail $vfn]: Missing $missing s of video,\
-						will pad with blank frames."
+				# If the actual video content of the file is shorter than the correct
+				# length of the file, we pad the video to the correct length and save
+				# the padded file in our scratch directory.
+				if {round($vlen) < $clen} {
+					set missing [expr $clen - $vlen]
+					LWDAQ_print $t "[file tail $vfn]: Missing $missing s,\
+						will pad with blank frames to correct length $clen s."
 					LWDAQ_update
+
+					# Determine dimensions and framerate of video.
 					set width 820
 					set height 616
 					set duration 60
 					set framerate 20
-					set bfn [file join $info(video_scratch) \
-						B_$width\x$height\_$duration\s.mp4]
-					if {![file exists $bfn]} {
-						LWDAQ_print $t "[file tail $vfn]: Generating blank video to\
-							pad video files."
+					
+					# Check to see if the blank file exists. If not, create the blank
+					# file and store it in the scratch area.
+					if {![file exists Blank.mp4]} {
+						LWDAQ_print $t "[file tail $vfn]: Generating blank video\
+							with dimensions $width\x$height\
+							and framerate $framerate fps."
 						LWDAQ_update
 						exec $info(ffmpeg) -loglevel error -f lavfi \
 							-i color=size=$width\x$height\:rate=$framerate\:color=black \
-							-c:v libx264 -t $duration $bfn \
-							>> $info(video_log)	
+							-c:v libx264 -t $duration Blank.mp4 \
+							>> $info(video_export_log)	
 					}
-					cd $config(export_dir)
-					set clf [open concat_list.txt w]
+
+					# Concatinate the short segment and however many blank segments we
+					# need to make up a video longer than the correct length.
+					set clf [open pad_list.txt w]
 					puts $clf "file [regsub -all {\\} [file nativename $vfn] {\\\\}]"
 					while {$missing > 0} {
-						puts $clf "file [regsub -all {\\} [file nativename $bfn] {\\\\}]"
+						puts $clf "file Blank.mp4"
 						set missing [expr $missing - $duration]
 					}
 					close $clf			
-					LWDAQ_print $t "[file tail $vfn]: Padding video file."
-					LWDAQ_update
 					exec $info(ffmpeg) \
 						-nostdin -f concat -safe 0 -loglevel error \
-						-i concat_list.txt -c copy \
-						Padded_[file tail $vfn] > concat_log.txt
+						-i pad_list.txt -c copy \
+						Padded.mp4 >> $info(video_export_log)	
+						
+					# Extract the correct length from the padded video into a
+					# new segment in the scratch area. Use this file instead of
+					# the original.
 					exec $info(ffmpeg) -nostdin -loglevel error \
-						-t $cdur \
-						-i Padded_[file tail $vfn] \
-						-c:v copy [file tail $vfn]
-					
+						-t $clen -i Padded.mp4 -c:v copy \
+						[file tail $vfn] >> $info(video_export_log)
+					set vfn [file tail $vfn]
+					file delete Padded.mp4
 				}
 
+				# If the actual video content of the file is longer than the correct
+				# length of the file, we extract the correct length from the start
+				# of the file.
+				if {round($vlen) > $clen} {
+					set extra [expr $vlen - $clen]
+					LWDAQ_print $t "[file tail $vfn]: Contains $extra s extra video,\
+						will trim to correct length $clen."
+					LWDAQ_update
+
+					# Copy the correct length into a new segment in the scratch
+					# area. Use this file instead of the original.
+					exec $info(ffmpeg) -nostdin -loglevel error \
+						-t $clen -i $vfn -c:v copy \
+						Trimmed.mp4 >> $info(video_export_log)	
+					file rename Trimmed.mp4 [file tail $vfn]
+					set vfn [file tail $vfn]
+				}
+
+				# We are either going to use a portion of the file, or the entire
+				# file. If we use only a portion, we make a new segment in the
+				# scratch area.
 				if {$cdur < $clen} {
-					cd $config(export_dir)
-					set nvfn [file join $config(export_dir) V$vt\.mp4]
-					if {[file exists $nvfn]} {
-						LWDAQ_print $t "Deleting existing [file tail $nvfn]."				
-						file delete $nvfn
-					}
+					set nvfn V$vt\.mp4
 					if {$tseek > 0} {
 						set tseek [expr $vlen - $cdur]
 					}
 					if {$tseek < 0} {
 						set tseek 0
 					}
-					set pid [exec $info(ffmpeg) -nostdin -loglevel error \
+					exec $info(ffmpeg) -nostdin -loglevel error \
 						-ss $tseek -t $cdur -i [file nativename $vfn] \
-						-c:v copy [file nativename $nvfn] > export_log.txt &]
-					lappend info(export_epl) $pid
+						-c:v copy $nvfn >> $info(video_export_log)	
 					lappend info(export_vfl) $nvfn
-					set tvlen [expr $tvlen + $vlen - $tseek]
 				} {
 					lappend info(export_vfl) $vfn
-					set tvlen [expr $tvlen + $vlen]
 				}			
 				LWDAQ_print $t "[file tail $vfn]: Using $cdur s,\
-					tseek=$tseek,\
-					vlen=[format %.2f $vlen],\
-					vdur=[format %.2f $vdur],\
-					clen=[format %.0f $clen]."
+					from $tseek s to [expr $tseek + $cdur] s,\
+					vlen=$vlen, clen=$clen, tclen=$tclen\."
 				set vt [expr $vt + $cdur]
 				LWDAQ_support
 			}
@@ -5479,21 +5505,19 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				}
 			}
 			
-			LWDAQ_print $t "Concatinating [llength $info(export_vfl)] video files,\
-				please wait..."
+			LWDAQ_print $t "Concatinating [llength $info(export_vfl)] video files..."
 
 			set info(export_state) "Concat"
-			cd $config(export_dir)
+			cd $info(video_export_scratch)
 			set clf [open concat_list.txt w]
 			foreach vfn $info(export_vfl) {
 				puts $clf "file [regsub -all {\\} [file nativename $vfn] {\\\\}]"
 			}
-			close $clf			
-			set tempfile [file join $config(export_dir) temp.mp4]
-			set info(export_epl) [exec $info(ffmpeg) \
+			close $clf
+			lappend info(export_epl) [exec $info(ffmpeg) \
 				-nostdin -f concat -safe 0 -loglevel error \
 				-i concat_list.txt -c copy \
-				[file nativename $tempfile] > concat_log.txt &]
+				Export.mp4 > $info(video_export_log) &]
 			LWDAQ_post "Neuroexporter_export Video"
 			return "SUCCESS"
 		}
@@ -5501,43 +5525,37 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		# In the concatination state, we are watching the concatination process. When
 		# it completes, we clean up.
 		if {$info(export_state) == "Concat"} {
+		
+			# If there is an export process running, wait a while longer.
 			if {[LWDAQ_process_exists $info(export_epl)]} {
 				LWDAQ_post "Neuroexporter_export Video"
 				return "SUCCESS"
 			}
-			set first_file [file join $config(export_dir) \
+			
+			# Move the export file into the export directory.
+			cd $info(video_export_scratch)
+			set export_file [file join $config(export_dir) \
 				[file tail [lindex $info(export_vfl) 0]]]
-			set tempfile [file join $config(export_dir) temp.mp4]
-			catch {file delete $first_file}
-			file rename $tempfile $first_file
-			
-			set last_file [file join $config(export_dir) \
-				[file tail [lindex $info(export_vfl) end]]]
-			catch {file delete $last_file}
-			
-			LWDAQ_print $t "Created [file tail $first_file],\
-				actual length [Neuroplayer_video_duration $first_file] s."
+			catch {file delete $export_file}
+			file rename Export.mp4 $export_file
+			LWDAQ_print $t "Created [file tail $export_file],\
+				actual length [Neuroplayer_video_duration $export_file] s."
 
-			cd $config(export_dir)
-			catch {file delete concat_list.txt}
-			if {[file exists concat_log.txt]} {
-				set clf [open concat_log.txt r]
-				set log [string trim [read $clf]]
-				close $clf
-				file delete concat_log.txt
-				if {$log != ""} {
-					LWDAQ_print $t "Concatination Log:\n$log"
-				}
-			}
-			if {[file exists export_log.txt]} {
-				set elf [open export_log.txt r]
-				set log [string trim [read $clf]]
+			# If the export log contains text, errors occurred, so reveal them.
+			if {[file exists $info(video_export_log)]} {
+				set elf [open $info(video_export_log) r]
+				set log [string trim [read $elf]]
 				close $elf
-				file delete export_log.txt
 				if {$log != ""} {
-					LWDAQ_print $t "Export Log:\n$log"
+					LWDAQ_print $t "Video Export Log:"
+					LWDAQ_print $t "$log" brown
 				}
 			}
+			
+			# Delete video files if instructed to do so.
+			if {$config(video_export_clean)} {
+				file delete -- {*}[glob -nocomplain *.mp4]
+			}			
 
 			LWDAQ_print $t "Export complete in\
 				[expr [clock seconds] - $info(export_run_start)] s.\n" purple
