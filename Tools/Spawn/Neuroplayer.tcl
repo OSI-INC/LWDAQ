@@ -5237,7 +5237,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 							$width\x$height, $framerate fps, duration = $bdur s."
 						LWDAQ_update
 						exec $info(ffmpeg) -loglevel error -f lavfi \
-							-i size=$width\x$height\:rate=$framerate\:color=black \
+							-i color=size=$width\x$height\:rate=$framerate\:color=black \
 							-c:v libx264 -t $bdur Blank.mp4 \
 							>> $info(video_export_log)	
 					}
@@ -5250,7 +5250,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						puts $clf "file Blank.mp4"
 						set missing [expr $missing - $bdur]
 					}
-					close $clf			
+					close $clf
+					catch {file delete Padded.mp4}	
 					exec $info(ffmpeg) \
 						-nostdin -f concat -safe 0 -loglevel error \
 						-i pad_list.txt -c copy \
@@ -5259,6 +5260,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					# Extract the correct length from the padded video into a
 					# new segment in the scratch area. Use this file instead of
 					# the original. 
+					catch {file delete [file tail $vfn]}
 					exec $info(ffmpeg) -nostdin -loglevel error \
 						-t $dur -i Padded.mp4 -c:v copy \
 						[file tail $vfn] >> $info(video_export_log)
@@ -5281,9 +5283,11 @@ proc Neuroexporter_export {{cmd "Start"}} {
 
 					# Copy the correct length into a new segment in the scratch
 					# area. Use this file instead of the original.
+					catch {file delete Trimmed.mp4}
 					exec $info(ffmpeg) -nostdin -loglevel error \
 						-t $dur -i [file nativename $vfn] -c:v copy \
 						Trimmed.mp4 >> $info(video_export_log)	
+					catch {file delete [file tail $vfn]}
 					file rename Trimmed.mp4 [file tail $vfn]
 					set vfn [file tail $vfn]
 				}
@@ -5304,6 +5308,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					
 					# Extract the boundary segment.
 					set dur [format %.3f [expr $cdur-2.0/$framerate]]
+					catch {file delete $nvfn}
 					exec $info(ffmpeg) -nostdin -loglevel error \
 						-ss $tseek -t $dur -i [file nativename $vfn] \
 						-c:v copy $nvfn >> $info(video_export_log)
@@ -5592,7 +5597,10 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				}
 			}
 			
-			LWDAQ_print $t "Concatinating [llength $info(export_vfl)] video files..."
+			set num_files [llength $info(export_vfl)]
+			LWDAQ_print $t "Concatinating $num_files video segments,\
+				will take $num_files s on 1 GHz CPU,\
+				please wait..."
 
 			set info(export_state) "Concat"
 			cd $info(video_export_scratch)
@@ -7847,7 +7855,7 @@ proc Neuroplayer_video_info {{fn ""}} {
 		set framerate 20
 	}
 	
-	if {![regexp { ([0-9]+)x([0-9]+)} $answer match width height]} {
+	if {![regexp { ([1-9][0-9]+)x([1-9][0-9]+)} $answer match width height]} {
 		set width 820
 		set height 616
 	}
