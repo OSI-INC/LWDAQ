@@ -1,5 +1,5 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
-# Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+# Copyright (C) 2004-2023 Kevan Hashemi, Brandeis University
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -27,7 +27,7 @@ set num_errors 0
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.5"
-set LWDAQ_Info(program_patchlevel) "10.5.3"
+set LWDAQ_Info(program_patchlevel) "10.5.4"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 set LWDAQ_Info(console_prompt) "LWDAQ% "
 	
