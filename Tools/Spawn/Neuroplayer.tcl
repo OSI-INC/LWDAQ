@@ -8053,12 +8053,10 @@ proc Neuroplayer_video_seek {datetime length} {
 }
 
 #
-# Neuroplayer_video_play first seeks for the interval in one of the video
-# files in the video directory tree. When it finds the interval it opens
-# an mplayer window and plays the interval. We specify the absolute time as a whole
-# number of Unix seconds. We specify the length of the interval in seconds. If
-# the video does not contain the entire video length, the routine returns an
-# error. 
+# Neuroplayer_video_play first seeks for the interval in one of the video files
+# in the video directory tree. When it finds the interval it opens an mplayer
+# window and plays the interval. We specify the absolute time as a whole number
+# of Unix seconds. We specify the length of the interval in seconds.
 #
 proc Neuroplayer_video_play {datetime length} {
 	upvar #0 Neuroplayer_config config
