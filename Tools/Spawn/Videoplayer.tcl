@@ -64,8 +64,8 @@ proc Videoplayer_init {} {
 #
 # We start setting intial values for the private display and control variables.
 #
-	set info(play_control) "Idle"
-	set info(play_control_label) "none"
+	set info(control) "Idle"
+	set info(control_label) "none"
 #
 # File and directory for videos.
 #
@@ -87,6 +87,12 @@ proc Videoplayer_init {} {
 	set config(display_scale) "0.5"
 	set config(display_time) "0.00"
 	set info(display_photo) "videoplayer_photo"
+#
+# Date and time.
+#
+	set info(datetime_format) {%d-%b-%Y %H:%M:%S}
+	set info(datetime_error) "dd-mmm-yyyy hh:mm:ss"
+
 #
 # Video tools.
 #
@@ -239,10 +245,6 @@ proc Videoplayer_print {line {color "black"}} {
 	
 	if {[regexp "^WARNING: " $line] || [regexp "^ERROR: " $line]} {
 		append line " ([Videoplayer_clock_convert [clock seconds]]\)"
-		if {[regexp -nocase [file tail $config(play_file)] $line]} {
-			set line [regsub "^WARNING: " $line "WARNING: $info(datetime_play_time) "]
-			set line [regsub "^ERROR: " $line "ERROR: $info(datetime_play_time) "]
-		} 
 		if {$config(log_warnings)} {
 			LWDAQ_print $config(log_file) "$line"
 		}
@@ -313,13 +315,17 @@ proc Videoplayer_read {{post 0}} {
 	# its execution to the event queue, and this we can do by
 	# adding a parameter of 1 to the end of the call.
 	if {$post} {
-		LWDAQ_post [list Videoplayer_pick 0]
+		LWDAQ_post [list Videoplayer_read 0]
 		return ""
 	}
+	
+	set info(control) "Read"
+	LWDAQ_update
 
 	set fn [LWDAQ_get_file_name 0 [file dirname [set config(video_file)]]]
 	if {![file exists $fn]} {
 		Videoplayer_print "ERROR: File \"$fn\" does not exist."
+		set info(control) "Idle"
 		return $fn
 	}
 	set config(video_file) $fn
@@ -344,6 +350,7 @@ proc Videoplayer_read {{post 0}} {
 			catch {exec $info(ffmpeg) -i $fn} answer
 			Videoplayer_print $answer green
 		}
+		set info(control) "Idle"
 	} else {
 		set config(video_duration) $duration
 		set config(video_width) $width
@@ -361,6 +368,7 @@ proc Videoplayer_read {{post 0}} {
 		-width [expr round($config(display_scale)*$config(video_width))] \
 		-height [expr round($config(display_scale)*$config(video_height))]
 
+	set info(control) "Idle"
 	return $fn
 }
 
@@ -400,24 +408,31 @@ proc Videoplayer_pickdir {{post 0}} {
 }
 
 proc Videoplayer_png_extract {} {
-	upvar stream stream
-	upvar s s
+	upvar stream_data s
+	upvar stream_pointer i
 	
-	set png [string range $stream $s [expr $s + 7]]
+	set png [string range $s $i [expr $i + 7]]
 	set type "IHDR"
-	set s [expr $s + 8]
-	while {($type != "IEND") && ($s < [string length $stream])} {
-		binary scan [string range $stream $s [expr $s+7]] Ia4 len type 
-		append png [string range $stream $s [expr $s + 12 + $len - 1]]
-		set s [expr $s + 12 + $len]
+	set original_i $i
+	set i [expr $i + 8]
+	while {($type != "IEND") && ($i < [string length $s])} {
+		binary scan [string range $s $i [expr $i+7]] Ia4 len type 
+		append png [string range $s $i [expr $i + 12 + $len - 1]]
+		set i [expr $i + 12 + $len]
 	}
+	if {$type != "IEND"} {
+		set i $original_i
+		set png ""
+	}
+	
 	return $png
 }
 
-proc Videoplayer_go {} {
+proc Videoplayer_play {} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 
+	set info(control) "Play"
 	set start [clock milliseconds]
 	set prev 0
 	set vtime 0
@@ -425,28 +440,73 @@ proc Videoplayer_go {} {
 	set prev [clock milliseconds]
 	set w [expr round($config(display_scale)*$config(video_width))]
 	set h [expr round($config(display_scale)*$config(video_height))]
-	set cmd "| $info(ffmpeg) -nostdin -loglevel error \
-		-i $config(video_file) -c:v png \
-		-vf \"scale=$w\:$h\" -frames:v [expr round($config(video_framerate))] \
+	set num_frames [expr round($config(video_duration)*$config(video_framerate))]
+	set cmd "| $info(ffmpeg) -nostdin \
+		-loglevel error \
+		-i $config(video_file) \
+		-c:v png \
+		-vf \"scale=$w\:$h\" \
+		-frames:v $num_frames \
 		-f image2pipe -"
-	set ch [open $cmd]
-	fconfigure $ch -translation binary -buffering full
-	set stream [read $ch]
-	close $ch
-	Videoplayer_print "Read [string length $stream] bytes\
-		in [expr [clock milliseconds] - $prev] ms" brown
-	LWDAQ_update
 	
-	set s 0
-	while {$s < [string length $stream]} {	
-		if {![winfo exists $info(text)]} {return}
+	set ch [open $cmd]
+	Videoplayer_print "Opened channel $ch to ffmpeg, reading PNG frames."
+	chan configure $ch -translation binary -blocking 0
+	set stream_pointer 0
+	set stream_data ""
+	set counter 0
+	set start [clock milliseconds]
+	set read_done 0
+	set read_start $start
+	set play_time 0
+	set video_time 0
+	while {($counter < $num_frames) && ($info(control) != "Stop")} {	
+		append stream_data [chan read $ch]
 		set png [Videoplayer_png_extract]
-		$info(display_photo) put $png
-		set now [clock milliseconds]
-		LWDAQ_update
+		if {$png != ""} {
+			incr counter
+			if {($read_done > 0) && ($play_time - $video_time < 0.1)} {
+				while {([clock milliseconds] - $read_done) \
+					< 1000.0/$config(video_framerate)} {
+					LWDAQ_wait_ms 1
+				}
+			}
+			set read_done [clock milliseconds]
+			$info(display_photo) put $png
+			set put_done [clock milliseconds]
+			LWDAQ_update
+			set update_done [clock milliseconds]
+			if {$config(verbose)} {
+				Videoplayer_print "frame = $counter,\
+					video time = [format %.2f \
+						[expr 1.0*$counter/$config(video_framerate)]],\
+					play time = [format %.2f [expr 0.001*($update_done - $start)]],\
+					read time = [expr $read_done - $read_start],\
+					put time = [expr $put_done - $read_done],\
+					update time = [expr $update_done - $put_done]."
+			}
+			set read_start [clock milliseconds]
+		} else {
+			if {[clock milliseconds] - $read_start > 1000} {break}
+			if {![winfo exists $info(text)]} {break}
+		}
+		LWDAQ_support
 	}
+	close $ch
+	Videoplayer_print "Done with video, closed channel $ch."
+	Videoplayer_print "frame = $counter,\
+		video time = [format %.2f \
+			[expr 1.0*$counter/$config(video_framerate)]],\
+		play time = [format %.2f [expr 0.001*($update_done - $start)]]."
+	set info(control) "Idle"
 }
 
+proc Videoplayer_stop {} {
+	upvar #0 Videoplayer_config config
+	upvar #0 Videoplayer_info info
+
+	set info(control) "Stop"
+}
 
 #
 # Videoplayer_seek looks for an entire video interval within a single
@@ -470,9 +530,7 @@ proc Videoplayer_seek {datetime length} {
 	# Check to see if ffmpeg and mplayer are available. If not, we suggest
 	# downloading the Videoarchiver package and go to idle state.
 	if {![file exists $info(ffmpeg)] || ![file exists $info(mplayer)]} {
-		Videoplayer_suggest
-		set info(video_state) "Idle"
-		return "ERROR: Failed to find Videoarchiver directory."
+		return "none 0 0 0 0 0 0"
 	}
 
 	# Look in our video file cache to see if the start and end of the 
@@ -558,12 +616,12 @@ proc Videoplayer_seek {datetime length} {
 }
 
 #
-# Videoplayer_play first seeks for the interval in one of the video files
+# Videoplayer_seek_play first seeks for the interval in one of the video files
 # in the video directory tree. When it finds the interval it displays plays the
 # interval. We specify the absolute time as a whole number of Unix seconds. We
 # specify the length of the interval in seconds. 
 #
-proc Videoplayer_play {datetime length} {
+proc Videoplayer_seek_play {datetime length} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
@@ -659,7 +717,7 @@ proc Videoplayer_play {datetime length} {
 	# Set the video state to play and report the seek time.
 	Videoplayer_print "Playing $vf for $length s\
 		starting at $vseek s of $vlen s." verbose
-	LWDAQ_set_bg $info(play_control_label) cyan
+	LWDAQ_set_bg $info(control_label) cyan
 	set info(video_state) "Play"
 	
 	# Return the file name, seek time, file duration, and correct length.
@@ -694,8 +752,12 @@ proc Videoplayer_open {} {
 	set f $w.controls
 	frame $f -relief groove -border 2
 	pack $f -side top -fill x
+	
+	label $f.ctrl -textvariable Videoplayer_info(control) -fg blue -width 8
+	set info(play_control_label) $f.ctrl
+	pack $f.ctrl -side left -expand yes
 
-	foreach a {Read Stop Play Go PickDir} {
+	foreach a {Read Stop Play PickDir} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command Videoplayer_$b
 		pack $f.$b -side left -expand yes

@@ -587,6 +587,7 @@ proc Neuroplayer_init {} {
 	set info(export_vfl) ""
 	set info(export_epl) ""
 	set config(export_video) "0"
+	set config(ffmpeg_offset_sbs) "1.0"
 	set config(export_signal) "1"
 	set config(export_activity) "0"
 	set config(export_centroid) "0"
@@ -5137,6 +5138,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		# We trim segments that are too long.
 		if {$config(export_video)} {
 
+			# First check that we have ffmpeg available.
+			if {![file exists $info(ffmpeg)]} {
+				LWDAQ_print $t "ERROR: Cannot find ffmpeg) utility,\
+					see Neuroplayer window for suggestion."
+				Neuroplayer_video_suggest
+				LWDAQ_post "Neuroexporter_export Abort"
+				return "ABORT"
+			}
 			# Stop stray processes, clear the process list, clear the video file
 			# list. Make sure the exporter scratch directory exists and clear up
 			# existing log files and video segments.
@@ -5153,6 +5162,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			LWDAQ_print $t "Looking for video files in $config(video_dir)."
 			set vt $info(export_start_s)
 			set tclen 0
+			set tframes 0
 			
 			# Search through the video directory for files that we can use to 
 			# construct the export video.
@@ -5205,13 +5215,17 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				}
 				set tclen [expr $tclen + $cdur]
 				
+				set vframes [expr round($vlen * $framerate)]
+				set cframes [expr round($clen * $framerate)]
+				
 				# If the actual video content of the file is shorter than the correct
 				# length of the file, we pad the video to the correct length and save
 				# the padded file in our scratch directory.
-				if {round($vlen) < $clen} {
+				if {$vframes < $cframes} {
 				
 					# There is a limit to how much padding we are prepared to do.
-					set missing [expr round($clen - $vlen)]
+					set missing [format %.2f [expr $clen - $vlen]]
+					set pad_frames [expr round($missing*$framerate)]
 					if {$missing > $config(video_pad_max)} {
 						LWDAQ_print $t "ERROR: Missing $missing s from video record,\
 							exceeds video_pad_max=$config(video_pad_max),\
@@ -5220,8 +5234,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						return "ERROR"
 					}
 
-					LWDAQ_print $t "[file tail $vfn]: Missing $missing s,\
-						will pad with blank frames to correct length $clen s."
+					LWDAQ_print $t "[file tail $vfn]: Missing frames,\
+						add $pad_frames blank frames to make $cframes."
 					LWDAQ_update
 					
 					# When we extract our replacement video with ffmpeg, we find by
@@ -5242,8 +5256,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 							>> $info(video_export_log)	
 					}
 
-					# Concatinate the short segment and however many blank segments we
-					# need to make up a video longer than the correct length.
+					# Concatinate the short segment and as many blank segments as we
+					# need to make a video longer than needed.
 					set clf [open pad_list.txt w]
 					puts $clf "file [regsub -all {\\} [file nativename $vfn] {\\\\}]"
 					while {$missing > 0} {
@@ -5266,15 +5280,23 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						[file tail $vfn] >> $info(video_export_log)
 					set vfn [file tail $vfn]
 					file delete Padded.mp4
+
+					# Report on the segment we added to the concatination list.
+					set vfi [Neuroplayer_video_info $vfn]
+					scan $vfi %d%d%f%f width height framerate vlen
+					LWDAQ_print $t "[file tail $vfn]: After padding,\
+						ffmpeg reports length [format %.2f $vlen] s\
+						at $framerate fps."
 				}
 
 				# If the actual video content of the file is longer than the correct
 				# length of the file, we extract the correct length from the start
 				# of the file.
-				if {round($vlen) > $clen} {
-					set extra [expr $vlen - $clen]
-					LWDAQ_print $t "[file tail $vfn]: Contains $extra s extra video,\
-						will trim to correct length $clen s."
+				if {$vframes > $cframes} {
+					set extra [format %.2f [expr $vlen - $clen]]
+					set extra_frames [expr round($extra*$framerate)]
+					LWDAQ_print $t "[file tail $vfn]: Extra frames,\
+						deleting $extra_frames frames to make $cframes\."
 					LWDAQ_update
 
 					# Calculate duration that corrects for ffmpeg adding two frames
@@ -5290,27 +5312,50 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					catch {file delete [file tail $vfn]}
 					file rename Trimmed.mp4 [file tail $vfn]
 					set vfn [file tail $vfn]
-				}
 
+					# Report on the segment we added to the concatination list.
+					set vfi [Neuroplayer_video_info $vfn]
+					scan $vfi %d%d%f%f width height framerate vlen
+					LWDAQ_print $t "[file tail $vfn]: After trimming,\
+						ffmpeg reports length [format %.2f $vlen] s\
+						at $framerate fps."
+				}
+				
+				# Calculate how many frames wer are extracting.
+				set dframes [expr round($cdur * $framerate)]
+				set tframes [expr $dframes + $tframes]
+				
 				# We are either going to use a portion of the file, or the
 				# entire file. If we use only a portion, we make a new segment
 				# in the scratch area. Such partial segments are either at the
 				# beginning or end of our export, so we call them "boundary
-				# segments".
+				# segments". When we are extracting a start segment, we find 
+				# that we must reduce the duration by the "ffmpeg_offset_sbs"
+				# in order to get the segment to come out the correct length.
 				if {$cdur < $clen} {
-					set nvfn Boundary_V$vt\.mp4
-					if {round($tseek) > 0} {set tseek [expr $clen - $cdur]}
-					if {round($tseek) <= 0} {set tseek 0}
-					LWDAQ_print $t "[file tail $vfn]: Using $cdur s,\
+				
+					# Set time limits of extraction.
+					if {round($tseek) > 0} {
+						set dur [expr $cdur - $config(ffmpeg_offset_sbs)]
+						set tseek [expr round($clen - $dur)]
+					} else {
+						set tseek 0
+						set dur [expr $cdur]
+					}
+					
+					# Report on extractions.
+					LWDAQ_print $t "[file tail $vfn]: Extracting\
 						$tseek s to [expr $tseek + $cdur] s,\
-						vlen = [format %.2f $vlen] s, clen = $clen s, tclen = $tclen s."
+						should be $cdur s,\
+						tclen = $tclen s."
 					LWDAQ_update
 					
 					# Extract the boundary segment.
-					set dur [format %.3f [expr $cdur-2.0/$framerate]]
+					set nvfn Boundary_V$vt\.mp4
 					catch {file delete $nvfn}
 					exec $info(ffmpeg) -nostdin -loglevel error \
-						-ss $tseek -t $dur -i [file nativename $vfn] \
+						-ss $tseek -t $cdur \
+						-i [file nativename $vfn] \
 						-c:v copy $nvfn >> $info(video_export_log)
 						
 					# We now have a file Extracted_V$vt\.mp4. We want to change
@@ -5323,12 +5368,26 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					set vfn V$vt\.mp4
 					catch {file delete $vfn}
 					file rename $nvfn $vfn
-					lappend info(export_vfl) $vfn
-				} {
-					LWDAQ_print $t "[file tail $vfn]: Using $cdur s,\
-						$tseek s to [expr $tseek + $cdur] s,\
-						vlen = [format %.2f $vlen] s, clen = $clen s, tclen = $tclen s."
+	
+					# Report on the segment we added to the concatination list.
+					set vfi [Neuroplayer_video_info $vfn]
+					scan $vfi %d%d%f%f width height framerate vlen
+					LWDAQ_print $t "[file tail $vfn]: After extraction,\
+						ffmpeg reports length [format %.2f $vlen] s\
+						at $framerate fps."
 					LWDAQ_update
+					
+					# Add segment to concatination list.
+					lappend info(export_vfl) $vfn				
+				} {
+				
+					# Report on the segment.
+					LWDAQ_print $t "[file tail $vfn]: Using\
+						0 s to [expr round($clen)] s,\
+						tclen = $tclen s."
+					LWDAQ_update
+					
+					# Add to concatination list.
 					lappend info(export_vfl) $vfn
 				}	
 				
@@ -5599,8 +5658,10 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			
 			set num_files [llength $info(export_vfl)]
 			LWDAQ_print $t "Concatinating $num_files video segments,\
-				will take $num_files s on 1 GHz CPU,\
-				please wait..."
+				expecting final video length\
+				[format %.2f [expr $info(export_end_s) - $info(export_start_s)]] s."
+			LWDAQ_print $t "Concatination will take approximately $num_files s\
+				on a 1-GHz CPU."
 
 			set info(export_state) "Concat"
 			cd $info(video_export_scratch)
@@ -5636,7 +5697,9 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			file rename Export.mp4 $export_file
 			set vfi [Neuroplayer_video_info $export_file]
 			scan $vfi %d%d%f%f width height framerate vlen
-			LWDAQ_print $t "Created [file tail $export_file] length $vlen s."
+			LWDAQ_print $t "Created [file tail $export_file],\
+				ffmpeg reports length [format %.2f $vlen] s\
+				at $framerate fps."
 
 			# If the export log contains text, errors occurred, so reveal them.
 			if {[file exists $info(video_export_log)]} {
@@ -7965,9 +8028,7 @@ proc Neuroplayer_video_seek {datetime length} {
 	# Check to see if ffmpeg and mplayer are available. If not, we suggest
 	# downloading the Videoarchiver package and go to idle state.
 	if {![file exists $info(ffmpeg)] || ![file exists $info(mplayer)]} {
-		Neuroplayer_video_suggest
-		set info(video_state) "Idle"
-		return "ERROR: Failed to find Videoarchiver directory."
+		return "none 0 0 0 0 0 0"
 	}
 
 	# Look in our video file cache to see if the start and end of the 
