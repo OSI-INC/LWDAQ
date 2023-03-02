@@ -66,6 +66,7 @@ proc LWDAQ_utils_init {} {
 	set info(default_lwdaq_addr) "10.0.0.37"
 	set info(lwdaq_close_string) "\x04"
 
+	set info(daq_truncate) "1"
 	set info(ndf_prefix) " ndf"
 	set info(ndf_header_size) 100
 	set info(ndf_string_length_addr) 12
@@ -1084,14 +1085,15 @@ proc LWDAQ_xml_get {xml tag} {
 
 #
 # LWDAQ_write_image_file writes an image to disk in the LWDAQ image format. If
-# the file name has tail ".gif" (case insensitive), the routine saves the file
-# in GIF format. If the file name ends with ".ndf", the routine writes the image
-# file as an NDF file. Otherwise, the routine saves the image in the DAQ format.
-# In a GIF or DAQ file, the LWDAQ image header, with dimensions, analysis
-# bounds, and results string, will be embedded in the first line of the image.
-# In an NDF file, this header information is lost. The results string is saved
-# in the meta-data string and the image contents, starting with the first pixel
-# of the first row, are stored in the NDF data block.
+# the file name has tail ".gif" or ".png" (case insensitive), the routine saves
+# the file in GIF or PNG format respectively. If the file name ends with ".ndf",
+# the routine treats the image as a container for one-dimensional data, skipping
+# the first row (row zero) and starting from the first pixel of the second row
+# (pixel zero of row one). Otherwise, the routine saves the image in the DAQ
+# format. In a GIF or DAQ file, the LWDAQ image header, with dimensions,
+# analysis bounds, and results string, will be embedded in the first line of the
+# image. In an NDF file, this header information is lost. The results string is
+# saved in the meta-data string.
 #
 proc LWDAQ_write_image_file {image_name outfile_name} {
 	global LWDAQ_Info
@@ -1103,18 +1105,25 @@ proc LWDAQ_write_image_file {image_name outfile_name} {
 			$p write $outfile_name -format GIF
 			image delete $p
 		} 
+		".png" {
+			set p [image create photo]
+			lwdaq_draw $image_name $p -show_bounds 0 -clear 1
+			$p write $outfile_name -format PNG
+			image delete $p
+		} 
 		".ndf" {
 			LWDAQ_ndf_create $outfile_name $LWDAQ_Info(ndf_string_size)
 			LWDAQ_ndf_string_write $outfile_name [lwdaq_image_results $image_name]
 			set data [lwdaq_image_contents $image_name \
-				-truncate 1 -data_only 1 -record_size $LWDAQ_Info(ndf_record_size)]
+				-truncate 0 -data_only 1 -record_size $LWDAQ_Info(ndf_record_size)]
 			LWDAQ_ndf_data_append $outfile_name $data		
 		}
 		default {
 			set outfile [open $outfile_name w]
 			fconfigure $outfile -translation binary
 			puts -nonewline $outfile \
-				[lwdaq_image_contents $image_name -truncate 1]
+				[lwdaq_image_contents $image_name \
+				-truncate $LWDAQ_Info(daq_truncate)]
 			close $outfile
 		}
 	}
@@ -1166,7 +1175,15 @@ proc LWDAQ_read_image_file {infile_name {image_name ""}} {
 				[LWDAQ_ndf_data_read $infile_name 0 *]
 		}
 		".png" {
-			error "cannot open png"
+			if {!$LWDAQ_Info(gui_enabled)} {
+				error "png format supported only with gui enabled"
+			}
+			set p [image create photo]
+			$p read $infile_name -format PNG
+			set data [lwdaq_photo_contents $p]
+			image delete $p
+			set image_name [lwdaq_image_create \
+				-try_header 1 -data $data -name $image_name]	
 		}
 		".jpg" {
 			error "cannot open jpg"

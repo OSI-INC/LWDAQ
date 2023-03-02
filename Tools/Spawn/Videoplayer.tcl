@@ -80,6 +80,7 @@ proc Videoplayer_init {} {
 	set config(video_width) "820"
 	set config(video_height) "616"
 	set config(video_duration) "1"
+	set config(pixel_bytes) "3"
 #
 # Display properties.
 #
@@ -428,6 +429,23 @@ proc Videoplayer_png_extract {} {
 	return $png
 }
 
+proc Videoplayer_raw_extract {} {
+	upvar #0 Videoplayer_config config
+	upvar #0 Videoplayer_info info
+	upvar stream_data s
+	upvar stream_pointer i
+	
+	set raw_size [expr $config(video_width)*$config(video_height)*$config(pixel_bytes)]
+	if {[string length $s] >= $i + $raw_size - 1} {
+		set raw [string range $s $i [expr $i + $raw_size - 1]]
+		set i [expr $i + $raw_size]
+	} else {
+		set raw ""
+	}
+	
+	return $raw
+}
+
 proc Videoplayer_play {} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
@@ -445,9 +463,11 @@ proc Videoplayer_play {} {
 		-loglevel error \
 		-i $config(video_file) \
 		-c:v png \
+		-pix_fmt rgb24 \
 		-vf \"scale=$w\:$h\" \
 		-frames:v $num_frames \
 		-f image2pipe -"
+# -c:v rawvideo specifies raw video output, just pixels in a stream.
 	
 	set ch [open $cmd]
 	Videoplayer_print "Opened channel $ch to ffmpeg, reading PNG frames."

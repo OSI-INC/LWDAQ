@@ -120,12 +120,12 @@ end;
 
 
 {
-	lwdaq_gui_draw draws the named image into the TK photo named
-	gui_photo_name. The routine calls lwdaq_draw, which, like all the
-	lwdaq TclTk commands, clears the global error_string. We save the
-	initial value of error_string so we can restore it after the 
-	update. This restoration means we can call lwdaq_gui_draw anywhere
-	in our code without deleting the existing error_string.
+	lwdaq_gui_draw draws the named image into the TK photo named gui_photo_name.
+	The routine calls lwdaq_draw, which, like all the lwdaq TclTk commands,
+	clears the global error_string. We save the initial value of error_string so
+	we can restore it after the update. This restoration means we can call
+	lwdaq_gui_draw anywhere in our code without deleting the existing
+	error_string.
 }
 procedure lwdaq_gui_draw(s:string); 
 var 
@@ -145,9 +145,9 @@ begin
 end;
 
 {
-	lwdaq_gui_wait pauses for gui_wait_ms milliseconds. If gui_wait_ms
-	is -1, the routine opens a window and asks the user to press the
-	button before returning.
+	lwdaq_gui_wait pauses for gui_wait_ms milliseconds. If gui_wait_ms is -1,
+	the routine opens a window and asks the user to press the button before
+	returning.
 }
 procedure lwdaq_gui_wait(s:string); 
 var 
