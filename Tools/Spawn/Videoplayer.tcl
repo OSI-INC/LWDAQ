@@ -80,7 +80,6 @@ proc Videoplayer_init {} {
 	set config(video_width) "820"
 	set config(video_height) "616"
 	set config(video_duration) "1"
-	set config(pixel_bytes) "3"
 #
 # Display properties.
 #
@@ -435,7 +434,8 @@ proc Videoplayer_raw_extract {} {
 	upvar stream_data s
 	upvar stream_pointer i
 	
-	set raw_size [expr $config(video_width)*$config(video_height)*$config(pixel_bytes)]
+	set raw_size [expr round($config(video_width)*$config(video_height)\
+		*$config(display_scale)*$config(display_scale))]
 	if {[string length $s] >= $i + $raw_size - 1} {
 		set raw [string range $s $i [expr $i + $raw_size - 1]]
 		set i [expr $i + $raw_size]
@@ -468,6 +468,10 @@ proc Videoplayer_play {} {
 		-frames:v $num_frames \
 		-f image2pipe -"
 # -c:v rawvideo specifies raw video output, just pixels in a stream.
+# -c:v png specifies png output.
+# -pix_fmt gray specifies eight-bit gray scale, can use lwdaq_draw
+# -pix_fmt rgb24 specifies twenty-four bit color, the default
+# -pix_fmt rgb8 does nothing.
 	
 	set ch [open $cmd]
 	Videoplayer_print "Opened channel $ch to ffmpeg, reading PNG frames."
@@ -482,17 +486,25 @@ proc Videoplayer_play {} {
 	set video_time 0
 	while {($counter < $num_frames) && ($info(control) != "Stop")} {	
 		append stream_data [chan read $ch]
-		set png [Videoplayer_png_extract]
-		if {$png != ""} {
+		set data [Videoplayer_png_extract]
+#		set data [Videoplayer_raw_extract]
+		if {$data != ""} {
 			incr counter
 			if {($read_done > 0) && ($play_time - $video_time < 0.1)} {
 				while {([clock milliseconds] - $read_done) \
 					< 1000.0/$config(video_framerate)} {
 					LWDAQ_wait_ms 1
 				}
+			} else {
+				set f [open ~/Desktop/Sample.png w]
+				fconfigure $f -translation binary
+				puts -nonewline $f $data
+				close $f
 			}
 			set read_done [clock milliseconds]
-			$info(display_photo) put $png
+#			lwdaq_image_create -name vid -data $data -height $h -width $w
+#			lwdaq_draw vid $info(display_photo)
+			$info(display_photo) put $data
 			set put_done [clock milliseconds]
 			LWDAQ_update
 			set update_done [clock milliseconds]
