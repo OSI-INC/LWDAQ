@@ -484,6 +484,7 @@ proc Videoplayer_play {} {
 	set read_start $start
 	set play_time 0
 	set video_time 0
+	set update_done [clock milliseconds]
 	while {($counter < $num_frames) && ($info(control) != "Stop")} {	
 		append stream_data [chan read $ch]
 		set data [Videoplayer_png_extract]

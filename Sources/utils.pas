@@ -2516,11 +2516,16 @@ var
 	g:x_graph_type;
 
 begin
-	if length(gp)<=1 then begin
+	if length(gp)=0 then begin
+		report_error('length(gp)=0 in percentile_x_graph');
+		exit;
+	end;
+	if length(gp)=1 then begin
 		percentile_x_graph:=gp[0];
 		exit;
 	end;
 	g:=copy(gp,0,length(gp));
+	g:=gp;
 	x_graph_ascending(g);
 	if (percentile<0) then percentile:=0;
 	if (percentile>100) then percentile:=100;

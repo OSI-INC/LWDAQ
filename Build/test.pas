@@ -10,7 +10,7 @@ const
 	bsize=10000000;
 	gsize=1000;
 	tsize=10;
-	reps=1000;
+	reps=100;
 	mreps=100;
 	msize=4;
 	tmsize=100;

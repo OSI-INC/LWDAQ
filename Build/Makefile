@@ -106,13 +106,13 @@ test: test.pas $(OBJA)
 
 # Compile the LWDAQ shared library. We don't list all the required objects in
 # the fpc command line because fpc will look for them as it compiles the dynamic
-# library. On MacOS when compiling our library with refence to the Tcl 8.7 
-# framework, we find that the Tcl library self-reference is an absolute path
-# to the Tcl library in a /Library subdirectory, as if it had been installed
-# in the operating system, so our lwdaq library will try to find the Tcl 
-# library in the /Library location, where it may not exist, and even if it 
-# does exist, we don't want to use it. We change the path to the Tcl library
-# used by our lwdaq library using the install_name_tool command.
+# library. On MacOS when compiling our library with reference to the Tcl 8.7
+# framework, we find that the Tcl library self-reference is an absolute path to
+# the Tcl library in a /Library subdirectory, as if it had been installed in the
+# operating system, so our lwdaq library will try to find the Tcl library in the
+# /Library location, where it may not exist, and even if it does exist, we don't
+# want to use it. We change the path to the Tcl library used by our lwdaq
+# library using the install_name_tool command.
 $(LWDAQ): $(SRC_DIR)/lwdaq.pas $(OBJA) $(OBJB)
 	fpc $< -o./$@ $(FPC_FLAGS) $(TCL_FLAGS)
 	cp -f $@ $(LWDAQ_DIR)/$@
