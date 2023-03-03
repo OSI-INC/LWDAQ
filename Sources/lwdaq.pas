@@ -530,13 +530,13 @@ begin
 end;
 
 {
-<p>lwdaq_draw transfers the named image into the named TK photo. You pass the lwdaq image name followed by the tk photo name, and then your options in the form ?option value?. When the routine draws the image, it over-writes the first few pixels in the first image row with a header block containing the image dimensions, its analysis bounds, and its results string.</p>
+<p>lwdaq_draw transfers the contents of a lwdaq image into a Tk photo. We pass the lwdaq image name followed by the Tk photo name, and then our options in the form ?option value?. When the routine draws the image, it over-writes the first few pixels in the first image row with a header block containing the image dimensions, its analysis bounds, and its results string.</p>
 
 <p>The -intensify option can take four values: mild, strong, exact, and none. Mild intensification displays anything darker than four standard deviations below the mean intensity as black, and anything brighter than four standard deviations above the mean intensity as white. In between black and white the display is linear with pixel brightness. Strong intensification does the same thing, but for a range of two standard deviations from the mean. Exact displays the darkest spot in the image as black and the brightest as white. In all three cases, we calculate the mean, standard deviation, minimum, and maximum intensity of the image within the <i>analysis bounds</i>, not across the entire image.</p>
 
-<p>The -zoom option scales the image as we draw it in the TK photo. This scaling is in addition to the scaling called for by the global <i>gui_display_zoom</i> parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. If the TK photo is initially smaller than the size required by the zoomed image, the TK photo will expand to accommodate the zoomed image. But if the TK photo is initially larger than required, the TK photo will not contract to the smaller size of the zoomed image. The product of the zoom value and the global <i>gui_display_zoom</i> can take any value between 0.1 and 10. But the effective value of the scaling factor is dicated by the requirements of sub-sampling. If the scaling factor is greater than 1, we round it to the nearest integer, <i>e</i>, and draw each image pixel on the screen as a block of <i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we round its inverse to the nearest integer, <i>c</i>. We draw only one pixel out of every <i>c</i> pixels in the TK photo. If the scaling factor is 0.3, we draw every third pixel. If 0.4, we draw every third pixel if your computer rounds 1/0.4 to 3, or every second pixel if your computer rounds 1/0.4 to 2. With scaling factor 0.0, we draw every tenth pixel.</p>
+<p>The -zoom option scales the image as we draw it in the Tk photo. This scaling is in addition to the scaling called for by the global <i>gui_display_zoom</i> parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. If the Tk photo is initially smaller than the size required by the zoomed image, the Tk photo will expand to accommodate the zoomed image. But if the Tk photo is initially larger than required, the Tk photo will not contract to the smaller size of the zoomed image. The product of the zoom value and the global <i>gui_display_zoom</i> can take any value between 0.1 and 10. But the effective value of the scaling factor is dicated by the requirements of sub-sampling. If the scaling factor is greater than 1, we round it to the nearest integer, <i>e</i>, and draw each image pixel on the screen as a block of <i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we round its inverse to the nearest integer, <i>c</i>. We draw only one pixel out of every <i>c</i> pixels in the Tk photo. If the scaling factor is 0.3, we draw every third pixel. If 0.4, we draw every third pixel if your computer rounds 1/0.4 to 3, or every second pixel if your computer rounds 1/0.4 to 2. With scaling factor 0.0, we draw every tenth pixel.</p>
 
-<p>With -clear set to 1, lwdaq_draw clears the overlay in the lwdaq image before drawing in the TK photo. The overlay may contain a graph or oscilloscope display, or analysis indicator lines. If you don't want these to be displayed, set -clear to 1. But note that whatever was in the overlay will be lost.</p>
+<p>With -clear set to 1, lwdaq_draw clears the overlay in the lwdaq image before drawing in the Tk photo. The overlay may contain a graph or oscilloscope display, or analysis indicator lines. If you don't want these to be displayed, set -clear to 1. But note that whatever was in the overlay will be lost.</p>
 
 <p>By default, -show_bounds is 1, and the routine draws a blue rectangle to show the the image analysis boundaries, which are used by image analysis routines like lwdaq_rasnik and lwdaq_bcam. But with -show_bounds set to 0, this blue rectangle is not drawn. If you want to be sure that you don't have a blue rectangle drawn over your gray-scale image, you should also specify -clear 1, so that lwdaq_draw will clear the image overlay of any pre-existing blue rectangles.</p>
 }
@@ -685,6 +685,139 @@ begin
 		zoomX,zoomY,subsampleX,subsampleY,1);
 	if error_string<>'' then Tcl_SetReturnString(interp,error_string);
 	lwdaq_draw:=Tcl_OK;
+end;
+
+{
+<p>lwdaq_draw_raw renders a block of raw image data in a Tk photo.</p>
+
+<p>The -zoom option scales the image as we draw it in the Tk photo, see <a href="#lwdaq_draw">lwdaq_draw</a>.
+}
+function lwdaq_draw_raw(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
+
+const
+	min_zoom=0.1;
+	max_zoom=10;
+	
+var 
+	option:string;
+	arg_index:integer;
+	data_obj:pointer=nil;
+	data_ptr:pointer=nil;
+	data_size:integer=0;
+	photo_name:string='';
+	width:integer=0;
+	height:integer=0;
+	pix_fmt:string='rgb24';
+	zoom:real=1;
+	vp:pointer=nil;
+	ph:pointer=nil;
+	pib:Tk_PhotoImageBlock;
+	subsampleX,subsampleY,zoomX,zoomY:integer;
+	draw_width,draw_height:integer;
+	scale:real;
+
+begin
+	error_string:='';
+	gui_interp_ptr:=interp;
+	lwdaq_draw_raw:=Tcl_Error;
+
+	if (argc<3)	or (not odd(argc)) then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Wrong number of arguments, must be "'
+			+'lwdaq_image_draw image photo ?option value?".');
+		exit;
+	end;
+		
+	data_obj:=argv[1];
+	photo_name:=Tcl_ObjString(argv[2]);
+	arg_index:=3;
+	while (arg_index<argc-1) do begin
+		option:=Tcl_ObjString(argv[arg_index]);
+		inc(arg_index);
+		vp:=argv[arg_index];
+		inc(arg_index);
+		if (option='-pix_fmt') then pix_fmt:=Tcl_ObjString(vp)
+		else if (option='-zoom') then zoom:=Tcl_ObjReal(vp)
+		else if (option='-width') then width:=Tcl_ObjInteger(vp)
+		else if (option='-height') then height:=Tcl_ObjInteger(vp)
+		else begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Bad option "'+option+'", must be one of '
+				+'"-intensify -zoom -clear -show_bounds".');
+			exit;
+		end;
+	end;
+	
+	data_ptr:=Tcl_GetByteArrayFromObj(data_obj,data_size);
+	
+	if (width<=0) and (height<=0) then begin
+		width:=trunc(sqrt(data_size));
+		height:=width;
+	end;
+
+	if (width<=0) and (height>0) then begin
+		width:=trunc(data_size/height);
+	end;
+
+	if (width>0) and (height<=0) then begin
+		height:=trunc(data_size/width);
+	end;
+
+	ph:=Tk_FindPhoto(interp,PChar(photo_name));
+	if ph=nil then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Photo "'+photo_name+'" does not exist.');
+		exit;
+	end;
+	
+	if (pix_fmt = 'gray') then begin
+		pib.pixelptr:=data_ptr;
+		pib.width:=width;
+		pib.height:=height;
+		pib.pitch:=width*1;
+		pib.pixelSize:=1;
+		pib.offset[red]:=0;
+		pib.offset[green]:=0;
+		pib.offset[blue]:=0;
+		pib.offset[alpha]:=0;
+	end else begin
+		pib.pixelptr:=data_ptr;
+		pib.width:=width;
+		pib.height:=height;
+		pib.pitch:=width*3;
+		pib.pixelSize:=3;
+		pib.offset[red]:=0;
+		pib.offset[green]:=1;
+		pib.offset[blue]:=2;
+		pib.offset[alpha]:=0;
+	end;
+	
+	scale:=zoom*gui_display_zoom;
+	if scale<min_zoom then scale:=min_zoom;
+	if scale>max_zoom then scale:=max_zoom;
+	if scale>=1 then begin
+		subsampleX:=1;
+		subsampleY:=1;
+		zoomX:=round(scale);
+		zoomY:=round(scale);
+		draw_width:=pib.width*zoomX;
+		draw_height:=pib.height*zoomY;
+	end else begin
+		subsampleX:=round(1/scale);
+		subsampleY:=round(1/scale);
+		zoomX:=1;
+		zoomY:=1;
+		draw_width:=round(pib.width/subsampleX);
+		draw_height:=round(pib.height/subsampleY);
+	end;
+
+	Tk_PhotoSetSize(interp,ph,draw_width,draw_height);
+	Tk_PhotoBlank(ph);
+	Tk_PhotoPutZoomedBlock(interp,ph,@pib,0,0,
+		draw_width,draw_height,
+		zoomX,zoomY,subsampleX,subsampleY,1);
+	if error_string<>'' then Tcl_SetReturnString(interp,error_string);
+	lwdaq_draw_raw:=Tcl_OK;
 end;
 
 {
@@ -5458,6 +5591,7 @@ begin
 	tcl_createobjcommand(interp,'lwdaq_error_string',lwdaq_error_string,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_image_create',lwdaq_image_create,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_draw',lwdaq_draw,0,nil);
+	tcl_createobjcommand(interp,'lwdaq_draw_raw',lwdaq_draw_raw,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_image_contents',lwdaq_image_contents,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_image_destroy',lwdaq_image_destroy,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_photo_contents',lwdaq_photo_contents,0,nil);

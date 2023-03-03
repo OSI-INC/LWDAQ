@@ -434,7 +434,7 @@ proc Videoplayer_raw_extract {} {
 	upvar stream_data s
 	upvar stream_pointer i
 	
-	set raw_size [expr round($config(video_width)*$config(video_height)\
+	set raw_size [expr round(3*$config(video_width)*$config(video_height)\
 		*$config(display_scale)*$config(display_scale))]
 	if {[string length $s] >= $i + $raw_size - 1} {
 		set raw [string range $s $i [expr $i + $raw_size - 1]]
@@ -451,18 +451,14 @@ proc Videoplayer_play {} {
 	upvar #0 Videoplayer_info info
 
 	set info(control) "Play"
-	set start [clock milliseconds]
-	set prev 0
-	set vtime 0
 
-	set prev [clock milliseconds]
 	set w [expr round($config(display_scale)*$config(video_width))]
 	set h [expr round($config(display_scale)*$config(video_height))]
 	set num_frames [expr round($config(video_duration)*$config(video_framerate))]
 	set cmd "| $info(ffmpeg) -nostdin \
 		-loglevel error \
 		-i $config(video_file) \
-		-c:v png \
+		-c:v rawvideo \
 		-pix_fmt rgb24 \
 		-vf \"scale=$w\:$h\" \
 		-frames:v $num_frames \
@@ -474,53 +470,34 @@ proc Videoplayer_play {} {
 # -pix_fmt rgb8 does nothing.
 	
 	set ch [open $cmd]
-	Videoplayer_print "Opened channel $ch to ffmpeg, reading PNG frames."
+	Videoplayer_print "Opened channel $ch to ffmpeg, reading frames."
 	chan configure $ch -translation binary -blocking 0
 	set stream_pointer 0
 	set stream_data ""
 	set counter 0
-	set start [clock milliseconds]
+	set start_time [clock milliseconds]
+	set idle_time 0
 	set read_done 0
-	set read_start $start
 	set play_time 0
 	set video_time 0
 	set update_done [clock milliseconds]
 	while {($counter < $num_frames) && ($info(control) != "Stop")} {	
 		append stream_data [chan read $ch]
-		set data [Videoplayer_png_extract]
-#		set data [Videoplayer_raw_extract]
+		set data [Videoplayer_raw_extract]
 		if {$data != ""} {
 			incr counter
 			if {($read_done > 0) && ($play_time - $video_time < 0.1)} {
+				set idle_start_time [clock milliseconds]
 				while {([clock milliseconds] - $read_done) \
 					< 1000.0/$config(video_framerate)} {
 					LWDAQ_wait_ms 1
 				}
-			} else {
-				set f [open ~/Desktop/Sample.png w]
-				fconfigure $f -translation binary
-				puts -nonewline $f $data
-				close $f
+				set idle_time [expr $idle_time + [clock milliseconds] - $idle_start_time]
 			}
 			set read_done [clock milliseconds]
-#			lwdaq_image_create -name vid -data $data -height $h -width $w
-#			lwdaq_draw vid $info(display_photo)
-			$info(display_photo) put $data
-			set put_done [clock milliseconds]
+			lwdaq_draw_raw $data $info(display_photo) -width $w -height $h -pix_fmt rgb24
 			LWDAQ_update
-			set update_done [clock milliseconds]
-			if {$config(verbose)} {
-				Videoplayer_print "frame = $counter,\
-					video time = [format %.2f \
-						[expr 1.0*$counter/$config(video_framerate)]],\
-					play time = [format %.2f [expr 0.001*($update_done - $start)]],\
-					read time = [expr $read_done - $read_start],\
-					put time = [expr $put_done - $read_done],\
-					update time = [expr $update_done - $put_done]."
-			}
-			set read_start [clock milliseconds]
 		} else {
-			if {[clock milliseconds] - $read_start > 1000} {break}
 			if {![winfo exists $info(text)]} {break}
 		}
 		LWDAQ_support
@@ -528,9 +505,9 @@ proc Videoplayer_play {} {
 	close $ch
 	Videoplayer_print "Done with video, closed channel $ch."
 	Videoplayer_print "frame = $counter,\
-		video time = [format %.2f \
-			[expr 1.0*$counter/$config(video_framerate)]],\
-		play time = [format %.2f [expr 0.001*($update_done - $start)]]."
+		video time = [format %.2f [expr 1.0*$counter/$config(video_framerate)]],\
+		play time = [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]],\
+		idle time = [format %.2f [expr 0.001*($idle_time)]]"
 	set info(control) "Idle"
 }
 
