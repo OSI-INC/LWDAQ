@@ -1,4 +1,24 @@
 <script>
+# This script illustrates the use of our database package, searching
+# through our Devices.xml file for devices with part number A3038 and
+# customer name "Natalia", then listing them.
+package require DB
+set devices [DB_read]
+set devices [DB_get_list $devices device]
+set count 0
+foreach d $devices {
+	set sn [DB_get_list $d sn]
+	set pn [DB_get_list $d pn]
+	set c [DB_get_list $d c]
+	if {[regexp {A3038} $pn] && [regexp {Natalia} $c]} {
+		LWDAQ_print $t "$sn $pn \"[lindex $c 0]\""
+		incr count
+	}
+}
+LWDAQ_print $t "Found $count matching devices."
+</script>
+
+<script>
 # We used this script to align circular survey targets with the 
 # field of view of a BCAM. The script opens a canvas widget in
 # the TK master window (the funny little window with the quit

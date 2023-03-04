@@ -46,39 +46,41 @@ proc DB_init {} {
 }
 
 #
-# DB_txt_to_xml reads a flat text database file, in which the first record gives the
-# field names, and all subsequent records are data. The field names will become tags
-# in the xml (extendable markup language) output, so the routine puts a leading
-# underscore before tags that begin with a number, and replaces all spaces, commas,
-# hyphens, periods, forward slashes, semicolons with underscores. The xml output
-# records will contain no empty fields. The entries will be indented by tabs for your
-# convenience when looking at the xml file with a text editor. The routine takes
-# up to four optional parameters. The file name is the first, and if you don't specify
-# this one, or pass an empty string in its place, the routine will open a browser
-# window and ask you to select a file. The second is the xml tag name you want to
-# assign to the records in the database. A flat database does not explicitly name
-# its records, and will not allow you to gather more than one type of record in the
-# same file. An xml database allows you to have as many different types of record as
-# you like, so long as each type has its own tag. All the records in the flat text
-# database will be of the same type, so you give DB_txt_to_xml a name for the record
-# type, which is by default "entry", but might be "customer" or "donor" instead. You
-# can then combine the file produced by DB_txt_to_xml with other xml databases with
-# different entry tags, and you will still be able to extract your "customers" and
-# "donors" even though you have "events" and "meetings" in the same database. The
-# purpose of DB_txt_to_xml is to help you move from a traditional flat database
-# structure supported by some office program into a more flexible xml database structure
-# supported by our free and simple TCL database searcher and editor, or by some
-# other, more powerful, xml database manager. When it's done, DB_txt_to_xml returns
-# the number of records it transferred from the txt database to the xml database.
-# The routine also creates for you a prototype version of your xml record. Because
-# the xml database will not contain any empty fields, you may have no individual
-# record in the xml database that manifests all the fields. The prototype record
-# corresponding to your record type has tag <entry_prototype> where "entry" is your
-# record type. All fields will be present in the prototype record, even though they
-# will all be empty. The order of the fields will be the order they occured in the
-# original database file. Later, when you want to add to the xml database, you can
-# pull out the prototype field, add entries, and then append it to the xml database
-# with DB_scrub, which removes empty fields.
+# DB_txt_to_xml reads a flat text database file, in which the first record gives
+# the field names, and all subsequent records are data. The field names will
+# become tags in the xml (extendable markup language) output, so the routine
+# puts a leading underscore before tags that begin with a number, and replaces
+# all spaces, commas, hyphens, periods, forward slashes, semicolons with
+# underscores. The xml output records will contain no empty fields. The entries
+# will be indented by tabs for your convenience when looking at the xml file
+# with a text editor. The routine takes up to four optional parameters. The file
+# name is the first, and if you don't specify this one, or pass an empty string
+# in its place, the routine will open a browser window and ask you to select a
+# file. The second is the xml tag name you want to assign to the records in the
+# database. A flat database does not explicitly name its records, and will not
+# allow you to gather more than one type of record in the same file. An xml
+# database allows you to have as many different types of record as you like, so
+# long as each type has its own tag. All the records in the flat text database
+# will be of the same type, so you give DB_txt_to_xml a name for the record
+# type, which is by default "entry", but might be "customer" or "donor" instead.
+# You can then combine the file produced by DB_txt_to_xml with other xml
+# databases with different entry tags, and you will still be able to extract
+# your "customers" and "donors" even though you have "events" and "meetings" in
+# the same database. The purpose of DB_txt_to_xml is to help you move from a
+# traditional flat database structure supported by some office program into a
+# more flexible xml database structure supported by our free and simple TCL
+# database searcher and editor, or by some other, more powerful, xml database
+# manager. When it's done, DB_txt_to_xml returns the number of records it
+# transferred from the txt database to the xml database. The routine also
+# creates for you a prototype version of your xml record. Because the xml
+# database will not contain any empty fields, you may have no individual record
+# in the xml database that manifests all the fields. The prototype record
+# corresponding to your record type has tag <entry_prototype> where "entry" is
+# your record type. All fields will be present in the prototype record, even
+# though they will all be empty. The order of the fields will be the order they
+# occured in the original database file. Later, when you want to add to the xml
+# database, you can pull out the prototype field, add entries, and then append
+# it to the xml database with DB_scrub, which removes empty fields.
 #
 proc DB_txt_to_xml {{file_name ""} {entry_tag "entry"} {entry_mark "\n"} {field_mark ","}} {
 	if {$file_name == ""} {
@@ -322,13 +324,13 @@ proc DB_prototype {xml tag} {
 # returned value gets printed to a new text window, and the list of commands
 # gets printed to another new text window in the same top-level window. The
 # commands in the command text window can refer to any of the Database Manager's
-# variables (in the info(variables) array), by their global names. The new toplevel
-# window provides two buttons, one to save the result to a file, and another to
-# append the result to an existing file. The routine adds the command text
-# window's contents to the Database Manager's list of previously-executed 
+# variables (in the info(variables) array), by their global names. The new
+# toplevel window provides two buttons, one to save the result to a file, and
+# another to append the result to an existing file. The routine adds the command
+# text window's contents to the Database Manager's list of previously-executed
 # commands, and clears the command text window for the next command. The command
-# itself can refer to the execut window's lower text display as $r, and if 
-# the local "result" variable is not empty, it also will appear in the execute
+# itself can refer to the execut window's lower text display as $r, and if the
+# local "result" variable is not empty, it also will appear in the execute
 # result text window.
 #
 proc DB_execute_command {} {
@@ -587,12 +589,12 @@ proc DB_open {} {
 
 
 #
-# DB_update is a routine that allows you to move the windows and press 
-# application buttons once every second while running a database read,
-# search or translation. The database routine includes a call to DB_update
-# in its repeating loop. You will note that DB_txt_to_xml calls this routine
-# in all of its repeat loops, and that's why the TCL interpreter responds
-# while the txt to xml translation is taking place.
+# DB_update is a routine that allows you to move the windows and press
+# application buttons once every second while running a database read, search or
+# translation. The database routine includes a call to DB_update in its
+# repeating loop. You will note that DB_txt_to_xml calls this routine in all of
+# its repeat loops, and that's why the TCL interpreter responds while the txt to
+# xml translation is taking place.
 #
 proc DB_update {} {
 	global DB_update_time
@@ -605,11 +607,11 @@ proc DB_update {} {
 }
 
 #
-# DB_print prints a string to the end of a text window's contents
-# in the specified color. If you pass "-nonewline" as an option after 
-# the command, then the routine does not add a carriage return to the end 
-# of its print-out. The routine also recognises the "-newline" option, which 
-# is the default. If the text window does not exist, the routine returns zero.
+# DB_print prints a string to the end of a text window's contents in the
+# specified color. If you pass "-nonewline" as an option after the command, then
+# the routine does not add a carriage return to the end of its print-out. The
+# routine also recognises the "-newline" option, which is the default. If the
+# text window does not exist, the routine returns zero.
 #
 proc DB_print {args} {
 	set option "-newline"

@@ -919,10 +919,6 @@ proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 }
 
 #
-# 
-#
-
-#
 # Videoarchiver_stream start streaming of video from the camera.
 #
 proc Videoarchiver_stream {n} {

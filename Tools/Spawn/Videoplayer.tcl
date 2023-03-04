@@ -511,6 +511,50 @@ proc Videoplayer_play {} {
 	set info(control) "Idle"
 }
 
+proc Videoplayer_stream {} {
+	upvar #0 Videoplayer_config config
+	upvar #0 Videoplayer_info info
+
+	set info(control) "Stream"
+
+	set w [expr round($config(display_scale)*$config(video_width))]
+	set h [expr round($config(display_scale)*$config(video_height))]
+	set cmd "| $info(ffmpeg) \
+			-nostdin \
+			-loglevel error \
+			-i tcp://71.174.73.190:2222 \
+			-c:v rawvideo \
+			-pix_fmt rgb24 \
+			-vf \"scale=$w\:$h\" \
+			-f image2pipe -"
+	set ch [open $cmd]
+	Videoplayer_print "Opened channel $ch to ffmpeg, reading frames."
+	chan configure $ch -translation binary -blocking 0
+	set stream_pointer 0
+	set stream_data ""
+	set counter 0
+	set start_time [clock milliseconds]
+	set play_time 0
+	set video_time 0
+	while {$info(control) != "Stop"} {	
+		append stream_data [chan read $ch]
+		set data [Videoplayer_raw_extract]
+		if {$data != ""} {
+			incr counter
+			lwdaq_draw_raw $data $info(display_photo) -width $w -height $h -pix_fmt rgb24
+			LWDAQ_update
+		} else {
+			if {![winfo exists $info(text)]} {break}
+		}
+		LWDAQ_support
+	}
+	close $ch
+	Videoplayer_print "Done with video, closed channel $ch."
+	Videoplayer_print "frame = $counter,\
+		video time = [format %.2f [expr 1.0*$counter/$config(video_framerate)]],\
+		play time = [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]."
+	set info(control) "Idle"
+}
 proc Videoplayer_stop {} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
@@ -767,7 +811,7 @@ proc Videoplayer_open {} {
 	set info(play_control_label) $f.ctrl
 	pack $f.ctrl -side left -expand yes
 
-	foreach a {Read Stop Play PickDir} {
+	foreach a {Read Stop Play Stream PickDir} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command Videoplayer_$b
 		pack $f.$b -side left -expand yes

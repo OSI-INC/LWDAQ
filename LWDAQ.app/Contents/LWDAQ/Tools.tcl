@@ -51,9 +51,11 @@ proc LWDAQ_read_script {fn} {
 # the tool script to use: one gives the mode in which the tool is to operate,
 # the other gives the tool file name. If the mode is "Standalone", the routine
 # deletes the Instrument and Tool menus so they will not conflict with those
-# provided by the original process that initiated the spawning of a standalone
-# tool. The default mode is "Communal", in which tools share the same LWDAQ
-# process.
+# provided by the original process that initiated the spawning. The default mode
+# is "Communal", in which tools share the same LWDAQ process. When the tool
+# starts up standalone, it should take over the main window for its own
+# interface, deleting the usual Quit button. When the tool starts up communal,
+# it should create a new toplevel window for its interface.
 #
 proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 	global LWDAQ_Info
@@ -131,7 +133,7 @@ proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 	global LWDAQ_Info
 	
-	# When we spawn the tool, we the spawned process to start with its operating
+	# When we spawn the tool, we want the spawned process to start with its operating
 	# system file pointer in a known location. So we change directory to the 
 	# LWDAQ program directory.
 	cd $LWDAQ_Info(program_dir)
