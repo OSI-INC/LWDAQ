@@ -9,16 +9,16 @@
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation; either version 2 of the License, or (at your option) any later
 # version.
-#
+
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 # details.
-#
+
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 # Place - Suite 330, Boston, MA  02111-1307, USA
-#
+
 # This program launches LWDAQ from a terminal on Linux, Raspbian, or MacOS. On
 # Windows, you can run the shell from Cygwin directly. On MinGW you can run the
 # shell only after you insert an empty line in front of the hash-bang at the top
@@ -41,10 +41,8 @@
 # script is in the LWDAQ directory.
 LWDAQ_DIR=`dirname $0`
 
-# Determine the architecture. We support only 64-bit.
-
 # Determine operating system. Default is Unix. 
-OS=Linux
+OS=Windows
 if [ "`uname -a | grep -i Darwin`" != "" ];
 then 
 	OS=MacOS
@@ -103,43 +101,34 @@ then
 fi
 if [ "$OPTION" == "--no-console" ]; 
 then 
-	# Run without graphics, without console, in the background.
+	# Run without graphics, without console, in background.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=1
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--no-gui" ]; 
 then 
-	# Run without graphics, with console, in the foreground.
+	# Run without graphics, with console, in foreground.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--gui" ]; 
 then 
+	# Run with graphics, with console, in foreground.
 	GUI_ENABLED=1
-	# On Linux and Raspbian we run in the foreground when we run with graphics
-	# because we want to use the terminal as our TCL console, and in any case
-	# the graphics will not show up on these systems if the application is running
-	# in the background. On Windows and MacOS we run in the background and free
-	# up the console.
-	if [ "$OS" == "Linux" ] || [ "$OS" == "Raspbian" ];
-	then
-		RUN_IN_BACKGROUND=0
-	else
-		RUN_IN_BACKGROUND=1
-	fi
+	RUN_IN_BACKGROUND=0
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--spawn" ]; 
 then 
-	# Run with graphics, with console, in background.
+	# Run with graphics, without console, background.
 	GUI_ENABLED=1
 	RUN_IN_BACKGROUND=1
 	OPTION_FOUND=1
 fi
 
-# If the option wass not found, we issue a warning and set the three
+# If the option was not found, we issue a warning and set the three
 # flags that need to be set.
 if [ $OPTION_FOUND == 0 ];
 then
@@ -228,15 +217,22 @@ echo "SHELL: $SHELL"
 INIT_FILE="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Init.tcl"
 
 # Launch the shell and pass to it the start-up script and any additional
-# parameters we may have passed to this bash script. On Linux, to make 
-# sure that our background process to be independent of the parent, we have 
-# to launch with the "no hang-up" command "nohup". The "nohup" we find is
-# necessary when launching from desktop icons on Ubuntu.
+# parameters we may have passed to this bash script. On Linux, to make sure that
+# our child process are independent of their parents, we have to launch with the
+# "no hang-up" command "nohup". This is the behavior we want when spawning new
+# lwdaq processes with --spawn. When we launch with --no-console, we also run
+# in the background, but we want our output to go to stdout, so we don't use
+# the nohup.
 if [ $RUN_IN_BACKGROUND == 1 ];
 then
 	if [ "$OS" == "Linux" ] || [ "$OS" == "Raspbian" ];
 	then
-		nohup $SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" &
+		if [ "$OPTION" == "--spawn" ];
+		then
+			nohup $SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" & 
+		else
+			$SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" & 
+		fi
 	else
 		$SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" &
 	fi

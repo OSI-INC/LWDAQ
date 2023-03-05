@@ -126,9 +126,13 @@ proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 # commands string, and these will be appended to the standalone run command in
 # the configuration file. We can pass a configuration file name in for the spawn
 # routine to use, in cases where we are spawning many processes consecutively,
-# each with their own custom configuration, we don't want to over-write one file
-# before it has been used. If we don't provide a file name, the spawn routine
-# generates a file in the temporary directory.
+# each with their own custom configuration, and we don't want to over-write one
+# file before it has been used. If we don't provide a file name, the spawn
+# routine generates a file in the temporary directory. When the routine launches
+# the new process, it does so using the command-line "--spawn" option, which
+# suppresses any console or pipe that might otherwise be connected to the new
+# process. By this means, the new process will not quit when the process that
+# created it quits.
 #
 proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 	global LWDAQ_Info

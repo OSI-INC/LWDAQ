@@ -1,121 +1,66 @@
 <script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq"]
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
+upvar #0 LWDAQ_Info info
 
-close $ch
+cd $info(program_dir)
+
+if {$info(os) == "Windows"} {
+	set ch [open "| [info nameofexecutable]" w+]
+} else {
+	set ch [open "| ./lwdaq" w+]
+}
+fconfigure $ch -translation auto -buffering line -blocking 0
+puts "Opened new LWDAQ with channel $ch."
+
+if {$info(os) == "Windows"} {
+	puts $ch {source LWDAQ.app/Contents/LWDAQ/Init.tcl}
+} 
+puts "Initialized the new LWDAQ."
+
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Standalone}
+puts "Opened the standalone tool."
 </script>
 
 <script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq &"]
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
+upvar #0 LWDAQ_Info info
 
-close $ch
+cd $info(program_dir)
+
+if {$info(os) == "Windows"} {
+	set ch [open "| [info nameofexecutable]" w+]
+} else {
+	set ch [open "| ./lwdaq" w+]
+}
+fconfigure $ch -translation auto -buffering line -blocking 0
+puts "Opened new LWDAQ with channel $ch."
+
+if {$info(os) == "Windows"} {
+	puts $ch {source LWDAQ.app/Contents/LWDAQ/Init.tcl}
+} 
+puts "Initialized the new LWDAQ."
+
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Standalone}
+puts "Opened the standalone tool."
 </script>
 
 <script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq" w]
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
+upvar #0 LWDAQ_Info info
 
-close $ch
-</script>
+cd $info(program_dir)
 
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq" rw]
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
+if {$info(os) == "Windows"} {
+	set ch [open "| [info nameofexecutable]" w+]
+} else {
+	set ch [open "| ./lwdaq" w+]
+}
+fconfigure $ch -translation auto -buffering line -blocking 0
+puts "Opened new LWDAQ with channel $ch."
 
-close $ch
-</script>
+if {$info(os) == "Windows"} {
+	puts $ch {source LWDAQ.app/Contents/LWDAQ/Init.tcl}
+} 
+puts "Initialized the new LWDAQ."
 
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq" r+]
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-
-close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui &" r+]
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-
-close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui" r+]
-LWDAQ_print $ch
-#while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-
-close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui" r+]
-LWDAQ_print $ch
-#while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-
-#close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui" r+]
-LWDAQ_print $t $ch
-#while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-#close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui" r+]
-fconfigure $ch -buffering line -blocking 0
-LWDAQ_print $t $ch
-#while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-#close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui" w+]
-fconfigure $ch -buffering line -blocking 0
-LWDAQ_print $t $ch
-#while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-#close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui"]
-fconfigure $ch -buffering line -blocking 0
-LWDAQ_print $t $ch
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-#close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui"]
-fconfigure $ch -buffering line -blocking 0
-LWDAQ_print $t $ch
-LWDAQ_delay_ms 1000
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-#close $ch
-</script>
-
-<script>
-cd $LWDAQ_Info(program_dir)
-set ch [open "| ./lwdaq --gui"]
-fconfigure $ch -buffering line -blocking 0
-LWDAQ_print $t $ch
-LWDAQ_wait_ms 1000
-while {[gets $ch line] > 0} {LWDAQ_print $t $line}
-#close $ch
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Standalone}
+puts "Opened the standalone tool."
 </script>
 

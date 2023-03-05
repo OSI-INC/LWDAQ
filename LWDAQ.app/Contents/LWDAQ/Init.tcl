@@ -106,7 +106,8 @@ set LWDAQ_Info(configuration_file) ""
 set LWDAQ_Info(argv) ""
 
 # Go through the list of arguments passed to this script, and set the
-# user-defined flags. We may overrule these values later. 
+# configuration file name and deteremine if we should commandeer the launching
+# terminal's standard input and output for use as a Tcl console. 
 foreach a $argv {
 	switch -glob -- $a {
 		"" {
@@ -120,13 +121,7 @@ foreach a $argv {
 			set LWDAQ_Info(run_mode) $a
 		}
 		"--gui" {
-			switch $LWDAQ_Info(os) {
-				"MacOS" {set LWDAQ_Info(console_enabled) 0}
-				"Windows" {set LWDAQ_Info(console_enabled) 0}
-				"Linux" {set LWDAQ_Info(console_enabled) 1}
-				"Raspbian" {set LWDAQ_Info(console_enabled) 1}
-				default {set LWDAQ_Info(console_enabled) 1}
-			}
+			set LWDAQ_Info(console_enabled) 1
 			set LWDAQ_Info(run_mode) $a
 		}
 		"--no-gui" {
@@ -159,11 +154,10 @@ foreach a $argv {
 	}
 }
 
-
-# Decide whether or not we should enable LWDAQ's graphical user
-# interface (GUI). If LWDAQ is running in the "wish" shell, which is the
-# TclTk shell, we turn on the GUI. But if LWDAQ is running in "tclsh", 
-# the Tcl-only shell, we turn off the GUI
+# Decide whether or not we should enable LWDAQ's graphical user interface (GUI).
+# If LWDAQ is running in the "wish" shell, which is the TclTk shell, we turn on
+# the GUI. But if LWDAQ is running in "tclsh", the Tcl-only shell, we turn off
+# the GUI
 set LWDAQ_Info(gui_enabled) \
 	[string match -nocase "*wish*" \
 		[file tail [info nameofexecutable]]]
@@ -174,8 +168,8 @@ if {!$LWDAQ_Info(gui_enabled)} {
 	proc winfo {args} {return 0}
 }
 
-# Determine whether or not we have a graphical slave console available
-# through the TK "console" command.
+# Determine whether or not we have a graphical slave console available through
+# the TK "console" command.
 if {$LWDAQ_Info(console_enabled)} {
 	set LWDAQ_Info(slave_console) 0
 } {

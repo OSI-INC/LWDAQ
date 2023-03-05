@@ -48,45 +48,42 @@ set script=%1
 set gui_enabled=1
 set console_enabled=0
 set background=1
-set option=--gui
+set option=--spawn
 
 REM ------------------------------------------
 REM Attempt to extract options and configuration
 REM file name from the command line parameters.
 REM ------------------------------------------
 
-if [%1]==[--no-gui] (
-	set option=%1
-	set gui_enabled=0
-	set console_enabled=1
-	set background=0
-	set script=%2
-) 
 if [%1]==[--gui] (
 	set option=%1
 	set gui_enabled=1
-	set console_enabled=0
 	set background=1
 	set script=%2
 )
+if [%1]==[--no-gui] (
+	set option=%1
+	set gui_enabled=0
+	set background=0
+	set script=%2
+) 
 if [%1]==[--no-console] (
 	set option=%1
 	set gui_enabled=0
-	set console_enabled=0
 	set background=1
 	set script=%2
 )
 if [%1]==[--spawn] (
 	set option=%1
 	set gui_enabled=1
-	set console_enabled=0
 	set background=1
 	set script=%2
 )
-echo Option: %option%
-echo Background: %background%
-echo Console: %console_enabled%
-echo Graphics: %gui_enabled%
+echo OS: Windows
+echo OPTION: %option%
+echo GUI_ENABLED: %gui_enabled%
+echo RUN_IN_BACKGROUND: %background%
+echo LOCAL_DIR: %cd%
 
 REM ------------------------------------------
 REM If the start-up script name is not an
@@ -102,11 +99,11 @@ if [%script%]==[] (
 		echo ERROR: No configuration file specified with no-console option.
 		goto done
 	) else (
-		echo Configuration: none
+		echo CONFIG_FILE: None
 		goto donescript
 	)
 )
-echo Configuration: %script%
+echo CONFIG_FILE: %script%
 :donescript
 
 REM ------------------------------------------
@@ -123,7 +120,7 @@ if not exist "%shell%" (
   echo ERROR: Cannot find shell %shell%.  
   goto done
 ) else (
-  echo Shell: "%shell%"
+  echo SHELL: "%shell%"
 )
 
 REM ------------------------------------------
@@ -131,12 +128,6 @@ REM Set the initializer script for the shell.
 REM ------------------------------------------
 
 set initializer=%LWDAQ_DIR%LWDAQ.app\Contents\LWDAQ\Init.tcl
-if not exist "%initializer%" (
-  echo ERROR: Cannot find initializer %initializer%.
-  goto done
-) else (
-  echo Initializer: "%initializer%"
-)
 
 REM ------------------------------------------
 REM Run LWDAQ as a separate process or a process
@@ -144,9 +135,9 @@ REM within this batch file, depending upon the
 REM options.
 REM ------------------------------------------
 
-if [%background%]==[0] (
   SETLOCAL
   set path="%path%"
+if [%background%]==[0] (
   "%shell%" "%initializer%" %option% %script%
 )
 if [%background%]==[1] (
