@@ -58,7 +58,7 @@ REM ------------------------------------------
 if [%1]==[--gui] (
 	set option=%1
 	set gui_enabled=1
-	set background=1
+	set background=0
 	set script=%2
 )
 if [%1]==[--no-gui] (
