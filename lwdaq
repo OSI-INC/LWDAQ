@@ -20,25 +20,24 @@
 # Place - Suite 330, Boston, MA  02111-1307, USA
 
 # This program launches LWDAQ from a terminal on Linux, Raspbian, or MacOS. On
-# Windows, you can run the shell from Cygwin directly. On MinGW you can run the
-# shell only after you insert an empty line in front of the hash-bang at the top
-# of the script. The shell program accepts options --no-gui, --gui,
-# --no-console, --pipe, or --spawn, as described in the LWDAQ manual. The
-# default is --gui. After the option you can pass a TCL script that will be
-# executed by LWDAQ after it starts up. This script is the configuration script.
-# Its full path name will be available in the global variable
-# LWDAQ_Info(configuration_file). If you specify a configuration script you can
-# pass parameters into it by adding them to your command line. These parameters
-# will be placed in the global variable LWDAQ_Info(argv). The first argument
-# after the configuration script will be element zero in the list. The following
-# line, for example, calls tclsh in the background and runs the tcl script
+# Windows, you can run the shell from GitBash or the Windows Linux shell. The
+# shell program accepts options --no-gui, --gui, --no-console, --pipe, or
+# --spawn, as described in the LWDAQ manual. The default is --gui. After the
+# option you can pass a TCL script that will be executed by LWDAQ after it
+# starts up. This script is the configuration script. The full path name of the
+# configuration script will be available in the global variable LWDAQ global
+# variable LWDAQ_Info(configuration_file). If you specify a configuration script
+# you can pass parameters into it by adding them to your command line. These
+# parameters will be placed in the global variable LWDAQ_Info(argv). The first
+# argument after the configuration script will be element zero in the list. The
+# following line calls tclsh in the background and runs the tcl script
 # config.tcl, passing two parameters into LWDAQ_Info(argv), data.txt and 34.58.
 #
 # ./lwdaq --no-console config.tcl data.txt 34.58
 #
 
-# Determine the location of the LWDAQ directory. We assume that this
-# script is in the LWDAQ directory.
+# Determine the location of the LWDAQ directory. We assume that this script is
+# in the LWDAQ directory.
 LWDAQ_DIR=`dirname $0`
 
 # Determine operating system. Default is Unix. 
@@ -60,32 +59,28 @@ then
 	fi 
 fi
 
-# Print operating system and architecture.
-echo "OS: $OS"
-
-# Determine the option and configuration script name. We look for the "--"
-# string at the start of the first parameter, and if we find it, we use this as
-# our option. Otherwise we create the option "--gui". We shift the positional
-# parameters to the left so as to remove the option and configuration file,
-# leaving only additional positional parameters, should they exist. We will pass
-# these additional parameters to tclsh or wish later. We will also pass the
-# value of OPTION into the LWDAQ process, be it --gui, --no-gui, --console,
-# --no-console, or --pipe, so that further handling of the option can take place
-# within LWDAQ. The --pipe and --no-console options are handled the same way in
-# this script: the process runs in the foreground with no graphics. Inside the
-# LWDAQ process, however, the way the console is set up to receive console
-# commands is different.
-if [ `expr "$1" : "--"` -eq 2 ];
+# Go through the options, all of which begin with two dashes, then read the
+# configuration file name, if it exits. After that, further arguments will
+# be retained to pass into LWDAQ. The default launch option is --gui.
+OPTION="--gui"
+VERBOSE=1
+CONFIG_FILE=""
+if [[ $1 == --* ]];
 then
-	OPTION=$1
-	CONFIG_FILE=$2
-	shift 2
+	while [[ $1 == --* ]];
+	do
+		if [ $1 == "--quiet" ];
+		then
+			VERBOSE=0
+		else
+			OPTION=$1
+		fi
+		shift 1
+	done
 else
-	OPTION="--gui"
 	CONFIG_FILE=$1
 	shift 1
 fi
-echo "OPTION: $OPTION"
 
 # Check to see if we should run in no-gui mode with tclsh or with gui in wish,
 # and also whether we should run in the background. The run mode options also
@@ -135,27 +130,6 @@ then
 	echo "WARNING: Unrecognised option '$OPTION', defaulting to --no-gui."
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
-fi
-
-# Report the process options.
-echo "GUI_ENABLED: $GUI_ENABLED"
-echo "RUN_IN_BACKGROUND: $RUN_IN_BACKGROUND"
-
-# Report local directory in which relative file names will be resolved.
-echo "LOCAL_DIR: `pwd`"
-
-# Check the configuration file.
-if [ "$CONFIG_FILE" != "" ];
-then 
-	echo "CONFIG_FILE: $CONFIG_FILE"
-else
-	if [ "$OPTION" == "--no-console" ];
-	then
-		echo "ERROR: No configuration file specified with no-console option."
-		exit
-	else
-		echo "CONFIG_FILE: None"
-	fi
 fi
 
 # Pick the TclTk shell based upon the options, operating system
@@ -210,11 +184,34 @@ then
 	fi
 fi
 
-# Let the user know which shell we selected.
-echo "SHELL: $SHELL"
-
 # Set the initialization script name.
 INIT_FILE="$LWDAQ_DIR/LWDAQ.app/Contents/LWDAQ/Init.tcl"
+
+# If verbose, print details of LWDAQ launch.
+if [ $VERBOSE = 1 ];
+then
+	echo "OS: $OS"
+	echo "OPTION: $OPTION"
+	echo "GUI_ENABLED: $GUI_ENABLED"
+	echo "RUN_IN_BACKGROUND: $RUN_IN_BACKGROUND"
+	echo "LOCAL_DIR: `pwd`"
+	if [ "$CONFIG_FILE" != "" ];
+	then 
+		echo "CONFIG_FILE: $CONFIG_FILE"
+	else
+		echo "CONFIG_FILE: None"
+	fi
+	echo "SHELL: $SHELL"
+fi
+
+# Check the configuration file.
+if [ "$CONFIG_FILE" == "" ];
+then 
+	if [ "$OPTION" == "--no-console" ];
+	then
+		exit "ERROR: No configuration file specified with no-console option."
+	fi
+fi
 
 # Launch the shell and pass to it the start-up script and any additional
 # parameters we may have passed to this bash script. On Linux, to make sure that

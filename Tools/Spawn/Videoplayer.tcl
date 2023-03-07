@@ -454,6 +454,7 @@ proc Videoplayer_play {} {
 
 	set w [expr round($config(display_scale)*$config(video_width))]
 	set h [expr round($config(display_scale)*$config(video_height))]
+	Videoplayer_print "Display width $w height $h"
 	set num_frames [expr round($config(video_duration)*$config(video_framerate))]
 	set cmd "| $info(ffmpeg) -nostdin \
 		-loglevel error \
@@ -489,13 +490,14 @@ proc Videoplayer_play {} {
 			if {($read_done > 0) && ($play_time - $video_time < 0.1)} {
 				set idle_start_time [clock milliseconds]
 				while {([clock milliseconds] - $read_done) \
-					< 1000.0/$config(video_framerate)} {
+					< 1000.0/$config(video_framerate)/$config(display_speed)} {
 					LWDAQ_wait_ms 1
 				}
 				set idle_time [expr $idle_time + [clock milliseconds] - $idle_start_time]
 			}
 			set read_done [clock milliseconds]
-			lwdaq_draw_raw $data $info(display_photo) -width $w -height $h -pix_fmt rgb24
+			lwdaq_draw_raw $data $info(display_photo) \
+				-width $w -height $h -pix_fmt rgb24
 			LWDAQ_update
 		} else {
 			if {![winfo exists $info(text)]} {break}

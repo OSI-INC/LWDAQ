@@ -110,8 +110,8 @@ proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 	# Proceed to run the script at the global scope.
 	uplevel #0 source $fn
 	
-	# At this point, we can assume success.
-	return "SUCCESS"
+	# At this point, we can assume success. We return an empty string.
+	return ""
 }
 
 #

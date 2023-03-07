@@ -135,8 +135,8 @@ REM within this batch file, depending upon the
 REM options.
 REM ------------------------------------------
 
-  SETLOCAL
-  set path="%path%"
+SETLOCAL
+set path="%path%"
 if [%background%]==[0] (
   "%shell%" "%initializer%" %option% %script%
 )

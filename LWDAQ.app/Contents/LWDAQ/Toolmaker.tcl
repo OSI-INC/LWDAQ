@@ -110,3 +110,15 @@ puts $ch {LWDAQ_run_tool Videoplayer.tcl Standalone}
 puts "Opened the standalone tool."
 </script>
 
+<script>
+upvar #0 LWDAQ_Info info
+
+cd $info(program_dir)
+
+set ch [open "| ./lwdaq --quiet --gui" w+]
+fconfigure $ch -translation auto -buffering line -blocking 0
+puts "Opened new LWDAQ with channel $ch."
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Standalone}
+puts "Opened the standalone tool."
+</script>
+

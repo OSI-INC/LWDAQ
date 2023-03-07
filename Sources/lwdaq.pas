@@ -743,7 +743,7 @@ begin
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"-intensify -zoom -clear -show_bounds".');
+				+'"-pix_fmt -zoom -width -height".');
 			exit;
 		end;
 	end;
