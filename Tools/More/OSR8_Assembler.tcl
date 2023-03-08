@@ -22,17 +22,15 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# Version 1.7: Fully functional assembler for OSR8, not major bugs.
-
 proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_info info
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.8"
+	LWDAQ_tool_init "OSR8_Assembler" "1.9"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
-		return "SUCCESS"
+		return ""
 	}
 	
 	set config(ifn) "~/Desktop/Program.asm"
@@ -58,7 +56,7 @@ proc OSR8_Assembler_init {} {
 		}
 	}	
 		
-	return "SUCCESS"
+	return ""
 }
 
 proc OSR8_Assembler_pick {a} {
@@ -72,11 +70,10 @@ proc OSR8_Assembler_pick {a} {
 	}
 	if {$fn != ""} {
 		set config($a) $fn
+		return $fn
 	} else {
-		return "ABORT"
+		return ""
 	}
-	
-	return "SUCCESS"
 }
 
 proc OSR8_Assembler_edit {a} {
@@ -85,10 +82,10 @@ proc OSR8_Assembler_edit {a} {
 
 	if {[winfo exists $info($a\_ew)]} {
 		raise $info($a\_ew)
-		return "SUCCESS"
 	} else {
 		set info($a\_ew) [LWDAQ_edit_script Open $config($a)]
 	}
+	return $info($a\_ew)
 }
 
 proc OSR8_Assembler_instructions {} {
@@ -114,6 +111,7 @@ proc OSR8_Assembler_instructions {} {
 	
 	LWDAQ_print $info(text) "Number of Available Instructions\
 		= [llength $info(instructions)].\n" purple
+	return ""
 }
 
 proc OSR8_Assembler_find_symbol {line} {
@@ -148,7 +146,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			LWDAQ_print $info(text) "Read [llength $asm] lines of assembler code." purple
 		} else {
 			LWDAQ_print $info(text) "ERROR: Cannot find $config(ifn)."
-			return "FAIL"
+			return ""
 		}
 	} else {
 		LWDAQ_print $info(text) "Received assembler code from input string." purple
@@ -414,14 +412,14 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		set sym_val [OSR8_Assembler_find_symbol $line] 
 		if {[LWDAQ_is_error_result $sym_val]} {
 			LWDAQ_print $info(text) "$sym_val at line $line_index\:\n$line"
-			return "ERROR"
+			return ""
 		} elseif {$sym_val != ""} {
 			set sym [lindex $sym_val 0]
 			set val [lindex $sym_val 1]
 			if {[lsearch -index 0 $symbol_list $sym] >= 0} {
 				LWDAQ_print $info(text) "ERROR: Symbol \"$sym\" already defined\
 					at line $line_index\:\n$line"
-				return "ERROR"
+				return ""
 			}
 			set match 1
 			lappend symbol_list $sym_val
@@ -445,7 +443,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		if {[regexp {\w+} $line dummy]} {
 			LWDAQ_print $info(text) "ERROR: Unrecognised pneumoic\
 				at line $line_index\:\n$line"
-			return "ERROR"
+			return ""
 		}
 	}
 	
@@ -469,14 +467,14 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		} elseif {[regexp {^(\w+):$} $m dummy lbl]} {
 			if {[lsearch -index 0 $label_list $lbl] >= 0} {
 				LWDAQ_print $info(text) "ERROR: Label \"$lbl\"\ defined more than once."
-				return "ERROR"
+				return ""
 			}
 			set val "[format %02X [expr $addr / 256]] [format %02X [expr $addr % 256]] "
 			lappend label_list [list $lbl $val]	
 			LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
 		} else {
 			LWDAQ_print $info(text) "ERROR: Bad label \"$m\" in object code."
-			return "ERROR"
+			return ""
 		}
 	}
 	set mem $new_mem
@@ -503,7 +501,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		}
 		if {!$found_label} {
 			LWDAQ_print $info(text) "ERROR: Undefined label \"$m\"."
-			return "ERROR"
+			return ""
 		} else {
 			incr counter
 		}
@@ -544,7 +542,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 			LWDAQ_print $info(text) "Read [llength $mem] instruction bytes." purple
 		} else {
 			LWDAQ_print $info(text) "ERROR: Cannot find file $config(ofn)."
-			return "FAIL"
+			return ""
 		}
 	} else {
 		LWDAQ_print $info(text) "Received object code from input string." purple
@@ -646,7 +644,7 @@ proc OSR8_Assembler_open {} {
 	upvar #0 OSR8_Assembler_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set f $w.controls
 	frame $f
@@ -683,13 +681,13 @@ proc OSR8_Assembler_open {} {
 	LWDAQ_print $info(text) "(c) 2020 Kevan Hashemi, Open Source\
 		Instruments Inc.\n" purple	
 	
-	return "SUCCESS"
+	return $w
 }
 
 OSR8_Assembler_init
 OSR8_Assembler_open
 	
-return 1
+return ""
 
 ----------Begin Help----------
 

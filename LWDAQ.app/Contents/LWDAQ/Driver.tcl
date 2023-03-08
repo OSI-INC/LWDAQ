@@ -171,7 +171,7 @@ proc LWDAQ_driver_init {} {
 #
 	set LWDAQ_Driver(min_sv_for_reboot) 13
 
-	return 1
+	return ""
 }
 
 
@@ -203,7 +203,7 @@ proc LWDAQ_transmit_message {sock id contents} {
 		LWDAQ_socket_write $sock $contents
 	}
 	
-	return 1
+	return ""
 }
 
 
@@ -327,11 +327,11 @@ proc LWDAQ_stream_read {sock addr stream_length} {
 #
 proc LWDAQ_stream_delete {sock addr stream_length value} {
 	global LWDAQ_Driver
-	if {$stream_length <= 0} {return 1}
+	if {$stream_length <= 0} {return ""}
 	LWDAQ_transmit_message $sock \
 		$LWDAQ_Driver(stream_delete_id) \
 		[binary format IIc1 $addr $stream_length $value]
-	return 1
+	return ""
 }
 
 #
@@ -353,7 +353,7 @@ proc LWDAQ_stream_write {sock addr data} {
 			$LWDAQ_Driver(stream_write_id) \
 			$contents
 	}
-	return 1
+	return ""
 }
 
 #
@@ -367,7 +367,7 @@ proc LWDAQ_byte_write {sock addr value} {
 	LWDAQ_transmit_message $sock \
 		$LWDAQ_Driver(byte_write_id) \
 		[binary format Ic1 $addr $value]
-	return 1
+	return ""
 }
 
 #
@@ -383,7 +383,7 @@ proc LWDAQ_byte_poll {sock addr value} {
 	LWDAQ_transmit_message $sock \
 		$LWDAQ_Driver(byte_poll_id) \
 		[binary format Ic1 $addr $value]
-	return 1
+	return ""
 }
 
 #
@@ -397,13 +397,13 @@ proc LWDAQ_byte_poll {sock addr value} {
 #
 proc LWDAQ_login {sock password {error_on_fail 1}} {
 	global LWDAQ_Driver
-	if {$password == "no_password"} {return 0}
+	if {$password == "no_password"} {return ""}
 	LWDAQ_transmit_message $sock $LWDAQ_Driver(login_id) "$password\x00" 
 	if {![LWDAQ_receive_byte $sock]} {
 		if {$error_on_fail} {error "login failed with \"$password\""}
 		return -1
 	}
-	return 1
+	return ""
 }
 
 #
@@ -463,7 +463,7 @@ proc LWDAQ_smallint_write {sock addr value} {
 	binary scan $integer cc b1 b2 
 	LWDAQ_byte_write $sock $addr $b1
 	LWDAQ_byte_write $sock [expr $addr + 1] $b2
-	return 1
+	return ""
 }
 
 #
@@ -478,7 +478,7 @@ proc LWDAQ_integer_write {sock addr value} {
 	LWDAQ_byte_write $sock [expr $addr + 1] $b2
 	LWDAQ_byte_write $sock [expr $addr + 2] $b3
 	LWDAQ_byte_write $sock [expr $addr + 3] $b4
-	return 1
+	return ""
 }
 
 #
@@ -537,7 +537,7 @@ proc LWDAQ_most_recent_byte {sock} {
 proc LWDAQ_set_data_addr {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_integer_write $sock $LWDAQ_Driver(da_addr) $value
-	return 1
+	return ""
 }
 
 #
@@ -566,7 +566,7 @@ proc LWDAQ_set_base_addr_hex {sock value} {
 	set temporary [binary format H8 $value]
 	binary scan $temporary I addr
 	LWDAQ_integer_write $sock $LWDAQ_Driver(ba_addr) $addr
-	return 1
+	return ""
 }
 
 #
@@ -578,7 +578,7 @@ proc LWDAQ_set_base_addr_hex {sock value} {
 proc LWDAQ_set_command_reg {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_smallint_write $sock $LWDAQ_Driver(cr_addr) $value
-	return 1
+	return ""
 }
 
 #
@@ -592,7 +592,7 @@ proc LWDAQ_set_command_reg_binary {sock value} {
 	set temporary [binary format B16 $value]
 	binary scan $temporary S command
 	LWDAQ_smallint_write $sock $LWDAQ_Driver(cr_addr) $command
-	return 1
+	return ""
 }
 
 #
@@ -604,7 +604,7 @@ proc LWDAQ_set_command_reg_hex {sock value} {
 	set temporary [binary format H4 $value]
 	binary scan $temporary S command
 	LWDAQ_smallint_write $sock $LWDAQ_Driver(cr_addr) $command
-	return 1
+	return ""
 }
 
 #
@@ -615,7 +615,7 @@ proc LWDAQ_set_command_reg_hex {sock value} {
 proc LWDAQ_set_device_type {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_byte_write $sock $LWDAQ_Driver(dtr_addr) $value
-	return 1
+	return ""
 }
 
 #
@@ -626,7 +626,7 @@ proc LWDAQ_set_device_type {sock value} {
 proc LWDAQ_set_device_element {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_byte_write $sock $LWDAQ_Driver(der_addr) $value
-	return 1
+	return ""
 }
 
 #
@@ -668,7 +668,7 @@ proc LWDAQ_set_multisource_element {sock value power} {
 	set cmd [format %02x $value]
 	append cmd 8[format %1x $power]
 	LWDAQ_set_command_reg_hex $sock $cmd
-	return 1
+	return ""
 }
 
 #
@@ -679,7 +679,7 @@ proc LWDAQ_set_multisource_element {sock value power} {
 proc LWDAQ_set_delay_ticks {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_integer_write $sock $LWDAQ_Driver(dt_addr) $value
-	return 1
+	return ""
 }
 
 #
@@ -692,7 +692,7 @@ proc LWDAQ_set_delay_seconds {sock value} {
 	global LWDAQ_Driver
 	set ticks [expr round( $value * $LWDAQ_Driver(delay_timer_frequency) )]
 	LWDAQ_set_delay_ticks $sock $ticks
-	return 1
+	return ""
 }
 
 #
@@ -703,7 +703,7 @@ proc LWDAQ_set_delay_seconds {sock value} {
 proc LWDAQ_set_repeat_counter {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_integer_write $sock $LWDAQ_Driver(rc_addr) $value
-	return 1
+	return ""
 }
 
 #
@@ -714,7 +714,7 @@ proc LWDAQ_set_repeat_counter {sock value} {
 proc LWDAQ_controller_reset {sock} {
 	global LWDAQ_Driver
 	LWDAQ_byte_write $sock $LWDAQ_Driver(srst_addr) 1 
-	return 1
+	return ""
 }
 
 #
@@ -723,9 +723,8 @@ proc LWDAQ_controller_reset {sock} {
 #
 proc LWDAQ_relay_reboot {sock} {
 	global LWDAQ_Driver
-
 	LWDAQ_transmit_message $sock $LWDAQ_Driver(reboot_id) ""
-	return 1
+	return ""
 }
 
 #
@@ -777,7 +776,7 @@ proc LWDAQ_ram_write {sock addr data} {
 proc LWDAQ_set_device_addr {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_byte_write $sock $LWDAQ_Driver(dar_addr) $value
-	return 1
+	return ""
 }
 
 #
@@ -813,7 +812,7 @@ proc LWDAQ_set_driver_mux {sock driver {mux 1}} {
 		}
 		LWDAQ_set_device_addr $sock [expr ($first * 16) + $mux]
 	}
-	return 1
+	return ""
 }
 
 #
@@ -859,7 +858,7 @@ proc LWDAQ_execute_job {sock job} {
 	global LWDAQ_Driver
 	LWDAQ_start_job $sock $job
 	LWDAQ_byte_poll $sock $LWDAQ_Driver(djr_addr) 0
-	return 1
+	return ""
 }
 
 #
@@ -876,7 +875,7 @@ proc LWDAQ_transmit_command {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_set_command_reg $sock $value
 	LWDAQ_execute_job $sock $LWDAQ_Driver(command_job)
-	return 1
+	return ""
 }
 
 #
@@ -889,7 +888,7 @@ proc LWDAQ_transmit_command_binary {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_set_command_reg_binary $sock $value
 	LWDAQ_execute_job $sock $LWDAQ_Driver(command_job)
-	return 1
+	return ""
 }
 
 #
@@ -902,7 +901,7 @@ proc LWDAQ_transmit_command_hex {sock value} {
 	global LWDAQ_Driver
 	LWDAQ_set_command_reg_hex $sock $value
 	LWDAQ_execute_job $sock $LWDAQ_Driver(command_job)
-	return 1
+	return ""
 }
 
 #
@@ -911,7 +910,7 @@ proc LWDAQ_transmit_command_hex {sock value} {
 proc LWDAQ_wake {sock} {
 	global LWDAQ_Driver
 	LWDAQ_execute_job $sock $LWDAQ_Driver(wake_job)
-	return 1
+	return ""
 }
 
 #
@@ -920,7 +919,7 @@ proc LWDAQ_wake {sock} {
 proc LWDAQ_sleep {sock} {
 	global LWDAQ_Driver
 	LWDAQ_execute_job $sock $LWDAQ_Driver(sleep_job)
-	return 1
+	return ""
 }
 
 #
@@ -1022,7 +1021,7 @@ proc LWDAQ_wait_for_driver {sock {approx 0}} {
 		LWDAQ_wait_seconds $approx
 	}
 	LWDAQ_software_version $sock
-	return 0
+	return ""
 }
 
 #
@@ -1086,7 +1085,7 @@ proc LWDAQ_image_sensor_clear {sock type} {
 		LWDAQ_wake $sock
 	}
 	
-	return 1
+	return ""
 }
 
 #
@@ -1122,4 +1121,6 @@ proc LWDAQ_image_sensor_transfer {sock type} {
 		# charges under the V2 clock.
 		LWDAQ_transmit_command_hex $sock 0088
 	}
+	
+	return ""
 }

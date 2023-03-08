@@ -33,7 +33,7 @@ proc Fiber_Positioner_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "Fiber_Positioner" "2.1"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
 	# a Fiber Positioner process by setting the control variable to "Stop", after
@@ -113,7 +113,7 @@ proc Fiber_Positioner_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1   
+	return ""   
 }
 
 #
@@ -210,7 +210,7 @@ proc Fiber_Positioner_transmit {{commands ""}} {
 	# If we get here, we have no reason to believe the transmission failed, although
 	# we could have instructed an empty driver socket or the positioner could have
 	# failed to receive the command.
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -228,7 +228,7 @@ proc Fiber_Positioner_transmit_panel {} {
 	set w $info(window)\.xmit_panel
 	if {[winfo exists $w]} {
 		raise $w
-		return "ABORT"
+		return ""
 	}
 	toplevel $w
 	wm title $w "Fiber_Positioner $info(version) Transmit Command Panel"
@@ -247,7 +247,7 @@ proc Fiber_Positioner_transmit_panel {} {
 	entry $f.commands -textvariable Fiber_Positioner_config(commands) -width 50
 	pack $f.lid $f.id $f.lcommands $f.commands -side left -expand yes
 
-	return "SUCCESS" 
+	return "" 
 }
 
 #
@@ -297,7 +297,7 @@ proc Fiber_Positioner_spot_position {} {
 	set result [LWDAQ_acquire BCAM]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(log) "$result"
-		return "ERROR"
+		return ""
 	}
 	
 	# Parse result string.
@@ -331,7 +331,7 @@ proc Fiber_Positioner_spot_position {} {
 		-zoom $config(zoom) \
 		-intensify $config(intensify)
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -387,7 +387,7 @@ proc Fiber_Positioner_report {{t ""}} {
 		[format %.0f $config(e_out)]\
 		[format %.0f $config(w_out)] " green
 	LWDAQ_print $t "$info(spot_positions)" black
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -400,7 +400,7 @@ proc Fiber_Positioner_move {} {
 	upvar #0 Fiber_Positioner_info info
 
 	if {![winfo exists $info(window)]} {
-		return "ABORT"
+		return ""
 	}
 	
 	if {[catch {
@@ -413,13 +413,13 @@ proc Fiber_Positioner_move {} {
 	} error_result]} {
 		LWDAQ_print $info(log) "ERROR: $error_result"
 		set info(control) "Idle"
-		return "ERROR"
+		return ""
 	}
 	
 	if {$info(control) == "Move"} {
 		set info(control) "Idle"
 	}
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -446,13 +446,13 @@ proc Fiber_Positioner_zero {} {
 	} error_result]} {
 		LWDAQ_print $info(log) "ERROR: $error_result"
 		set info(control) "Idle"
-		return "ERROR"
+		return ""
 	}
 
 	if {$info(control) == "Zero"} {
 		set info(control) "Idle"
 	}
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -470,13 +470,13 @@ proc Fiber_Positioner_check {} {
 	} error_result]} {
 		LWDAQ_print $info(log) "ERROR: $error_result"
 		set info(control) "Idle"
-		return "ERROR"
+		return ""
 	}
 	
 	if {$info(control) == "Check"} {
 		set info(control) "Idle"
 	}
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -504,7 +504,7 @@ proc Fiber_Positioner_clear {} {
 		set info(control) "Idle"
 	}
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -523,7 +523,7 @@ proc Fiber_Positioner_reset {} {
 		set info(control) "Idle"
 	}
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -588,7 +588,7 @@ proc Fiber_Positioner_travel {} {
 	# Because the travel operation can go on for some time, we must handle the 
 	# closing of the window gracefully: we abort if the window is no longer open.
 	if {![winfo exists $info(window)]} {
-		return "ABORT"
+		return ""
 	}
 
 	# Read the travel file, if we can find it. If not, abort and report an error.
@@ -600,7 +600,7 @@ proc Fiber_Positioner_travel {} {
 		catch {close $f}
 		LWDAQ_print $info(log) "ERROR: $error_result."
 		set info(control) "Idle"		
-		return "ERROR"
+		return ""
 	}
 	
 	# Our travel output file name we construct from the travel file name by
@@ -665,7 +665,7 @@ proc Fiber_Positioner_travel {} {
 			if {![string is wordchar $label]} {
 				LWDAQ_print $info(log) "ERROR: Bad label name \"$label\"."
 				set info(control) "Idle"
-				return "ERROR"
+				return ""
 			}
 		}
 		
@@ -678,7 +678,7 @@ proc Fiber_Positioner_travel {} {
 			} error_result]} {
 				LWDAQ_print $info(log) "ERROR: $error_result"
 				set info(control) "Idle"
-				return "ERROR"
+				return ""
 			}
 		}
 		
@@ -692,14 +692,14 @@ proc Fiber_Positioner_travel {} {
 			if {![file exists $sfn]} {
 				LWDAQ_print $info(log) "ERROR: No such file \"$sfn\"."
 				set info(control) "Idle"
-				return "ERROR"				
+				return ""				
 			}
 			if {[catch {
 				source $sfn
 			} error_result]} {
 				LWDAQ_print $info(log) "ERROR: $error_result"
 				set info(control) "Idle"
-				return "ERROR"
+				return ""
 			}
 		}
 		
@@ -711,7 +711,7 @@ proc Fiber_Positioner_travel {} {
 			if {![string is integer -strict $wait_seconds]} {
 				LWDAQ_print $info(log) "ERROR: Invalid wait time \"$wait_seconds\"."
 				set info(control) "Idle"
-				return "ERROR"
+				return ""
 			}
 			if {$info(travel_wait) == 0} {
 				set info(travel_wait) [clock seconds]
@@ -736,7 +736,7 @@ proc Fiber_Positioner_travel {} {
 					|| ([lindex $line $i] > 255)} {
 					LWDAQ_print $info(log) "ERROR: Invalid control value \"$line\"."
 					set info(control) "Idle"
-					return "ERROR"
+					return ""
 				}
 			}
 
@@ -749,7 +749,7 @@ proc Fiber_Positioner_travel {} {
 			} error_result]} {
 				LWDAQ_print $info(log) "ERROR: $error_result"
 				set info(control) "Idle"
-				return "ERROR"
+				return ""
 			}
 	
 			# Wait for the fiber to settle, then measure voltages, spot position, and
@@ -765,18 +765,18 @@ proc Fiber_Positioner_travel {} {
 	incr config(travel_index)
 	if {($info(control) == "Stop") || ($info(control) == "Step")} {
 		set info(control) "Idle"
-		return "ABORT"
+		return ""
 	} elseif {($config(travel_index) < [llength $travel_list])} {
 		LWDAQ_post "Fiber_Positioner_travel"
-		return "SUCCESS"
+		return ""
 	} else {
 		LWDAQ_print $info(log) "Travel Complete, Pass $config(pass_counter)." purple
 		if {$config(repeat)} {
 			LWDAQ_post "Fiber_Positioner_travel"
-			return "SUCCESS"
+			return ""
 		} else {
 			set info(control) "Idle"
-			return "SUCCESS"
+			return ""
 		}
 	}
 }
@@ -795,7 +795,7 @@ proc Fiber_Positioner_travel_edit {} {
 	} else {
 		LWDAQ_edit_script Open $config(travel_file)
 	}
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -820,7 +820,7 @@ proc Fiber_Positioner_open {} {
 	upvar #0 Fiber_Positioner_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set ff [frame $w.parameters]
 	pack $ff -side top -fill x
@@ -928,13 +928,13 @@ proc Fiber_Positioner_open {} {
 	set info(log) [LWDAQ_text_widget $f 30 40 1 1]
 	LWDAQ_print $info(log) "Fiber Positioner Log" purple
 	
-	return 1
+	return $w
 }
 
 Fiber_Positioner_init
 Fiber_Positioner_open
 	
-return 1
+return ""
 
 ----------Begin Help----------
 

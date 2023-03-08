@@ -22,7 +22,7 @@ proc Configurator_init {} {
 	global LWDAQ_Info
 	
 	LWDAQ_tool_init "Configurator" "21"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set config(contact_ip_addr) 10.0.0.37
 	set config(contact_ip_port) 90
@@ -40,7 +40,7 @@ proc Configurator_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1   
+	return ""   
 }
 
 proc Configurator_contact {} {
@@ -86,9 +86,9 @@ proc Configurator_contact {} {
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
-		return 0
+		return ""
 	}	
-	return 1
+	return ""
 }
 
 proc Configurator_read {} {
@@ -108,9 +108,9 @@ proc Configurator_read {} {
 		LWDAQ_print $info(text)
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
-		return 0
+		return ""
 	}	
-	return 1
+	return ""
 }
 
 proc Configurator_write {} {
@@ -137,9 +137,9 @@ proc Configurator_write {} {
 		LWDAQ_print $info(text)
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
-		return 0
+		return ""
 	}	
-	return 1
+	return ""
 }
 
 proc Configurator_copy {} {
@@ -166,14 +166,14 @@ proc Configurator_reboot {} {
 		LWDAQ_print $info(text)
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
-		return 0
+		return ""
 	}	
 	catch {LWDAQ_socket_close $sock}
 
 	LWDAQ_print $info(text) "succeeded." green
 	LWDAQ_print $info(text)  "New configuration will be loaded after reboot.\n"
 
-	return 1
+	return ""
 }
 
 proc Configurator_open {} {
@@ -181,7 +181,7 @@ proc Configurator_open {} {
 	upvar #0 Configurator_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 		
 	set f $w.buttons
 	frame $f
@@ -217,13 +217,13 @@ proc Configurator_open {} {
 	
 	set info(text) [LWDAQ_text_widget $w 100 15]
 	
-	return 1
+	return $w
 }
 
 Configurator_init
 Configurator_open
 
-return 1
+return ""
 
 ----------Begin Help----------
 

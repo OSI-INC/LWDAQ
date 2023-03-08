@@ -40,7 +40,7 @@ proc BCAM_Calibrator_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "BCAM_Calibrator" "30"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set config(apparatus_file) "apparatus_database.txt"
 	set config(calibration_file) [clock format [clock seconds] \
@@ -112,7 +112,7 @@ proc BCAM_Calibrator_init {} {
 	set info(instruction) "Loading..."
 	set info(display_image) "bcam_calibrator_image"
 	
-	return 1	
+	return ""	
 }
 
 proc BCAM_Calibrator_configure {} {
@@ -134,7 +134,7 @@ proc BCAM_Calibrator_configure {} {
 		if {$fn != ""} {set BCAM_Calibrator_config(calibration_file) $fn}
 	}
 	pack $f.calib_file_get -side top -expand 1
-	return 1
+	return ""
 }
 
 proc BCAM_Calibrator_store {} {
@@ -156,7 +156,7 @@ proc BCAM_Calibrator_store {} {
 	puts $f $info(device_calibration)
 	close $f
 	set info(stored) 1
-	return 1
+	return ""
 }
 
 proc BCAM_Calibrator_stop {} {
@@ -271,7 +271,7 @@ proc BCAM_Calibrator_check {} {
 	set result [LWDAQ_acquire BCAM]	
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
-		return 0
+		return ""
 	}
 
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name $info(display_image)
@@ -324,7 +324,7 @@ proc BCAM_Calibrator_camera_acquire {range orientation} {
 	set result [LWDAQ_acquire BCAM]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
-		return 0
+		return ""
 	}
 	
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name $info(display_image)
@@ -414,7 +414,7 @@ proc BCAM_Calibrator_sources_acquire {orientation} {
 	set result [LWDAQ_acquire BCAM]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
-		return 0
+		return ""
 	}
 	
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name $info(display_image)
@@ -759,7 +759,7 @@ proc BCAM_Calibrator_do {step} {
 		if {$info(control) != "Idle"} {
 			LWDAQ_print $info(text) "ERROR: Cannot execute until \"Idle\"."
 			LWDAQ_print $info(text) "SUGGESTION: Wait a second, or try \"Stop\""
-			return 1
+			return ""
 		}
 		focus $info(execute_button)
 	}
@@ -768,19 +768,19 @@ proc BCAM_Calibrator_do {step} {
 		if {$info(control) != "Idle"} {
 			LWDAQ_print $info(text) "ERROR: Cannot go backwards until \"Idle\"."
 			LWDAQ_print $info(text) "SUGGESTION: Wait a second, or try \"Stop\"."
-			return 1
+			return ""
 		}
 		set info(state) [lindex $info(state_history) end]
 		set info(state_history) [lreplace $info(state_history) end end]
 		BCAM_Calibrator_do Establish
-		return 1
+		return ""
 	}
 	
 	if {$step == "Forward"} {
 		if {$info(control) != "Idle"} {
 			LWDAQ_print $info(text) "ERROR: Cannot go forwards until \"Idle\"."
 			LWDAQ_print $info(text) "SUGGESTION: Wait a second, or try \"Stop\"."
-			return 1
+			return ""
 		}
 		lappend info(state_history) $info(state)
 		if {[llength $info(state_history)] > 30} {
@@ -801,7 +801,7 @@ proc BCAM_Calibrator_do {step} {
 					specify a calibration file."
 			LWDAQ_print $info(text) \
 				"NOTE: Your new measurements will be appended to the calibration file."
-			return 1
+			return ""
 		}
 		if {$step == "Execute"} {
 			foreach a {calibration_type apparatus_version operator_name device_id} {
@@ -814,7 +814,7 @@ proc BCAM_Calibrator_do {step} {
 				LWDAQ_print $info(text) \
 					"ERROR: Cannot find apparatus file \"$config(apparatus_file)\"."
 				set info(control) "Idle"
-				return 1
+				return ""
 			}
 			set f [open $config(apparatus_file) r]
 			set am [read $f]
@@ -849,7 +849,7 @@ proc BCAM_Calibrator_do {step} {
 				LWDAQ_print $info(text) \
 					"SUGGESTION: Check apparatus database file with a text editor."
 				set info(control) "Idle"
-				return 1
+				return ""
 			}
 			$info(calibration_type_menu) delete 0 end
 			foreach b $available {
@@ -858,28 +858,28 @@ proc BCAM_Calibrator_do {step} {
 			}
 			set info(control) "Idle"
 			BCAM_Calibrator_do Forward
-			return 1
+			return ""
 		}
 		if {$step == "Forward"} {
 			set info(state) "Define_Calibration"
 			BCAM_Calibrator_do Establish
-			return 1
+			return ""
 		}
 	}
 	
 	if {$info(state) == "Define_Calibration"} {
 		if {$step == "Establish"} {
-			set info(instruction)	"Select calibration, apparatus, operator, and id."
-			return 1
+			set info(instruction) "Select calibration, apparatus, operator, and id."
+			return ""
 		}
 		if {$step == "Execute"} {
 			if {$info(calibration_type) == "none"} {
 				LWDAQ_print $info(text) "ERROR: No calibration type selected."
-				return 1
+				return ""
 			}			
 			if {$info(apparatus_version) == "none"} {
 				LWDAQ_print $info(text) "ERROR: No apparatus version selected."
-				return 1
+				return ""
 			}			
 			if {$info(operator_name) == "none"} {
 				LWDAQ_print $info(text) "WARNING: No operator name entered."
@@ -915,25 +915,25 @@ proc BCAM_Calibrator_do {step} {
 			}
 						
 			BCAM_Calibrator_do Forward
-			return 1
+			return ""
 		}
 		if {$step == "Forward"} {
 			set info(state) "Test"
 			BCAM_Calibrator_do Establish
-			return 1
+			return ""
 		}
 	}
 
 	if {$info(state) == "Test"} {
 		if {$step == "Establish"} {
 			set info(instruction)	"Press Execute for Test Image, Forward When Satisfied."
-			return 1
+			return ""
 		}
 		if {$step == "Execute"} {
 			set info(control) "Acquire"
 			BCAM_Calibrator_check
 			set info(control) "Idle"
-			return 1
+			return ""
 		}
 		if {$step == "Forward"} {
 			if {$info(calibration_class) == "camera"} {
@@ -943,7 +943,7 @@ proc BCAM_Calibrator_do {step} {
 			}
 			BCAM_Calibrator_do Establish
 			focus $info(execute_button)
-			return 1
+			return ""
 		}
 	}
 	
@@ -955,14 +955,14 @@ proc BCAM_Calibrator_do {step} {
 			set info(instruction) "Capture Image, \
 				Source Block [string toupper $range] Range,\
 				Roll Cage $orientation\-DEGREE Orientation."
-			return 1
+			return ""
 		}
 		if {$step == "Execute"} {
 			set info(control) "Acquire"
 			set result [BCAM_Calibrator_camera_acquire $range $orientation]
 			set info(control) "Idle"
 			if {![LWDAQ_is_error_result $result]} {BCAM_Calibrator_do Forward}
-			return 1
+			return ""
 		}
 		if {$step == "Forward"} {
 			set orientation [expr $orientation + 90]
@@ -980,7 +980,7 @@ proc BCAM_Calibrator_do {step} {
 				}
 			}
 			BCAM_Calibrator_do Establish
-			return 1
+			return ""
 		}
 	}
 	
@@ -990,14 +990,14 @@ proc BCAM_Calibrator_do {step} {
 		if {$step == "Establish"} {
 			set info(instruction) "Capture Image With\
 				Roll Cage in $orientation\-DEGREE Orientation."
-			return 1
+			return ""
 		}
 		if {$step == "Execute"} {
 			set info(control) "Acquire"
 			set result [BCAM_Calibrator_sources_acquire $orientation]
 			set info(control) "Idle"
 			if {![LWDAQ_is_error_result $result]} {BCAM_Calibrator_do Forward}
-			return 1
+			return ""
 		}
 		if {$step == "Forward"} {
 			set orientation [expr $orientation + 90]
@@ -1007,14 +1007,14 @@ proc BCAM_Calibrator_do {step} {
 				set info(state) "Source_Calib_$orientation"
 			}
 			BCAM_Calibrator_do Establish
-			return 1
+			return ""
 		}
 	}
 	
 	if {$info(state) == "Calculate"} {
 		if {$step == "Establish"} {
 			set info(instruction) "Calculate Calibration Constants."
-			return 1
+			return ""
 		}
 		if {$step == "Execute"} {
 			set dc ""
@@ -1064,12 +1064,12 @@ proc BCAM_Calibrator_do {step} {
 			}
 			set info(control) "Idle"
 			BCAM_Calibrator_do Forward	
-			return 1
+			return ""
 		}
 		if {$step == "Forward"} {
 			set info(state) "Finish"
 			BCAM_Calibrator_do Establish
-			return 1
+			return ""
 		}
 	}
 		
@@ -1081,7 +1081,7 @@ proc BCAM_Calibrator_do {step} {
 			} {
 				set info(instruction) "Press Store to save constants, Execute to move on."
 			}
-			return 1
+			return ""
 		}
 		if {$step == "Execute"} {
 			if {!$info(stored)} {
@@ -1101,12 +1101,12 @@ proc BCAM_Calibrator_do {step} {
 				if {!$info(retain_$p)} {set info($p) "none"}
 			}
 			BCAM_Calibrator_do Forward
-			return 1
+			return ""
 		}	
 		if {$step == "Forward"} {
 			set info(state) "Define_Calibration"
 			BCAM_Calibrator_do Establish
-			return 1
+			return ""
 		}
 	}
 }
@@ -1116,7 +1116,7 @@ proc BCAM_Calibrator_open {} {
 	upvar #0 BCAM_Calibrator_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set f $w.status
 	frame $f -padx 2 -pady 2
@@ -1258,13 +1258,13 @@ proc BCAM_Calibrator_open {} {
 	
 	BCAM_Calibrator_do Establish
 	
-	return 1
+	return $w
 }
 
 BCAM_Calibrator_init
 BCAM_Calibrator_open
 
-return 1
+return ""
 
 ----------Begin Help----------
 

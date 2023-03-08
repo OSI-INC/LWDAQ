@@ -87,7 +87,7 @@ proc LWDAQ_init_RFPM {} {
 	set config(intensify) none
 	set config(verbose_result) 0
 	
-	return 1
+	return ""
 }
 
 #
@@ -145,7 +145,7 @@ proc LWDAQ_controls_RFPM {} {
 	upvar #0 LWDAQ_info_RFPM info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set f $w.scale
 	frame $f

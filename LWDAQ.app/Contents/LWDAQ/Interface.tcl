@@ -45,7 +45,7 @@ proc LWDAQ_interface_init {} {
 		magenta brown salmon LightSlateBlue black gray40 gray60 maroon\
 		green4 blue4 brown4"
 
-	if {!$LWDAQ_Info(gui_enabled)} {return 1}
+	if {!$LWDAQ_Info(gui_enabled)} {return ""}
 
 	if {($LWDAQ_Info(os) == "MacOS") && $LWDAQ_Info(gui_enabled)} {
 		font configure TkTextFont -size 14 -family Helvetica -weight normal
@@ -90,7 +90,7 @@ proc LWDAQ_interface_init {} {
 	LWDAQ_bind_command_key all q [list exit]
 	LWDAQ_bind_command_key all w "destroy \[winfo toplevel %W\]"
 	
-	return 1
+	return ""
 }
 
 #
@@ -99,7 +99,7 @@ proc LWDAQ_interface_init {} {
 #
 proc LWDAQ_init_main_window {} {
 	upvar #0 LWDAQ_Info info
-	if {!$info(gui_enabled)} {return 0}
+	if {!$info(gui_enabled)} {return ""}
 
 	# Give a title to the main window
 	wm title . $info(program_name)
@@ -178,7 +178,7 @@ proc LWDAQ_init_main_window {} {
 		default {pack .frame.quit -side left -expand 1 -padx 100 -pady 20}
 	}
 
-	return 1	
+	return ""	
 }
 
 #
@@ -189,7 +189,7 @@ proc LWDAQ_about {} {
 	upvar #0 LWDAQ_Info info
 	
 	set w .lwdaq_about
-	if {[winfo exists $w]} {focus $w.b; return 0}
+	if {[winfo exists $w]} {focus $w.b; return ""}
 	toplevel $w
 	wm title $w "About $info(program_name)"
 	set f [frame $w.frame1 -padx 20 -pady 10]
@@ -215,7 +215,7 @@ proc LWDAQ_about {} {
 		-command "destroy $w" 
 	pack $f.gpl $f.okay -side left -expand 1
 	raise $w
-	return 1
+	return ""
 }
 
 #
@@ -390,7 +390,7 @@ proc LWDAQ_make_tool_menu {} {
 	}
 
 	# Done.
-	return 1
+	return ""
 }
 
 #
@@ -416,7 +416,7 @@ proc LWDAQ_make_instrument_menu {} {
 	$m add command -label "Reset Counters" -command LWDAQ_reset_instrument_counters
 	
 	# Done.
-	return 1
+	return ""
 }
 
 #
@@ -737,7 +737,7 @@ proc LWDAQ_clock_widget {{wf ""}} {
 		toplevel $wf
 		wm title $wf Clock
 	} {
-		if {![winfo exists $wf]} {return 0}
+		if {![winfo exists $wf]} {return ""}
 	}
 	if {![winfo exists $wf\.clock]} {
 		text $wf.clock -undo 0 -width 30 -height 1
@@ -747,7 +747,7 @@ proc LWDAQ_clock_widget {{wf ""}} {
 	set s [clock format [clock seconds] -format {%c}]
 	$wf.clock insert end $s
 	LWDAQ_post "LWDAQ_clock_widget $wf"
-	return 1
+	return ""
 }
 
 #
@@ -961,7 +961,7 @@ proc LWDAQ_button_confirm {s} {
 #
 proc LWDAQ_view_array {array_name} {
 	upvar #0 $array_name array
-	if {![info exists array]} {return 0}
+	if {![info exists array]} {return ""}
 	set w [LWDAQ_toplevel_window "$array_name"]
 	frame $w.f1
 	frame $w.f2
@@ -995,12 +995,12 @@ proc LWDAQ_monitor_open {} {
 	global LWDAQ_Info
 	global LWDAQ_lwdaq_config
 
-	if {!$LWDAQ_Info(gui_enabled)} {return 0}
+	if {!$LWDAQ_Info(gui_enabled)} {return ""}
 
 	set w ".monitorwindow"
 	if {[winfo exists $w]} {
 		raise $w
-		return 0
+		return ""
 	}
 	
 	toplevel $w
@@ -1063,7 +1063,7 @@ proc LWDAQ_monitor_open {} {
 	LWDAQ_text_widget $w.sockets 90 6 0
 		
 	after $LWDAQ_Info(monitor_ms) LWDAQ_monitor_refresh
-	return 1
+	return ""
 }
 
 #
@@ -1078,7 +1078,7 @@ proc LWDAQ_library_settings {} {
 	set w ".lwdaqconfig"
 	if {[winfo exists $w]} {
 		raise $w
-		return 0
+		return ""
 	}
 	
 	toplevel $w
@@ -1127,7 +1127,7 @@ proc LWDAQ_monitor_refresh {} {
 	global LWDAQ_Info
 	
 	set w ".monitorwindow"
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 	
 	set t $w.current.text
 	$t delete 1.0 end
@@ -1157,7 +1157,7 @@ proc LWDAQ_monitor_refresh {} {
 	}
 
 	after $LWDAQ_Info(monitor_ms) LWDAQ_monitor_refresh
-	return 1
+	return ""
 }
 
 #
@@ -1200,12 +1200,12 @@ proc LWDAQ_reset {} {
 proc LWDAQ_server_open {} {
 	global LWDAQ_Info
 
-	if {!$LWDAQ_Info(gui_enabled)} {return 0}
+	if {!$LWDAQ_Info(gui_enabled)} {return ""}
 
 	set w ".serverwindow"
 	if {[winfo exists $w]} {
 		raise $w
-		return 0
+		return ""
 	}
 	
 	toplevel $w
@@ -1233,7 +1233,7 @@ proc LWDAQ_server_open {} {
 	pack $f.lmode $f.emode -side left
 
 	LWDAQ_text_widget $w 60 20
-	return 1
+	return ""
 }
 
 #
@@ -1248,8 +1248,9 @@ proc LWDAQ_server_start {} {
 	set sock [LWDAQ_socket_listen LWDAQ_server_accept $info(server_listening_port)]
 	set info(server_listening_sock) $sock
 	set info(server_control) "Run"
-	LWDAQ_print $t "$sock listening on port $info(server_listening_port)." green
-	return 1
+	LWDAQ_print -nonewline $t "$sock\: " green
+	LWDAQ_print $t "Listening on port $info(server_listening_port)."
+	return ""
 }
 
 #
@@ -1268,16 +1269,16 @@ proc LWDAQ_server_stop {} {
 		}
 	}
 	set info(server_control) "Stop"
-	return 1
+	return ""
 }
 
 #
-# LWDAQ_server_accept is called when a remote control socket opens. 
-# The first thing the routine does is check that the IP address
-# of the TCPIP client matches the server's address_filter. The routine
-# installs the LWDAQ_server_interpreter routine as the incoming data
-# handler for the remote control socket, and it lists the new socket
-# in the LWDAQ open socket list.
+# LWDAQ_server_accept is called when a remote control socket opens. The first
+# thing the routine does is check that the IP address of the TCPIP client
+# matches the server's address_filter. The routine installs the
+# LWDAQ_server_interpreter routine as the incoming data handler for the remote
+# control socket, and it lists the new socket in the LWDAQ open socket list. If
+# succesful, it returns a one, otherwise a zero.
 #
 proc LWDAQ_server_accept {sock addr port} {
 	upvar #0 LWDAQ_Info info
@@ -1285,13 +1286,14 @@ proc LWDAQ_server_accept {sock addr port} {
 	if {![string match $info(server_address_filter) $addr]} {
 		close $sock
 		LWDAQ_print $t "Refused connection request from $addr."
-		return 0
+		return ""
 	} {
 		fconfigure $sock -buffering line
 		fileevent $sock readable [list LWDAQ_server_interpreter $sock]
 		lappend info(open_sockets) "$sock $addr $port basic server"
-		LWDAQ_print $t "$sock opened by $addr\:$port." blue
-		return 1
+		LWDAQ_print -nonewline $t "$sock\: " blue
+		LWDAQ_print $t "Opened by client $addr\:$port."
+		return ""
 	}
 }
 
@@ -1319,7 +1321,7 @@ proc LWDAQ_server_info {{sock "nosocket"}} {
 }
 
 #
-# LWDAQ_server_interpreter receives commands from a TCPIP socket
+# LWDAQ_server_interpreter receives commands from a TCPIP socket.
 #
 proc LWDAQ_server_interpreter {sock} {
 	upvar #0 LWDAQ_Info info
@@ -1328,24 +1330,39 @@ proc LWDAQ_server_interpreter {sock} {
 
 	if {[eof $sock]} {
 		LWDAQ_socket_close $sock
-		LWDAQ_print $t "$sock closed by client." blue
-		return 1
+		LWDAQ_print -nonewline $t "$sock\: " blue
+		LWDAQ_print $t "Closed by client." 
+		return ""
 	}	
 	
 	if {[catch {gets $sock line} result]} {
 		LWDAQ_socket_close $sock
-		LWDAQ_print $t "$sock closed because broken." blue
-		return 1
+		LWDAQ_print $t "$sock Closed because broken."
+		return ""
+	}
+	
+	set line [string trim $line]
+	if {$line == ""} {return ""}
+	
+	if {[string length $line] == 1} {
+		binary scan $line c lcode
+		binary scan $info(lwdaq_close_string) c ccode
+		if {$lcode == $ccode} {
+			LWDAQ_socket_close $sock
+			LWDAQ_print -nonewline $t "$sock\: " blue
+			LWDAQ_print $t "Closed by client."	
+			return ""		
+		}
 	}
 
-	set line [string trim $line]
-	if {$line == ""} {return 1}
 	set LWDAQ_server_line $line
 
 	if {[string length $line] > 50} {
-		LWDAQ_print $t "$sock read: \"[string range $line 0 49]\...\""
+		LWDAQ_print -nonewline $t "$sock\: " blue
+		LWDAQ_print $t "Read \"[string range $line 0 49]\...\""
 	} {
-		LWDAQ_print $t "$sock read: \"$line\""
+		LWDAQ_print -nonewline $t "$sock\: " blue
+		LWDAQ_print $t "Read \"$line\""
 	}
 	
 	set result ""
@@ -1368,17 +1385,21 @@ proc LWDAQ_server_interpreter {sock} {
 	
 	if {$result != ""} {
 		if {[catch {puts $sock $result} sock_error]} {
+			LWDAQ_print -nonewline $t "$sock\: " blue
 			LWDAQ_print $t "ERROR: $sock_error"
 			LWDAQ_socket_close $sock
-			LWDAQ_print $t "$sock closed." blue
-			return 0
+			LWDAQ_print -nonewline $t "$sock\: " blue
+			LWDAQ_print $t "Closed after fatal socket error."
+			return ""
 		} {
 			if {[string length $result] > 50} {
-				LWDAQ_print $t "$sock wrote: \"[string range $result 0 49]\...\""
+				LWDAQ_print -nonewline $t "$sock\: " blue
+				LWDAQ_print $t "Wrote \"[string range $result 0 49]\...\""
 			} {
-				LWDAQ_print $t "$sock wrote: \"$result\""
+				LWDAQ_print -nonewline $t "$sock\: " blue
+				LWDAQ_print $t "Wrote \"$result\""
 			}
-			return 1
+			return ""
 		}
 	}
 }

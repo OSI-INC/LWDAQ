@@ -24,7 +24,7 @@ proc Tapermaker_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 
 	LWDAQ_tool_init "Tapermaker" "2.7"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 	
 	# Conversion constants.
 	set info(steps_per_mm) "4000"
@@ -76,7 +76,7 @@ proc Tapermaker_init {} {
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	}
-	return 1
+	return ""
 }
 
 #
@@ -354,7 +354,7 @@ proc Tapermaker_open {} {
 	upvar #0 Tapermaker_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}	
+	if {$w == ""} {return ""}	
 
 	set f [frame $w.top]
 	pack $f -side top -fill x
@@ -457,13 +457,13 @@ proc Tapermaker_open {} {
 	# Print help.
 	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple
 
-	return 1
+	return $w
 }
 
 Tapermaker_init
 Tapermaker_open
 
-return 1
+return ""
 
 ----------Begin Help----------
 

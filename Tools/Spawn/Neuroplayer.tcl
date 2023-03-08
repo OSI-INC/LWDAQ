@@ -61,7 +61,7 @@ proc Neuroplayer_init {} {
 # If a graphical tool window already exists, we abort our initialization.
 #
 	if {[winfo exists $info(window)]} {
-		return "ABORT"
+		return ""
 	}
 #
 # We start setting intial values for the private display and control variables.
@@ -681,7 +681,7 @@ proc Neuroplayer_init {} {
 #
 # We are done with initialization. We return a 1 to show success.
 #
-	return "SUCCESS"   
+	return ""   
 }
 
 #
@@ -772,7 +772,7 @@ proc Neuroplayer_print_event {{event ""}} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return ""}
 
 	if {$event == ""} {
 		set event "$info(play_file_tail) $info(t_min) \"$config(channel_selector)\"\
@@ -867,7 +867,7 @@ proc Neuroplayer_list {{index 0} {fl ""}} {
 	if {$fl == ""} {
 		set fl [LWDAQ_get_file_name 1]
 		if {$fl == ""} {
-			return "ABORT"
+			return ""
 		}
 	}
 	set fl [lsort -dictionary $fl]
@@ -878,7 +878,7 @@ proc Neuroplayer_list {{index 0} {fl ""}} {
 		set w $info(window)\.list_$index
 		if {[winfo exists $w]} {
 			raise $w
-			return "SUCCESS"
+			return ""
 		}
 	}
 	
@@ -933,7 +933,7 @@ proc Neuroplayer_list {{index 0} {fl ""}} {
 	}
 	
 	# Returnn successful.
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -943,7 +943,7 @@ proc Neuroplayer_list {{index 0} {fl ""}} {
 #
 proc Neuroplayer_metadata_write {w fn} {
 	LWDAQ_ndf_string_write $fn [string trim [$w.text get 1.0 end]]\n
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -961,7 +961,7 @@ proc Neuroplayer_metadata_view {fn} {
 		default {
 			if {![file exists $fn]} {
 				Neuroplayer_print "ERROR: File \"$fn\" does not exist."
-				return "FAIL"
+				return ""
 			}
 		}
 	}
@@ -969,7 +969,7 @@ proc Neuroplayer_metadata_view {fn} {
 	# Check the file.
 	if {[catch {LWDAQ_ndf_data_check $fn} error_message]} {
 		Neuroplayer_print "ERROR: Checking archive, $error_message."
-		return "FAIL"
+		return ""
 	}
 	
 	# If the metadata viewing panel exists, destroy it. We are going to make a
@@ -994,7 +994,7 @@ proc Neuroplayer_metadata_view {fn} {
 	# Print the metadata to the text window.
 	LWDAQ_print $w.text [LWDAQ_ndf_string_read $fn]
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -2007,7 +2007,7 @@ proc Neuroplayer_overview {{fn ""} } {
 	# If the file does not exist, complain.
 	if {![file exists $fn]} {
 		Neuroplayer_print "ERROR: File \"$fn\" does not exist for overview."
-		return "ERROR"
+		return ""
 	}
 
 	# Now we have the index providing an unused list name, so create the window
@@ -2151,7 +2151,7 @@ proc Neuroplayer_overview {{fn ""} } {
 			set metadata [LWDAQ_ndf_string_read $config(play_file)]
 		} error_message]} {
 			Neuroplayer_print "ERROR: $error_message."
-			return "FAIL"			
+			return ""			
 		}
 		set ov_config(payload) [LWDAQ_xml_get_list $metadata "payload"]
 		if {![string is integer -strict $ov_config(payload)]} {
@@ -2165,7 +2165,7 @@ proc Neuroplayer_overview {{fn ""} } {
 				[Neuroplayer_end_time $ov_config(fn) $ov_config(payload)]
 		} message]} {
 			Neuroplayer_print "ERROR: $message."
-			return "FAIL"
+			return ""
 		}
 		set ov_config(t_min) "0.0"
 		set ov_config(t_max) $ov_config(t_end)
@@ -2175,7 +2175,7 @@ proc Neuroplayer_overview {{fn ""} } {
 		Neuroplayer_overview_plot
 	}
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -2191,9 +2191,9 @@ proc Neuroplayer_overview_jump {x y} {
 	upvar #0 Neuroplayer_overview ov_config
 
 	# Check the window and declare the overview array.
-	if {![winfo exists $info(window)]} {return "ABORT"}
-	if {![info exists ov_config]} {return "ABORT"}
-	if {![winfo exists $ov_config(w)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return ""}
+	if {![info exists ov_config]} {return ""}
+	if {![winfo exists $ov_config(w)]} {return ""}
 
 	# Calculate the play time.
 	set ptime [expr round( 1.0 \
@@ -2207,6 +2207,7 @@ proc Neuroplayer_overview_jump {x y} {
 	# Jump to the new location, using the file nake to seek the playback tree.
 	Neuroplayer_jump "$ov_config(fn_tail) [format %.1f $ptime] \
 			\"$config(channel_selector)\" \"Overview Jump\"" 0
+	return ""
 }
 
 #
@@ -2220,28 +2221,28 @@ proc Neuroplayer_overview_cursor {} {
 	upvar #0 Neuroplayer_overview ov_config
 
 	# Check the window and declare the overview array.
-	if {![winfo exists $info(window)]} {return "ABORT"}
-	if {![info exists ov_config]} {return "ABORT"}
-	if {![winfo exists $ov_config(w)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return ""}
+	if {![info exists ov_config]} {return ""}
+	if {![winfo exists $ov_config(w)]} {return ""}
 
 	# Delete the old cursor, if any.
 	$ov_config(plot) delete cursor
 
 	# Check to see if the overview is showing the play file.
 	if {[file tail $config(play_file)] != [file tail $ov_config(fn)]} {
-		return "ABORT"
+		return ""
 	}
 	
 	# Check to see if the play time is in the overview time span.
 	if {($config(play_time) < $ov_config(t_min)) \
 		|| ($config(play_time) > $ov_config(t_max))} {
-		return "ABORT"
+		return ""
 	}
 	
 	# Detect zero width interval.
 	if {$ov_config(t_max) - $ov_config(t_min) <= 0} {
 		Neuroplayer_print "ERROR: Cannot draw cursor on zero width overview."
-		return "ERROR"
+		return ""
 	}
 	
 	# Draw the new cursor.
@@ -2254,7 +2255,7 @@ proc Neuroplayer_overview_cursor {} {
 	$ov_config(plot) create line "$x 0 $x $info(overview_height)" -tag "cursor" \
 		-fill [lwdaq tkcolor [Neuroplayer_color $ov_config(cursor_cc)]]
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -2268,11 +2269,11 @@ proc Neuroplayer_overview_plot {} {
 	global LWDAQ_Info
 
 	# Check the window and declare the overview array.
-	if {![winfo exists $info(window)]} {return "ABORT"}
-	if {![info exists ov_config]} {return "ABORT"}
-	if {![winfo exists $ov_config(w)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return ""}
+	if {![info exists ov_config]} {return ""}
+	if {![winfo exists $ov_config(w)]} {return ""}
 	set w $ov_config(w)
-	if {$ov_config(status) != "Idle"} {return "ABORT"}
+	if {$ov_config(status) != "Idle"} {return ""}
 
 	# Check that the archive exists and is an ndf file. Extract the
 	# data start address and data length.
@@ -2280,7 +2281,7 @@ proc Neuroplayer_overview_plot {} {
 		scan [LWDAQ_ndf_data_check $ov_config(fn)] %u%u data_start data_length
 	} error_message]} {
 		Neuroplayer_print "ERROR: Checking archive, $error_message."
-		return "FAIL"
+		return ""
 	}
 	
 	# Delete the old cursor, if any.
@@ -2433,7 +2434,7 @@ proc Neuroplayer_overview_plot {} {
 			[expr $config(overview_activity_fraction)\
 			* $config(overview_num_samples)])} {continue}
 		LWDAQ_support
-		if {![winfo exists $w]} {return "ABORT"}
+		if {![winfo exists $w]} {return ""}
 		append ov_config(activity) "$id:[expr [llength $graph($id)] / 2] "
 		lwdaq_graph $graph($id) $info(overview_image) \
 			-x_min $ov_config(t_min) -x_max $ov_config(t_max) \
@@ -2447,7 +2448,7 @@ proc Neuroplayer_overview_plot {} {
 	
 	# Done.
 	set ov_config(status) "Idle"
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -2472,7 +2473,7 @@ proc Neuroplayer_overview_excerpt {} {
 		scan [LWDAQ_ndf_data_check $ov_config(fn)] %u%u data_start data_length
 	} error_message]} {
 		Neuroplayer_print "ERROR: Checking archive, $error_message."
-		return "FAIL"
+		return ""
 	}
 	
 	set ov_config(status) "Excerpt"
@@ -2531,7 +2532,7 @@ proc Neuroplayer_overview_newndf {step} {
 		Neuroplayer_print "ERROR: In Overview, cannot find\
 			\"[file tail $ov_config(fn)]\" in playback directory tree."
 		set ov_config(status) "Idle"
-		return "FAIL"
+		return ""
 	}
 	
 	# We see if there is later file in the directory tree. If so,
@@ -2541,7 +2542,7 @@ proc Neuroplayer_overview_newndf {step} {
 		Neuroplayer_print "ERROR: Overview cannot step $step from\
 			\"[file tail $ov_config(fn)]\" in Player Directory Tree."
 		set ov_config(status) "Idle"
-		return "FAIL"	
+		return ""	
 	}
 	set ov_config(fn) $file_name
 	set ov_config(fn_tail) [file tail $ov_config(fn)]
@@ -2557,7 +2558,7 @@ proc Neuroplayer_overview_newndf {step} {
 		set metadata [LWDAQ_ndf_string_read $ov_config(fn)]
 	} error_message]} {
 		Neuroplayer_print "ERROR: $error_message."
-		return "FAIL"			
+		return ""			
 	}
 	set ov_config(payload) [LWDAQ_xml_get_list $metadata "payload"]
 	if {![string is integer -strict $ov_config(payload)]} {
@@ -2622,7 +2623,7 @@ proc Neuroclassifier_open {} {
 	set w $info(classifier_window)
 	if {[winfo exists $w]} {
 		raise $w
-		return "ABORT"
+		return $w
 	}
 	toplevel $w
 	wm title $w "Event Classifier for Neuroplayer $info(version)"
@@ -2735,8 +2736,8 @@ proc Neuroclassifier_plot {tag event} {
 	global LWDAQ_Info
 
 	# Abort if running in no-graphics mode.
-	if {![winfo exists $info(window)]} {return "ABORT"}
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return ""}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	# Set up scaling.	
 	set zoom [LWDAQ_get_lwdaq_config display_zoom]
@@ -2808,7 +2809,7 @@ proc Neuroclassifier_event {event} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 	set t $info(classifier_text)
 	set index [$t search [lrange $event 0 $info(sii)] 1.0]
 	if {$index != ""} {
@@ -2824,7 +2825,7 @@ proc Neuroclassifier_select {event} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	# We remove any hilites in the text window.
 	set t $info(classifier_text)
@@ -2838,7 +2839,7 @@ proc Neuroclassifier_select {event} {
 		set event [$t get "$index" "$index lineend"]
 	} {
 		Neuroplayer_print "ERROR: Cannot find event \"[lrange $event 0 2]\"."
-		return "FAIL"
+		return ""
 	}
 
 	# We hilite the event and move it into the visible area of the
@@ -2846,6 +2847,9 @@ proc Neuroclassifier_select {event} {
 	$t tag add hilite "$index" "$index lineend"
 	$t tag configure hilite -background lightgreen
 	$t see $index
+	
+	# Return the event line index.
+	return "$index"
 }
 
 #
@@ -2856,10 +2860,11 @@ proc Neuroclassifier_jump {event} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	Neuroclassifier_select $event
 	Neuroplayer_jump $event 0
+	return ""
 }
 
 #
@@ -2870,7 +2875,7 @@ proc Neuroclassifier_change {event} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	# Find the event in the text window.
 	set t $info(classifier_text)
@@ -2905,6 +2910,7 @@ proc Neuroclassifier_change {event} {
 	} {
 		Neuroplayer_print "ERROR: Cannot find event \"[lrange $event 0 $info(sii)]\"."
 	}
+	return ""
 }
 
 #
@@ -2919,7 +2925,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	if {$index == ""} {
 		set index $info(classifier_index)
@@ -2930,7 +2936,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 		if {([llength $id]>1) || ($id == "*")} {
 			if {$info(window) == ""} {raise "."} {raise $info(window)}
 			Neuroplayer_print "ERROR: Select a single channel to add to the library."
-			return "ERROR"
+			return ""
 		}
 		set event "[file tail $config(play_file)]\
 			[Neuroplayer_play_time_format \
@@ -2957,7 +2963,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 		LWDAQ_post [list Neuroclassifier_jump $event]
 	}
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -2969,7 +2975,7 @@ proc Neuroclassifier_metric_display {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	# Set up the x and y metric selection menues. Make sure the current 
 	# value of the metric menu is one of those available. If not, set it
@@ -3012,6 +3018,8 @@ proc Neuroclassifier_metric_display {} {
 			}
 		}
 	}
+	
+	return ""
 }
 
 #
@@ -3022,7 +3030,7 @@ proc Neuroclassifier_display {event_list} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	# Clear the text window and map.
 	set t $info(classifier_text)
@@ -3052,13 +3060,13 @@ proc Neuroclassifier_display {event_list} {
 			incr info(classifier_index)
 		} error_message]} {
 			Neuroplayer_print "ERROR: Bad event \"$event\"."
-			return "ERROR"
+			return ""
 		}
 		
 		# Check for user pressing Stop.
 		LWDAQ_support
 		if {$info(classifier_display_control) != "Run"} {
-			return "ABORT"
+			return ""
 		}
 	}
 	
@@ -3105,7 +3113,7 @@ proc Neuroclassifier_refresh {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	set event_list [Neuroclassifier_event_list]
 	Neuroclassifier_display $event_list
@@ -3218,7 +3226,7 @@ proc Neuroclassifier_processing {characteristics} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![winfo exists $info(classifier_window)]} {return "ABORT"}
+	if {![winfo exists $info(classifier_window)]} {return ""}
 	
 	# We check to see if the processor has modified the metric list.
 	# if so, we refresh the plot coordinate menus and the metric
@@ -3411,14 +3419,14 @@ proc Neuroclassifier_reprocess {{index 0}} {
 
 	if {![winfo exists $info(classifier_window)]} {
 		catch {unset info(reprocessing_event_list)}
-		return "ABORT"
+		return ""
 	}
 	if {$index == 0} {
-		if {[info exists info(reprocessing_event_list)]} {return "ABORT"}
+		if {[info exists info(reprocessing_event_list)]} {return ""}
 		set info(reprocessing_event_list) [Neuroclassifier_event_list]
 	} 
 	if {($index > 0) && ![info exists info(reprocessing_event_list)]} {
-		return "ABORT"
+		return ""
 	}
 	if {$index >= [llength $info(reprocessing_event_list)]} {
 		set event_list [lsort -increasing \
@@ -3426,14 +3434,14 @@ proc Neuroclassifier_reprocess {{index 0}} {
 			[Neuroclassifier_event_list]]
 		Neuroclassifier_display $event_list
 		catch {unset info(reprocessing_event_list)}
-		return "FAIL"
+		return ""
 	}
-	if {![info exists info(reprocessing_event_list)]} {return "FAIL"}
+	if {![info exists info(reprocessing_event_list)]} {return ""}
 	Neuroclassifier_jump [lindex $info(reprocessing_event_list) $index]
 	if {$index < [llength $info(reprocessing_event_list)]} {
 		LWDAQ_post [list Neuroclassifier_reprocess [incr index]]
 	}
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -3471,14 +3479,14 @@ proc Neuroclassifier_compare {} {
 	# Check that at least one metric is enabled.
 	if {[llength $index_list] == 0} {
 		Neuroplayer_print "ERROR: No events metrics enabled for comparison.\n"
-		return "FAIL"
+		return ""
 	}
 	
 	# Make a copy of the event library.
 	set events [Neuroclassifier_event_list]
 	if {[llength $events] == 0} {
 		Neuroplayer_print "ERROR: No events in library to compare.\n"
-		return "FAIL"
+		return ""
 	}
 	
 	# Go through the event list, comparing each event to every other event.
@@ -3608,7 +3616,7 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 	if {$state == "Start"} {
 		if {[winfo exists $w]} {
 			raise $w
-			return "ABORT"
+			return ""
 		}
 		toplevel $w
 		wm title $w "Batch Classification for Neuroplayer $info(version)"
@@ -3720,15 +3728,15 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 	}
 	
 	if {$state == "Classify"} {
-		if {$nbc(run)} {return "ABORT"}
+		if {$nbc(run)} {return ""}
 		
 		if {![info exists nbc(fnl)]} {
 			LWDAQ_print $nbc(t) "ERROR: Select input files."
-			return "FAIL"
+			return ""
 		}
 		if {![info exists nbc(ofn)]} {
 			LWDAQ_print $nbc(t) "ERROR: Specify output files."
-			return "FAIL"
+			return ""
 		}
 		set entire_classifier_library [Neuroclassifier_event_list]
 		set classifier_library [list]
@@ -3755,7 +3763,7 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 		}
 		if {[llength $classifier_library] < 1} {
 			LWDAQ_print $nbc(t) "ERROR: No library events exist or are selected."
-			return "FAIL"
+			return ""
 		}
 		
 		set nbc(run) 1
@@ -3771,7 +3779,7 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 
 		if {[catch {set of [open $nbc(ofn) w]} error_result]} {
 			LWDAQ_print $nbc(t) "ERROR: Cannot open file \"$nbc(ofn)\"."
-			return "FAIL"
+			return ""
 		}
 		LWDAQ_print $nbc(t) "Opened \"$nbc(ofn)\" for output."
 		
@@ -3827,7 +3835,7 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 				if {!$nbc(run) || ![winfo exists $w]} {
 					LWDAQ_print $nbc(t) "Aborted\n" purple
 					close $of
-					return "ABORT"
+					return ""
 				}
 				incr file_interval_count
 				set archive [lindex $c 0]
@@ -3841,7 +3849,7 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 							in \"[file tail $fn]\"."
 						close $of
 						set nbc(run) 0
-						return "FAIL"
+						return ""
 					}
 					incr count_$id
 					if {$nbc(en_$id)} {
@@ -3991,7 +3999,7 @@ proc Neurotracker_extract {} {
 		for {set slice_num 0} {$slice_num <= $num_slices} {incr slice_num} {
 			lappend history "0.0 0.0 0.0 0.0 0.0 0.0 0.0"
 		}
-		return "ABORT"
+		return ""
 	}
 	
 	# Determine if this is a lossy interval.
@@ -4040,7 +4048,7 @@ proc Neurotracker_extract {} {
 				lappend history "0.0 0.0 0.0 0.0 0.0 0.0 0.0"
 			}
 		}
-		return "ABORT"
+		return ""
 	}
 	
 	# Split up the tracker result into a list delimited by line breaks.
@@ -4109,12 +4117,8 @@ proc Neurotracker_extract {} {
 	Neuroplayer_print "Tracker: [lrange $final_slice 0 2]\
 		[lrange $final_slice 7 end]" verbose
 	
-	# Return a success flag.
-	if {$error_flag} {
-		return "ERROR"
-	} {
-		return "SUCCESS"
-	}
+	# Return an empty string.
+	return ""
 }
 
 #
@@ -4127,13 +4131,13 @@ proc Neurotracker_open {} {
 	global LWDAQ_Info
 	
 	# Abort if we don't have graphics.
-	if {!$info(gui)} {return "ABORT"}
+	if {!$info(gui)} {return ""}
 
 	# Open the tracker window, unless it exists already.
 	set w $info(tracker_window)
 	if {[winfo exists $w]} {
 		raise $w
-		return ""
+		return $w
 	}
 	toplevel $w
 	wm title $w "Neurotracker for Neuroplayer $info(version)"	
@@ -4236,7 +4240,7 @@ proc Neurotracker_fresh_graphs {} {
 	set info(tracker_range) "$x_min $x_max $y_min $y_max"
 
 	# Return now if the tracker window is unavailable.
-	if {![winfo exists $info(tracker_window)]} {return "FAIL"}
+	if {![winfo exists $info(tracker_window)]} {return ""}
 	
 	# Clear canvas widget.
 	$info(tracker_plot) delete location
@@ -4260,7 +4264,7 @@ proc Neurotracker_fresh_graphs {} {
 			-color 11
 	}
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -4274,15 +4278,15 @@ proc Neurotracker_plot {} {
 	global LWDAQ_Info	
 
 	# Abort if running in no-gui mode or window does not exist.
-	if {!$info(gui)} {return "ABORT"}
-	if {![winfo exists $info(tracker_window)]} {return "ABORT"}
+	if {!$info(gui)} {return ""}
+	if {![winfo exists $info(tracker_window)]} {return ""}
 	
 	# Set colors and the source of the location values.
 	set color [Neuroplayer_color $info(channel_num)]
 	
 	# If the locations string is empty, we get the locations we want to plot from
 	# the history string. 
-	if {![info exists history]} {return "ERROR"}
+	if {![info exists history]} {return ""}
 	
 	# Find the range of x and y values we must cover.
 	scan $info(tracker_range) %f%f%f%f x_min x_max y_min y_max
@@ -4372,7 +4376,7 @@ proc Neurotracker_plot {} {
 	# Detect errors.
 	if {[lwdaq_error_string] != ""} {Neuroplayer_print [lwdaq_error_string]}
 	LWDAQ_support
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -4384,14 +4388,14 @@ proc Neurotracker_draw_graphs {} {
 	global LWDAQ_Info	
 
 	# Abort if running in no-gui mode.
-	if {!$info(gui)} {return "ABORT"}
-	if {![winfo exists $info(tracker_window)]} {return "ABORT"}
+	if {!$info(gui)} {return ""}
+	if {![winfo exists $info(tracker_window)]} {return ""}
 
 	# Draw the tracker picture.
 	lwdaq_draw $info(tracker_image) $info(tracker_photo)
 	
 	# Return.
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -4426,7 +4430,7 @@ proc Neuroplayer_clock {} {
 	set w $info(datetime_panel)
 	if {[winfo exists $w]} {
 		raise $w
-		return "ABORT"
+		return ""
 	}
 	toplevel $w
 	wm title $w "Clock Panel, Neuroplayer $info(version)"
@@ -4470,7 +4474,7 @@ proc Neuroexporter_open {} {
 	set w $info(export_panel)
 	if {[winfo exists $w]} {
 		raise $w
-		return "ABORT"
+		return ""
 	}
 	toplevel $w
 	wm title $w "Exporter Panel for Neuroplayer $info(version)"
@@ -4656,10 +4660,10 @@ proc Neuroplayer_autofill {} {
 		Neuroplayer_print "Autofill found no active channels.\
 			Setting channel select to \"*\". Play one interval and try again."
 		set config(channel_selector) "*"
-		return "FAIL"
+		return ""
 	}
 	set config(channel_selector) [string trim $autofill]
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -4824,7 +4828,7 @@ proc Neuroexporter_txt_setup {} {
 	set w $info(text_panel)
 	if {[winfo exists $w]} {
 		raise $w
-		return "ABORT"
+		return ""
 	}
 	
 	# Create the text setup panel.	
@@ -4846,7 +4850,7 @@ proc Neuroexporter_txt_setup {} {
 	}
 	
 	# Return successful.
-	return "SUCCESS"
+	return ""
 }
 
 
@@ -4862,7 +4866,7 @@ proc Neuroexporter_txt_save {w} {
 	upvar #0 Neuroplayer_config config
 
 	set config(export_txt_header) [string trim [$w.text get 1.0 end]]
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -4908,7 +4912,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		Neuroplayer_command "Stop"
 		foreach pid $info(export_epl) {LWDAQ_process_stop $pid}
 		set info(export_state) "Idle"
-		return "SUCCESS"
+		return ""
 	}
 
 	# If the command is start, begin the export process.
@@ -4918,14 +4922,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		if {$info(export_state) != "Idle"} {
 			LWDAQ_print $t "WARNING: Exporter already started,\
 				press stop before starting again."
-			return "ERROR"
+			return ""
 		}
 
 		# Check for incompatible options.
 		if {$config(export_centroid) || $config(export_powers)} {
 			if {$config(export_format) == "EDF"} {
 				LWDAQ_print $t "ERROR: Cannot store centroid or powers in EDF."
-				return "ERROR"
+				return ""
 			}
 		}	
 		if {round([expr $config(export_duration)]) \
@@ -4944,7 +4948,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			LWDAQ_print $t "ERROR: Invalid time \"$config(export_start),\
 				should be $info(datetime_error)."
 			LWDAQ_post "Neuroexporter_export Abort"
-			return "ERROR"
+			return ""
 		}
 		set info(export_start_s) $start_s
 		set info(export_end_s) [expr $info(export_start_s) \
@@ -4963,7 +4967,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		if {![file exists $config(export_dir)]} {
 			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
 			LWDAQ_post "Neuroexporter_export Abort"
-			return "ERROR"
+			return ""
 		}
 
 		# If we are playing an NDF, not just exporting video, we set up the playback
@@ -4979,7 +4983,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						"ERROR: Cannot use wildcard channel select, aborting export.\
 							Use Autofill or enter select string by hand."
 					LWDAQ_post "Neuroexporter_export Abort"
-					return "ERROR"
+					return ""
 				}
 				set id [lindex [split $channel :] 0]		
 				if {![string is integer -strict $id] \
@@ -4988,7 +4992,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					LWDAQ_print $t \
 						"ERROR: Invalid channel id \"$id\", aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
-					return "ERROR"
+					return ""
 				}
 				set sps [lindex [split $channel :] 1]
 				if {$sps == ""} {
@@ -4996,13 +5000,13 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						"ERROR: No sample rate specified for channel $id,\
 							aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
-					return "ERROR"
+					return ""
 				}
 				if {[lsearch $config(default_frequencies) $sps] < 0} {
 					LWDAQ_print $t \
 						"ERROR: Invalid sample rate \"$sps\", aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
-					return "ERROR"
+					return ""
 				}
 				lappend signals $id $sps
 						
@@ -5144,7 +5148,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					see Neuroplayer window for suggestion."
 				Neuroplayer_video_suggest
 				LWDAQ_post "Neuroexporter_export Abort"
-				return "ABORT"
+				return ""
 			}
 			# Stop stray processes, clear the process list, clear the video file
 			# list. Make sure the exporter scratch directory exists and clear up
@@ -5171,7 +5175,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				# Break out of the loop if the state is forced to Idle by an
 				# abort command.
 				if {$info(export_state) == "Idle"} {
-					return "ABORT"
+					return ""
 				}
 			
 				# Try to find a file containing time vt.
@@ -5188,7 +5192,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 							export end time, aborting export."
 					}
 					LWDAQ_post "Neuroexporter_export Abort"
-					return "ERROR"
+					return ""
 				}
 				
 				# If the file does not contain at least one second of our export
@@ -5197,7 +5201,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					LWDAQ_print $t "ERROR: Video recording does not include\
 						export end time, aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
-					return "ERROR"
+					return ""
 				}
 				
 				# Determine how much of the correct length of this file we need for
@@ -5211,7 +5215,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					LWDAQ_print $t "ERROR: Video recording does not include\
 						export end time, aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
-					return "ERROR"
+					return ""
 				}
 				set tclen [expr $tclen + $cdur]
 				
@@ -5231,7 +5235,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 							exceeds video_pad_max=$config(video_pad_max),\
 							aborting export."
 						LWDAQ_post "Neuroexporter_export Abort"
-						return "ERROR"
+						return ""
 					}
 
 					LWDAQ_print $t "[file tail $vfn]: Missing frames,\
@@ -5413,18 +5417,18 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			LWDAQ_post "Neuroexporter_export Video"
 		}
 
-		return "SUCCESS"
+		return ""
 	}
 
 	if {$cmd == "Play"} {	
 		# Check the current state of the exporter is "Play", or else we will ignore
 		# this request to play and return.
-		if {$info(export_state) != "Play"} {return "IGNORE"}
+		if {$info(export_state) != "Play"} {return ""}
 		
 		# Check that the export directory exists.
 		if {![file exists $config(export_dir)]} {
 			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
-			return "ERROR"
+			return ""
 		}
 		
 		# Continue to export, provided that we are not yet done.
@@ -5490,7 +5494,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				if {![info exists history]} {
 					LWDAQ_print $t "ERROR: No tracker history to export,\
 						make sure alt_calculate is set."
-					return "ERROR"
+					return ""
 				}
 				if {$config(export_combine)} {
 					set tfn [file join $config(export_dir) \
@@ -5556,7 +5560,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				if {![info exists history]} {
 					LWDAQ_print $t "ERROR: No tracker history to export,\
 						make sure alt_calculate is set."
-					return "ERROR"
+					return ""
 				}
 				if {$config(export_combine)} {
 					set afn [file join $config(export_dir) \
@@ -5642,7 +5646,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			}
 		}
 				
-		return "SUCCESS"
+		return ""
 	}
 	
 	if {$cmd == "Video"} {
@@ -5652,7 +5656,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			foreach pid $info(export_epl) {
 				if {[LWDAQ_process_exists $pid]} {
 					LWDAQ_post "Neuroexporter_export Video"
-					return "SUCCESS"
+					return ""
 				}
 			}
 			
@@ -5676,7 +5680,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				-i concat_list.txt -c copy \
 				Export.mp4 > $info(video_export_log) &]
 			LWDAQ_post "Neuroexporter_export Video"
-			return "SUCCESS"
+			return ""
 		}
 
 		# In the concatination state, we are watching the concatination process. When
@@ -5686,7 +5690,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			# If there is an export process running, wait a while longer.
 			if {[LWDAQ_process_exists $info(export_epl)]} {
 				LWDAQ_post "Neuroexporter_export Video"
-				return "SUCCESS"
+				return ""
 			}
 			
 			# Move the export file into the export directory.
@@ -5721,7 +5725,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				[expr [clock seconds] - $info(export_run_start)] s.\n" purple
 			set info(export_state) "Wait"
 			LWDAQ_post "Neuroexporter_export Repeat" 
-			return "SUCCESS"
+			return ""
 		}
 	}
 
@@ -5729,7 +5733,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	# from the point immediately after the end of the previous export.
 	if {$cmd == "Repeat"} {
 		if {$info(export_state) != "Wait"} {
-			return "ERROR"
+			return ""
 		}
 		
 		if {$config(export_reps) == "*"} {
@@ -5751,14 +5755,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				+ round($info(t_min)) ]]
 			set info(export_state) "Idle"
 			LWDAQ_post Neuroexporter_export
-			return "SUCCESS"	
+			return ""	
 		} {
 			set info(export_state) "Idle"
-			return "SUCCESS"
+			return ""
 		}		
 	}
 
-	return "ERROR"
+	return ""
 }
 
 #
@@ -5815,7 +5819,7 @@ proc Neuroplayer_calibration {{name ""}} {
 	set w $info(window)\.baselines
 	if {[winfo exists $w]} {
 		raise $w
-		return "ABORT"
+		return ""
 	}
 	toplevel $w
 	wm title $w "Calibration Panel V$info(version)"
@@ -5992,12 +5996,12 @@ proc Neuroplayer_baselines_write {name} {
 
 	if {[regexp {[^a-zA-Z0-9_\-\.]} $name]} {
 		Neuroplayer_print "ERROR: Name \"$name\" invalid contains illegal characters."
-		return "FAIL"
+		return ""
 	}
 
 	if {[catch {set metadata [LWDAQ_ndf_string_read $config(play_file)]} error_string]} {
 		Neuroplayer_print "ERROR: $error_string"
-		return "FAIL"
+		return ""
 	}
 	
 	if {$name == $info(no_name)} {
@@ -6026,7 +6030,7 @@ proc Neuroplayer_baselines_write {name} {
 	Neuroplayer_print "Wrote baselines \"$name\" to\
 		[file tail $config(play_file)]." verbose
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -6041,12 +6045,12 @@ proc Neuroplayer_baselines_read {name} {
 
 	if {[regexp {[^a-zA-Z0-9_\-\.]} $name]} {
 		Neuroplayer_print "ERROR: Baseline name \"$name\" contains illegal characters."
-		return "FAIL"
+		return ""
 	}
 
 	if {[catch {set metadata [LWDAQ_ndf_string_read $config(play_file)]} error_string]} {
 		Neuroplayer_print "ERROR: $error_string"
-		return "FAIL"
+		return ""
 	}
 
 	if {$name == $info(no_name)} {
@@ -6064,11 +6068,11 @@ proc Neuroplayer_baselines_read {name} {
 	} {
 		Neuroplayer_print "ERROR: No baselines \"$name\" in\
 			[file tail $config(play_file)]."
-		return "FAIL"
+		return ""
 	}
 	Neuroplayer_print "Read baselines \"$name\" from [file tail\
 		$config(play_file)]." verbose
-	return "SUCCESS"
+	return ""
 }
 
 # The activity displays the frequencies used for reconstruction, which may have
@@ -6081,7 +6085,7 @@ proc Neuroplayer_activity {} {
 	set w $info(window)\.activity
 	if {[winfo exists $w]} {
 		raise $w
-		return "ABORT"
+		return ""
 	}
 	toplevel $w
 	scan [wm maxsize .] %d%d x y
@@ -6241,7 +6245,7 @@ proc Neuroplayer_fresh_graphs {{clear_screen 0}} {
 	upvar #0 Neuroplayer_config config
 	global LWDAQ_Info	
 
-	if {![winfo exists $info(window)]} {return "ABORT"}
+	if {![winfo exists $info(window)]} {return ""}
 	
 	lwdaq_graph "0 0" $info(vt_image) -fill 1 \
 			-x_min 0 -x_max 1 -x_div $config(t_div) \
@@ -6295,7 +6299,7 @@ proc Neuroplayer_fresh_graphs {{clear_screen 0}} {
 	set info(spectrum) "0 0"
 	
 	LWDAQ_support
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -6307,7 +6311,7 @@ proc Neuroplayer_draw_graphs {} {
 	upvar #0 Neuroplayer_config config
 	global LWDAQ_Info	
 
-	if {!$info(gui)} {return "ABORT"}
+	if {!$info(gui)} {return ""}
 	
 	lwdaq_draw $info(vt_image) $info(vt_photo)
 	if {[winfo exists $info(vt_view)]} {
@@ -6318,7 +6322,7 @@ proc Neuroplayer_draw_graphs {} {
 		lwdaq_draw $info(af_image) $info(af_view_photo) -zoom $config(af_view_zoom)
 	}
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -6334,7 +6338,7 @@ proc Neuroplayer_magnified_view {figure} {
 		set w $info(vt_view)
 		if {[winfo exists $w]} {
 			raise $w
-			return "ABORT"
+			return ""
 		}
 		toplevel $w
 		wm title $w "Voltage vs. Time Magnified View, Neuroplayer $info(version)"
@@ -6347,7 +6351,7 @@ proc Neuroplayer_magnified_view {figure} {
 		set w $info(af_view)
 		if {[winfo exists $w]} {
 			raise $w
-			return "ABORT"
+			return ""
 		}
 		toplevel $w
 		wm title $w "Amplitude vs. Frequency Magnified View, Neuroplayer $info(version)"
@@ -6420,7 +6424,7 @@ proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 	global LWDAQ_Info	
 
 	# Abort if running in no-gui mode.
-	if {!$info(gui)} {return "ABORT"}
+	if {!$info(gui)} {return ""}
 	
 	# Select colors and signal.
 	if {$color == ""} {set color [Neuroplayer_color $info(channel_num)]}
@@ -6430,14 +6434,14 @@ proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 	foreach a {v_range v_offset} {
 		if {![string is double -strict $config($a)]} {
 			set result "ERROR: Invalid value, \"$config($a)\" for $a."
-			return "FAIL"
+			return ""
 		}
 	}
 	
 	# Check color for errors.
 	if {[llength $color] > 1} {
 		set result "ERROR: Invalid color, \"$color\"."
-		return "FAIL"
+		return ""
 	}
 
 	# Set up the range and plot the values.
@@ -6464,7 +6468,7 @@ proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 	if {[lwdaq_error_string] != ""} {Neuroplayer_print [lwdaq_error_string]}
 
 	LWDAQ_support
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -6482,7 +6486,7 @@ proc Neuroplayer_plot_values {{color ""} {values ""}} {
 	global LWDAQ_Info
 
 	# Abort if running in no-gui mode.
-	if {!$info(gui)} {return "ABORT"}
+	if {!$info(gui)} {return ""}
 	
 	# Select values.
 	if {$values == ""} {set values $info(values)}
@@ -6498,7 +6502,7 @@ proc Neuroplayer_plot_values {{color ""} {values ""}} {
 	# Call the plot routine.
 	Neuroplayer_plot_signal $color $signal
 	
-	return "SUCCESS"
+	return ""
 }
 
 
@@ -6519,7 +6523,7 @@ proc Neuroplayer_plot_spectrum {{color ""} {spectrum ""}} {
 	global LWDAQ_Info	
 
 	# Abort if running in no-gui mode.
-	if {!$info(gui)} {return "ABORT"}
+	if {!$info(gui)} {return ""}
 	
 	# Select color and spectrum values.
 	if {$color == ""} {set color [Neuroplayer_color $info(channel_num)]}
@@ -6529,7 +6533,7 @@ proc Neuroplayer_plot_spectrum {{color ""} {spectrum ""}} {
 	foreach a {a_min a_max f_min f_max} {
 		if {![string is double -strict $config($a)]} {
 			set result "ERROR: Invalid value, \"$config($a)\" for $a."
-			return "FAIL"
+			return ""
 		}
 	}
 	
@@ -6586,7 +6590,7 @@ proc Neuroplayer_plot_spectrum {{color ""} {spectrum ""}} {
 	if {[lwdaq_error_string] != ""} {Neuroplayer_print [lwdaq_error_string]}
 
 	LWDAQ_support
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -6615,7 +6619,7 @@ proc Neuroplayer_play {{command ""}} {
 	global LWDAQ_Info
 
 	# Make sure we have the info array.
-	if {![array exists info]} {return "ABORT"}
+	if {![array exists info]} {return ""}
 
 	# Check if we have an overriding command.
 	if {$command != ""} {set info(play_control) $command}
@@ -6623,31 +6627,31 @@ proc Neuroplayer_play {{command ""}} {
 	# Consider various ways in which we will do nothing and return.
 	if {$LWDAQ_Info(reset)} {
 		set info(play_control) "Idle"
-		return "SUCCESS"
+		return ""
 	}
 	if {$info(gui) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
-		return "ABORT"
+		return ""
 	}
 	if {$info(play_control) == "Stop"} {
 		LWDAQ_set_bg $info(play_control_label) white
 		set info(play_control) "Idle"
-		return "SUCCESS"
+		return ""
 	}
 	if {$config(video_enable) && ($config(play_interval) < $info(video_min_interval))} {
 		Neuroplayer_print "ERROR: Playback interval must be a multiple\
 			of $info(video_min_interval) when video is enabled."
 		LWDAQ_set_bg $info(play_control_label) white
 		set info(play_control) "Idle"
-		return "SUCCESS"
+		return ""
 	}
 
 	# Check to see if there are any videos playing. We must wait for them
 	# to finish before we continue with playback of the archive.	
 	if {$info(video_state) == "Play"} {
 		LWDAQ_post Neuroplayer_play
-		return "SUCCESS"
+		return ""
 	}
 	
 	# If the play control label background is yellow and we are 
@@ -6710,7 +6714,7 @@ proc Neuroplayer_play {{command ""}} {
 				playback directory tree."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
-			return "FAIL"
+			return ""
 		}
 		if {$info(play_control) == "First"} {
 			set config(play_file) [lindex $play_list 0]
@@ -6726,7 +6730,7 @@ proc Neuroplayer_play {{command ""}} {
 		Neuroplayer_print "ERROR: Cannot find play file \"$config(play_file)\"."
 		LWDAQ_set_bg $info(play_control_label) white
 		set info(play_control) "Idle"
-		return "FAIL"
+		return ""
 	}
 
 	# If we have changed files, check the new file is NDF.
@@ -6735,7 +6739,7 @@ proc Neuroplayer_play {{command ""}} {
 			Neuroplayer_print "ERROR: Checking archive, $error_message."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
-			return "FAIL"
+			return ""
 		}	
 	}
 	
@@ -6755,7 +6759,7 @@ proc Neuroplayer_play {{command ""}} {
 			Neuroplayer_print "ERROR: $error_message."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
-			return "FAIL"			
+			return ""			
 		}
 		set payload [LWDAQ_xml_get_list $metadata "payload"]
 		if {[string is integer -strict $payload]} {
@@ -6823,7 +6827,7 @@ proc Neuroplayer_play {{command ""}} {
 	if {($info(play_control) == "Pick") || ($info(play_control) == "First")} {
 		LWDAQ_set_bg $info(play_control_label) white
 		set info(play_control) "Idle"
-		return "SUCCESS"
+		return ""
 	}
 	
 	# If Back, we are going to jump to the start of the previous interval, even
@@ -6845,7 +6849,7 @@ proc Neuroplayer_play {{command ""}} {
 					\"$info(play_file_tail)\" not in playback directory tree."
 				LWDAQ_set_bg $info(play_control_label) white
 				set info(play_control) "Idle"
-				return "FAIL"
+				return ""
 			}
 			set file_name [lindex $fl [expr $i - 1]]
 			if {$file_name != ""} {
@@ -6859,13 +6863,13 @@ proc Neuroplayer_play {{command ""}} {
 				set config(play_time) 0.0
 				LWDAQ_set_bg $info(play_control_label) white
 				set info(play_control) "Idle"
-				return "FAIL"
+				return ""
 			}
 		} 
 		
 		set info(play_control) "Step"
 		LWDAQ_post Neuroplayer_play
-		return "SUCCESS"
+		return ""
 	}
 	
 	# If Repeat we re-display the previous interval.
@@ -6877,7 +6881,7 @@ proc Neuroplayer_play {{command ""}} {
 		}
 		set info(play_control) "Step"
 		LWDAQ_post Neuroplayer_play front
-		return "SUCCESS"
+		return ""
 	}
 	
 	# We trim the text window to a maximum number of lines.
@@ -6978,7 +6982,7 @@ proc Neuroplayer_play {{command ""}} {
 			Neuroplayer_print "ERROR: $error_message."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
-			return "FAIL"			
+			return ""			
 		}
 		set num_bytes_read [string length $data]
 		set num_messages_read [expr $num_bytes_read / $message_length ]
@@ -7013,7 +7017,7 @@ proc Neuroplayer_play {{command ""}} {
 				}
 
 				LWDAQ_post Neuroplayer_play
-				return "ERROR"
+				return ""
 			}
 			
 			lwdaq_data_manipulate $info(buffer_image) write \
@@ -7043,7 +7047,7 @@ proc Neuroplayer_play {{command ""}} {
 		if {$config(play_stop_at_end)} {
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
-			return "SUCCESS"
+			return ""
 		}
 		
 		# We obtain a list of all NDF files in the play_dir directory tree. If
@@ -7056,7 +7060,7 @@ proc Neuroplayer_play {{command ""}} {
 				\"$info(play_file_tail)\" not in playback directory tree."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
-			return "FAIL"
+			return ""
 		}
 		
 		# We see if there is a later file in the directory tree. If so, we switch to
@@ -7080,7 +7084,7 @@ proc Neuroplayer_play {{command ""}} {
 			}
 			LWDAQ_set_bg $info(play_control_label) white
 			LWDAQ_post Neuroplayer_play
-			return "SUCCESS"
+			return ""
 		} {
 			# This is the case where we have $num_clocks but need
 			# $play_num_clocks and we have no later file to switch to. This case
@@ -7098,7 +7102,7 @@ proc Neuroplayer_play {{command ""}} {
 				}
 			}
 			LWDAQ_post Neuroplayer_play
-			return "SUCCESS"
+			return ""
 		}
 	}
 	
@@ -7855,10 +7859,8 @@ proc Neuroplayer_video_download {} {
 	set result [LWDAQ_url_open $info(video_library_archive)]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
-		return "ERROR"
-	} else {
-		return "SUCCESS"
 	}
+	return ""
 }
 
 #
@@ -8241,7 +8243,7 @@ proc Neuroplayer_open {} {
 	# routine, something has gone wrong, or a window already exists for this
 	# tool, so we abort.
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return "ABORT"}
+	if {$w == ""} {return ""}
 	
 	# Get on with creating the display in the tool's frame or window.
 	set f $w.displays
@@ -8507,7 +8509,7 @@ proc Neuroplayer_open {} {
 	$info(text) tag bind textbutton <Enter> {%W configure -cursor arrow} 
 	$info(text) tag bind textbutton <Leave> {%W configure -cursor xterm} 
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -8523,14 +8525,14 @@ proc Neuroplayer_close {} {
 	}
 	array unset config
 	array unset info
-	return "SUCCESS"
+	return ""
 }
 
 Neuroplayer_init 
 Neuroplayer_open
 Neuroplayer_fresh_graphs 1
 	
-return "SUCCESS"
+return ""
 
 ----------Begin Help----------
 

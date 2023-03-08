@@ -3,39 +3,6 @@
 # Copyright (C) 2015 Michael Bradshaw, Open Source Instruments Inc.
 # Copyright (C) 2015-2023 Kevan Hashemi, Open Source Instruments Inc.
 
-#Version 1.1 Fixes:  
-#removed Recorder ip address/driversocket/mux socket initialization on startup
-#modified code to allow user to input 'output voltage' rather than 'memory amplitude'
-#setting output voltage changes analog gain
-#removed dc offset entry, renamed 'set frequency' to 'set output', 
-#renamed 'stop' to 'output off'
-#fixed gui so that labels and entries line up better
-#added option to sweep frequency and not record the data
-#output voltage is calibrated to the pcbs whose gain is set 
-#specifically for low voltage frequency sweep
-#version 1.1 allows user to set voltage between 0.1V- ~10V p-p
-#version 1.1 has a bug that provides no output signal for frequencies above 40,001 Hz. 
-#version 1.1 adds more discrete frequency/#samples bands.
-
-# Version 2.0 Edits by Kevan Hashemi. Change tool name, set default values.
-# Version 2.1 Edits to screen prints.
-# Version 2.2 Speed up sweep slightly.
-# Version 2.3 Provide version, batch, and channel fields with which to 
-# compose transmitter id.
-# Version 2.6 Add sample rate buttons to set frequencies automatically.
-# Version 2.7 Add sample rate 2048.
-# Version 2.8 Add support for 16 SPS EMG
-# Version 2.9 Automatically set minimum number of clocks.
-# Version 2.10 Restore "*" for analysis channels after acquire.
-# Version 3.1 The function generator sweep uses the LWDAQ event queue.
-# Version 3.2 Allow specification of multiple channels.
-# Version 3.3 Sort channel numbers correctly for printout.
-# Version 3.4 Fix repeat frequency value in 512 SPS sweep.
-# Version 3.5 Add autofill for channel numbers.
-# Version 3.6 Add Receiver button.
-# Version 3.7 Add glitch threshold for Receiver.
-# Version 3.8 Double the setup delay.
-
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
 	upvar #0 Function_Generator_config config
@@ -49,8 +16,8 @@ proc Function_Generator_init {} {
 	global LWDAQ_Driver
 
 	
-	LWDAQ_tool_init "Function_Generator" "4.1"
-	if {[winfo exists $info(window)]} {return 0}
+	LWDAQ_tool_init "Function_Generator" "4.2"
+	if {[winfo exists $info(window)]} {return ""}
 
 	set info(control) "Idle"
 	set config(database_file_name) "/Users/kevan/Desktop/TX_Gain_vs_F.txt"
@@ -180,8 +147,7 @@ proc Function_Generator_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 	
-	
-	return 1	
+	return ""	
 }
 
 proc Function_Generator_set_frequencies {{print 0}} {
@@ -1030,7 +996,7 @@ proc Function_Generator_open {} {
 	upvar #0 LWDAQ_config_Receiver iconfig
 		
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 			
 	set e1 $w.e1
 	frame $e1
@@ -1201,14 +1167,14 @@ proc Function_Generator_open {} {
 	
 	Function_Generator_set_frequencies
 	
-	return 1
+	return $w
 	
 }
 
 Function_Generator_init
 Function_Generator_open
 
-return 1
+return ""
 
 ----------Begin Help----------
 

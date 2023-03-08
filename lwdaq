@@ -65,27 +65,20 @@ fi
 OPTION="--gui"
 VERBOSE=1
 CONFIG_FILE=""
-if [[ $1 == --* ]];
-then
-	while [[ $1 == --* ]];
-	do
-		if [ $1 == "--quiet" ];
-		then
-			VERBOSE=0
-		else
-			if [ $1 == "--verbose" ];
-			then
-				VERBOSE=1
-			else
-				OPTION=$1
-			fi
-		fi
-		shift 1
-	done
-else
-	CONFIG_FILE=$1
+PROMPT=""
+while [[ $1 == --* ]];
+do
+	case "$1" in
+		"--quiet") VERBOSE=0;;
+		"--verbose") VERBOSE=1;;
+		"--prompt") PROMPT="";;
+		"--no-prompt") PROMPT="--no-prompt";;
+		*) OPTION=$1;;
+	esac
 	shift 1
-fi
+done
+CONFIG_FILE=$1
+shift 1
 
 # Check to see if we should run in no-gui mode with tclsh or with gui in wish,
 # and also whether we should run in the background. The run mode options also
@@ -197,6 +190,7 @@ if [ $VERBOSE = 1 ];
 then
 	echo "OS: $OS"
 	echo "OPTION: $OPTION"
+	echo "PROMPT: $PROMPT"
 	echo "GUI_ENABLED: $GUI_ENABLED"
 	echo "RUN_IN_BACKGROUND: $RUN_IN_BACKGROUND"
 	echo "LOCAL_DIR: `pwd`"
@@ -231,13 +225,13 @@ then
 	then
 		if [ "$OPTION" == "--spawn" ];
 		then
-			nohup $SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" & 
+			nohup $SHELL $INIT_FILE $OPTION $PROMPT $CONFIG_FILE "$@" & 
 		else
-			$SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" & 
+			$SHELL $INIT_FILE $OPTION $PROMPT $CONFIG_FILE "$@" & 
 		fi
 	else
-		$SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@" &
+		$SHELL $INIT_FILE $OPTION $PROMPT $CONFIG_FILE "$@" &
 	fi
 else
-	$SHELL $INIT_FILE $OPTION $CONFIG_FILE "$@"
+	$SHELL $INIT_FILE $OPTION $PROMPT $CONFIG_FILE "$@"
 fi

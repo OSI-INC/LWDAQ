@@ -23,7 +23,7 @@ proc Motion_Sensor_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "Motion_Sensor" "3"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 	
 	set info(control) "Idle"
 	set info(photo) "motion_sensor_image"
@@ -44,7 +44,7 @@ proc Motion_Sensor_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1   
+	return ""   
 }
 
 proc Motion_Sensor_browse_image_directory {} {
@@ -77,7 +77,7 @@ proc Motion_Sensor_command {command} {
 	} {
 		LWDAQ_print $info(text) "ERROR: Can't $command during $info(control)."
 	}
-	return 1
+	return ""
 }
 
 
@@ -88,14 +88,14 @@ proc Motion_Sensor_execute {} {
 
 	global LWDAQ_Info
 	
-	if {![array exists info]} {return 0}
+	if {![array exists info]} {return ""}
 
 	if {$info(window) != ""} {
-		if {![winfo exists $info(window)]} {return 0}
+		if {![winfo exists $info(window)]} {return ""}
 	}
 	if {$info(control) == "Stop"} {
 		set info(control) "Idle"
-		return 1
+		return ""
 	}
 	 
 	if {[winfo exists $info(text)]} {
@@ -107,7 +107,7 @@ proc Motion_Sensor_execute {} {
 			LWDAQ_print $info(text) \
 				"ERROR: directory \"$config(image_directory)\" does not exist."
 			set info(control) "Idle"
-			return 0
+			return ""
 		}
 	
 		set result [LWDAQ_acquire $config(instrument)]
@@ -144,7 +144,7 @@ proc Motion_Sensor_execute {} {
 			LWDAQ_print $info(text) $result
 		}
 		LWDAQ_post Motion_Sensor_execute
-		return 1
+		return ""
 	}
 	
 	if {$info(control) == "Replay"} {
@@ -154,7 +154,7 @@ proc Motion_Sensor_execute {} {
 			LWDAQ_print $info(text) \
 				"ERROR: directory \"$config(image_directory)\" does not exist."
 			set info(control) "Idle"
-			return 0
+			return ""
 		}
 	
 		foreach image_name [lsort -dictionary \
@@ -173,11 +173,11 @@ proc Motion_Sensor_execute {} {
 		}
 		LWDAQ_print $info(text) "End.\n" purple
 		set info(control) "Idle"
-		return 1
+		return ""
 	}
 
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 proc Motion_Sensor_open {} {
@@ -186,7 +186,7 @@ proc Motion_Sensor_open {} {
 	global LWDAQ_Info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 		
 	set f $w.controls
 	frame $f
@@ -234,13 +234,13 @@ proc Motion_Sensor_open {} {
 
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
 	
-	return 1
+	return $w
 }
 
 Motion_Sensor_init
 Motion_Sensor_open
 	
-return 1
+return ""
 
 ----------Begin Help----------
 The Motion Sensor tool captures images from the Camera instrument. It

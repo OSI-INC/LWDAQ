@@ -86,6 +86,7 @@ proc LWDAQ_quit {} {
 	upvar #0 LWDAQ_Info info
 	LWDAQ_close_all_sockets
 	set LWDAQ_Info(quit) 1
+	LWDAQ_update
 	exit
 }
 
@@ -250,7 +251,7 @@ proc LWDAQ_socket_accept {sock addr port} {
 	lappend LWDAQ_Info(open_sockets) "$sock $addr $port basic server"
 	fconfigure $sock -translation auto -buffering line
 	fileevent $sock readable [list LWDAQ_socket_interpreter $sock]
-	return 1
+	return ""
 }
 
 #
@@ -264,16 +265,17 @@ proc LWDAQ_socket_interpreter {sock} {
 	} {
 		puts "$sock received \"$line\""
 	}
+	return ""
 }
 
 #
-# LWDAQ_socket_close closes a socket if it exists, and returns a 1. Otherwise
-# it returns a zero. If the socket is listed in the LWDAQ open sockets list,
-# this routine will remove the socket from the list. If the socket is a LWDAQ
-# client, the routine sends an end of transmission character before closing the
-# socket, and also applies a delay of a few milliseconds afterwards to give 
-# LWDAQ Drivers with older software time to get ready to accept another connection.
-# Use this routine to close sockets opened by LWDAQ_socket_open. 
+# LWDAQ_socket_close closes a socket if it exists. If the socket is listed in
+# the LWDAQ open sockets list, this routine will remove the socket from the
+# list. If the socket is a LWDAQ client, the routine sends an end of
+# transmission character before closing the socket, and also applies a delay of
+# a few milliseconds afterwards to give LWDAQ Drivers with older software time
+# to get ready to accept another connection. Use this routine to close sockets
+# opened by LWDAQ_socket_open. The routine always returns an empty string.
 #
 proc LWDAQ_socket_close {sock} {
 	global LWDAQ_Info
@@ -285,7 +287,7 @@ proc LWDAQ_socket_close {sock} {
 	} {
 		set sock_info ""
 	}
-	if {[catch {
+	catch {
 		if {[string match "*lwdaq client*" $sock_info]} {
 			puts -nonewline $sock $LWDAQ_Info(lwdaq_close_string)
 		}
@@ -293,18 +295,20 @@ proc LWDAQ_socket_close {sock} {
 		if {[string match "*lwdaq client*" $sock_info]} {
 			LWDAQ_wait_ms $LWDAQ_Info(close_delay_ms)
 		}
-	}]} {return 0}
-	if {$sock_info != ""} {return 1} {return 0}
+	}
+	
+	return ""
 }
 
 #
-# LWDAQ_close_all_sockets closes all open sockets.
+# LWDAQ_close_all_sockets closes all open sockets and returns an empty string.
 #
 proc LWDAQ_close_all_sockets {} {
 	global LWDAQ_Info
 	foreach sockinfo $LWDAQ_Info(open_sockets) {
 		LWDAQ_socket_close [lindex $sockinfo 0]
 	}
+	return ""
 }
 
 #
@@ -316,7 +320,7 @@ proc LWDAQ_socket_flush {sock} {
 	if {[catch {flush $sock} error_result]} {
 		error "cannot flush socket, $error_result"
 	}
-	return 1
+	return ""
 }
 
 #
@@ -481,28 +485,28 @@ proc LWDAQ_socket_write {sock data} {
 		LWDAQ_socket_close $sock
 		error "failed writing to $sock, $error_result"
 	}
-	return 1
+	return ""
 }
 
 #
-# LWDAQ_socket_upload opens a socket to a server, writes a data string
-# to the socket, and closes the socket. The target parameter is of
-# the form a:b where a is an IP address in standard x.x.x.x format or a
-# host name, b is an IP port number in decimal format. The routine treats
-# the string as a binary object and transmits it without a carriage return
-# at the end.
+# LWDAQ_socket_upload opens a socket to a server, writes a data string to the
+# socket, and closes the socket. The target parameter is of the form a:b where a
+# is an IP address in standard x.x.x.x format or a host name, b is an IP port
+# number in decimal format. The routine treats the string as a binary object and
+# transmits it without a carriage return at the end.
 #
 proc LWDAQ_socket_upload {target data} {
 	set sock [LWDAQ_socket_open $target basic]
 	LWDAQ_socket_write $sock $data
 	LWDAQ_socket_close $sock
+	return ""
 }
 
 #
-# LWDAQ_ip_addr_match takes two IP address strings and compares
-# them to see if they point to the same driver socket. If the addresses
-# match, the routine returns a 1. If they don't match, it returns a 0.
-# A * in either parameter is a wild card, and will match.
+# LWDAQ_ip_addr_match takes two IP address strings and compares them to see if
+# they point to the same driver socket. If the addresses match, the routine
+# returns a 1. If they don't match, it returns a 0. A * in either parameter is a
+# wild card, and will match.
 #
 proc LWDAQ_ip_addr_match {addr_1 addr_2} {
 	global LWDAQ_Info
@@ -528,13 +532,12 @@ proc LWDAQ_queue_start {} {
 		set LWDAQ_Info(queue_run) 1
 		after $LWDAQ_Info(queue_ms) LWDAQ_queue_step
 	}
-	return 1
+	return ""
 }
 
 #
-# LWDAQ_queue_step takes the first event out of the event queue
-# deletes it, executes it, and posts itself to execute again after
-# a delay of queue_ms.
+# LWDAQ_queue_step takes the first event out of the event queue deletes it,
+# executes it, and posts itself to execute again after a delay of queue_ms.
 #
 proc LWDAQ_queue_step {} {
 	global LWDAQ_Info
@@ -552,19 +555,26 @@ proc LWDAQ_queue_step {} {
 		}
 	} 
 	
+	# If we have events waiting, we set the current even to the reserved
+	# Wait event, which will appear in the System Monitor to show we are
+	# waiting to step to the next queue event. If there are no events waiting,
+	# the queue will be Idle.
 	if {[llength $LWDAQ_Info(queue_events)] > 0} {
 		set LWDAQ_Info(current_event) "Wait"
 	} {
 		set LWDAQ_Info(current_event) "Idle"
 	}
 	
+	# Run this routine again in queue_ms, or stop and set the current event
+	# to the reserved word Stop.
 	if {$LWDAQ_Info(queue_run)} {
 		after $LWDAQ_Info(queue_ms) LWDAQ_queue_step
 	} {
 		set LWDAQ_Info(current_event) "Stop"
 	}
 
-	return 1
+	# We always return an empty string.
+	return ""
 }
 
 #
@@ -573,7 +583,7 @@ proc LWDAQ_queue_step {} {
 proc LWDAQ_queue_stop {} {
 	global LWDAQ_Info
 	set LWDAQ_Info(queue_run) 0
-	return 1
+	return ""
 }
 
 #
@@ -590,6 +600,7 @@ proc LWDAQ_queue_clear { {pattern "*"} } {
 		}
 	}
 	set LWDAQ_Info(queue_events) $newlist
+	return ""
 }
 
 #
@@ -598,7 +609,7 @@ proc LWDAQ_queue_clear { {pattern "*"} } {
 # the front of the queue, in first place. If "place" is "end" or "0", the event
 # is added to the end of the queue. If "place" is any other positive integer
 # greater than zero, the event is inserted into the queue in the position given
-# by the integer, or the end of the queue if no such position exists. 
+# by the integer, or the end of the queue if no such position exists.
 #
 proc LWDAQ_post {event {place "end"}} {
 	global LWDAQ_Info
@@ -626,7 +637,7 @@ proc LWDAQ_post {event {place "end"}} {
 		lappend LWDAQ_Info(queue_events) $event
 	}
 		
-	return $place
+	return ""
 }
 
 #
@@ -653,6 +664,7 @@ proc LWDAQ_queue_error {event error_result} {
 			puts stdout "No error information available."
 		}
 	}
+	return ""
 }
 
 #
@@ -754,7 +766,8 @@ proc LWDAQ_scheduler {{next_check "0"}} {
 		}
 	}
 	LWDAQ_post "LWDAQ_scheduler [expr $next_check + $LWDAQ_Info(scheduler_increment)]"
-	return "Run"
+	
+	return ""
 }
 
 #
@@ -798,7 +811,7 @@ proc LWDAQ_schedule_task {name schedule command} {
 	if {$LWDAQ_Info(scheduler_control) == "Stop"} {
 		LWDAQ_post [list LWDAQ_scheduler 0]
 	}
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -825,7 +838,7 @@ proc LWDAQ_unschedule_task {name} {
 				[clock format [clock seconds] -format $LWDAQ_Info(scheduler_format)]."
 		}
 	}
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -860,7 +873,7 @@ proc LWDAQ_ndf_create {file_name meta_data_size} {
 	puts -nonewline $f $blank_bytes
 	close $f
 	
-	return $file_name
+	return ""
 }
 
 #
@@ -958,7 +971,7 @@ proc LWDAQ_ndf_string_write {file_name meta_data} {
 	puts -nonewline $f "\x00"
 	close $f
 	
-	return $mdl
+	return ""
 }
 
 #
@@ -1003,7 +1016,7 @@ proc LWDAQ_ndf_string_append {file_name meta_data} {
 	puts -nonewline $f "\x00"
 	close $f
 
-	return [string length $meta_data]
+	return ""
 }
 
 #
@@ -1022,7 +1035,7 @@ proc LWDAQ_ndf_data_append {file_name data} {
 		error "file locked, $error_message"
 	}
 	
-	return 1
+	return ""
 }
 
 #
@@ -1127,7 +1140,7 @@ proc LWDAQ_write_image_file {image_name outfile_name} {
 			close $outfile
 		}
 	}
-	return 1
+	return ""
 }
 
 #
@@ -1343,9 +1356,11 @@ proc LWDAQ_get_dir_name { {initialdir ""} } {
 # an output file. The browser allows the user to select an existing directory in
 # the file system, and to type in a name for the file within that directory. If
 # the "name" parameter is set when this procedure is called, the value of "name"
-# will be the default file name in the browser window.
+# will be the default file name in the browser window. The routine returns the 
+# name of the file that was written to. An empty string indicates that no file
+# was written.
 #
-proc LWDAQ_put_file_name { {name ""} } {
+proc LWDAQ_put_file_name {{name ""}} {
 	global LWDAQ_Info
 	if {[file dirname $name] == "."} {
 		if {![file exists $LWDAQ_Info(working_dir)]} {
@@ -1527,7 +1542,7 @@ proc LWDAQ_stop_vwaits {} {
 		}
 	}
 
-	return [llength $LWDAQ_Info(vwait_var_names)]
+	return ""
 }
 
 #
@@ -1537,7 +1552,8 @@ proc LWDAQ_stop_vwaits {} {
 # the waiting period by setting the variable from a button or some other event
 # command. When the waiting is done, we unset the waiting variable. When the
 # waiting is aborted, we cancel the waiting command so that the waiting variable
-# will not be set later.
+# will not be set later. We return the value to which the vwait variable was
+# set.
 #
 proc LWDAQ_wait_ms {time_ms {vwait_var_name ""}} {
 	if {![string is integer -strict $time_ms]} {
@@ -1565,6 +1581,7 @@ proc LWDAQ_wait_ms {time_ms {vwait_var_name ""}} {
 #
 proc LWDAQ_wait_seconds {t {vwait_var_name ""}} {
 	LWDAQ_wait_ms [expr round( 1000 * $t )] $vwait_var_name
+	return ""
 }
 
 #
@@ -1580,6 +1597,7 @@ proc LWDAQ_watch {watch_var watch_val command} {
 	} {
 		LWDAQ_post [list LWDAQ_watch $watch_var $watch_val $command]
 	}
+	return ""
 }
 
 #
@@ -1590,7 +1608,7 @@ proc LWDAQ_watch {watch_var watch_val command} {
 proc LWDAQ_update {} {
 	global LWDAQ_Info
 	LWDAQ_wait_ms $LWDAQ_Info(update_ms)
-	return 1
+	return ""
 }
 
 #
@@ -1605,10 +1623,8 @@ proc LWDAQ_support {} {
 	if {$LWDAQ_Info(support_time) <= $c} {
 		LWDAQ_update
 		set LWDAQ_Info(support_time) [expr [clock milliseconds] + $LWDAQ_Info(support_ms)]
-		return 1
-	} {
-		return 0
 	}
+	return ""
 }
 
 #
@@ -1667,7 +1683,7 @@ proc LWDAQ_process_exists {id} {
 proc LWDAQ_process_stop {id} {
 	global LWDAQ_Info
 
-	if {$id == "0"} {return 0}
+	if {$id == "0"} {return ""}
 	
 	if {$LWDAQ_Info(os) == "Windows"} {
 		catch {eval exec [auto_execok taskkill] /PID $id /F} message
@@ -1718,6 +1734,9 @@ proc LWDAQ_url_open {url} {
 	if {[catch {exec {*}$command $url &} error]} {
 		return "ERROR: $error trying to open url."
 	}
+	
+	# If all is well, return an empty string.
+	return ""
 }
 
 #
@@ -1944,7 +1963,8 @@ proc LWDAQ_script_description {{file_name ""} {keep_breaks 0} } {
 }
 
 #
-# LWDAQ_list_commands lists LWDAQ commands.
+# LWDAQ_list_commands lists LWDAQ commands in the console and returns an empty
+# string.
 #
 proc LWDAQ_list_commands { {pattern *} } {
 	set clist [info commands lwdaq_$pattern]
@@ -1953,11 +1973,11 @@ proc LWDAQ_list_commands { {pattern *} } {
 	set clist [info commands LWDAQ_$pattern]
 	set sclist [lsort -dictionary $clist]
 	foreach command $sclist {puts $command}
-	return 1
+	return ""
 }
 
 #
-# help provides help on all matching routines.
+# help prints help on all matching routines to the console. It returns an empty string.
 #
 proc help { {pattern ""} {option "none"}} {
 	global LWDAQ_Info
@@ -1984,6 +2004,7 @@ proc help { {pattern ""} {option "none"}} {
 			}
 		}
 	}
+	return ""
 }
 
 #
@@ -2005,6 +2026,7 @@ proc man { {pattern ""} {option "none"} } {
 # HTML file to be processed.
 #
 proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
+
 	# procedure that tabulates headings.
 	proc LWDAQ_html_contents_tabulate {names outfile cell_spacing num_columns} {
 		if {[llength $names] > 0} {
@@ -2028,7 +2050,7 @@ proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
 	# Find the input file.
 	if {$file_name == ""} {
 		set file_name [LWDAQ_get_file_name]
-		if {$file_name == ""} {return 0}
+		if {$file_name == ""} {return ""}
 	}
 	set ft [file tail $file_name]
 	set nfn [file join [file dirname $file_name] "new_$ft"]
@@ -2117,7 +2139,7 @@ proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
 	# Delete the temporary file.
 	file delete $nfn
 	
-	return 1
+	return ""
 }	
 
 #
@@ -2141,7 +2163,7 @@ proc LWDAQ_html_split {{file_name ""}} {
 		set file_name [LWDAQ_get_file_name]
 	}
 	if {$file_name == ""} {
-		return 0
+		return ""
 	}
 
 	# Read input file.
@@ -2234,7 +2256,7 @@ proc LWDAQ_html_split {{file_name ""}} {
 		close $f
 	}
 
-	return 1
+	return ""
 }
 
 #
@@ -2300,6 +2322,7 @@ proc LWDAQ_html_tables { {file_name ""} } {
 	# Close the files.
 	close $f
 	close $nf
+	return ""
 }
 
 #
@@ -2426,4 +2449,6 @@ proc LWDAQ_command_reference { {file_name ""} } {
 	close $ref_file
 	
 	LWDAQ_html_contents 3 3 $file_name
+	
+	return ""
 }

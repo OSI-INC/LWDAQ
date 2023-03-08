@@ -189,11 +189,11 @@ proc DB_scrub {xml} {
 # replaces the contents with the result.
 #
 proc DB_scrub_text {t} {
-	if {![winfo exists $t]} {return 0}
+	if {![winfo exists $t]} {return ""}
 	set r [$t get 1.0 end]
 	$t delete 1.0 end
 	DB_print $t [DB_scrub $r]
-	return 1
+	return ""
 }
 
 #
@@ -377,7 +377,7 @@ proc DB_execute_command {} {
 	if {$result != ""} {
 		DB_print -nonewline $r [string trim $result]
 	}
-	return 1
+	return ""
 }
 
 #
@@ -394,7 +394,7 @@ proc DB_back_command {} {
 		$info(command_text) delete 1.0 end
 		DB_print $info(command_text) $command
 	}
-	return 1
+	return ""
 }
 
 #
@@ -411,7 +411,7 @@ proc DB_forward_command {} {
 		$info(command_text) delete 1.0 end
 		DB_print $info(command_text) $command
 	}
-	return 1
+	return ""
 }
 
 #
@@ -420,7 +420,7 @@ proc DB_forward_command {} {
 proc DB_save_command {} {
 	upvar #0 DB_info info
 	set file_name [tk_getSaveFile -initialfile commands.xml]
-	if {$file_name == ""} {return 0}
+	if {$file_name == ""} {return ""}
 	set f [open $file_name w]
 	foreach c $info(commands) {
 		puts $f "<command>"
@@ -428,7 +428,7 @@ proc DB_save_command {} {
 		puts $f "</command>\n"
 	}
 	close $f
-	return 1
+	return ""
 }
 
 #
@@ -437,7 +437,7 @@ proc DB_save_command {} {
 proc DB_restore_command {} {
 	upvar #0 DB_info info
 	set file_name [tk_getOpenFile]
-	if {$file_name == ""} {return 0}
+	if {$file_name == ""} {return ""}
 	set f [open $file_name r]
 	set contents [read $f]
 	close $f
@@ -446,7 +446,7 @@ proc DB_restore_command {} {
 	foreach c $clist {lappend info(commands) [string trim $c]}
 	set info(command_index) [llength $info(commands)]
 	$info(command_text) delete 1.0 end
-	return 1
+	return ""
 }
 
 #
@@ -460,7 +460,7 @@ proc DB_delete_command {} {
 	set info(command_index) [expr $info(command_index) - 1]
 	$info(command_text) delete 1.0 end
 	DB_print $info(command_text) [lindex $info(commands) $info(command_index)]
-	return 1
+	return ""
 }
 
 #
@@ -471,7 +471,7 @@ proc DB_data_read {} {
 	upvar #0 DB_info info
 	upvar $info(read_var) v
 	set file_name [tk_getOpenFile]
-	if {$file_name == ""} {return 0}
+	if {$file_name == ""} {return ""}
 	set v [DB_read $file_name]
 	set d [list $info(read_var) [file tail $file_name] [string length $v]]
 	set index [lsearch $info(variables) "$info(read_var)\*"]
@@ -491,11 +491,11 @@ proc DB_data_write {} {
 	upvar #0 DB_info info
 	upvar $info(write_var) v
 	set file_name [tk_getSaveFile]
-	if {$file_name == ""} {return 0}
+	if {$file_name == ""} {return ""}
 	set f [open $file_name w]
 	puts -nonewline $f $v
 	close $f
-	return 1
+	return ""
 }
 
 #
@@ -519,13 +519,13 @@ proc DB_data_delete {} {
 proc DB_status_refresh {} {
 	upvar #0 DB_info info
 	set t $info(status_text)
-	if {![winfo exists $t]} {return 0}
+	if {![winfo exists $t]} {return ""}
 	$t delete 1.0 end
 	DB_print $t "Variable, File, Size (bytes)" blue
 	foreach e $info(variables) {
 		DB_print $t $e
 	}
-	return 1
+	return ""
 }
 
 #
@@ -537,7 +537,7 @@ proc DB_status_refresh {} {
 proc DB_open {} {
 	upvar #0 DB_info info
 	set w $info(window)
-	if {[winfo exists $w]} {return 0}
+	if {[winfo exists $w]} {return ""}
 	toplevel $w
 	wm title $w "Database Manager"
 
@@ -585,6 +585,7 @@ proc DB_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	set info(command_text) [DB_text_window $w 60 15]
+	return $w
 }
 
 
@@ -626,12 +627,12 @@ proc DB_print {args} {
 	set print_str [lindex $args 1]
 	if {$option == "-newline"} {append print_str \n}
 	if {![winfo exists $text_win]} {
-		return 0
+		return ""
 	}
 	set color [lindex $args 2]
 	$text_win insert end "$print_str" $color
 	$text_win yview moveto 1
-	return 1
+	return ""
 }
 
 #
@@ -672,6 +673,6 @@ proc DB_number {s} {
 	if {[string is double $s]} {
 		return $s
 	} {
-		return 0
+		return ""
 	}
 }

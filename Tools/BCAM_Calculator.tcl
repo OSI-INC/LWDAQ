@@ -39,6 +39,8 @@
 # lazy to translate the GNU Pascal simplex fitting code into Free Pascal
 # Compiler code. Improve printout from combining calibration files, so 
 # we can consolidate large files.
+#
+# Version 31: Routines with no useful return value return empty string.
 
 proc BCAM_Calculator_init {} {
 	upvar #0 BCAM_Calculator_info info
@@ -46,7 +48,7 @@ proc BCAM_Calculator_init {} {
 	global LWDAQ_Info
 	
 	LWDAQ_tool_init "BCAM_Calculator" "29"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 	
 	set info(apparatus_database) ""
 	set info(calibration_database) ""
@@ -79,7 +81,7 @@ proc BCAM_Calculator_init {} {
 	set info(state) "Start"
 	set info(counter) 0
 	
-	return 1	
+	return ""	
 }
 
 proc BCAM_Calculator_stop {} {
@@ -263,7 +265,7 @@ proc BCAM_Calculator_print_result {dc s} {
 	}
 	
 	LWDAQ_support
-	return 1
+	return ""
 }
 
 proc BCAM_Calculator_ct_change {ct} {
@@ -304,7 +306,7 @@ proc BCAM_Calculator_load {} {
 
 	if {$info(control) != "Idle"} {
 		LWDAQ_print $info(text) "ERROR: Cannot load until 'Idle'."
-		return 0
+		return ""
 	}
 	set info(control) "Load"
 	LWDAQ_update
@@ -313,7 +315,7 @@ proc BCAM_Calculator_load {} {
 		LWDAQ_print $info(text) \
 			"ERROR: Can't find calibration database."
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 	
 	set f [open $config(calibration_database_file) r]
@@ -330,7 +332,7 @@ proc BCAM_Calculator_load {} {
 		LWDAQ_print $info(text) \
 			"ERROR: Can't find apparatus database."
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 
 	set f [open $config(apparatus_database_file) r]
@@ -354,7 +356,7 @@ proc BCAM_Calculator_load {} {
 		LWDAQ_print $info(text) \
 			"ERROR: No valid entries in apparatus database."
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 	$info(calibration_type_menu) delete 0 100
 	foreach b $available {
@@ -365,7 +367,7 @@ proc BCAM_Calculator_load {} {
 	$info(apparatus_version_menu) add command \
 			-label * -command "set BCAM_Calculator_config(apparatus_version) *"
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 proc BCAM_Calculator_calculate {} {
@@ -374,7 +376,7 @@ proc BCAM_Calculator_calculate {} {
 
 	if {$info(control) != "Idle"} {
 		LWDAQ_print $info(text) "ERROR: Cannot calculate until 'Idle'."
-		return 0
+		return ""
 	}
 
 	set info(control) "Select"
@@ -393,7 +395,7 @@ proc BCAM_Calculator_calculate {} {
 	if {$info(control) == "Stop"} {
 		LWDAQ_print $info(text) "WARNING: Calculation aborted."
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 
 	set number [llength $selected]
@@ -401,7 +403,7 @@ proc BCAM_Calculator_calculate {} {
 		LWDAQ_print $info(text) \
 			"WARNING: No device calibrations matched your criteria."
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 	LWDAQ_print $info(text) "Found $number matching device calibrations:"
 	LWDAQ_print $info(text) ""
@@ -443,7 +445,7 @@ proc BCAM_Calculator_calculate {} {
 	eval "lwdaq_config $saved_lwdaq_config"		
 	LWDAQ_print $info(text) "Done." $config(title_color)
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 proc BCAM_Calculator_add {} {
@@ -452,7 +454,7 @@ proc BCAM_Calculator_add {} {
 
 	if {$info(control) != "Idle"} {
 		LWDAQ_print $info(text) "ERROR: Cannot calculate until 'Idle'."
-		return 0
+		return ""
 	}
 	set info(control) "Read"
 	LWDAQ_update
@@ -460,7 +462,7 @@ proc BCAM_Calculator_add {} {
 	if {![file exists $config(calibration_database_file)]} {
 		LWDAQ_print $info(text) "ERROR: Can't find calibration database."
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 	
 	set f [open $config(calibration_database_file) r]
@@ -477,7 +479,7 @@ proc BCAM_Calculator_add {} {
 	if {$fnl == ""} {
 		LWDAQ_print $info(text) "WARNING: Addition of measurements canceled."
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 
 	set new ""
@@ -522,7 +524,7 @@ proc BCAM_Calculator_add {} {
 		if {$info(control) != "Sort"} {
 			LWDAQ_print $info(text) "WARNING: Addition of measurements aborted."
 			set info(control) "Idle"
-			return 0
+			return ""
 		}
 	}
 
@@ -543,7 +545,7 @@ proc BCAM_Calculator_add {} {
 	LWDAQ_print $info(text) "Done." $config(title_color)
 	
 	set info(control) "Idle"	
-	return 1
+	return ""
 }
 
 proc BCAM_Calculator_open {} {
@@ -551,7 +553,7 @@ proc BCAM_Calculator_open {} {
 	upvar #0 BCAM_Calculator_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 		
 	set f $w.controls
 	frame $f
@@ -652,7 +654,7 @@ proc BCAM_Calculator_open {} {
 
 	set info(text) [LWDAQ_text_widget $w 100 20]
 	
-	return 1
+	return $w
 }
 
 BCAM_Calculator_init

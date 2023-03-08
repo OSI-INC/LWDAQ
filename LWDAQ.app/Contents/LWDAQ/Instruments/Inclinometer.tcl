@@ -79,7 +79,7 @@ proc LWDAQ_init_Inclinometer {} {
 	set config(intensify) none
 	set config(verbose_result) 0
 	
-	return 1
+	return ""
 }
 
 #
@@ -149,7 +149,7 @@ proc LWDAQ_controls_Inclinometer {} {
 	upvar #0 LWDAQ_info_Inclinometer info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set f $w.scale
 	frame $f
@@ -164,6 +164,7 @@ proc LWDAQ_controls_Inclinometer {} {
 			-width 6
 		pack $f.l$element_name $f.e$element_name -side left -expand 1
 	}
+	return ""
 }
 
 

@@ -92,7 +92,7 @@ proc LWDAQ_init_Dosimeter {} {
 	set config(analysis_enable) "1"
 	set config(verbose_result) "0"
 
-	return 1
+	return ""
 }		
 
 #

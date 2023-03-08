@@ -86,7 +86,7 @@ proc LWDAQ_init_Thermometer {} {
 	set config(intensify) none
 	set config(verbose_result) 0
 	
-	return 1
+	return ""
 }
 
 #
@@ -133,6 +133,7 @@ proc LWDAQ_refresh_Thermometer {} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
+	return ""
 }
 
 #
@@ -145,7 +146,7 @@ proc LWDAQ_controls_Thermometer {} {
 	upvar #0 LWDAQ_info_Thermometer info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set g $w.custom
 	frame $g
@@ -163,6 +164,8 @@ proc LWDAQ_controls_Thermometer {} {
 		pack $g.l$element_name $g.e$element_name -side left -expand 1
 		bind $g.e$element_name <Return> LWDAQ_refresh_Thermometer
 	}
+	
+	return ""
 }
 
 

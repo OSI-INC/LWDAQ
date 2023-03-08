@@ -99,7 +99,7 @@ proc LWDAQ_init_Voltmeter {} {
 	set config(verbose_result) 0
 	set config(voltmeter_device) "A2057"
 	
-	return 1
+	return ""
 }
 
 #
@@ -158,7 +158,7 @@ proc LWDAQ_controls_Voltmeter {} {
 	upvar #0 LWDAQ_info_Voltmeter info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set g $w.scale
 	frame $g

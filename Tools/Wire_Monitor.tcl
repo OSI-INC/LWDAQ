@@ -20,8 +20,8 @@ proc Wire_Monitor_init {} {
 	upvar #0 Wire_Monitor_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Wire_Monitor" "1.3"
-	if {[winfo exists $info(window)]} {return 0}
+	LWDAQ_tool_init "Wire_Monitor" "1.4"
+	if {[winfo exists $info(window)]} {return ""}
 
 	set config(wps_list) "1"	
 	set config(wps1_id) "Q0216"
@@ -43,7 +43,7 @@ proc Wire_Monitor_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1   
+	return ""   
 }
 
 proc Wire_Monitor_acquire {} {
@@ -350,7 +350,7 @@ proc Wire_Monitor_open {} {
 	upvar #0 Wire_Monitor_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set f $w.controls
 	frame $f
@@ -382,13 +382,13 @@ proc Wire_Monitor_open {} {
 
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n" purple
 	
-	return 1
+	return $w
 }
 
 Wire_Monitor_init
 Wire_Monitor_open
 	
-return 1
+return ""
 
 ----------Begin Help----------
 

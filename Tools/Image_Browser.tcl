@@ -21,7 +21,7 @@ proc Image_Browser_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "Image_Browser" "10"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set info(initial_width) 120
 	set info(initial_height) 40
@@ -46,16 +46,15 @@ proc Image_Browser_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1   
+	return ""   
 }
 
 proc Image_Browser_stop {} {
 	upvar #0 Image_Browser_info info
    	if {$info(control) != "Idle"} {
    		set info(control) "Stop"
-		return 0
 	}
-	return 1
+	return ""
 }
 
 proc Image_Browser_choose {} {
@@ -81,7 +80,7 @@ proc Image_Browser_display {file_name} {
 	set iconfig(image_source) "file"
 	set iconfig(file_name) $file_name
 	LWDAQ_acquire $name
-	return 0
+	return ""
 }
 
 proc Image_Browser_sort {a b} {
@@ -118,7 +117,7 @@ proc Image_Browser_refresh {} {
 	}
 	
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 	if {[winfo exists $w.browse]} {
 		$w.browse.text delete 1.0 end
 	} {
@@ -165,14 +164,14 @@ proc Image_Browser_refresh {} {
 		if {$info(control) == "Stop"} {
 			break
 		}
-		if {![winfo exists $w]} {return 0}
+		if {![winfo exists $w]} {return ""}
 	}
 	LWDAQ_print $info(text)
 	foreach n $saved_names {
 		LWDAQ_print -nonewline $info(text) "\t$n" blue
 	}
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 proc Image_Browser_open {} {
@@ -181,7 +180,7 @@ proc Image_Browser_open {} {
 	global LWDAQ_Info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 		
 	set f $w.controls
 	frame $f -border 2
@@ -228,7 +227,7 @@ proc Image_Browser_open {} {
 			-label $s -command "set Image_Browser_config(sort) $s"
 	}
 
-	return 1
+	return $w
 }
 
 proc Image_Browser_cleanup {} {
@@ -250,7 +249,7 @@ Image_Browser_open
 Image_Browser_refresh
 Image_Browser_cleanup
 	
-return 1
+return ""
 
 ----------Begin Help----------
 

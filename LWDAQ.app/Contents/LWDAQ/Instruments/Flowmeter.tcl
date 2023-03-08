@@ -90,7 +90,7 @@ proc LWDAQ_init_Flowmeter {} {
 	set config(intensify) none
 	set config(verbose_result) 0
 	
-	return 1
+	return ""
 }
 
 #
@@ -144,7 +144,7 @@ proc LWDAQ_controls_Flowmeter {} {
 	upvar #0 LWDAQ_info_Flowmeter info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set g $w.display
 	frame $g

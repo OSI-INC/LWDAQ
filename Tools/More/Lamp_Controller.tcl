@@ -23,7 +23,7 @@ proc Lamp_Controller_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "Lamp_Controller" "2"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set config(ip_addr) "10.0.0.37"
 	set config(driver_socket) 1
@@ -42,7 +42,7 @@ proc Lamp_Controller_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1   
+	return ""   
 }
 
 proc Lamp_Controller_commands {} {
@@ -111,6 +111,7 @@ proc Lamp_Controller_stimulate {} {
 	set commands [Lamp_Controller_commands]
 	Lamp_Controller_transmit $commands
 	set info(state) "Idle"
+	return ""
 }
 
 proc Lamp_Controller_stop {} {
@@ -122,6 +123,7 @@ proc Lamp_Controller_stop {} {
 	set commands "0081"
 	Lamp_Controller_transmit $commands
 	set info(state) "Idle"
+	return ""
 }
 
 proc Lamp_Controller_repeat {} {
@@ -133,6 +135,7 @@ proc Lamp_Controller_repeat {} {
 	set commands "0181"
 	Lamp_Controller_transmit $commands
 	set info(state) "Idle"
+	return ""
 }
 
 proc Lamp_Controller_print {} {
@@ -153,6 +156,7 @@ LWDAQ_socket_close $sock
 	set script [regsub %2 $script $config(driver_socket)]
 	set script [regsub %3 $script $commands]	
 	LWDAQ_print $info(text) $script
+	return ""
 }
 
 proc Lamp_Controller_open {} {
@@ -160,7 +164,7 @@ proc Lamp_Controller_open {} {
 	upvar #0 Lamp_Controller_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set f $w.controls
 	frame $f
@@ -204,13 +208,13 @@ proc Lamp_Controller_open {} {
 
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
 	
-	return 1
+	return $w
 }
 
 Lamp_Controller_init
 Lamp_Controller_open
 	
-return 1
+return ""
 
 ----------Begin Help----------
 

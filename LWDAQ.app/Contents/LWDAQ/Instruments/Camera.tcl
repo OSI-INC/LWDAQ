@@ -78,7 +78,7 @@ proc LWDAQ_init_Camera {} {
 	set config(analysis_manipulation) "none"
 	set config(verbose_result) 0
 	
-	return 1
+	return ""
 }
 
 #
@@ -345,7 +345,7 @@ proc LWDAQ_controls_Camera {} {
 	global LWDAQ_Driver
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set f $w.setbuttons
 	frame $f
@@ -356,4 +356,5 @@ proc LWDAQ_controls_Camera {} {
 		button $f.$b -text $a -command "LWDAQ_set_image_sensor $a Camera"
 		pack $f.$b -side left -expand yes
 	}
+	return ""
 }

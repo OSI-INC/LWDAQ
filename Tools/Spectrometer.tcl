@@ -52,7 +52,7 @@ proc Spectrometer_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "Spectrometer" "28"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	# Software constants for the Spectrometer Tool.
 	set info(control) "Idle"
@@ -106,7 +106,7 @@ proc Spectrometer_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 	
-	return 1	
+	return ""	
 }
 
 proc Spectrometer_print {s {color black}} {
@@ -223,21 +223,21 @@ proc Spectrometer_command {command} {
 	upvar #0 Spectrometer_config config
 	global LWDAQ_Info
 	if {$command == $info(control)} {
-		return 1
+		return ""
 	}
 	if {$command == "Stop"} {
 		if {$info(control) != "Idle"} {set info(control) "Stop"}
-		return 1
+		return ""
 	}
 	if {$info(control) == "Idle"} {
 		set info(control) $command
 		LWDAQ_post Spectrometer_execute
-		return 1
+		return ""
 	} {
 		set info(control) $command
-		return 1
+		return ""
 	}
-	return 0
+	return ""
 }
 
 
@@ -350,7 +350,7 @@ proc Spectrometer_open {} {
 	upvar #0 Spectrometer_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 		
 	set f $w.setup
 	frame $f
@@ -441,13 +441,13 @@ proc Spectrometer_open {} {
 
 	Spectrometer_refresh
 
-	return 1
+	return ""
 }
 
 Spectrometer_init
 Spectrometer_open
 
-return 1
+return ""
 
 ----------Begin Help----------
 

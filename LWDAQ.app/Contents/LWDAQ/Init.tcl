@@ -29,7 +29,7 @@ set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.5"
 set LWDAQ_Info(program_patchlevel) "10.5.5"
 set LWDAQ_Info(tcl_version) [info patchlevel]
-set LWDAQ_Info(console_prompt) "LWDAQ% "
+set LWDAQ_Info(console_prompt) "LWDAQ$ "
 	
 # Determine architecture.
 package require platform
@@ -136,6 +136,10 @@ foreach a $argv {
 			set LWDAQ_Info(console_enabled) 0
 			set LWDAQ_Info(run_mode) $a
 		}
+		"--no-prompt" {
+			set LWDAQ_Info(console_prompt) ""
+		}
+		
 		default {
 			if {$LWDAQ_Info(configuration_file) == ""} {
 				if {[file exists $a]} {
@@ -163,7 +167,7 @@ set LWDAQ_Info(gui_enabled) \
 		[file tail [info nameofexecutable]]]
 
 # If the GUI is disabled, create a dummy TK window procedure. The winfo
-# procedure returns 0 always to indicate that windows don't exist.
+# procedure returns zero always to indicate that windows don't exist.
 if {!$LWDAQ_Info(gui_enabled)} {
 	proc winfo {args} {return 0}
 }
@@ -383,5 +387,5 @@ if {!$LWDAQ_Info(gui_enabled)} {
 	vwait LWDAQ_Info(quit)
 }
 
-# Return a value of 1 to show success.
-return "SUCCESS"
+# Return an empty string.
+return ""

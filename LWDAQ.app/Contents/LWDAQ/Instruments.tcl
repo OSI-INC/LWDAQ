@@ -39,7 +39,7 @@ proc LWDAQ_instruments_init {} {
 	set info(instruments) [lsort -dictionary $info(instruments)]
 	foreach i $instrument_files {source $i}
 	foreach i $info(instruments) {LWDAQ_init_$i}
-	return 1
+	return ""
 }
 
 #
@@ -123,33 +123,35 @@ proc LWDAQ_write_button {name} {
 	global LWDAQ_Info
 	if {$info(control) == "Idle"} {
 		if {[lwdaq_image_exists $config(memory_name)] != ""} {
-			set f [LWDAQ_put_file_name $config(memory_name)\.daq]
-			if {$f == ""} {return 0}
-			LWDAQ_write_image_file $config(memory_name) $f 
+			set fn [LWDAQ_put_file_name $config(memory_name)\.daq]
+			if {$fn == ""} {return ""}
+			LWDAQ_write_image_file $config(memory_name) $fn
 		} {
 			LWDAQ_print $info(text) \
-				"ERROR: Image '$config(memory_name)' does not exist."
-			return 0
+				"ERROR: Image \"$config(memory_name)\" does not exist."
+			return ""
 		}
 	}
-	return 1
+	return ""
 }
 
 #
 # LWDAQ_read_button reads an image from disk. It allows the user
-# to specify multiple files, and opens them one after another.
+# to specify multiple files, and opens them one after another. It
+# returns an empty string instead of the list of files, which might
+# otherwise overwhelm our system server.
 #
 proc LWDAQ_read_button {name} {
 	upvar #0 LWDAQ_info_$name info
 	upvar #0 LWDAQ_config_$name config
 	if {$info(control) == "Idle"} {
 		set fl [LWDAQ_get_file_name 1]
-		if {$fl == ""} {return 0}
+		if {$fl == ""} {return ""}
 		set config(image_source) "file"
 		set config(file_name) $fl
 		LWDAQ_post [list LWDAQ_acquire $name]
 	}
-	return 1
+	return ""
 }
  
 #
@@ -164,6 +166,7 @@ proc LWDAQ_acquire_button {name} {
 	if {$info(control) == "Loop"} {
 		set info(control) "Acquire"
 	}
+	return ""
 }
  
 #
@@ -178,7 +181,8 @@ proc LWDAQ_loop_button {name} {
 	if {$info(control) == "Acquire"} {
 		set info(control) "Loop"
 		LWDAQ_post [list LWDAQ_acquire $info(name)]
-	} 
+	}
+	return ""
 }
 
 #
@@ -199,6 +203,7 @@ proc LWDAQ_stop_button {name} {
 			set info(control) "Stop"
 		}
 	}
+	return ""
 }
 
 #
@@ -209,7 +214,7 @@ proc LWDAQ_stop_instruments {} {
 	foreach i $LWDAQ_Info(instruments) {
 		LWDAQ_stop_button $i
 	}
-	return 1
+	return ""
 }
 
 #
@@ -227,7 +232,7 @@ proc LWDAQ_stop_instruments {} {
 proc LWDAQ_instrument_print {instrument s {color black}} {
 	upvar #0 LWDAQ_info_$instrument info
 	upvar #0 LWDAQ_config_$instrument config
-	if {![winfo exists $info(window)]} {return 0}
+	if {![winfo exists $info(window)]} {return ""}
 	if {(![LWDAQ_is_error_result $s]) && ($config(verbose_result) != 0)} {
 		set verbose "\n[lindex $s 0]\n"
 		set s [lreplace $s 0 0]
@@ -241,7 +246,7 @@ proc LWDAQ_instrument_print {instrument s {color black}} {
 		set s $verbose
 	}
 	LWDAQ_print $info(text) $s $color
-	return 1
+	return ""
 }
 
 #
@@ -482,7 +487,8 @@ proc LWDAQ_acquire {instrument} {
 #
 # LWDAQ_open opens the named instrument's window. We recommend that you post
 # this routine to the event queue, or else it will conflict with acquisitions
-# from the same instrument that are taking place with the window closed.
+# from the same instrument that are taking place with the window closed. The
+# routine returns the name of the instrument window.
 #
 proc LWDAQ_open {name} { 
 	global LWDAQ_Info LWDAQ_Driver
@@ -492,7 +498,7 @@ proc LWDAQ_open {name} {
 	set w $info(window)
 	if {[winfo exists $w]} {
 		raise $w
-		return 1
+		return ""
 	}
 
 	toplevel $w
@@ -552,7 +558,7 @@ proc LWDAQ_open {name} {
 	# for a long time.
 	set info(text) [LWDAQ_text_widget $w 90 10 1 1]
 
-	return 1
+	return $w
 }
 
 #
@@ -561,6 +567,7 @@ proc LWDAQ_open {name} {
 proc LWDAQ_close {name} {
 	upvar #0 LWDAQ_info_$name info
 	catch {destroy $info(window)}
+	return ""
 }
 
 #
@@ -568,7 +575,8 @@ proc LWDAQ_close {name} {
 # LWDAQ configuration directory, so they will be loaded automatically when LWDAQ is
 # next launched, or when a new LWDAQ is spawned. There is one parameter we don't
 # want to save or read back: the name of the data image, which is something that
-# cannot persist from one launch of LWDAQ to the next.
+# cannot persist from one launch of LWDAQ to the next. It returns the name of the
+# settings file.
 #
 proc LWDAQ_instrument_save {name} {
 	global LWDAQ_Info 
@@ -595,8 +603,9 @@ proc LWDAQ_instrument_save {name} {
 }
 
 #
-# LWDAQ_instrument_unsave deletes a perviously-saved instrument settings file, if one
-# exists.
+# LWDAQ_instrument_unsave deletes a perviously-saved instrument settings file,
+# if one exists. It returns the name of the settings file that was deleted, or
+# an empty string if no file was found.
 #
 proc LWDAQ_instrument_unsave {name} {
 	global LWDAQ_Info 

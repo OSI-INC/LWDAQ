@@ -22,8 +22,8 @@ proc Image_Contrast_init {} {
 	upvar #0 Image_Contrast_info info
 	upvar #0 Image_Contrast_config config
 
-	LWDAQ_tool_init "Image_Contrast" "3"
-	if {[winfo exists $info(window)]} {return 0}
+	LWDAQ_tool_init "Image_Contrast" "3.1"
+	if {[winfo exists $info(window)]} {return ""}
 
 	set info(control) "Idle"
 	
@@ -37,6 +37,8 @@ proc Image_Contrast_init {} {
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
+	
+	return ""
 }
 
 proc Image_Contrast_capture {} {
@@ -64,6 +66,7 @@ proc Image_Contrast_capture {} {
 		$config(root_1) $config(root_2) $config(branch)"
 	LWDAQ_print $info(text)  " $config(comment)" green
 	set info(control) "Idle"
+	return ""
 }
 
 proc Image_Contrast_open {} {
@@ -71,7 +74,7 @@ proc Image_Contrast_open {} {
 	upvar #0 Image_Contrast_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 		
 	set f $w.setup
 	frame $f
@@ -110,13 +113,13 @@ proc Image_Contrast_open {} {
 	
 	set info(text) [LWDAQ_text_widget $w 80 20]
 	
-	return 1
+	return $w
 }
 
 Image_Contrast_init
 Image_Contrast_open
 
-return 1
+return ""
 
 ----------Begin Help----------
 

@@ -26,7 +26,7 @@ proc Startup_Manager_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 
 	LWDAQ_tool_init "Startup_Manager" 1.6
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set info(dummy_step) "dummy: end.\n"
 	set info(control) "Idle"
@@ -54,7 +54,7 @@ proc Startup_Manager_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1	
+	return ""	
 }
 
 #
@@ -66,12 +66,12 @@ proc Startup_Manager_command {command} {
 	global LWDAQ_Info
 	
 	if {$command == $info(control)} {
-		return "IGNORE"
+		return ""
 	}
 
 	if {$command == "Stop"} {
 		if {$info(control) == "Idle"} {
-			return "ABORT"
+			return ""
 		}
 		set info(control) "Stop"
 		set event_pending [string match "Startup_Manager*" $LWDAQ_Info(current_event)]
@@ -83,17 +83,17 @@ proc Startup_Manager_command {command} {
 		if {!$event_pending} {
 			set info(control) "Idle"
 		}
-		return "SUCCESS"
+		return ""
 	}
 	
 	if {$info(control) == "Idle"} {
 		set info(control) $command
 		LWDAQ_post Startup_Manager_execute
-		return "SUCCESS"
+		return ""
 	} 
 	
 	set info(control) $command
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -140,9 +140,9 @@ proc Startup_Manager_get_param {step_num param_name} {
 proc Startup_Manager_put_param {step_num param_name value} {
 	upvar #0 Startup_Manager_info info
 	set index [Startup_Manager_get_param_index $step_num $param_name]
-	if {$index == 0} {return 0}
+	if {$index == 0} {return ""}
 	lset info(steps) $step_num $index $value
-	return 1
+	return ""
 }
 
 #
@@ -208,7 +208,7 @@ proc Startup_Manager_script_print {} {
 			[format {%-20s} $tool]"
 	}
 	
-	return 1
+	return ""
 }
 
 #
@@ -219,8 +219,8 @@ proc Startup_Manager_load_script {{fn ""}} {
 	upvar #0 Startup_Manager_info info
 	upvar #0 Startup_Manager_config config
 	
-	if {$info(control) == "Load_Script"} {return "IGNORE"}
-	if {$info(control) != "Idle"} {return "IGNORE"}
+	if {$info(control) == "Load_Script"} {return ""}
+	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Load_Script"
 	set info(step) 0
 	LWDAQ_update
@@ -249,7 +249,7 @@ proc Startup_Manager_load_script {{fn ""}} {
 		LWDAQ_print $info(text) "ERROR: Can't find startup manager script."
 		LWDAQ_print $info(text) "SUGGESTION: Press \"Browse\" and choose a script."
 		set info(control) "Idle"
-		return "ERROR"
+		return ""
 	}
 		
 	# Read file contents and remove comment lines.
@@ -259,7 +259,7 @@ proc Startup_Manager_load_script {{fn ""}} {
 	} error_message]} {
 		LWDAQ_print $info(text) "ERROR: $error_message\."
 		set info(control) "Idle"
-		return "ERROR"
+		return ""
 	}
 	regsub -all {\n[ \t]*#[^\n]*} $as "" as
 	
@@ -283,7 +283,7 @@ proc Startup_Manager_load_script {{fn ""}} {
 	LWDAQ_print $info(text) "Load okay." $config(result_color)
 	
 	set info(control) "Idle"
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -297,11 +297,11 @@ proc Startup_Manager_edit_script {} {
 
 	if {![file exists $config(daq_script)]} {
 		LWDAQ_print $info(text) "ERROR: Startup script file does not exist."
-		return "ERROR"
+		return ""
 	}
 	
 	LWDAQ_edit_script Open $config(daq_script)
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -315,19 +315,19 @@ proc Startup_Manager_execute {} {
 	global LWDAQ_Info
 
 	# If the info array has been destroyed, abort.	
-	if {![array exists info]} {return 0}
+	if {![array exists info]} {return ""}
 
 	# Detect global LWDAQ reset.
 	if {$LWDAQ_Info(reset)} {
 		set info(control) "Idle"
-		return "ABORT"
+		return ""
 	}
 	
 	# If the window is closed, quit the Startup_Manager.
 	if {$info(gui) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
-		return "ABORT"
+		return ""
 	}
 	
 	# Interpret the step number, in case it's a step name rather than a number.
@@ -351,13 +351,13 @@ proc Startup_Manager_execute {} {
 	# Interpret the control variable.
 	if {$info(control) == "Stop"} {
 		set info(control) "Idle"
-		return "ABORT"
+		return ""
 	}
 	if {$info(control) == "Step"} {
 		if {$info(step) == $info(num_steps)} {
 			LWDAQ_print $info(text) "ERROR: At end of script, cannot step."
 			set info(control) "Idle"
-			return "ERROR"
+			return ""
 		}
 		incr info(step)
 	}
@@ -366,7 +366,7 @@ proc Startup_Manager_execute {} {
 			LWDAQ_print $info(text) "ERROR: At end of script, cannot run."
 			LWDAQ_print $info(text) "SUGGESTION: Enter zero for step number, then run."
 			set info(control) "Idle"
-			return "ERROR"
+			return ""
 		}
 		incr info(step)
 	}
@@ -374,7 +374,7 @@ proc Startup_Manager_execute {} {
 		if {($info(step) > $info(num_steps)) || ($info(step) < 1)} {
 			LWDAQ_print $info(text) "ERROR: Step number $info(step) out of bounds."
 			set info(control) "Idle"
-			return "ERROR"
+			return ""
 		}
 	}
 	
@@ -392,7 +392,7 @@ proc Startup_Manager_execute {} {
 				has been replaced by \"communal\"."
 		}
 		set info(control) "Idle"
-		return "ERROR"
+		return ""
 	}
 
 	# Obtain the name of the step. Some steps may have no specific name, in
@@ -453,7 +453,7 @@ proc Startup_Manager_execute {} {
 		if {[catch {LWDAQ_run_tool $tool} error_result]} {
 			LWDAQ_print $info(text) "ERROR: $error_result"
 			set info(control) "Idle"
-			return "ERROR"
+			return ""
 		}
 
 		# Declare the tool config and info arrays for local access as tconfig
@@ -630,7 +630,7 @@ proc Startup_Manager_open {} {
 	upvar #0 Startup_Manager_info info
 	
 	set w [LWDAQ_tool_open Startup_Manager]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set f $w.setup
 	frame $f
@@ -680,7 +680,7 @@ proc Startup_Manager_open {} {
 	
 	set info(text) [LWDAQ_text_widget $w 90 25 1 1]
 	
-	return "SUCCESS"
+	return ""
 }
 
 Startup_Manager_init
@@ -694,7 +694,7 @@ if {$Startup_Manager_config(auto_run)} {
 }
 
 # This is the final return.
-return "SUCCESS"
+return ""
 
 ----------Begin Help----------
 

@@ -99,13 +99,16 @@
 # revelation at CERN that they run one script to set up the default parameters,
 # and then run their successive acquisition scripts afterwards. [16-FEB-22]
 
+# Version 59: Change return values of 1 and 0 to empty strings where there is 
+# no value in forcing a write to standard output. [08-MAR-23]
+
 proc Acquisifier_init {} {
 	upvar #0 Acquisifier_info info
 	upvar #0 Acquisifier_config config
 	global LWDAQ_Info LWDAQ_Driver
 
 	LWDAQ_tool_init "Acquisifier" 58
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set info(dummy_step) "dummy: end.\n"
 	set info(control) "Idle"
@@ -138,7 +141,7 @@ proc Acquisifier_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1	
+	return ""	
 }
 
 # Acquisifier_spawn creates a new and independent acquisifier
@@ -176,26 +179,27 @@ proc Acquisifier_spawn {} {
 	uplevel #0 $script
 }
 
-# Acquisifier_command handles a button press requesting the
-# execution of a command. If appropriate, the routine sets
-# the Acquisifier in motion.
+#
+# Acquisifier_command handles a button press requesting the execution of a
+# command. If appropriate, the routine sets the Acquisifier in motion.
+#
 proc Acquisifier_command {command} {
 	upvar #0 Acquisifier_info info
 	global LWDAQ_Info
 	
 	if {$command == $info(control)} {
-		return 1
+		return ""
 	}
 
 	if {$command == "Reset"} {
 		if {$info(control) != "Idle"} {set info(control) "Stop"}
 		LWDAQ_reset
-		return 1
+		return ""
 	}
 	
 	if {$command == "Stop"} {
 		if {$info(control) == "Idle"} {
-			return 1
+			return ""
 		}
 		set info(control) "Stop"
 		set event_pending [string match "Acquisifier*" $LWDAQ_Info(current_event)]
@@ -207,17 +211,17 @@ proc Acquisifier_command {command} {
 		if {!$event_pending} {
 			set info(control) "Idle"
 		}
-		return 1
+		return ""
 	}
 	
 	if {$info(control) == "Idle"} {
 		set info(control) $command
 		LWDAQ_post Acquisifier_execute
-		return 1
+		return ""
 	} 
 	
 	set info(control) $command
-	return 1	
+	return ""	
 }
 
 # Find and remember the data acquisition script.
@@ -266,9 +270,9 @@ proc Acquisifier_get_param {step_num param_name} {
 proc Acquisifier_put_param {step_num param_name value} {
 	upvar #0 Acquisifier_info info
 	set index [Acquisifier_get_param_index $step_num $param_name]
-	if {$index == 0} {return 0}
+	if {$index == 0} {return ""}
 	lset info(steps) $step_num $index $value
-	return 1
+	return ""
 }
 
 #
@@ -343,7 +347,7 @@ proc Acquisifier_step_list_print {text_widget num_lines} {
 		}
 	}
 	
-	return 1
+	return ""
 }
 
 #
@@ -358,7 +362,7 @@ proc Acquisifier_load_script {{fn ""}} {
 	
 	if {$info(control) == "Load_Script"} {return}
 	if {$info(control) != "Idle"} {
-		return 0
+		return ""
 	}
 	set info(control) "Load_Script"
 	set info(step) 0
@@ -383,7 +387,7 @@ proc Acquisifier_load_script {{fn ""}} {
 		LWDAQ_print $info(text) "ERROR: Can't find acquisifier data acquisition script."
 		LWDAQ_print $info(text) "SUGGESTION: Press 'Browse' and locate a data acquisition script."
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 	
 	# Read file contents and remove comment lines.
@@ -410,7 +414,7 @@ proc Acquisifier_load_script {{fn ""}} {
 	LWDAQ_print $info(text) "Load okay." $config(result_color)
 	
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 proc Acquisifier_list_script {} {
@@ -425,7 +429,7 @@ proc Acquisifier_list_script {} {
 	set t [LWDAQ_text_widget $w 80 20]
 	Acquisifier_step_list_print $t 0
 
-	return 1
+	return ""
 }
 
 proc Acquisifier_script_string {} {
@@ -483,7 +487,7 @@ proc Acquisifier_store_script {{fn ""}} {
 	if {$info(control) == "Store_Script"} {return}
 	if {$info(control) != "Idle"} {
 		LWDAQ_print $info(text) "ERROR: Can't Store_Script while in \"$info(control)\" state."
-		return 0
+		return ""
 	}
 	set info(control) "Store_Script"
 	LWDAQ_update
@@ -497,7 +501,7 @@ proc Acquisifier_store_script {{fn ""}} {
 	}
 	
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 proc Acquisifier_execute {} {
@@ -506,19 +510,19 @@ proc Acquisifier_execute {} {
 	global LWDAQ_Info
 
 	# If the info array has been destroyed, abort.	
-	if {![array exists info]} {return 0}
+	if {![array exists info]} {return ""}
 
 	# Detect global LWDAQ reset.
 	if {$LWDAQ_Info(reset)} {
 		set info(control) "Idle"
-		return 1
+		return ""
 	}
 	
 	# If the window is closed, quit the Acquisifier.
 	if {$LWDAQ_Info(gui_enabled) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
-		return 0
+		return ""
 	}
 	
 	# Interpret the step name, if it's not an integer
@@ -542,7 +546,7 @@ proc Acquisifier_execute {} {
 	# Interpret the control variable.
 	if {$info(control) == "Stop"} {
 		set info(control) "Idle"
-		return 1
+		return ""
 	}
 	if {$info(control) == "Step"} {
 		incr info(step)
@@ -565,13 +569,13 @@ proc Acquisifier_execute {} {
 			LWDAQ_print $info(text) \
 				"\nWaiting until [clock format $info(next_run_time) -format {%c}]\.\n"
 			LWDAQ_post Acquisifier_execute
-			return 1
+			return ""
 		}
 	}
 	if {$info(control) == "Wait"} {
 		if {[clock seconds] < $info(next_run_time)} {
 			LWDAQ_post Acquisifier_execute
-			return 1
+			return ""
 		} {
 			set info(step) 1
 			set info(control) "Repeat_Run"
@@ -939,7 +943,7 @@ proc Acquisifier_clear_run_results {} {
 	upvar #0 Acquisifier_config config
 	set f [open $config(run_results) w]
 	close $f
-	return 1
+	return ""
 }
 
 proc Acquisifier_open {} {
@@ -947,7 +951,7 @@ proc Acquisifier_open {} {
 	upvar #0 Acquisifier_info info
 	
 	set w [LWDAQ_tool_open Acquisifier]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set f $w.setup
 	frame $f
@@ -1004,7 +1008,7 @@ proc Acquisifier_open {} {
 	
 	set info(text) [LWDAQ_text_widget $w 90 25 1 1]
 	
-	return 1
+	return $w
 }
 
 #
@@ -1020,7 +1024,7 @@ proc Acquisifier_close {} {
 	}
 	array unset config
 	array unset info
-	return 1
+	return ""
 }
 
 Acquisifier_init
@@ -1040,7 +1044,9 @@ if {$Acquisifier_config(auto_repeat)} {
 
 # This is the final return. There must be no tab or space in
 # front of the return command, or else the spawn procedure
-# won't work.
+# won't work. The routine must return the Acquisifier index,
+# which is one for the first call and increases for subsequent
+# calls.
 return 1
 
 ----------Begin Help----------

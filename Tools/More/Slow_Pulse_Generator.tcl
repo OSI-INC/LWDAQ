@@ -16,7 +16,7 @@ proc Slow_Pulse_Generator_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "Slow_Pulse_Generator" "1.2"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set config(datetime_format) {%d-%b-%Y %H:%M:%S}
 	set config(start_time) [Slow_Pulse_Generator_datetime_convert [clock seconds]]
@@ -42,7 +42,7 @@ proc Slow_Pulse_Generator_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1   
+	return ""   
 }
 
 #
@@ -238,7 +238,7 @@ proc Slow_Pulse_Generator_open {} {
 	upvar #0 Slow_Pulse_Generator_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set f $w.controls
 	frame $f
@@ -299,13 +299,13 @@ proc Slow_Pulse_Generator_open {} {
 
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
 	
-	return 1
+	return $w
 }
 
 Slow_Pulse_Generator_init
 Slow_Pulse_Generator_open
 	
-return 1
+return ""
 
 ----------Begin Help----------
 

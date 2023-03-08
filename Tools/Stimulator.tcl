@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "Stimulator" "3.1"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
 	set config(driver_socket) "8"
@@ -99,7 +99,7 @@ proc Stimulator_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	return 1   
+	return ""   
 }
 
 #
@@ -168,13 +168,13 @@ proc Stimulator_transmit {{commands ""}} {
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]"
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
-		return "FAIL"
+		return ""
 	}
 	
 	# If we get here, we have no reason to believe the transmission failed, although
 	# we could have instructed an empty driver socket or the stimulator could have
 	# failed to receive the command.
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -313,7 +313,7 @@ proc Stimulator_start {n} {
 	LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
 	set info(state) "Idle"
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -349,7 +349,7 @@ proc Stimulator_stop {n} {
 	LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 	set info(state) "Idle"
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -385,7 +385,7 @@ proc Stimulator_xon {n} {
 	LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
 	set info(state) "Idle"
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -417,7 +417,7 @@ proc Stimulator_xoff {n} {
 	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 	set info(state) "Idle"
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -450,7 +450,7 @@ proc Stimulator_battery {n} {
 	# Set state variables.
 	set info(state) "Idle"
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -484,7 +484,7 @@ proc Stimulator_identify {} {
 	# Set state variables.
 	set info(state) "Idle"
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -504,7 +504,7 @@ proc Stimulator_all {action} {
 		LWDAQ_wait_seconds $config(spacing_delay_cmd)
 	}
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -519,7 +519,7 @@ proc Stimulator_clear {n} {
 	LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bnone_color)
 	set info(dev$n\_battery) "?"	
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -534,14 +534,14 @@ proc Stimulator_monitor {} {
 	upvar #0 Neuroplayer_config nconfig
 	global LWDAQ_Info
 	
-	if {![winfo exists $info(window)]} {return 0}
-	if {$LWDAQ_Info(reset)} {return 0}
+	if {![winfo exists $info(window)]} {return ""}
+	if {$LWDAQ_Info(reset)} {return ""}
 	set f $info(window).state
 
 	set now_time [clock milliseconds]
 	if {$now_time < $info(monitor_ms)} {
 		LWDAQ_post Stimulator_monitor
-		return "WAITING"
+		return ""
 	} {
 		set info(monitor_ms) [expr $now_time + $info(monitor_interval_ms)]
 	}
@@ -558,7 +558,7 @@ proc Stimulator_monitor {} {
 	# hope of finding any auxiliary messages from our stimulators.
 	if {![info exists ninfo(aux_messages)]} {
 		LWDAQ_post Stimulator_monitor
-		return "SUCCESS"
+		return ""
 	}
 	
 	# Go through the Neuroplayer's auxiliary message list and find messages that
@@ -644,7 +644,7 @@ proc Stimulator_monitor {} {
 
 	# We post the monitor to the event queue and report success.
 	LWDAQ_post Stimulator_monitor
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -659,7 +659,7 @@ proc Stimulator_undraw_list {} {
 		catch {destroy $ff}
 	}
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -752,7 +752,7 @@ proc Stimulator_draw_list {} {
 		pack $ff.delete -side left -expand yes
 	}
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -769,13 +769,13 @@ proc Stimulator_ask_remove {n} {
 	# Exit if the stimulator does not exist.
 	if {$index < 0} {
 		LWDAQ_print $info(text) "ERROR: No stimulator with list index $n."
-		return "ERROR"
+		return ""
 	}
 	
 	set w $info(window)\.remove$n
 	if {[winfo exists $w]} {
 		raise $w
-		return "FAIL"
+		return ""
 	}
 	toplevel $w
 	wm title $w "Remove Device Number $info(dev$n\_id)"
@@ -787,7 +787,7 @@ proc Stimulator_ask_remove {n} {
 		[list LWDAQ_post "destroy $w" front]
 	pack $w.q $w.yes $w.no -side left -expand yes
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -807,7 +807,7 @@ proc Stimulator_remove {n} {
 	# Exit if the stimulator does not exist.
 	if {$index < 0} {
 		LWDAQ_print $info(text) "ERROR: No stimulator with list index $n."
-		return "ERROR"
+		return ""
 	}
 	
 	# Destroy the device window frame, remove the device from our
@@ -826,7 +826,7 @@ proc Stimulator_remove {n} {
 	unset info(dev$n\_sps)
 	unset info(dev$n\_end)
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -865,7 +865,7 @@ proc Stimulator_add_device {} {
 	# Re-draw the sensor list.
 	Stimulator_draw_list
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -878,7 +878,7 @@ proc Stimulator_save_list {{fn ""}} {
 	# Try to get a valid file name.
 	if {$fn == ""} {
 		set fn [LWDAQ_put_file_name "DevList.tcl"]
-		if {$fn == ""} {return "FAIL"}
+		if {$fn == ""} {return ""}
 	}
 
 	# Write stimulator list to disk.
@@ -894,7 +894,7 @@ proc Stimulator_save_list {{fn ""}} {
 	# Change the stimulator list file parameter.
 	set config(dev_list_file) $fn
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -909,9 +909,9 @@ proc Stimulator_load_list {{fn ""}} {
 	# Try to get a valid file name.
 	if {$fn == ""} {
 		set fn [LWDAQ_get_file_name]		
-		if {$fn == ""} {return "FAIL"}
+		if {$fn == ""} {return ""}
 	} else {
-		if {![file exists $fn]} {return "FAIL"}
+		if {![file exists $fn]} {return ""}
 	}
 
 	# Undraw the list, run the stimulator list file, and re-draw the list.
@@ -933,7 +933,7 @@ proc Stimulator_load_list {{fn ""}} {
 	# Change the stimulator list file name to match the newly-loaded file.
 	set config(dev_list_file) $fn
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -988,7 +988,7 @@ proc Stimulator_refresh_list {{fn ""}} {
 	
 	Stimulator_draw_list
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -1004,7 +1004,7 @@ proc Stimulator_transmit_panel {} {
 	set w $info(window)\.xmit_panel
 	if {[winfo exists $w]} {
 		raise $w
-		return "ABORT"
+		return ""
 	}
 	toplevel $w
 	wm title $w "Stimulator $info(version) Transmit Command Panel"
@@ -1021,7 +1021,7 @@ proc Stimulator_transmit_panel {} {
 	entry $f.commands -textvariable Stimulator_config(commands) -width 50
 	pack $f.lcommands $f.commands -side left -expand yes
 
-	return "SUCCESS" 
+	return "" 
 }
 
 #
@@ -1032,7 +1032,7 @@ proc Stimulator_open {} {
 	upvar #0 Stimulator_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	set f $w.controls
 	frame $f
@@ -1095,7 +1095,7 @@ proc Stimulator_open {} {
 		Stimulator_load_list $config(dev_list_file)
 	}
 	
-	return 1
+	return $w
 }
 
 # Start up the tool. We call the monitor routine, which sets the monitor 
@@ -1104,7 +1104,7 @@ Stimulator_init
 Stimulator_open
 Stimulator_monitor
 
-return 1
+return ""
 
 ----------Begin Help----------
 

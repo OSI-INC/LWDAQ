@@ -54,7 +54,7 @@ proc Neurorecorder_init {} {
 # If a graphical tool window already exists, we abort our initialization.
 #
 	if {[winfo exists $info(window)]} {
-		return "ABORT"
+		return ""
 	}
 #
 # We start setting intial values for the private display and control variables.
@@ -226,7 +226,7 @@ proc Neurorecorder_init {} {
 #
 # We are done with initialization. We return a 1 to show success.
 #
-	return "SUCCESS"   
+	return ""   
 }
 
 #
@@ -397,7 +397,7 @@ proc Neurorecorder_metadata_header_edit {} {
 	set w $info(metadata_header_window)
 	if {[winfo exists $w]} {
 		raise $w
-		return "SUCCESS"
+		return ""
 	} {
 		toplevel $w
 		wm title $w "Recording Metadata Header"
@@ -414,7 +414,7 @@ proc Neurorecorder_metadata_header_edit {} {
 	# Print the metadata to the text window.
 	LWDAQ_print $w.text $info(metadata_header)
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -446,7 +446,7 @@ proc Neurorecorder_customization_edit {} {
 	set w $info(customization_window)
 	if {[winfo exists $w]} {
 		raise $w
-		return "SUCCESS"
+		return ""
 	} {
 		toplevel $w
 		wm title $w "Recorder Customization String"
@@ -463,7 +463,7 @@ proc Neurorecorder_customization_edit {} {
 	# Print the metadata to the text window.
 	LWDAQ_print $w.text $config(recorder_customization)
 
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -632,7 +632,7 @@ proc Neurorecorder_set_receiver {version} {
 		}
 	}
 	
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -652,7 +652,7 @@ proc Neurorecorder_record {{command ""}} {
 	global LWDAQ_Info
 
 	# Make sure we have the info array.
-	if {![array exists info]} {return "ABORT"}
+	if {![array exists info]} {return ""}
 
 	# Check if we have an overriding command passed with the call to this
 	# procedure, as we might from a LWDAQ configuration script.
@@ -662,7 +662,7 @@ proc Neurorecorder_record {{command ""}} {
 	if {$LWDAQ_Info(reset)} {
 		set info(record_control) "Idle"
 		set info(recorder_buffer) ""
-		return "SUCCESS"
+		return ""
 	}
 	
 	# If we have closed the Neurorecorder window when we are running with graphics,
@@ -671,7 +671,7 @@ proc Neurorecorder_record {{command ""}} {
 	if {$info(gui) && ![winfo exists $info(window)]} {
 		array unset info
 		array unset config
-		return "ABORT"
+		return ""
 	}
 	
 	# If Stop, we move to Idle and return.
@@ -681,7 +681,7 @@ proc Neurorecorder_record {{command ""}} {
 		Neurorecorder_print "Press Resume within the next few seconds to\
 			re-start without loss."
 		set info(record_control) "Idle"
-		return "SUCCESS"
+		return ""
 	}
 	
 	# If PickDir we choose a directory in which to create new archives.
@@ -738,7 +738,7 @@ proc Neurorecorder_record {{command ""}} {
 					if {[winfo exists $info(window)]} {
 						LWDAQ_set_bg $info(record_control_label) white
 					}
-					return "ABORT"
+					return ""
 				}
 			}
 		}
@@ -758,7 +758,7 @@ proc Neurorecorder_record {{command ""}} {
 				Neurorecorder_print "$result"
 				set info(record_control) "Idle"
 				LWDAQ_set_bg $info(record_control_label) white
-				return "ERROR"
+				return ""
 			}
 			Neurorecorder_set_receiver $iinfo(receiver_type)
 		}
@@ -773,7 +773,7 @@ proc Neurorecorder_record {{command ""}} {
 			Neurorecorder_print "SUGGESTION: Press PickDir to\
 				specify a recording directory."
 			set info(record_control) "Idle"
-			return "FAIL"
+			return ""
 		}
 
 		# Create and set up the new recording file.
@@ -808,7 +808,7 @@ proc Neurorecorder_record {{command ""}} {
 		# post the recorder to the end of the event queue.
 		if {$iinfo(acquire_end_ms) > [clock milliseconds] - 1000*$config(record_lag)} {		
 			LWDAQ_post Neurorecorder_record end
-			return "SUCCESS"
+			return ""
 		}
 
 		# If our recording buffer is not empty, try to write the data to disk
@@ -831,7 +831,7 @@ proc Neurorecorder_record {{command ""}} {
 					set info(record_control) "Idle"
 				}
 				LWDAQ_set_bg $info(record_control_label) white
-				return "FAIL"
+				return ""
 			}
 		}
 		
@@ -896,7 +896,7 @@ proc Neurorecorder_record {{command ""}} {
 					* $info(message_interval_multiplier)]
 			}
 			LWDAQ_post Neurorecorder_record end
-			return "FAIL"
+			return ""
 		} 
 		
 		# If we encountered an error earlier during disk access, we notify the user
@@ -943,7 +943,7 @@ proc Neurorecorder_record {{command ""}} {
 				set info(recorder_buffer) ""				
 			}
 			LWDAQ_set_bg $info(record_control_label) white
-			return "FAIL"
+			return ""
 		}
 		
 		# Trim the text window to a maximum number of lines.
@@ -965,12 +965,12 @@ proc Neurorecorder_record {{command ""}} {
 		
 		# We continue recording by posting the record process to the LWDAQ event queue.
 		LWDAQ_post Neurorecorder_record end
-		return "SUCCESS"
+		return ""
 	}
 
 	# We are done and Idle.
 	set info(record_control) "Idle"
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -989,7 +989,7 @@ proc Neurorecorder_open {} {
 	# routine, something has gone wrong, or a window already exists for this
 	# tool, so we abort.
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return "ABORT"}
+	if {$w == ""} {return ""}
 	
 	# Get on with creating the display in the tool's frame or window.
 	set f $w.record
@@ -1080,7 +1080,7 @@ proc Neurorecorder_open {} {
 
 	set info(text) [LWDAQ_text_widget $w 90 7 1 1]
 	
-	return "SUCCESS"
+	return "$w"
 }
 
 #
@@ -1096,13 +1096,13 @@ proc Neurorecorder_close {} {
 	}
 	array unset config
 	array unset info
-	return "SUCCESS"
+	return ""
 }
 
 Neurorecorder_init 
 Neurorecorder_open
 	
-return "SUCCESS"
+return ""
 
 ----------Begin Help----------
 

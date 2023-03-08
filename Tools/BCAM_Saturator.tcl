@@ -25,7 +25,7 @@ proc BCAM_Saturator_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "BCAM_Saturator" "9"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set config(flash_factors) "0.0 0.1 0.3 0.5 0.6 \
 		0.7 0.8 0.9 1.0 \
@@ -45,7 +45,7 @@ proc BCAM_Saturator_init {} {
 
 	set info(control) "Idle"
 
-	return 1	
+	return ""	
 }
 
 proc BCAM_Saturator_bcam {} {
@@ -59,7 +59,7 @@ proc BCAM_Saturator_saturate {} {
 	upvar #0 LWDAQ_info_BCAM iinfo
 	global LWDAQ_Driver
 
-	if {$info(control) != "Idle"} {return 0}
+	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Acquire"
 	set w $info(window)
 	
@@ -85,7 +85,7 @@ proc BCAM_Saturator_saturate {} {
 		if {$info(control) == "Abort"} {
 			set info(control) "Idle"
 			set iconfig(daq_flash_seconds) $saved_f
-			return 0
+			return ""
 		}
 		lwdaq_draw $iconfig(memory_name) $info(photo)
 		set characteristics [lwdaq_image_characteristics $iconfig(memory_name)]
@@ -118,13 +118,15 @@ proc BCAM_Saturator_abort {} {
 	if {$info(control) != "Idle"} {
 		set info(control) "Abort"
 	}
+	return ""
 }
 
 proc BCAM_Saturator_clear {} {
 	upvar #0 BCAM_Saturator_info info
-	if {$info(control) != "Idle"} {return 0}
+	if {$info(control) != "Idle"} {return ""}
 	lwdaq_graph "0 0" $info(graph_image_name) -fill 1
 	lwdaq_draw $info(graph_image_name) $info(graph)
+	return ""
 }
 
 proc BCAM_Saturator_open {} {
@@ -132,7 +134,7 @@ proc BCAM_Saturator_open {} {
 	upvar #0 BCAM_Saturator_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 		
 	set f $w.controls
 	frame $f
@@ -191,13 +193,13 @@ proc BCAM_Saturator_open {} {
 
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
 	
-	return 1
+	return $w
 }
 
 BCAM_Saturator_init
 BCAM_Saturator_open
 
-return 1
+return ""
 
 ----------Begin Help----------
 The BCAM_Saturator will show you the saturation intensity of a camera,

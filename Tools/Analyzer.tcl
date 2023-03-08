@@ -55,7 +55,7 @@ proc Analyzer_init {} {
 	global LWDAQ_Info
 	
 	LWDAQ_tool_init "Analyzer" "22"
-	if {[winfo exists $info(window)]} {return 0}
+	if {[winfo exists $info(window)]} {return ""}
 
 	set info(lines_per_measurement) 18
 	set info(data_image) "_analyzer_data_image"
@@ -104,7 +104,7 @@ proc Analyzer_init {} {
 		}
 	}
 	
-	return 1   
+	return ""   
 }
 
 proc Analyzer_command {command} {
@@ -113,12 +113,12 @@ proc Analyzer_command {command} {
 	global LWDAQ_Info
 	
 	if {$command == $info(control)} {
-		return 1
+		return ""
 	}
 
 	if {$command == "Stop"} {
 		if {$info(control) == "Idle"} {
-			return 1
+			return ""
 		}
 		set info(control) "Stop"
 		set event_pending [string match "Analyzer*" $LWDAQ_Info(current_event)]
@@ -130,17 +130,17 @@ proc Analyzer_command {command} {
 		if {!$event_pending} {
 			set info(control) "Idle"
 		}
-		return 1
+		return ""
 	}
 	
 	if {$info(control) == "Idle"} {
 		set info(control) $command
 		LWDAQ_post Analyzer_execute
-		return 1
+		return ""
 	} 
 	
 	set info(control) $command
-	return 1	
+	return ""	
 }
 
 proc Analyzer_contact {} {
@@ -182,7 +182,7 @@ proc Analyzer_contact {} {
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
 	}	
-	return 1
+	return ""
 }
 
 proc Analyzer_power_off {} {
@@ -203,7 +203,7 @@ proc Analyzer_power_off {} {
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
 	}	
-	return 1
+	return ""
 }
 
 proc Analyzer_power_on {} {
@@ -224,7 +224,7 @@ proc Analyzer_power_on {} {
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
 	}	
-	return 1
+	return ""
 }
 
 #
@@ -275,7 +275,7 @@ proc Analyzer_sleep {} {
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
 	}	
-	return 1
+	return ""
 }
 
 #
@@ -294,7 +294,7 @@ proc Analyzer_sleep_mux {sock driver_socket} {
 	}
 	LWDAQ_set_driver_mux $sock $driver_socket $config(mux_null_socket)
 	LWDAQ_wait_for_driver $sock
-	return 0
+	return ""
 }
 
 #
@@ -325,7 +325,7 @@ proc Analyzer_repeaters_off {} {
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
 		catch {LWDAQ_socket_close $sock}
 	}	
-	return 1
+	return ""
 }
 
 proc Analyzer_record_supplies {sock} {
@@ -340,7 +340,7 @@ proc Analyzer_record_supplies {sock} {
 	}
 	LWDAQ_wait_for_driver $sock
 
-	return 1
+	return ""
 }
 
 proc Analyzer_signatures {} {
@@ -381,7 +381,7 @@ proc Analyzer_print_supplies {supplies comment} {
 			LWDAQ_print $info(text) $comment orange
 		}
 	}
-	return 1
+	return ""
 }
 
 proc Analyzer_analyze {ip_addr base_addr driver_socket mux_socket} {
@@ -695,7 +695,7 @@ proc Analyzer_execute {{control ""}} {
 	
 	if {$info(control) == "Stop"} {
 		set info(control) "Idle"
-		return 0
+		return ""
 	}
 	
 	if {($info(control) == "Analyze") || ($info(control) == "Analyze_All")} {
@@ -711,7 +711,7 @@ proc Analyzer_execute {{control ""}} {
 			}
 			if {$config(driver_socket) <= $config(driver_end_socket)} {
 				LWDAQ_post Analyzer_execute
-				return 1
+				return ""
 			} {
 				set config(driver_socket) $config(driver_start_socket)
 			}
@@ -725,7 +725,7 @@ proc Analyzer_execute {{control ""}} {
 	}
 
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 proc Analyzer_open {} {
@@ -733,7 +733,7 @@ proc Analyzer_open {} {
 	upvar #0 Analyzer_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 	
 	frame $w.a
 	pack $w.a -side top -fill x
@@ -780,14 +780,14 @@ proc Analyzer_open {} {
 	
 	set info(text) [LWDAQ_text_widget $w 75 17]
 	
-	return 1
+	return $w
 }
 
 
 Analyzer_init
 Analyzer_open
 
-return 1
+return ""
 
 ----------Begin Help----------
 

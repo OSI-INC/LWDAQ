@@ -72,7 +72,7 @@ proc PXC_Calibrator_init {} {
     global LWDAQ_Info LWDAQ_Driver
 	
     LWDAQ_tool_init "PXC_Calibrator" "14"
-    if {[winfo exists $info(window)]} {return 0}
+    if {[winfo exists $info(window)]} {return ""}
     
     # Set file names and database directory.
     set config(apparatus_file) "apparatus_database.txt"
@@ -188,7 +188,7 @@ proc PXC_Calibrator_configure {} {
 		if {$f != ""} {set PXC_Calibrator_config(calibration_file) $f}
 	}
 	pack $w.calib_file_get -side top -expand 1
-    return 1
+    return ""
 }
 
 # Puts calibration files into appropriate files when the store button is pressed.
@@ -227,7 +227,7 @@ proc PXC_Calibrator_store {} {
 	if {![file exists [file dirname $config(calibration_file)]]} {
 		LWDAQ_print $info(text) "ERROR: Can't find calibration database file."
 		LWDAQ_print $info(text) "SUGGESTION: Press Configure and Choose Calibration Database."
-		return 0
+		return ""
 	}	
 	
 	set f [open $config(calibration_file) a]
@@ -711,7 +711,7 @@ proc PXC_Calibrator_recalculate_all {} {
 	if {![file exists $config(apparatus_file)]} {
 		LWDAQ_print $info(text) "ERROR: Can't find apparatus database file."
 		LWDAQ_print $info(text) "SUGGESTION: Press Configure and Choose Apparatus Database."
-		return 0
+		return ""
 	}
 
 	# Read in the apparatus database and remove tildas and comments
@@ -725,7 +725,7 @@ proc PXC_Calibrator_recalculate_all {} {
 	if {![file exists $config(calibration_file)]} {
 		LWDAQ_print $info(text) "ERROR: Can't find calibration database file."
 		LWDAQ_print $info(text) "SUGGESTION: Press Configure and Choose Calibration Database."
-		return 0
+		return ""
 	}	
 	
 	# Read in the file contents and remove tildas and comments.
@@ -815,7 +815,7 @@ proc PXC_Calibrator_do {step} {
 		if {$info(control) != "Idle"} {
 			LWDAQ_print $info(text) "ERROR: Cannot execute until Idle."
 			LWDAQ_print $info(text) "SUGGESTION: Wait a second, or try Stop"
-			return 0
+			return ""
 		}
 		focus $info(execute_button)
     }
@@ -824,19 +824,19 @@ proc PXC_Calibrator_do {step} {
 		if {$info(control) != "Idle"} {
 			LWDAQ_print $info(text) "ERROR: Cannot go backwards until Idle."
 			LWDAQ_print $info(text) "SUGGESTION: Wait a second, or try Stop."
-			return 0
+			return ""
 		}
 		set info(state) [lindex $info(state_history) end]
 		set info(state_history) [lreplace $info(state_history) end end]
 		PXC_Calibrator_do Establish
-		return 1
+		return ""
     }
 	
     if {$step == "Forward"} {
 		if {$info(control) != "Idle"} {
 			LWDAQ_print $info(text) "ERROR: Cannot go forwards until Idle."
 			LWDAQ_print $info(text) "SUGGESTION: Wait a second, or try Stop."
-			return 0
+			return ""
 		}
 		lappend info(state_history) $info(state)
 		if {[llength $info(state_history)] > 30} {
@@ -862,7 +862,7 @@ proc PXC_Calibrator_do {step} {
 				LWDAQ_print $info(text) "ERROR: Can't find apparatus database file."
 				LWDAQ_print $info(text) "SUGGESTION: Press Configure and Choose Apparatus Database."
 				set info(control) "Idle"
-				return 0
+				return ""
 			}
 	
 			# Read in the apparatus database and replace tildas and comments.
@@ -907,22 +907,22 @@ proc PXC_Calibrator_do {step} {
 
 			if {$count_cs == 0} {
 				LWDAQ_print $info(text) "ERROR: No calibration stage entries in apparatus database."
-				return 0
+				return ""
 			}
 		
 			if {$count_mm == 0} {
 				LWDAQ_print $info(text) "ERROR: No master mask entries in apparatus database."
-				return 0
+				return ""
 			}
 		
 			PXC_Calibrator_do Forward
-			return 1
+			return ""
 		}
 
 		if {$step == "Forward"} {
 			set info(state) "Enter_Device_ID"
 			PXC_Calibrator_do Establish
-			return 1
+			return ""
 		}
     }
 
@@ -931,18 +931,18 @@ proc PXC_Calibrator_do {step} {
 			set info(title) "Install the camera on the mount and scan in the device id."
 			focus $info(device_id_text_field)
 			$info(device_id_text_field) selection range 0 end
-			return 1
+			return ""
 		}
 
 		if {$step == "Execute"} {
 			# Check if the device_id has been entered.
 			if {$info(device_id) == "none" || $info(device_id) == ""} {
 				LWDAQ_print $info(text) "ERROR: No device_id entered."
-				return 0
+				return ""
 			}
 			if {![regexp {^20MABND([A-Z])00([0-9][0-9][0-9][0-9])$} $info(device_id) match let num]} {
 				LWDAQ_print $info(text) "ERROR: Invalid device id, must be of the form 20MABNDG00xxxx."
-				return 0
+				return ""
 			}
 			set info(short_device_id) "$let$num"
 	
@@ -964,14 +964,16 @@ proc PXC_Calibrator_do {step} {
 				}
 			}   
 			if {$info(set_mpin_dist) == "N/A" || $info(meas_mag) == "N/A"} {
-				LWDAQ_print $info(text) "ERROR: No entry found for $info(device_id) in the lookup table."
-				LWDAQ_print $info(text) "SUGGESTION: Create an entry in PXC_Calibrator.tcl data section."
-				return 0
+				LWDAQ_print $info(text) "ERROR: No entry found for $info(device_id)\
+					in the lookup table."
+				LWDAQ_print $info(text) "SUGGESTION: Create an entry\
+					in PXC_Calibrator.tcl data section."
+				return ""
 			}
 			if {$cam_type == "unknown"} {
 				LWDAQ_print $info(text) "ERROR: Unknown device_id"
 				LWDAQ_print $info(text) "SUGGESTION: Create an entry in PXC_Calibrator.tcl data section."
-				return 0
+				return ""
 			}
 			LWDAQ_print $info(text) "Camera Type: $cam_type ($info(device_id))"
 			
@@ -989,7 +991,7 @@ proc PXC_Calibrator_do {step} {
     if {$info(state) == "Define_Calibration"} {
 		if {$step == "Establish"} {
 			set info(title) "Select calibration stage and master mask."
-			return 1
+			return ""
 		}
 
 		if {$step == "Execute"} {
@@ -1019,7 +1021,7 @@ proc PXC_Calibrator_do {step} {
 				incr num_errors 1
 			}
 		   
-			if {$num_errors > 0} {return 0}
+			if {$num_errors > 0} {return ""}
 			
 			#Determine mask_to_pin distances for the current stage.
 			set info(stage_z_coords) [PXC_Calibrator_get_stage_z_coords]
@@ -1046,7 +1048,7 @@ proc PXC_Calibrator_do {step} {
 			}
 			
 			PXC_Calibrator_do Forward
-			return 1
+			return ""
 		}
 
 		if {$step == "Forward"} {
@@ -1059,7 +1061,7 @@ proc PXC_Calibrator_do {step} {
 				}
 			}
 			PXC_Calibrator_do Establish
-			return 1
+			return ""
 		}
     }
 
@@ -1071,7 +1073,7 @@ proc PXC_Calibrator_do {step} {
 			} {
 				set info(title) "Re-position camera in the camera mount."
 			}
-			return 1
+			return ""
 		}
 		
 		if {$step == "Execute"} {
@@ -1090,7 +1092,7 @@ proc PXC_Calibrator_do {step} {
 			set info(control) "Idle"
 			if {[LWDAQ_is_error_result $result]} {
 				LWDAQ_print $info(text) $result
-				return 0
+				return ""
 			}
 
 			set result "$info(center_stage_pos) [lrange $result 1 end]"
@@ -1116,12 +1118,12 @@ proc PXC_Calibrator_do {step} {
 		
 			if {[LWDAQ_is_error_result $result]} {
 				LWDAQ_print $info(text) $result
-				return 0
+				return ""
 			}
 			set info(data_$info(center_stage_pos)) $result
 			set info(positions) $info(center_stage_pos)
 			PXC_Calibrator_do Forward
-			return 1
+			return ""
 		}
 		
 		if {$step == "Forward"} {
@@ -1132,7 +1134,7 @@ proc PXC_Calibrator_do {step} {
 				set info(state) "Position_Instrument_2"
 				PXC_Calibrator_do Establish
 			}
-			return 1
+			return ""
 		}
     }
 
@@ -1142,7 +1144,7 @@ proc PXC_Calibrator_do {step} {
 			$info(calculation_status_label) configure -text "$position" -fg darkblue
 			set info(data_$position) "R 0 0 0 0 0 0 0 0 0 0 0 0"
 			set info(title) "Place master mask in position $position."
-			return 1
+			return ""
 		}
 
 		if {$step == "Execute"} {
@@ -1160,14 +1162,14 @@ proc PXC_Calibrator_do {step} {
 					set info(state) "Calculate"
 				}
 				PXC_Calibrator_do Establish
-				return 1
+				return ""
 			} 
 			
 			set result "$position [lrange $result 1 end]"
 			LWDAQ_print $info(text) $result
 	
 			set result [PXC_Calibrator_check_magnification $position $result]
-			if {[LWDAQ_is_error_result $result]} {return 0}
+			if {[LWDAQ_is_error_result $result]} {return ""}
 			set info(data_$position) $result
 			if {[lsearch $info(positions) $position] == -1} {
 				lappend info(positions) $position
@@ -1175,7 +1177,7 @@ proc PXC_Calibrator_do {step} {
 			}
 
 			PXC_Calibrator_do Forward
-			return 1
+			return ""
 		}
 	
 		if {$step == "Forward"} {
@@ -1198,7 +1200,7 @@ proc PXC_Calibrator_do {step} {
 			}
 
 			PXC_Calibrator_do Establish
-			return 1
+			return ""
 		}
     }
 
@@ -1206,7 +1208,7 @@ proc PXC_Calibrator_do {step} {
 		if {$step == "Establish"} {
 			$info(calculation_status_label) configure -text "$info(short_device_id)" -fg darkblue
 			set info(title) "Press Execute to calculate calibration constants."
-			return 1
+			return ""
 		}
 		
 		if {$step == "Execute"} {
@@ -1222,13 +1224,13 @@ proc PXC_Calibrator_do {step} {
 			}
 			
 			PXC_Calibrator_do Forward
-			return 1
+			return ""
 		}
 		
 		if {$step == "Forward"} {
 			set info(state) "Finish"
 			PXC_Calibrator_do Establish
-			return 1
+			return ""
 		}
     }
 
@@ -1240,7 +1242,7 @@ proc PXC_Calibrator_do {step} {
 			} {
 				set info(title) "Press Store to save constants, Execute to move on."
 			}
-			return 1
+			return ""
 		}
 
 		if {$step == "Execute"} {
@@ -1266,13 +1268,13 @@ proc PXC_Calibrator_do {step} {
 			}
 		
 			PXC_Calibrator_do Forward
-			return 1
+			return ""
 		}	
 
 		if {$step == "Forward"} {
 			set info(state) "Enter_Device_ID"
 			PXC_Calibrator_do Establish
-			return 1
+			return ""
 		}
     }
 }
@@ -1282,7 +1284,7 @@ proc PXC_Calibrator_open {} {
     upvar #0 PXC_Calibrator_info info
 
 	set w [LWDAQ_tool_open $info(name)]
-	if {$w == ""} {return 0}
+	if {$w == ""} {return ""}
 		
     set f $w.status
     frame $f
@@ -1413,7 +1415,7 @@ proc PXC_Calibrator_open {} {
 	
     PXC_Calibrator_do Establish
 	
-    return 1
+    return $w
 }
 
 PXC_Calibrator_init
@@ -1721,7 +1723,7 @@ proc Mean_No_Outliers {points lim} {
 #------------------------------END MATH ROUTINES------------------------------------------#
 
 
-return 1
+return ""
 
 ----------Begin Help----------
 

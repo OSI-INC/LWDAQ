@@ -123,7 +123,7 @@ proc LWDAQ_init_Receiver {} {
 	set config(daq_num_clocks) 128
 	set config(payload_length) 0
 
-	return 1
+	return ""
 }
 
 #
@@ -445,7 +445,7 @@ proc LWDAQ_reset_Receiver {} {
 		return "ERROR: $error_result"
 	}
 	
-	return 1
+	return ""
 }
 
 # LWDAQ_activity_Receiver opens a new panel that shows a table of telemetry 
@@ -501,7 +501,7 @@ proc LWDAQ_controls_Receiver {} {
 	upvar #0 LWDAQ_info_Receiver info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set g $w.scale
 	frame $g

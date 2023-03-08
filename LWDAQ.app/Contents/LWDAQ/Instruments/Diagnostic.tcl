@@ -97,7 +97,7 @@ proc LWDAQ_init_Diagnostic {} {
 	set config(verbose_result) 0
 	set config(daq_actions) "none"
 	
-	return 1
+	return ""
 }
 
 #
@@ -156,7 +156,7 @@ proc LWDAQ_on_Diagnostic {sock} {
 	LWDAQ_on $sock
 	LWDAQ_wait_for_driver $sock
 	LWDAQ_print $info(text) "done."
-	return 1
+	return ""
 }
 
 #
@@ -172,7 +172,7 @@ proc LWDAQ_off_Diagnostic {sock} {
 	LWDAQ_off $sock
 	LWDAQ_wait_for_driver $sock
 	LWDAQ_print $info(text) "done."
-	return 1
+	return ""
 }
 
 #
@@ -188,7 +188,7 @@ proc LWDAQ_reset_Diagnostic {sock} {
 	LWDAQ_controller_reset $sock
 	LWDAQ_wait_for_driver $sock
 	LWDAQ_print $info(text) "done."
-	return 1
+	return ""
 }
 
 #
@@ -201,7 +201,7 @@ proc LWDAQ_reboot_Diagnostic {sock} {
 	LWDAQ_print -nonewline $info(text) "Sending reboot command to relay..."
 	LWDAQ_relay_reboot $sock
 	LWDAQ_print $info(text) "done."
-	return 1
+	return ""
 }
 
 #
@@ -217,7 +217,7 @@ proc LWDAQ_sleep_Diagnostic {sock} {
 	LWDAQ_transmit_command_hex $sock 0000
 	LWDAQ_wait_for_driver $sock
 	LWDAQ_print $info(text) "done."
-	return 1
+	return ""
 }
 
 #
@@ -250,7 +250,7 @@ proc LWDAQ_sleepall_Diagnostic {sock} {
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_print $info(text) "."
 	}
-	return 1
+	return ""
 }
 
 #
@@ -270,7 +270,7 @@ proc LWDAQ_wake_Diagnostic {sock} {
 	LWDAQ_wake $sock
 	LWDAQ_wait_for_driver $sock
 	LWDAQ_print $info(text) "done."
-	return 1
+	return ""
 }
 
 #
@@ -304,7 +304,7 @@ proc LWDAQ_transmit_Diagnostic {sock} {
 	LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 	if {[llength $info(commands)] == 0} {
 		LWDAQ_print $info(text) "ERROR: no command specified."
-		return 0
+		return ""
 	}
 	if {[llength $info(commands)] == 1} {
 		LWDAQ_print -nonewline $info(text) \
@@ -329,7 +329,7 @@ proc LWDAQ_transmit_Diagnostic {sock} {
 		}
 		LWDAQ_print $info(text) "done."
 	}
-	return 1
+	return ""
 }
 
 #
@@ -517,7 +517,7 @@ proc LWDAQ_controls_Diagnostic {} {
 	upvar #0 LWDAQ_info_Diagnostic info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set g $w.custom1
 	frame $g
@@ -572,6 +572,8 @@ proc LWDAQ_controls_Diagnostic {} {
 	entry $f.repeat -textvariable LWDAQ_info_Diagnostic(repeat) -width 5
 	pack $f.target $f.sleep $f.wake $f.looptime $f.transmit \
 		$f.cl $f.command $f.rl $f.repeat -side left -expand 1
+		
+	return $w
 }
 
 

@@ -167,12 +167,12 @@ proc sudoku_print {args} {
 	set print_str [lindex $args 1]
 	if {$option == "-newline"} {append print_str \n}
 	if {![winfo exists $text_win]} {
-		return 0
+		return ""
 	}
 	set color [lindex $args 2]
 	$text_win insert end "$print_str" $color
 	$text_win yview moveto 1
-	return 1
+	return ""
 }
 
 # welcome message.

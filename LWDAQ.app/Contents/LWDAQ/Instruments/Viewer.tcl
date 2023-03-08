@@ -70,7 +70,7 @@ proc LWDAQ_init_Viewer {} {
 	set config(analysis_enable) 1
 	set config(verbose_result) 0
 	
-	return 1
+	return ""
 }
 
 
@@ -159,7 +159,7 @@ proc LWDAQ_crop_Viewer {{image_name ""}} {
 proc LWDAQ_DAQ_to_GIF_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
-	if {$info(control) != "Idle"} {return 0}
+	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Convert"
 	set file_list [lsort -dictionary [LWDAQ_get_file_name 1]]
 	set num [llength $file_list]
@@ -177,7 +177,7 @@ proc LWDAQ_DAQ_to_GIF_Viewer {} {
 		if {$info(control)=="Stop"} {break}
 	}
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 #
@@ -188,7 +188,7 @@ proc LWDAQ_DAQ_to_GIF_Viewer {} {
 proc LWDAQ_GIF_to_DAQ_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
-	if {$info(control) != "Idle"} {return 0}
+	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Convert"
 	set file_list [lsort -dictionary [LWDAQ_get_file_name 1]]
 	set num [llength $file_list]
@@ -206,7 +206,7 @@ proc LWDAQ_GIF_to_DAQ_Viewer {} {
 		if {$info(control)=="Stop"} {break}
 	}
 	set info(control) "Idle"
-	return 1
+	return ""
 }
 
 #
@@ -219,7 +219,7 @@ proc LWDAQ_set_bounds_Viewer {} {
 	upvar #0 LWDAQ_info_Viewer info
 	if {[lwdaq_image_exists $config(memory_name)] == ""} {
 		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
-		return 0
+		return ""
 	}
 	lwdaq_image_manipulate $config(memory_name) none \
 		-left $info(daq_image_left) \
@@ -229,7 +229,7 @@ proc LWDAQ_set_bounds_Viewer {} {
 		-clear 1
 	lwdaq_draw $config(memory_name) $info(photo) \
 		-intensify $config(intensify) -zoom $info(zoom)
-	return 1
+	return ""
 }
 
 #
@@ -243,7 +243,7 @@ proc LWDAQ_set_dimensions_Viewer {} {
 	upvar #0 LWDAQ_info_Viewer info
 	if {[lwdaq_image_exists $config(memory_name)] == ""} {
 		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
-		return 0
+		return ""
 	}
 	set data [lwdaq_image_contents $config(memory_name)]
 	set stats [lwdaq_image_characteristics $config(memory_name)]
@@ -262,7 +262,7 @@ proc LWDAQ_set_dimensions_Viewer {} {
 		-name "$info(name)\_$info(counter)"]
 	lwdaq_draw $config(memory_name) $info(photo) \
 		-intensify $config(intensify) -zoom $info(zoom)
-	return 1
+	return ""
 }
 
 #
@@ -273,13 +273,13 @@ proc LWDAQ_set_results_Viewer {} {
 	upvar #0 LWDAQ_info_Viewer info
 	if {[lwdaq_image_exists $config(memory_name)] == ""} {
 		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
-		return 0
+		return ""
 	}
 	lwdaq_image_manipulate $config(memory_name) none \
 		-results $info(image_results)
 	lwdaq_draw $config(memory_name) $info(photo) \
 		-intensify $config(intensify) -zoom $info(zoom)
-	return 1
+	return ""
 }
 
 #
@@ -361,7 +361,7 @@ proc LWDAQ_controls_Viewer {} {
 	upvar #0 LWDAQ_info_Viewer info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set f $w.row1
 	frame $f

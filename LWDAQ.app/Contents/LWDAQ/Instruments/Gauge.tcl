@@ -84,7 +84,7 @@ proc LWDAQ_init_Gauge {} {
 	set config(ref_bottom_y) 15.38
 	set config(ref_top_y) 25.69
 	
-	return 1
+	return ""
 }
 
 #
@@ -143,7 +143,7 @@ proc LWDAQ_controls_Gauge {} {
 	upvar #0 LWDAQ_info_Gauge info
 
 	set w $info(window)
-	if {![winfo exists $w]} {return 0}
+	if {![winfo exists $w]} {return ""}
 
 	set g $w.custom
 	frame $g

@@ -87,7 +87,7 @@ proc LWDAQ_init_Terminal {} {
 	set config(rx_timeout_ms) "1000"
 	set config(rx_size) "100"
 	
-	return 1
+	return ""
 }
 
 #

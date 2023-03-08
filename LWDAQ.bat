@@ -44,7 +44,8 @@ REM ------------------------------------------
 set gui_enabled=1
 set background=1
 set option=--spawn
-set verbose=1
+set verbose=0
+set pmt=
 
 REM ------------------------------------------
 REM Attempt to extract options and configuration
@@ -64,6 +65,16 @@ if [%op%]==[--quiet] (
 )
 if [%op%]==[--verbose] (
 	set verbose=1
+	shift
+	goto optionloop
+)
+if [%op%]==[--prompt] (
+	set pmt=
+	shift
+	goto optionloop
+)
+if [%op%]==[--no-prompt] (
+	set pmt=%op%
 	shift
 	goto optionloop
 )
@@ -177,10 +188,10 @@ REM ------------------------------------------
 SETLOCAL
 set path="%path%"
 if [%background%]==[0] (
-  "%shell%" "%initializer%" %option% %script% %args%
+  "%shell%" "%initializer%" %option% %pmt% %script% %args%
 )
 if [%background%]==[1] (
-  start "LWDAQ %option%" "%shell%" "%initializer%" %option% %script% %args%
+  start "LWDAQ %option%" "%shell%" "%initializer%" %option% %pmt% %script% %args%
 )
 
 :done

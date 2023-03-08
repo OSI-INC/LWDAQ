@@ -27,7 +27,7 @@
 #
 proc LWDAQ_tools_init {} {
 	global LWDAQ_Info
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -111,7 +111,7 @@ proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 	uplevel #0 source $fn
 	
 	# At this point, we can assume success. We return an empty string.
-	return "SUCCESS"
+	return ""
 }
 
 #
@@ -176,8 +176,8 @@ proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 		}
 	}
 	
-	# Return a success flag.
- 	return "SUCCESS"
+	# Return an empty string.
+ 	return ""
 }
 
 #
@@ -221,8 +221,8 @@ proc LWDAQ_tool_init {name version} {
 		[file join $LWDAQ_Info(tools_dir) Data $name\_Settings.tcl]
 	set info(data_dir) [file join $LWDAQ_Info(tools_dir) Data]
 		
-	# Return a flag to show success.
-	return "SUCCESS"
+	# Return an empty string.
+	return ""
 }
 
 #
@@ -280,7 +280,7 @@ proc LWDAQ_tool_save {name} {
 		puts $f "set $info(name)\_config($name) \"$config($name)\""
 	}
 	close $f
-	return 1
+	return ""
 }
 
 #
@@ -321,7 +321,7 @@ proc LWDAQ_tool_help {name} {
 	} {
 		LWDAQ_print $info(text) "ERROR: Can't find $info(tool_file_name) to get help text.\n"
 		LWDAQ_print $info(text) "SUGGESTION: Put the tool script in ./Tools or ./Tools/More.\n"
-		return 0
+		return ""
 	}
 
 	if {[regexp {\A[ \t\n]*(http://[^\n]*)} $help_text match link]} {
@@ -331,7 +331,7 @@ proc LWDAQ_tool_help {name} {
 		wm title $w "$info(name) Version $info(version) Help\n"
 		$w.text insert end "$help_text\n"
 	}
-	return 1
+	return ""
 }
 
 #
@@ -390,6 +390,7 @@ proc LWDAQ_tool_rewrite_data {name data} {
 		LWDAQ_print $info(text) "ERROR: Can't find $info(tool_file_name) to extract data.\n"
 		LWDAQ_print $info(text) "SUGGESTION: Put the tool script in the Tools folder.\n"
 	}
+	return ""
 }
 
 
@@ -467,6 +468,7 @@ proc LWDAQ_tool_reload {name} {
 	} {
 		LWDAQ_print $info(text) "ERROR: Can't find $info(tool_file_name) to reload."
 	}
+	return ""
 }
 
 #
@@ -518,7 +520,8 @@ proc LWDAQ_Toolmaker_execute {{save 1}} {
 		}
 	}
 
-	return 1
+	# Return an empty string.
+	return ""
 }
 
 #
@@ -542,7 +545,7 @@ proc LWDAQ_Toolmaker_back {} {
 		LWDAQ_print $info(text) $script
 		$info(text) see 0.0
 	}
-	return 1
+	return ""
 }
 
 #
@@ -559,17 +562,17 @@ proc LWDAQ_Toolmaker_forward {} {
 		LWDAQ_print $info(text) $script
 		$info(text) see 0.0
 	}
-	return 1
+	return ""
 }
 
 #
 # LWDAQ_Toolmaker_save saves the current Toolmaker script list 
-# to a file.
+# to a file. It returns the file name.
 #
 proc LWDAQ_Toolmaker_save {{file_name ""}} {
 	upvar #0 Toolmaker_info info
 	if {$file_name == ""} {set file_name [LWDAQ_put_file_name Scripts.tcl]}
-	if {$file_name == ""} {return 0}
+	if {$file_name == ""} {return ""}
 	set f [open $file_name w]
 	foreach c $info(scripts) {
 		puts $f "<script>"
@@ -577,18 +580,18 @@ proc LWDAQ_Toolmaker_save {{file_name ""}} {
 		puts $f "</script>\n"
 	}
 	close $f
-	return 1
+	return $file_name
 }
 
 #
 # LWDAQ_Toolmaker_load reads a previously-saved script library or an
 # individual script from a file and appends the script or scripts
-# to the current script list.
+# to the current script list. It returns the file name.
 #
 proc LWDAQ_Toolmaker_load {{file_name ""}} {
 	upvar #0 Toolmaker_info info
 	if {$file_name == ""} {set file_name [LWDAQ_get_file_name]}
-	if {$file_name == ""} {return 0}
+	if {$file_name == ""} {return ""}
 	set f [open $file_name r]
 	set contents [read $f]
 	close $f
@@ -614,7 +617,7 @@ proc LWDAQ_Toolmaker_load {{file_name ""}} {
 	set info(script_index) [llength $info(scripts)]
 	LWDAQ_Toolmaker_save $info(list_backup)
 	LWDAQ_Toolmaker_back
-	return 1
+	return $file_name
 }
 
 #
@@ -629,6 +632,7 @@ proc LWDAQ_Toolmaker_delete {} {
 		LWDAQ_print $info(text) [lindex $info(scripts) $info(script_index)]
 	}
 	LWDAQ_Toolmaker_save $info(list_backup)
+	return ""
 }
 
 #
@@ -640,6 +644,7 @@ proc LWDAQ_Toolmaker_delete_all {} {
 	set info(scripts) [list]
 	$info(text) delete 1.0 end
 	LWDAQ_Toolmaker_save $info(list_backup)
+	return ""
 }
 
 #
@@ -663,7 +668,7 @@ proc LWDAQ_Toolmaker {} {
 	set w $info(window)
 	if {[winfo exists $w]} {
 		raise $w
-		return 0
+		return ""
 	}
 	toplevel $w
 	wm title $w "Toolmaker"
@@ -693,5 +698,7 @@ proc LWDAQ_Toolmaker {} {
 	if {[file exists $info(list_backup)]} {
 		LWDAQ_Toolmaker_load $info(list_backup)
 	}
+	
+	return ""
 }
 
