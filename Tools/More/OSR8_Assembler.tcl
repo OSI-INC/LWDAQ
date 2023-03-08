@@ -637,6 +637,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 	}	
 	
 	LWDAQ_print $info(text) "Done.\n" purple
+	return ""
 }
 
 proc OSR8_Assembler_open {} {

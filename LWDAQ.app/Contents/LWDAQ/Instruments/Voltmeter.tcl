@@ -146,6 +146,7 @@ proc LWDAQ_refresh_Voltmeter {} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
+	return ""
 }
 
 #
@@ -198,6 +199,7 @@ proc LWDAQ_controls_Voltmeter {} {
 	pack $g.a2057 -side left -expand yes	
 	button $g.a2081 -text "A2081" -command "LWDAQ_set_voltmeter_device a2081"
 	pack $g.a2081 -side left -expand yes
+	return ""
 }
 
 #
@@ -237,6 +239,7 @@ proc LWDAQ_set_voltmeter_device {device} {
 		}
 		default {}
 	}
+	return ""
 }
 
 #
@@ -259,6 +262,7 @@ proc LWDAQ_cmd_Voltmeter {cmd} {
 			return $cmd
 		}
 	}
+	return ""
 }
 
 #

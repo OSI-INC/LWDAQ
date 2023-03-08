@@ -294,6 +294,7 @@ proc LWDAQ_infobuttons_Rasnik {f} {
 		button $f.$b -text $a -command "LWDAQ_set_image_sensor $a Rasnik"
 		pack $f.$b -side left -expand yes
 	}
+	return ""
 }
 
 #

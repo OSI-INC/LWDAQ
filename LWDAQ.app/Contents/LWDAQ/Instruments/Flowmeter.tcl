@@ -132,6 +132,7 @@ proc LWDAQ_refresh_Flowmeter {} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
+	return ""
 }
 
 #
@@ -175,6 +176,7 @@ proc LWDAQ_controls_Flowmeter {} {
 		checkbutton $g.c$var_name -variable LWDAQ_info_Flowmeter($var_name) -text $label_name
 		pack $g.c$var_name -side left -expand 1
 	}
+	return ""
 }
 
 #

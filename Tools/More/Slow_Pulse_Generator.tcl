@@ -76,6 +76,7 @@ proc Slow_Pulse_Generator_browse {} {
 	if {$fn != ""} {
 		set config(log_file) $fn
 	}
+	return ""
 }
 
 #
@@ -142,6 +143,7 @@ proc Slow_Pulse_Generator_set {state} {
 			LWDAQ DISABLED\""
 	}
 	LWDAQ_print $config(log_file) $result
+	return ""
 }
 
 #

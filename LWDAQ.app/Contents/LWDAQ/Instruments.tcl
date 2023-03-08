@@ -52,6 +52,7 @@ proc LWDAQ_reset_instrument_counters {{value 0}} {
 		upvar #0 LWDAQ_info_$e info_instr
 		set info_instr(counter) $value
 	}
+	return ""
 }
 
 #

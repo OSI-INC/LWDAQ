@@ -348,6 +348,7 @@ proc Analyzer_signatures {} {
 	upvar #0 Analyzer_info info
 
 	LWDAQ_print $info(text) [LWDAQ_tool_data Analyzer]
+	return ""
 }
 
 proc Analyzer_supplies {{basis "0 0 0 0 0 0"}} {
@@ -366,6 +367,7 @@ proc Analyzer_print {s {color black}} {
 	if {[LWDAQ_is_error_result $s] || $config(verbose)} {
 		LWDAQ_print $info(text) $s $color
 	}
+	return ""
 }
 
 proc Analyzer_print_supplies {supplies comment} {

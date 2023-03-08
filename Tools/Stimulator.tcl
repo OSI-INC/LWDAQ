@@ -953,6 +953,7 @@ proc Stimulator_rename_device {n m} {
 			unset info($p)
 		}
 	}
+	return ""
 }
 
 #

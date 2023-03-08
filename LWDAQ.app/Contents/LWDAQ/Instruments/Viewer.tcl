@@ -149,6 +149,7 @@ proc LWDAQ_crop_Viewer {{image_name ""}} {
 	lwdaq_image_manipulate $image_name crop -replace 1
 	lwdaq_draw $image_name $info(photo) \
 		-intensify $config(intensify) -zoom $info(zoom)
+	return ""
 }
 
 #
@@ -293,6 +294,7 @@ proc LWDAQ_zoom_Viewer {} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
+	return ""
 }
 
 #
@@ -349,6 +351,7 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 		}
 		LWDAQ_set_bounds_Viewer
 	}
+	return ""
 }
 
 #
@@ -426,5 +429,6 @@ proc LWDAQ_controls_Viewer {} {
 			[list LWDAQ_post LWDAQ_$a\_Viewer front]
 		pack $f.$b -side left -expand 1
 	}	
+	return ""
 }
 

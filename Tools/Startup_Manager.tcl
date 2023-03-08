@@ -103,6 +103,7 @@ proc Startup_Manager_browse_daq_script {} {
 	upvar #0 Startup_Manager_config config
 	set f [LWDAQ_get_file_name]
 	if {$f != ""} {set config(daq_script) $f}
+	return ""
 }
 
 #

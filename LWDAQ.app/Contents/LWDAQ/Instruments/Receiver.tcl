@@ -249,6 +249,7 @@ proc LWDAQ_refresh_Receiver {} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
+	return ""
 }
 
 #
@@ -490,6 +491,7 @@ proc LWDAQ_activity_Receiver {} {
 		grid $f.id_$count $f.cc_$count $f.csps_$count -sticky ew
 		incr count
 	}
+	return ""
 }
 
 #
@@ -546,6 +548,7 @@ proc LWDAQ_controls_Receiver {} {
 	button $g.panel -text "Panel" \
 		-command "LWDAQ_post LWDAQ_activity_Receiver"
 	pack $g.l $g.c $g.panel -side left -expand yes
+	return ""
 }
 
 #

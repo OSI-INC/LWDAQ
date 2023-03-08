@@ -148,6 +148,7 @@ proc Configurator_copy {} {
 		set config([string map {read write} $e]) $config($e)
 	}
 	set config(write_configuration_time:) ""
+	return ""
 }
 
 proc Configurator_reboot {} {

@@ -101,6 +101,7 @@ proc Tapermaker_xmit {{cmd ""}} {
 	
 	LWDAQ_print $info(text) $cmd brown
 	LWDAQ_acquire Terminal
+	return ""
 }
 
 #
@@ -114,6 +115,7 @@ proc Tapermaker_stop {} {
 	LWDAQ_print $info(text) "Transmitting STOP command."
 	Tapermaker_xmit "<00 *"
 	LWDAQ_print $info(text) "Stop command transmitted.\n"
+	return ""
 }
 
 #
@@ -126,6 +128,7 @@ proc Tapermaker_off {} {
 	LWDAQ_print $info(text) "Transmitting Off command."
 	Tapermaker_xmit "<00 H36"
 	LWDAQ_print $info(text) "Off command transmitted.\n"
+	return ""
 }
 
 #
@@ -239,6 +242,7 @@ proc Tapermaker_reset {} {
 	Tapermaker_xmit "H2 L13 $num_pulses H7"
 
 	LWDAQ_print $info(text) "Establishing home position.\n"
+	return ""
 }
 
 #
@@ -315,6 +319,7 @@ proc Tapermaker_taper {} {
 	LWDAQ_print $info(text) "Initiating tapering process."
 	Tapermaker_xmit "<00 N1 H01"
 	LWDAQ_print $info(text) "Tapering in progress.\n"
+	return ""
 }
 
 #
@@ -344,6 +349,7 @@ proc Tapermaker_home {} {
 	}
 	
 	LWDAQ_print $info(text) "Moving to home position.\n"
+	return ""
 }
 
 #

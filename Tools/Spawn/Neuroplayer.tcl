@@ -693,6 +693,7 @@ proc Neuroplayer_configure {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 	LWDAQ_tool_configure Neuroplayer 4
+	return ""
 }
 
 #
@@ -2507,6 +2508,7 @@ proc Neuroplayer_overview_excerpt {} {
 		$ov_config(t_min)-$ov_config(t_max) of $ov_config(fn_tail)."
 				
 	set ov_config(status) "Idle"
+	return ""
 }
 
 #
@@ -2573,6 +2575,7 @@ proc Neuroplayer_overview_newndf {step} {
 	# Plot the overview of the new archive.
 	set ov_config(status) "Idle"
 	Neuroplayer_overview_plot
+	return ""
 }
 
 #
@@ -2705,6 +2708,7 @@ proc Neuroclassifier_open {} {
 	set info(classifier_enable_metric_frame) $w.controls3
 
 	Neuroclassifier_display ""
+	return ""
 }
 
 #
@@ -3404,6 +3408,7 @@ proc Neuroclassifier_processing {characteristics} {
 			set info(classifier_continue) 0
 		}
 	}
+	return ""
 }
 
 #
@@ -3548,6 +3553,7 @@ proc Neuroclassifier_compare {} {
 	}
 	catch {$info(classification_label) configure -text "Idle" -fg white -bg black}
 	Neuroplayer_print "Done with $count Overlaps." purple
+	return ""
 }
 
 #
@@ -3561,6 +3567,7 @@ proc Neuroclassifier_stop {} {
 	catch {unset info(reprocessing_event_list)}
 	set info(classifier_display_control) "Stop"
 	Neuroplayer_command "Stop"
+	return ""
 }
 
 proc Neuroclassifier_step {} {
@@ -3573,6 +3580,7 @@ proc Neuroclassifier_step {} {
 	}
 	set info(classifier_continue) 0
 	Neuroplayer_command "Step"
+	return ""
 }
 
 proc Neuroclassifier_back {} {
@@ -3585,6 +3593,7 @@ proc Neuroclassifier_back {} {
 	}
 	set info(classifier_continue) 0
 	Neuroplayer_command "Back"
+	return ""
 }
 
 proc Neuroclassifier_continue {} {
@@ -3597,6 +3606,7 @@ proc Neuroclassifier_continue {} {
 	}
 	set info(classifier_continue) 1
 	Neuroplayer_command "Play"
+	return ""
 }
 
 #
@@ -3911,6 +3921,7 @@ proc Neuroclassifier_batch_classification {{state "Start"}} {
 		LWDAQ_print $nbc(t) "Done." purple
 		set nbc(run) 0
 	}
+	return ""
 }
 
 #
@@ -3929,6 +3940,7 @@ proc Neuroclassifier_save {{name ""}} {
 	set f [open $name w]
 	foreach event $event_list {puts $f "$event"}
 	close $f
+	return ""
 }
 
 #
@@ -3959,6 +3971,7 @@ proc Neuroclassifier_load {{name ""}} {
 	set config(classifier_library) $name
 	
 	Neuroclassifier_display $event_list
+	return ""
 }
 
 #
@@ -4416,6 +4429,7 @@ proc Neurotracker_clear {} {
 	Neurotracker_fresh_graphs
 	set config(tracker_persistence) $saved
 	Neurotracker_draw_graphs
+	return ""
 }
 
 #
@@ -4460,6 +4474,7 @@ proc Neuroplayer_clock {} {
 	grid $w.jl $w.jlc $w.jli -sticky news
 
 	Neuroplayer_clock_update
+	return ""
 }
 
 #
@@ -4599,6 +4614,7 @@ proc Neuroexporter_open {} {
 		LWDAQ_post {Neuroplayer_play "Reload"}
 		LWDAQ_post {Neuroexporter_begin "Archive"}
 	}
+	return ""
 }
 
 #
@@ -4814,6 +4830,7 @@ proc Neuroexporter_edf_setup {} {
 			}
 		}
 	}
+	return ""
 }
 
 #
@@ -5784,6 +5801,7 @@ proc Neuroplayer_clock_update {} {
 	set info(datetime_play_time) [Neuroplayer_clock_convert \
 		[expr [Neuroplayer_clock_convert $info(datetime_start_time)] \
 			+ round($config(play_time)) ] ]
+	return ""
 }
 
 #
@@ -5801,6 +5819,7 @@ proc Neuroplayer_clock_jump {} {
 		set config(datetime_jump_to) [Neuroplayer_clock_convert $jump_time]
 		Neuroplayer_jump "$jump_time 0.0 ? \"$config(datetime_jump_to)\"" 0
 	}
+	return ""
 }
 
 #
@@ -5954,6 +5973,7 @@ proc Neuroplayer_calibration {{name ""}} {
 			incr count
 		}	
 	}
+	return ""
 }
 
 #
@@ -5968,6 +5988,7 @@ proc Neuroplayer_baseline_reset {} {
 	for {set i $info(min_id)} {$i <= $info(max_id)} {incr i} {
 		set info(bp_$i) $info(bp_reset)
 	}
+	return ""
 }
 
 #
@@ -5981,6 +6002,7 @@ proc Neuroplayer_baselines_set {} {
 	for {set i $info(min_id)} {$i <= $info(max_id)} {incr i} {
 		set info(bp_$i) $config(bp_set)
 	}
+	return ""
 }
 
 #
@@ -6188,6 +6210,7 @@ proc Neuroplayer_activity {} {
 			incr count
 		}
 	}
+	return ""
 }
 
 #
@@ -6216,6 +6239,7 @@ proc Neuroplayer_color_swap {id w e x y} {
 		set color "white"
 	}
 	$w configure -bg $color
+	return ""
 }
 
 #
@@ -6232,6 +6256,7 @@ proc Neuroplayer_frequency_reset {} {
 		set info(msps_$i) "0"
 		set info(status_$i) "None"
 	}
+	return ""
 }
 
 #
@@ -8221,8 +8246,7 @@ proc Neuroplayer_video_play {datetime length} {
 	set info(video_state) "Play"
 	
 	# Return the file name, seek time, file duration, and correct length.
-	return [list $vf $vseek $vlen $
-	]
+	return [list $vf $vseek $vlen $clen]
 }
 
 #

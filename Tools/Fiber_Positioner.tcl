@@ -262,6 +262,7 @@ proc Fiber_Positioner_set_nsew {id} {
 	append command " 1 $config(n_out) 0 2 $config(s_out) 0\
 		3 $config(e_out) 0 4 $config(w_out) 0"
 	Fiber_Positioner_transmit $command
+	return ""
 }
 
 #
@@ -533,6 +534,7 @@ proc Fiber_Positioner_reset {} {
 #
 proc Fiber_Positioner_step {} {
 	Fiber_Positioner_travel 
+	return ""
 }
 
 #

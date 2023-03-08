@@ -64,6 +64,7 @@ proc Image_Browser_choose {} {
 		set config(directory) $d
 		Image_Browser_refresh
 	}
+	return ""
 }
 
 proc Image_Browser_display {file_name} {
@@ -242,6 +243,7 @@ proc Image_Browser_cleanup {} {
 	} {
 		after 1000 Image_Browser_cleanup
 	}
+	return ""
 }
 
 Image_Browser_init

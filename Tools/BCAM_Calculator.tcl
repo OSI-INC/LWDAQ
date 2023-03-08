@@ -89,6 +89,7 @@ proc BCAM_Calculator_stop {} {
 	if {$info(control) != "Idle"} {
 		set info(control) "Stop"
 	}
+	return ""
 }
 
 proc BCAM_Calculator_get_param {entry name} {
@@ -291,6 +292,7 @@ proc BCAM_Calculator_ct_change {ct} {
 			[list set BCAM_Calculator_config(apparatus_version) $b]
 	}	
 	set config(apparatus_version) "*"
+	return ""
 }
 
 proc BCAM_Calculator_parse {database} {
@@ -660,7 +662,7 @@ proc BCAM_Calculator_open {} {
 BCAM_Calculator_init
 BCAM_Calculator_open
 
-return
+return ""
 
 ----------Begin Help----------
 

@@ -561,6 +561,7 @@ proc Videoarchiver_reboot {n} {
 	}
 	
 	set info(cam$n\_state) "Idle"
+	return ""
 }
 
 #
@@ -1172,6 +1173,7 @@ proc Videoarchiver_live {n} {
 	# We start the live video watchdog process that looks to see if the 
 	# mplayer process has been stopped by a user closing its window. 
 	LWDAQ_post [list Videoarchiver_live_watchdog $n]
+	return ""
 }
 
 #
@@ -2140,6 +2142,7 @@ proc Videoarchiver_stop {n} {
 	}
 	
 	set info(cam$n\_state) "Idle"
+	return ""
 }
 
 #
@@ -2200,6 +2203,7 @@ proc Videoarchiver_killall {ip} {
 			LWDAQ_print $info(text) "Stopped additional ffmpeg processes." 
 		}
 	}
+	return ""
 }
 
 
@@ -2342,6 +2346,7 @@ proc Videoarchiver_check_libraries {} {
 	if {$suggest} {
 		Videoarchiver_suggest_download
 	}
+	return ""
 }
 
 #
@@ -2355,6 +2360,7 @@ proc Videoarchiver_undraw_list {} {
 		set ff $info(window).cam_list.cam$n
 		catch {destroy $ff}
 	}
+	return ""
 }
 
 #
@@ -2513,6 +2519,7 @@ proc Videoarchiver_draw_list {} {
 			[list LWDAQ_post "Videoarchiver_ask_remove $n" front]
 		pack $ff.delete -side left -expand yes
 	}
+	return ""
 }
 
 #
@@ -2799,6 +2806,7 @@ proc Videoarchiver_lamps_off {} {
 		Videoarchiver_setlamp $n white [lindex $info(lamp_dac_values) 0]
 		Videoarchiver_setlamp $n infrared [lindex $info(lamp_dac_values) 0]
 	}		
+	return ""
 }
 
 #
@@ -2952,6 +2960,7 @@ proc Videoarchiver_schedule_stop {} {
 	set info(scheduler_state) "Stop"
 	LWDAQ_print $info(text) "Unscheduled all tasks, aborted all tasks,\
 		aborted tasks remain incomplete."
+	return ""
 }
 
 #

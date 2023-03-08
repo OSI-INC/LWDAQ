@@ -131,6 +131,7 @@ proc LWDAQ_refresh_Gauge {} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
+	return ""
 }
 
 #
@@ -161,6 +162,7 @@ proc LWDAQ_controls_Gauge {} {
 		pack $g.l$element_name $g.e$element_name -side left -expand 1
 		bind $g.e$element_name <Return> LWDAQ_refresh_Gauge
 	}
+	return ""
 }
 
 #

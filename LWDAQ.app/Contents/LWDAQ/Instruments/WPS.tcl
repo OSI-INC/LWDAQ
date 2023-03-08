@@ -92,7 +92,7 @@ proc LWDAQ_init_WPS {} {
 	set config(analysis_threshold) "30 # 10"
 	set config(verbose_result) 0
 
-	return 1
+	return ""
 }		
 
 #
@@ -312,5 +312,6 @@ proc LWDAQ_daq_WPS {} {
 		set info(flash_num_tries) 0
 		return $config(memory_name) 
 	}
+	return ""
 } 
 

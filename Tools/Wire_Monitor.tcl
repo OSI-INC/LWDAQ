@@ -145,6 +145,7 @@ proc Wire_Monitor_acquire {} {
 	}
 	
 	LWDAQ_print $info(text) "[clock seconds] $acquire_result"
+	return ""
 }
 
 
@@ -157,6 +158,7 @@ proc Wire_Monitor_undraw_list {} {
 		catch {destroy $ff}
 	}
 	
+	return ""
 }
 
 proc Wire_Monitor_draw_list {} {
@@ -182,6 +184,7 @@ proc Wire_Monitor_draw_list {} {
 		button $ff.delete -text "Remove" -command "Wire_Monitor_remove $n"
 		pack $ff.delete -side left -expand yes
 	}
+	return ""
 }
 
 proc Wire_Monitor_remove {n} {
@@ -200,6 +203,7 @@ proc Wire_Monitor_remove {n} {
 		unset config(wps$n\_y)
 		Wire_Monitor_draw_list
 	}
+	return ""
 }
 
 proc Wire_Monitor_add {} {
@@ -228,6 +232,7 @@ proc Wire_Monitor_add {} {
 
 	# Re-draw the sensor list.
 	Wire_Monitor_draw_list
+	return ""
 }
 
 proc Wire_Monitor_save {} {
@@ -289,6 +294,7 @@ proc Wire_Monitor_download {} {
 	set info(calibration) [split [string trim [LWDAQ_tool_data $info(name)] ] \n]
 	LWDAQ_print $info(text) "Downloaded [expr [llength $info(calibration)]/2] calbrations,\
 		saved to disk, and reloaded into memory."
+	return ""
 }
 
 proc Wire_Monitor_edit {{command "New"}} {

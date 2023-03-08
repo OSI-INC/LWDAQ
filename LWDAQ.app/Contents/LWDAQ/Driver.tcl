@@ -823,6 +823,7 @@ proc LWDAQ_on {sock} {
 	global LWDAQ_Driver
 	LWDAQ_byte_write $sock $LWDAQ_Driver(edp_addr) 1
 	LWDAQ_socket_flush $sock
+	return ""
 }
 
 #
@@ -833,6 +834,7 @@ proc LWDAQ_off {sock} {
 	global LWDAQ_Driver
 	LWDAQ_byte_write $sock $LWDAQ_Driver(edp_addr) 0
 	LWDAQ_socket_flush $sock
+	return ""
 }
 
 #
@@ -843,6 +845,7 @@ proc LWDAQ_off {sock} {
 proc LWDAQ_start_job {sock job} {
 	global LWDAQ_Driver
 	LWDAQ_byte_write $sock $LWDAQ_Driver(djr_addr) $job
+	return ""
 }
 
 #

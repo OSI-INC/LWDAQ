@@ -51,6 +51,7 @@ proc Motion_Sensor_browse_image_directory {} {
 	upvar #0 Motion_Sensor_config config
 	set d [LWDAQ_get_dir_name]
 	if {$d != ""} {set config(image_directory) $d}
+	return ""
 }
 
 proc Motion_Sensor_command {command} {

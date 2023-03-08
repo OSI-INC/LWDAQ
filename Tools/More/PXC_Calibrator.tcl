@@ -165,6 +165,7 @@ proc PXC_Calibrator_stop {} {
     if {$iinfo(control) != "Idle"} {
 		set iinfo(control) "Stop"
     }
+	return ""
 }
 
 # Generates a configuration window from entries in the config array when the 
@@ -802,6 +803,7 @@ proc PXC_Calibrator_recalculate_all {} {
 		LWDAQ_print $info(text) "Done.\n" purple
 	}
 	set info(control) "Idle"
+	return ""
 }
 
 # Defines calibration steps.

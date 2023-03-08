@@ -333,6 +333,7 @@ proc LWDAQ_set_image_sensor {name instrument} {
 	if {[lsearch [array names info] analysis_add_y_um]} {
 		set info(analysis_add_y_um) $y
 	}
+	return ""
 }
 
 #

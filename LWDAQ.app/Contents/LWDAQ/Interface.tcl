@@ -290,6 +290,7 @@ proc LWDAQ_save_settings {} {
 	}
 	puts $f "lwdaq_config [lwdaq_config]"
 	close $f
+	return ""
 }
 
 #
@@ -300,6 +301,7 @@ proc LWDAQ_unsave_settings {} {
 
 	set fn [file join $info(config_dir) "Core_Settings.tcl"]
 	if {[file exists $fn]} {file delete $fn}
+	return ""
 }
 
 
@@ -474,6 +476,7 @@ proc LWDAQ_text_widget {wf width height {scrolly 1} {scrollx 0}} {
 #
 proc LWDAQ_enable_text_undo {t} {
 	$t configure -undo 1 -autosep 1
+	return ""
 }
 
 #
@@ -768,6 +771,7 @@ proc LWDAQ_bind_command_key {window letter command} {
 	if {$info(os) == "Windows"} {
 		bind $window <Control-KeyPress-$letter> $command
 	}
+	return ""
 }
 
 #
@@ -785,6 +789,7 @@ proc LWDAQ_set_bg {widget color} {
 			update idletasks
 		}
 	}
+	return ""
 }
 
 #
@@ -802,6 +807,7 @@ proc LWDAQ_set_fg {widget color} {
 			update idletasks
 		}
 	}
+	return ""
 }
 
 #
@@ -850,6 +856,7 @@ proc LWDAQ_save_text_window {window_name file_name} {
 	set f [open $file_name w]
 	puts $f [$window_name get 1.0 end]
 	close $f
+	return ""
 }
 
 #
@@ -889,6 +896,7 @@ proc LWDAQ_MacOS_Open_File {theAppleEvent theReplyAE} {
 	set alisDesc [::tclAE::coerceDesc $fileDesc alis]
 		lappend paths [::tclAE::getData $alisDesc TEXT]
 	}
+	return ""
 }
 
 #
@@ -920,6 +928,7 @@ proc LWDAQ_open_document {fn} {
 			}
 		}
 	}	
+	return ""
 }
 
 #
@@ -985,7 +994,6 @@ proc LWDAQ_view_array {array_name} {
 		grid $w.$f.l$i $w.$f.e$i -sticky news
 	}
 	return $w
-
 }
 
 #
@@ -1116,6 +1124,7 @@ proc LWDAQ_library_settings {} {
 	}
 	
 	LWDAQ_text_widget $w 90 4 0
+	return $w
 }
 
 #

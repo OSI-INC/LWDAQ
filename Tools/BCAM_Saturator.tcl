@@ -50,6 +50,7 @@ proc BCAM_Saturator_init {} {
 
 proc BCAM_Saturator_bcam {} {
 	LWDAQ_open BCAM
+	return ""
 }
 
 proc BCAM_Saturator_saturate {} {

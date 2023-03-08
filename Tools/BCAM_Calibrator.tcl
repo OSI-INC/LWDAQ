@@ -166,11 +166,13 @@ proc BCAM_Calibrator_stop {} {
 		set info(control) "Stop"
 		set iinfo(control) "Stop"
 	}
+	return ""
 }
 
 proc BCAM_Calibrator_timeout {} {
 	BCAM_Calibrator_stop
 	LWDAQ_print $info(text) "ERROR: Timeout waiting for BCAM measurement."
+	return ""
 }
 
 proc BCAM_Calibrator_get_param {entry name} {
@@ -747,6 +749,7 @@ proc BCAM_Calibrator_ct_change {ct} {
 			-command [list set BCAM_Calibrator_info(apparatus_version) $b]
 	}	
 	set info(apparatus_version) $b
+	return ""
 }
 
 proc BCAM_Calibrator_do {step} {

@@ -112,6 +112,7 @@ proc Spectrometer_init {} {
 proc Spectrometer_print {s {color black}} {
 	upvar #0 Spectrometer_info info
 	LWDAQ_print $info(text) $s $color
+	return ""
 }
 
 proc Spectrometer_refresh {} {
@@ -167,6 +168,7 @@ proc Spectrometer_refresh {} {
 			-color $config(cursor_color)
 	}
 	lwdaq_draw $info(image_name) $info(photo_name)
+	return ""
 }
 
 proc Spectrometer_clear {} {
@@ -180,6 +182,7 @@ proc Spectrometer_clear {} {
 	}
 	set info(data) $new_data
 	Spectrometer_refresh
+	return ""
 }
 
 proc Spectrometer_clear_all {} {
@@ -187,6 +190,7 @@ proc Spectrometer_clear_all {} {
 	upvar #0 Spectrometer_config config
 	set info(data) [list]
 	Spectrometer_refresh
+	return ""
 }
 
 proc Spectrometer_save_graphs {} {
@@ -201,6 +205,7 @@ proc Spectrometer_save_graphs {} {
 		}
 	}
 	close $f
+	return ""
 }
 
 proc Spectrometer_load_graphs {} {
@@ -216,6 +221,7 @@ proc Spectrometer_load_graphs {} {
 		close $f
 	}
 	Spectrometer_refresh
+	return ""
 }
 
 proc Spectrometer_command {command} {
@@ -343,6 +349,7 @@ proc Spectrometer_sample {} {
 	}
 	set info(control) "Sample"
 	Spectrometer_execute
+	return ""
 }
 
 proc Spectrometer_open {} {

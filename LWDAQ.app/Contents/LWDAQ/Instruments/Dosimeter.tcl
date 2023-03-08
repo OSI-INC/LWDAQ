@@ -182,6 +182,7 @@ proc LWDAQ_infobuttons_Dosimeter {f} {
 		button $f.$b -text $a -command "LWDAQ_set_image_sensor $a Dosimeter"
 		pack $f.$b -side left -expand yes
 	}
+	return ""
 }
 
 

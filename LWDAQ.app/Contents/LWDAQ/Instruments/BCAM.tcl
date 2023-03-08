@@ -153,6 +153,7 @@ proc LWDAQ_infobuttons_BCAM {f} {
 		button $f.$b -text $a -command "LWDAQ_set_image_sensor $a BCAM"
 		pack $f.$b -side left -expand yes
 	}
+	return ""
 }
 
 #

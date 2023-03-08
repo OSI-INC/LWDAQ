@@ -133,6 +133,7 @@ proc LWDAQ_refresh_RFPM {} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}
+	return ""
 }
 
 #
@@ -169,6 +170,7 @@ proc LWDAQ_controls_RFPM {} {
 			-width 6
 		pack $f.l$element_name $f.e$element_name -side left -expand 1
 	}
+	return ""
 }
 
 #

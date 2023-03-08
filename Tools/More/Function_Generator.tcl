@@ -179,6 +179,7 @@ proc Function_Generator_set_frequencies {{print 0}} {
 			LWDAQ_print $info(text) "$f" green
 		}
 	}
+	return ""
 }
 
 proc Function_Generator_browse {} {
@@ -187,6 +188,7 @@ proc Function_Generator_browse {} {
 	if {$f != ""} {
 		set config(database_file_name) $f
 	}
+	return ""
 }
 
 proc Function_Generator_set_file_name {} {
@@ -211,6 +213,7 @@ proc Function_Generator_set_file_name {} {
 	set a choose_database_file_name
 	button $top.$a -text "Browse" -command Function_Generator_browse
 	pack $top.$a -side left -expand 1
+	return ""
 }
 
 proc Function_Generator_autofill {} {
@@ -357,7 +360,7 @@ proc Function_Generator_assemble_command {control_data wake lb cw control_addr} 
 	append binary_string $reduced_binary_control_addr
 	set command $binary_string
 	
-return $command	
+	return $command	
 }
 	
 proc Function_Generator_execute_start {} {
@@ -382,6 +385,7 @@ proc Function_Generator_execute_start {} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		LWDAQ_print $info(text) "ERROR: $error_result"
 	}
+	return ""
 }
 
 proc Function_Generator_execute_stop {} {
@@ -405,6 +409,7 @@ proc Function_Generator_execute_stop {} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		LWDAQ_print $info(text) "ERROR: $error_result"
 	}
+	return ""
 }
 
 proc Function_Generator_set_analog_gain {} {
@@ -467,6 +472,7 @@ proc Function_Generator_set_analog_gain {} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		LWDAQ_print $info(text) "ERROR: $error_result"
 	}
+	return ""
 }
 
 proc Function_Generator_set_rcfilter_bits {} {
@@ -494,6 +500,7 @@ proc Function_Generator_set_rcfilter_bits {} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		LWDAQ_print $info(text) "ERROR: $error_result"
 	}
+	return ""
 }
 
 proc dec2bin {i} {
@@ -650,6 +657,7 @@ proc Function_Generator_print_response {} {
 		}
 		LWDAQ_print $info(text)
 	}
+	return ""
 }
 
 proc Function_Generator_convert_voltage_to_memory_amplitude {voltage} {
@@ -698,6 +706,7 @@ proc Function_Generator_set_frequency {} {
 	
 	Function_Generator_execute_start
 	LWDAQ_print $info(text) "Output Enabled."
+	return ""
 }
 
 
@@ -739,6 +748,7 @@ proc Function_Generator_adjust_sample_period {} {
 			if {[info exists sock]} {LWDAQ_socket_close $sock}
 			LWDAQ_print $info(text) "ERROR: $error_result"
 	}
+	return ""
 }
 
 
@@ -988,6 +998,7 @@ proc Function_Generator_update_filter {val} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		LWDAQ_print $info(text) "ERROR: $error_result"
 	}
+	return ""
 }		
 
 proc Function_Generator_open {} {
@@ -1167,8 +1178,7 @@ proc Function_Generator_open {} {
 	
 	Function_Generator_set_frequencies
 	
-	return $w
-	
+	return $w	
 }
 
 Function_Generator_init

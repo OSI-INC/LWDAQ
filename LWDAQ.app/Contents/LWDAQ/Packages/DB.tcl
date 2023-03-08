@@ -43,6 +43,7 @@ proc DB_init {} {
 		set info(field_mark) ","
 		set info(scrub_saves) 1
 	}
+	return ""
 }
 
 #
@@ -296,6 +297,7 @@ proc DB_display_list {xml_list args} {
 		}
 		DB_print $t ""
 	}
+	return ""
 }
 
 
@@ -316,6 +318,7 @@ proc DB_prototype {xml tag} {
 		set field ""
 	}
 	set field "<$tag>$field</$tag>"
+	return ""
 }
 
 #
@@ -605,6 +608,7 @@ proc DB_update {} {
 		update
 		set DB_update_time [expr [clock seconds] + 1]
 	}
+	return ""
 }
 
 #

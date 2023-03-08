@@ -177,6 +177,8 @@ proc Acquisifier_spawn {} {
 	# Now run the modified script at the global scope. The 
 	# script will return the name of the new acquisifier.
 	uplevel #0 $script
+	
+	return ""
 }
 
 #
@@ -229,6 +231,7 @@ proc Acquisifier_browse_daq_script {} {
 	upvar #0 Acquisifier_config config
 	set f [LWDAQ_get_file_name]
 	if {$f != ""} {set config(daq_script) $f}
+	return ""
 }
 
 #
