@@ -73,7 +73,12 @@ then
 		then
 			VERBOSE=0
 		else
-			OPTION=$1
+			if [ $1 == "--verbose" ];
+			then
+				VERBOSE=1
+			else
+				OPTION=$1
+			fi
 		fi
 		shift 1
 	done

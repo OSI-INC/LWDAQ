@@ -20,18 +20,15 @@ REM along with this program; if not, write to the Free Software
 REM Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307.
 REM
 REM This program launches LWDAQ from a DOS prompt. You can pass options
-REM --no-gui, --gui, --no-console, or --spawn as described in the LWDAQ manual.
-REM After the option (if any), you can pass a TCL script that will be
-REM executed by LWDAQ after it starts up and initialized. The script can
-REM refer to itself by the name $LWDAQ_Info(configuration_file) to determine
-REM its own location.
+REM --no-gui, --gui, --no-console, or --spawn to launch the program in 
+REM various configurations, as described in the LWDAQ manual. The options
+REM --quiet and --verbose control if this batch file reports anything
+REM under normal operation, verbose being the default. After the options,
+REM if any, comes the name of a TCL script that will be executed by LWDAQ after 
+REM it starts up. The first parameter after the options is always a configuration
+REM file or an empty string. Any further parameters will be passed into
+REM the LWDAQ program.
 REM 
-REM [01-APR-10] Modified code so it can handle spaces in LWDAQ directory
-REM path. If the TCL script file has a space in it, we must enclose the file
-REM name in double quotation marks when we pass the file name to the lwdaq.bat
-REM command. Thus the following command works.
-REM lwdaq.bat --no-console "Test Directory\test.tcl"
-REM
 
 REM ------------------------------------------
 REM Determine the LWDAQ directory
@@ -44,46 +41,78 @@ REM Default values for options and configuration
 REM file name.
 REM ------------------------------------------
 
-set script=%1
 set gui_enabled=1
-set console_enabled=0
 set background=1
 set option=--spawn
+set verbose=1
 
 REM ------------------------------------------
 REM Attempt to extract options and configuration
 REM file name from the command line parameters.
 REM ------------------------------------------
 
-if [%1]==[--gui] (
-	set option=%1
+:optionloop
+set op=%1
+set script=%op%
+if [%op%]==[] (
+	goto optiondone
+)
+if [%op%]==[--quiet] (
+	set verbose=0
+	shift
+	goto optionloop
+)
+if [%op%]==[--verbose] (
+	set verbose=1
+	shift
+	goto optionloop
+)
+if [%op%]==[--gui] (
+	set option=%op%
 	set gui_enabled=1
 	set background=0
-	set script=%2
+	shift
+	goto optionloop
 )
-if [%1]==[--no-gui] (
-	set option=%1
+if [%op%]==[--no-gui] (
+	set option=%op%
 	set gui_enabled=0
 	set background=0
-	set script=%2
+	shift
+	goto optionloop
 ) 
-if [%1]==[--no-console] (
-	set option=%1
+if [%op%]==[--no-console] (
+	set option=%op%
 	set gui_enabled=0
 	set background=1
-	set script=%2
+	shift
+	goto optionloop
 )
-if [%1]==[--spawn] (
-	set option=%1
+if [%op%]==[--spawn] (
+	set option=%op%
 	set gui_enabled=1
 	set background=1
-	set script=%2
+	shift
+	goto optionloop
 )
-echo OS: Windows
-echo OPTION: %option%
-echo GUI_ENABLED: %gui_enabled%
-echo RUN_IN_BACKGROUND: %background%
-echo LOCAL_DIR: %cd%
+if [%op:~0,2%] equ [--] (
+	echo ERROR: Unrecognised option "%op%".
+	goto done
+)
+:optiondone
+
+REM ------------------------------------------
+REM Assemble the remaining options into a new 
+REM variable.
+REM ------------------------------------------
+
+set args=
+:argloop
+if [%1] neq [] (
+	set args=%args% %1
+	shift
+	goto argloop
+)
 
 REM ------------------------------------------
 REM If the start-up script name is not an
@@ -98,13 +127,8 @@ if [%script%]==[] (
 	if [%option%]==[--no-console] (
 		echo ERROR: No configuration file specified with no-console option.
 		goto done
-	) else (
-		echo CONFIG_FILE: None
-		goto donescript
-	)
+	) 
 )
-echo CONFIG_FILE: %script%
-:donescript
 
 REM ------------------------------------------
 REM Choose the shell based upon the option.
@@ -117,10 +141,25 @@ if [%gui_enabled%]==[1] (
   set shell=%LWDAQ_DIR%LWDAQ.app\Contents\Windows\bin\wish86.exe
 )
 if not exist "%shell%" (
-  echo ERROR: Cannot find shell %shell%.  
+  echo ERROR: Cannot find shell "%shell%".  
   goto done
-) else (
-  echo SHELL: "%shell%"
+) 
+
+REM ------------------------------------------
+REM Report on options and configuration found.
+REM ------------------------------------------
+if [%verbose%]==[1] (
+	echo OS: Windows
+	echo OPTION: %option%
+	echo GUI_ENABLED: %gui_enabled%
+	echo RUN_IN_BACKGROUND: %background%
+	echo LOCAL_DIR: %cd%
+	if [%script%]==[] (
+		echo CONFIG_FILE: None
+	) else (
+		echo CONFIG_FILE: %script%
+	)
+  	echo SHELL: "%shell%"
 )
 
 REM ------------------------------------------
@@ -138,10 +177,10 @@ REM ------------------------------------------
 SETLOCAL
 set path="%path%"
 if [%background%]==[0] (
-  "%shell%" "%initializer%" %option% %script%
+  "%shell%" "%initializer%" %option% %script% %args%
 )
 if [%background%]==[1] (
-  start "LWDAQ %option%" "%shell%" "%initializer%" %option% %script%
+  start "LWDAQ %option%" "%shell%" "%initializer%" %option% %script% %args%
 )
 
 :done

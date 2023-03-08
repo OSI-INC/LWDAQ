@@ -111,7 +111,7 @@ proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 	uplevel #0 source $fn
 	
 	# At this point, we can assume success. We return an empty string.
-	return ""
+	return "SUCCESS"
 }
 
 #
