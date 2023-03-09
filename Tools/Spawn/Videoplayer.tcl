@@ -68,6 +68,10 @@ proc Videoplayer_init {} {
 	set config(video_file) [file join $config(video_dir) V0000000000.mp4]
 	set info(video_file_cache) [list]
 #
+# Video stream sources.
+#
+	set config(video_stream) "tcp://192.168.1.31:2222"
+#
 # Video file properties.
 #
 	set config(video_file_time) "0"
@@ -479,10 +483,12 @@ proc Videoplayer_play {start end_code {post 0}} {
 	}
 	set w [expr round($config(display_scale) * $config(video_width))]
 	set h [expr round($config(display_scale) * $config(video_height))]
+	set frame_ms [format %.1f [expr 1000.0/$config(video_fps)/$config(display_speed)]]
 
 	Videoplayer_print "Display width=$w, height=$h,\
 		playing from $start s to $end s,\
-		expect $num_frames frames." verbose
+		expect $num_frames frames,\
+		$frame_ms ms per frame." verbose
 	set info(control) "Play"
 	LWDAQ_update
 
@@ -506,29 +512,79 @@ proc Videoplayer_play {start end_code {post 0}} {
 	set ch [open $cmd]
 	Videoplayer_print "Opened channel $ch to ffmpeg, reading frames." verbose
 	chan configure $ch -translation binary -blocking 0
+
 	set stream_pointer 0
 	set stream_data ""
 	set info(frame_count) 0
 	set start_time [clock milliseconds]
-	set idle_time 0
-	set read_done 0
-	set play_time 0
-	set video_time 0
-	set update_done [clock milliseconds]
+
 	while {($info(frame_count) < $num_frames) && ($info(control) != "Stop")} {	
 		append stream_data [chan read $ch]
 		set data [Videoplayer_raw_extract]
 		if {$data != ""} {
-			incr info(frame_count)
-			if {($read_done > 0) && ($play_time - $video_time < 0.1)} {
-				set idle_start_time [clock milliseconds]
-				while {([clock milliseconds] - $read_done) \
-					< 1000.0/$config(video_fps)/$config(display_speed)} {
-					LWDAQ_wait_ms 1
-				}
-				set idle_time [expr $idle_time + [clock milliseconds] - $idle_start_time]
+			while {[clock milliseconds] < $start_time \
+				+ 1.0*$info(frame_count)*$frame_ms} {
+				LWDAQ_wait_ms 1
 			}
-			set read_done [clock milliseconds]
+			incr info(frame_count)
+			lwdaq_draw_raw $data $info(display_photo) \
+				-width $w -height $h -pix_fmt rgb24
+			LWDAQ_update
+		}
+		LWDAQ_support
+	}
+	
+	close $ch
+	Videoplayer_print "Done with video, closed channel $ch." verbose
+	
+	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_fps)]]
+	set display_s [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]
+	set config(display_start_s) [format %.2f [expr $start + $video_s]]
+	set config(display_end_s) $end_code
+	Videoplayer_print "Read $info(frame_count) frames\
+		spanning $video_s s, displayed in $display_s s." verbose
+	set info(control) "Idle"
+	return ""
+}
+
+proc Videoplayer_stream {{post "0"}} {
+	upvar #0 Videoplayer_config config
+	upvar #0 Videoplayer_info info
+
+	if {$post} {
+		LWDAQ_post [list Videoplayer_stream 0]
+		return ""
+	}
+	
+	set w [expr round($config(display_scale) * $config(video_width))]
+	set h [expr round($config(display_scale) * $config(video_height))]
+	Videoplayer_print "Display width=$w, height=$h." verbose
+	set info(control) "Stream"
+	LWDAQ_update
+
+	set cmd "| $info(ffmpeg) \
+			-nostdin \
+			-loglevel error \
+			-i $config(video_stream) \
+			-c:v rawvideo \
+			-pix_fmt rgb24 \
+			-vf \"scale=$w\:$h\" \
+			-f image2pipe -"
+
+	set ch [open $cmd]
+	Videoplayer_print "Opened channel $ch to ffmpeg, reading frames." verbose
+	chan configure $ch -translation binary -blocking 0
+
+	set stream_pointer 0
+	set stream_data ""
+	set info(frame_count) 0
+	set start_time [clock milliseconds]
+	
+	while {$info(control) != "Stop"} {	
+		append stream_data [chan read $ch]
+		set data [Videoplayer_raw_extract]
+		if {$data != ""} {
+			incr info(frame_count)
 			lwdaq_draw_raw $data $info(display_photo) \
 				-width $w -height $h -pix_fmt rgb24
 			LWDAQ_update
@@ -537,64 +593,14 @@ proc Videoplayer_play {start end_code {post 0}} {
 		}
 		LWDAQ_support
 	}
+	
 	close $ch
 	Videoplayer_print "Done with video, closed channel $ch." verbose
+	
 	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_fps)]]
 	set display_s [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]
-	set idle_s [format %.2f [expr 0.001*($idle_time)]]
-	set config(display_start_s) [format %.2f [expr $start + $video_s]]
-	set config(display_end_s) $end_code
 	Videoplayer_print "Read $info(frame_count) frames\
-		spanning $video_s s in $display_s s,\
-		of which $idle_s s was idle time." verbose
-	set info(control) "Idle"
-	return ""
-}
-
-proc Videoplayer_stream {} {
-	upvar #0 Videoplayer_config config
-	upvar #0 Videoplayer_info info
-
-	set info(control) "Stream"
-
-	set w [expr round($config(display_scale)*$config(video_width))]
-	set h [expr round($config(display_scale)*$config(video_height))]
-	set cmd "| $info(ffmpeg) \
-			-nostdin \
-			-loglevel error \
-			-i tcp://71.174.73.190:2222 \
-			-c:v rawvideo \
-			-pix_fmt rgb24 \
-			-vf \"scale=$w\:$h\" \
-			-f image2pipe -"
-	set ch [open $cmd]
-	Videoplayer_print "Opened channel $ch to ffmpeg, reading frames."
-	chan configure $ch -translation binary -blocking 0
-	set stream_pointer 0
-	set stream_data ""
-	set info(frame_count) 0
-	set start_time [clock milliseconds]
-	set play_time 0
-	set video_time 0
-	while {$info(control) != "Stop"} {	
-		append stream_data [chan read $ch]
-		set data [Videoplayer_raw_extract]
-		if {$data != ""} {
-			incr info(frame_count)
-			lwdaq_draw_raw $data $info(display_photo) -width $w -height $h -pix_fmt rgb24
-			LWDAQ_update
-		} else {
-			if {![winfo exists $info(text)]} {break}
-		}
-		LWDAQ_support
-	}
-	close $ch
-	Videoplayer_print "Done with video, closed channel $ch."
-	Videoplayer_print "frame = $info(frame_count),\
-		video time = [format %.2f \
-			[expr 1.0*$info(frame_count)/$config(video_fps)]],\
-		play time = [format %.2f \
-			[expr 0.001*([clock milliseconds] - $start_time)]]."
+		spanning $video_s s, displayed in $display_s s." verbose
 	set info(control) "Idle"
 	return ""
 }
@@ -603,6 +609,7 @@ proc Videoplayer_stop {} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 
+	if {$info(control) == "Idle"} {return ""}
 	set info(control) "Stop"
 	return ""
 }
