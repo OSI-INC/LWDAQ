@@ -298,7 +298,7 @@ proc Neurorecorder_print {line {color "black"}} {
 		if {$color == "verbose"} {set color black}
 		LWDAQ_print $info(text) $line $color
 	}
-	return $line
+	return ""
 }
 
 #

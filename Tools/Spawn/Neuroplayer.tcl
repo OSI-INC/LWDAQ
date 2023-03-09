@@ -29,12 +29,7 @@
 #
 # Neuroplayer_init creates the info and config arrays and the images the
 # Neuroplayer uses to hold data in memory. The config array is available through
-# the Config button but the info array is private. We select the mode in which
-# the Neuroplayer should operate by means of the global Neuroplayer_mode
-# variable. If this is not set, or if it is set to "Main", we create a new
-# toplevel window and construct the Neuroplayer interface in this new window. If
-# the mode is set to "Standalone" we take over the LWDAQ main window and
-# construct in it the Neuroplayer interface.
+# the Config button but the info array is private.
 #
 proc Neuroplayer_init {} {
 #
@@ -49,7 +44,7 @@ proc Neuroplayer_init {} {
 #
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
-	global LWDAQ_Info Neuroplayer_mode
+	global LWDAQ_Info
 #
 # We initialise the Neuroplayer with LWDAQ_tool_init. Because this command
 # begins with "LWDAQ" we know that it's one of those in the LWDAQ command
@@ -760,7 +755,7 @@ proc Neuroplayer_print {line {color "black"}} {
 		if {$color == "verbose"} {set color black}
 		LWDAQ_print $info(text) $line $color
 	}
-	return $line
+	return ""
 }
 
 #

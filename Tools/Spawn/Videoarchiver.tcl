@@ -24,7 +24,7 @@
 proc Videoarchiver_init {} {
 	upvar #0 Videoarchiver_info info
 	upvar #0 Videoarchiver_config config
-	global LWDAQ_Info LWDAQ_Driver Videoarchiver_mode
+	global LWDAQ_Info LWDAQ_Driver
 	
 	# Initialize the tool. Exit if the window is already open.
 	LWDAQ_tool_init "Videoarchiver" "30"

@@ -323,3 +323,33 @@ puts $ch {Videoplayer_play}
 puts $ch {set Videoplayer_info(frame_count)}
 </script>
 
+<script>
+upvar #0 LWDAQ_Info info
+cd $info(program_dir)
+set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
+fconfigure $ch -translation auto -buffering line -blocking 1
+LWDAQ_print $t "Opened new LWDAQ with channel $ch."
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Standalone}
+puts $ch {Videoplayer_read /Users/kevan/Desktop/Scratch/VideoPlayer/V1234567890.mp4}
+</script>
+
+<script>
+upvar #0 LWDAQ_Info info
+cd $info(program_dir)
+set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
+fconfigure $ch -translation auto -buffering line -blocking 0
+LWDAQ_print $t "Opened new LWDAQ with channel $ch."
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Standalone}
+puts $ch {Videoplayer_read /Users/kevan/Desktop/Scratch/VideoPlayer/V1234567890.mp4}
+</script>
+
+<script>
+upvar #0 LWDAQ_Info info
+cd $info(program_dir)
+set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
+fconfigure $ch -translation auto -buffering line -blocking 0
+LWDAQ_print $t "Opened new LWDAQ with channel $ch."
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Standalone}
+puts $ch {Videoplayer_read /Users/kevan/Desktop/Scratch/VideoPlayer/V1234567890.mp4}
+</script>
+
