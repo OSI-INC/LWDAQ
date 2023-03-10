@@ -688,9 +688,7 @@ begin
 end;
 
 {
-<p>lwdaq_draw_raw renders a block of raw image data in a Tk photo.</p>
-
-<p>The -zoom option scales the image as we draw it in the Tk photo, see <a href="#lwdaq_draw">lwdaq_draw</a>.
+<p>lwdaq_draw_raw renders a block of raw image data in a Tk photo. The -pix_fmt option follows the naming conventions of <i>ffmpeg</i>. We currently recognise formats "gray" for eight-bit gray-scale, and "rgb24" for three-byte color. The -width and -height options specify the dimensions of the image. The -zoom option scales the image as we draw it in the Tk photo. See <a href="#lwdaq_draw">lwdaq_draw</a> for description of these last three options.</p>
 }
 function lwdaq_draw_raw(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 

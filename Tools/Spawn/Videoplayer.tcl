@@ -80,6 +80,8 @@ proc Videoplayer_init {} {
 	set config(video_height) "616"
 	set config(video_length_s) "1"
 	set config(video_length_f) "1"
+	set config(video_pix_fmt) "rgb24"
+	set config(video_pix_size) "3"
 #
 # Display properties.
 #
@@ -104,7 +106,6 @@ proc Videoplayer_init {} {
 #
 	set info(datetime_format) {%d-%b-%Y %H:%M:%S}
 	set info(datetime_error) "dd-mmm-yyyy hh:mm:ss"
-
 #
 # Video tools.
 #
@@ -119,20 +120,15 @@ proc Videoplayer_init {} {
 	set info(log_file) [file join $info(video_scratch) Videoplayer_log.txt]
 	set os_dir [file join $info(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
-		set info(ssh) [file join $os_dir ssh/ssh.exe]	
 		set info(ffmpeg) [file join $os_dir ffmpeg/bin/ffmpeg.exe]
 	} elseif {$LWDAQ_Info(os) == "MacOS"} {
-		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) [file join $os_dir ffmpeg]
 	} elseif {$LWDAQ_Info(os) == "Linux"} {
-		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) [file join $os_dir ffmpeg/ffmpeg]
 	} elseif {$LWDAQ_Info(os) == "Raspbian"} {
-		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) "/usr/bin/ffmpeg"
 	} else {
 		Videoplayer_print "WARNING: Video playback may not work on $LWDAQ_Info(os)."
-		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) "/usr/bin/ffmpeg"
 	}
 #
@@ -323,18 +319,18 @@ proc Videoplayer_pickvid {{fn ""} {post 0}} {
 
 	if {$fn == ""} {set fn [LWDAQ_get_file_name 0 $config(video_dir)]}
 	if {![file exists $fn]} {
-		Videoplayer_print "ERROR: Cannot find \"$fn\"."
+		Videoplayer_print "ERROR: Cannot find file \"$fn\"."
 		set info(control) "Idle"
 		return ""
 	}
 	set config(video_file) $fn
 	if {![regexp {V([0-9]{10})\.mp4} [file tail $fn] match config(video_file_time)]} {
 		set config(video_file_time) 0
-		Videoplayer_print "Cannot deduce start time of \"[file tail $fn]\"." verbose
+		Videoplayer_print "Cannot deduce start time of file \"[file tail $fn]\"." verbose
 	}
 	scan [Videoplayer_info $fn] %d%d%f%f width height fps duration
 	if {$duration < 0} {
-		Videoplayer_print "ERROR: Cannot understand \"$fn\"."
+		Videoplayer_print "ERROR: Cannot understand file \"$fn\"."
 		set config(video_width) 820
 		set config(video_height) 616
 		set config(video_fps) 20
@@ -346,8 +342,6 @@ proc Videoplayer_pickvid {{fn ""} {post 0}} {
 			Videoplayer_print $answer green
 			Videoplayer_print "End Output from FFMPEG.\n" purple
 		}
-		set info(control) "Idle"
-		return ""
 	} else {
 		set config(video_width) $width
 		set config(video_height) $height
@@ -360,9 +354,11 @@ proc Videoplayer_pickvid {{fn ""} {post 0}} {
 			fps = $config(video_fps) fps,\
 			length_s = $config(video_length_s) s,\
 			length_f = $config(video_length_f) f." verbose
-		set info(control) "Idle"
-		return $fn
 	}	
+	set config(display_start_s) "0"
+	set config(display_end_s) "*"
+	set info(control) "Idle"
+	return ""
 }
 
 #
@@ -392,6 +388,26 @@ proc Videoplayer_pickdir {} {
 	return $dn
 }
 
+#
+# Videoplayer_raw_extract 
+#
+proc Videoplayer_raw_extract {raw_size} {
+	upvar #0 Videoplayer_config config
+	upvar #0 Videoplayer_info info
+	upvar stream_data s
+	upvar stream_pointer i
+	
+	if {[string length $s] >= $i + $raw_size - 1} {
+		set raw [string range $s $i [expr $i + $raw_size - 1]]
+		set i [expr $i + $raw_size]
+	} else {
+		set raw ""
+	}
+	
+	return $raw
+}
+
+#
 proc Videoplayer_png_extract {} {
 	upvar stream_data s
 	upvar stream_pointer i
@@ -413,24 +429,6 @@ proc Videoplayer_png_extract {} {
 	return $png
 }
 
-proc Videoplayer_raw_extract {} {
-	upvar #0 Videoplayer_config config
-	upvar #0 Videoplayer_info info
-	upvar stream_data s
-	upvar stream_pointer i
-	
-	set raw_size [expr round(3*$config(video_width)*$config(video_height)\
-		*$config(display_scale)*$config(display_scale))]
-	if {[string length $s] >= $i + $raw_size - 1} {
-		set raw [string range $s $i [expr $i + $raw_size - 1]]
-		set i [expr $i + $raw_size]
-	} else {
-		set raw ""
-	}
-	
-	return $raw
-}
-
 #
 # Videoplayer_play plays the current video file, which must previously have been
 # read and understood by Videoplayer_pickvid. The routine starts playing the
@@ -444,18 +442,16 @@ proc Videoplayer_play {start end_code {post 0}} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
+	# Startup checks.
 	if {$post} {
 		LWDAQ_post [list Videoplayer_play $fn $start $end_code]
 		return ""
 	}
-	
 	if {$info(control) != "Idle"} {
 		Videoplayer_print "ERROR: Cannot play a new file while busy."
 		return ""
 	}
-	
 	set fn $config(video_file)
-
 	if {![file exists $fn]} {
 		Videoplayer_print "ERROR: File \"$fn\" does not exist."
 		return ""
@@ -468,67 +464,98 @@ proc Videoplayer_play {start end_code {post 0}} {
 		set start $config(video_length_s)
 		set end_code "+"
 	}
+	
+	# Determine the end time in seconds, the number of frames we should read to 
+	# complete the required duration, and construct the ffmpeg time control string.
 	if {$end_code == "*"} {
 		set end $config(video_length_s)
-		set time_control "-ss $start"
 		set num_frames [expr round(($end - $start)*$config(video_fps))]
+		set time_control "-ss $start"
 	} elseif {$end_code == "+"} {
 		set end [format %.3f $start [expr 2.0/$config(video_fps)]]
-		set time_control "-ss $start -t [format %.3f [expr 2.0/$config(video_fps)]]"
 		set num_frames 1
+		set time_control "-ss $start -t [format %.3f [expr 2.0/$config(video_fps)]]"
 	} else {
 		if {![string is double -strict $end_code]} {
 			Videoplayer_print "ERROR: Invalid end time \"$end_code\"."
 			return ""
 		}
 		set end $end_code
-		set time_control "-ss $start -t [format %.3f [expr $end - $start]]"
 		set num_frames [expr round(($end_code - $start)*$config(video_fps))]
+		set time_control "-ss $start -t [format %.3f [expr $end - $start]]"
 	}
-	set w [expr round($config(display_scale) * $config(video_width))]
-	set h [expr round($config(display_scale) * $config(video_height))]
+	
+	# If the display scale is greater than one, we want to expand the image in
+	# our own drawing routine, rather than asking ffmpeg to provide us with the
+	# enlarged image. But if the scale is less than one, we will allow ffmeg to
+	# provide the reduced image, which accelerates the display. Here we calculate
+	# width we will specify to ffmpeg, and also the final display dimensions.
+	if {$config(display_scale) >= 1.0} {
+		set w $config(video_width)
+		set h $config(video_height)
+		set dw [expr round($config(display_scale) * $w)]
+		set dh [expr round($config(display_scale) * $h)]
+	} else {
+		set w [expr round($config(display_scale) * $config(video_width))]
+		set h [expr round($config(display_scale) * $config(video_height))]	
+		set dw $w
+		set dh $h
+	}
 	set frame_ms [format %.1f [expr 1000.0/$config(video_fps)/$config(display_speed)]]
-
-	Videoplayer_print "Display width=$w, height=$h,\
+	Videoplayer_print "Display width=$dw, height=$dh,\
 		playing from $start s to $end s,\
 		expect $num_frames frames,\
 		$frame_ms ms per frame." verbose
 	set info(control) "Play"
 	LWDAQ_update
 
+	# We compose our ffmpeg command, taking care to include literal double
+	# quotes for the file name and video filter definition. Other options
+	# we have worked with, but eliminated, we list below.
+	# -frames:v $num_frames says we will read only this number of rames
+	# -c:v rawvideo specifies raw video output, just pixels in a stream
+	# -c:v png specifies png output
+	# -pix_fmt gray specifies eight-bit gray scale, can use lwdaq_draw
+	# -pix_fmt rgb24 specifies twenty-four bit color, the default
+	# -pix_fmt rgb8 does nothing
 	set cmd "| $info(ffmpeg) -nostdin \
 		-loglevel error \
 		$time_control \
 		-i \"$fn\" \
 		-c:v rawvideo \
-		-pix_fmt rgb24 \
+		-pix_fmt $config(video_pix_fmt) \
 		-vf \"scale=$w\:$h\" \
 		-f image2pipe -"
 		
-# Other ffmpeg options we have worked with:
-# -frames:v $num_frames says we will read only this number of frames
-# -c:v rawvideo specifies raw video output, just pixels in a stream
-# -c:v png specifies png output
-# -pix_fmt gray specifies eight-bit gray scale, can use lwdaq_draw
-# -pix_fmt rgb24 specifies twenty-four bit color, the default
-# -pix_fmt rgb8 does nothing
-	
-	set ch [open $cmd r+]
+	# Launch ffmpeg with a one-way pipe out of which we can read the raw video.
+	# We have no access to the standard error channel from the ffmpeg process.
+	# We will use a timout to detect errors, but otherwise the nature of an
+	# ffmpeg failure will be unknown. 
+	set ch [open $cmd r]
 	set chpid [pid $ch]
 	set info(display_channel) $ch
 	set info(display_process) $chpid
 	Videoplayer_print "Opened channel $ch to ffmpeg, reading [file tail $fn]." verbose
 	chan configure $ch -translation binary -blocking 0
 
+	# Configure and initialize the display process.
 	set stream_pointer 0
 	set stream_data ""
 	set info(frame_count) 0
 	set start_time [clock milliseconds]
 	set timeout 0
-
+	set raw_size [expr round( $config(video_pix_size) * $w * $h)]
+	if {$config(display_scale) >= 1.0} {
+		set zoom $config(display_scale)
+	} else {
+		set zoom 1.0
+	}
+	
+	# We now enter the display loop, in which we are grabbing frames, waiting until
+	# the next frame display time, displaying the frame, and watching for a timeout.
 	while {($info(frame_count) < $num_frames) && ($info(control) != "Stop")} {	
 		append stream_data [chan read $ch]
-		set data [Videoplayer_raw_extract]
+		set data [Videoplayer_raw_extract $raw_size]
 		if {$data != ""} {
 			while {[clock milliseconds] < $start_time \
 				+ 1.0*$info(frame_count)*$frame_ms} {
@@ -536,8 +563,8 @@ proc Videoplayer_play {start end_code {post 0}} {
 			}
 			incr info(frame_count)
 			set timeout 0
-			lwdaq_draw_raw $data $info(display_photo) \
-				-width $w -height $h -pix_fmt rgb24
+			lwdaq_draw_raw $data $info(display_photo) -width $w -height $h \
+				-pix_fmt $config(video_pix_fmt) -zoom $zoom
 			LWDAQ_update
 		}
 		LWDAQ_wait_ms 1
@@ -582,13 +609,13 @@ proc Videoplayer_stream {{post "0"}} {
 	LWDAQ_update
 
 	set cmd "| $info(ffmpeg) \
-			-nostdin \
-			-loglevel error \
-			-i $stream \
-			-c:v rawvideo \
-			-pix_fmt rgb24 \
-			-vf \"scale=$w\:$h\" \
-			-f image2pipe -"
+		-nostdin \
+		-loglevel error \
+		-i $stream \
+		-c:v rawvideo \
+		-pix_fmt rgb24 \
+		-vf \"scale=$w\:$h\" \
+		-f image2pipe -"
 
 	set ch [open $cmd r+]
 	set chpid [pid $ch]
