@@ -90,6 +90,10 @@ proc Videoplayer_init {} {
 	set config(display_time) "0.00"
 	set info(display_photo) "videoplayer_photo"
 	set info(frame_count) "0"
+	set info(display_process) "0"
+	set info(display_channel) "none"
+	set config(display_timeout_ms) "1000"
+	set config(stream_timeout_ms) "5000"
 #
 # Graphical user display configuration.
 #
@@ -495,7 +499,7 @@ proc Videoplayer_play {start end_code {post 0}} {
 	set cmd "| $info(ffmpeg) -nostdin \
 		-loglevel error \
 		$time_control \
-		-i $fn \
+		-i \"$fn\" \
 		-c:v rawvideo \
 		-pix_fmt rgb24 \
 		-vf \"scale=$w\:$h\" \
@@ -509,14 +513,18 @@ proc Videoplayer_play {start end_code {post 0}} {
 # -pix_fmt rgb24 specifies twenty-four bit color, the default
 # -pix_fmt rgb8 does nothing
 	
-	set ch [open $cmd]
-	Videoplayer_print "Opened channel $ch to ffmpeg, reading frames." verbose
+	set ch [open $cmd r+]
+	set chpid [pid $ch]
+	set info(display_channel) $ch
+	set info(display_process) $chpid
+	Videoplayer_print "Opened channel $ch to ffmpeg, reading [file tail $fn]." verbose
 	chan configure $ch -translation binary -blocking 0
 
 	set stream_pointer 0
 	set stream_data ""
 	set info(frame_count) 0
 	set start_time [clock milliseconds]
+	set timeout 0
 
 	while {($info(frame_count) < $num_frames) && ($info(control) != "Stop")} {	
 		append stream_data [chan read $ch]
@@ -527,14 +535,22 @@ proc Videoplayer_play {start end_code {post 0}} {
 				LWDAQ_wait_ms 1
 			}
 			incr info(frame_count)
+			set timeout 0
 			lwdaq_draw_raw $data $info(display_photo) \
 				-width $w -height $h -pix_fmt rgb24
 			LWDAQ_update
 		}
+		LWDAQ_wait_ms 1
+		incr timeout
 		LWDAQ_support
+		if {$timeout > $config(display_timeout_ms)} {
+			Videoplayer_print "ERROR: Timeout waiting for frame $info(frame_count),\
+				waited over $config(display_timeout_ms) ms."
+			break
+		}
 	}
 	
-	close $ch
+	catch {close $ch}
 	Videoplayer_print "Done with video, closed channel $ch." verbose
 	
 	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_fps)]]
@@ -558,27 +574,34 @@ proc Videoplayer_stream {{post "0"}} {
 	
 	set w [expr round($config(display_scale) * $config(video_width))]
 	set h [expr round($config(display_scale) * $config(video_height))]
-	Videoplayer_print "Display width=$w, height=$h." verbose
+	set stream $config(video_stream)
+	Videoplayer_print "Display width=$w, height=$h,\
+		streaming from $stream\
+		at $config(video_fps)." verbose
 	set info(control) "Stream"
 	LWDAQ_update
 
 	set cmd "| $info(ffmpeg) \
 			-nostdin \
 			-loglevel error \
-			-i $config(video_stream) \
+			-i $stream \
 			-c:v rawvideo \
 			-pix_fmt rgb24 \
 			-vf \"scale=$w\:$h\" \
 			-f image2pipe -"
 
-	set ch [open $cmd]
-	Videoplayer_print "Opened channel $ch to ffmpeg, reading frames." verbose
+	set ch [open $cmd r+]
+	set chpid [pid $ch]
+	set info(display_channel) $ch
+	set info(display_process) $chpid
+	Videoplayer_print "Opened channel $ch to ffmpeg, reading $stream." verbose
 	chan configure $ch -translation binary -blocking 0
 
 	set stream_pointer 0
 	set stream_data ""
 	set info(frame_count) 0
 	set start_time [clock milliseconds]
+	set timeout 0
 	
 	while {$info(control) != "Stop"} {	
 		append stream_data [chan read $ch]
@@ -588,10 +611,15 @@ proc Videoplayer_stream {{post "0"}} {
 			lwdaq_draw_raw $data $info(display_photo) \
 				-width $w -height $h -pix_fmt rgb24
 			LWDAQ_update
-		} else {
-			if {![winfo exists $info(text)]} {break}
 		}
+		LWDAQ_wait_ms 1
+		incr timeout
 		LWDAQ_support
+		if {$timeout > $config(stream_timeout_ms)} {
+			Videoplayer_print "ERROR: Timeout waiting for frame $info(frame_count),\
+				waited over $config(stream_timeout_ms) ms."
+			break
+		}
 	}
 	
 	close $ch
@@ -599,7 +627,7 @@ proc Videoplayer_stream {{post "0"}} {
 	
 	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_fps)]]
 	set display_s [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]
-	Videoplayer_print "Read $info(frame_count) frames\
+	Videoplayer_print "Received $info(frame_count) frames\
 		spanning $video_s s, displayed in $display_s s." verbose
 	set info(control) "Idle"
 	return ""
