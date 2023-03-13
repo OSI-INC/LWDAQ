@@ -70,7 +70,7 @@ proc Videoarchiver_init {} {
 	}
 	
 	# The time we alloew for video streaming to start on the camera.
-	set info(pi_start_ms) "500"
+	set info(pi_start_ms) "1000"
 	
 	# The codec to use for compression on the Pi. The libx264 codec is provided
 	# by ffmpeg in compiled code that runs on the Pi microprocessor cores

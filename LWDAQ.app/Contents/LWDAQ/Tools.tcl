@@ -41,21 +41,24 @@ proc LWDAQ_read_script {fn} {
 }
 
 #
-# LWDAQ_run_tool runs a tool script. If we pass it an empty string, the routine
-# opens a browser and asks the user to select a file. It deduces the tool name
-# from the file name and runs the tool. If we pass it a tool name, the routine
-# looks for the tool script in Tools, Tools/More, Tools/Spawn, the default
-# directory, and the working directory in that order. The routine deduces the
-# tool name from the root of the file name. Once we have the tool name and its
-# script file name, we prepare to run the tool. We set two global variables for
-# the tool script to use: one gives the mode in which the tool is to operate,
-# the other gives the tool file name. If the mode is "Standalone", the routine
-# deletes the Instrument and Tool menus so they will not conflict with those
-# provided by the original process that initiated the spawning. The default mode
-# is "Communal", in which tools share the same LWDAQ process. When the tool
-# starts up standalone, it should take over the main window for its own
-# interface, deleting the usual Quit button. When the tool starts up communal,
-# it should create a new toplevel window for its interface.
+# LWDAQ_run_tool runs a tool script. It takes two optional parameters: the tool
+# name and the mode in which the tool is to run. If pass no paramters, these two
+# default to an empty string and "Communal" mode. With an empty string for the
+# tool name, the routine opens a browser and asks the user to select a file. It
+# deduces the tool name from the file name and runs the tool. If we pass it a
+# tool name, the routine looks for the tool script in Tools, Tools/More,
+# Tools/Spawn, the default directory, and the working directory in that order.
+# The routine deduces the tool name from the root of the file name. Once we have
+# the tool name and its script file name, we prepare to run the tool. The mode
+# can have one of three possible values: Standalone, Slave, or Communal. If the
+# mode is "Standalone" or "Slave", the routine deletes the Instrument and Tool
+# menus. If the mode is Communal, the routine leaves these menus intact. When
+# the tool starts up in Standalone of Slave mode, it should take over the main
+# window for its own interface and delete the usual Quit button. When the tool
+# starts up communal, it should create a new toplevel window for its interface.
+# In Slave mode, the tool should set itself up to receive commands through stdin
+# from its master, and send output through stdout. In Standalone mode, the tool
+# should operate independent of stdin and stdout.
 #
 proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 	global LWDAQ_Info
@@ -227,7 +230,9 @@ proc LWDAQ_tool_init {name version} {
 # LWDAQ_tool_open opens a tool window if none exists, and returns the name of
 # the window. If the tool window does exist, the routine raises the tool window
 # and returns an empty string. If graphics are disabled, the routine returns an
-# empty string. 
+# empty string. The routine recognises two special opening modes, Standalone and
+# Slave, in which the tool will take over the main window and delete the Quit
+# button.
 #
 proc LWDAQ_tool_open {name} {
 	upvar #0 $name\_info info
@@ -238,28 +243,45 @@ proc LWDAQ_tool_open {name} {
 	# for our tool window.
 	scan [wm maxsize .] %d%d x y	
 
-	# In the standalone mode, we create a frame in the root window for the tool.
-	# In all other modes, we create a new top-level window for the tool.
-	if {$info(mode) == "Standalone"} {
-		if {[winfo exists $info(window)]} {
-			raise .
-			return ""
-		} {
-			catch {destroy .frame}
-			set f [frame $info(window)]
-			pack $f -side top -fill both -expand yes
-			wm title . "Standalone $info(name) $info(version)" 
-			raise .	
-			wm maxsize . [expr $x*2] [expr $y*2]
+	# In the standalone and slave modes, we create a frame in the root window
+	# for the tool. In all other modes, we create a new top-level window for the
+	# tool.
+	switch $info(mode) {
+		"Standalone" {
+			if {[winfo exists $info(window)]} {
+				raise .
+				return ""
+			} {
+				catch {destroy .frame}
+				set f [frame $info(window)]
+				pack $f -side top -fill both -expand yes
+				wm title . "Standalone $info(name) $info(version)" 
+				raise .	
+				wm maxsize . [expr $x*2] [expr $y*2]
+			}
 		}
-	} {
-		if {[winfo exists $info(window)]} {
-			raise $info(window)
-			return ""
-		} {
-			toplevel $info(window)
-			wm title $info(window) "$info(name) $info(version)"				
-			wm maxsize $info(window) [expr $x*2] [expr $y*2]
+		"Slave" {
+			if {[winfo exists $info(window)]} {
+				raise .
+				return ""
+			} {
+				catch {destroy .frame}
+				set f [frame $info(window)]
+				pack $f -side top -fill both -expand yes
+				wm title . "Slave $info(name) $info(version)" 
+				raise .	
+				wm maxsize . [expr $x*2] [expr $y*2]
+			}
+		}
+		default {
+			if {[winfo exists $info(window)]} {
+				raise $info(window)
+				return ""
+			} {
+				toplevel $info(window)
+				wm title $info(window) "$info(name) $info(version)"				
+				wm maxsize $info(window) [expr $x*2] [expr $y*2]
+			}
 		}
 	}		
 	

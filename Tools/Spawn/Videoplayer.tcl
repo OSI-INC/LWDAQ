@@ -66,10 +66,6 @@ proc Videoplayer_init {} {
 #
 	set config(video_dir) $LWDAQ_Info(working_dir)
 	set config(video_file) [file join $config(video_dir) V0000000000.mp4]
-	set info(video_file_cache) [list]
-#
-# Video stream sources.
-#
 	set config(video_stream) "tcp://192.168.1.31:2222"
 #
 # Video file properties.
@@ -78,8 +74,9 @@ proc Videoplayer_init {} {
 	set config(video_fps) "20"
 	set config(video_width) "820"
 	set config(video_height) "616"
+	set config(video_rotation) "0"
 	set config(video_length_s) "1"
-	set config(video_length_f) "1"
+	set config(video_length_f) "20"
 	set config(video_pix_fmt) "rgb24"
 	set config(video_pix_size) "3"
 #
@@ -173,7 +170,7 @@ proc Videoplayer_download {} {
 
 #
 # Videoplayer_suggest prints a message with a text link suggesting that
-# the user download the Videoarchiver directory to install ffmpeg and mplayer.
+# the user download the Videoarchiver directory to install ffmpeg.
 #
 proc Videoplayer_suggest {} {
 	upvar #0 Videoplayer_config config
@@ -192,35 +189,10 @@ proc Videoplayer_suggest {} {
 	LWDAQ_print $info(text) {
 After download, expand the zip archive. Move the entire Videoarchiver directory
 into the same directory as your LWDAQ installation, so the LWDAQ and
-Videoarchiver directories will be next to one another. You now have Mplayer, and
-FFMpeg installed for use by the Videoarchiver and Videoplayer on Linux, MacOS,
-and Windows.
+Videoarchiver directories will be next to one another. You now have FFMpeg
+installed for use by the Videoarchiver and Videoplayer on Linux, MacOS, and
+Windows.
 	}
-}
-
-#
-# Videoplayer_clock_convert converts between integer seconds and the datetime
-# format given in the configuration array. If the input is in integer seconds,
-# it gets converted into our datetime format. If the input is in the datetime
-# format, it gets converted into integer seconds. If the format is incorrect,
-# we return the value zero.
-#
-proc Videoplayer_clock_convert {datetime} {
-	upvar #0 Videoplayer_config config
-	upvar #0 Videoplayer_info info
-	
-	if {[string is integer $datetime]} {
-		set newformat [clock format $datetime -format $info(datetime_format)]
-	} {
-		if {[catch {
-			set newformat [clock scan $datetime -format $info(datetime_format)]
-		} error_result]} {
-			set newformat 0
-			Videoplayer_print "ERROR: Invalid time \"$datetime\",\
-				should be $info(datetime_error)."
-		}
-	}
-	return $newformat
 }
 
 #
@@ -253,19 +225,16 @@ proc Videoplayer_print {line {color "black"}} {
 }
 
 #
-# Videoplayer_info calls ffmpeg to determine the width, height, frame rate
-# and duration of an existing video file. The frame rate is frames per second.
+# Videoplayer_info calls ffmpeg to determine the width, height, framerate
+# and duration of an existing video file. The framerate is frames per second.
 # The duration is in seconds. If the file does not exist, the routine returns "0
 # 0 0 -1".
 #
-proc Videoplayer_info {{fn ""}} {
+proc Videoplayer_info {fn} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
-	if {$fn == ""} {
-		set fn $info(video_file)
-		if {![file exists $fn]} {return "0 0 0 -1"}
-	}
+	if {![file exists $fn]} {return "0 0 0 -1"}
 	
 	catch {[exec $info(ffmpeg) -i [file normalize $fn]]} answer
 	
@@ -296,41 +265,53 @@ proc Videoplayer_info {{fn ""}} {
 }
 
 #
-# Videoplayer_pickvid attempts to read a video file and determine its width,
-# height, frame rate, and duration. If we pass an empty file name, or do not
-# specify a file name, the routine will open a browser for the user to select a
-# file. The routine sets the configuration array values for the four video
-# parameters, so they may be used by other routines. If we set "post" to one,
-# the routine will post itself to the event queue so that it is executed in 
-# order.
+# Videoplayer_pickfile reads a video file and determines its width, height,
+# framerate, and duration. If we pass an empty file name, or do not specify a
+# file name, the routine opens a browser for the user to select a new file. The
+# routine sets the configuration array values for the four video parameters, so
+# they may be used by other routines. It sets the current video file name as
+# well. If we set "post" to one, the routine will post itself to the event queue
+# so that it is executed in order.
 #
-proc Videoplayer_pickvid {{fn ""} {post 0}} {
+proc Videoplayer_pickfile {fn {post 0}} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	global LWDAQ_Info
 
+	# Post to queue if the post flag is set.
 	if {$post} {
-		LWDAQ_post [list Videoplayer_pickvid $fn 0]
+		LWDAQ_post [list Videoplayer_picfile $fn 0]
 		return ""
 	}
 
+	# Set the control variable.
 	set info(control) "Read"
 	LWDAQ_update
 
-	if {$fn == ""} {set fn [LWDAQ_get_file_name 0 $config(video_dir)]}
+	# Check the file exists. If so, save as current video file. 
+	if {$fn == ""} {
+		set fn [LWDAQ_get_file_name 0 $config(video_file)]
+		if {$fn == ""} {
+			set info(control) "Idle"
+			return ""
+		}
+	}
 	if {![file exists $fn]} {
 		Videoplayer_print "ERROR: Cannot find file \"$fn\"."
 		set info(control) "Idle"
 		return ""
 	}
 	set config(video_file) $fn
-	if {![regexp {V([0-9]{10})\.mp4} [file tail $fn] match config(video_file_time)]} {
-		set config(video_file_time) 0
-		Videoplayer_print "Cannot deduce start time of file \"[file tail $fn]\"." verbose
-	}
+	
+	# Get properties of video contained in the file.
 	scan [Videoplayer_info $fn] %d%d%f%f width height fps duration
+	
+	# If the duration is less than zero, we have encountered an error, so we
+	# report on that now, including printing a full ffmpeg output if the verbose
+	# flag is set.
 	if {$duration < 0} {
-		Videoplayer_print "ERROR: Cannot understand file \"$fn\"."
+		Videoplayer_print "ERROR: Cannot decode \"$fn\",\
+			check Verbose for details."
 		set config(video_width) 820
 		set config(video_height) 616
 		set config(video_fps) 20
@@ -343,6 +324,8 @@ proc Videoplayer_pickvid {{fn ""} {post 0}} {
 			Videoplayer_print "End Output from FFMPEG.\n" purple
 		}
 	} else {
+	# If duration is greater than or equal to zero, we decoded the file and we
+	# can now set configuration parameters to match the file.
 		set config(video_width) $width
 		set config(video_height) $height
 		set config(video_fps) [format %.2f $fps]
@@ -355,6 +338,8 @@ proc Videoplayer_pickvid {{fn ""} {post 0}} {
 			length_s = $config(video_length_s) s,\
 			length_f = $config(video_length_f) f." verbose
 	}	
+	
+	# Reset the start and end codes.
 	set config(display_start_s) "0"
 	set config(display_end_s) "*"
 	set info(control) "Idle"
@@ -362,51 +347,9 @@ proc Videoplayer_pickvid {{fn ""} {post 0}} {
 }
 
 #
-# Videoplayer_pickdir allows the user to pick a new video directory. The 
-# Videoplayer then picks the first video in that directory for its video file.
-#
-proc Videoplayer_pickdir {} {
-	upvar #0 Videoplayer_config config
-	upvar #0 Videoplayer_info info
-	global LWDAQ_Info
-
-	set dn [LWDAQ_get_dir_name [set config(video_dir)]]
-	if {![file exists $dn]} {
-		Videoplayer_print "WARNING: Directory \"$dn\" does not exist."
-		return $dn
-	}
-	if {$dn != $config(video_dir)} {
-		set info(video_file_cache) [list]
-	}
-	set config(video_dir) $dn
-	
-	Videoplayer_print "Directory: $dn\."
-	cd $dn
-	set vfl [glob -nocomplain V*.mp4]
-	Videoplayer_print "Video directory contains [llength $vfl] files matching V*.mp4."
-
-	return $dn
-}
-
-#
-# Videoplayer_raw_extract 
-#
-proc Videoplayer_raw_extract {raw_size} {
-	upvar #0 Videoplayer_config config
-	upvar #0 Videoplayer_info info
-	upvar stream_data s
-	upvar stream_pointer i
-	
-	if {[string length $s] >= $i + $raw_size - 1} {
-		set raw [string range $s $i [expr $i + $raw_size - 1]]
-		set i [expr $i + $raw_size]
-	} else {
-		set raw ""
-	}
-	
-	return $raw
-}
-
+# Video_png_extract extracts a PNG message from a stream buffer. We don't use 
+# this routine in the Videoplayer, but we are leaving it here because it shows
+# how to find the end of a PNG.
 #
 proc Videoplayer_png_extract {} {
 	upvar stream_data s
@@ -430,28 +373,36 @@ proc Videoplayer_png_extract {} {
 }
 
 #
-# Videoplayer_play plays the current video file, which must previously have been
-# read and understood by Videoplayer_pickvid. The routine starts playing the
-# video at time "start" in seconds, continuing to "end" seconds. If the end time
-# is a wildcard character, we play the entire video from the start time. If the
-# end time is a "+" character, we grab one frame and stop. If "post" is one, we
-# post the Videoplayer_play command to the event queue so it will be executed in
-# turn, without delay, following other video actions.
+# Videoplayer_play plays the video file named in video_file, for which the
+# routine assumes the values of width, height, framerate, and duration stored in
+# the configuration array are correct. The routine uses the display scale value
+# to obtain the display dimensions from the video width and height. It starts
+# playing the video at time "display_start_s" in seconds, continuing to
+# "display_end_s" seconds. If the end time is a wildcard character, it plays the
+# entire video from the start time. If the end time is a "+" character, it grabs
+# one frame and stops. If "post" is one, we post Videoplayer_play command to the
+# event queue so it will be executed in turn. 
 #
-proc Videoplayer_play {start end_code {post 0}} {
+proc Videoplayer_play {{post 0}} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
 	# Startup checks.
 	if {$post} {
-		LWDAQ_post [list Videoplayer_play $fn $start $end_code]
+		LWDAQ_post [list Videoplayer_play]
 		return ""
 	}
 	if {$info(control) != "Idle"} {
 		Videoplayer_print "ERROR: Cannot play a new file while busy."
 		return ""
 	}
+
+	# Abbreviations.
 	set fn $config(video_file)
+	set start $config(display_start_s)
+	set end_code $config(display_end_s)
+	
+	# Consistency checks.
 	if {![file exists $fn]} {
 		Videoplayer_print "ERROR: File \"$fn\" does not exist."
 		return ""
@@ -501,8 +452,45 @@ proc Videoplayer_play {start end_code {post 0}} {
 		set dw $w
 		set dh $h
 	}
+	
+	# Calculate the frame time.
 	set frame_ms [format %.1f [expr 1000.0/$config(video_fps)/$config(display_speed)]]
+	
+	# Combine dimensions and rotation into one video filter.
+	switch $config(video_rotation) {
+		"0" {
+			set vf "scale=$w\:$h"
+		}
+		"90" {
+			set vf "scale=$w\:$h, transpose=clock"
+			set temp $dw
+			set dw $dh
+			set dh $temp
+			set temp $w
+			set w $h
+			set h $temp
+		}
+		"180" {
+			set vf "scale=$w\:$h, transpose=clock, transpose=clock"
+		}
+		"270" {
+			set vf "scale=$w\:$h, transpose=cclock"
+			set temp $dw
+			set dw $dh
+			set dh $temp
+			set temp $w
+			set w $h
+			set h $temp
+		}
+		default {
+			set vf "scale=$w\:$h"
+			Videoplayer_print "WARNING: Invalid rotation \"$config(video_rotation)\"."
+		}
+	}
+	
+	# Report on final display parameters.
 	Videoplayer_print "Display width=$dw, height=$dh,\
+		rotation=$config(video_rotation),\
 		playing from $start s to $end s,\
 		expect $num_frames frames,\
 		$frame_ms ms per frame." verbose
@@ -524,7 +512,7 @@ proc Videoplayer_play {start end_code {post 0}} {
 		-i \"$fn\" \
 		-c:v rawvideo \
 		-pix_fmt $config(video_pix_fmt) \
-		-vf \"scale=$w\:$h\" \
+		-vf \"$vf\" \
 		-f image2pipe -"
 		
 	# Launch ffmpeg with a one-way pipe out of which we can read the raw video.
@@ -535,28 +523,29 @@ proc Videoplayer_play {start end_code {post 0}} {
 	set chpid [pid $ch]
 	set info(display_channel) $ch
 	set info(display_process) $chpid
-	Videoplayer_print "Opened channel $ch to ffmpeg, reading [file tail $fn]." verbose
+	Videoplayer_print "Opened channel $ch to ffmpeg, process $chpid,\
+		reading [file tail $fn]." verbose
 	chan configure $ch -translation binary -blocking 0
 
 	# Configure and initialize the display process.
-	set stream_pointer 0
-	set stream_data ""
 	set info(frame_count) 0
 	set start_time [clock milliseconds]
 	set timeout 0
-	set raw_size [expr round( $config(video_pix_size) * $w * $h)]
 	if {$config(display_scale) >= 1.0} {
 		set zoom $config(display_scale)
 	} else {
 		set zoom 1.0
 	}
+	set raw_size [expr round( $config(video_pix_size) * $w * $h)]
+	set data_size 0
+	set data ""
 	
 	# We now enter the display loop, in which we are grabbing frames, waiting until
 	# the next frame display time, displaying the frame, and watching for a timeout.
 	while {($info(frame_count) < $num_frames) && ($info(control) != "Stop")} {	
-		append stream_data [chan read $ch]
-		set data [Videoplayer_raw_extract $raw_size]
-		if {$data != ""} {
+		append data [chan read $ch [expr $raw_size - $data_size]]
+		set data_size [string length $data]
+		if {$data_size >= $raw_size} {
 			while {[clock milliseconds] < $start_time \
 				+ 1.0*$info(frame_count)*$frame_ms} {
 				LWDAQ_wait_ms 1
@@ -565,6 +554,7 @@ proc Videoplayer_play {start end_code {post 0}} {
 			set timeout 0
 			lwdaq_draw_raw $data $info(display_photo) -width $w -height $h \
 				-pix_fmt $config(video_pix_fmt) -zoom $zoom
+			set data ""
 			LWDAQ_update
 		}
 		LWDAQ_wait_ms 1
@@ -577,9 +567,13 @@ proc Videoplayer_play {start end_code {post 0}} {
 		}
 	}
 	
+	# Close the ffmpeg channel and make sure the ffmpeg process is stopped.
 	catch {close $ch}
-	Videoplayer_print "Done with video, closed channel $ch." verbose
+	LWDAQ_process_stop $chpid
+	Videoplayer_print "Video playback complete, closed channel $ch,\
+		stopped process $chpid." verbose
 	
+	# Report on outcome of playback if verbose flag is set.
 	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_fps)]]
 	set display_s [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]
 	set config(display_start_s) [format %.2f [expr $start + $video_s]]
@@ -590,58 +584,136 @@ proc Videoplayer_play {start end_code {post 0}} {
 	return ""
 }
 
+#
+# Videoplayer_stream connects to a video stream server, which we specify with an
+# IP address and port number like "tcp://192.168.1.31:2222". The routine uses
+# the video_stream value and assumes the other video and display values in the
+# configuration array are to be applied to the streaming. The routine calls
+# ffmpeg to connect to the server and receive the stream. We do not give ffmpeg
+# any advice as to the format or encoding of the stream, but instead leave
+# ffmpeg to figure these details out for itself. The ffmpeg process translates
+# the stream into raw video with dimensions and pixel format we specify. The
+# width and height are obtained from the product of display_scale and
+# video_width and video_height respectively. That is: the routine is assuming
+# the stream has dimensions video_width x video_height, and asks ffmpeg to scale
+# the stream by display_scale. The pixel format specified by video_pix_fmt,
+# which must must be accompanied by a matching value of video_pix_size. We read
+# the raw video produced by ffmpeg and display it on the screen. If ffmpeg fails
+# to connect to the stream, or if the connection is subsequently broken or
+# corrupted, we break out of the streaming loop with a timeout after
+# stream_timeout_ms. 
+#
 proc Videoplayer_stream {{post "0"}} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 
+	# Startup checks.
 	if {$post} {
-		LWDAQ_post [list Videoplayer_stream 0]
+		LWDAQ_post [list Videoplayer_stream $stream 0]
 		return ""
 	}
-	
-	set w [expr round($config(display_scale) * $config(video_width))]
-	set h [expr round($config(display_scale) * $config(video_height))]
+
+	# Abbreviations.
 	set stream $config(video_stream)
+	
+	# Determine the dimensions of the display.
+	if {$config(display_scale) >= 1.0} {
+		set w $config(video_width)
+		set h $config(video_height)
+		set dw [expr round($config(display_scale) * $w)]
+		set dh [expr round($config(display_scale) * $h)]
+	} else {
+		set w [expr round($config(display_scale) * $config(video_width))]
+		set h [expr round($config(display_scale) * $config(video_height))]	
+		set dw $w
+		set dh $h
+	}
+
+	# Combine dimensions and rotation into one video filter.
+	switch $config(video_rotation) {
+		"0" {
+			set vf "scale=$w\:$h"
+		}
+		"90" {
+			set vf "scale=$w\:$h, transpose=clock"
+			set temp $dw
+			set dw $dh
+			set dh $temp
+			set temp $w
+			set w $h
+			set h $temp
+		}
+		"180" {
+			set vf "scale=$w\:$h, transpose=clock, transpose=clock"
+		}
+		"270" {
+			set vf "scale=$w\:$h, transpose=cclock"
+			set temp $dw
+			set dw $dh
+			set dh $temp
+			set temp $w
+			set w $h
+			set h $temp
+		}
+		default {
+			set vf "scale=$w\:$h"
+			Videoplayer_print "WARNING: Invalid rotation \"$config(video_rotation)\"."
+		}
+	}
+
+	# Report on final display parameters.
 	Videoplayer_print "Display width=$w, height=$h,\
-		streaming from $stream\
-		at $config(video_fps)." verbose
+		rotation=$config(video_rotation),\
+		stream server $stream." verbose
 	set info(control) "Stream"
 	LWDAQ_update
 
+	# Define the ffmpeg command.
 	set cmd "| $info(ffmpeg) \
 		-nostdin \
 		-loglevel error \
 		-i $stream \
 		-c:v rawvideo \
-		-pix_fmt rgb24 \
-		-vf \"scale=$w\:$h\" \
+		-pix_fmt $config(video_pix_fmt) \
+		-vf \"$vf\" \
 		-f image2pipe -"
 
+	# Open the channel to ffmpeg and start streaming.
 	set ch [open $cmd r+]
 	set chpid [pid $ch]
 	set info(display_channel) $ch
 	set info(display_process) $chpid
-	Videoplayer_print "Opened channel $ch to ffmpeg, reading $stream." verbose
+	Videoplayer_print "Opened channel $ch to ffmpeg, process $chpid,\
+		connecting to $stream." verbose
 	chan configure $ch -translation binary -blocking 0
 
-	set stream_pointer 0
-	set stream_data ""
+	# Set monitor variables.
 	set info(frame_count) 0
 	set start_time [clock milliseconds]
 	set timeout 0
+	if {$config(display_scale) >= 1.0} {
+		set zoom $config(display_scale)
+	} else {
+		set zoom 1.0
+	}
+	set raw_size [expr round( $config(video_pix_size) * $w * $h)]
+	set data_size 0
 	
+	# Read the frames as they come in, watch for a timeout.
 	while {$info(control) != "Stop"} {	
-		append stream_data [chan read $ch]
-		set data [Videoplayer_raw_extract]
-		if {$data != ""} {
-			incr info(frame_count)
+		append data [chan read $ch [expr $raw_size - $data_size]]
+		set data_size [string length $data]
+		if {$data_size >= $raw_size} {
 			lwdaq_draw_raw $data $info(display_photo) \
-				-width $w -height $h -pix_fmt rgb24
+				-width $w -height $h -pix_fmt rgb24 -zoom $zoom
+			incr info(frame_count)
+			set timeout 0
+			set data ""
 			LWDAQ_update
 		}
 		LWDAQ_wait_ms 1
-		incr timeout
 		LWDAQ_support
+		incr timeout
 		if {$timeout > $config(stream_timeout_ms)} {
 			Videoplayer_print "ERROR: Timeout waiting for frame $info(frame_count),\
 				waited over $config(stream_timeout_ms) ms."
@@ -649,9 +721,13 @@ proc Videoplayer_stream {{post "0"}} {
 		}
 	}
 	
-	close $ch
-	Videoplayer_print "Done with video, closed channel $ch." verbose
+	# Close the channel and make sure the ffmpeg process is killed.
+	catch {close $ch}
+	LWDAQ_process_stop $chpid
 	
+	# Report on outcome of the streaming if the verbose flag is set.
+	Videoplayer_print "Video streaming halted, closed channel $ch,\
+		stopped process $chpid." verbose
 	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_fps)]]
 	set display_s [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]
 	Videoplayer_print "Received $info(frame_count) frames\
@@ -660,6 +736,11 @@ proc Videoplayer_stream {{post "0"}} {
 	return ""
 }
 
+#
+# Videoplayer_stop sets the Videoplayer control flag to Stop. Continuous
+# Videoplayer processes should check the control flag and abort when they see
+# Stop, then set the flag to Idle.
+#
 proc Videoplayer_stop {} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
@@ -670,219 +751,66 @@ proc Videoplayer_stop {} {
 }
 
 #
-# Videoplayer_seek looks for an entire video interval within a single
-# video file in the video directory. The routine returns the name of the video
-# file containing the entire interval (vf), the video time at which the interval
-# begins (vseek), the length of video in the file (vlen), and the length of
-# video we expect the file to contain given the timestamp in the name of the
-# next file in the video directory (clen). If further returns the width, height
-# and framerate of the video. When choosing the video time, the routine assumes
-# that the start of the video always corresponds to the absolute time specified
-# in the video file name. The routine uses a cache of recently-used video
-# files to save time when searching for the correct file, because the search
-# requires that we get the length of the video calculated by ffmpeg, and this
-# calculation is time-consuming. If the video is not in the cache, we use the
-# video directory as a source of video files.
-# 
-proc Videoplayer_seek {datetime length} {
+# Videoplayer_setup allows us to set the video width, height, framerate, and
+# rotation with a routine that will post itself to the event queue so that these
+# values will be applied once the current video playback action has completed.
+# The routine takes options -width, -height, -fps, and -length_s for this
+# purpose. We also allow -framerate to specify the framerate and -duration to
+# specify the length of a video file in seconds. The -post option says that the
+# routine should be posted to the event queue, and must always be specified and
+# always come first.
+#
+proc Videoplayer_setup {post args} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
-	# Check to see if ffmpeg and mplayer are available. If not, we suggest
-	# downloading the Videoarchiver package and go to idle state.
-	if {![file exists $info(ffmpeg)] || ![file exists $info(mplayer)]} {
-		return "none 0 0 0 0 0 0"
-	}
-
-	# Look in our video file cache to see if the start and end of the 
-	# requested interval is contained in a video we have already read
-	# from the video directory and assessed previously.
-	set vf ""
-	foreach entry $info(video_file_cache) {
-		scan $entry %s%d%f%f%d%d%f fn vtime vlen clen width height fps
-		if {($vtime <= $datetime) && ($vtime + $clen >= $datetime + $length)} {
-			set vf $fn
-			break
-		}
-	}
-
-	if {$vf != ""} {
-		Videoplayer_print "Using cached video file $vf." verbose
+	if {$post} {
+		LWDAQ_post "$Videoplayer_setup 0 $args"
+		return ""
 	}
 	
-	# If we have not found a file that includes the start of the requested
-	# interval, look for one in the file system.
-	if {$vf == ""} {
-	
-		# Make a list of video files in the camera directory and sort them
-		# in chronological order.
-		set fl [LWDAQ_find_files $config(video_dir) V??????????.mp4]
-		set fl [LWDAQ_sort_files $fl]
-	
-		# Find the newest file that begins before or at the start of our
-		# interval. Determine the start time of the next file in the list.
-		set vtime 0
-		set ntime 0
-		foreach fn $fl {
-			if {[regexp {([0-9]{10})\.mp4$} [file tail $fn] match newtime]} {
-				if {($newtime <= $datetime)} {
-					set vf $fn
-					set vtime $newtime
-				} else {
-					set ntime $newtime
-					break
+	foreach {option value} $args {
+		switch $option {
+			"-width" {
+				set config(video_width) $value
+			}
+			"-height" {
+				set config(video_height) $value
+			}
+			"-rotation" {
+				set config(video_rotation) $value
+			}
+			"-fps" {
+				set config(video_fps) $value
+			}
+			"-framerate" {
+				set config(video_fps) $value
+			}
+			"-length_s" {
+				set config(video_duration) $value
+			}
+			"-duration" {
+				set config(video_duration) $value
+			}
+			"-start" {
+				set config(display_start_s) $value
+			}
+			"-end" {
+				set config(display_end_s) $value
+			}
+			"-title" {
+				switch $info(mode) {
+					"Standalone" {wm title . $value} 
+					"Slave" {wm title . $value} 
+					default {wm title $info(window) $value}
 				}
 			}
+			default {
+				puts "WARNING: Unknown option \"$option\"."
+			}
 		}
-		
-		# If we still have no file return null values.
-		if {$vf == ""} {
-			return "none 0 0 0 0 0 0"
-		}
-
-		# Calculate the actual video file length.
-		set vfi [Videoplayer_info $vf]
-		scan $vfi %d%d%f%f width height fps vlen
-
-		# Calculate the length of time between the start of this video file and
-		# the start of the next video file, if one exists. We call this length
-		# the "correct length" of the video. If there is no subsequent file, set
-		# set the correct length equal to the duration, rounded to the nearest
-		# second.
-		if {$ntime > 0} {
-			set clen [expr round($ntime - $vtime)]
-		} {
-			set clen [expr round($vlen)]
-		}
-		
-		# Add the video to our cache.
-		lappend info(video_file_cache) "$vf $vtime $vlen $clen $width $height $fps"
-		if {[llength $info(video_file_cache)] > $info(max_files)} {
-			set info(video_file_cache) [lrange $info(video_file_cache) 10 end]
-		}
-		Videoplayer_print "Added $vf to video cache." verbose
-		
-		# Check that the video file's correct length includes the interval start. If 
-		# not, we return a null result.
-		if {$vtime + $clen - $datetime < 0} {return "none 0 0 0 0 0 0"}
 	}
-
-	# We calculate the time within the video recording that corresponds to the 
-	# sought-after moment in the signal recording. 
-	set vseek [expr $datetime - $vtime]
-	if {$vseek < 0.0} {set vseek 0.0}
-	
-	# Return the file name, seek position, and file length.
-	return "$vf $vseek $vlen $clen $width $height $fps"
-}
-
-#
-# Videoplayer_seek_play first seeks for the interval in one of the video files
-# in the video directory tree. When it finds the interval it displays plays the
-# interval. We specify the absolute time as a whole number of Unix seconds. We
-# specify the length of the interval in seconds. 
-#
-proc Videoplayer_seek_play {datetime length} {
-	upvar #0 Videoplayer_config config
-	upvar #0 Videoplayer_info info
-	
-	# Check to see if ffmpeg and mplayer are available. If not, we suggest
-	# downloading the Videoarchiver package and go to idle state.
-	if {![file exists $info(ffmpeg)] || ![file exists $info(mplayer)]} {
-		Videoplayer_suggest
-		set info(video_state) "Idle"
-		return ""
-	}
-
-	# Seek the interval in the video directory.
-	set result [Videoplayer_seek $datetime $length]
-
-	# Extract the file name, seek time, length of the video existing in the
-	# file and the correct length of the file, which is the length of video that
-	# fills the time between the start of this file and the next file in the
-	# recording directory, if it exists.
-	scan $result %s%f%f%f%d%d%f vf vseek vlen clen width height fps
-	
-	# If we have no file containing the interval start, give up.
-	if {$vf == "none"} {
-		Videoplayer_print "ERROR: No video file contains interval start."
-		set info(video_state) "Idle"
-		return ""
-	}
-	
-	# If the end of the interval does not lie within the file, issue a warning.
-	set missing [expr $vseek + $length - $clen]
-	if {$missing > 0} {
-		Videoplayer_print "WARNING: Video file missing last $missing s\
-			of interval."
-	}
-		
-	# If no video player window is open, we create a new one. If we
-	# are loading a new video file, destroy the old process and create
-	# a new one. This avoids problems we don't understand developing in
-	# the Mplayer process.
-	set new_process 0
-	if {![LWDAQ_process_exists $info(video_process)] \
-		|| [catch {puts $info(video_channel) ""}] \
-		|| ([file tail $vf] != [file tail $info(video_file)])} {
-		
-		# Make sure the old video process is destroyed.
-		LWDAQ_process_stop $info(video_process)
-		catch {close $info(video_channel)}
-		
-		# Create MPlayer window with channel to write in commands and
-		# read back answers. For a camera identifier, we are going to 
-		# use the video directory tail.
-		set camera_id [file tail $config(video_dir)]
-		if {[winfo parent $info(window)] == ""} {
-			set title "Camera $camera_id in [wm title .]"
-		} {
-			set title "Camera $camera_id in [wm title [winfo parent $info(window)]]"
-		}
-		set info(video_channel) [open "| $info(mplayer) \
-			-title \"$title\" \
-			-geometry 10%:10% -slave -idle -quiet -fixed-vo \
-			-zoom -xy $config(video_zoom)" w+]
-		fconfigure $info(video_channel) -buffering line -translation auto -blocking 0
-		set info(video_process) [pid $info(video_channel)]
-		
-		# Set the video file, delete the video log if it exists.
-		set info(video_file) $vf
-		catch {file delete $info(video_log)}
-		
-		# Load the video file without starting playback. We don't want to start at
-		# the beginning if we are seeking a later time in the file.
-		puts $info(video_channel) "pausing loadfile \"$vf\" 0"
-		
-		# Disable the progress bar and other Mplayer overlays.
-		puts $info(video_channel) "pausing osd 0"
-
-		# Start up the watchdog for this MPlayer process.
-		LWDAQ_post [list Videoplayer_watchdog $info(video_process)]
-	}
-
-	# Set the end time of the video and the stop time. The stop time is one
-	# half-frame before the end time, so we don't play the first frame of the
-	# next interval.
-	set info(video_end_time) [format %.3f $vlen]
-	set info(video_stop_time) [format %.3f \
-		[expr $vseek + $length - 1.0/$fps]]
-	if {$info(video_stop_time) > $info(video_end_time)} {
-		set info(video_stop_time) $info(video_end_time)
-	}
-
-	# Set the playback speed and seek the interval start.
-	puts $info(video_channel) "pausing speed_set $config(video_speed)"
-	puts $info(video_channel) "seek $vseek 2"
-	
-	# Set the video state to play and report the seek time.
-	Videoplayer_print "Playing $vf for $length s\
-		starting at $vseek s of $vlen s." verbose
-	LWDAQ_set_bg $info(control_label) cyan
-	set info(video_state) "Play"
-	
-	# Return the file name, seek time, file duration, and correct length.
-	return [list $vf $vseek $vlen $clen]
+	return ""
 }
 
 #
@@ -909,6 +837,10 @@ proc Videoplayer_open {} {
 	label $f.display -image $info(display_photo)
 	pack $f.display -side top
 
+	# If we are running in slave mode, we stop here: we want only a video display
+	# window.
+	if {$info(mode) == "Slave"} {return $w}
+	
 	set f $w.controls
 	frame $f -relief groove -border 2
 	pack $f -side top -fill x
@@ -918,24 +850,19 @@ proc Videoplayer_open {} {
 	pack $f.ctrl -side left -expand yes
 
 	button $f.play -text "Play" -command {
-		Videoplayer_play $Videoplayer_config(display_start_s) \
-			$Videoplayer_config(display_end_s)
+		Videoplayer_play $Videoplayer_config(video_file) \
+			$Videoplayer_config(display_start_s) \
+			$Videoplayer_config(display_end_s) 1
 	}
 	pack $f.play -side left -expand yes
 
-	button $f.stream -text "Stream" -command {Videoplayer_stream}
+	button $f.stream -text "Stream" -command {
+		Videoplayer_stream $Videoplayer_config(video_stream) 1
+	}
 	pack $f.stream -side left -expand yes
 
-	button $f.stop -text "Stop" -command {
-		Videoplayer_stop
-	}
+	button $f.stop -text "Stop" -command {Videoplayer_stop}
 	pack $f.stop -side left -expand yes
-
-	foreach a {PickVid PickDir} {
-		set b [string tolower $a]
-		button $f.$b -text "$a" -command "LWDAQ_post Videoplayer_$b"
-		pack $f.$b -side left -expand yes
-	}
 
 	button $f.config -text "Configure" -command "Videoplayer_configure"
 	pack $f.config -side left -expand yes
@@ -950,7 +877,7 @@ proc Videoplayer_open {} {
 	frame $f -relief groove -border 2
 	pack $f -side top -fill x
 	
-	foreach a {width height fps length_s length_f} {
+	foreach a {width height rotation fps length_s length_f} {
 		label $f.l$a -text "$a"
 		entry $f.e$a -textvariable Videoplayer_config(video_$a) -width 5
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -962,10 +889,18 @@ proc Videoplayer_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	set f $w.actions
+	set f $w.vf
 	frame $f -relief groove -bd 1
 	pack $f -side top -fill x
 	
+	label $f.lfn -text "File:"
+	entry $f.efn -textvariable Videoplayer_config(video_file) -width 60
+	button $f.pick -text "PickFile" -command "LWDAQ_post Videoplayer_pickfile"
+	pack $f.lfn $f.efn $f.pick -side left -expand yes
+	label $f.lvs -text "Stream:"
+	entry $f.evs -textvariable Videoplayer_config(video_stream) -width 20
+	pack $f.lvs $f.evs -side left -expand yes
+
 	set info(text) [LWDAQ_text_widget $w 100 10 1 1]
 	
 	LWDAQ_print $info(text) "WARNING: This tool is in active development, 09-MAR-23."
