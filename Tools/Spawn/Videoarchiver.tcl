@@ -1174,11 +1174,19 @@ proc Videoarchiver_live {n} {
 	set info(cam$n\_vchan) $ch
 	set info(cam$n\_vpid) [pid $ch]
 	fconfigure $ch -translation auto -buffering line -blocking 0
-	puts $ch {LWDAQ_run_tool Videoplayer.tcl Slave}
+	puts $ch "cd [Videoarchiver_segdir $n]"
+	puts $ch "LWDAQ_run_tool Videoplayer.tcl Slave"
 	puts $ch "videoplayer stream -stream tcp://$ip:$info(tcp_port) \
 		-width $width -height $height -rotation $info(cam$n\_rot) \
 		-scale $config(display_zoom)\
 		-title \"Live View From $info(cam$n\_id) $ip\""
+	while {[gets $ch message] > 0} {
+		if {[LWDAQ_is_error_result $line]} {
+			LWDAQ_print $info(text) "$message"
+		}
+		Videoarchiver_stop $n
+		return ""
+	}
 			
 	# We start the live video watchdog process that looks to see if the 
 	# videoplayer process has been stopped by a user closing its window. 
@@ -1319,6 +1327,7 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 		set info(cam$n\_vchan) $ch
 		set info(cam$n\_vpid) [pid $info(cam$n\_vchan)]
 		set info(monitor_start) [clock seconds]
+		puts $ch "cd [Videoarchiver_segdir $n]"
 		puts $ch {LWDAQ_run_tool Videoplayer.tcl Slave}
 		puts $ch "videoplayer setup \
 			-title \"Recording View From $info(cam$n\_id) $ip\" \
@@ -1327,6 +1336,12 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 			-width $width -height $height \
 			-framerate $framerate \
 			-nocomplain 1"
+		while {[gets $ch message] > 0} {
+			if {[LWDAQ_is_error_result $line]} {
+				LWDAQ_print $info(text) "$message"
+			}
+			return ""
+		}
 	} elseif {$command == "Stop"} {
 		if {$info(cam$n\_vchan) != "none"} {
 			catch {puts $info(cam$n\_vchan) "videoplayer stop"}
@@ -1701,7 +1716,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 			if {[LWDAQ_is_error_result $result] \
 					|| ($result == "") \
 					|| [regexp {defunct} $result]} {
-				error "camera stalled"
+				error "Camera stalled"
 			}
 		
 			# Get a list of segments that are available for download on the camera. 
@@ -1885,8 +1900,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 				if {$info(cam$n\_vchan) != "none"} {
 					set when "loading monitor"
 					foreach sf $seg_list {
-						Videoarchiver_monitor $n Add \
-							[file join [Videoarchiver_segdir $n] $sf]
+						Videoarchiver_monitor $n Add $sf
 					}
 					if {$config(verbose)} {
 						regexp {V([0-9]{10})} [lindex $seg_list 0] match tfirst

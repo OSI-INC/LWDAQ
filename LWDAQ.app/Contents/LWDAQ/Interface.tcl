@@ -1059,16 +1059,16 @@ proc LWDAQ_monitor_open {} {
 	
 	frame $w.current
 	pack $w.current
-	LWDAQ_text_widget $w.current 90 2 0
+	LWDAQ_text_widget $w.current 90 2 0 0
 	frame $w.queue
 	pack $w.queue
-	LWDAQ_text_widget $w.queue 90 8 0
+	LWDAQ_text_widget $w.queue 90 8 0 0
 	frame $w.vwaits
 	pack $w.vwaits
-	LWDAQ_text_widget $w.vwaits 90 4 0
+	LWDAQ_text_widget $w.vwaits 90 4 0 0
 	frame $w.sockets
 	pack $w.sockets
-	LWDAQ_text_widget $w.sockets 90 6 0
+	LWDAQ_text_widget $w.sockets 90 6 0 0
 		
 	after $LWDAQ_Info(monitor_ms) LWDAQ_monitor_refresh
 	return ""
@@ -1147,7 +1147,7 @@ proc LWDAQ_monitor_refresh {} {
 	$t delete 1.0 end
 	LWDAQ_print $t "Event Queue:" blue
 	foreach event $LWDAQ_Info(queue_events) {
-		LWDAQ_print $t [string range $event 0 100]
+		LWDAQ_print $t [string range $event 0 200]
 	}
 	
 	set t $w.vwaits.text	

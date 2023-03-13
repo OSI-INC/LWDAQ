@@ -888,9 +888,8 @@ proc Videoplayer_open {} {
 	# an exit command when someone closes the main window
 	if {($info(mode) == "Slave") || ($info(mode) == "Standalone")} {
 		wm protocol . WM_DELETE_WINDOW {
-			LWDAQ_process_stop $Videoplayer_info(display_process)
-			catch {close $Videoplayer_info(display_channel)}
-			destroy .
+			Videoplayer_stop
+			LWDAQ_post exit
 		}
 	}	
 		
