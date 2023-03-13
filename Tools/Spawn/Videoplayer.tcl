@@ -82,6 +82,7 @@ proc Videoplayer_init {} {
 #
 # Display properties.
 #
+	set info(init_size) "200"
 	set config(display_start_s) "0"
 	set config(display_end_s) "*"
 	set config(display_speed) "1.0"
@@ -90,8 +91,9 @@ proc Videoplayer_init {} {
 	set info(frame_count) "0"
 	set info(display_process) "0"
 	set info(display_channel) "none"
-	set config(display_timeout_ms) "1000"
-	set config(stream_timeout_ms) "5000"
+	set config(file_timeout_ms) "1000"
+	set config(tcp_timeout_ms) "5000"
+	set config(read_nocomplain) "0"
 #
 # Graphical user display configuration.
 #
@@ -204,19 +206,19 @@ proc Videoplayer_print {line {color "black"}} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
-	if {$config(verbose) \
-		|| [regexp "^WARNING: " $line] \
-		|| [regexp "^ERROR: " $line] \
-		|| ($color != "verbose")} {
-		if {$color == "verbose"} {
-			if {!$config(slave)} {
+	if {$info(mode) == "Slave"} {
+		if {$color != "verbose"} {
+			catch {puts $line}
+		}
+	} else {
+		if {$config(verbose) \
+				|| [regexp "^WARNING: " $line] \
+				|| [regexp "^ERROR: " $line] \
+				|| ($color != "verbose")} {
+			if {$color == "verbose"} {
 				LWDAQ_print $info(text) $line black
-			}
-		} else {
-			if {!$config(slave)} {
-				LWDAQ_print $info(text) $line $color
 			} else {
-				puts $line
+				LWDAQ_print $info(text) $line $color
 			}
 		}
 	}
@@ -395,7 +397,9 @@ proc Videoplayer_play {} {
 	
 	# Consistency checks.
 	if {![file exists $fn]} {
-		Videoplayer_print "ERROR: File \"$fn\" does not exist."
+		if {!$config(read_nocomplain)} {
+			Videoplayer_print "ERROR: File \"$fn\" does not exist."
+		}
 		return ""
 	}
 	if {![string is double -strict $start]} {
@@ -551,9 +555,11 @@ proc Videoplayer_play {} {
 		LWDAQ_wait_ms 1
 		incr timeout
 		LWDAQ_support
-		if {$timeout > $config(display_timeout_ms)} {
-			Videoplayer_print "ERROR: Timeout waiting for frame $info(frame_count),\
-				waited over $config(display_timeout_ms) ms."
+		if {$timeout > $config(file_timeout_ms)} {
+			Videoplayer_print "ERROR: Timeout trying to read \"$fn\"." 
+			break
+		}
+		if {($num_frames > 0) && ($timeout > $frame_ms)} {
 			break
 		}
 	}
@@ -592,7 +598,7 @@ proc Videoplayer_play {} {
 # the raw video produced by ffmpeg and display it on the screen. If ffmpeg fails
 # to connect to the stream, or if the connection is subsequently broken or
 # corrupted, we break out of the streaming loop with a timeout after
-# stream_timeout_ms. 
+# tcp_timeout_ms. 
 #
 proc Videoplayer_stream {} {
 	upvar #0 Videoplayer_config config
@@ -705,9 +711,9 @@ proc Videoplayer_stream {} {
 		LWDAQ_wait_ms 1
 		LWDAQ_support
 		incr timeout
-		if {$timeout > $config(stream_timeout_ms)} {
-			Videoplayer_print "ERROR: Timeout waiting for frame $info(frame_count),\
-				waited over $config(stream_timeout_ms) ms."
+		if {$timeout > $config(tcp_timeout_ms)} {
+			Videoplayer_print "ERROR: Streaming failure,\
+				timeout waiting for frame $info(frame_count)."
 			break
 		}
 	}
@@ -790,6 +796,9 @@ proc Videoplayer_setup {args} {
 			"-end" {
 				set config(display_end_s) $value
 			}
+			"-tcp_timeout_ms" {
+				set config(display_tcp_timeout_ms) $value
+			}
 			"-title" {
 				switch $info(mode) {
 					"Standalone" {wm title . $value} 
@@ -797,8 +806,11 @@ proc Videoplayer_setup {args} {
 					default {wm title $info(window) $value}
 				}
 			}
+			"-nocomplain" {
+				set config(read_nocomplain) 1
+			}
 			default {
-				puts "WARNING: Unknown option \"$option\"."
+				Videoplayer_print "ERROR: Unknown option \"$option\"."
 			}
 		}
 	}
@@ -824,11 +836,14 @@ proc videoplayer {instruction args} {
 		}
 		"stream" {
 			LWDAQ_post "Videoplayer_setup $args"
-			LWDAQ_post "Videoplayer_stream $args"
+			LWDAQ_post "Videoplayer_stream"
 		}
 		"pickfile" {
 			LWDAQ_post "Videoplayer_setup $args"
 			LWDAQ_post "Videoplayer_pickfile"
+		}
+		"setup" {
+			eval "Videoplayer_setup $args"
 		}
 		default {
 			Videoplayer_print "ERROR: Unrecognised instruction \"$instruction\".
@@ -857,13 +872,27 @@ proc Videoplayer_open {} {
 	frame $f -relief groove -border 2
 	pack $f -side top -fill x
 	
-	image create photo $info(display_photo) -width 600 -height 200
+	# Make the image where we will display video.
+	image create photo $info(display_photo) \
+		-width $info(init_size) -height $info(init_size) 
 	label $f.display -image $info(display_photo)
 	pack $f.display -side top
 
-	# If we are running in slave mode, we stop here: we want only a video display
-	# window.
-	if {$info(mode) == "Slave"} {return $w}
+	# If we are running in slave or standalone mode, we make sure that we send
+	# an exit command when someone closes the main window
+	if {($info(mode) == "Slave") || ($info(mode) == "Standalone")} {
+		wm protocol . WM_DELETE_WINDOW {
+			LWDAQ_process_stop $Videoplayer_info(display_process)
+			catch {close $Videoplayer_info(display_channel)}
+			destroy .
+		}
+	}	
+		
+	# If we are running in slave mode, don't open any other widgets in the 
+	# user interface.
+	if {$info(mode) == "Slave"} {
+		return $w
+	}	
 	
 	set f $w.controls
 	frame $f -relief groove -border 2
@@ -873,16 +902,10 @@ proc Videoplayer_open {} {
 	set info(play_control_label) $f.ctrl
 	pack $f.ctrl -side left -expand yes
 
-	button $f.play -text "Play" -command {
-		Videoplayer_play $Videoplayer_config(video_file) \
-			$Videoplayer_config(display_start_s) \
-			$Videoplayer_config(display_end_s) 1
-	}
+	button $f.play -text "Play" -command {LWDAQ_post Videoplayer_play}
 	pack $f.play -side left -expand yes
 
-	button $f.stream -text "Stream" -command {
-		Videoplayer_stream $Videoplayer_config(video_stream) 1
-	}
+	button $f.stream -text "Stream" -command {LWDAQ_post Videoplayer_stream}
 	pack $f.stream -side left -expand yes
 
 	button $f.stop -text "Stop" -command {Videoplayer_stop}

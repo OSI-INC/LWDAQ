@@ -102,7 +102,7 @@ proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 	set $name\_mode $mode
 
 	# If we are running the tool as a standalone, we delete some menus.
-	if {$mode == "Standalone"} {
+	if {($mode == "Standalone") || ($mode == "Slave")} {
 		switch $LWDAQ_Info(os) {
 			"MacOS" {.menubar delete 1 2}
 			"Windows" {.menubar delete 3 4}

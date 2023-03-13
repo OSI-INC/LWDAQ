@@ -27,7 +27,10 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "30"
+	LWDAQ_tool_init "Videoarchiver" "31"
+	
+	# Set minimum camera compressor version.
+	set info(min_compressor_version) "31"
 
 	# If a graphical tool window already exists, we abort our initialization.
 	if {[winfo exists $info(window)]} {
@@ -49,28 +52,23 @@ proc Videoarchiver_init {} {
 	if {$info(os) == "Windows"} {
 		set info(ssh) [file join $info(os_dir) ssh/ssh.exe]	
 		set info(ffmpeg) [file join $info(os_dir) ffmpeg/bin/ffmpeg.exe]
-		set info(mplayer) [file join $info(os_dir) mplayer/mplayer.exe]
 	} elseif {$info(os) == "MacOS"} {
 		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) [file join $info(os_dir) ffmpeg]
-		set info(mplayer) [file join $info(os_dir) mplayer]
 	} elseif {$info(os) == "Linux"} {
 		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) [file join $info(os_dir) ffmpeg/ffmpeg]
-		set info(mplayer) [file join $info(os_dir) mplayer]
 	} elseif {$LWDAQ_Info(os) == "Raspbian"} {
 		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) "/usr/bin/ffmpeg"
-		set info(mplayer) "/usr/bin/mplayer"
 	} else {
 		Neuroplayer_print "WARNING: Videoarchive may not work on $LWDAQ_Info(os)."
 		set info(ssh) "/usr/bin/ssh"
 		set info(ffmpeg) "/usr/bin/ffmpeg"
-		set info(mplayer) "/usr/bin/mplayer"
 	}
 	
 	# The time we alloew for video streaming to start on the camera.
-	set info(pi_start_ms) "1000"
+	set info(pi_start_ms) "500"
 	
 	# The codec to use for compression on the Pi. The libx264 codec is provided
 	# by ffmpeg in compiled code that runs on the Pi microprocessor cores
@@ -186,10 +184,7 @@ echo "SUCCESS"
 	# Monitor parameters
 	set config(monitor_speed) "1.0"
 	set config(display_zoom) "1.0"
-	set info(monitor_process) "0"
-	set info(monitor_channel) "none"
-	set info(monitor_cam) "0"
-	set config(monitor_longevity) "30"
+	set config(monitor_longevity) "600"
 	set info(monitor_start) "0"
 	
 	# Lag thresholds and restart log.
@@ -353,20 +348,27 @@ proc Videoarchiver_camera_init {n} {
 		} else {
 			set info(cam$n\_ver) "A3034C1"
 		}
-		LWDAQ_print $info(text) "$info(cam$n\_id) is version [set info(cam$n\_ver)]."
+		LWDAQ_print $info(text) "$info(cam$n\_id)\
+			Camera is version [set info(cam$n\_ver)]."
 		
-		# We look for the manager.tcl file. If it's not present, the camera must
-		# be updated.
-		LWDAQ_socket_write $sock "getfile manager.tcl\n"
+		# We look at the compressor.config file. If it's not present, or if the version
+		# number it contains is obsolete, the camera must be updated.
+		LWDAQ_socket_write $sock "getfile compressor.config\n"
 		set size [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $size]} {
 			error $size
 		}		
 		if {$size == 0} {
-			error "Camera firmware incompatible with Videoarchiver $info(version);\
-				update with \"U\" button."
+			error "Camera software obsolete, update with \"U\" button."
 		}
-		set manager [LWDAQ_socket_read $sock $size]
+		set configuration [LWDAQ_socket_read $sock $size]
+		if {[regexp {version=([0-9]+)} $configuration match version]} {
+			if {$version < $info(min_compressor_version)} {
+				error "Camera software V$version obsolete, update with \"U\" button."
+			}
+		} else {
+			error "Corrupted camera software, update with \"U\" button."
+		}
 		
 		LWDAQ_socket_close $sock
 	} message]} {
@@ -460,7 +462,22 @@ proc Videoarchiver_query {n} {
 	
 	if {[catch {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
-			
+		
+		foreach cf {videoarchiver compressor} {
+			LWDAQ_socket_write $sock "getfile $cf\.config\n"
+			set size [LWDAQ_socket_read $sock line]
+			if {[LWDAQ_is_error_result $size]} {error $size}
+			set contents [string trim [LWDAQ_socket_read $sock $size]]
+			LWDAQ_print $t "Contents of $cf\.config\
+				on $info(cam$n\_id):" purple
+			if {$size > 0} {
+				LWDAQ_print $t $contents
+			} else {
+				LWDAQ_print $t "WARNING: Cannot find $cf\.config,\
+					firmware update required."
+			}
+		}
+
 		foreach log {interface stream segmentation manager compressor} {
 			set lfn "$log\_log.txt"
 			LWDAQ_socket_write $sock "getfile $lfn\n"
@@ -478,14 +495,6 @@ proc Videoarchiver_query {n} {
 			LWDAQ_update
 		}
 	
-		LWDAQ_socket_write $sock "getfile videoarchiver.config\n"
-		set size [LWDAQ_socket_read $sock line]
-		if {[LWDAQ_is_error_result $size]} {error $size}
-		set contents [string trim [LWDAQ_socket_read $sock $size]]
-		LWDAQ_print $t "Contents of videoarchiver.config\
-			on $info(cam$n\_id):" purple
-		if {$size > 0} {LWDAQ_print $t $contents}
-
 		LWDAQ_socket_write $sock "llength \[glob -nocomplain tmp/V*.mp4\]\n"
 		set len [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $len]} {error $len}
@@ -717,7 +726,7 @@ proc Videoarchiver_update {n} {
 			 $command]} message
 		if {![regexp "SUCCESS" $message]} {error $message}
 
-		# Wait for the streaming to start up, or else the mplayer process may find
+		# Wait for the streaming to start up, or else the videoplayer process may find
 		# no listening port and abort.
 		LWDAQ_wait_ms $info(pi_start_ms)
 	
@@ -732,7 +741,7 @@ proc Videoarchiver_update {n} {
 			catch {close $sock}
 			error "Failed to create test directory."
 		}
-		
+				
 		# Update files on the camera. For each file we provide a functional name and
 		# a file name.
 		foreach {sn fn} {manager manager.tcl \
@@ -754,6 +763,16 @@ proc Videoarchiver_update {n} {
 				catch {close $sock}
 				error "Failed to write $size bytes to $fn on $info(cam$n\_id)"
 			}
+		}
+		
+		# Write a new compressor configuration file.
+		set cc "version=$info(version)"
+		set size [string length $cc]
+		LWDAQ_socket_write $sock "putfile compressor.config $size\n$cc"
+		set result [LWDAQ_socket_read $sock line]
+		if {$result != $size} {
+			catch {close $sock}
+			error "Failed to write $size bytes to $fn on $info(cam$n\_id)"
 		}
 		
 		# Close the socket, the update is complete.
@@ -934,9 +953,9 @@ proc Videoarchiver_stream {n} {
 		error "No camera with list index $n."
 	}
 
-	# We move to the scratch directory because file names are simpler
-	# when calling mplayer and ffmpeg so we can use the same command line
-	# code for all operating systems.
+	# We move to the scratch directory because file names are simpler when
+	# calling ffmpeg so we can use the same command line code for all operating
+	# systems.
 	cd [Videoarchiver_segdir $n]
 	
 	# Obtain the height and width size of the image we want, and the frame rate.
@@ -952,12 +971,14 @@ proc Videoarchiver_stream {n} {
 	LWDAQ_update
 
 	# Determine the rotation we want from the camera. Some rotations we begin
-	# in the camera and complete during compression.
+	# in the camera and complete during compression. In some versions of the
+	# Videoarchiver, we perform no ration in the stream at all, but we leave
+	# this code in place for future versions.
 	switch $info(cam$n\_rot) {
 		0 {set rot 0}
 		90 {set rot 0}
-		180 {set rot 180}
-		270 {set rot 180}
+		180 {set rot 0}
+		270 {set rot 0}
 		default {set rot 0}
 	}
 
@@ -1003,7 +1024,7 @@ proc Videoarchiver_stream {n} {
 		if {[LWDAQ_is_error_result $result]} {
 			set message [regsub "ERROR: " $result ""]
 			error $message
-		}
+		} 
 		
 		# Close socket.
 		LWDAQ_socket_close $sock
@@ -1013,8 +1034,8 @@ proc Videoarchiver_stream {n} {
 		return ""
 	}
 
-	# Wait for the streaming to start up, or else the mplayer process may find
-	# no listening port and abort.
+	# Wait for the streaming to start up, or else the videoplayer process may
+	# find no listening port and abort.
 	LWDAQ_wait_ms $info(pi_start_ms)
 	
 	# Return success.
@@ -1099,6 +1120,7 @@ proc Videoarchiver_synchronize {n} {
 proc Videoarchiver_live {n} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
+	global LWDAQ_Info
 	
 	# Get IP address and open an interface socket.
 	set ip [Videoarchiver_ip $n]
@@ -1133,9 +1155,9 @@ proc Videoarchiver_live {n} {
 		return ""	
 	} 
 	
-	# We move to the scratch directory because file names are simpler
-	# when calling mplayer and ffmpeg so we can use the same command line
-	# code for all operating systems.
+	# We move to the scratch directory because file names are simpler when
+	# calling ffmpeg. We can use the same command line code for all operating
+	# systems.
 	cd [Videoarchiver_segdir $n]
 	
 	# Obtain the height and width size of the image we want, and the frame rate.
@@ -1144,34 +1166,21 @@ proc Videoarchiver_live {n} {
 	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
 		version width height framerate crf sl
 		
-	# Construct mplayer command.
-	set cmd [list $info(mplayer) \
-		-title "Live View From $info(cam$n\_id) $ip" \
-		-really-quiet \
-		-noconsolecontrols \
-		-demuxer lavf -cache 1000 \
-		-zoom -xy $config(display_zoom) \
-		-geometry 10%:10% \
-		-fps [expr 2*$framerate]]
-
-	# Determine the rotation command, if any.
-	switch $info(cam$n\_rot) {
-		90 {lappend cmd -vf rotate=1}
-		270 {lappend cmd -vf rotate=1}
-	}
-	
-	# Add stream source.
-	lappend cmd "ffmpeg://tcp://$ip:$info(tcp_port)"
-	
-	# Start the mplayer receiving the stream directly from the camera. We set 
-	# the frame to be higher than the actual frame rate, so the player displays
-	# every frame as it arrives, and catches up if it lags behind.
-	set info(cam$n\_lproc) [exec {*}$cmd >& live_log.txt &]
+	# Spawn a Videoplayer and use it to stream the incoming video.
 	LWDAQ_print $info(text) "$info(cam$n\_id) Starting live view,\
 		 this will take a few seconds..." $config(v_col)
-		
+	cd $LWDAQ_Info(program_dir)
+	set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
+	set info(cam$n\_vchan) $ch
+	set info(cam$n\_vpid) [pid $ch]
+	fconfigure $ch -translation auto -buffering line -blocking 0
+	puts $ch {LWDAQ_run_tool Videoplayer.tcl Slave}
+	puts $ch "videoplayer stream -stream tcp://$ip:$info(tcp_port) \
+		-width $width -height $height -rotation $info(cam$n\_rot) \
+		-scale $config(display_zoom)"
+			
 	# We start the live video watchdog process that looks to see if the 
-	# mplayer process has been stopped by a user closing its window. 
+	# videoplayer process has been stopped by a user closing its window. 
 	LWDAQ_post [list Videoarchiver_live_watchdog $n]
 	return ""
 }
@@ -1198,38 +1207,37 @@ proc Videoarchiver_live_watchdog {n} {
 	}
 
 	if {$info(cam$n\_state) != "Live"} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live watchdog." $config(v_col)
+		LWDAQ_print $info(text) "$info(cam$n\_id)\
+			Stopped live view watchdog." $config(v_col)
 		return ""
 	} elseif {$LWDAQ_Info(reset)} {
 		Videoarchiver_stop $n
 		return ""
-	} elseif {![LWDAQ_process_exists $info(cam$n\_lproc)]} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Live view has stopped running." \
+	} elseif {[catch {puts $info(cam$n\_vchan) ""}]} {
+		LWDAQ_print $info(text) "$info(cam$n\_id)\
+			Live view has stopped running, stopping watchdog." \
 			$config(v_col)
 		Videoarchiver_stop $n
 		return ""
 	} else {
-		if {rand()<0.1} {
-			if {[catch {
-				set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
-				LWDAQ_socket_write $sock "getfile stream_log.txt\n"
-				set size [LWDAQ_socket_read $sock line]
-				if {[LWDAQ_is_error_result $size]} {error $size}
-				set contents [LWDAQ_socket_read $sock $size]	
-				LWDAQ_socket_close $sock
-			} message]} {
-				LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
-				catch {LWDAQ_socket_close $sock}
-				return ""
+		catch {
+		
+			LWDAQ_socket_write $sock \
+				"exec ps -e | grep -e raspivid -e libcamera-vid \n"
+			set result [LWDAQ_socket_read $sock line]
+			if {[LWDAQ_is_error_result $result] \
+					|| ($result == "") \
+					|| [regexp {defunct} $result]} {
+				error "camera stalled"
 			}
-			if {[regexp "ERROR: (.+?)\n" $contents match message]} {
-				set message [string trim [regsub -all {\*} $message ""]]
-				LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
+		while {[gets $info(cam$n\_vchan) line] > 0} {
+			if {[LWDAQ_is_error_result $line]} {
+				LWDAQ_print $info(text) $line
 				LWDAQ_print $info(text) "SUGGESTION: $info(cam$n\_id)\
-					Try live view a few times, then try rebooting."
+					Reboot the camera and try again."
 				Videoarchiver_stop $n
 				return ""
-			} 
+			}
 		}
 		LWDAQ_post [list Videoarchiver_live_watchdog $n]
 		return ""
@@ -1238,11 +1246,13 @@ proc Videoarchiver_live_watchdog {n} {
 
 #
 # Videoarchiver_monitor manages the video monitor that gives a delayed view of 
-# recorded video. We allow only one video stream to be monitored at a time.
+# recorded video. We allow only one video stream to be monitored at a time. We
+# have an optional file name for the Add instruction.
 #
-proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
+proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
+	global LWDAQ_Info
 
 	# Get IP address and open an interface socket.
 	set ip [Videoarchiver_ip $n]
@@ -1253,52 +1263,65 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 		return ""
 	}
 
-	# Check the state of the camera.
+	# Start a new monitor window. 
 	if {$command == "Start"} {
-		if {[LWDAQ_process_exists $info(monitor_process)]} {
-			if {$info(monitor_cam) == $n} {
-				LWDAQ_print $info(text) "$info(cam$n\_id)\
-					Restarting recording view." $config(v_col)
-			} {
-				LWDAQ_print $info(text) "$info(cam$info(monitor_cam)\_id)\
-					Stopping recording view: only one recording may be\
-					viewed at a time." $config(v_col)			
-			}
-		}
-		LWDAQ_process_stop $info(monitor_process)
-		catch {close $info(monitor_channel)}
-		set info(monitor_channel) "none"
-		set info(monitor_cam) "0"
+
+		# Check we are recording.
 		if {$info(cam$n\_state) != "Record"} {
 			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot start recording\
 				view during \"$info(cam$n\_state)\"."
 			return ""
 		}
-		set info(monitor_cam) $n
-		set info(monitor_channel) [open "| $info(mplayer) \
-			-title \"Recording View From $info(cam$n\_id) $ip\" \
-			-slave -demuxer lavf -idle -really-quiet \
-			-fixed-vo -zoom -xy $config(display_zoom) -geometry 10%:10% \
-			>& monitor_log.txt" w]
-		fconfigure $info(monitor_channel) -translation auto -buffering line
-		set info(monitor_process) [pid $info(monitor_channel)]
-		puts $info(monitor_channel) "vo_ontop 0"
-		puts $info(monitor_channel) "speed_set $config(monitor_speed)"		
-		LWDAQ_print $info(text) "$info(cam$n\_id) Started recording view,\
-			expect delay of five seconds, will close itself in\
-			$config(monitor_longevity) s." $config(v_col)
-		set info(monitor_start) [clock seconds]
-	} elseif {$command == "Stop"} {
-		if {[LWDAQ_process_exists $info(monitor_process)] \
-			&& ($info(monitor_cam) == $n)} {
+
+		# Check the state of the camera.
+		if {$info(cam$n\_vchan) != "none"} {
+			catch {puts $info(cam$n\_vchan) "videoplayer stop"}
+			catch {puts $info(cam$n\_vchan) "exit"}
+			catch {close $info(cam$n\_vchan)}
+			LWDAQ_process_stop $info(cam$n\_vpid)
 			LWDAQ_print $info(text) "$info(cam$n\_id)\
-				Stopping recording view." $config(v_col)
+				Stopped pre-existing monitor view, starting another." $config(v_col)
 		}
-		LWDAQ_process_stop $info(monitor_process)
-		catch {close $info(monitor_channel)}
-		set info(monitor_channel) "none"
-		set info(monitor_cam) "0"
-	} elseif {$command == "Write"} {
+		
+		# Obtain the height and width size of the image we want, and the frame rate.
+		set sensor_index [lsearch $config(versions) "$info(cam$n\_ver)*"]
+		if {$sensor_index < 0} {set sensor_index 0}
+		scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
+			version width height framerate crf sl
+		
+		# Spawn and configure a Videoplayer and use it to stream the incoming
+		# video. We tell it not to complain if a video file does not exist when
+		# it tries to play the file. We can set the speed slightly higher than
+		# normal so the view will catch up with recording. We allow for scaling
+		# of the view, and we tell the viewer the correct dimensions of the
+		# video and its framerate.
+		LWDAQ_print $info(text) "$info(cam$n\_id) Starting recording view." $config(v_col)
+		cd $LWDAQ_Info(program_dir)
+		set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
+		fconfigure $ch -translation auto -buffering line -blocking 0
+		set info(cam$n\_vchan) $ch
+		set info(cam$n\_vpid) [pid $info(cam$n\_vchan)]
+		set info(monitor_start) [clock seconds]
+		puts $ch {LWDAQ_run_tool Videoplayer.tcl Slave}
+		puts $ch "videoplayer setup \
+			-title \"Recording View From $info(cam$n\_id) $ip\" \
+			-speed $config(monitor_speed) \
+			-scale $config(display_zoom) \
+			-width $width -height $height \
+			-framerate $framerate \
+			-nocomplain 1"
+	} elseif {$command == "Stop"} {
+		if {$info(cam$n\_vchan) != "none"} {
+			catch {puts $info(cam$n\_vchan) "videoplayer stop"}
+			catch {puts $info(cam$n\_vchan) "exit"}
+			catch {close $info(cam$n\_vchan)}
+			LWDAQ_process_stop $info(cam$n\_vpid)
+			LWDAQ_print $info(text) "$info(cam$n\_id)\
+				Stopped monitor view." $config(v_col)
+		}
+		set info(cam$n\_vchan) "none"
+		set info(cam$n\_vpid) "0"
+	} elseif {$command == "Add"} {
 		if {[clock seconds] - $info(monitor_start) > $config(monitor_longevity)} {
 			LWDAQ_print $info(text) "Closing recording view automatically after\
 				$config(monitor_longevity) s." $config(v_col)
@@ -1306,14 +1329,17 @@ proc Videoarchiver_monitor {n {command "Start"} {line ""}} {
 			return "" 
 		}
 		if {[catch {
-			puts $info(monitor_channel) $line
+			while {[gets $info(cam$n\_vchan) result] > 0} {
+				LWDAQ_print $info(text) $result orange
+			}
+			if {$fn != ""} {
+				puts $info(cam$n\_vchan) "videoplayer play -file $fn -start 0 -end *"
+			}
 		} message]} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Recording view has stopped." \
+			LWDAQ_print $info(text) "$info(cam$n\_id) Recording view has been closed." \
 				$config(v_col)
-			LWDAQ_process_stop $info(monitor_process)
-			catch {close $info(monitor_channel)}
-			set info(monitor_channel) "none"
-			set info(monitor_cam) "0"
+			LWDAQ_post [list Videoarchiver_monitor $n "Stop"]
+			return "" 
 		}		
 	} else {
 		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Unknown recording view\
@@ -1345,14 +1371,6 @@ proc Videoarchiver_compress {n} {
 	scan [lindex $config(versions) $sensor_index] %s%d%d%d%d%d \
 		version width height framerate crf sl
 	
-	# Determine if the compressors should rotate the images by ninety 
-	# degrees.
-	set rotation 0
-	switch $info(cam$n\_rot) {
-		90 {set rotation 90}
-		270 {set rotation 90}
-	}
-				
 	if {[catch {
 		# Open a socket to the interface.
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
@@ -1365,7 +1383,7 @@ proc Videoarchiver_compress {n} {
 			-crf $crf \
 			-preset veryfast \
 			-verbose $config(verbose_compressors) \
-			-rotation $rotation \
+			-rotation $info(cam$n\_rot) \
 			-processes $config(compression_num_cpu) \
 			>& manager_log.txt & \n"
 		set result [LWDAQ_socket_read $sock line]
@@ -1645,8 +1663,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 	}
 
 	# We move to the scratch directory because file names are simpler when
-	# calling mplayer and ffmpeg so we can use the same command line code for
-	# all operating systems.
+	# calling ffmpeg. We can use the same command line code for all operating
+	# systems.
 	cd [Videoarchiver_segdir $n]
 	
 	# If recording has been stopped, we don't want to try to contact the camera
@@ -1654,38 +1672,28 @@ proc Videoarchiver_transfer {n {init 0}} {
 	# the downloading and transfer all remaining segments, then stop.
 	if {$info(cam$n\_state) == "Record"} {
 	
-		# Occasionally, we read the streaming log file and check that
-		# the video stream is active.
-		if {rand()<0.1} {
-			set when "checking streaming"
-			if {[catch {
-				set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
-				LWDAQ_socket_write $sock "getfile stream_log.txt\n"
-				set size [LWDAQ_socket_read $sock line]
-				if {[LWDAQ_is_error_result $size]} {error $size}
-				set contents [LWDAQ_socket_read $sock $size]	
-				LWDAQ_socket_close $sock
-				if {[regexp "ERROR: (.+?)\n" $contents match message]} {
-					set message [string trim [regsub -all {\*} $message ""]]
-					error "$message"
-				} 
-			} message]} {
-				set error_description "ERROR: $message while $when for $info(cam$n\_id)."
-				LWDAQ_print $info(text) $error_description
-				LWDAQ_print $config(restart_log) $error_description
-				catch {LWDAQ_socket_close $sock}
-				LWDAQ_post [list Videoarchiver_restart_recording $n]
-				return ""
-			}
-		}
-		
-		# Get a list of segments that are available for download on the camera. 
-		set when "fetching segment list"
 		if {[catch {
+			# Open a socket to the interface on the camera.
 			set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
+
+			# Check that the video is still streaming.
+			set when "checking streaming"
+			LWDAQ_socket_write $sock \
+				"exec ps -e | grep -e raspivid -e libcamera-vid \n"
+			set result [LWDAQ_socket_read $sock line]
+			if {[LWDAQ_is_error_result $result] \
+					|| ($result == "") \
+					|| [regexp {defunct} $result]} {
+				error "camera stalled"
+			}
+		
+			# Get a list of segments that are available for download on the camera. 
+			set when "fetching segment list"
 			LWDAQ_socket_write $sock "glob -nocomplain tmp/V*.mp4\n"
 			set seg_list [LWDAQ_socket_read $sock line]
 			set seg_list [regsub -all {tmp/} $seg_list ""]
+
+			# Close the socket.
 			LWDAQ_socket_close $sock
 		} message]} {
 			set error_description "ERROR: $message while $when for $info(cam$n\_id)."
@@ -1695,7 +1703,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 			LWDAQ_post [list Videoarchiver_restart_recording $n]
 			return ""
 		}
-		
+				
 		# If there are one or more segments available, download up to
 		# transfer_max_files of them from the camera, save to the local segment
 		# directory, and delete from the camera.
@@ -1856,11 +1864,13 @@ proc Videoarchiver_transfer {n {init 0}} {
 				LWDAQ_socket_close $sock
 
 				# If the recording monitor is running for this channel, load the
-				# new segments into the monitor
-				if {($info(monitor_cam) == $n) && ($info(monitor_channel) != "none")} {
+				# new segments into the monitor. We specify 
+				if {$info(cam$n\_vchan) != "none"} {
 					set when "loading monitor"
-					foreach sf $seg_list {Videoarchiver_monitor $n Write \
-						"loadfile [file join [Videoarchiver_segdir $n] $sf] 1"}
+					foreach sf $seg_list {
+						Videoarchiver_monitor $n Add \
+							[file join [Videoarchiver_segdir $n] $sf]
+					}
 					if {$config(verbose)} {
 						regexp {V([0-9]{10})} [lindex $seg_list 0] match tfirst
 						set tnow [clock seconds]
@@ -2112,22 +2122,22 @@ proc Videoarchiver_stop {n} {
  	if {![winfo exists $info(window)]} {
  		set info(text) stdout
  	}
+		
+	Videoarchiver_monitor $n "Stop"
 	
-	set ip [Videoarchiver_ip $n]
-	
-	if {$info(monitor_cam) == $n} {
-		Videoarchiver_monitor $n "Stop"
-	}
-	
-	if {[LWDAQ_process_exists $info(cam$n\_lproc)]} {
-		LWDAQ_process_stop $info(cam$n\_lproc)
+	if {![catch {puts $info(cam$n\_vchan) ""}]} {
+		catch {puts $info(cam$n\_vchan) "videoplayer stop"}
+		catch {puts $info(cam$n\_vchan) "exit"}
+		catch {close $info(cam$n\_vchan)}
 		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live view." $config(v_col)
 	}
+	LWDAQ_process_stop $info(cam$n\_vpid)
 	
 	LWDAQ_print $info(text) "$info(cam$n\_id) Stopping streaming, segmentation,\
 		and compression."
 	LWDAQ_update
 	cd $info(main_dir)
+	set ip [Videoarchiver_ip $n]
 	catch {exec $info(ssh) \
 		-o ConnectTimeout=$config(connect_timeout_s) \
 		-o UserKnownHostsFile=/dev/null \
@@ -2174,28 +2184,16 @@ proc Videoarchiver_record_all {} {
 }
 
 #
-# Videoarchiver_killall kills all ffmpeg and mplayer processes.
+# Videoarchiver_killall kills all ffmpeg processes.
 #
 proc Videoarchiver_killall {ip} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 
 	if {$info(os) == "Windows"} {
-		catch {eval exec [auto_execok taskkill] /IM mplayer.exe /F} message
-		if {[regexp "SUCCESS" $message]} {
-			LWDAQ_print $info(text) "Stopped additional mplayer processes." 
-		}
-	} else {
-		catch {eval exec [auto_execok killall] -9 mplayer} message
-		if {$message == ""} {
-			LWDAQ_print $info(text) "Stopped additional mplayer processes." 
-		}
-	}
-
-	if {$info(os) == "Windows"} {
 		catch {eval exec [auto_execok taskkill] /IM ffmpeg.exe /F} message
 		if {[regexp "SUCCESS" $message]} {
-			LWDAQ_print $info(text) "Stopped additional mplayer processes." 
+			LWDAQ_print $info(text) "Stopped additional ffmpeg processes." 
 		}
 	} else {
 		catch {eval exec [auto_execok killall] -9 ffmpeg} message
@@ -2205,7 +2203,6 @@ proc Videoarchiver_killall {ip} {
 	}
 	return ""
 }
-
 
 #
 # Videoarchiver_directory allows the user to pick a new master recording directory.
@@ -2267,7 +2264,7 @@ proc Videoarchiver_download_libraries {} {
 
 #
 # Videoarchiver_suggest_download prints a message with a text link suggesting that
-# the user download the Videoarchiver directory to install FFMPEG and MPLAYER.
+# the user download the Videoarchiver directory to install ffmpeg.
 #
 proc Videoarchiver_suggest_download {} {
 	upvar #0 Videoarchiver_config config
@@ -2283,14 +2280,14 @@ proc Videoarchiver_suggest_download {} {
 	LWDAQ_print $info(text) {
 After download, expand the zip archive. Move the entire Videoarchiver directory
 into the same directory as your LWDAQ installation, so the LWDAQ and
-Videoarchiver directories will be next to one another. You now have Mplayer, and
-FFMpeg installed for use by the Videoarchiver and Neuroplayer on Linux, MacOS,
-and Windows.
+Videoarchiver directories will be next to one another. You now have ffmpeg and
+ssh installed for use by the Videoarchiver and Neuroplayer on Linux, MacOS, and
+Windows.
 	}
 }
 
 #
-# Videoarchiver_check_libraries heck to see if the mplayer, ffpeg, and ssh programs 
+# Videoarchiver_check_libraries check to see if the ffpeg and ssh programs 
 # are available at the command line, and issue warnings if not.
 #
 proc Videoarchiver_check_libraries {} {
@@ -2329,17 +2326,6 @@ proc Videoarchiver_check_libraries {} {
 			LWDAQ_print $info(text) "ERROR: $message"
 			LWDAQ_print $info(text) "The ffmpeg executable should be in\
 				[file dirname $info(ffmpeg)]."
-			set suggest 1
-		}
-		LWDAQ_print -nonewline $info(text) "Checking mplayer utility... " 
-		catch {exec $info(mplayer) -V} message
-		if {[regexp "MPlayer" $message]} {
-			LWDAQ_print $info(text) "success."
-		} else {
-			LWDAQ_print $info(text) "FAIL."
-			LWDAQ_print $info(text) "ERROR: $message"
-			LWDAQ_print $info(text) "The mplayer executable should be in\
-				[file dirname $info(mplayer)]."
 			set suggest 1
 		}
 	}
@@ -2417,7 +2403,8 @@ proc Videoarchiver_draw_list {} {
 		# as other system parameters.
 		if {![info exists info(cam$n\_state)]} {
 			set info(cam$n\_state) "Idle"
-			set info(cam$n\_lproc) "0"
+			set info(cam$n\_vchan) "none"
+			set info(cam$n\_vpid) "0"
 			set info(cam$n\_rstart) "0"
 			set info(cam$n\_prevseg) "V0000000000.mp4"
 			set info(cam$n\_white) "0"
@@ -2594,7 +2581,8 @@ proc Videoarchiver_remove {n} {
 		unset info(cam$n\_sat)
 		unset info(cam$n\_ec)
 		unset info(cam$n\_state)
-		unset info(cam$n\_lproc)
+		unset info(cam$n\_vchan)
+		unset info(cam$n\_vpid)
 		unset info(cam$n\_rstart)
 		unset info(cam$n\_prevseg)
 		unset info(cam$n\_white)
@@ -2634,7 +2622,8 @@ proc Videoarchiver_add_camera {} {
 	set info(cam$n\_ec) $info(default_ec)
 	set info(cam$n\_dir) [file normalize "~/Desktop"]
 	set info(cam$n\_state) "Idle"
-	set info(cam$n\_lproc) "0"
+	set info(cam$n\_vchan) "none"
+	set info(cam$n\_vpid) "0"
 	set info(cam$n\_rstart) "0"
 	set info(cam$n\_prevseg) "V0000000000.mp4"
 	set info(cam$n\_white) "0"
@@ -3643,9 +3632,23 @@ set cmd [list /usr/bin/ffmpeg \
 	-c:v $codec \
 	-crf $crf \
 	-preset $preset]
-if {$rotation == 90} {
+	
+# If we are to rotate the image before compression, we add a video filter to
+# specify the rotation.
+switch $rotation {
+	"90" {
 	lappend cmd -vf "transpose=clock"
+	}
+	"180" {
+	lappend cmd -vf "hflip,vflip"
+	}
+	"270" {
+	lappend cmd -vf "transpose=cclock"
+	}	
 }
+
+# We force key frames every second, so that we can navigate easily to the
+# one-second boundaries.
 lappend cmd -force_key_frames "expr:eq(mod(n,20),0)" $outfile
 
 # Compress with ffmpeg to produce video with the specified frame rate. If we

@@ -1147,7 +1147,7 @@ proc LWDAQ_monitor_refresh {} {
 	$t delete 1.0 end
 	LWDAQ_print $t "Event Queue:" blue
 	foreach event $LWDAQ_Info(queue_events) {
-		LWDAQ_print $t [string range $event 0 50]
+		LWDAQ_print $t [string range $event 0 100]
 	}
 	
 	set t $w.vwaits.text	
