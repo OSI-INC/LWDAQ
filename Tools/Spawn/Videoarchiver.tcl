@@ -181,11 +181,12 @@ echo "SUCCESS"
 	set config(verbose_compressors) "0"
 	set config(log_max) "100"
 	
-	# Monitor parameters
+	# Live view and recording view parameters.
 	set config(monitor_speed) "1.0"
 	set config(display_zoom) "1.0"
 	set config(monitor_longevity) "600"
 	set info(monitor_start) "0"
+	set info(watchdog_interval) "1000"
 	
 	# Lag thresholds and restart log.
 	set config(lag_warning) "15.0"
@@ -1167,8 +1168,7 @@ proc Videoarchiver_live {n} {
 		version width height framerate crf sl
 		
 	# Spawn a Videoplayer and use it to stream the incoming video.
-	LWDAQ_print $info(text) "$info(cam$n\_id) Starting live view,\
-		 this will take a few seconds..." $config(v_col)
+	LWDAQ_print $info(text) "$info(cam$n\_id) Starting live view." $config(v_col)
 	cd $LWDAQ_Info(program_dir)
 	set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
 	set info(cam$n\_vchan) $ch
@@ -1177,11 +1177,14 @@ proc Videoarchiver_live {n} {
 	puts $ch {LWDAQ_run_tool Videoplayer.tcl Slave}
 	puts $ch "videoplayer stream -stream tcp://$ip:$info(tcp_port) \
 		-width $width -height $height -rotation $info(cam$n\_rot) \
-		-scale $config(display_zoom)"
+		-scale $config(display_zoom)\
+		-title \"Live View From $info(cam$n\_id) $ip\""
 			
 	# We start the live video watchdog process that looks to see if the 
 	# videoplayer process has been stopped by a user closing its window. 
-	LWDAQ_post [list Videoarchiver_live_watchdog $n]
+	LWDAQ_print $info(text) "$info(cam$n\_id)\
+		Starting live view watchdog." $config(v_col)
+	LWDAQ_post [list Videoarchiver_live_watchdog $n 1]
 	return ""
 }
 
@@ -1192,7 +1195,7 @@ proc Videoarchiver_live {n} {
 # up the streaming, by reading the stream log file. We read the log file only 
 # occasionaly, at random.
 #
-proc Videoarchiver_live_watchdog {n} {
+proc Videoarchiver_live_watchdog {n {first 0}} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 	global LWDAQ_Info
@@ -1206,42 +1209,56 @@ proc Videoarchiver_live_watchdog {n} {
 		return ""
 	}
 
+	# Don't do anything if the state is not "Live".
 	if {$info(cam$n\_state) != "Live"} {
 		LWDAQ_print $info(text) "$info(cam$n\_id)\
 			Stopped live view watchdog." $config(v_col)
 		return ""
-	} elseif {$LWDAQ_Info(reset)} {
+	} 
+	
+	# If this is our first call to the watchdog, set the timer.
+	if {$first} {
+		set info(cam$n\_wdt) [clock milliseconds]
+		LWDAQ_post [list Videoarchiver_live_watchdog $n]
+		return ""
+	}
+	
+	if {$LWDAQ_Info(reset)} {
 		Videoarchiver_stop $n
 		return ""
-	} elseif {[catch {puts $info(cam$n\_vchan) ""}]} {
+	} 
+	
+	if {[catch {puts $info(cam$n\_vchan) ""}]} {
 		LWDAQ_print $info(text) "$info(cam$n\_id)\
 			Live view has stopped running, stopping watchdog." \
 			$config(v_col)
 		Videoarchiver_stop $n
 		return ""
-	} else {
-		catch {
-		
+	} 
+	
+	if {[clock milliseconds] - $info(cam$n\_wdt) > $info(watchdog_interval)} {
+		if {[catch {		
+			set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 			LWDAQ_socket_write $sock \
 				"exec ps -e | grep -e raspivid -e libcamera-vid \n"
 			set result [LWDAQ_socket_read $sock line]
 			if {[LWDAQ_is_error_result $result] \
 					|| ($result == "") \
 					|| [regexp {defunct} $result]} {
-				error "camera stalled"
+				error "Live view stalled, try again, or reboot camera and try again"
 			}
-		while {[gets $info(cam$n\_vchan) line] > 0} {
-			if {[LWDAQ_is_error_result $line]} {
-				LWDAQ_print $info(text) $line
-				LWDAQ_print $info(text) "SUGGESTION: $info(cam$n\_id)\
-					Reboot the camera and try again."
-				Videoarchiver_stop $n
-				return ""
-			}
+			LWDAQ_socket_close $sock
+		} message]} {
+			catch {LWDAQ_socket_close $sock}
+			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message\."
+			Videoarchiver_stop $n
+			return ""
 		}
-		LWDAQ_post [list Videoarchiver_live_watchdog $n]
-		return ""
+		set info(cam$n\_wdt) [clock milliseconds]
 	}
+	
+	LWDAQ_post [list Videoarchiver_live_watchdog $n]
+	return ""
 }
 
 #

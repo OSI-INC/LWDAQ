@@ -268,13 +268,13 @@ proc Videoplayer_info {fn} {
 #
 # Videoplayer_pickfile reads a video file and determines its width, height,
 # framerate, and duration. If we pass an empty file name, or do not specify a
-# file name, the routine opens a browser for the user to select a new file. The
-# routine sets the configuration array values for the four video parameters, so
-# they may be used by other routines. It sets the current video file name as
-# well. If we set "post" to one, the routine will post itself to the event queue
-# so that it is executed in order.
+# file name, the routine uses the current video_file name. If we pass the
+# keyword "browse" for the file name, the routine opens a browser for the user
+# to select a new file. The routine sets the configuration array values for the
+# four video parameters, so they may be used by other routines. It sets the
+# current video file name as well. 
 #
-proc Videoplayer_pickfile {} {
+proc Videoplayer_pickfile {{fn ""}} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	global LWDAQ_Info
@@ -283,22 +283,28 @@ proc Videoplayer_pickfile {} {
 	set info(control) "Read"
 	LWDAQ_update
 	
-	# Abbrevaiations
-	set fn $config(video_file)
-
 	# Check the file exists. If so, save as current video file. 
-	if {$fn == ""} {
+	if {$fn == "browse"} {
 		set fn [LWDAQ_get_file_name 0 $config(video_file)]
 		if {$fn == ""} {
 			set info(control) "Idle"
 			return ""
 		}
 	}
+
+	# If empty string, use current video file name.
+	if {$fn == ""} {
+		set fn $config(video_file)
+	}
+	
+	# Check the file exists.
 	if {![file exists $fn]} {
 		Videoplayer_print "ERROR: Cannot find file \"$fn\"."
 		set info(control) "Idle"
 		return ""
 	}
+	
+	# Update the video file in case we chose a new valid file.
 	set config(video_file) $fn
 	
 	# Get properties of video contained in the file.
@@ -926,7 +932,7 @@ proc Videoplayer_open {} {
 	
 	foreach a {width height rotation fps length_s length_f} {
 		label $f.l$a -text "$a"
-		entry $f.e$a -textvariable Videoplayer_config(video_$a) -width 5
+		entry $f.e$a -textvariable Videoplayer_config(video_$a) -width 6
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -942,7 +948,9 @@ proc Videoplayer_open {} {
 	
 	label $f.lfn -text "File:"
 	entry $f.efn -textvariable Videoplayer_config(video_file) -width 60
-	button $f.pick -text "PickFile" -command "LWDAQ_post Videoplayer_pickfile"
+	button $f.pick -text "PickFile" -command {
+		LWDAQ_post "Videoplayer_pickfile browse"
+	}
 	pack $f.lfn $f.efn $f.pick -side left -expand yes
 	label $f.lvs -text "Stream:"
 	entry $f.evs -textvariable Videoplayer_config(video_stream) -width 20
