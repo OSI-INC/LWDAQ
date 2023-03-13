@@ -98,7 +98,7 @@ proc Videoarchiver_init {} {
 	# compression will be greater as the crf is lower. Standard crf is 23. The
 	# crf of 15 gives a particularly sharp image.
 	set config(versions) [list \
-		{A3034C1 820 616 20 23} \
+		{A3034C1 820 616 20 27} \
 		{A3034C2 820 616 20 27} ]
 	
 	# The rotation of the image readout.

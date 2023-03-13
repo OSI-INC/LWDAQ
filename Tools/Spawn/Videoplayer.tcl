@@ -875,7 +875,7 @@ proc Videoplayer_open {} {
 	
 	# Get on with creating the video display.
 	set f $w.display
-	frame $f -relief groove -border 2
+	frame $f -relief flat -bd 0
 	pack $f -side top -fill x
 	
 	# Make the image where we will display video.
@@ -900,7 +900,7 @@ proc Videoplayer_open {} {
 	}	
 	
 	set f $w.controls
-	frame $f -relief groove -border 2
+	frame $f -relief groove -bd 2
 	pack $f -side top -fill x
 	
 	label $f.ctrl -textvariable Videoplayer_info(control) -fg blue -width 8
@@ -926,7 +926,7 @@ proc Videoplayer_open {} {
 	pack $f.verbose -side left -expand yes
 
 	set f $w.parameters
-	frame $f -relief groove -border 2
+	frame $f -relief groove -bd 2
 	pack $f -side top -fill x
 	
 	foreach a {width height rotation fps length_s length_f} {
