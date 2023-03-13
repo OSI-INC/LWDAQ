@@ -86,7 +86,6 @@ proc Videoplayer_init {} {
 	set config(display_end_s) "*"
 	set config(display_speed) "1.0"
 	set config(display_scale) "0.5"
-	set config(display_time) "0.00"
 	set info(display_photo) "videoplayer_photo"
 	set info(frame_count) "0"
 	set info(display_process) "0"
@@ -273,20 +272,17 @@ proc Videoplayer_info {fn} {
 # well. If we set "post" to one, the routine will post itself to the event queue
 # so that it is executed in order.
 #
-proc Videoplayer_pickfile {fn {post 0}} {
+proc Videoplayer_pickfile {} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	global LWDAQ_Info
 
-	# Post to queue if the post flag is set.
-	if {$post} {
-		LWDAQ_post [list Videoplayer_picfile $fn 0]
-		return ""
-	}
-
 	# Set the control variable.
 	set info(control) "Read"
 	LWDAQ_update
+	
+	# Abbrevaiations
+	set fn $config(video_file)
 
 	# Check the file exists. If so, save as current video file. 
 	if {$fn == ""} {
@@ -380,20 +376,15 @@ proc Videoplayer_png_extract {} {
 # playing the video at time "display_start_s" in seconds, continuing to
 # "display_end_s" seconds. If the end time is a wildcard character, it plays the
 # entire video from the start time. If the end time is a "+" character, it grabs
-# one frame and stops. If "post" is one, we post Videoplayer_play command to the
-# event queue so it will be executed in turn. 
+# one frame and stops.
 #
-proc Videoplayer_play {{post 0}} {
+proc Videoplayer_play {} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
 	# Startup checks.
-	if {$post} {
-		LWDAQ_post [list Videoplayer_play]
-		return ""
-	}
 	if {$info(control) != "Idle"} {
-		Videoplayer_print "ERROR: Cannot play a new file while busy."
+		Videoplayer_print "ERROR: Cannot start playback while busy."
 		return ""
 	}
 
@@ -603,13 +594,13 @@ proc Videoplayer_play {{post 0}} {
 # corrupted, we break out of the streaming loop with a timeout after
 # stream_timeout_ms. 
 #
-proc Videoplayer_stream {{post "0"}} {
+proc Videoplayer_stream {} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 
 	# Startup checks.
-	if {$post} {
-		LWDAQ_post [list Videoplayer_stream $stream 0]
+	if {$info(control) != "Idle"} {
+		Videoplayer_print "ERROR: Cannot start streaming while busy."
 		return ""
 	}
 
@@ -751,26 +742,21 @@ proc Videoplayer_stop {} {
 }
 
 #
-# Videoplayer_setup allows us to set the video width, height, framerate, and
-# rotation with a routine that will post itself to the event queue so that these
-# values will be applied once the current video playback action has completed.
-# The routine takes options -width, -height, -fps, and -length_s for this
-# purpose. We also allow -framerate to specify the framerate and -duration to
-# specify the length of a video file in seconds. The -post option says that the
-# routine should be posted to the event queue, and must always be specified and
-# always come first.
+# Videoplayer_setup allows us to set Videoplayer configuration parameters by 
+# name by prefixing them with a dash and then giving their value.
 #
-proc Videoplayer_setup {post args} {
+proc Videoplayer_setup {args} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
-	if {$post} {
-		LWDAQ_post "$Videoplayer_setup 0 $args"
-		return ""
-	}
-	
 	foreach {option value} $args {
 		switch $option {
+			"-file" {
+				set config(video_file) $value
+			}
+			"-stream" {
+				set config(video_stream) $value
+			}
 			"-width" {
 				set config(video_width) $value
 			}
@@ -792,6 +778,12 @@ proc Videoplayer_setup {post args} {
 			"-duration" {
 				set config(video_duration) $value
 			}
+			"-scale" {
+				set config(display_scale) $value
+			}
+			"-speed" {
+				set config(display_speed) $value
+			}
 			"-start" {
 				set config(display_start_s) $value
 			}
@@ -808,6 +800,38 @@ proc Videoplayer_setup {post args} {
 			default {
 				puts "WARNING: Unknown option \"$option\"."
 			}
+		}
+	}
+	return ""
+}
+
+#
+# videoplayer is a command-line procedure for use when the Videoplayer is
+# operating as a slave. It takes one instruction and then an even number of
+# arguments as option-value pairs "-option value". The instruction selects
+# Videoplayer_play, Videoplayer_stream, Videoplayer_pickfile, or
+# Videoplayer_stop. The stop routine it executes immediately. The others it
+# posts to the event queue.
+#
+proc videoplayer {instruction args} {
+	switch $instruction {
+		"stop" {
+			Videoplayer_stop
+		}
+		"play" {
+			LWDAQ_post "Videoplayer_setup $args"
+			LWDAQ_post "Videoplayer_play"
+		}
+		"stream" {
+			LWDAQ_post "Videoplayer_setup $args"
+			LWDAQ_post "Videoplayer_stream $args"
+		}
+		"pickfile" {
+			LWDAQ_post "Videoplayer_setup $args"
+			LWDAQ_post "Videoplayer_pickfile"
+		}
+		default {
+			Videoplayer_print "ERROR: Unrecognised instruction \"$instruction\".
 		}
 	}
 	return ""
