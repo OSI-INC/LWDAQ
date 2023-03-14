@@ -94,6 +94,7 @@ proc Videoplayer_init {} {
 	set config(file_timeout_ms) "1000"
 	set config(tcp_timeout_ms) "5000"
 	set config(read_nocomplain) "0"
+	set info(display_max_skip) "2"
 #
 # Graphical user display configuration.
 #
@@ -514,7 +515,7 @@ proc Videoplayer_play {} {
 		-c:v rawvideo \
 		-pix_fmt $config(video_pix_fmt) \
 		-vf \"$vf\" \
-		-f image2pipe -"
+		-f image2pipe - "
 		
 	# Launch ffmpeg with a one-way pipe out of which we can read the raw video.
 	# We have no access to the standard error channel from the ffmpeg process.
@@ -544,29 +545,66 @@ proc Videoplayer_play {} {
 	# We now enter the display loop, in which we are grabbing frames, waiting until
 	# the next frame display time, displaying the frame, and watching for a timeout.
 	while {($info(frame_count) < $num_frames) && ($info(control) != "Stop")} {	
+	
+		# Read from the video channel all the bytes available, up to the number
+		# required to complete an image.
 		append data [chan read $ch [expr $raw_size - $data_size]]
+		
+		# Determine how many bytes we have accumulated.
 		set data_size [string length $data]
+		
+		# If we have an entire image of bytes, we proceed with display. We do not 
+		# insist upon having exactly the right number, even though our code should
+		# ensure that the number is always exact. If we are reading one byte too 
+		# many from the buffer, our image will start to drift sideways across the
+		# display.
 		if {$data_size >= $raw_size} {
+		
+			# Wait until the next frame display moment.
 			while {[clock milliseconds] < $start_time \
 				+ 1.0*$info(frame_count)*$frame_ms} {
 				LWDAQ_wait_ms 1
 			}
-			incr info(frame_count)
-			set timeout 0
+			
+			# Draw the image, clear our data variable, increment the frame count,
+			# reset the timeout counter, and update the dispplay.
 			lwdaq_draw_raw $data $info(display_photo) -width $w -height $h \
 				-pix_fmt $config(video_pix_fmt) -zoom $zoom
 			set data ""
+			incr info(frame_count)
+			set timeout 0
 			LWDAQ_update
 		}
+		
+		# Paus for one millisecond and increment our timeout counter. Attend to the
+		# graphical user interface occasionaly.
 		LWDAQ_wait_ms 1
 		incr timeout
 		LWDAQ_support
-		if {$timeout > $config(file_timeout_ms)} {
-			Videoplayer_print "ERROR: Timeout trying to read \"$fn\"." 
-			break
-		}
-		if {($info(frame_count) > 0) && ($timeout > $frame_ms)} {
-			break
+		
+		# It may take ffmpeg some time to generate the first frame, depending upon
+		# the size of the video file and the exact location between key frames within
+		# the file that we want to start at. 
+		if {($info(frame_count) == 0)} {
+			if {$timeout > $config(file_timeout_ms)} {
+				Videoplayer_print "ERROR: Timeout waiting for\
+					frame 0, time $start s, file [file tail $fn]." 
+				break
+			}
+		} else {
+		# Once ffmpeg has started producing the video stream, any pause in the 
+		# stream indicates a problem, so we look fore a much shorter timeout. If we
+		# are waiting for the last frame, it may never show up because of a disagreement
+		# between the Videoplayer and ffmpeg about how many frames there are in the
+		# interval. But if we are waiting for any frame 1 to frame_count-1, we generate
+		# an error.
+			if {$timeout > $info(display_max_skip)*$frame_ms} {
+				if {$info(frame_count) < $num_frames - 1} {
+					Videoplayer_print "ERROR: Timeout waiting for\
+						frame $info(frame_count), time $start s, file [file tail $fn]." 
+				}
+				break
+			}
 		}
 	}
 	
@@ -841,6 +879,7 @@ proc videoplayer {instruction args} {
 
 	switch $instruction {
 		"stop" {
+			LWDAQ_queue_clear
 			Videoplayer_stop
 		}
 		"play" {
@@ -859,21 +898,23 @@ proc videoplayer {instruction args} {
 			eval "Videoplayer_setup $args"
 		}
 		"status" {
-			set busy "no"
+			set busy 0
 			if {[llength $LWDAQ_Info(queue_events) ] > 0} {
-				set busy "yes"
+				set busy 1
 			}
 			if {$LWDAQ_Info(current_event) != "Idle"} {
-				set busy "yes"
+				set busy 1
 			}
 			if {$info(control) != "Idle"} {
-				set busy "yes"
+				set busy 1
 			}
 			set play_time_s [format %.2f \
 				[expr $config(display_start_s) \
 				+ 1.0*$info(frame_count)/$config(video_fps)]]
 			return "busy=$busy\
 				control=$info(control)\
+				file=$config(video_file)\
+				stream=$config(video_stream)\
 				play_time_s=$play_time_s\
 				frame_count=$info(frame_count)"
 		}
@@ -914,9 +955,9 @@ proc Videoplayer_open {} {
 	# an exit command when someone closes the main window
 	if {($info(mode) == "Slave") || ($info(mode) == "Standalone")} {
 		wm protocol . WM_DELETE_WINDOW {
-			LWDAQ_reset
-			Videoplayer_stop
-			LWDAQ_post exit			
+			LWDAQ_process_stop $Videoplayer_info(display_process)
+			catch {close $Videoplayer_info(display_channel)}
+			exit	
 		}
 	}	
 		

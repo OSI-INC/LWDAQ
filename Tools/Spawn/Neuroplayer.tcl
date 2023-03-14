@@ -603,17 +603,11 @@ proc Neuroplayer_init {} {
 			[file normalize [file join $LWDAQ_Info(program_dir) .. Videoarchiver]]
 	}
 	set config(video_dir) $LWDAQ_Info(working_dir)
-	set info(video_file) [file join $config(video_dir) V0000000000.mp4]
-	set info(video_stop_time) 0.0
-	set info(video_end_time) 0.0
-	set info(video_wait_ms) 10
-	set info(video_num_waits) 10
 	set info(video_min_interval) 1.0
 	set config(video_speed) "1.0"
 	set config(video_zoom) "1.0"
 	set info(video_state) "Idle"
 	set info(video_scratch) [file join $info(videoarchiver_dir) Scratch]
-	set info(video_log) [file join $info(video_scratch) Neuroplayer_log.txt]
 	set info(video_export_scratch) [file join $info(video_scratch) Exporter]
 	set info(video_export_log) [file join $info(video_export_scratch) export_log.txt]
 	set config(video_export_clean) "1"
@@ -1668,6 +1662,7 @@ proc Neuroplayer_command {action} {
 		}
 	}
 
+	# Deal with signal player actions.
 	if {$action != $info(play_control)} {
 		if {!$event_executing} {
 			set info(play_control) $action
@@ -1684,6 +1679,13 @@ proc Neuroplayer_command {action} {
 			} {
 				set info(play_control) $action
 			}
+		}
+	}
+	
+	# Deal with stop action for video playback.
+	if {$action == "Stop"} {
+		if {$info(video_state) != "Idle"} {
+			set info(video_state) "Stop"
 		}
 	}
 	
@@ -7906,14 +7908,11 @@ Windows.
 # The duration is in seconds. If the file does not exist, the routine returns "0
 # 0 0 -1".
 #
-proc Neuroplayer_video_info {{fn ""}} {
+proc Neuroplayer_video_info {fn} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 	
-	if {$fn == ""} {
-		set fn $info(video_file)
-		if {![file exists $fn]} {return "0 0 0 -1"}
-	}
+	if {![file exists $fn]} {return "0 0 0 -1"}
 	
 	catch {[exec $info(ffmpeg) -i [file normalize $fn]]} answer
 	
@@ -7939,69 +7938,93 @@ proc Neuroplayer_video_info {{fn ""}} {
 }
 
 #
-# Neuroplayer_video_watchdog waits for the existing video to play for one
-# play interval and then stops the video.
+# Neuroplayer_video_watchdog monitors video playback
 #
-proc Neuroplayer_video_watchdog {pid} {
+proc Neuroplayer_video_watchdog {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info
 
-	if {![info exists config]} {
-		LWDAQ_process_stop $pid
-		return "Idle"
-	}
-
-	if {$info(gui) && ![winfo exists $info(window)]} {
-		LWDAQ_process_stop $pid
-		return "Idle"
-	}
-
-	if {!$config(video_enable)} {
-		set info(video_state) "Idle"
-		LWDAQ_process_stop $pid
+	# If the video monitor should not be open, close it.
+	if {![info exists config] \
+		|| ($info(gui) && ![winfo exists $info(window)]) \
+		|| !$config(video_enable)} {
+		catch {puts $info(video_channel) "videoplayer stop"}
+		catch {puts $info(video_channel) "exit"}
+		catch {close $info(video_channel)}
+		LWDAQ_process_stop $info(video_process)
+		set info(video_channel) "none"
+		set info(video_process) "0"
 		LWDAQ_set_bg $info(play_control_label) white
-		return "Idle"
+		set info(video_state) "Idle"
+		return ""
 	}
 	
-	if {$info(video_process) != $pid} {
-		LWDAQ_process_stop $pid
-		return "Idle"
-	}
+	if {$info(video_state) == "Stop"} {
+
+		# In response to a stop command, we stop playback, but carry on with our
+		# watchdog.
+		catch {puts $info(video_channel) "videoplayer stop"}
+		LWDAQ_set_bg $info(play_control_label) white
+		set info(video_state) "Idle"
+		Neuroplayer_print "Video playback aborted by stop command." verbose
+		LWDAQ_post [list Neuroplayer_video_watchdog]
+		return ""
+	} elseif {$info(video_state) == "Play"} {
 	
-	if {$info(video_state) == "Play"} {
-		set busy "yes"
+		# During video playback, we check to see if the Videoplayer still
+		# exists, and if so, if it's still busy. If the Videoplayer appears to
+		# be closed, or stalled, we force it to close and terminate the
+		# watchdog.
+		set busy 1
 
 		if {[catch {
-			# Check to see if the Videoplayer returned any errors.
-			while {[gets $info(video_channel) line] > 0} {
-				if {[LWDAQ_is_error_result $line]} {
-					error "videoplayer error"
+		
+			# Check to see if the videoplayer still exists.
+			if {![LWDAQ_process_exists $info(video_process)] \
+				|| [catch {puts $info(video_channel) ""}]} {
+				error "videoplayer closed"
+			}
+			
+			# Get the Videoplayer status. We may not get it this time, we may 
+			# have to wait to get it next time. If we get a string, try to find
+			# the busy code in the string.
+			puts $info(video_channel) "videoplayer status"
+			if {[gets $info(video_channel) status] > 0} {
+				if {![regexp {busy=([0-1]+)} $status match busy]} {
+					error "videoplayer internal error"
 				}
 			}
-			puts $info(video_channel) "videoplayer status"
-			while {[gets $info(video_channel) status] <= 0} {
-				LWDAQ_support
-			}
-			if {![regexp {busy=([a-z]*)} $status match busy]} {
-				error "$status"
-			}
 		} message]} {
-			Neuroplayer_print "Playback of [file tail $info(video_file)] aborted,\
-				$message." verbose
+
+			# Force the Viodeoplayer to close. Terminate the watchdog.
+			Neuroplayer_print "Video playback aborted, $message." verbose
+			catch {puts $info(video_channel) "videoplayer stop"}
+			catch {puts $info(video_channel) "exit"}
+			catch {close $info(video_channel)}
+			LWDAQ_process_stop $info(video_process)
+			set info(video_channel) "none"
+			set info(video_process) "0"
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(video_state) "Idle"
-			return $info(video_state)
+			return ""
 		}
 
-		if {$busy != "yes"} {
+		# If not busy, go to Idle state. 
+		if {!$busy} {
 			Neuroplayer_print "Video playback complete." verbose
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(video_state) "Idle"
 		} 
-	}
+		
+		# Continue the watchdog process.
+		LWDAQ_post Neuroplayer_video_watchdog
+		return ""
+	} else {
 
-	LWDAQ_post [list Neuroplayer_video_watchdog $pid]
-	return $info(video_state)
+		# Continue the watchdog process.
+		LWDAQ_post Neuroplayer_video_watchdog
+		return ""
+	}
 }
 
 #
@@ -8122,7 +8145,7 @@ proc Neuroplayer_video_play {datetime length} {
 	upvar #0 Neuroplayer_info info
 	global LWDAQ_Info
 	
-	# Check to see if ffmpeg and mplayer are available. If not, we suggest
+	# Check to see if ffmpeg is available. If not, we suggest
 	# downloading the Videoarchiver package and go to idle state.
 	if {![file exists $info(ffmpeg)]} {
 		Neuroplayer_video_suggest
@@ -8130,29 +8153,50 @@ proc Neuroplayer_video_play {datetime length} {
 		return ""
 	}
 
-	# Seek the interval in the video directory.
-	set result [Neuroplayer_video_seek $datetime $length]
-
-	# Extract the file name, seek time, length of the video existing in the
-	# file and the correct length of the file, which is the length of video that
-	# fills the time between the start of this file and the next file in the
-	# recording directory, if it exists.
-	scan $result %s%f%f%f%d%d%f vf vseek vlen clen width height framerate
+	# We are going to make a list of files, each with a play start and play end
+	# time, that we can queue up to present the entire "length" seconds starting
+	# at "datetime" in the record.
+	set missing $length
+	set vpos $datetime
+	set vfl [list]
 	
-	# If we have no file containing the interval start, give up.
-	if {$vf == "none"} {
-		Neuroplayer_print "ERROR: No video file contains interval start."
+	while {$missing > 0} {
+		# Seek the interval in the video directory.
+		set result [Neuroplayer_video_seek $vpos $missing]
+
+		# Extract the file name, seek time, length of the video existing in the
+		# file and the correct length of the file, which is the length of video
+		# that fills the time between the start of this file and the next file
+		# in the recording directory.
+		scan $result %s%f%f%f%d%d%f vf start_s vlen clen width height framerate
+	
+		# If we have no file containing the interval start, give up.
+		if {$vf == "none"} {break}
+	
+		# Calculate how many seconds of our requested length are missing, and
+		# move the video position to the end of the interval, or the start of
+		# the next file if the file does not cover the interval.
+		if {$start_s + $missing <= $clen} {
+			set vpos [expr round($vpos + $missing)]
+			set end_s [format %.2f [expr $start_s + $missing]]
+			set missing "0.00"
+		} else {
+			set vpos [expr round($vpos + $vlen - $start_s)]
+			set end_s [format %.2f $vlen]
+			set missing [format %.2f [expr $missing - $vlen + $start_s]]
+		}
+
+		# Append the file, play start time, and video position to our playback
+		# list.
+		lappend vfl "$vf $start_s $end_s"
+	}
+		
+	if {$missing > 0} {
+		Neuroplayer_print "ERROR: Missing $missing s of requested video interval."
 		set info(video_state) "Idle"
 		return ""
 	}
-	
-	# If the end of the interval does not lie within the file, issue a warning.
-	set missing [expr $vseek + $length - $clen]
-	if {$missing > 0} {
-		Neuroplayer_print "WARNING: Video file missing last $missing s\
-			of interval."
-	}
-		
+
 	# If no video player window is open, we create a new one. 
 	set new_process 0
 	if {![LWDAQ_process_exists $info(video_process)] \
@@ -8175,55 +8219,43 @@ proc Neuroplayer_video_play {datetime length} {
 		puts $ch [list cd $config(video_dir)]
 		puts $ch "LWDAQ_run_tool Videoplayer.tcl Slave"
 		
-		# Configure the Videoplayer for our video file by giving the file
+		# Configure the Videoplayer for our first video file by giving the file
 		# name and our display parameters. 
 		puts $ch "videoplayer pickfile \
-			-file $vf \
+			-file [lindex $vfl 0 0] \
 			-title \"$title\" \
 			-speed $config(video_speed) \
 			-scale $config(video_zoom)"
 			
-		# Set the video file, delete the video log if it exists.
-		set info(video_file) $vf
-		catch {file delete $info(video_log)}
-		
-		# Start up the watchdog for this MPlayer process.
-		LWDAQ_post [list Neuroplayer_video_watchdog $info(video_process)]
+		# Start up the watchdog for this Videoplayer process.
+		LWDAQ_post [list Neuroplayer_video_watchdog]
 	}
 
-	# Set the end time of the video and the stop time. The stop time is one
-	# half-frame before the end time, so we don't play the first frame of the
-	# next interval.
-	set info(video_end_time) [format %.3f $vlen]
-	set info(video_stop_time) [format %.3f \
-		[expr $vseek + $length - 1.0/$framerate]]
-	if {$info(video_stop_time) > $info(video_end_time)} {
-		set info(video_stop_time) $info(video_end_time)
+	# Start playing the files that cover our requested interval.
+	foreach pb $vfl {
+		scan $pb %s%f%f fn start_s end_s		
+		puts $info(video_channel) "videoplayer play \
+			-file \"$fn\" -start $start_s -end $end_s"
+		Neuroplayer_print "Playing video [file tail $fn]\
+			from $start_s s to $end_s s." verbose
 	}
-
-	# Initiate playing of the video $vf from time $vseek for time $vlen.
-	puts $info(video_channel) "videoplayer play \
-		-file $vf \
-		-start $vseek \
-		-end [expr $vseek + $length]"
 	
 	# Check to see if the Videoplayer returned any errors.
 	while {[gets $info(video_channel) message] > 0} {
-		if {[LWDAQ_is_error_result $line]} {
+		if {[LWDAQ_is_error_result $message]} {
 			Neuroplayer_print "$message"
+			LWDAQ_set_bg $info(play_control_label) white
+			set info(video_state) "Idle"
+			return ""
 		}
-		set info(video_state) "Idle"
-		return ""
 	}
 
 	# Set the video state to play and report the seek time.
-	Neuroplayer_print "Playing [file tail $vf] for $length s\
-		starting at $vseek s of $vlen s." verbose
 	LWDAQ_set_bg $info(play_control_label) cyan
 	set info(video_state) "Play"
 	
-	# Return the file name, seek time, file duration, and correct length.
-	return [list $vf $vseek $vlen $clen]
+	# Return the list of files and intervals.
+	return $vfl
 }
 
 #
