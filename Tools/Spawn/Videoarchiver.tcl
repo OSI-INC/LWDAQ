@@ -183,7 +183,7 @@ echo "SUCCESS"
 	
 	# Live view and recording view parameters.
 	set config(monitor_speed) "1.0"
-	set config(display_zoom) "1.0"
+	set config(display_zoom) "0.5"
 	set config(monitor_longevity) "600"
 	set info(monitor_start) "0"
 	set info(watchdog_interval) "1000"

@@ -605,7 +605,7 @@ proc Neuroplayer_init {} {
 	set config(video_dir) $LWDAQ_Info(working_dir)
 	set info(video_min_interval) 1.0
 	set config(video_speed) "1.0"
-	set config(video_zoom) "1.0"
+	set config(video_zoom) "0.5"
 	set info(video_state) "Idle"
 	set info(video_scratch) [file join $info(videoarchiver_dir) Scratch]
 	set info(video_export_scratch) [file join $info(video_scratch) Exporter]
