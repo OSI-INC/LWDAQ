@@ -120,6 +120,7 @@ proc Videoplayer_init {} {
 	set os_dir [file join $info(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
 		set info(ffmpeg) [file join $os_dir ffmpeg/bin/ffmpeg.exe]
+#		set info(ffmpeg) [file join $LWDAQ_Info(program_dir) ffmpeg/bin/ffmpeg.exe]
 	} elseif {$LWDAQ_Info(os) == "MacOS"} {
 		set info(ffmpeg) [file join $os_dir ffmpeg]
 	} elseif {$LWDAQ_Info(os) == "Linux"} {
@@ -191,7 +192,7 @@ proc Videoplayer_suggest {} {
 	LWDAQ_print $info(text) {
 After download, expand the zip archive. Move the entire Videoarchiver directory
 into the same directory as your LWDAQ installation, so the LWDAQ and
-Videoarchiver directories will be next to one another. You now have FFMpeg
+Videoarchiver directories will be next to one another. You now have ffmpeg
 installed for use by the Videoarchiver and Videoplayer on Linux, MacOS, and
 Windows.
 	}
@@ -517,11 +518,11 @@ proc Videoplayer_play {} {
 		-vf \"$vf\" \
 		-f image2pipe - "
 		
-	# Launch ffmpeg with a one-way pipe out of which we can read the raw video.
+	# Launch ffmpeg with a pipe out of which we can read the raw video.
 	# We have no access to the standard error channel from the ffmpeg process.
 	# We will use a timout to detect errors, but otherwise the nature of an
 	# ffmpeg failure will be unknown. 
-	set ch [open $cmd r]
+	set ch [open $cmd]
 	set chpid [pid $ch]
 	set info(display_channel) $ch
 	set info(display_process) $chpid
@@ -576,11 +577,11 @@ proc Videoplayer_play {} {
 			LWDAQ_update
 		}
 		
-		# Paus for one millisecond and increment our timeout counter. Attend to the
+		# Pause for one millisecond and increment our timeout counter. Attend to the
 		# graphical user interface occasionaly.
 		LWDAQ_wait_ms 1
-		incr timeout
 		LWDAQ_support
+		incr timeout
 		
 		# It may take ffmpeg some time to generate the first frame, depending upon
 		# the size of the video file and the exact location between key frames within
