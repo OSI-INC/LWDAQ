@@ -1336,6 +1336,8 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 			-width $width -height $height \
 			-framerate $framerate \
 			-nocomplain 1"
+			
+		# Check to see if the Videoplayer returned any errors.
 		while {[gets $ch message] > 0} {
 			if {[LWDAQ_is_error_result $line]} {
 				LWDAQ_print $info(text) "$message"

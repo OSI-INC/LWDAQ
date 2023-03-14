@@ -825,13 +825,20 @@ proc Videoplayer_setup {args} {
 
 #
 # videoplayer is a command-line procedure for use when the Videoplayer is
-# operating as a slave. It takes one instruction and then an even number of
-# arguments as option-value pairs "-option value". The instruction selects
-# Videoplayer_play, Videoplayer_stream, Videoplayer_pickfile, or
-# Videoplayer_stop. The stop routine it executes immediately. The others it
-# posts to the event queue.
+# operating as a slave. It takes one instruction followed by arguments that will
+# be passed to Videoplayer_setup. The arguments are of the form "-option value".
+# The "play", "stream", and "pickfile" tasks are posted to the event queue, to
+# be executed in turn, so that we can queue Videoplayer actions to generate
+# seemless display. The other tasks execute immediately. They can return
+# information or they can return an empty string. The "status" instruction
+# returns a bunch of information about the videoplayer and its tasks to the text
+# window or to standard out, in units of seconds.
 #
 proc videoplayer {instruction args} {
+	upvar #0 Videoplayer_config config
+	upvar #0 Videoplayer_info info
+	global LWDAQ_Info
+
 	switch $instruction {
 		"stop" {
 			Videoplayer_stop
@@ -850,6 +857,25 @@ proc videoplayer {instruction args} {
 		}
 		"setup" {
 			eval "Videoplayer_setup $args"
+		}
+		"status" {
+			set busy "no"
+			if {[llength $LWDAQ_Info(queue_events) ] > 0} {
+				set busy "yes"
+			}
+			if {$LWDAQ_Info(current_event) != "Idle"} {
+				set busy "yes"
+			}
+			if {$info(control) != "Idle"} {
+				set busy "yes"
+			}
+			set play_time_s [format %.2f \
+				[expr $config(display_start_s) \
+				+ 1.0*$info(frame_count)/$config(video_fps)]]
+			return "busy=$busy\
+				control=$info(control)\
+				play_time_s=$play_time_s\
+				frame_count=$info(frame_count)"
 		}
 		default {
 			Videoplayer_print "ERROR: Unrecognised instruction \"$instruction\".
@@ -888,8 +914,9 @@ proc Videoplayer_open {} {
 	# an exit command when someone closes the main window
 	if {($info(mode) == "Slave") || ($info(mode) == "Standalone")} {
 		wm protocol . WM_DELETE_WINDOW {
+			LWDAQ_reset
 			Videoplayer_stop
-			LWDAQ_post exit
+			LWDAQ_post exit			
 		}
 	}	
 		

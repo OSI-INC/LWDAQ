@@ -433,3 +433,25 @@ puts $ch {LWDAQ_run_tool Videoplayer.tcl Slave}
 puts $ch {videoplayer play}
 </script>
 
+<script>
+upvar #0 LWDAQ_Info info
+cd $info(program_dir)
+set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
+fconfigure $ch -translation auto -buffering line -blocking 0
+LWDAQ_print $t "Opened new LWDAQ with channel $ch."
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Slave}
+puts $ch {videoplayer_pickfile browse}
+puts $ch {videoplayer play}
+</script>
+
+<script>
+upvar #0 LWDAQ_Info info
+cd $info(program_dir)
+set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
+fconfigure $ch -translation auto -buffering line -blocking 0
+LWDAQ_print $t "Opened new LWDAQ with channel $ch."
+puts $ch {LWDAQ_run_tool Videoplayer.tcl Slave}
+puts $ch {Videoplayer_pickfile browse}
+puts $ch {videoplayer play}
+</script>
+
