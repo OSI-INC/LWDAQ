@@ -5676,8 +5676,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			LWDAQ_print $t "Concatinating $num_files video segments,\
 				expecting final video length\
 				[format %.2f [expr $info(export_end_s) - $info(export_start_s)]] s."
-			LWDAQ_print $t "Concatination will take approximately $num_files s\
-				on a 1-GHz CPU."
+			LWDAQ_print $t "Concatination will take approximately\
+				[expr $config(export_duration)/600] s on a 1-GHz CPU."
 
 			set info(export_state) "Concat"
 			cd $info(video_export_scratch)

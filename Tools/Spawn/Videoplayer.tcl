@@ -565,7 +565,7 @@ proc Videoplayer_play {} {
 			Videoplayer_print "ERROR: Timeout trying to read \"$fn\"." 
 			break
 		}
-		if {($num_frames > 0) && ($timeout > $frame_ms)} {
+		if {($info(frame_count) > 0) && ($timeout > $frame_ms)} {
 			break
 		}
 	}
