@@ -74,19 +74,21 @@ proc Videoplayer_init {} {
 	set config(video_fps) "20"
 	set config(video_width) "820"
 	set config(video_height) "616"
-	set config(video_rotation) "0"
 	set config(video_length_s) "1"
 	set config(video_length_f) "20"
 	set config(video_pix_fmt) "rgb24"
 	set config(video_pix_size) "3"
 #
-# Display properties.
+# Display properties. Some of these we update later in the operating system
+# specific clauses.
 #
 	set info(init_size) "200"
 	set config(display_start_s) "0"
 	set config(display_end_s) "*"
-	set config(display_speed) "1.0"
 	set config(display_scale) "0.5"
+	set config(display_zoom) "2.0"
+	set config(display_rotation) "0"
+	set config(display_speed) "1.0"
 	set info(display_photo) "videoplayer_photo"
 	set info(frame_count) "0"
 	set info(display_process) "0"
@@ -120,16 +122,25 @@ proc Videoplayer_init {} {
 	set os_dir [file join $info(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
 		set info(ffmpeg) [file join $os_dir ffmpeg/bin/ffmpeg.exe]
-#		set info(ffmpeg) [file join $LWDAQ_Info(program_dir) ffmpeg/bin/ffmpeg.exe]
+		set config(display_scale) "0.5"
+		set config(display_zoom) "2.0"
 	} elseif {$LWDAQ_Info(os) == "MacOS"} {
 		set info(ffmpeg) [file join $os_dir ffmpeg]
+		set config(display_scale) "1.0"
+		set config(display_zoom) "1.0"
 	} elseif {$LWDAQ_Info(os) == "Linux"} {
 		set info(ffmpeg) [file join $os_dir ffmpeg/ffmpeg]
+		set config(display_scale) "0.5"
+		set config(display_zoom) "2.0"
 	} elseif {$LWDAQ_Info(os) == "Raspbian"} {
 		set info(ffmpeg) "/usr/bin/ffmpeg"
+		set config(display_scale) "0.5"
+		set config(display_zoom) "2.0"
 	} else {
 		Videoplayer_print "WARNING: Video playback may not work on $LWDAQ_Info(os)."
 		set info(ffmpeg) "/usr/bin/ffmpeg"
+		set config(display_scale) "0.5"
+		set config(display_zoom) "2.0"
 	}
 #
 # The Save button in the Configuration Panel allows you to save your own
@@ -460,7 +471,7 @@ proc Videoplayer_play {} {
 	set frame_ms [format %.1f [expr 1000.0/$config(video_fps)/$config(display_speed)]]
 	
 	# Combine dimensions and rotation into one video filter.
-	switch $config(video_rotation) {
+	switch $config(display_rotation) {
 		"0" {
 			set vf "scale=$w\:$h"
 		}
@@ -487,13 +498,13 @@ proc Videoplayer_play {} {
 		}
 		default {
 			set vf "scale=$w\:$h"
-			Videoplayer_print "WARNING: Invalid rotation \"$config(video_rotation)\"."
+			Videoplayer_print "WARNING: Invalid rotation \"$config(display_rotation)\"."
 		}
 	}
 	
 	# Report on final display parameters.
 	Videoplayer_print "Display width=$dw, height=$dh,\
-		rotation=$config(video_rotation),\
+		rotation=$config(display_rotation),\
 		playing from $start s to $end s,\
 		expect $num_frames frames,\
 		$frame_ms ms per frame." verbose
@@ -535,9 +546,9 @@ proc Videoplayer_play {} {
 	set start_time [clock milliseconds]
 	set timeout 0
 	if {$config(display_scale) >= 1.0} {
-		set zoom $config(display_scale)
+		set zoom [expr $config(display_scale)*$config(display_zoom)]
 	} else {
-		set zoom 1.0
+		set zoom $config(display_zoom)
 	}
 	set raw_size [expr round( $config(video_pix_size) * $w * $h)]
 	set data_size 0
@@ -672,7 +683,7 @@ proc Videoplayer_stream {} {
 	}
 
 	# Combine dimensions and rotation into one video filter.
-	switch $config(video_rotation) {
+	switch $config(display_rotation) {
 		"0" {
 			set vf "scale=$w\:$h"
 		}
@@ -699,13 +710,13 @@ proc Videoplayer_stream {} {
 		}
 		default {
 			set vf "scale=$w\:$h"
-			Videoplayer_print "WARNING: Invalid rotation \"$config(video_rotation)\"."
+			Videoplayer_print "WARNING: Invalid rotation \"$config(display_rotation)\"."
 		}
 	}
 
 	# Report on final display parameters.
 	Videoplayer_print "Display width=$w, height=$h,\
-		rotation=$config(video_rotation),\
+		rotation=$config(display_rotation),\
 		stream server $stream." verbose
 	set info(control) "Stream"
 	LWDAQ_update
@@ -734,9 +745,9 @@ proc Videoplayer_stream {} {
 	set start_time [clock milliseconds]
 	set timeout 0
 	if {$config(display_scale) >= 1.0} {
-		set zoom $config(display_scale)
+		set zoom [expr $config(display_scale)*$config(display_zoom)]
 	} else {
-		set zoom 1.0
+		set zoom $config(display_zoom)
 	}
 	set raw_size [expr round( $config(video_pix_size) * $w * $h)]
 	set data_size 0
@@ -815,7 +826,7 @@ proc Videoplayer_setup {args} {
 				set config(video_height) $value
 			}
 			"-rotation" {
-				set config(video_rotation) $value
+				set config(display_rotation) $value
 			}
 			"-fps" {
 				set config(video_fps) $value
@@ -831,6 +842,9 @@ proc Videoplayer_setup {args} {
 			}
 			"-scale" {
 				set config(display_scale) $value
+			}
+			"-zoom" {
+				set config(display_zoom) $value
 			}
 			"-speed" {
 				set config(display_speed) $value
@@ -985,6 +999,11 @@ proc Videoplayer_open {} {
 	button $f.stop -text "Stop" -command {Videoplayer_stop}
 	pack $f.stop -side left -expand yes
 
+	button $f.pick -text "PickFile" -command {
+		LWDAQ_post "Videoplayer_pickfile browse"
+	}
+	pack $f.pick -side left -expand yes
+
 	button $f.config -text "Configure" -command "Videoplayer_configure"
 	pack $f.config -side left -expand yes
 	
@@ -994,19 +1013,23 @@ proc Videoplayer_open {} {
 	checkbutton $f.verbose -text "Verbose" -variable Videoplayer_config(verbose)
 	pack $f.verbose -side left -expand yes
 
-	set f $w.parameters
+	set f $w.vprop
 	frame $f -relief groove -bd 2
 	pack $f -side top -fill x
 	
-	foreach a {width height rotation fps length_s length_f} {
+	foreach a {width height fps length_s length_f} {
 		label $f.l$a -text "$a"
-		entry $f.e$a -textvariable Videoplayer_config(video_$a) -width 6
+		entry $f.e$a -textvariable Videoplayer_config(video_$a) -width 8
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	foreach a {start_s end_s speed scale} {
+	set f $w.dprop
+	frame $f -relief groove -bd 2
+	pack $f -side top -fill x
+	
+	foreach a {rotation start_s end_s speed scale zoom} {
 		label $f.l$a -text "$a"
-		entry $f.e$a -textvariable Videoplayer_config(display_$a) -width 5
+		entry $f.e$a -textvariable Videoplayer_config(display_$a) -width 8
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -1019,9 +1042,9 @@ proc Videoplayer_open {} {
 	button $f.pick -text "PickFile" -command {
 		LWDAQ_post "Videoplayer_pickfile browse"
 	}
-	pack $f.lfn $f.efn $f.pick -side left -expand yes
+	pack $f.lfn $f.efn -side left -expand yes
 	label $f.lvs -text "Stream:"
-	entry $f.evs -textvariable Videoplayer_config(video_stream) -width 20
+	entry $f.evs -textvariable Videoplayer_config(video_stream) -width 25
 	pack $f.lvs $f.evs -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 100 10 1 1]

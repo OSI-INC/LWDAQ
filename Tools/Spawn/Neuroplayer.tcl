@@ -605,7 +605,6 @@ proc Neuroplayer_init {} {
 	set config(video_dir) $LWDAQ_Info(working_dir)
 	set info(video_min_interval) 1.0
 	set config(video_speed) "1.0"
-	set config(video_zoom) "0.5"
 	set info(video_state) "Idle"
 	set info(video_scratch) [file join $info(videoarchiver_dir) Scratch]
 	set info(video_export_scratch) [file join $info(video_scratch) Exporter]
@@ -621,15 +620,25 @@ proc Neuroplayer_init {} {
 	set os_dir [file join $info(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
 		set info(ffmpeg) [file join $os_dir ffmpeg/bin/ffmpeg.exe]
+		set config(video_scale) "0.5"
+		set config(video_zoom) "2.0"
 	} elseif {$LWDAQ_Info(os) == "MacOS"} {
 		set info(ffmpeg) [file join $os_dir ffmpeg]
+		set config(video_scale) "1.0"
+		set config(video_zoom) "1.0"
 	} elseif {$LWDAQ_Info(os) == "Linux"} {
 		set info(ffmpeg) [file join $os_dir ffmpeg/ffmpeg]
+		set config(video_scale) "0.5"
+		set config(video_zoom) "2.0"
 	} elseif {$LWDAQ_Info(os) == "Raspbian"} {
 		set info(ffmpeg) "/usr/bin/ffmpeg"
+		set config(video_scale) "0.5"
+		set config(video_zoom) "2.0"
 	} else {
 		Neuroplayer_print "WARNING: Video playback may not work on $LWDAQ_Info(os)."
 		set info(ffmpeg) "/usr/bin/ffmpeg"
+		set config(video_scale) "0.5"
+		set config(video_zoom) "2.0"
 	}
 #
 # The Save button in the Configuration Panel allows you to save your own
@@ -8225,7 +8234,8 @@ proc Neuroplayer_video_play {datetime length} {
 			-file [lindex $vfl 0 0] \
 			-title \"$title\" \
 			-speed $config(video_speed) \
-			-scale $config(video_zoom)"
+			-scale $config(video_scale) \
+			-zoom $config(video_zoom)"
 			
 		# Start up the watchdog for this Videoplayer process.
 		LWDAQ_post [list Neuroplayer_video_watchdog]

@@ -67,7 +67,7 @@ proc Videoarchiver_init {} {
 		set info(ffmpeg) "/usr/bin/ffmpeg"
 	}
 	
-	# The time we alloew for video streaming to start on the camera.
+	# The time we allow for video streaming to start on the camera.
 	set info(pi_start_ms) "500"
 	
 	# The codec to use for compression on the Pi. The libx264 codec is provided
@@ -181,12 +181,30 @@ echo "SUCCESS"
 	set config(verbose_compressors) "0"
 	set config(log_max) "100"
 	
-	# Live view and recording view parameters.
+	# Display parameters.
 	set config(monitor_speed) "1.0"
-	set config(display_zoom) "0.5"
 	set config(monitor_longevity) "600"
 	set info(monitor_start) "0"
 	set info(watchdog_interval) "1000"
+	
+	# Operating-system dependent display parameters.
+	if {$info(os) == "Windows"} {
+		set config(display_zoom) "2.0"
+		set config(display_scale) "0.5"
+	} elseif {$info(os) == "MacOS"} {
+		set config(display_zoom) "1.0"
+		set config(display_scale) "1.0"
+	} elseif {$info(os) == "Linux"} {
+		set config(display_zoom) "2.0"
+		set config(display_scale) "0.5"
+	} elseif {$LWDAQ_Info(os) == "Raspbian"} {
+		set config(display_zoom) "2.0"
+		set config(display_scale) "0.5"
+	} else {
+		Neuroplayer_print "WARNING: Videoarchive may not work on $LWDAQ_Info(os)."
+		set config(display_zoom) "2.0"
+		set config(display_scale) "0.5"
+	}
 	
 	# Lag thresholds and restart log.
 	set config(lag_warning) "15.0"
@@ -1176,9 +1194,13 @@ proc Videoarchiver_live {n} {
 	fconfigure $ch -translation auto -buffering line -blocking 0
 	puts $ch "cd [Videoarchiver_segdir $n]"
 	puts $ch "LWDAQ_run_tool Videoplayer.tcl Slave"
-	puts $ch "videoplayer stream -stream tcp://$ip:$info(tcp_port) \
-		-width $width -height $height -rotation $info(cam$n\_rot) \
-		-scale $config(display_zoom)\
+	puts $ch "videoplayer stream \
+		-stream tcp://$ip:$info(tcp_port) \
+		-width $width \
+		-height $height \
+		-rotation $info(cam$n\_rot) \
+		-scale $config(display_scale) \
+		-zoom $config(display_zoom)\
 		-title \"Live View From $info(cam$n\_id) $ip\""
 	while {[gets $ch message] > 0} {
 		if {[LWDAQ_is_error_result $line]} {
@@ -1332,8 +1354,10 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 		puts $ch "videoplayer setup \
 			-title \"Recording View From $info(cam$n\_id) $ip\" \
 			-speed $config(monitor_speed) \
-			-scale $config(display_zoom) \
-			-width $width -height $height \
+			-scale $config(display_scale) \
+			-zoom $config(display_zoom) \
+			-width $width \
+			-height $height \
 			-framerate $framerate \
 			-nocomplain 1"
 			
