@@ -49,7 +49,7 @@ proc Videoplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Videoplayer" "1"
+	LWDAQ_tool_init "Videoplayer" "2"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -1049,8 +1049,6 @@ proc Videoplayer_open {} {
 
 	set info(text) [LWDAQ_text_widget $w 100 10 1 1]
 	
-	LWDAQ_print $info(text) "WARNING: This tool is in active development, 09-MAR-23."
-	
 	return $w
 }
 
@@ -1077,6 +1075,17 @@ return ""
 
 ----------Begin Help----------
 
-http://www.opensourceinstruments.com/ACC/Videoplayer.html
+The Videoplayer's chief function is to act as a video player for the
+Videoarchiver and Neuroplayer. When launched as a standalone process in Slave
+mode, the Videoplayer may be controlled through a Tcl channel, and it in turn
+calls ffmpeg through another channel. In slave mode, the Videoplayer has not
+buttons or entries to control its behavior. All control takes place through the
+master-slave pipe. But when launched from the tool menus, the Videoplayer
+provides us with buttons to pick a file, stream from a server, and present a
+video's characteristics. The Videoplayer will play any video that ffmpeg can
+decypher. It plays without sound. Depending upon your operating system and
+computer speed, you may find that playback cannot proceed at full speed. Use the
+scale value to change the resolution of the image. Use the zoom value to
+increase the size of each pixel when rendered on your screen.
 
 ----------End Help----------
