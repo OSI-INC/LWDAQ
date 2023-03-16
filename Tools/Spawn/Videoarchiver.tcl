@@ -27,7 +27,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "31"
+	LWDAQ_tool_init "Videoarchiver" "32"
 	
 	# Set minimum camera compressor version.
 	set info(min_compressor_version) "31"
@@ -2710,8 +2710,6 @@ proc Videoarchiver_save_list {{fn ""}} {
 
 	# Write camera list to disk.
 	set f [open $fn w]
-	puts $f "set Videoarchiver_info(cam_list) \"$info(cam_list)\""
-	puts $f "set Videoarchiver_config(recording_dir) \"$config(recording_dir)\""
 	foreach n $info(cam_list) {
 		foreach a {id ver addr rot sat ec} {
 			puts $f "set Videoarchiver_info(cam$n\_$a) \"[set info(cam$n\_$a)]\"" 
