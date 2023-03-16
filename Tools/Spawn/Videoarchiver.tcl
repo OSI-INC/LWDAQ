@@ -2713,6 +2713,7 @@ proc Videoarchiver_save_list {{fn ""}} {
 
 	# Write camera list to disk.
 	set f [open $fn w]
+	puts $f "set Videoarchiver_info(cam_list) \"$info(cam_list)\""
 	foreach n $info(cam_list) {
 		foreach a {id ver addr rot sat ec} {
 			puts $f "set Videoarchiver_info(cam$n\_$a) \"[set info(cam$n\_$a)]\"" 
