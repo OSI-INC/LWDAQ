@@ -615,7 +615,7 @@ proc Neuroplayer_init {} {
 	set config(video_enable) "0"
 	set info(video_channel) "none"
 	set info(video_process) "0"
-	set info(video_file_cache) [list]
+	set info(video_cache) [list]
 	set info(max_video_files) "100"
 	set os_dir [file join $info(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
@@ -834,7 +834,9 @@ proc Neuroplayer_pick {name {post 0}} {
 		}
 		set config($name) $dn
 		if {$name == "video_dir"} {
-			set info(video_file_cache) [list]
+			set info(video_cache) [list]
+			Neuroplayer_print "Clearing video cache:\
+				new or refreshed video directory" verbose
 		}
 		return $dn
 	}
@@ -8080,7 +8082,7 @@ proc Neuroplayer_video_seek {datetime length} {
 	# requested interval is contained in a video we have already read
 	# from the video directory and assessed previously.
 	set vf ""
-	foreach entry $info(video_file_cache) {
+	foreach entry $info(video_cache) {
 		scan $entry %s%d%f%f%d%d%f fn vtime vlen clen width height framerate
 		if {($vtime <= $datetime) && ($vtime + $clen >= $datetime + $length)} {
 			set vf $fn
@@ -8138,9 +8140,9 @@ proc Neuroplayer_video_seek {datetime length} {
 		}
 		
 		# Add the video to our cache.
-		lappend info(video_file_cache) "$vf $vtime $vlen $clen $width $height $framerate"
-		if {[llength $info(video_file_cache)] > $info(max_video_files)} {
-			set info(video_file_cache) [lrange $info(video_file_cache) 10 end]
+		lappend info(video_cache) "$vf $vtime $vlen $clen $width $height $framerate"
+		if {[llength $info(video_cache)] > $info(max_video_files)} {
+			set info(video_cache) [lrange $info(video_cache) 10 end]
 		}
 		Neuroplayer_print "Added [file tail $vf] to video cache." verbose
 		

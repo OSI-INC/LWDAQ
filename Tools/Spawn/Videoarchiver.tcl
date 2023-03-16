@@ -1692,7 +1692,8 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 # being compressed. Keeps the camera clock synchronized. Arranges video segments in 
 # correct order adds to recording file. The first time we call the routine to start
 # a transfer process, we pass a 1 for the init parameter. This allows the routine
-# to delete the first segment in a stream and clear the camera's segment time to zero.
+# to delete the first segment in a stream, identify the first segment that it is going
+# to save, and make sure that its timestamp is correct.
 #
 proc Videoarchiver_transfer {n {init 0}} {
 	upvar #0 Videoarchiver_config config
@@ -1807,9 +1808,11 @@ proc Videoarchiver_transfer {n {init 0}} {
 					set result [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $result]} {error $result}
 					
-					# If we are initializing, don't save this segment to disk. Instead
-					# we create a blank image, clear the file time to zero, set the
-					# lag to unknown, and clear the init flat.
+					# If we are initializing, don't save this segment to disk.
+					# Instead, we take this opportunity to create a blank image
+					# that we will use to pad segments that are missing frames.
+					# We clear the file time to zero, set the lag to unknown,
+					# and clear the init flat.
 					if {$init} {
 						set info(cam$n\_ftime) 0
 						set lag "?"
