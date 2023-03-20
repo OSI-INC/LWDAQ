@@ -180,10 +180,10 @@ begin
 end;
 
 {
-	wps_coordinates_from_mount takes the global coordinates of the wps
-	mounting balls and calculates the origin and axis unit vectors of the wps
-	coordinate system expressed in global coordinates. We define wps coordinates
-	in the same way as bcam coordinates, so we just call the bcam routine that
+	wps_coordinates_from_mount takes the global coordinates of the wps mounting
+	balls and calculates the origin and axis unit vectors of the wps coordinate
+	system expressed in global coordinates. We define wps coordinates in the
+	same way as bcam coordinates, so we just call the bcam routine that
 	generates these coordinates, and use its result.
 }
 function wps_coordinates_from_mount(mount:kinematic_mount_type):coordinates_type;
@@ -220,7 +220,7 @@ begin
 end;
 
 {
-	global_from_wps_vector converts a direction in wps coordinates into a 
+	global_from_wps_vector converts a direction in wps coordinates into a
 	direction in global coordinates.
 }
 function global_from_wps_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
@@ -235,8 +235,8 @@ begin
 end;
 
 {
-	global_from_wps_point converts a point in wps coordinates into a point
-	in global coordinates.
+	global_from_wps_point converts a point in wps coordinates into a point in
+	global coordinates.
 }
 function global_from_wps_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
 

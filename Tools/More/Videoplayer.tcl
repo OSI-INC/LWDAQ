@@ -25,6 +25,10 @@
 # processing.
 #
 
+# [17-MAR-23] Videoplayer should detect when live streaming falls behind, which
+# is to say: it needs to know the frame rate and to keep track of time. When the
+# lag exceeds a limit, the streaming or playing should quit and issue an error.
+
 #
 # Videoplayer_init creates the info and config arrays. The config array is
 # available through the Config button but the info array is private. 

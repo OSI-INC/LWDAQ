@@ -16,6 +16,10 @@
 # this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 # Place - Suite 330, Boston, MA	02111-1307, USA.
 
+# [17-MAR-23] Videoarchiver should detect when live or recording views are lagging
+# behind, receive error from Videoplayer, and close live window, suggesting
+# user drops resolution.
+
 
 #
 # Videoarchiver_init initializes the info and config arrays, and reads
