@@ -37,31 +37,15 @@ type
 	center of the ccd, and the rotation about x, y, and z of the ccd. All
 	coordinates are in scam coordinates, which are defined with respect to the
 	scam mounting balls in the same way we define bcam coordinates with respect
-	to bcam mounting balls. Rotation (0, 0, 0) is when the ccd is in a z-y scam
-	plane, with the image sensor x-axis parallel to the scam y-axis and the image
-	sensor y-axis is parallel and opposite to the scam z-axis.
+	to bcam mounting balls. Rotation (0, 0, 0) is when the ccd is in an x-y scam
+	plane, with the image sensor x-axis parallel to the scam x-axis and the image
+	sensor y-axis is parallel and opposite to the scam y-axis.
 }
 	scam_camera_type=record
 		pivot:xyz_point_type;{scam coordinates of pivot point (mm)}
 		sensor:xyz_point_type;{scam coordinates of ccd center}
 		rot:xyz_point_type;{rotation of ccd about x, y, z in rad}
 		id:string;{identifier}
-	end;
-{
-	scam_wire_type describes a wire in space.
-}
-	scam_wire_type=record
-		position:xyz_point_type;{where the center-line crosses the measurement plane}
-		direction:xyz_point_type;{direction cosines of center-line direction}
-		radius:real;{radius of wire}
-	end;
-{
-	scam_edge_type describes an edge line on the ccd;
-}
-	scam_edge_type=record
-		position:xy_point_type;{of a point in the edge line, in image coordinates, mm}
-		rotation:real;{of the edge line, anticlockwise positive in image, radians}
-		side:integer;{0 for wire center, +1 for left edges, -1 for right edges, as seen in image}
 	end;
 	
 function scam_ray(p:xy_point_type;camera:scam_camera_type):xyz_line_type;
@@ -286,9 +270,9 @@ var
 	q:xyz_point_type;
 	
 begin
-	q.x:=0;
-	q.y:=p.y-scam_sensor_y;
-	q.z:=-(p.x-scam_sensor_x);
+	q.z:=0;
+	q.x:=p.x-scam_sensor_x;
+	q.y:=-(p.y-scam_sensor_y);
 	q:=xyz_rotate(q,camera.rot);
 	q:=xyz_sum(q,camera.sensor);
 	scam_from_image_point:=q;
@@ -314,7 +298,7 @@ begin
 	r.x:=scam_sensor_x;
 	r.y:=scam_sensor_y;
 	plane.point:=scam_from_image_point(r,camera);
-	with normal_point do begin x:=1; y:=0; z:=0; end;
+	with normal_point do begin x:=0; y:=0; z:=1; end;
 	normal_point:=xyz_rotate(normal_point,camera.rot);
 	normal_point:=xyz_sum(normal_point,camera.sensor);
 	plane.normal:=xyz_difference(normal_point,plane.point);
@@ -323,8 +307,8 @@ begin
 	q:=xyz_line_plane_intersection(ray,plane);
 	q:=xyz_difference(q,camera.sensor);
 	q:=xyz_unrotate(q,camera.rot);
-	r.x:=scam_sensor_x-q.z;
-	r.y:=scam_sensor_y+q.y;
+	r.x:=scam_sensor_x+q.x;
+	r.y:=scam_sensor_y-q.y;
 	image_from_scam_point:=r;
 end;
 
@@ -360,36 +344,24 @@ begin
 	with camera do begin
 		case code of
 			1:begin
-				id:='scam1_A_1';
-				pivot.x:=-4.5;
-				pivot.y:=87.4;
-				pivot.z:=-5;
-				rot.x:=-pi/2;
+				id:='scam1';
+				pivot.x:=0;
+				pivot.y:=0;
+				pivot.z:=0;
+				rot.x:=0;
 				rot.y:=0;
-				rot.z:=-0.541;
-				sensor.x:=pivot.x-11.4*cos(rot.z);
-				sensor.y:=pivot.y-11.4*sin(rot.z);
-				sensor.z:=pivot.z;
-			end;
-			2:begin
-				id:='scam1_A_2';
-				pivot.x:=-4.5;
-				pivot.y:=37.4;
-				pivot.z:=-5;
-				rot.x:=+pi/2;
-				rot.y:=0;
-				rot.z:=+0.541;
-				sensor.x:=pivot.x-11.4*cos(rot.z);
-				sensor.y:=pivot.y-11.4*sin(rot.z);
-				sensor.z:=pivot.z;
+				rot.z:=0;
+				sensor.x:=pivot.x;
+				sensor.y:=pivot.y;
+				sensor.z:=pivot.z-25;
 			end;
 			otherwise begin
 				id:='DEFAULT';
 				pivot:=xyz_origin;
-				sensor.x:=-1;
-				sensor.y:=0;
-				sensor.z:=0;
 				rot:=xyz_origin;
+				sensor.x:=0;
+				sensor.y:=0;
+				sensor.z:=-1;
 			end;
 		end;
 	end;

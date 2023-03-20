@@ -2884,6 +2884,117 @@ begin
 end;
 
 {
+<p>lwdaq_scam analyzes Silhouette Camera images. It clears the overlay for its own use.</p>
+
+<center><table border cellspacing=2>
+<tr><th>Option</th><th>Function</th></tr>
+<tr><td>-pixel_size_um</td><td>Width and height of image pixels in microns.</td></tr>
+<tr><td>-reference_x_um</td><td>x-coordinate of reference point on sensor.</td></tr>
+<tr><td>-reference_y_um</td><td>y-coordinate of reference point on sensor.</td></tr>
+<tr><td>-show_edges</td><td>If 1, show edge pixesls in image, defalut 0</td></tr>
+<tr><td>-pre_smooth</td><td>Smooth the image before you take the derivative.</td></tr>
+<tr><td>-threshold</td><td>Criteria for selecting silhouette pixels.</td></tr>
+pixels.</td></tr>
+</table></center>
+
+<p>The -threshold string is used in the same way as in <a href="#lwdaq_bcam">lwdaq_bcam</a>. It can contain an intensity threshold or it can define a means to calculate the threshold. With -pre_smooth set to 1, the routine smooths the original image with a box filter before it applies the gradient and threshold. With <i>show_edges</i> equal to one, the routine plots all the edge pixels in color.</p>
+}
+function lwdaq_scam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
+
+var 
+	ip:image_ptr_type=nil;
+	iip:image_ptr_type=nil;
+	sip:image_ptr_type=nil;
+	image_name:string='';
+	result:string='';
+	option:string;
+	arg_index:integer;
+	reference_x_um:real=bcam_icx424_center_x*1000;
+	reference_y_um:real=bcam_icx424_center_y*1000;
+	vp:pointer;	
+	show_edges:boolean=false;
+	pre_smooth:boolean=false;
+	pixel_size_um:real=7.4;
+	i:integer=1;
+	j:integer=1;
+	saved_bounds:ij_rectangle_type;
+	threshold:string='50 #';
+		
+begin
+	error_string:='';
+	gui_interp_ptr:=interp;
+	lwdaq_scam:=Tcl_Error;
+	
+	if (argc<2) or (odd(argc)) then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Wrong number of arguments, must be "'
+			+'lwdaq_scam image ?option value?".');
+		exit;
+	end;
+	
+	image_name:=Tcl_ObjString(argv[1]);
+	ip:=image_ptr_from_name(image_name);
+	if not valid_image_ptr(ip) then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Image "'+image_name+'" does not exist in '
+			+'lwdaq_scam.');
+		exit;
+	end;
+	
+	arg_index:=2;
+	while (arg_index<argc-1) do begin
+		option:=Tcl_ObjString(argv[arg_index]);
+		inc(arg_index);
+		vp:=argv[arg_index];
+		inc(arg_index);
+		if (option='-show_edges') then show_edges:=Tcl_ObjBoolean(vp)
+		else if (option='-pixel_size_um') then pixel_size_um:=Tcl_ObjReal(vp)
+		else if (option='-reference_x_um') then reference_x_um:=Tcl_ObjReal(vp)
+		else if (option='-reference_y_um') then reference_y_um:=Tcl_ObjReal(vp)
+		else if (option='-pre_smooth') then pre_smooth:=Tcl_ObjBoolean(vp)
+		else if (option='-threshold') then threshold:=Tcl_ObjString(vp)
+		else begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Bad option "'+option+'", must be one of '
+				+'-pixel_size_um -reference_x_um -reference_y_um '
+				+'-threshold -show_edges -pre_smooth" in '
+				+'lwdaq_scam.');
+			exit;
+		end;
+	end;
+	
+	if image_name='' then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Specify an image name with -image_name in '
+			+'lwdaq_scam.');
+		exit;
+	end;
+	ip:=image_ptr_from_name(image_name);
+	if not valid_image_ptr(ip) then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Image "'+image_name+'" does not exist in '
+			+'lwdaq_scam.');
+		exit;
+	end;	
+{
+	Generate the derivative image and find spots above threshold in this new
+	image.
+}
+	if pre_smooth then begin
+		sip:=image_filter(ip,1,1,1,1,1,1,0);
+		iip:=image_grad_i(sip);
+		dispose_image(sip);
+	end else begin
+		iip:=image_grad_i(ip);
+	end;
+	dispose_image(iip);
+	
+	if error_string='' then Tcl_SetReturnString(interp,result)
+	else Tcl_SetReturnString(interp,error_string);
+	lwdaq_scam:=Tcl_OK;
+end;
+
+{
 <p>lwdaq_calibration takes as input an apparatus measurement and a device calibration, and returns a parameter calculation. The routine calls parameter_calculation in the <a href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a>. This routine supports bcam cameras and bcam sources for all types of bcam and both j_plates and k_plates.</p>
 }
 function lwdaq_calibration(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
@@ -5611,6 +5722,7 @@ begin
 	tcl_createobjcommand(interp,'lwdaq_wps',lwdaq_wps,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_shadow',lwdaq_shadow,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_bcam',lwdaq_bcam,0,nil);
+	tcl_createobjcommand(interp,'lwdaq_scam',lwdaq_scam,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_dosimeter',lwdaq_dosimeter,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_diagnostic',lwdaq_diagnostic,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_gauge',lwdaq_gauge,0,nil);

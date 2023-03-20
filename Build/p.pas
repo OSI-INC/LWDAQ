@@ -3,32 +3,27 @@ program p;
 {$MODESWITCH CLASSICPROCVARS+}
 {$LONGSTRINGS ON}
 
-const
-  threshold = 1000;
-  fifo_addr = $1200;
-  fifo_length = 128;
-  stimulus_addr = $E010;
-
-type
-  shortint = $0000..$FFFF; {16-bit unsigned}
-  shortint_ptr = ^shortint;
-  integer = $00000000..$FFFFFFFF; {32-bit unsigned}
+uses
+	scam,bcam,utils,images,image_manip;
 
 var
-  sum,sum_squares,variance : integer;
-  index : 0..fifo_length-1;
-  sample : shortint;
-
+	sc:scam_camera_type;
+	q,qq:xy_point_type;
+	r:xyz_point_type;
+	d:real;
+	i:integer;
+	
 begin
-  sum := 0;
-  sum_squares := 0;
-  for index := 0 to fifo_length-1 do begin
-    sample := shortint_ptr(fifo_addr)^;  {FIFO provides a new byte for each read.}
-    sum := sum + sample;
-    sum_squares := sum_squares + (sample * sample);
-  end;
-  variance := sum_squares - (sum * sum); {we are avoiding a division operation}
-  if variance > threshold * threshold * fifo_length then begin
-    shortint_ptr(stimulus_addr)^ := 1;
-  end;
+	sc:=nominal_scam_camera(1);
+	for i:=1 to 1000 do begin
+		q.x:=2.590+random_0_to_1-0.5;
+		q.y:=1.924+random_0_to_1-0.5;
+		r:=scam_from_image_point(q,sc);
+		qq:=image_from_scam_point(r,sc);
+		if xy_separation(q,qq) > 0.001 then begin
+			writeln(string_from_xy(q));
+			writeln(string_from_xyz(r));
+			writeln(string_from_xy(qq));
+		end; 
+	end;
 end.

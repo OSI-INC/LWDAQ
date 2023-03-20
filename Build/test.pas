@@ -7,7 +7,7 @@ uses
 	utils;
 	
 const
-	bsize=10000000;
+	bsize=1000000;
 	gsize=1000;
 	tsize=10;
 	reps=100;
@@ -82,7 +82,7 @@ begin
 {
 	Test block move and timer system.
 }	
-	writeln('Creating two 10-MByte arrays...');
+	writeln('Creating two arrays of ',bsize:1,' bytes.');
 	setlength(b1,bsize);
 	setlength(b2,bsize);
 
@@ -90,7 +90,7 @@ begin
 	for i:=0 to bsize-1 do
 		b1[i]:=i mod 256;
 
-	writeln('Copying 10 MByte with block_move ',reps:1,' times...');
+	writeln('Copying ',bsize:1,'bytes with block_move ',reps:1,' times...');
 	start_timer('Start','block_move test');
 	for j:=1 to reps do 
 		block_move(@b1[0],@b2[0],bsize);
@@ -118,7 +118,7 @@ begin
 {
 	Test block set and block clear.
 }
-	writeln('Testing block clear on 10-MByte array.');
+	writeln('Testing block clear on array of ',bsize:1,' bytes.');
 	setlength(b1,bsize);
 	for i:=0 to bsize-1 do b1[i]:=i mod 256;
 	block_clear(@b1[0],bsize);
@@ -133,7 +133,7 @@ begin
 		end;
 	if good then writeln('Block clear accurate.');
 		
-	writeln('Testing block fill on 10-MByte array.');
+	writeln('Testing block fill on array of ',bsize:1,' bytes.');
 	for i:=0 to bsize-1 do b1[i]:=i mod 256;
 	block_fill(@b1[0],bsize);
 	good:=true;
@@ -147,7 +147,7 @@ begin
 		end;
 	if good then writeln('Block fill accurate.');
 			
-	writeln('Testing block set on 10-MByte array.');
+	writeln('Testing block set on array of ',bsize:1,' bytes.');
 	for i:=0 to bsize-1 do
 		b1[i]:=i mod 256;
 	block_set(@b1[0],bsize,$AA);
@@ -565,6 +565,6 @@ begin
 		writeln('You entered: "',s,'".');
 		x:=real_from_string(s,good);
 		if not good then writeln('Hey! That was not a number')
-		else writeln('That was a real number.');
+		else writeln('That was a number.');
 	until good;
 end.
