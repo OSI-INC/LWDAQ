@@ -84,7 +84,7 @@ SRC_DIR = ../Sources
 
 # Objects required to create LWDAQ, ANALYSIS, and p targets.
 OBJA = utils.o images.o transforms.o image_manip.o rasnik.o spot.o bcam.o \
-	shadow.o wps.o electronics.o metrics.o
+	shadow.o wps.o scam.o electronics.o metrics.o
 
 # Objects required by LWDAQ only.
 OBJB = tcltk.o
