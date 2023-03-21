@@ -544,15 +544,20 @@ function xy_rectangle_ellipse(rect:xy_rectangle_type):xy_ellipse_type;
 	The length, combined with the direction of the normal vector used to express
 	the plane, give us the direction and terminus of the cylinder axis, and
 	therefore the far face of the cylinder as well. We have no xyz_circle,
-	because we can get a circle by setting the length of a cylinder to zero.
+	because we can get a circle by setting the length of a cylinder to zero. We
+	define a three-dimensional coordinate system as an origin point and three
+	unit vectors for the three axes. The coordinate system is over-constrained,
+	but in our code we find that the over-constrained definition serves as a
+	self-consistency check, and is at the same time easier to work with and
+	easier to check.
 }
 type 
 	xyz_line_type=record point,direction:xyz_point_type; end;
 	xyz_line_ptr_type=^xyz_line_type;
 	xyz_plane_type=record point,normal:xyz_point_type; end;
 	xyz_plane_ptr_type=^xyz_plane_type;
-	xyz_sphere_type=record point:xyz_point_type;radius:real; end;
-	xyz_cylinder_type=record plane:xyz_plane_type;radius,length:real; end;
+	xyz_sphere_type=record center:xyz_point_type;radius:real; end;
+	xyz_cylinder_type=record face:xyz_plane_type;radius,length:real; end;
 	coordinates_type=record
 		origin,x_axis,y_axis,z_axis:xyz_point_type;{a point and three unit vectors}
 	end;
@@ -578,7 +583,7 @@ function xyz_plane_plane_plane_intersection(p,q,r:xyz_plane_type):xyz_point_type
 function xyz_line_plane_intersection(line:xyz_line_type;plane:xyz_plane_type):xyz_point_type;
 function xyz_plane_plane_intersection(p,q:xyz_plane_type):xyz_line_type;
 function xyz_line_crosses_sphere(line:xyz_line_type;sphere:xyz_sphere_type):boolean;
-function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:xyz_sphere_type):boolean;
+function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:xyz_cylinder_type):boolean;
 function xyz_line_reflect(line:xyz_line_type;plane:xyz_plane_type):xyz_line_type;
 function xyz_point_line_vector(point:xyz_point_type;line:xyz_line_type):xyz_point_type;
 function xyz_line_line_bridge(p,q:xyz_line_type):xyz_line_type;
@@ -2543,6 +2548,7 @@ var
 	g:x_graph_type;
 
 begin
+	percentile_x_graph:=0;
 	if length(gp)=0 then begin
 		report_error('length(gp)=0 in percentile_x_graph');
 		exit;
@@ -5546,7 +5552,10 @@ begin
 end;
 
 {
-	xyz_point_line_vector returns the shortest vector from a point to a line.
+	xyz_point_line_vector returns the shortest vector from a starting point to a
+	destination line. The point on the target line that is closest to the
+	starting point we can obtain by adding the shortest vector to the starting
+	point.
 }
 function xyz_point_line_vector(point:xyz_point_type;line:xyz_line_type):xyz_point_type;
 begin
@@ -5633,17 +5642,58 @@ end;
 	the sphere.
 }
 function xyz_line_crosses_sphere(line:xyz_line_type;sphere:xyz_sphere_type):boolean;
+var
+	range:real;
 begin
 	xyz_line_crosses_sphere:=false;
+	range:=xyz_length(xyz_point_line_vector(sphere.center,line));
+	xyz_line_crosses_sphere:=(range<=sphere.radius);
 end;
 
 {
 	xyz_line_crosses_cylinder returns true iff the line intersects or touches
-	the cylinder.
+	the cylinder. We check to see if the line crosses either flat face of the 
+	cylinder, then to see if it crosses the curved surface. A line crosses a
+	flat face if it intersects with the plane defining the flat surface within
+	the cylinder radius of the face center. If a line crosses neither face, its
+	only means of crossing the cylinder is to enter the curved surface of the
+	cylinder some place and leave the curved surface at another place. The closest
+	approach of the line to the cylinder axis will have length less than the 
+	cylinder radius, and the closest point on the axis will lie between the 
+	two cylinder faces.
 }
-function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:xyz_sphere_type):boolean;
+function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:xyz_cylinder_type):boolean;
+var
+	f:xyz_plane_type;
+	n,p:xyz_point_type;
+	axis,bridge:xyz_line_type;
+	a:real;
 begin
 	xyz_line_crosses_cylinder:=false;
+	if xyz_separation(
+			xyz_line_plane_intersection(line,cylinder.face),
+			cylinder.face.point) 
+			<= cylinder.radius then 
+		xyz_line_crosses_cylinder:=true
+	else begin
+		n:=xyz_unit_vector(cylinder.face.normal);
+		f.point:=xyz_sum(cylinder.face.point,xyz_scale(n,cylinder.length));
+		f.normal:=n;
+		if xyz_separation(
+				xyz_line_plane_intersection(line,f),
+				f.point) <= cylinder.radius then 
+			xyz_line_crosses_cylinder:=true
+		else begin
+			axis.point:=cylinder.face.point;
+			axis.direction:=n;
+			bridge:=xyz_line_line_bridge(axis,line);
+			p:=xyz_difference(bridge.point,cylinder.face.point);
+			a:=xyz_dot_product(p,n);
+			if (a>=0) and (a<=cylinder.length) 
+					and (xyz_length(bridge.direction)<=cylinder.radius) then
+				xyz_line_crosses_cylinder:=true
+		end;
+	end;
 end;
 
 {

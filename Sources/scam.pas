@@ -1,20 +1,19 @@
 {
-Utilities for Silhouette Camera Image Analysis and Object Location
+Silhouette Camera (SCAM) Projection and Fitting Routines
 Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place - Suite 330, Boston, MA  02111-1307, USA.
 }
 
 unit scam;
@@ -25,29 +24,36 @@ unit scam;
 interface
 
 uses
-	utils,bcam;
-	
-const
-	scam_sensor_x=bcam_icx424_center_x;
-	scam_sensor_y=bcam_icx424_center_y;
-	
+	utils,images,transforms,bcam;
+		
 type
 {
 	scam_camera_type gives the pivot point coordinates, the coordinates of the
 	center of the ccd, and the rotation about x, y, and z of the ccd. All
-	coordinates are in scam coordinates, which are defined with respect to the
+	coordinates are in SCAM coordinates, which are defined with respect to the
 	scam mounting balls in the same way we define bcam coordinates with respect
 	to bcam mounting balls. Rotation (0, 0, 0) is when the ccd is in an x-y scam
-	plane, with the image sensor x-axis parallel to the scam x-axis and the image
-	sensor y-axis is parallel and opposite to the scam y-axis.
+	plane, with the image sensor x-axis parallel to the SCAM x-axis and the image
+	sensor y-axis is parallel and opposite to the SCAM y-axis.
 }
 	scam_camera_type=record
-		pivot:xyz_point_type;{scam coordinates of pivot point (mm)}
-		sensor:xyz_point_type;{scam coordinates of ccd center}
+		pivot:xyz_point_type;{scam coordinates of pivot point in mm}
+		sensor:xyz_point_type;{scam coordinates of sensor reference point in mm}
 		rot:xyz_point_type;{rotation of ccd about x, y, z in rad}
+		reference_point:xy_point_type;{from sensor top-left corner in mm}
+		pixel_size:real;{width and height of a sensor pixel in mm}
 		id:string;{identifier}
 	end;
 	
+{
+	Coordinate transformations. The SCAM coordinates are the mount coordinates
+	of the SCAM mount. We define with respect to its kinematic cone, slot flat
+	in the same way we do for BCAMs. See bcam_coordinates_from_mount for
+	details. Image coordinates are in millimeters from the top-left corner of
+	the image sensor. Global coordinates are those in which we express the
+	position of the SCAM mounting balls and of the objects the SCAMs see in
+	front of a backlight to generate silhouette images.
+}	
 function scam_ray(p:xy_point_type;camera:scam_camera_type):xyz_line_type;
 function scam_coordinates_from_mount(mount:kinematic_mount_type):coordinates_type;
 function scam_from_image_point(p:xy_point_type;camera:scam_camera_type):xyz_point_type;
@@ -60,19 +66,52 @@ function global_from_scam_vector(p:xyz_point_type;mount:kinematic_mount_type):xy
 function global_from_scam_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
 function global_from_scam_line(b:xyz_line_type;mount:kinematic_mount_type):xyz_line_type;
 function global_from_scam_plane(p:xyz_plane_type;mount:kinematic_mount_type):xyz_plane_type;
+
+{
+	Routines to read and write camera parameters from and to strings.
+}
 function nominal_scam_camera(code:integer):scam_camera_type;
 function read_scam_camera(var f:string):scam_camera_type;
 function scam_camera_from_string(s:string):scam_camera_type;
 function string_from_scam_camera(camera:scam_camera_type):string;
 
+{
+	Routines that project hypothetical objects in SCAM coordinates onto SCAM
+	image sensors to produce simulated views of the hypothetical objects. We
+	pass an image pointer to the routines, and the routine works on this image.
+	We specify an object in SCAM coordinates and we give the calibration of the
+	SCAM itself, which is also in SCAM coordinates.
+}
+procedure scam_project_sphere(ip:image_ptr_type;
+	sphere:xyz_sphere_type;
+	camera:scam_camera_type);
+procedure scam_project_cylinder(ip:image_ptr_type;
+	cylinder:xyz_cylinder_type;
+	camera:scam_camera_type);
+
 
 implementation
 
 const
-	n=3;{three-dimensional space}
-
 {
-	read_scam_camera reads a camera type from a string.
+	The reference point in the image is the point that we use as the center of
+	the sensor when we express the geometry of a camera in mount coordinates. We
+	give the default value here, in millimeters. These values are for the ICX424.
+}
+	reference_x_default=2.590; 
+	reference_y_default=1.924;
+	pixel_size_default=0.0074;
+{
+	Colors for various shapes.
+}
+	sphere_color=green_color;
+	cylinder_color=blue_color;
+	
+{
+	read_scam_camera reads a camera type from a string. It assumes that the pivot and
+	sensor coordinates are in millimeters, and leaves them in millimeters. It assumes
+	the rotation is in milliradians, but converts them to radians. It assumes the
+	reference point and pixel size are in microns, and leaves them in microns.
 }
 function read_scam_camera(var f:string):scam_camera_type;
 
@@ -90,12 +129,14 @@ begin
 			y:=y/mrad_per_rad;
 			z:=z/mrad_per_rad;
 		end;
+		reference_point:=read_xy(f);
+		pixel_size:=read_real(f);
 	end;
 	read_scam_camera:=camera;
 end;
 
 {
-	scam_camera_from_string converts a string into a scam_camera_type;
+	scam_camera_from_string converts a string into a scam_camera_type.
 }
 function scam_camera_from_string(s:string):scam_camera_type;
 begin
@@ -103,7 +144,8 @@ begin
 end;
 
 {
-	string_from_scam_camera appends a camera type to a string, using only one line.
+	string_from_scam_camera appends a camera type to a string, using only one line. It
+	converts rotation in radians into milliradians. 
 }
 function string_from_scam_camera(camera:scam_camera_type):string;
 	
@@ -123,13 +165,16 @@ begin
 		with rot do 
 			writestr(f,f,x*mrad_per_rad:9:fsdr,' ',
 				y*mrad_per_rad:7:fsdr,' ',
-				z*mrad_per_rad:8:fsdr);
+				z*mrad_per_rad:8:fsdr,' ');
+		with reference_point do
+			writestr(f,f,x:fsr:fsdr,' ',y:fsr:fsdr,' ');
+		writestr(f,f,pixel_size:fsr:fsdr);
 	end;
 	string_from_scam_camera:=f;
 end;
 
 {
-	scam_origin returns the origin of the scam coordinates for the specified mounting balls.
+	scam_origin returns the origin of the SCAM coordinates for the specified mounting balls.
 }
 function scam_origin(mount:kinematic_mount_type):xyz_point_type;
 
@@ -138,9 +183,9 @@ begin
 end;
 
 {
-	scam_coordinates_from_mount takes the global coordinates of the scam mounting
-	balls and calculates the origin and axis unit vectors of the scam coordinate
-	system expressed in global coordinates. We define scam coordinates in the
+	scam_coordinates_from_mount takes the global coordinates of the SCAM mounting
+	balls and calculates the origin and axis unit vectors of the SCAM coordinate
+	system expressed in global coordinates. We define SCAM coordinates in the
 	same way as bcam coordinates, so we just call the bcam routine that
 	generates these coordinates, and use its result.
 }
@@ -152,7 +197,7 @@ end;
 
 {
 	scam_from_global_vector converts a direction in global coordinates into a 
-	direction in scam coordinates.
+	direction in SCAM coordinates.
 }
 function scam_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
 
@@ -169,7 +214,7 @@ end;
 
 {
 	scam_from_global_point converts a point in global coordinates into a point
-	in scam coordinates.
+	in SCAM coordinates.
 }
 function scam_from_global_point (p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
 
@@ -178,7 +223,7 @@ begin
 end;
 
 {
-	global_from_scam_vector converts a direction in scam coordinates into a
+	global_from_scam_vector converts a direction in SCAM coordinates into a
 	direction in global coordinates.
 }
 function global_from_scam_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
@@ -193,7 +238,7 @@ begin
 end;
 
 {
-	global_from_scam_point converts a point in scam coordinates into a point in
+	global_from_scam_point converts a point in SCAM coordinates into a point in
 	global coordinates.
 }
 function global_from_scam_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
@@ -203,7 +248,7 @@ begin
 end;
 
 {
-	global_from_scam_line converts a bearing (point and direction) in scam coordinates into
+	global_from_scam_line converts a bearing (point and direction) in SCAM coordinates into
 	a bearing in global coordinates.
 }
 function global_from_scam_line(b:xyz_line_type;mount:kinematic_mount_type):xyz_line_type;
@@ -232,7 +277,7 @@ begin
 end;
 
 {
-	global_from_scam_plane converts a plane in scam coordinates into a plane
+	global_from_scam_plane converts a plane in SCAM coordinates into a plane
 	global coordinates.
 }
 function global_from_scam_plane(p:xyz_plane_type;mount:kinematic_mount_type):xyz_plane_type;
@@ -261,7 +306,7 @@ begin
 end;
 
 {
-	scam_from_image_point converts a point on the ccd into a point in scam coordinates. 
+	scam_from_image_point converts a point on the ccd into a point in SCAM coordinates. 
 	The calculation takes account of the orientation of the ccd in the camera.
 }
 function scam_from_image_point(p:xy_point_type;camera:scam_camera_type):xyz_point_type;
@@ -271,19 +316,19 @@ var
 	
 begin
 	q.z:=0;
-	q.x:=p.x-scam_sensor_x;
-	q.y:=-(p.y-scam_sensor_y);
+	q.x:=p.x-camera.reference_point.x;
+	q.y:=-(p.y-camera.reference_point.y);
 	q:=xyz_rotate(q,camera.rot);
 	q:=xyz_sum(q,camera.sensor);
 	scam_from_image_point:=q;
 end;
 
 {
-	image_from_scam_point converts a point in scam coordinates into a point in
-	image coordinates. The scam point can lie in the image, but it does not
-	have to. We make a line out of the point and the scam pivot, and 
+	image_from_scam_point converts a point in SCAM coordinates into a point in
+	image coordinates. The SCAM point can lie in the image, but it does not
+	have to. We make a line out of the point and the SCAM pivot, and 
 	intersect this line with the image plane to obtain the point on the image
-	plane that marks the image of the scam point. Thus we can use this routine 
+	plane that marks the image of the SCAM point. Thus we can use this routine 
 	to figure out where the image of an object will lie on the image sensor.
 }
 function image_from_scam_point(p:xyz_point_type;camera:scam_camera_type):xy_point_type;
@@ -295,8 +340,8 @@ var
 	r:xy_point_type;
 	
 begin
-	r.x:=scam_sensor_x;
-	r.y:=scam_sensor_y;
+	r.x:=camera.reference_point.x;
+	r.y:=camera.reference_point.y;
 	plane.point:=scam_from_image_point(r,camera);
 	with normal_point do begin x:=0; y:=0; z:=1; end;
 	normal_point:=xyz_rotate(normal_point,camera.rot);
@@ -307,8 +352,8 @@ begin
 	q:=xyz_line_plane_intersection(ray,plane);
 	q:=xyz_difference(q,camera.sensor);
 	q:=xyz_unrotate(q,camera.rot);
-	r.x:=scam_sensor_x+q.x;
-	r.y:=scam_sensor_y-q.y;
+	r.x:=camera.reference_point.x+q.x;
+	r.y:=camera.reference_point.y-q.y;
 	image_from_scam_point:=r;
 end;
 
@@ -354,20 +399,74 @@ begin
 				sensor.x:=pivot.x;
 				sensor.y:=pivot.y;
 				sensor.z:=pivot.z-25;
+				reference_point.x:=reference_x_default; 
+				reference_point.y:=reference_y_default;
+				pixel_size:=pixel_size_default;
 			end;
 			otherwise begin
-				id:='DEFAULT';
+				id:='scam0';
 				pivot:=xyz_origin;
 				rot:=xyz_origin;
 				sensor.x:=0;
 				sensor.y:=0;
 				sensor.z:=-1;
+				reference_point:=xy_origin; 
+				pixel_size:=0.01;
 			end;
 		end;
 	end;
 	nominal_scam_camera:=camera;
 end;
 
+{
+	scam_project_sphere takes a sphere in SCAM coordinates and projects it onto the
+	image sensor of a camera. The image sensor's center and pixel size are specified by
+	the camera parameters. The pixels of the image sensor we obtain from the image, 
+	which defines its own width and height. The routine draws in the overlay, not the
+	actual image. I draws only within the analysis boundaries.
+}
+procedure scam_project_sphere(ip:image_ptr_type;
+	sphere:xyz_sphere_type;
+	camera:scam_camera_type);
+var
+	i,j:integer;
+	q:xy_point_type;
+	r:xyz_point_type;
+begin
+	with ip^.analysis_bounds do begin
+		for j:=top to bottom do begin
+			for i:=left to right do begin
+				q.x:=(i+ccd_origin_x)*camera.pixel_size;
+				q.y:=(j+ccd_origin_y)*camera.pixel_size;
+				if xyz_line_crosses_sphere(scam_ray(q,camera),sphere) then
+					set_ov(ip,j,i,sphere_color);
+			end;
+		end;
+	end;
+end;
+
+{
+	scam_project_cylinder does for cylinders what scam_project_sphere does for spheres.
+}
+procedure scam_project_cylinder(ip:image_ptr_type;
+	cylinder:xyz_cylinder_type;
+	camera:scam_camera_type);
+var
+	i,j:integer;
+	q:xy_point_type;
+	r:xyz_point_type;
+begin
+	with ip^.analysis_bounds do begin
+		for j:=top to bottom do begin
+			for i:=left to right do begin
+				q.x:=(i+ccd_origin_x)*camera.pixel_size;
+				q.y:=(j+ccd_origin_y)*camera.pixel_size;
+				if xyz_line_crosses_cylinder(scam_ray(q,camera),cylinder) then
+					set_ov(ip,j,i,cylinder_color);
+			end;
+		end;
+	end;
+end;
 
 end.
 

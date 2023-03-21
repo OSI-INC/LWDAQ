@@ -758,10 +758,11 @@ end;
 	calibration error, and while doing so, it writes its intermediate values,
 	and a set of final errors for the pin positions, to the current target of
 	gui_writeln.
-	
-	On a 2.3-GHz Intel Core i5 MacBook Pro, we calculated calibration constants using this routine
-	for 53 WPS calibrations. The 64-bit version of the routine, compiled with FPC, completed in
-	136 s. The 32-bit version, compiled with GPC, completed in 335 s.
+
+	On a 2.3-GHz Intel Core i5 MacBook Pro, we calculated calibration constants
+	using this routine for 53 WPS calibrations. The 64-bit version of the
+	routine, compiled with FPC, completed in 136 s. The 32-bit version, compiled
+	with GPC, completed in 335 s.
 }
 function wps_calibrate(device_name:string;camera_num:integer;data:string):string;
 

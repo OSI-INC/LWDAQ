@@ -25,17 +25,6 @@ unit transforms;
 	contains routines to transform display commands in these coordinate systems
 	into drawing commands in an image overlay.
 
-	CCD coordinates specify a pixel in an image. They are named after the type
-	of image sensor we used for most of our cameras. The letters CCD stand for
-	Charge-Coupled Device. Our CCD images are rectangular with square pixels.
-	The pixels are arranged in rows and columns. We specify a pixel in the image
-	with its column and row number. A ccd point has the form (i,j) where i is
-	the column number and j is the row number. Pixel (0,0) is the top-left
-	pixel. Column number increases from left to right and row number increases
-	from top to bottom. CCD Coordinates are therefore left-handed. We use
-	ij_point_type for points in CCD Coordinates. You will find ij_point_type
-	defined in our utils unit.
-
 	Image coordinates specify a point in an image. An image point has the form
 	(x,y), where x and y are real numbers, x is horizontal distance from left to
 	right and y is vertical distance from top to bottom. The units of both x and
@@ -43,9 +32,18 @@ unit transforms;
 	pixel. Point (1,1) is the bottom-right corner of the top-left pixel, and
 	also the top-left corner of the second pixel in the second row.
 
-	We have constants ccd_origin_x and ccd_origin_y that define the location of
-	the ccd coordinate origin in image coordinates. The center values declared
-	below for these two constants place the ccd origin at image point (0.5,0.5).
+	Our CCD coordinates specify a pixel in an image. They are named after the type
+	of image sensor we used for most of our cameras. The letters CCD stand for
+	Charge-Coupled Device. Our CCD images are rectangular with square pixels.
+	The pixels are arranged in rows and columns. We specify a pixel in the image
+	with its column and row number. A ccd point has the form (i,j) where i is
+	the column number and j is the row number. Pixel (0,0) is the top-left
+	pixel. Column number increases from left to right and row number increases
+	from top to bottom. The CCD Coordinates are therefore left-handed. We use
+	ij_point_type for points in CCD Coordinates. You will find ij_point_type
+	defined in our utils unit. The origin of CCD coordinates in image coordinates
+	is given by our constants ccd_origin_x and ccd_origin_y, which both have value
+	one half, so that the CCD origin is at image point (0.5,0.5).
 
 	Pattern coordinates specify a point in a pattern superimposed on an image.
 	Pattern points are of the form (x,y), where x and y are the real. We assume

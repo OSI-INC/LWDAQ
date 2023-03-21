@@ -1126,9 +1126,9 @@ begin
 end;
 
 {
-	bcam_coordinates_from_mount takes the global coordintes of the camera mounting balls 
-	and calculates the origin and axis unit vectors of the bcam coordinate system expressed in global 
-	coordinates.
+	bcam_coordinates_from_mount takes the global coordintes of the camera
+	mounting balls and calculates the origin and axis unit vectors of the bcam
+	coordinate system expressed in global coordinates.
 }
 function bcam_coordinates_from_mount(mount:kinematic_mount_type):coordinates_type;
 	
