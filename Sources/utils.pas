@@ -529,11 +529,22 @@ function xy_unit_vector(p:xy_point_type):xy_point_type;
 function xy_rectangle_ellipse(rect:xy_rectangle_type):xy_ellipse_type;
 
 {
-	Three-Dimensional Geometry. The xyz_line is point and a vector, which is
-	consistent witht he xyz_plane, which is also a point and a vector, but not
-	consistent with our xy_line, which is two points. A sphere is a point and
-	a radius. A cylinder is two points giving the end points of the axis, and 
-	a radius.
+	Three-Dimensional Geometry. The xyz_line is a point and a vector. So is the
+	xyz_plane, where the point is a point in the plane, and the vector is a
+	normal to the plane. We note that the line is defined by six numbers, where
+	only five numbers are needed to define a line in three-dimensional space.
+	And in the case of the plane, we have six numbers when only four numbers are
+	required. Our expression for line and plane are not intended to be
+	intellectually satisfying, but rather to be convenient for programming and
+	debugging. We do note, however, that our definition of an xyz_line is not
+	consistent with our definition of an xy_line. In the xy_line, we use two
+	points, no vector. An xyz_sphere we define with a point and a radius. An
+	xyz_cylinder is a plane containing one of the two circular ends of the
+	cylinder, a radius that gives us the perimiter of the circle, and a length.
+	The length, combined with the direction of the normal vector used to express
+	the plane, give us the direction and terminus of the cylinder axis, and
+	therefore the far face of the cylinder as well. We have no xyz_circle,
+	because we can get a circle by setting the length of a cylinder to zero.
 }
 type 
 	xyz_line_type=record point,direction:xyz_point_type; end;
@@ -541,7 +552,7 @@ type
 	xyz_plane_type=record point,normal:xyz_point_type; end;
 	xyz_plane_ptr_type=^xyz_plane_type;
 	xyz_sphere_type=record point:xyz_point_type;radius:real; end;
-	xyz_cylinder_type=record axis:xyz_line_type;length,radius:real; end;
+	xyz_cylinder_type=record plane:xyz_plane_type;radius,length:real; end;
 	coordinates_type=record
 		origin,x_axis,y_axis,z_axis:xyz_point_type;{a point and three unit vectors}
 	end;
