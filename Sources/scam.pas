@@ -232,8 +232,8 @@ begin
 end;
 
 {
-	global_from_scam_plane converts a bearing (point and direction) in scam coordinates into
-	a bearing in global coordinates.
+	global_from_scam_plane converts a plane in scam coordinates into a plane
+	global coordinates.
 }
 function global_from_scam_plane(p:xyz_plane_type;mount:kinematic_mount_type):xyz_plane_type;
 
@@ -367,6 +367,7 @@ begin
 	end;
 	nominal_scam_camera:=camera;
 end;
+
 
 end.
 

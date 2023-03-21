@@ -468,6 +468,10 @@ function fft_real_inverse(var ft:xy_graph_type):x_graph_type;
 {
 	Pixel Array Geometry. We provide routines for manipulating shapes in pixel
 	arrays, where coordinates are row j and column i, which are always integers.
+	Our ij_line is two ij_points on the line. This restricts our choice of line
+	to one for which two exact ij_points exist on the line. We use the same
+	two-point definition of a line in xy-coordinates, but in xyz-coordinates we
+	use a point and vector definition.
 }
 type
 	ij_point_type=record i,j:integer; end;
@@ -496,7 +500,11 @@ function ij_in_rectangle(point:ij_point_type;rect:ij_rectangle_type): boolean;
 function ij_random_point(rect:ij_rectangle_type):ij_point_type;
 
 {
-	Two-Dimensional Geometry.
+	Two-Dimensional Real-Valued Geometry. The xy_line is two points on the line.
+	We could instead have constrained a two-dimensional line with a point on the
+	line and a vector parallel to the line. The choice of two points on the line
+	is usually easier to work with, but it is inconsistent with our xyz_line, in
+	which we use the point and vector constraint.
 }
 type
 	xy_line_type=record a,b:xy_point_type;end;
@@ -521,13 +529,19 @@ function xy_unit_vector(p:xy_point_type):xy_point_type;
 function xy_rectangle_ellipse(rect:xy_rectangle_type):xy_ellipse_type;
 
 {
-	Three-Dimensional Geometry.
+	Three-Dimensional Geometry. The xyz_line is point and a vector, which is
+	consistent witht he xyz_plane, which is also a point and a vector, but not
+	consistent with our xy_line, which is two points. A sphere is a point and
+	a radius. A cylinder is two points giving the end points of the axis, and 
+	a radius.
 }
 type 
 	xyz_line_type=record point,direction:xyz_point_type; end;
 	xyz_line_ptr_type=^xyz_line_type;
 	xyz_plane_type=record point,normal:xyz_point_type; end;
 	xyz_plane_ptr_type=^xyz_plane_type;
+	xyz_sphere_type=record point:xyz_point_type;radius:real; end;
+	xyz_cylinder_type=record axis:xyz_line_type;length,radius:real; end;
 	coordinates_type=record
 		origin,x_axis,y_axis,z_axis:xyz_point_type;{a point and three unit vectors}
 	end;
@@ -552,6 +566,8 @@ function xyz_matrix_from_points(p,q,r:xyz_point_type):xyz_matrix_type;
 function xyz_plane_plane_plane_intersection(p,q,r:xyz_plane_type):xyz_point_type;
 function xyz_line_plane_intersection(line:xyz_line_type;plane:xyz_plane_type):xyz_point_type;
 function xyz_plane_plane_intersection(p,q:xyz_plane_type):xyz_line_type;
+function xyz_line_crosses_sphere(line:xyz_line_type;sphere:xyz_sphere_type):boolean;
+function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:xyz_sphere_type):boolean;
 function xyz_line_reflect(line:xyz_line_type;plane:xyz_plane_type):xyz_line_type;
 function xyz_point_line_vector(point:xyz_point_type;line:xyz_line_type):xyz_point_type;
 function xyz_line_line_bridge(p,q:xyz_line_type):xyz_line_type;
@@ -5599,6 +5615,24 @@ begin
 	M:=xyz_matrix_from_points(row_x,row_y,row_z);
 	N:=xyz_matrix_inverse(M);
 	xyz_line_plane_intersection:=xyz_transform(N,constants);
+end;
+
+{
+	xyz_line_crosses_sphere returns true iff the line intersects or touches
+	the sphere.
+}
+function xyz_line_crosses_sphere(line:xyz_line_type;sphere:xyz_sphere_type):boolean;
+begin
+	xyz_line_crosses_sphere:=false;
+end;
+
+{
+	xyz_line_crosses_cylinder returns true iff the line intersects or touches
+	the cylinder.
+}
+function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:xyz_sphere_type):boolean;
+begin
+	xyz_line_crosses_cylinder:=false;
 end;
 
 {

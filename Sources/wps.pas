@@ -274,8 +274,8 @@ begin
 end;
 
 {
-	global_from_wps_plane converts a bearing (point and direction) in wps coordinates into
-	a bearing in global coordinates.
+	global_from_wps_plane converts a plane in wps coordinates into a bearing in
+	global coordinates.
 }
 function global_from_wps_plane(p:xyz_plane_type;mount:kinematic_mount_type):xyz_plane_type;
 
