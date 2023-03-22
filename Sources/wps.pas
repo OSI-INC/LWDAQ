@@ -64,7 +64,7 @@ type
 		radius:real;{radius of wire}
 	end;
 {
-	wps_edge_type describes an edge line on the ccd;
+	wps_edge_type describes an edge line on the ccd.
 }
 	wps_edge_type=record
 		position:xy_point_type;{of a point in the edge line, in image coordinates, mm}
@@ -633,7 +633,9 @@ end;
 
 {	
 	Wire Position Sensor Calibration. We begin with a data structure required by
-	the simplex error function. The structure contains
+	the simplex error function. The structure contains the number of calibration
+	positions, N, an array of N wire positions measured by a CMM, and an array
+	of N wire centerlines on the WPS camera selected for calibraion.
 }
 type
 	wps_simplex_data=record

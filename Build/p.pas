@@ -33,7 +33,14 @@ begin
 		end; 
 	end;
 	
-	writeln('Testing xyz_line_crosses_sphere, should see vertical ellips.');
+	writeln('Testing xyz_line_crosses_sphere, should see a circle.');
+	line.direction.x:=0;
+	line.direction.y:=0;
+	line.direction.z:=1;
+	sphere.center.x:=0;
+	sphere.center.y:=0;
+	sphere.center.z:=0;
+	sphere.radius:=5;
 	i_ext:=20;
 	j_ext:=8;
 	for i:=-i_ext to +i_ext do write('-');
@@ -44,13 +51,6 @@ begin
 			line.point.x:=i*0.5;
 			line.point.y:=j;
 			line.point.z:=0;
-			line.direction.x:=0;
-			line.direction.y:=1;
-			line.direction.z:=1;
-			sphere.center.x:=0;
-			sphere.center.y:=0;
-			sphere.center.z:=0;
-			sphere.radius:=5;
 			if xyz_line_crosses_sphere(line,sphere) then
 				write('X')
 			else
@@ -62,7 +62,18 @@ begin
 	writeln;
 	
 	
-	writeln('Testing xyz_line_crosses_cylinder, should vertical pillar.');
+	writeln('Testing xyz_line_crosses_cylinder.');
+	line.direction.x:=0;
+	line.direction.y:=0;
+	line.direction.z:=1;
+	cylinder.face.point.x:=-5;
+	cylinder.face.point.y:=-3;
+	cylinder.face.point.z:=0;
+	cylinder.face.normal.x:=1;
+	cylinder.face.normal.y:=1;
+	cylinder.face.normal.z:=0;
+	cylinder.radius:=2;
+	cylinder.length:=100;
 	i_ext:=20;
 	j_ext:=5;
 	for i:=-i_ext to +i_ext do write('-');
@@ -73,18 +84,6 @@ begin
 			line.point.x:=i*0.5;
 			line.point.y:=j;
 			line.point.z:=0;
-			line.direction.x:=0;
-			line.direction.y:=0;
-			line.direction.z:=1;
-			cylinder.face.point.x:=0;
-			cylinder.face.point.y:=0;
-			cylinder.face.point.z:=0;
-			cylinder.face.normal.x:=0;
-			cylinder.face.normal.y:=0;
-			cylinder.face.normal.z:=1;
-			cylinder.radius:=4;
-			cylinder.length:=5;
-			sphere.radius:=5;
 			if xyz_line_crosses_cylinder(line,cylinder) then
 				write('X')
 			else
@@ -95,8 +94,11 @@ begin
 	for i:=-i_ext to +i_ext do write('-');
 	writeln;
 	
-	writeln('Testing SCAM projection routines, SCAM x left, y up in view.');
+	writeln('Testing SCAM projection routines, +x left, +y up, as seen from camera.');
 	ip:=new_image(20,40);
+	with ip^.analysis_bounds do begin
+		top:=0;
+	end;
 	clear_overlay(ip);
 	sc:=nominal_scam_camera(0);
 	sc.pixel_size:=0.01;
@@ -104,14 +106,14 @@ begin
 	sc.reference_point.y:=10*sc.pixel_size;
 
 	sphere.center.x:=-200;
-	sphere.center.y:=0;
+	sphere.center.y:=100;
 	sphere.center.z:=1000;
 	sphere.radius:=50;
 	scam_project_sphere(ip,sphere,sc);
 	
-	sphere.center.x:=150;
+	sphere.center.x:=100;
 	sphere.center.y:=0;
-	sphere.center.z:=1000;
+	sphere.center.z:=500;
 	sphere.radius:=50;
 	scam_project_sphere(ip,sphere,sc);
 
@@ -125,10 +127,10 @@ begin
 	cylinder.face.point.y:=-20;
 	cylinder.face.point.z:=1000;
 	cylinder.face.normal.x:=-0.04;
-	cylinder.face.normal.y:=+0.05;
+	cylinder.face.normal.y:=-0.02;
 	cylinder.face.normal.z:=-1;
 	cylinder.radius:=10;
-	cylinder.length:=700;
+	cylinder.length:=1000;
 	scam_project_cylinder(ip,cylinder,sc);
 
 	for i:=0 to ip^.i_size-1 do write('--');
