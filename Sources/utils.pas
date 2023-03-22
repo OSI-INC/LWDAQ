@@ -678,6 +678,8 @@ function xy_from_string(s:string):xy_point_type;
 function xyz_from_string(s:string):xyz_point_type;
 function xyz_line_from_string(s:string):xyz_line_type;
 function xyz_plane_from_string(s:string):xyz_plane_type;
+function xyz_sphere_from_string(s:string):xyz_sphere_type;
+function xyz_cylinder_from_string(s:string):xyz_cylinder_type;
 function kinematic_mount_from_string(s:string):kinematic_mount_type;
 function string_from_boolean(value:boolean):string;
 function string_from_integer(value,fsi:integer):string;
@@ -707,6 +709,8 @@ function read_real(var s:string):real;
 function read_integer(var s:string):integer;
 function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
+function read_xyz_sphere(var s:string):xyz_sphere_type;
+function read_xyz_cylinder(var s:string):xyz_cylinder_type;
 function read_x_graph(var s:string):x_graph_type;
 function read_xy_graph(var s:string):xy_graph_type;
 function read_xyz_graph(var s:string):xyz_graph_type;
@@ -1924,6 +1928,30 @@ begin
 	p.normal:=read_xyz(s);
 	xyz_plane_from_string:=p;
 end;
+
+function read_xyz_sphere(var s:string):xyz_sphere_type;
+var sphere:xyz_sphere_type;
+begin 
+	sphere.center:=read_xyz(s);
+	sphere.radius:=read_real(s);
+	read_xyz_sphere:=sphere;
+end;
+
+function xyz_sphere_from_string(s:string):xyz_sphere_type;
+begin xyz_sphere_from_string:=read_xyz_sphere(s); end;
+
+function read_xyz_cylinder(var s:string):xyz_cylinder_type;
+var cylinder:xyz_cylinder_type;
+begin 
+	cylinder.face.point:=read_xyz(s);
+	cylinder.face.normal:=read_xyz(s);
+	cylinder.radius:=read_real(s);
+	cylinder.length:=read_real(s);
+	read_xyz_cylinder:=cylinder;
+end;
+
+function xyz_cylinder_from_string(s:string):xyz_cylinder_type;
+begin xyz_cylinder_from_string:=read_xyz_cylinder(s); end;
 
 function kinematic_mount_from_string(s:string):kinematic_mount_type;
 begin kinematic_mount_from_string:=read_kinematic_mount(s); end;

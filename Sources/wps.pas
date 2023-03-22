@@ -52,7 +52,6 @@ type
 		pivot:xyz_point_type;{wps coordinates of pivot point (mm)}
 		sensor:xyz_point_type;{wps coordinates of ccd center}
 		rot:xyz_point_type;{rotation of ccd about x, y, z in rad}
-		aberration:real;{cubic aberration}
 		id:string;{identifier}
 	end;
 {
@@ -126,10 +125,6 @@ begin
 			y:=y/mrad_per_rad;
 			z:=z/mrad_per_rad;
 		end;
-		if wps_enable_aberration then
-			aberration:=read_real(f)
-		else
-			aberration:=0;
 	end;
 	read_wps_camera:=camera;
 end;
@@ -164,8 +159,6 @@ begin
 			writestr(f,f,x*mrad_per_rad:9:fsdr,' ',
 				y*mrad_per_rad:7:fsdr,' ',
 				z*mrad_per_rad:8:fsdr);
-		if wps_enable_aberration then 
-			writestr(f,f,' ',aberration:fsr:fsdr);
 	end;
 	string_from_wps_camera:=f;
 end;
@@ -315,8 +308,6 @@ begin
 	q.x:=0;
 	q.y:=p.y-wps_sensor_y;
 	q.z:=-(p.x-wps_sensor_x);
-	if wps_enable_aberration then 
-		q:=xyz_scale(q,(1+camera.aberration/wps_aberration_scale*sqr(xyz_length(q))));
 	q:=xyz_rotate(q,camera.rot);
 	q:=xyz_sum(q,camera.sensor);
 	wps_from_image_point:=q;
@@ -351,8 +342,6 @@ begin
 	q:=xyz_line_plane_intersection(ray,plane);
 	q:=xyz_difference(q,camera.sensor);
 	q:=xyz_unrotate(q,camera.rot);
-	if wps_enable_aberration then
-		q:=xyz_scale(q,1/(1+camera.aberration/wps_aberration_scale*sqr(xyz_length(q))));
 	r.x:=wps_sensor_x-q.z;
 	r.y:=wps_sensor_y+q.y;
 	image_from_wps_point:=r;
@@ -449,7 +438,6 @@ begin
 				sensor.x:=pivot.x-11.4*cos(rot.z);
 				sensor.y:=pivot.y-11.4*sin(rot.z);
 				sensor.z:=pivot.z;
-				aberration:=0;
 			end;
 			2:begin
 				id:='WPS1_A_2';
@@ -462,7 +450,6 @@ begin
 				sensor.x:=pivot.x-11.4*cos(rot.z);
 				sensor.y:=pivot.y-11.4*sin(rot.z);
 				sensor.z:=pivot.z;
-				aberration:=0;
 			end;
 			otherwise begin
 				id:='DEFAULT';
@@ -771,7 +758,7 @@ function wps_calibrate(device_name:string;camera_num:integer;data:string):string
 const
 	pin_radius=1.0/16*25.4/2; {one sixteenth inch steel pin}
 	random_scale=1;
-	num_parameters=9; {10 with aberration correction}
+	num_parameters=9; 
 	max_num_shrinks=10;
 	max_iterations=30000;
 	min_iterations=6000;
@@ -872,7 +859,6 @@ begin
 			y:=y+disturb/10;
 			z:=z+disturb/10;
 		end;
-		aberration:=aberration+disturb/10;
 	end;
 	gui_writeln('disturbed: '+string_from_wps_camera(camera));
 {
@@ -889,7 +875,6 @@ begin
 		vertices[1,7]:=rot.x;
 		vertices[1,8]:=rot.y;
 		vertices[1,9]:=rot.z;
-		{vertices[1,10]:=aberration;}
 		construct_size:=random_scale/10;
 		done_counter:=0;
 		max_done_counter:=max_done;
@@ -917,7 +902,6 @@ begin
 				rot.x:=vertices[1,7];
 				rot.y:=vertices[1,8];
 				rot.z:=vertices[1,9];
-				{aberration:=vertices[1,10];}
 			end;
 			fsd:=4;
 			writestr(line,i:5,' ',

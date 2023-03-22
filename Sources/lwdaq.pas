@@ -50,7 +50,7 @@ library lwdaq;
 
 uses
 	utils,images,transforms,image_manip,rasnik,
-	spot,bcam,shadow,wps,electronics,metrics,
+	spot,bcam,scam,shadow,wps,electronics,metrics,
 	tcltk;
 
 const
@@ -2905,23 +2905,30 @@ var
 	sip:image_ptr_type=nil;
 	image_name:string='';
 	result:string='';
-	option:string;
+	command:string='';
+	option:string='';
+	body:string='';
 	arg_index:integer;
 	vp:pointer;	
 	show_edges:boolean=false;
 	pre_smooth:boolean=false;
 	pixel_size_um:real=7.4;
 	threshold:string='50 #';
+	camera:bcam_camera_type;
+	sphere:xyz_sphere_type;
+	cylinder:xyz_cylinder_type;
 		
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_scam:=Tcl_Error;
+	camera:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
+	body:='sphere 0 0 1000 50';
 	
-	if (argc<2) or (odd(argc)) then begin
+	if (argc<3) then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Wrong number of arguments, must be "'
-			+'lwdaq_scam image ?option value?".');
+			+'lwdaq_wps image command ?arguments? ?option value?".');
 		exit;
 	end;
 	
@@ -2934,7 +2941,26 @@ begin
 		exit;
 	end;
 	
-	arg_index:=2;
+	command:=Tcl_ObjString(argv[2]);
+	if (command='project') then begin
+		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
+		if argc>4 then body:=Tcl_ObjString(argv[4]);
+		arg_index:=5;
+	end else begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Invalid command "'+command+'", must be one of '
+			+'"project" in '
+			+'lwdaq_scam.');
+		exit;
+	end;
+	
+	if odd(argc-arg_index) then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Wrong number of arguments, must be "'
+			+'lwdaq_wps image command ?arguments? ?option value?".');
+		exit;
+	end;
+	
 	while (arg_index<argc-1) do begin
 		option:=Tcl_ObjString(argv[arg_index]);
 		inc(arg_index);
@@ -2947,38 +2973,43 @@ begin
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'-pixel_size_um -threshold -show_edges -pre_smooth" in '
+				+'"-pixel_size_um -threshold -show_edges -pre_smooth" in '
 				+'lwdaq_scam.');
 			exit;
 		end;
 	end;
 	
-	if image_name='' then begin
-		Tcl_SetReturnString(interp,error_prefix
-			+'Specify an image name with -image_name in '
-			+'lwdaq_scam.');
-		exit;
-	end;
-	ip:=image_ptr_from_name(image_name);
-	if not valid_image_ptr(ip) then begin
-		Tcl_SetReturnString(interp,error_prefix
-			+'Image "'+image_name+'" does not exist in '
-			+'lwdaq_scam.');
-		exit;
-	end;	
 {
-	Generate the derivative image and find spots above threshold in this new
-	image.
-}
 	if pre_smooth then begin
 		sip:=image_filter(ip,1,1,1,1,1,1,0);
-		iip:=image_grad_i(sip);
+		iip:=image_grad(sip);
 		dispose_image(sip);
 	end else begin
-		iip:=image_grad_i(ip);
+		iip:=image_grad(ip);
 	end;
 	dispose_image(iip);
+}
+
+	if command='project' then begin
+		while body<>'' do begin
+			option:=read_word(body);
+			if option='sphere' then begin
+				sphere:=read_xyz_sphere(body);
+				scam_project_sphere(ip,sphere,camera);
+			end else if option='cylinder' then begin
+				cylinder:=read_xyz_cylinder(body);
+				scam_project_cylinder(ip,cylinder,camera);
+			end else begin
+				Tcl_SetReturnString(interp,error_prefix
+					+'Invalid shape "'+option+'", must be one of '
+					+'"sphere cylinder" in '
+					+'lwdaq_scam.');
+				exit;
+			end;
+		end;
+	end;
 	
+
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
 	lwdaq_scam:=Tcl_OK;

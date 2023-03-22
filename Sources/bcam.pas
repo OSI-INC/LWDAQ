@@ -140,10 +140,13 @@ const
 	bcam_mid_z=-40;{mm approx for discrimination}
 	bcam_tc255_center_x=1.720;{along image coordinate x-axis (mm)}
 	bcam_tc255_center_y=1.220;{along image coordinate y-axis (mm)}
+	bcam_tc255_pixel_um=10;
 	bcam_tc255_code=1;{in axis code specifies tc255}
 	bcam_icx424_center_x=2.590;{along image coordinate x-axis (mm)}
 	bcam_icx424_center_y=1.924;{along image coordinate y-axis (mm)}
+	bcam_icx424_pixel_um=7.4;
 	bcam_icx424_code=2;{in axis code specifies icx424}
+	bcam_generic_code=3;
 	bcam_front_source_z=0.36;{front laser facet bcam-coord z-position (mm)}
 	bcam_rear_source_z=-82.85;{rear laser facet bcam-coord z-position (mm)}
 	num_mounts_per_pair=2;
@@ -151,6 +154,11 @@ const
 	num_sources_per_range=4;
 	num_sources_per_pair=2;
 	num_ranges_per_mount=2;
+	
+var
+	bcam_generic_center_x:real=bcam_tc255_center_x;
+	bcam_generic_center_y:real=bcam_tc255_center_y;
+	bcam_generic_pixel_um:real=bcam_tc255_pixel_um;
 
 type
 {
@@ -1356,12 +1364,23 @@ var
 begin
 	cc:=bcam_ccd_center(camera);
 	with camera do begin
-		if code=bcam_icx424_code then begin
-			q.x:=p.x-bcam_icx424_center_x;
-			q.y:=p.y-bcam_icx424_center_y;
-		end else begin
-			q.x:=p.x-bcam_tc255_center_x;
-			q.y:=p.y-bcam_tc255_center_y;
+		case round(code) of 
+			bcam_icx424_code: begin
+				q.x:=p.x-bcam_icx424_center_x;
+				q.y:=p.y-bcam_icx424_center_y;
+			end;
+			bcam_tc255_code: begin
+				q.x:=p.x-bcam_tc255_center_x;
+				q.y:=p.y-bcam_tc255_center_y;
+			end;
+			bcam_generic_code: begin
+				q.x:=p.x-bcam_generic_center_x;
+				q.y:=p.y-bcam_generic_center_y;
+			end;
+			otherwise begin
+				q.x:=p.x-bcam_tc255_center_x;
+				q.y:=p.y-bcam_tc255_center_y;
+			end;
 		end;
 		if axis.z>0 then begin
 			r.x:=cc.x+q.x*cos(ccd_rotation)-q.y*sin(ccd_rotation);
@@ -1390,12 +1409,23 @@ begin
 	with camera do begin
 		r.x:=p.x-cc.x;
 		r.y:=p.y-cc.y;
-		if code=bcam_icx424_code then begin
-			ic.x:=bcam_icx424_center_x;
-			ic.y:=bcam_icx424_center_y;
-		end else begin
-			ic.x:=bcam_tc255_center_x;
-			ic.y:=bcam_tc255_center_y;
+		case round(code) of 
+			bcam_icx424_code: begin
+				ic.x:=bcam_icx424_center_x;
+				ic.y:=bcam_icx424_center_y;
+			end;
+			bcam_tc255_code: begin
+				ic.x:=bcam_tc255_center_x;
+				ic.y:=bcam_tc255_center_y;
+			end;
+			bcam_generic_code: begin
+				ic.x:=bcam_generic_center_x;
+				ic.y:=bcam_generic_center_y;
+			end;
+			otherwise begin
+				ic.x:=bcam_tc255_center_x;
+				ic.y:=bcam_tc255_center_y;
+			end;
 		end;
 		if axis.z>0 then begin
 			q.x:=ic.x+r.x*cos(ccd_rotation)+r.y*sin(ccd_rotation);
@@ -1519,12 +1549,23 @@ var
 begin
 	source_point:=global_from_calib_datum(p,camera,mount);
 	with axis_data_point do begin
-		if camera.code=bcam_icx424_code then begin
-			spot_center.x:=bcam_icx424_center_x;
-			spot_center.y:=bcam_icx424_center_y;
-		end else begin
-			spot_center.x:=bcam_tc255_center_x;
-			spot_center.y:=bcam_tc255_center_y;
+		case round(camera.code) of 
+			bcam_icx424_code: begin
+				spot_center.x:=bcam_icx424_center_x;
+				spot_center.y:=bcam_icx424_center_y;
+			end;
+			bcam_tc255_code: begin
+				spot_center.x:=bcam_tc255_center_x;
+				spot_center.y:=bcam_tc255_center_y;
+			end;
+			bcam_generic_code: begin
+				spot_center.x:=bcam_generic_center_x;
+				spot_center.y:=bcam_generic_center_y;
+			end;
+			otherwise begin
+				spot_center.x:=bcam_tc255_center_x;
+				spot_center.y:=bcam_tc255_center_y;
+			end;
 		end;
 		source_range:=p.source_range;
 	end;
