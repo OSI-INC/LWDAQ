@@ -42,7 +42,7 @@ interface
 
 uses
 	utils,images,transforms,bcam;
-		
+
 {
 	Routines that project hypothetical objects in SCAM coordinates onto SCAM
 	image sensors to produce simulated views of the hypothetical objects. We
@@ -56,7 +56,10 @@ procedure scam_project_sphere(ip:image_ptr_type;
 procedure scam_project_cylinder(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
 	camera:bcam_camera_type);
-
+{
+	Routines that analyze the image.
+}
+procedure scam_classify(ip:image_ptr_type;rule:string);
 
 implementation
 
@@ -67,6 +70,55 @@ const
 }
 	sphere_color=green_color;
 	cylinder_color=blue_color;
+
+{
+	scam_decode_rule takes a string like "10 &" and returns, for
+	the specified image, an intensity threshold for backlight pixels in the
+	image. The first parameter in the command string must be an integer
+	specifying the threshold intensity. The integer may be followed by of the
+	symbols *, %, #, $, or &. Each of these symbols gives a different meaning to
+	the threshold value, in the same way they do for spot analysis, see the
+	spot_decode_command_string for details.
+}
+function scam_decode_rule(ip:image_ptr_type;rule:string):integer;
+
+const
+	percent_unit=100;
+
+var
+	word:string;
+	background,threshold:integer;
+	
+begin
+{
+	Decode the threshold string. First we read the threshold, then we look for a
+	valid threshold qualifier.
+}
+	threshold:=read_integer(rule);
+	word:=read_word(rule);
+	if word='%' then begin
+		background:=round(image_minimum(ip));
+		threshold:=
+			round((1-threshold/percent_unit)*background
+			+threshold/percent_unit*image_maximum(ip));
+	end else if word='#' then begin
+		background:=round(image_average(ip));
+		threshold:=
+			round((1-threshold/percent_unit)*background
+			+threshold/percent_unit*image_maximum(ip));
+	end else if word='*' then begin
+		background:=0;
+		threshold:=threshold-background;
+	end else if word='$' then begin
+		background:=round(image_average(ip));
+		threshold:=background+threshold;
+	end else if word='&' then begin
+		background:=round(image_median(ip));
+		threshold:=background+threshold;
+	end;
+	scam_decode_rule:=threshold;
+end;
+
 	
 {
 	scam_project_sphere takes a sphere in SCAM coordinates and projects it onto the
@@ -127,6 +179,31 @@ begin
 				q.y:=(j+ccd_origin_y)*w;
 				if xyz_line_crosses_cylinder(bcam_source_bearing(q,camera),cylinder) then
 					set_ov(ip,j,i,cylinder_color);
+			end;
+		end;
+	end;
+end;
+
+{
+	scam_classify takes a rule string, goes through the image, and marks the
+	overlay according to the rule. The rule sets a threshold intensity above
+	which we classify pixels as part of the background, and below which they are
+	part of a silhouette.
+	
+}
+procedure scam_classify(ip:image_ptr_type;rule:string);
+
+var
+	i,j:integer;
+	t:integer;
+
+begin
+	t:=scam_decode_rule(ip,rule);
+	with ip^.analysis_bounds do begin
+		for j:=top to bottom do begin
+			for i:=left to right do begin
+				if get_px(ip,j,i)<=t then
+					set_ov(ip,j,i,orange_color);
 			end;
 		end;
 	end;

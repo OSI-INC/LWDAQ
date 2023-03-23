@@ -21,28 +21,27 @@
 library lwdaq;
 
 {
-	lwdaq is the interface between our Pascal libraries and TCL/TK. It
-	provides init_Lwdaq, which TCL/TK calls when it loads the lwdaq
-	dynamic library. init_Lwdaq installs TCL commands, each of which has
-	a name beginning with lwdaq in lower-case letters. The lower-case
-	letters distinguish these commands from those that we define in
-	TCL/TK scripts, which have names that begin with LWDAQ.
+	lwdaq is the interface between our Pascal libraries and TCL/TK. It provides
+	init_Lwdaq, which TCL/TK calls when it loads the lwdaq dynamic library.
+	init_Lwdaq installs TCL commands, each of which has a name beginning with
+	lwdaq in lower-case letters. The lower-case letters distinguish these
+	commands from those that we define in TCL/TK scripts, which have names that
+	begin with LWDAQ.
 
-	This is a program instead of a unit, even though we compile it into
-	a dynamic library. The GPC compiler expects a main program if it is
-	to include the _p_initialize routine in the compiled object. We will
-	need this routine to be present in the lwdaq.o object when we link
-	the final lwdaq.so dynamic library with GCC.
+	This is a program instead of a unit, even though we compile it into a
+	dynamic library. The GPC compiler expects a main program if it is to include
+	the _p_initialize routine in the compiled object. We will need this routine
+	to be present in the lwdaq.o object when we link the final lwdaq.so dynamic
+	library with GCC.
 
-	For a list of routines registered with TCL by this library, scroll
-	down to lwdaq_init.
+	For a list of routines registered with TCL by this library, scroll down to
+	lwdaq_init.
 
-	At the top of each command-line function declaration you will find a
-	comment in braces that describes the function. This comment will be
-	extracted from lwdaq.pas automatically by our Command Maker script,
-	and inserted into an HTML document. The comments appear as they are,
-	in the HTML manual, and so include their own HTML tags, and even
-	anchors.
+	At the top of each command-line function declaration you will find a comment
+	in braces that describes the function. This comment will be extracted from
+	lwdaq.pas automatically by our Command Maker script, and inserted into an
+	HTML document. The comments appear as they are, in the HTML manual, and so
+	include their own HTML tags, and even anchors.
 }
 
 {$MODESWITCH CLASSICPROCVARS+}
@@ -178,7 +177,16 @@ begin
 end;
 
 {
-<p>lwdaq_error_string returns the global error string into which our library routines record potentially fatal errors they encounter during execution. If we set the -append_errors flag with <a href="#lwdaq_config">lwdaq_config</a>, the string will contain all errors encountered, separated by line breaks. Otherwise, the string will contain only the most recent error. Each error line begins with the error prefix string, which is defined in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. If we pass the -value option, we provide a string that is to take the place of the current error string. If this string parameter is empty, the error string is cleared.</p>
+<p>lwdaq_error_string returns the global error string into which our library
+routines record potentially fatal errors they encounter during execution. If we
+set the -append_errors flag with <a href="#lwdaq_config">lwdaq_config</a>, the
+string will contain all errors encountered, separated by line breaks. Otherwise,
+the string will contain only the most recent error. Each error line begins with
+the error prefix string, which is defined in <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. If we
+pass the -value option, we provide a string that is to take the place of the
+current error string. If this string parameter is empty, the error string is
+cleared.</p>
 }
 function lwdaq_error_string(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -221,7 +229,12 @@ begin
 end;
 
 {
-<p>lwdaq_config sets global variables that control the operation of the lwdaq libraries. If you specify no options, lwdaq_config returns a string giving you the current values of all the options, <i>except</i> the -eol option. Each option requires a value, which will be assigned to the global variable names in the option. Here are the options and their expected value types. Boolean variables you specify with 0 for false and 1 for true.</p>
+<p>lwdaq_config sets global variables that control the operation of the lwdaq
+libraries. If you specify no options, lwdaq_config returns a string giving you
+the current values of all the options, <i>except</i> the -eol option. Each
+option requires a value, which will be assigned to the global variable names in
+the option. Here are the options and their expected value types. Boolean
+variables you specify with 0 for false and 1 for true.</p>
 
 <center><table cellspacing=1 border>
 <tr><th>Option</th><th>Type</th><th>Function</th></tr>
@@ -247,16 +260,55 @@ end;
 <tr><td>-show_details</td><td>Boolean</td><td>Write execution details to text window, default 0</td></tr>
 </table></center>
 
-<p>The lwdaq library routines can write to Tk text windows through -text_name and -photo_name. The -text_name should specify a Tk text widget (such as .text), <i>stdout</i>, or a file name. The default is <i>stdout</i>. If the -text_name does not begin with a period, indicating a text window, nor is it <i>stdout</i>, we assume it is the name of a file. File names cannot be numbers. If the file name contains a path, that path must exist. The -show_details option is used by some library routines to generate additional exectution details that will be printed to the text window specified by -text_name.</p>
+<p>The lwdaq library routines can write to Tk text windows through -text_name
+and -photo_name. The -text_name should specify a Tk text widget (such as .text),
+<i>stdout</i>, or a file name. The default is <i>stdout</i>. If the -text_name
+does not begin with a period, indicating a text window, nor is it <i>stdout</i>,
+we assume it is the name of a file. File names cannot be numbers. If the file
+name contains a path, that path must exist. The -show_details option is used by
+some library routines to generate additional exectution details that will be
+printed to the text window specified by -text_name.</p>
 
-<p>The library routines can draw an image in a Tk photo by calling <i>gui_draw</i> and specifying the name of the image. The photo that will receive the image is the one named by a global variable we set with the -photo_name option. The -photo_name must be an existing Tk photo (such as bcam_photo), and has default value "none", which disables the drawing. By default, <i>gui_draw</i> is set to <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>. The -intensify specifies <i>gui_intensification</i> for lwdaq_gui_draw. The -display_zoom option specifies <i>gui_display_zoom</i>, which applies an additional scaling to all images drawn by <i>lwdaq_draw</i> or by <i>gui_draw</i>. The <a href=#lwdaq_draw">lwdaq_draw</a> routine multiplies its image-specific zoom value by the global gui_display_zoom to obtain a total scaling value. The -display_zoom option is designed to accommodate different computer display resolutions, which sometimes result in lwdaq images being too large or too small. The <a href="http://www.cgsd.com/papers/gamma.html">gamma correction</a></td> sets the gray scale image display gamma correction used by lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear relationship between the image pixel intensity and the display pixel intensity. The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we increase the brightness of the red and blue component of the display pixel with respect to the green component. By default, these are also 1.0.
+<p>The library routines can draw an image in a Tk photo by calling
+<i>gui_draw</i> and specifying the name of the image. The photo that will
+receive the image is the one named by a global variable we set with the
+-photo_name option. The -photo_name must be an existing Tk photo (such as
+bcam_photo), and has default value "none", which disables the drawing. By
+default, <i>gui_draw</i> is set to <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>.
+The -intensify specifies <i>gui_intensification</i> for lwdaq_gui_draw. The
+-display_zoom option specifies <i>gui_display_zoom</i>, which applies an
+additional scaling to all images drawn by <i>lwdaq_draw</i> or by
+<i>gui_draw</i>. The <a href=#lwdaq_draw">lwdaq_draw</a> routine multiplies its
+image-specific zoom value by the global gui_display_zoom to obtain a total
+scaling value. The -display_zoom option is designed to accommodate different
+computer display resolutions, which sometimes result in lwdaq images being too
+large or too small. The <a href="http://www.cgsd.com/papers/gamma.html">gamma
+correction</a></td> sets the gray scale image display gamma correction used by
+lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear
+relationship between the image pixel intensity and the display pixel intensity.
+The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we
+increase the brightness of the red and blue component of the display pixel with
+respect to the green component. By default, these are also 1.0.
 
-<p>During execution, analysis routines can pause to allow us to view intermediate drarwing results by means of the -wait_ms option. If we set -wait_ms to 1000, the analysis routine will pause for one second. If we set -wait_ms to -1, Tk will open a window with a <i>Continue</i> button in it, which we click before the analysis proceeds.</p>
+<p>During execution, analysis routines can pause to allow us to view
+intermediate drarwing results by means of the -wait_ms option. If we set
+-wait_ms to 1000, the analysis routine will pause for one second. If we set
+-wait_ms to -1, Tk will open a window with a <i>Continue</i> button in it, which
+we click before the analysis proceeds.</p>
 
-<p>Many routines return real numbers in strings. These real numbers will have a fixed number of decimal places equal to the global Pascal variable <i>fsd</i> and a total field size equal to the global Pascal variable <i>fsr</i>.</p> 
+<p>Many routines return real numbers in strings. These real numbers will have a
+fixed number of decimal places equal to the global Pascal variable <i>fsd</i>
+and a total field size equal to the global Pascal variable <i>fsr</i>.</p>
 
-<p>The global error_string variable is used by all the command routines in lwdaq.pas. Each command routine resets error_string and checks it when it's finished. If error_string is not empty, the routine will return an error condition and error_string will be its result. The append_errors option tells the analysis library to append new errors to error_string instead of over-writing previous errors with the new error. By default, append_errors is false. When we set log_errors to 1, each error reported by the report_error routine will, in addition, be written to a log file with the global debug_log procedure.</p>
-
+<p>The global error_string variable is used by all the command routines in
+lwdaq.pas. Each command routine resets error_string and checks it when it's
+finished. If error_string is not empty, the routine will return an error
+condition and error_string will be its result. The append_errors option tells
+the analysis library to append new errors to error_string instead of
+over-writing previous errors with the new error. By default, append_errors is
+false. When we set log_errors to 1, each error reported by the report_error
+routine will, in addition, be written to a log file with the global debug_log
+procedure.</p>
 }
 function lwdaq_config(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -338,7 +390,9 @@ begin
 end;
 
 {
-<p>lwdaq_image_create creates a new image and returns a unique name for the image, by which the interpreter can identify the image to other lwdaq routines.</p>
+<p>lwdaq_image_create creates a new image and returns a unique name for the
+image, by which the interpreter can identify the image to other lwdaq
+routines.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -354,9 +408,22 @@ end;
 <tr><td>-try_header</td><td>Try image data for a lwdaq-format header, default 1.</td></tr>
 </table></center>
 
-<p>The above table lists the options accepted by lwdaq_image_create, and their functions. If you use the -name option and provide the name of a pre-existing image in the lwdaq image list, lwdaq_image_create deletes the pre-existing image. If you specify "-data $value", the routine copies $value into the image's intensity array, starting at the first pixel of the first row. When you combine "-data $value" with "-try_header 1", the routine looks at the first bytes in $value to see if it contains a valid image header, specifying image width and height, as well as analysis bounds and a results string. When the routine looks for the header, it assumes that the bytes in the header specify two-byte integers in big-endian order.</p>
+<p>The above table lists the options accepted by lwdaq_image_create, and their
+functions. If you use the -name option and provide the name of a pre-existing
+image in the lwdaq image list, lwdaq_image_create deletes the pre-existing
+image. If you specify "-data $value", the routine copies $value into the image's
+intensity array, starting at the first pixel of the first row. When you combine
+"-data $value" with "-try_header 1", the routine looks at the first bytes in
+$value to see if it contains a valid image header, specifying image width and
+height, as well as analysis bounds and a results string. When the routine looks
+for the header, it assumes that the bytes in the header specify two-byte
+integers in big-endian order.</p>
 
-<p>If you have -try_header 0, or if the routine's effort to find a header fails, lwdaq_image_create will look at the values you specify for the analysis bounds with the -left, -top, -right, and -bottom options. A value of &minus;1 directs the routine to place the boundary at the edge of the image. The default values for these options are all &minus;1.</p>
+<p>If you have -try_header 0, or if the routine's effort to find a header fails,
+lwdaq_image_create will look at the values you specify for the analysis bounds
+with the -left, -top, -right, and -bottom options. A value of &minus;1 directs
+the routine to place the boundary at the edge of the image. The default values
+for these options are all &minus;1.</p>
 }
 function lwdaq_image_create(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -530,15 +597,52 @@ begin
 end;
 
 {
-<p>lwdaq_draw transfers the contents of a lwdaq image into a Tk photo. We pass the lwdaq image name followed by the Tk photo name, and then our options in the form ?option value?. When the routine draws the image, it over-writes the first few pixels in the first image row with a header block containing the image dimensions, its analysis bounds, and its results string.</p>
+<p>lwdaq_draw transfers the contents of a lwdaq image into a Tk photo. We pass
+the lwdaq image name followed by the Tk photo name, and then our options in the
+form ?option value?. When the routine draws the image, it over-writes the first
+few pixels in the first image row with a header block containing the image
+dimensions, its analysis bounds, and its results string.</p>
 
-<p>The -intensify option can take four values: mild, strong, exact, and none. Mild intensification displays anything darker than four standard deviations below the mean intensity as black, and anything brighter than four standard deviations above the mean intensity as white. In between black and white the display is linear with pixel brightness. Strong intensification does the same thing, but for a range of two standard deviations from the mean. Exact displays the darkest spot in the image as black and the brightest as white. In all three cases, we calculate the mean, standard deviation, minimum, and maximum intensity of the image within the <i>analysis bounds</i>, not across the entire image.</p>
+<p>The -intensify option can take four values: mild, strong, exact, and none.
+Mild intensification displays anything darker than four standard deviations
+below the mean intensity as black, and anything brighter than four standard
+deviations above the mean intensity as white. In between black and white the
+display is linear with pixel brightness. Strong intensification does the same
+thing, but for a range of two standard deviations from the mean. Exact displays
+the darkest spot in the image as black and the brightest as white. In all three
+cases, we calculate the mean, standard deviation, minimum, and maximum intensity
+of the image within the <i>analysis bounds</i>, not across the entire image.</p>
 
-<p>The -zoom option scales the image as we draw it in the Tk photo. This scaling is in addition to the scaling called for by the global <i>gui_display_zoom</i> parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. If the Tk photo is initially smaller than the size required by the zoomed image, the Tk photo will expand to accommodate the zoomed image. But if the Tk photo is initially larger than required, the Tk photo will not contract to the smaller size of the zoomed image. The product of the zoom value and the global <i>gui_display_zoom</i> can take any value between 0.1 and 10. But the effective value of the scaling factor is dicated by the requirements of sub-sampling. If the scaling factor is greater than 1, we round it to the nearest integer, <i>e</i>, and draw each image pixel on the screen as a block of <i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we round its inverse to the nearest integer, <i>c</i>. We draw only one pixel out of every <i>c</i> pixels in the Tk photo. If the scaling factor is 0.3, we draw every third pixel. If 0.4, we draw every third pixel if your computer rounds 1/0.4 to 3, or every second pixel if your computer rounds 1/0.4 to 2. With scaling factor 0.0, we draw every tenth pixel.</p>
+<p>The -zoom option scales the image as we draw it in the Tk photo. This scaling
+is in addition to the scaling called for by the global <i>gui_display_zoom</i>
+parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. If the Tk
+photo is initially smaller than the size required by the zoomed image, the Tk
+photo will expand to accommodate the zoomed image. But if the Tk photo is
+initially larger than required, the Tk photo will not contract to the smaller
+size of the zoomed image. The product of the zoom value and the global
+<i>gui_display_zoom</i> can take any value between 0.1 and 10. But the effective
+value of the scaling factor is dicated by the requirements of sub-sampling. If
+the scaling factor is greater than 1, we round it to the nearest integer,
+<i>e</i>, and draw each image pixel on the screen as a block of
+<i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we round its inverse to
+the nearest integer, <i>c</i>. We draw only one pixel out of every <i>c</i>
+pixels in the Tk photo. If the scaling factor is 0.3, we draw every third pixel.
+If 0.4, we draw every third pixel if your computer rounds 1/0.4 to 3, or every
+second pixel if your computer rounds 1/0.4 to 2. With scaling factor 0.0, we
+draw every tenth pixel.</p>
 
-<p>With -clear set to 1, lwdaq_draw clears the overlay in the lwdaq image before drawing in the Tk photo. The overlay may contain a graph or oscilloscope display, or analysis indicator lines. If you don't want these to be displayed, set -clear to 1. But note that whatever was in the overlay will be lost.</p>
+<p>With -clear set to 1, lwdaq_draw clears the overlay in the lwdaq image before
+drawing in the Tk photo. The overlay may contain a graph or oscilloscope
+display, or analysis indicator lines. If you don't want these to be displayed,
+set -clear to 1. But note that whatever was in the overlay will be lost.</p>
 
-<p>By default, -show_bounds is 1, and the routine draws a blue rectangle to show the the image analysis boundaries, which are used by image analysis routines like lwdaq_rasnik and lwdaq_bcam. But with -show_bounds set to 0, this blue rectangle is not drawn. If you want to be sure that you don't have a blue rectangle drawn over your gray-scale image, you should also specify -clear 1, so that lwdaq_draw will clear the image overlay of any pre-existing blue rectangles.</p>
+<p>By default, -show_bounds is 1, and the routine draws a blue rectangle to show
+the the image analysis boundaries, which are used by image analysis routines
+like lwdaq_rasnik and lwdaq_bcam. But with -show_bounds set to 0, this blue
+rectangle is not drawn. If you want to be sure that you don't have a blue
+rectangle drawn over your gray-scale image, you should also specify -clear 1, so
+that lwdaq_draw will clear the image overlay of any pre-existing blue
+rectangles.</p>
 }
 function lwdaq_draw(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -688,7 +792,13 @@ begin
 end;
 
 {
-<p>lwdaq_draw_raw renders a block of raw image data in a Tk photo. The -pix_fmt option follows the naming conventions of <i>ffmpeg</i>. We currently recognise formats "gray" for eight-bit gray-scale, and "rgb24" for three-byte color. The -width and -height options specify the dimensions of the image. The -zoom option scales the image as we draw it in the Tk photo. See <a href="#lwdaq_draw">lwdaq_draw</a> for description of these last three options.</p>
+<p>lwdaq_draw_raw renders a block of raw image data in a Tk photo. The -pix_fmt
+option follows the naming conventions of <i>ffmpeg</i>. We currently recognise
+formats "gray" for eight-bit gray-scale, and "rgb24" for three-byte color. The
+-width and -height options specify the dimensions of the image. The -zoom option
+scales the image as we draw it in the Tk photo. See <a
+href="#lwdaq_draw">lwdaq_draw</a> for description of these last three
+options.</p>
 }
 function lwdaq_draw_raw(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -819,7 +929,27 @@ begin
 end;
 
 {
-<p>lwdaq_image_contents returns a byte array containing the intensity array from the named image. In the first line of the image the routine records the image dimensions, analysis boundry, and results string. The image dimensions and boundaries are given as two-bytes integers, and we use big-endian byte ordering, so the high-order byte is first. The rest of the image data is returned exactly as it is in the image. If the image consists of single-byte pixels, these are returned with no modification or padding. Likewise, if the image consists of two-byte words, or four-byte messages, these are returned as a block of bytes with no modification. If you specify -truncate 1, the routine removes all trailing zero-bytes from the data. When we create a new image to accomodate the same data later, we clear the image intensity array before we copy in the new data, so the image is re-constructed faithfully. This truncation is effective at reducing the size of data files from instruments that don't fill the intensity array with real data, but instead use the intensity array as a place to store one-dimensional data, and use the overlay as a white-board upon which to render the data (like the Voltmeter). If you specify -data_only 1, the routine chops off the leading row of data, leaving only the data from the first pixel of the first row onwards, which is the block of data operated upon by our lwdaq_data_manipulate routines. If you specify -record_size larger than 1, the routine makes sure that the size of the block it returns is divisible by the record size.</p>
+<p>lwdaq_image_contents returns a byte array containing the intensity array from
+the named image. In the first line of the image the routine records the image
+dimensions, analysis boundry, and results string. The image dimensions and
+boundaries are given as two-bytes integers, and we use big-endian byte ordering,
+so the high-order byte is first. The rest of the image data is returned exactly
+as it is in the image. If the image consists of single-byte pixels, these are
+returned with no modification or padding. Likewise, if the image consists of
+two-byte words, or four-byte messages, these are returned as a block of bytes
+with no modification. If you specify -truncate 1, the routine removes all
+trailing zero-bytes from the data. When we create a new image to accomodate the
+same data later, we clear the image intensity array before we copy in the new
+data, so the image is re-constructed faithfully. This truncation is effective at
+reducing the size of data files from instruments that don't fill the intensity
+array with real data, but instead use the intensity array as a place to store
+one-dimensional data, and use the overlay as a white-board upon which to render
+the data (like the Voltmeter). If you specify -data_only 1, the routine chops
+off the leading row of data, leaving only the data from the first pixel of the
+first row onwards, which is the block of data operated upon by our
+lwdaq_data_manipulate routines. If you specify -record_size larger than 1, the
+routine makes sure that the size of the block it returns is divisible by the
+record size.</p>
 }
 function lwdaq_image_contents(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -913,7 +1043,9 @@ begin
 end;
 
 {
-<p>lwdaq_image_destroy disposes of an image. You can specify multiple images, or image name patterns with * and ? wild cards. You can enter multiple image names on the command line, too.</p>
+<p>lwdaq_image_destroy disposes of an image. You can specify multiple images, or
+image name patterns with * and ? wild cards. You can enter multiple image names
+on the command line, too.</p>
 }
 function lwdaq_image_destroy(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -943,11 +1075,27 @@ begin
 end;
 
 {
-<p>lwdaq_photo_contents returns a byte array containing gray-scale intensity array corresponding to a tk photo. The routine uses the red intensity as the gray-scale intensity, which will work in a purely gray-scale image, and assumes that the red intensity is an 8-bit number.<p>
+<p>lwdaq_photo_contents returns a byte array containing gray-scale intensity
+array corresponding to a tk photo. The routine uses the red intensity as the
+gray-scale intensity, which will work in a purely gray-scale image, and assumes
+that the red intensity is an 8-bit number.</p>
 
-<p>The routine embeds the image dimensions in the first four pixels of the image by over-writing them with j_size-1 and i_size-1 each as two-byte integers in big-endian format. If the image is one that has been previously stored or drawn by lwdaq routines, the first twelve pixels of the first line will already contain the image dimensions, plus the analysis boundaries, all encoded as two-byte big-endian integers. Because the routine already knows for sure what the image dimensions are, it over-writes dimensions in the first row. But it does not over-write the analysis boundaries. These may be correct or incorrect. You can pass this routine's result to lwdaq_image_create, and have the image-creating routine check the first twelve bytes for valid analysis bounds, or ignore these bounds and use newly-specified bounds.</p>
+<p>The routine embeds the image dimensions in the first four pixels of the image
+by over-writing them with j_size-1 and i_size-1 each as two-byte integers in
+big-endian format. If the image is one that has been previously stored or drawn
+by lwdaq routines, the first twelve pixels of the first line will already
+contain the image dimensions, plus the analysis boundaries, all encoded as
+two-byte big-endian integers. Because the routine already knows for sure what
+the image dimensions are, it over-writes dimensions in the first row. But it
+does not over-write the analysis boundaries. These may be correct or incorrect.
+You can pass this routine's result to lwdaq_image_create, and have the
+image-creating routine check the first twelve bytes for valid analysis bounds,
+or ignore these bounds and use newly-specified bounds.</p>
 
-<p>To assemble the 8-bit gray-scale image, the routine uses the lwdaq scratch image. If the routine were to allocate and dispose of an image, the printing activity of the disposal when -track_ptrs is set to 1 would alter the TCL return string.</p>
+<p>To assemble the 8-bit gray-scale image, the routine uses the lwdaq scratch
+image. If the routine were to allocate and dispose of an image, the printing
+activity of the disposal when -track_ptrs is set to 1 would alter the TCL return
+string.</p>
 }
 function lwdaq_photo_contents(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1009,7 +1157,10 @@ begin
 end;
 
 {
-<p>lwdaq_image_characteristics returns a string of numbers, each of which is some characteristic of the image. We list the characteristics in the table below. The first row of the table gives the first number in the return string. The last row gives the last number.</p>
+<p>lwdaq_image_characteristics returns a string of numbers, each of which is
+some characteristic of the image. We list the characteristics in the table
+below. The first row of the table gives the first number in the return string.
+The last row gives the last number.</p>
 
 <center><table border>
 <tr><th>Index</th><th>Characteristic</th><th>Description</th></tr>
@@ -1025,7 +1176,9 @@ end;
 <tr><td>9</td><td>width</td><td>the number of colums in the image</td></tr>
 </table></center>
 
-<p>The lwdaq_image_characteristics routine does not use the global fsr and fsd parameters to format its output. Instead, it always provides one and only one decimal place for its real-valued characteristics.</p>
+<p>The lwdaq_image_characteristics routine does not use the global fsr and fsd
+parameters to format its output. Instead, it always provides one and only one
+decimal place for its real-valued characteristics.</p>
 }
 function lwdaq_image_characteristics(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1067,7 +1220,13 @@ begin
 end;
 
 {
-<p>lwdaq_image_histogram returns a histogram of image intensity within the analysis bounds of an image. The histogram takes the form of an x-y graph in a space-delimited string, with the x-coordinate representing intensity, and the y-coordinate representing frequency. Suppose we apply the histogram routine to a 20&times;20 image and we assume that the pixel intensities range from 0 to 3. The string "0 100 1 210 2 40 3 50" confirms that there are 400 pixels in the image, 100 with intensity 0, 210 with intensity 1, and so on.</p>
+<p>lwdaq_image_histogram returns a histogram of image intensity within the
+analysis bounds of an image. The histogram takes the form of an x-y graph in a
+space-delimited string, with the x-coordinate representing intensity, and the
+y-coordinate representing frequency. Suppose we apply the histogram routine to a
+20&times;20 image and we assume that the pixel intensities range from 0 to 3.
+The string "0 100 1 210 2 40 3 50" confirms that there are 400 pixels in the
+image, 100 with intensity 0, 210 with intensity 1, and so on.</p>
 }
 function lwdaq_image_histogram(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1110,7 +1269,15 @@ end;
 
 
 {
-<p>lwdaq_image_profile returns a list of the average intensity in the analysis boundaries along the row or column directions.  The profile takes the form of series of numbers in a space-delimited decimal string. The first number of a row profile is the average intensity of pixels in the leftmost column of the analysis boundaries. The last number is the average intensity of the right-most column. The first number of a column profile is the average intensity of the topmost row in the analysis boundaries. The last number is the average intensity of the bottom row. To obtain the row profile, use option -row 1, which is the default. To obtain the column profile, use -row 0.</p>
+<p>lwdaq_image_profile returns a list of the average intensity in the analysis
+boundaries along the row or column directions.  The profile takes the form of
+series of numbers in a space-delimited decimal string. The first number of a row
+profile is the average intensity of pixels in the leftmost column of the
+analysis boundaries. The last number is the average intensity of the right-most
+column. The first number of a column profile is the average intensity of the
+topmost row in the analysis boundaries. The last number is the average intensity
+of the bottom row. To obtain the row profile, use option -row 1, which is the
+default. To obtain the column profile, use -row 0.</p>
 }
 function lwdaq_image_profile(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1171,7 +1338,10 @@ begin
 end;
 
 {
-<p>lwdaq_image_exists returns a list of images in the lwdaq image list that match the image_name pattern you pass to the routine. If you pass "*", it will return a list of all existing images. If there are no matching images, lwdaq_image_exists returns an empty string.</p>
+<p>lwdaq_image_exists returns a list of images in the lwdaq image list that
+match the image_name pattern you pass to the routine. If you pass "*", it will
+return a list of all existing images. If there are no matching images,
+lwdaq_image_exists returns an empty string.</p>
 }
 function lwdaq_image_exists(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1221,7 +1391,8 @@ begin
 end;
 
 {
-<p>lwdaq_image_results returns an image's results string, which may be up to string_length characters long.</p>
+<p>lwdaq_image_results returns an image's results string, which may be up to
+string_length characters long.</p>
 }
 function lwdaq_image_results(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1256,7 +1427,12 @@ begin
 end;
 
 {
-<p>lwdaq_image_manipulate returns the name of a new image derived from one or more images passed to lwdaq_image_manipulate. If we set the -replace option to 1, the routine replaces the original image with the new image. The command takes the name of an image in the LWDAQ image list, and the name of a manipulation to be performed upon this image. The currently-supported manipulations are as follows.</p>
+<p>lwdaq_image_manipulate returns the name of a new image derived from one or
+more images passed to lwdaq_image_manipulate. If we set the -replace option to
+1, the routine replaces the original image with the new image. The command takes
+the name of an image in the LWDAQ image list, and the name of a manipulation to
+be performed upon this image. The currently-supported manipulations are as
+follows.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Manipulation</th><th>Function</th></tr>
@@ -1287,38 +1463,151 @@ end;
 <tr><td>transfer_overlay</td><td>Transfer the overlay of a second image into the overlay of the first image.</td></tr>
 </table><b>Table:</b> Manipulation Codes and their Functions. All codes create a new image, except for <i>none</i>. With -replace 1 the old image will be replaced by the new image. With -replace 0, the new image will be distinct, with a distinct name.</center>
 
-<p>The <i>none</i> manipulation does nothing. It does not return a new image. Instead, the <i>none</i> manipulation allows us to manipulate an existing image's analysis boundaries, result string, and overlay pixels.</p>
+<p>The <i>none</i> manipulation does nothing. It does not return a new image.
+Instead, the <i>none</i> manipulation allows us to manipulate an existing
+image's analysis boundaries, result string, and overlay pixels.</p>
 
-<p>The <i>accumulate</i> option allows us to combine the contrast of two images. It adds the intensity of the two images together, subtracts the average intensity of each image, and adds the mid-intensity value, which is 128 in eight-bit images. If we have ten dim x-ray images of the same device, we can add them together with the accumulate instruction so as to obtain an image with better contrast.</p>
+<p>The <i>accumulate</i> option allows us to combine the contrast of two images.
+It adds the intensity of the two images together, subtracts the average
+intensity of each image, and adds the mid-intensity value, which is 128 in
+eight-bit images. If we have ten dim x-ray images of the same device, we can add
+them together with the accumulate instruction so as to obtain an image with
+better contrast.</p>
 
-<p>The <i>bounds_subtract</i> manipulation is like <i>subtract</i>, but applies the subtraction only within the
-analysis bounds of the first image. Elsewhere, the difference image is equal to the first image.</p>
+<p>The <i>bounds_subtract</i> manipulation is like <i>subtract</i>, but applies
+the subtraction only within the analysis bounds of the first image. Elsewhere,
+the difference image is equal to the first image.</p>
 
-<p>The <i>copy</i> manipulation makes a copy of an image. By default, the name of the copy will be the name of the original, which is inconvenient. So we should use the -name option with <i>copy</i> to specify a name for the copy. As always, when we specify a name, all existing images with that name will be deleted to make way for the new image, thus assuring us that the new image is the only one with its name. With the -replace option we disturb the behavior of the <i>copy</i> manipulationg by deleting the original image and replacing it with the copy.</p>
+<p>The <i>copy</i> manipulation makes a copy of an image. By default, the name
+of the copy will be the name of the original, which is inconvenient. So we
+should use the -name option with <i>copy</i> to specify a name for the copy. As
+always, when we specify a name, all existing images with that name will be
+deleted to make way for the new image, thus assuring us that the new image is
+the only one with its name. With the -replace option we disturb the behavior of
+the <i>copy</i> manipulationg by deleting the original image and replacing it
+with the copy.</p>
 
-<p>The <i>combine</i> manipulation allows you to write over the data in an image, starting with the <i>offset</i>'th pixel. You specify <i>offset</i> after the data. The manipulation copies the entire contents of an <i>m</i>-byte binary block into the image, starting at pixel <i>offset</i>, and ending at pixel <i>offset+m-1</i>. If the copy goes past the end of the image array, the manipulation aborts without doing anything, and returns an error.</p>
+<p>The <i>combine</i> manipulation allows you to write over the data in an
+image, starting with the <i>offset</i>'th pixel. You specify <i>offset</i> after
+the data. The manipulation copies the entire contents of an <i>m</i>-byte binary
+block into the image, starting at pixel <i>offset</i>, and ending at pixel
+<i>offset+m-1</i>. If the copy goes past the end of the image array, the
+manipulation aborts without doing anything, and returns an error.</p>
 
-<p>The <i>crop</i> manipulation extracts the pixels inside the analysis boundaries of the original image, and creates a new image containing only these pixels. The dimensions of the new image will be those of the original analysis boundaries, but with one extra row at the top to accommodate an image header when we save to disk. The new analysis boundaries will include the entire image except for row zero.</p>
+<p>The <i>crop</i> manipulation extracts the pixels inside the analysis
+boundaries of the original image, and creates a new image containing only these
+pixels. The dimensions of the new image will be those of the original analysis
+boundaries, but with one extra row at the top to accommodate an image header
+when we save to disk. The new analysis boundaries will include the entire image
+except for row zero.</p>
 
-<p>The <i>grad</i> manipulations either return an absolute intensity gradient or a signed intensity gradient. We calculate the horizontal gradient at pixel (i,j) by subtracting the intensity of pixel (i-1,j) from that of pixel (i+1,j). The vertical gradient is (i,j+1) minus (i,j-1). When we return the magnitude of the gradient, the intensity of the gradient image is simply the absolute value of the gradient. When we return the signed gradient, we offset the gradient image intensity by mid_intensity, which is 128 for eight-bit gray scale images. Thus an intensity of 128 means zero gradient, and an intensity of 138 means +10. When the gradient exceeds 127 or -128, we clip its value to 255 and 0 respectively. For more details, see the image_filter and subsequent routine in <a href="../../Software/Sources/image_manip.pas">image_manip.pas</a>.</p>
+<p>The <i>grad</i> manipulations either return an absolute intensity gradient or
+a signed intensity gradient. We calculate the horizontal gradient at pixel (i,j)
+by subtracting the intensity of pixel (i-1,j) from that of pixel (i+1,j). The
+vertical gradient is (i,j+1) minus (i,j-1). When we return the magnitude of the
+gradient, the intensity of the gradient image is simply the absolute value of
+the gradient. When we return the signed gradient, we offset the gradient image
+intensity by mid_intensity, which is 128 for eight-bit gray scale images. Thus
+an intensity of 128 means zero gradient, and an intensity of 138 means +10. When
+the gradient exceeds 127 or -128, we clip its value to 255 and 0 respectively.
+For more details, see the image_filter and subsequent routine in <a
+href="../../Software/Sources/image_manip.pas">image_manip.pas</a>.</p>
 
-<p>The <i>rasnik</i> manipulation draws a rasnik pattern in the image. We specify the rasnik pattern with a string of seven numbers: origin.x, origin.y, pattern_x_width, pattern_y_width, rotation, sharpness, and noise amplitude. The origin is the image coordinates of the top-left corner of one of the squares in the chessboard. Units are pixels, not mircons. The x and y width of the squares are in the near-horizontal and near-vertical direction respectively. Units are pixels again. The rotation is counter-clockwise in milliradians of the pattern with respect to the sensor. With sharpness 1, the pattern has sinusoidal intensity variation from black to white. With sharpness less than 1, the amplitude of the sinusoidal variation decreases in proportion. With sharpness greater than one, the sinusoidal amplitude increases in proportion, but is clipped to black and white intensity, so that we obtain a sharply-defined chessboard. With sharpness 0.01 we obtain an image with alternating circles of intensity one count above and below the middle intensity, set in a field of middle intensity, as shown <a href="../../Devices/Rasnik/Sharpness_001.jpg">here</a>. When we differentiate such an image in the horizontal direction, we get <a href="../../Devices/Rasnik/Sharpness_001_grad_i.gif">this</a>, which defeats our frequency-based rasnik analysis. We can add noise to our simulated image with the noise amplitude parameter. If we set this to 1.0, we add a random number between 0.0 and 1.0 to each pixel.</p>
+<p>The <i>rasnik</i> manipulation draws a rasnik pattern in the image. We
+specify the rasnik pattern with a string of seven numbers: origin.x, origin.y,
+pattern_x_width, pattern_y_width, rotation, sharpness, and noise amplitude. The
+origin is the image coordinates of the top-left corner of one of the squares in
+the chessboard. Units are pixels, not mircons. The x and y width of the squares
+are in the near-horizontal and near-vertical direction respectively. Units are
+pixels again. The rotation is counter-clockwise in milliradians of the pattern
+with respect to the sensor. With sharpness 1, the pattern has sinusoidal
+intensity variation from black to white. With sharpness less than 1, the
+amplitude of the sinusoidal variation decreases in proportion. With sharpness
+greater than one, the sinusoidal amplitude increases in proportion, but is
+clipped to black and white intensity, so that we obtain a sharply-defined
+chessboard. With sharpness 0.01 we obtain an image with alternating circles of
+intensity one count above and below the middle intensity, set in a field of
+middle intensity, as shown <a
+href="../../Devices/Rasnik/Sharpness_001.jpg">here</a>. When we differentiate
+such an image in the horizontal direction, we get <a
+href="../../Devices/Rasnik/Sharpness_001_grad_i.gif">this</a>, which defeats our
+frequency-based rasnik analysis. We can add noise to our simulated image with
+the noise amplitude parameter. If we set this to 1.0, we add a random number
+between 0.0 and 1.0 to each pixel.</p>
 
 <p><pre>lwdaq_image_manipulate image_name rasnik "0 0 20 30 2 10" -replace 1</pre></p>
 
-<p>In the above example, the the existing image would be replaced by a new image containing a rasnik pattern with origin at the top-left corner of the top-left pixel in the image, each square 20 pixels wide and 30 pixels high, rotated by 2 mrad anti-clockwise, with sharp edges.</p>
+<p>In the above example, the the existing image would be replaced by a new image
+containing a rasnik pattern with origin at the top-left corner of the top-left
+pixel in the image, each square 20 pixels wide and 30 pixels high, rotated by 2
+mrad anti-clockwise, with sharp edges.</p>
 
-<p>The <i>rotate</i> manipulation rotates the entire image about a point. We specify the rotation in radians. We specify the point in <i>image coordinates</i>, where point (0,0) is the top-left corner of the top-left pixel, the <i>x</i>-axis runs left to right, the <i>y</i>-axis runs top to bottom, and the units of length are pixels. The point (0.5,0.5) is the center of the top-left pixel. The point (199.5,99.5) is the center of the pixel in the 200'th column and 100'th row. When we rotate a rectangular image, some parts will leave the rectangular image area. These are lost by the rotation manipulation. Opposite to these losses are regions where there is no intensity information to fill in the image area. These regions we fill in with pixels intensity equal to the average intensity of the original image within its analysis bounds. The rotation is applied to the entire image, not just the analysis area.</p>
+<p>The <i>rotate</i> manipulation rotates the entire image about a point. We
+specify the rotation in radians. We specify the point in <i>image
+coordinates</i>, where point (0,0) is the top-left corner of the top-left pixel,
+the <i>x</i>-axis runs left to right, the <i>y</i>-axis runs top to bottom, and
+the units of length are pixels. The point (0.5,0.5) is the center of the
+top-left pixel. The point (199.5,99.5) is the center of the pixel in the 200'th
+column and 100'th row. When we rotate a rectangular image, some parts will leave
+the rectangular image area. These are lost by the rotation manipulation.
+Opposite to these losses are regions where there is no intensity information to
+fill in the image area. These regions we fill in with pixels intensity equal to
+the average intensity of the original image within its analysis bounds. The
+rotation is applied to the entire image, not just the analysis area.</p>
 
-<p>The <i>smooth</i> manipulation applies a 3&times;3 average filter to the image within the analysis boundaries. The value of pixel (i, j) in the new image will be proportional to the sum of the pixels (i-1..i+1, j-1..j+1) in the original image. One of the potential benifits of smoothing is to attenuate stochastic noise. We would like the smoothing to attenuate quantization noise in very dim images. But if we add the nine pixels in the 3&times;3 block together and dividing by nine to obtain their average, we find that our average itself suffers from quantization noise. For example, suppose eight pixels have value 100 and the ninth is 101. The average should be 100.1, but this will be rounded to 100. The smooth routine calculates the average value of the nine pixels and stores them in an array of real values. Once the array is complete, the routine tranforms the minimum to maximum range in the real-valued array into the pixel value range in the final image. If the smoothed values ranged from 98 to 102 and the final image pixels can be 0 to 255, the smooth routine transforms 98 to 0 and 102 to 255. Thus we obtain the best possible contrast in the final image, and we do the best we can to remove quantization noise.</p>
+<p>The <i>smooth</i> manipulation applies a 3&times;3 average filter to the
+image within the analysis boundaries. The value of pixel (i, j) in the new image
+will be proportional to the sum of the pixels (i-1..i+1, j-1..j+1) in the
+original image. One of the potential benifits of smoothing is to attenuate
+stochastic noise. We would like the smoothing to attenuate quantization noise in
+very dim images. But if we add the nine pixels in the 3&times;3 block together
+and dividing by nine to obtain their average, we find that our average itself
+suffers from quantization noise. For example, suppose eight pixels have value
+100 and the ninth is 101. The average should be 100.1, but this will be rounded
+to 100. The smooth routine calculates the average value of the nine pixels and
+stores them in an array of real values. Once the array is complete, the routine
+tranforms the minimum to maximum range in the real-valued array into the pixel
+value range in the final image. If the smoothed values ranged from 98 to 102 and
+the final image pixels can be 0 to 255, the smooth routine transforms 98 to 0
+and 102 to 255. Thus we obtain the best possible contrast in the final image,
+and we do the best we can to remove quantization noise.</p>
 
-<p>The <i>subtract</i> manipulation requires you to name a second image, which will be subtracted from the first to create a third image. The two images must have the same dimensions. All pixels in the second images will be subtracted from the first image. The third image, being the difference, will be the same dimensions as the first two.</p>
+<p>The <i>subtract</i> manipulation requires you to name a second image, which
+will be subtracted from the first to create a third image. The two images must
+have the same dimensions. All pixels in the second images will be subtracted
+from the first image. The third image, being the difference, will be the same
+dimensions as the first two.</p>
 
-<p>The <i>subtract_row</i> manipulation does not require a second image. It operates only upon the image within the analysis boundaries. Pixels outside the analysis boundaries are unchanged. Within the analysis boundaries, we subtract the average intensity of each row from the pixels in the row. The row average we obtain from the pixels in the row that lie within the analysis boundaries. In addition, we offset the intensity of the pixels in the analysis boundaries so that the intensity of the top-left pixel in the analysis bounds remains unchanged.</p>
+<p>The <i>subtract_row</i> manipulation does not require a second image. It
+operates only upon the image within the analysis boundaries. Pixels outside the
+analysis boundaries are unchanged. Within the analysis boundaries, we subtract
+the average intensity of each row from the pixels in the row. The row average we
+obtain from the pixels in the row that lie within the analysis boundaries. In
+addition, we offset the intensity of the pixels in the analysis boundaries so
+that the intensity of the top-left pixel in the analysis bounds remains
+unchanged.</p>
 
-<p>The <i>subtract_gradient</i> manipulation does not require a second image. We determine the gradient of intensity within the analysis boundaries. We measure the slope of the vertical and horizontal intensity profiles and use these to obtain the two-dimensional gradient. We subtract the intensity due to the gradient from each pixel in the analysis boundaries, but not from those outside the analysis boundaries. We thus remove both the horizontal and vertical intensity slopes from the image. We offset the intensity within the analysis boundaries so that the intensity of the top-left pixel in the analysis bounds remains unchanged.</p>
+<p>The <i>subtract_gradient</i> manipulation does not require a second image. We
+determine the gradient of intensity within the analysis boundaries. We measure
+the slope of the vertical and horizontal intensity profiles and use these to
+obtain the two-dimensional gradient. We subtract the intensity due to the
+gradient from each pixel in the analysis boundaries, but not from those outside
+the analysis boundaries. We thus remove both the horizontal and vertical
+intensity slopes from the image. We offset the intensity within the analysis
+boundaries so that the intensity of the top-left pixel in the analysis bounds
+remains unchanged.</p>
 
-<p>The <i>transfer_overlay</i> manipulation copies the overlay of a second image into the overlay of the first. This manipulation is the only one operating upon the image ovelays. Each image has an overlay area whose colors we draw on top of the image when we display the image on the screen. Thus we can use the overlay to mark features in the image without corrupting the image itself. The overlay transfer scales the original overlay so that it fits into the rectangle of the new image. We can shrink a large image by a factor of four, analyze the quarter-sized image, record the results of analysis in the overlay, and transfer the overlay back into the original full-sized image. The transfer will make sure that the markings are aligned correctly with the features in the original image.</p>
+<p>The <i>transfer_overlay</i> manipulation copies the overlay of a second image
+into the overlay of the first. This manipulation is the only one operating upon
+the image ovelays. Each image has an overlay area whose colors we draw on top of
+the image when we display the image on the screen. Thus we can use the overlay
+to mark features in the image without corrupting the image itself. The overlay
+transfer scales the original overlay so that it fits into the rectangle of the
+new image. We can shrink a large image by a factor of four, analyze the
+quarter-sized image, record the results of analysis in the overlay, and transfer
+the overlay back into the original full-sized image. The transfer will make sure
+that the markings are aligned correctly with the features in the original
+image.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -1334,15 +1623,34 @@ analysis bounds of the first image. Elsewhere, the difference image is equal to 
 <tr><td>-right value</td><td>Set the rigth of the analysis bounds to value.</td></tr>
 </table></center>
 
-<p>With -name you specify the name of the new image created by the manipulation, or the existing image if there is no new image created by the manipulation. Any pre-existing images with this name will be destroyed before the name change occurs.</p>
+<p>With -name you specify the name of the new image created by the manipulation,
+or the existing image if there is no new image created by the manipulation. Any
+pre-existing images with this name will be destroyed before the name change
+occurs.</p>
 
-<p>With -replace 0, the manipulation creates a new image and returns its name. With -replace 1, the manipulation over-writes data in the old image and returns the old image name.</p>
+<p>With -replace 0, the manipulation creates a new image and returns its name.
+With -replace 1, the manipulation over-writes data in the old image and returns
+the old image name.</p>
 
-<p>The -paint option instructs lwdaq_image_manipulate to paint the entire area within the analysis bounds with the color given by <i>value</i>. This value should be a number between 0 and 255. The value 0 is for transparant. Other than the 0-value, the number will be treated like an eight-bit RGB code, with the top three bits for red, the middle three for green, and the bottom three for blue. Thus $E0 (hex E0) is red, $1C is green, and $03 is blue. Note that paint does not convert value into one of LWDAQ's standard graph-plotting colors, as defined in the overlay_color_from_integer routine of images.pas, and used in <a href="#lwdaq_graph">lwdaq_graph</a>.</p>
+<p>The -paint option instructs lwdaq_image_manipulate to paint the entire area
+within the analysis bounds with the color given by <i>value</i>. This value
+should be a number between 0 and 255. The value 0 is for transparant. Other than
+the 0-value, the number will be treated like an eight-bit RGB code, with the top
+three bits for red, the middle three for green, and the bottom three for blue.
+Thus $E0 (hex E0) is red, $1C is green, and $03 is blue. Note that paint does
+not convert value into one of LWDAQ's standard graph-plotting colors, as defined
+in the overlay_color_from_integer routine of images.pas, and used in <a
+href="#lwdaq_graph">lwdaq_graph</a>.</p>
 
-<p>In addition to the pixel manipulations, we also have options to change other secondary properties of the image. The table above shows the available manipulation options, each of which is followed by a value in the command line, in the format ?option value?.</p>
+<p>In addition to the pixel manipulations, we also have options to change other
+secondary properties of the image. The table above shows the available
+manipulation options, each of which is followed by a value in the command line,
+in the format ?option value?.</p>
 
-<p>When you specify the analysis bounds, a value of &minus;1 is the code for "do nothing". The boundary will remain as it was. This use of the &minus;1 code contasts with that of lwdaq_image_create, where &minus;1 directs lwdaq_image_create to move the boundary to the edge of the image.</p>
+<p>When you specify the analysis bounds, a value of &minus;1 is the code for "do
+nothing". The boundary will remain as it was. This use of the &minus;1 code
+contasts with that of lwdaq_image_create, where &minus;1 directs
+lwdaq_image_create to move the boundary to the edge of the image.</p>
 }
 function lwdaq_image_manipulate(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1565,7 +1873,18 @@ begin
 end;
 
 {
-<p>lwdaq_data_manipulate operates upon the data in an image, and we intend it for use with instruments that store one-dimensional arrays of data in an image's intensity array. Our convention, when using the intensity array in this way, is to start storing data in the first column of the second row. This leaves the first row free for header information when we store the image to disk. We refer to the block of memory starting with the first byte of the second row, and ending with the last byte of the last row, as the <i>data space</i>. We specify bytes in the data space with their <i>byte address</i>, which is zero at the first byte in the data space. The routine returns a byte array in the case of the <i>read</i> manipulation, or an empty string otherwise. In the event of an error, it returns an error description. The <i>write</i>, <i>shift</i>, and <i>clear</i> manipulations affect the data in the image.</p>
+<p>lwdaq_data_manipulate operates upon the data in an image, and we intend it
+for use with instruments that store one-dimensional arrays of data in an image's
+intensity array. Our convention, when using the intensity array in this way, is
+to start storing data in the first column of the second row. This leaves the
+first row free for header information when we store the image to disk. We refer
+to the block of memory starting with the first byte of the second row, and
+ending with the last byte of the last row, as the <i>data space</i>. We specify
+bytes in the data space with their <i>byte address</i>, which is zero at the
+first byte in the data space. The routine returns a byte array in the case of
+the <i>read</i> manipulation, or an empty string otherwise. In the event of an
+error, it returns an error description. The <i>write</i>, <i>shift</i>, and
+<i>clear</i> manipulations affect the data in the image.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Manipulation</th><th>Function</th></tr>
@@ -1575,21 +1894,38 @@ end;
 <tr><td>clear</td><td>Clears the data.</td></tr>
 <tr><td>none</td><td>No action.</td></tr></table></center>
 
-<p>The <i>write</i> function requires two parameters: the data you wish to write to the data space and the byte address at which you want the first byte of your data to be written. The following command writes the contents of <i>data</i> to the data space of the image named <i>image_name</i> starting at the first byte in the data space (which is the first pixel in the second row).</p>
+<p>The <i>write</i> function requires two parameters: the data you wish to write
+to the data space and the byte address at which you want the first byte of your
+data to be written. The following command writes the contents of <i>data</i> to
+the data space of the image named <i>image_name</i> starting at the first byte
+in the data space (which is the first pixel in the second row).</p>
 
 <pre>lwdaq_data_manipulate image_name write 0 $data</pre>
 
-<p>The <i>read</i> function requires two parameters: the number of bytes you wish to read from the data space and the byte address at which you want to start reading. The following command reads 10000 bytes starting at byte address 100, and returns them as a byte array. If the image has 100 pixels per row, the first byte the routine reads will be the first pixel in the third row of the image.</p>
+<p>The <i>read</i> function requires two parameters: the number of bytes you
+wish to read from the data space and the byte address at which you want to start
+reading. The following command reads 10000 bytes starting at byte address 100,
+and returns them as a byte array. If the image has 100 pixels per row, the first
+byte the routine reads will be the first pixel in the third row of the
+image.</p>
 
 <pre>lwdaq_data_manipulate image_name read 100 10000</pre>
 
-<p>The following commands read 200 bytes from the image, starting with the 50'th byte, and transforms them into a list of signed integers, on the assumption that the 200 bytes represent 100 consecutive, two-byte signed binary values with the most significant byte first (big-endian byte ordering).</p>
+<p>The following commands read 200 bytes from the image, starting with the 50'th
+byte, and transforms them into a list of signed integers, on the assumption that
+the 200 bytes represent 100 consecutive, two-byte signed binary values with the
+most significant byte first (big-endian byte ordering).</p>
 
 <pre>lwdaq_data_manipulate image_name read 50 200</pre>
 
-<p>The <i>shift</i> function requires one parameter: the number of bytes to the left by which you want the data to be shifted. Shifting to the left is in the direction of the start of the data space. If you specify a negative shift, the routine shifts the data to the right, in the direction of the end of the data space.</p>
+<p>The <i>shift</i> function requires one parameter: the number of bytes to the
+left by which you want the data to be shifted. Shifting to the left is in the
+direction of the start of the data space. If you specify a negative shift, the
+routine shifts the data to the right, in the direction of the end of the data
+space.</p>
 
-<p>The <i>clear</i> function takes no parameters. It clears all the byte in the data space to zero.</p>
+<p>The <i>clear</i> function takes no parameters. It clears all the byte in the
+data space to zero.</p>
 }
 function lwdaq_data_manipulate(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1746,7 +2082,8 @@ begin
 end;
 
 {
-<p>lwdaq_bcam finds spots in images. The routine clears the image overlay for its own use.</p>
+<p>lwdaq_bcam finds spots in images. The routine clears the image overlay for
+its own use.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -1766,17 +2103,70 @@ end;
 <tr><td>-reference_um</td><td>Reference line y-position for line fits, default 0</td></tr>
 </table></center>
 
-<p>The lwdaq_bcam routine makes a list of spots in the image. The -threshold string tells lwdaq_bcam how to distinguish background pixels from spot pixels. At the very least, the -threshold string must specify a threshold intensity, or a means of calculating a threshold intensity. All the spot-locating routines called by lwdaq_bcam use the <i>net intensity</i> of pixels, which is the image intensity minus the threshold intensity, with negative values clipped to zero.</p>
+<p>The lwdaq_bcam routine makes a list of spots in the image. The -threshold
+string tells lwdaq_bcam how to distinguish background pixels from spot pixels.
+At the very least, the -threshold string must specify a threshold intensity, or
+a means of calculating a threshold intensity. All the spot-locating routines
+called by lwdaq_bcam use the <i>net intensity</i> of pixels, which is the image
+intensity minus the threshold intensity, with negative values clipped to
+zero.</p>
 
-<p>The -threshold string must begin with an integer, <i>t</i>. After <i>t</i> comes an optional symbol, the <i>threshold symbol</i>. If there is no threshold symbol, the routine assumes the "*" symbol. The "*" symbol tells the routine to use <i>t</i> as the threshold. The string "20 *" means any pixel with intensity 20 or greater is a spot or part of some larger spot. The "%" symbol means that the threshold is some fraction of the way from the minimum image intensity to the maximum intensity, where the minimum and maximum are obtained from within the image analysis boundaries. The value of <i>t</i> is treated as a percentage. The string "10 %" in an image with minimum intensity 40 and maximum intensity 140 results in a threshold of 50. The "#" symbol is similar to the "%" symbol, except the average intensity takes the place of the minimum. The string "10 #" in an image with average intensity 50 and maximum intensity 140 results in a threshold of 59. The "$" symbol means the threshold is <i>t</i> counts above the average intensity. The string "5 $" in an image with average intensity 50 results in a threshold of 55. The "&" symbol uses the median intensity to obtain the threshold. The string "5 &" in an image with median intensity 62 results in a threshold of 67. In each of these calculations, the BCAM analysis also defines a "background" intensity, which it uses only when we want it to calculate and report to us the total brightness of a spot. The background is the average (# and $), minimum (%), median (&), or simply zero (*).</p>
+<p>The -threshold string must begin with an integer, <i>t</i>. After <i>t</i>
+comes an optional symbol, the <i>threshold symbol</i>. If there is no threshold
+symbol, the routine assumes the "*" symbol. The "*" symbol tells the routine to
+use <i>t</i> as the threshold. The string "20 *" means any pixel with intensity
+20 or greater is a spot or part of some larger spot. The "%" symbol means that
+the threshold is some fraction of the way from the minimum image intensity to
+the maximum intensity, where the minimum and maximum are obtained from within
+the image analysis boundaries. The value of <i>t</i> is treated as a percentage.
+The string "10 %" in an image with minimum intensity 40 and maximum intensity
+140 results in a threshold of 50. The "#" symbol is similar to the "%" symbol,
+except the average intensity takes the place of the minimum. The string "10 #"
+in an image with average intensity 50 and maximum intensity 140 results in a
+threshold of 59. The "$" symbol means the threshold is <i>t</i> counts above the
+average intensity. The string "5 $" in an image with average intensity 50
+results in a threshold of 55. The "&" symbol uses the median intensity to obtain
+the threshold. The string "5 &" in an image with median intensity 62 results in
+a threshold of 67. In each of these calculations, the BCAM analysis also defines
+a "background" intensity, which it uses only when we want it to calculate and
+report to us the total brightness of a spot. The background is the average (#
+and $), minimum (%), median (&), or simply zero (*).</p>
 
-<p>Following the threshold value and threshold symbol there are two further, optional criteria we can use to restrict the routine's choice of spots. The first parameter must be an integer, <i>n</i>, which specifies the number of pixels above threshold in a spot. If <i>n</i> is followed by the symbol ">", spots must contain at least <i>n</i> pixels or else they are rejected. The symbol "<" means spots must contain at most <i>n</i> pixels. If the symbol is omitted, we assume <i>n</i> is a minimum.</p>
+<p>Following the threshold value and threshold symbol there are two further,
+optional criteria we can use to restrict the routine's choice of spots. The
+first parameter must be an integer, <i>n</i>, which specifies the number of
+pixels above threshold in a spot. If <i>n</i> is followed by the symbol ">",
+spots must contain at least <i>n</i> pixels or else they are rejected. The
+symbol "<" means spots must contain at most <i>n</i> pixels. If the symbol is
+omitted, we assume <i>n</i> is a minimum.</p>
 
-<p>The next parameter must be a real number, <i>e</i>, which specifies the maximum eccentricity of the spot, which is the maximum ratio of width to height, or height to width. Spots that have greater eccentricity will be rejected by the routine. The second parameter cannot be included without the first, but if you use 0 for the first, the routine ignores the first parameter and moves on to the second.</p>
+<p>The next parameter must be a real number, <i>e</i>, which specifies the
+maximum eccentricity of the spot, which is the maximum ratio of width to height,
+or height to width. Spots that have greater eccentricity will be rejected by the
+routine. The second parameter cannot be included without the first, but if you
+use 0 for the first, the routine ignores the first parameter and moves on to the
+second.</p>
 
-<p>The lwdaq_bcam routine identifies all distinct sets of contiguous pixels above threshold, eliminates those that do not meet the test criteria, determines the position and total net intensity of each remaining set, sorts them in order of decreasing total net intensity, and eliminates all but the first -num_spots sets. The <i>total net intensity</i> is the sum of the net intensities of all the pixels in the set. By default, the routine returns the position of each spot in microns with respect to the top-left corner of the image. To convert from pixels to microns, the routine uses -pixel_size_um, and assumes the pixels are square.</p>
+<p>The lwdaq_bcam routine identifies all distinct sets of contiguous pixels
+above threshold, eliminates those that do not meet the test criteria, determines
+the position and total net intensity of each remaining set, sorts them in order
+of decreasing total net intensity, and eliminates all but the first -num_spots
+sets. The <i>total net intensity</i> is the sum of the net intensities of all
+the pixels in the set. By default, the routine returns the position of each spot
+in microns with respect to the top-left corner of the image. To convert from
+pixels to microns, the routine uses -pixel_size_um, and assumes the pixels are
+square.</p>
 
-<p>There are several ways that lwdaq_bcam can analyze an image. We can manipulate the image before analysis, or we can operate on the original image. Regardless of what image the analysis works on, it still drawss the results of analysis in the overlay of the original image so that we will see the results when we display the image. We can find the weighted centroid of the pixels in the spot, fit an ellipse to the perimeter of the spot, or fit a straight line to the pixels in the spot. We specify a combination of manipulation and calculation with the analysis_type parameter, which correspond to the <i>spot_use</i> constants in <a href="http://www.bndhep.net/Software/Sources/spot.pas">spot.pas</a>.</p>
+<p>There are several ways that lwdaq_bcam can analyze an image. We can
+manipulate the image before analysis, or we can operate on the original image.
+Regardless of what image the analysis works on, it still drawss the results of
+analysis in the overlay of the original image so that we will see the results
+when we display the image. We can find the weighted centroid of the pixels in
+the spot, fit an ellipse to the perimeter of the spot, or fit a straight line to
+the pixels in the spot. We specify a combination of manipulation and calculation
+with the analysis_type parameter, which correspond to the <i>spot_use</i>
+constants in <a
+href="http://www.bndhep.net/Software/Sources/spot.pas">spot.pas</a>.</p>
 
 <center><table border=1>
 <tr><th>Value</th><th>Manipulation</th><th>Calculation</th><th>Description</th></tr>
@@ -1788,11 +2178,40 @@ end;
 <tr><td>6</td><td>negate</td><td>edge of elliptical shadow</td><td>Weighted fit to edge pixels.</tr>
 </table><small><b>Table:</b> Analysis Types, Image Manipulations and Calculations</small></center>
 
-<p>With analysis_type=1, which is the default, the position of the spot is the weighted centroid of its net intensity. With analysis_type=2, the routine fits an ellipse to the edge of the spot. The position is the center of the ellipse. With analysis_type=3 the routine fits a straight line to the net intensity of a bright stripe. The analysis returnsthe <i>x</i>-coordinate of the intersection of this straight line with a reference line. We specify the <i>y</i>-coordinate of a horizontal reference line with <i>reference_um</i>. In place of a <i>y</i>-coordinate of the line, the routine returns its anti-clockwise rotation in milliradians. With analysis_type=4, the routine negates the image, turning a dark shadow into a bright stripe, and then applies vertical stripe analysis to the negated image. With analysis_type=5, the routine obtains the absolute horizontal gradient of intensity and applies vertical stripe analyis to the gradient image. With analysis_type=5, the routine negates the image, finds bright spots, and fits an ellipse to their edges.</p>
+<p>With analysis_type=1, which is the default, the position of the spot is the
+weighted centroid of its net intensity. With analysis_type=2, the routine fits
+an ellipse to the edge of the spot. The position is the center of the ellipse.
+With analysis_type=3 the routine fits a straight line to the net intensity of a
+bright stripe. The analysis returnsthe <i>x</i>-coordinate of the intersection
+of this straight line with a reference line. We specify the <i>y</i>-coordinate
+of a horizontal reference line with <i>reference_um</i>. In place of a
+<i>y</i>-coordinate of the line, the routine returns its anti-clockwise rotation
+in milliradians. With analysis_type=4, the routine negates the image, turning a
+dark shadow into a bright stripe, and then applies vertical stripe analysis to
+the negated image. With analysis_type=5, the routine obtains the absolute
+horizontal gradient of intensity and applies vertical stripe analyis to the
+gradient image. With analysis_type=5, the routine negates the image, finds
+bright spots, and fits an ellipse to their edges.</p>
 
-<p>With return_threshold=1, the routine does no spot-finding, but instead returns a string of five values obtained by interpreting the threshold string and examining the image. These five values are four integers and one real. The integers are threshold intensity, background intensity, minimum numbser of pixels in a valid spot, maximum number of pixels in a valid spot, and maximum eccentricity of a valid spot. With return_bounds=1 and return_threshold=0, the routine returns as its result string the boundaries around the spots. It chooses the same boundaries it draws in the image overlay. Each spot boundary is given as four integers: left, top, right, and bottom. The left and right integers are column numbers. The top and bottom integers are row numbers. Each spot gets four numbers, and these make up the result string, separated by spaces. With return_intensity=1, return_bounds=0, and return_threshold=0, the routine returns only the total intensity above background of the spot for each spot. Note that this total intensity above background is not the same as the net intensity of the spot, which is the intensity above threshold. The centroid analysis uses the intensity above threshold, not the total intensity above background.</p>
+<p>With return_threshold=1, the routine does no spot-finding, but instead
+returns a string of five values obtained by interpreting the threshold string
+and examining the image. These five values are four integers and one real. The
+integers are threshold intensity, background intensity, minimum numbser of
+pixels in a valid spot, maximum number of pixels in a valid spot, and maximum
+eccentricity of a valid spot. With return_bounds=1 and return_threshold=0, the
+routine returns as its result string the boundaries around the spots. It chooses
+the same boundaries it draws in the image overlay. Each spot boundary is given
+as four integers: left, top, right, and bottom. The left and right integers are
+column numbers. The top and bottom integers are row numbers. Each spot gets four
+numbers, and these make up the result string, separated by spaces. With
+return_intensity=1, return_bounds=0, and return_threshold=0, the routine returns
+only the total intensity above background of the spot for each spot. Note that
+this total intensity above background is not the same as the net intensity of
+the spot, which is the intensity above threshold. The centroid analysis uses the
+intensity above threshold, not the total intensity above background.</p>
 
-<p>The sort_code has the following meanings, and dictates the order in which the spots are returned in the result string.</p>
+<p>The sort_code has the following meanings, and dictates the order in which the
+spots are returned in the result string.</p>
 
 <pre>spot_decreasing_brightness=1;
 spot_increasing_x=2;
@@ -1803,13 +2222,31 @@ spot_decreasing_max=6;
 spot_decreasing_size=7;
 spot_increasing_xy=8;</pre>
 
-<p>Thus with spot_decreasing_x as the value for sort_code, the routine sorts the num_spots brightest spots in order of decreasing <i>x</i> position, which means spots on the right of the image will appear first in the result string. With spot_decreasing_brightness, which is the default, the spot with the highest total net intensity comes first. But with spot_decreasing_max, the spot with the highest maximum intensity comes first. With spot_decreasing_size, the spot with the largest number of pixels comes first.</p>
+<p>Thus with spot_decreasing_x as the value for sort_code, the routine sorts the
+num_spots brightest spots in order of decreasing <i>x</i> position, which means
+spots on the right of the image will appear first in the result string. With
+spot_decreasing_brightness, which is the default, the spot with the highest
+total net intensity comes first. But with spot_decreasing_max, the spot with the
+highest maximum intensity comes first. With spot_decreasing_size, the spot with
+the largest number of pixels comes first.</p>
 
-<p>With show_pixels=0, which is the default value, the routine draws red boxes around the spots. These boxes are of the same size as the spots, or a little bigger if the spots are small. If num_spots=1 and the number of pixels in the spot is greater than min_pixels_for_cross, the routine draws a cross centered on the spot instead of a box around it. When show_pxels=1, the routine marks all the pixels in each spot, so you can see the pixels that are above threshold and contiguous.</p>
+<p>With show_pixels=0, which is the default value, the routine draws red boxes
+around the spots. These boxes are of the same size as the spots, or a little
+bigger if the spots are small. If num_spots=1 and the number of pixels in the
+spot is greater than min_pixels_for_cross, the routine draws a cross centered on
+the spot instead of a box around it. When show_pxels=1, the routine marks all
+the pixels in each spot, so you can see the pixels that are above threshold and
+contiguous.</p>
 
-<p>The color we use to mark the image with the results of analysis is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
+<p>The color we use to mark the image with the results of analysis is given in
+the <i>-color</i> option. You specify the color with an integer. Color codes 0
+to 15 specity a set of distinct colors, shown <a
+href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p
+>
 
-<p>See the <a href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM Instrument</a> Manual for more information about the option values.</p>
+<p>See the <a
+href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM
+Instrument</a> Manual for more information about the option values.</p>
 }
 function lwdaq_bcam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2096,7 +2533,8 @@ begin
 end;
 
 {
-<p>lwdaq_dosimeter finds hits in images. It is called by the Dosimeter Instrument. The routine clears the image overlay for its own use.</p>
+<p>lwdaq_dosimeter finds hits in images. It is called by the Dosimeter
+Instrument. The routine clears the image overlay for its own use.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -2109,15 +2547,52 @@ end;
 <tr><td>-include_ij</td><td>If 1, include column and row of hit centers, default 0.</td></tr>
 </table></center>
 
-<p>The lwdaq_dosimeter routine measures the vertical slope of intensity in the image, which is a measure of the sensor dark current, and then finds all the bright pixels in the image, which we call <i>hits</i>, as directed by a threshold string. The -threshold string tells lwdaq_dosimeter how to distinguish background pixels from bright pixels. A bright pixel is one with intensity above the threshold intensity. The brightness of a bright pixel is its intensity minus the background intensity. The threshold string uses the same syntax as the <a href="#lwdaq_bcam">lwdaq_bcam</a> routine. It allows us to define the background, threshold, limits on the number of pixels a hit may contain, and a limit for its eccentricity.</p>
+<p>The lwdaq_dosimeter routine measures the vertical slope of intensity in the
+image, which is a measure of the sensor dark current, and then finds all the
+bright pixels in the image, which we call <i>hits</i>, as directed by a
+threshold string. The -threshold string tells lwdaq_dosimeter how to distinguish
+background pixels from bright pixels. A bright pixel is one with intensity above
+the threshold intensity. The brightness of a bright pixel is its intensity minus
+the background intensity. The threshold string uses the same syntax as the <a
+href="#lwdaq_bcam">lwdaq_bcam</a> routine. It allows us to define the
+background, threshold, limits on the number of pixels a hit may contain, and a
+limit for its eccentricity.</p>
 
-<p>The lwdaq_dosimeter routine identifies all sets of contiguous pixels above threshold in the analysis bounds. It eliminates those that have too few or too many pixels, and those that are too eccentric. It adds up the total intensity above backround of the accepted hits, and the total number of pixels in the accepted hits. Now the routine composes its output string. First comes the vertical slope of intensity, which we call the <i>intensity-slope</i>, in units of ADC counts per row, or cnt/row. Next comes the total intensity of all accepted hits divided by the total number of pixels in the analysis bounds, which we call the <i>charge density</i>, in units of counts per pixel, or cnt/px. The next value is the standard deviation of intensity in the analysis bounds, in counts. The fourth number is the threshold intensity used to isolate bright pixels, also in counts. The fifth number is the total number of bright pixels in all accepted hits, also in counts. Following these five numbers is an optional list of hits. If <i>num_hits</i> &ge; 0, it spectifies the number of hits to be listed. If <i>num_hits</i> &lt; 0, all valid hits will be listed. By default, each hit is listed by its brightness above background. Non-existent hits are indicated with brightness &minus;1. If <i>include_ij</i> is set, the brightness of each hit is followed by the image column and row of the pixel containing its intensity centroid.</p>
+<p>The lwdaq_dosimeter routine identifies all sets of contiguous pixels above
+threshold in the analysis bounds. It eliminates those that have too few or too
+many pixels, and those that are too eccentric. It adds up the total intensity
+above backround of the accepted hits, and the total number of pixels in the
+accepted hits. Now the routine composes its output string. First comes the
+vertical slope of intensity, which we call the <i>intensity-slope</i>, in units
+of ADC counts per row, or cnt/row. Next comes the total intensity of all
+accepted hits divided by the total number of pixels in the analysis bounds,
+which we call the <i>charge density</i>, in units of counts per pixel, or
+cnt/px. The next value is the standard deviation of intensity in the analysis
+bounds, in counts. The fourth number is the threshold intensity used to isolate
+bright pixels, also in counts. The fifth number is the total number of bright
+pixels in all accepted hits, also in counts. Following these five numbers is an
+optional list of hits. If <i>num_hits</i> &ge; 0, it spectifies the number of
+hits to be listed. If <i>num_hits</i> &lt; 0, all valid hits will be listed. By
+default, each hit is listed by its brightness above background. Non-existent
+hits are indicated with brightness &minus;1. If <i>include_ij</i> is set, the
+brightness of each hit is followed by the image column and row of the pixel
+containing its intensity centroid.</p>
 
-<p>With subgract_gradient=0, the dosimeter analysis operates entirely upon the original image. But with subgract_gradient=1, the analysis obtains the intensity-slope with the original image, but then subtracts the average intensity gradient from the analysis bounds and continues with bright-pixel collection in the gradient-subtracted image.</p>
+<p>With subgract_gradient=0, the dosimeter analysis operates entirely upon the
+original image. But with subgract_gradient=1, the analysis obtains the
+intensity-slope with the original image, but then subtracts the average
+intensity gradient from the analysis bounds and continues with bright-pixel
+collection in the gradient-subtracted image.</p>
 
-<p>The color we use to outline bright pixels is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
+<p>The color we use to outline bright pixels is given in the <i>-color</i>
+option. You specify the color with an integer. Color codes 0 to 15 specity a set
+of distinct colors, shown <a
+href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p
+>
 
-<p>See the <a href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Dosimeter">Dosimeter Instrument</a> Manual for more information about the option values.</p>
+<p>See the <a
+href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Dosimeter">Dosimeter
+Instrument</a> Manual for more information about the option values.</p>
 }
 function lwdaq_dosimeter(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2265,7 +2740,11 @@ begin
 end;
 
 {
-<p>lwdaq_rasnik analyzes rasnik images. Specify the image with -image_name as usual. The routine clears the image overlay for its own use. The routine takes the following options, each of which you specify by giving the option name followed by its value, ?option value?. See the <a href="">Rasnik Instrument</a> for a description of the options.</p>
+<p>lwdaq_rasnik analyzes rasnik images. Specify the image with -image_name as
+usual. The routine clears the image overlay for its own use. The routine takes
+the following options, each of which you specify by giving the option name
+followed by its value, ?option value?. See the <a href="">Rasnik Instrument</a>
+for a description of the options.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -2281,11 +2760,30 @@ end;
 <tr><td>-disable_skew</td><td>If 1, forces skew and slant values to zero, default 0.</td></tr>
 </table></center>
 
-<p>See the <a href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Rasnik">Rasnik Instrument</a> Manual for more information about the option values, in particular the reference and orientation code meanings.</p>
+<p>See the <a
+href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Rasnik">Rasnik
+Instrument</a> Manual for more information about the option values, in
+particular the reference and orientation code meanings.</p>
 
-<p>The <i>rotation_mrad</i> option allows us to specify a large nominal rotation of the mask, positive is counter-clockwise. The rasnik routine will rotate the image so as to remove the large rotation, apply analysis, then un-rotate the image. The rotation takes place about the center of the analysis bounds.</p>
+<p>The <i>rotation_mrad</i> option allows us to specify a large nominal rotation
+of the mask, positive is counter-clockwise. The rasnik routine will rotate the
+image so as to remove the large rotation, apply analysis, then un-rotate the
+image. The rotation takes place about the center of the analysis bounds.</p>
 
-<p>With the -pattern_only option set, the routine returns a description of the chessboard pattern it finds in the image. The result string contains seven numbers: origin.x, origin.y, pattern_x_width, pattern_y_width, rotation, error, and extent. The origin values are the image coordinates of the top-left corner of one of the squares in the chessboard. Units are pixels, not mircons. The next two numbers are the  width of the squares in the near-horizontal direction and their width in the near-vertical direction. Units are again pixels. The rotation is counter-clockwise in milliradians. The error is an estimate of the fitting accuracy in pixel widths. The extent is the number of squares from the image center over which the pattern extends. If we know that our image is neither slanted nor skewed, but has instead been severely corrupted by poor focus and dirt, we can force the skew and slant to zero with -disable_skew. Now, when we apply the rasnik analysis a hundred times to the same poor image, we have a higher chance of finding the correct pattern by accident.</p> 
+<p>With the -pattern_only option set, the routine returns a description of the
+chessboard pattern it finds in the image. The result string contains seven
+numbers: origin.x, origin.y, pattern_x_width, pattern_y_width, rotation, error,
+and extent. The origin values are the image coordinates of the top-left corner
+of one of the squares in the chessboard. Units are pixels, not mircons. The next
+two numbers are the  width of the squares in the near-horizontal direction and
+their width in the near-vertical direction. Units are again pixels. The rotation
+is counter-clockwise in milliradians. The error is an estimate of the fitting
+accuracy in pixel widths. The extent is the number of squares from the image
+center over which the pattern extends. If we know that our image is neither
+slanted nor skewed, but has instead been severely corrupted by poor focus and
+dirt, we can force the skew and slant to zero with -disable_skew. Now, when we
+apply the rasnik analysis a hundred times to the same poor image, we have a
+higher chance of finding the correct pattern by accident.</p> 
 }
 function lwdaq_rasnik(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2477,7 +2975,10 @@ begin
 end;
 
 {
-<p>lwdaq_rasnik_shift takes in a rasnik result string and shifts it to a new reference point. The routine gets the old reference point from the results string, and re-calculates the rasnik measurement using the x and y coordinates you specify with -reference_x_um and -reference_y_um.</p>
+<p>lwdaq_rasnik_shift takes in a rasnik result string and shifts it to a new
+reference point. The routine gets the old reference point from the results
+string, and re-calculates the rasnik measurement using the x and y coordinates
+you specify with -reference_x_um and -reference_y_um.</p>
 }
 function lwdaq_rasnik_shift(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2536,7 +3037,14 @@ begin
 end;
 
 {
-<p>lwdaq_shadow finds vertical or horizontal line shadows in images. We call these <i>wire shadows</i> because we firsst obtained them from wires in x-ray images. The image itself must be blurred enough that the minimum intensity of the shadow lies near its center. We use a simplex fitter to maximize the correlation between the image and a prototype shape. You will find this analysis described in the  <a href="http://www.opensourceinstruments.com/WPS/WPS1/index.html#Fitting%20Analysis">Fitting Analysis</a> section of the WPS1 Manual.</p>
+<p>lwdaq_shadow finds vertical or horizontal line shadows in images. We call
+these <i>wire shadows</i> because we firsst obtained them from wires in x-ray
+images. The image itself must be blurred enough that the minimum intensity of
+the shadow lies near its center. We use a simplex fitter to maximize the
+correlation between the image and a prototype shape. You will find this analysis
+described in the  <a
+href="http://www.opensourceinstruments.com/WPS/WPS1/index.html#Fitting%
+20Analysis">Fitting Analysis</a> section of the WPS1 Manual.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -2547,9 +3055,13 @@ end;
 <tr><td>-num_shadows</td><td>Number of shadows you want the routine to find.</td></tr>
 </table></center>
 
-<p>With -pre_smooth set to 1, the routine smooths the original image with a box filter before it applies the gradient and threshold. We use -pre_smooth when noise is obscuring the larger edge features in a wire image.</p>
+<p>With -pre_smooth set to 1, the routine smooths the original image with a box
+filter before it applies the gradient and threshold. We use -pre_smooth when
+noise is obscuring the larger edge features in a wire image.</p>
 
-<p>The shadow positions are given with respect to a horizontal reference line drawing <i>reference_um</i> microns down from the top edge of the top image row.</p>
+<p>The shadow positions are given with respect to a horizontal reference line
+drawing <i>reference_um</i> microns down from the top edge of the top image
+row.</p>
 }
 function lwdaq_shadow(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2680,7 +3192,9 @@ begin
 end;
 
 {
-<p>lwdaq_wps analyzes wps images. It clears the overlay for its own use. We describe the analysis in our <a href="http://www.opensourceinstruments.com/WPS/WPS1/">WPS1 Manual</a>.</p>
+<p>lwdaq_wps analyzes wps images. It clears the overlay for its own use. We
+describe the analysis in our <a
+href="http://www.opensourceinstruments.com/WPS/WPS1/">WPS1 Manual</a>.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -2695,13 +3209,32 @@ end;
 pixels.</td></tr>
 </table></center>
 
-<p>The -threshold string is used in the same way as in <a href="#lwdaq_bcam">lwdaq_bcam</a>. It can contain an intensity threshold or it can define a means to calculate the threshold. The string can also specify the minimum number of pixels a spot must contain, and its maximum eccentricity. Spots that do not meet these criteria will be marked as invalid. In this case, note that the threshold intensity will be applied to the horizontal gradient of the wire image, not the image itself.</p>
+<p>The -threshold string is used in the same way as in <a
+href="#lwdaq_bcam">lwdaq_bcam</a>. It can contain an intensity threshold or it
+can define a means to calculate the threshold. The string can also specify the
+minimum number of pixels a spot must contain, and its maximum eccentricity.
+Spots that do not meet these criteria will be marked as invalid. In this case,
+note that the threshold intensity will be applied to the horizontal gradient of
+the wire image, not the image itself.</p>
 
-<p>With -pre_smooth set to 1, the routine smooths the original image with a box filter before it applies the gradient and threshold. We use -pre_smooth when noise is obscuring the larger edge features in a wire image.</p>
+<p>With -pre_smooth set to 1, the routine smooths the original image with a box
+filter before it applies the gradient and threshold. We use -pre_smooth when
+noise is obscuring the larger edge features in a wire image.</p>
 
-<p>With -merge set to 1, the routine checks for edge pixel clusters that are closely aligned, and merges these together. We use -merge when image contrast is so poor that the edge pixels along one side of a wire image can break into two or more separate clusters.</p>
+<p>With -merge set to 1, the routine checks for edge pixel clusters that are
+closely aligned, and merges these together. We use -merge when image contrast is
+so poor that the edge pixels along one side of a wire image can break into two
+or more separate clusters.</p>
 
-<p>The wire positions are given with respect to a horizontal reference line drawing <i>reference_um</i> microns down from the top edge of the top image row. With <i>show_edges</i> equal to zero (the default value), the routine plots the image's horizontal intensity profile in green and the derivative profile in yellow. But when you set <i>show_edges</i> to 1, the routine no longer plots these two graphs, but instead displays the spots it finds in the derivative image, overlayed upon the original image. The edges of a wire will be covered with colored pixels. White pixels are ones that were part of spots that did not satisfy the -threshold critera.</p>
+<p>The wire positions are given with respect to a horizontal reference line
+drawing <i>reference_um</i> microns down from the top edge of the top image row.
+With <i>show_edges</i> equal to zero (the default value), the routine plots the
+image's horizontal intensity profile in green and the derivative profile in
+yellow. But when you set <i>show_edges</i> to 1, the routine no longer plots
+these two graphs, but instead displays the spots it finds in the derivative
+image, overlayed upon the original image. The edges of a wire will be covered
+with colored pixels. White pixels are ones that were part of spots that did not
+satisfy the -threshold critera.</p>
 }
 function lwdaq_wps(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2884,7 +3417,8 @@ begin
 end;
 
 {
-<p>lwdaq_scam analyzes Silhouette Camera (SCAM) images. It clears the overlay for its own use.</p>
+<p>lwdaq_scam analyzes Silhouette Camera (SCAM) images. It clears the overlay
+for its own use.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -2895,7 +3429,12 @@ end;
 pixels.</td></tr>
 </table></center>
 
-<p>The -threshold string is used in the same way as in <a href="#lwdaq_bcam">lwdaq_bcam</a>. It can contain an intensity threshold or it can define a means to calculate the threshold. With -pre_smooth set to 1, the routine smooths the original image with a box filter before it applies the gradient and threshold. With <i>show_edges</i> equal to one, the routine plots all the edge pixels in color.</p>
+<p>The -threshold string is used in the same way as in <a
+href="#lwdaq_bcam">lwdaq_bcam</a>. It can contain an intensity threshold or it
+can define a means to calculate the threshold. With -pre_smooth set to 1, the
+routine smooths the original image with a box filter before it applies the
+gradient and threshold. With <i>show_edges</i> equal to one, the routine plots
+all the edge pixels in color.</p>
 }
 function lwdaq_scam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2913,7 +3452,7 @@ var
 	show_edges:boolean=false;
 	pre_smooth:boolean=false;
 	pixel_size_um:real=7.4;
-	threshold:string='50 #';
+	rule:string='50 #';
 	camera:bcam_camera_type;
 	sphere:xyz_sphere_type;
 	cylinder:xyz_cylinder_type;
@@ -2946,6 +3485,9 @@ begin
 		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then body:=Tcl_ObjString(argv[4]);
 		arg_index:=5;
+	end else if (command='classify') then begin
+		if argc>3 then rule:=Tcl_ObjString(argv[3]);
+		arg_index:=4;
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Invalid command "'+command+'", must be one of '
@@ -2967,29 +3509,16 @@ begin
 		vp:=argv[arg_index];
 		inc(arg_index);
 		if (option='-show_edges') then show_edges:=Tcl_ObjBoolean(vp)
-		else if (option='-pixel_size_um') then pixel_size_um:=Tcl_ObjReal(vp)
 		else if (option='-pre_smooth') then pre_smooth:=Tcl_ObjBoolean(vp)
-		else if (option='-threshold') then threshold:=Tcl_ObjString(vp)
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"-pixel_size_um -threshold -show_edges -pre_smooth" in '
+				+'"-show_edges -pre_smooth" in '
 				+'lwdaq_scam.');
 			exit;
 		end;
 	end;
 	
-{
-	if pre_smooth then begin
-		sip:=image_filter(ip,1,1,1,1,1,1,0);
-		iip:=image_grad(sip);
-		dispose_image(sip);
-	end else begin
-		iip:=image_grad(ip);
-	end;
-	dispose_image(iip);
-}
-
 	if command='project' then begin
 		while body<>'' do begin
 			option:=read_word(body);
@@ -3009,14 +3538,22 @@ begin
 		end;
 	end;
 	
-
+	if command='classify' then begin
+		scam_classify(ip,rule);
+	end;
+	
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
 	lwdaq_scam:=Tcl_OK;
 end;
 
 {
-<p>lwdaq_calibration takes as input an apparatus measurement and a device calibration, and returns a parameter calculation. The routine calls parameter_calculation in the <a href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a>. This routine supports bcam cameras and bcam sources for all types of bcam and both j_plates and k_plates.</p>
+<p>lwdaq_calibration takes as input an apparatus measurement and a device
+calibration, and returns a parameter calculation. The routine calls
+parameter_calculation in the <a
+href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a>. This
+routine supports bcam cameras and bcam sources for all types of bcam and both
+j_plates and k_plates.</p>
 }
 function lwdaq_calibration(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3129,7 +3666,11 @@ begin
 end;
 
 {
-<p>lwdaq_diagnostic analyzes sixteen-bit adc samples from the driver supplies. It assumes that five numbers specifying the relay software version, the driver assembly number, the driver hardware version, the controller firmware version, and the data transfer speed are all saved in the input image's results string. The routine leaves these numbers in the results string after it is done.</p>
+<p>lwdaq_diagnostic analyzes sixteen-bit adc samples from the driver supplies.
+It assumes that five numbers specifying the relay software version, the driver
+assembly number, the driver hardware version, the controller firmware version,
+and the data transfer speed are all saved in the input image's results string.
+The routine leaves these numbers in the results string after it is done.</p>
 }
 function lwdaq_diagnostic(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3195,7 +3736,11 @@ begin
 end;
 
 {
-<p>lwdaq_voltmeter analyzes image data for the Voltmeter instrument. We pass the routine an image name and it returns either a string of characteristics of the voltages recorded in the image, or the voltages themselves. It plots the voltages in the image overlay, according to plot ranges passed to the routine. The display looks like an oscilloscope, and provides a software trigger.</p>
+<p>lwdaq_voltmeter analyzes image data for the Voltmeter instrument. We pass the
+routine an image name and it returns either a string of characteristics of the
+voltages recorded in the image, or the voltages themselves. It plots the
+voltages in the image overlay, according to plot ranges passed to the routine.
+The display looks like an oscilloscope, and provides a software trigger.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -3210,19 +3755,64 @@ end;
 <tr><td>-values</td><td>Return the voltage values rather than characteristics.</td></tr>
 </table></center>
 
-<p>The lwdaq_voltmeter routine calls lwdaq_A2057_voltmeter to analyze the samples in the image. The image results string must contain some information about the samples that will allow the analysis to parse the voltages into reference samples and signal samples. The results string will contain 5 numbers. The first two are the bottom and top reference voltages available on the LWDAQ device. In the case of the A2057 these are 0 V and 5 V, but they could be some other value on another device. The third number is the gain applied to the signal. The fourth number is the data acquisition redundancy factor, which is the number of samples recorded divided by the width of the image. Because we will use a software trigger, we want to give the routine a chance to find a trigger and still have enough samples to plot one per image column. Suppose the image contains 200 columns, then we might record 600 samples so that any trigger occuring in the first 400 samples will leave us with 200 samples after the trigger to plot on the screen. In this case, our redundancy factor is 3. The fifth number is the number of channels from which we have recorded.</p>
+<p>The lwdaq_voltmeter routine calls lwdaq_A2057_voltmeter to analyze the
+samples in the image. The image results string must contain some information
+about the samples that will allow the analysis to parse the voltages into
+reference samples and signal samples. The results string will contain 5 numbers.
+The first two are the bottom and top reference voltages available on the LWDAQ
+device. In the case of the A2057 these are 0 V and 5 V, but they could be some
+other value on another device. The third number is the gain applied to the
+signal. The fourth number is the data acquisition redundancy factor, which is
+the number of samples recorded divided by the width of the image. Because we
+will use a software trigger, we want to give the routine a chance to find a
+trigger and still have enough samples to plot one per image column. Suppose the
+image contains 200 columns, then we might record 600 samples so that any trigger
+occuring in the first 400 samples will leave us with 200 samples after the
+trigger to plot on the screen. In this case, our redundancy factor is 3. The
+fifth number is the number of channels from which we have recorded.</p>
 
-<p>The result string "0.0 5.0 10 3 2" indicates 0 V and 5 V references, a gain of 10, a redundancy factor of 3 and two channels. The channels will be plotted with the usual LWDAQ <a href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">colors</a>, with the first channel being color zero.</p>
+<p>The result string "0.0 5.0 10 3 2" indicates 0 V and 5 V references, a gain
+of 10, a redundancy factor of 3 and two channels. The channels will be plotted
+with the usual LWDAQ <a
+href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">colors</a>,
+with the first channel being color zero.</p>
 
-<p>The analysis assumes the samples are recorded as sixteen-bit numbers taking up two bytes, with the most significant byte first (big-endian short integer). The first byte of the recorded signal should be the first pixel in the second row of the image, which is pixel (0,1). If <i>n</i> is the image width and <i>r</i> is the redundancy factory, the first <i>n</i> samples (therefore 2<i>n</i> bytes) are samples of the bottom reference voltage. After that come <i>nr</i> samples from each channel recorded (therefore 2<i>nr</i> bytes from each channel). Last of all are <i>n</i> samples from the top reference.</p>
+<p>The analysis assumes the samples are recorded as sixteen-bit numbers taking
+up two bytes, with the most significant byte first (big-endian short integer).
+The first byte of the recorded signal should be the first pixel in the second
+row of the image, which is pixel (0,1). If <i>n</i> is the image width and
+<i>r</i> is the redundancy factory, the first <i>n</i> samples (therefore
+2<i>n</i> bytes) are samples of the bottom reference voltage. After that come
+<i>nr</i> samples from each channel recorded (therefore 2<i>nr</i> bytes from
+each channel). Last of all are <i>n</i> samples from the top reference.</p>
 
-<p>The analysis uses the bottom and top reference values to calibrate the recorded signals, which are otherwise poorly defined in their correspondance between integer values and voltages. We turn on the calibration with the auto_calib option.</p>
+<p>The analysis uses the bottom and top reference values to calibrate the
+recorded signals, which are otherwise poorly defined in their correspondance
+between integer values and voltages. We turn on the calibration with the
+auto_calib option.</p>
 
-<p>The recorded signal from the last channel to be analysed can be returned as a string. Each point consists of a time and a voltage. We instruct the analysis to return the points rather than characteristics with the values option. The following line of code extracts the signal of the last channel. Time zero will be the trigger instant if a trigger was detected, and the first sample otherwise. Thus the returned string contains more data than is plotted by the voltmeter analysis in the image overlay. It contains all the samples recorded.</p>
+<p>The recorded signal from the last channel to be analysed can be returned as a
+string. Each point consists of a time and a voltage. We instruct the analysis to
+return the points rather than characteristics with the values option. The
+following line of code extracts the signal of the last channel. Time zero will
+be the trigger instant if a trigger was detected, and the first sample
+otherwise. Thus the returned string contains more data than is plotted by the
+voltmeter analysis in the image overlay. It contains all the samples
+recorded.</p>
 
 <pre>set trace [lwdaq_voltmeter image_name -values 1 -auto_calib 1]</pre>
 
-<p>When the values option is not set, as is the case by default, the analysis returns four numbers for each channel recorded. The first number is the average value of the signal. The second is its standard deviation. You can obtain the root mean square of the signal by adding the square of the average and the standard deviation, and taking the square root. The third number is an estimate of the fundamental frequency of the recorded signal, if such a frequency exists, in Hertz, as obtained from a discrete fourier transform. To obtain the discrete fourier transform, we use a subset of the data containing an exact power of two number of samples. We pass this exact power of two number of samples to our fast fourier transform routine. The fourth number is the amplitude of this fundamental frequency.</p>
+<p>When the values option is not set, as is the case by default, the analysis
+returns four numbers for each channel recorded. The first number is the average
+value of the signal. The second is its standard deviation. You can obtain the
+root mean square of the signal by adding the square of the average and the
+standard deviation, and taking the square root. The third number is an estimate
+of the fundamental frequency of the recorded signal, if such a frequency exists,
+in Hertz, as obtained from a discrete fourier transform. To obtain the discrete
+fourier transform, we use a subset of the data containing an exact power of two
+number of samples. We pass this exact power of two number of samples to our fast
+fourier transform routine. The fourth number is the amplitude of this
+fundamental frequency.</p>
 }
 function lwdaq_voltmeter(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3363,7 +3953,8 @@ begin
 end;
 
 {
-<p>lwdaq_inclinometer analyzes an image returned by the Inclinometer instrument. It returns the amplitude of harmonics in signals recorde in an image.</p>
+<p>lwdaq_inclinometer analyzes an image returned by the Inclinometer instrument.
+It returns the amplitude of harmonics in signals recorde in an image.</p>
 }
 function lwdaq_inclinometer(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3652,11 +4243,55 @@ begin
 end;
 
 {
-<p>lwdaq_alt extracts power measurements from data recorded by an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of Subcutaneous Transmitters (SCTs), such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), or Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
+<p>lwdaq_alt extracts power measurements from data recorded by an Animal
+Location Tracker (ALT, <a
+href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</
+a>) so as to measure the location of Subcutaneous Transmitters (SCTs), such as
+our Subcutaneous Transmitters (<a
+href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial
+Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), or
+Implantable Stimulator-Transponders (<a
+href="http://www.opensourceinstruments.com/IST">IST</a>). The routine assumes
+that the global electronics_trace is a valid xy_graph created by lwdaq_receiver,
+giving a list of x-y values in which x is an integer time and y is an integer
+index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in
+the Receiver Instrument image to which we applied the lwdaq_receiver routine.
+The electronics_trace will be valid provided that the most recent call to the
+lwdaq electronics library was the <a
+href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">
+lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
 
-<p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements.</p>
+<p>The routine takes two parameters and has several options. The first parameter
+is the name of the image that contains the tracker data. The indices in
+electronics_trace must refer to the data space of this image. An index of
+<i>n</i> points to the <i>n</i>'th message in the data, with the first message
+being number zero. Each message starts with four bytes and is followed by one or
+more <i>payload bytes</i>. The payload bytes contain one or more power
+measurements.</p>
 
-<p>The second parameter is a list of locations of detector coils, given as a sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces. When calculating the location of a transmitter, lwdaq_alt will center each detector on these coordinates. All coordinates are assumed to be greater than or equal to zero, so that (-1,-1,-1) will be recognised as an invalid location. When we pass "-1 -1 -1" as the coordinate of a coil, lwdaq_alt does not include the coil in its position calculation. We use position "-1 -1 -1" for auxiliary antenna coils in animal location trackers. The A3038C, for example, provides fifteen tracker coils and a sixteenth auxiliary antenna input that may be used for reception of telemetry signals and for measuring background power. We use any position (-1,y,z) for coils we want to ignore. We might have sixteen detector antennas divided into two sets of eight for monitoring the location of animals in two habitats. When we calculate position in the first habitat, we ignore the coils arranged in the second habitat. We set the coordinates of the coils we want to ignore to "-1 y z", where <i>y</i> and <i>z</i> can be anything. In a two-dimensional tracker platform such as the A3038C, the value of the <i>z</i>-coordinate will be shared by all coils. Regardless of the arrangent of antennas, all <i>z</i>-coordinates must be greater than zero. We must make it impossible for the measured position of the transmitter to come out as "0.0 0.0 0.0" because we use this origin position to indicate "no position measurement obtained in this interval". For the A3038C we set the <i>z</i>-coordinage to 2.0, the approximate distance from the center of its detector coils to a transmitter sitting on the platform.</p>
+<p>The second parameter is a list of locations of detector coils, given as a
+sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces. When
+calculating the location of a transmitter, lwdaq_alt will center each detector
+on these coordinates. All coordinates are assumed to be greater than or equal to
+zero, so that (-1,-1,-1) will be recognised as an invalid location. When we pass
+"-1 -1 -1" as the coordinate of a coil, lwdaq_alt does not include the coil in
+its position calculation. We use position "-1 -1 -1" for auxiliary antenna coils
+in animal location trackers. The A3038C, for example, provides fifteen tracker
+coils and a sixteenth auxiliary antenna input that may be used for reception of
+telemetry signals and for measuring background power. We use any position
+(-1,y,z) for coils we want to ignore. We might have sixteen detector antennas
+divided into two sets of eight for monitoring the location of animals in two
+habitats. When we calculate position in the first habitat, we ignore the coils
+arranged in the second habitat. We set the coordinates of the coils we want to
+ignore to "-1 y z", where <i>y</i> and <i>z</i> can be anything. In a
+two-dimensional tracker platform such as the A3038C, the value of the
+<i>z</i>-coordinate will be shared by all coils. Regardless of the arrangent of
+antennas, all <i>z</i>-coordinates must be greater than zero. We must make it
+impossible for the measured position of the transmitter to come out as "0.0 0.0
+0.0" because we use this origin position to indicate "no position measurement
+obtained in this interval". For the A3038C we set the <i>z</i>-coordinage to
+2.0, the approximate distance from the center of its detector coils to a
+transmitter sitting on the platform.</p>
 
 <p>The lwdaq_alt routine supports the following options:</p>
 
@@ -3670,9 +4305,28 @@ end;
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
 </table></center>
 
-<p>The output contains <i>x</i>, <i>y</i>, and <i>z</i> in whatever units we used to specify the coil centers, followed by a string of detector power values. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the position and powers values for a fraction of the interval represented by the data image. The purpose of the <i>slices</i> option is to permit us to play through a recording with eight-second intervals and yet obtain tracker measurements with a sample period that is some integer fraction of the interval period. The unit of activity is coil center units per slice interval. If we have break the interval into eight slices and specify coil positions in centimeters, the activity will be centimeters per eighth of a second.</p>
+<p>The output contains <i>x</i>, <i>y</i>, and <i>z</i> in whatever units we
+used to specify the coil centers, followed by a string of detector power values.
+If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string,
+each giving the position and powers values for a fraction of the interval
+represented by the data image. The purpose of the <i>slices</i> option is to
+permit us to play through a recording with eight-second intervals and yet obtain
+tracker measurements with a sample period that is some integer fraction of the
+interval period. The unit of activity is coil center units per slice interval.
+If we have break the interval into eight slices and specify coil positions in
+centimeters, the activity will be centimeters per eighth of a second.</p>
 
-<p>The -background option allows us to specify background power levels for all detector coils, in anticipation of a need to calibrate detectors. By default, these background powers are all zero. If we pass an empty string for the background powers, lwdaq_alt will use zeros. The -extent value sets a maximum distance from the location of the transmitter to a coil used to calculate the transmitter location. The -payload value is the number of bytes added to the core four-byte message in order to accommodate the power values. A fifteen-coil tracker has payload sixteen and returns sixteen power values. The first fifteen are the powers from the coils, in the order defined by the tracker's geometry map. The sixteenth value is either zero or the power we obtain from an auxiliary detector module.</p>
+<p>The -background option allows us to specify background power levels for all
+detector coils, in anticipation of a need to calibrate detectors. By default,
+these background powers are all zero. If we pass an empty string for the
+background powers, lwdaq_alt will use zeros. The -extent value sets a maximum
+distance from the location of the transmitter to a coil used to calculate the
+transmitter location. The -payload value is the number of bytes added to the
+core four-byte message in order to accommodate the power values. A fifteen-coil
+tracker has payload sixteen and returns sixteen power values. The first fifteen
+are the powers from the coils, in the order defined by the tracker's geometry
+map. The sixteenth value is either zero or the power we obtain from an auxiliary
+detector module.</p>
 }
 function lwdaq_alt(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3938,11 +4592,58 @@ begin
 end;
 
 {
-<p>lwdaq_tcb extracts the top antenna and top power from data recorded by a Telemetry Control Box (TCB, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</a>. The top antenna is a number specifying one of the antennas connected to the TCB. Each of these antennas is capable of receiving telemetry messages from devices such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), or Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). For each message it receives, the TCB adds a payload of two bytes to the core four-byte telemetry message. The first payload byte is the maximum power with which this message was received by any of the TCB's antennas. The second payload byte is a number identifying this antenna. We call this antenna the <i>top</i> antenna and its received power is the <i>top</i> power. The TCB-A16 antenna inputs are numbered 1-16 on the connectors on the back of the box. The top antenna number provided by the TCB-A16 gives us the antenna input to which the top antenna is connected.</p>
+<p>lwdaq_tcb extracts the top antenna and top power from data recorded by a
+Telemetry Control Box (TCB, <a
+href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</
+a>. The top antenna is a number specifying one of the antennas connected to the
+TCB. Each of these antennas is capable of receiving telemetry messages from
+devices such as our Subcutaneous Transmitters (<a
+href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial
+Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), or
+Implantable Stimulator-Transponders (<a
+href="http://www.opensourceinstruments.com/IST">IST</a>). For each message it
+receives, the TCB adds a payload of two bytes to the core four-byte telemetry
+message. The first payload byte is the maximum power with which this message was
+received by any of the TCB's antennas. The second payload byte is a number
+identifying this antenna. We call this antenna the <i>top</i> antenna and its
+received power is the <i>top</i> power. The TCB-A16 antenna inputs are numbered
+1-16 on the connectors on the back of the box. The top antenna number provided
+by the TCB-A16 gives us the antenna input to which the top antenna is
+connected.</p>
 
-<p>If we know where our antennas are located in our recording system, the top antenna number gives us an approximate measurement of the transmitter's location. Most likely, the transmitter is nearer to the top antenna than to any other. If the transmitter is half-way between two antennas, we may see the top antenna number varying from one received message to the next. The lwdaq_tcb routine returns the median antenna number and the median power. Our assumption is that these two median values correspond to one another. We convert the antenna number into a three-dimensional position with a string of three-dimensional points, each point representing the location of an antenna in an arbitrary three-dimensional coordinate system with arbitrary units. The lwdaq_tcb routine picks the point corresponding to the top antenna and returns its three coordinates <i>x</i>, <i>y</i>, and <i>z</i>. We must choose the coordinate system for the antennas such that all <i>z</i>-coordinates are positive and non-zero. By this means, we allow our analysis of animal movement, which we apply to a history of animal position, to use coordinate "0.0 0.0 0.0" as a marker for "no measurement in this interval".</p>
+<p>If we know where our antennas are located in our recording system, the top
+antenna number gives us an approximate measurement of the transmitter's
+location. Most likely, the transmitter is nearer to the top antenna than to any
+other. If the transmitter is half-way between two antennas, we may see the top
+antenna number varying from one received message to the next. The lwdaq_tcb
+routine returns the median antenna number and the median power. Our assumption
+is that these two median values correspond to one another. We convert the
+antenna number into a three-dimensional position with a string of
+three-dimensional points, each point representing the location of an antenna in
+an arbitrary three-dimensional coordinate system with arbitrary units. The
+lwdaq_tcb routine picks the point corresponding to the top antenna and returns
+its three coordinates <i>x</i>, <i>y</i>, and <i>z</i>. We must choose the
+coordinate system for the antennas such that all <i>z</i>-coordinates are
+positive and non-zero. By this means, we allow our analysis of animal movement,
+which we apply to a history of animal position, to use coordinate "0.0 0.0 0.0"
+as a marker for "no measurement in this interval".</p>
 
-<p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements. The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions. The second parameter is a list of locations of antennas, given as a sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces.</p>
+<p>The routine takes two parameters and has several options. The first parameter
+is the name of the image that contains the tracker data. The indices in
+electronics_trace must refer to the data space of this image. An index of
+<i>n</i> points to the <i>n</i>'th message in the data, with the first message
+being number zero. Each message starts with four bytes and is followed by one or
+more <i>payload bytes</i>. The payload bytes contain one or more power
+measurements. The routine assumes that the global electronics_trace is a valid
+xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an
+integer time and y is an integer index. The message corresponding to time
+<i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we
+applied the lwdaq_receiver routine. The electronics_trace will be valid provided
+that the most recent call to the lwdaq electronics library was the <a
+href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">
+lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions. The
+second parameter is a list of locations of antennas, given as a sequence of
+numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces.</p>
 
 <p>The lwdaq_tcb routine supports the following options:</p>
 
@@ -3951,7 +4652,13 @@ end;
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
 </table></center>
 
-<p>The lwdaq_tcb output is compatible with that of <a href="#lwdaq_alt">lwdaq_alt</a>. The first three values returned are <i>x</i>, <i>y</i>, and <i>z</i> of the top antenna. Next comes one power value for each antenna. These are all zero except for that of the top antenna, for which the power is the value recorded by the TCB. If <i>slices</i> &gt; 1, we will have <i>slices</i> lines in our output string, each giving the position and power for a fraction of the interval represented by the data image.</p>
+<p>The lwdaq_tcb output is compatible with that of <a
+href="#lwdaq_alt">lwdaq_alt</a>. The first three values returned are <i>x</i>,
+<i>y</i>, and <i>z</i> of the top antenna. Next comes one power value for each
+antenna. These are all zero except for that of the top antenna, for which the
+power is the value recorded by the TCB. If <i>slices</i> &gt; 1, we will have
+<i>slices</i> lines in our output string, each giving the position and power for
+a fraction of the interval represented by the data image.</p>
 }
 function lwdaq_tcb(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4129,7 +4836,21 @@ end;
 
 
 {
-<p>lwdaq_simplex finds a point in an n-dimensional space at which an error function is a minium. The routine has two parameters: the initial position and the error function. The initial position must be a list of n real numbers. The error function must be a procedure defined in the Tcl interpreter. This error function must take n real-valued numbers as input, not passed in one list, but as separate parameters. The error function must return a real-valued number. The simplex fitter starts at the initial position and moves through the n-dimensional space until it finds a minium, or determines that it has converged around a minimum. When it converges, it returns the n-dimensional point at the minimum, the final error value, and the number of steps it took to reach the minimum. To avoid freezing LWDAQ during a long fitting process, call LWDAQ_support in the error function. To permit the user to abort the fit, have the error procedure check a global variable that can be set by an abort button. When the error procedure sees the abort, it can return a Tcl error to the lwdaq_simplex routine, and lwdaq_simplex will abort.</p>
+<p>lwdaq_simplex finds a point in an n-dimensional space at which an error
+function is a minium. The routine has two parameters: the initial position and
+the error function. The initial position must be a list of n real numbers. The
+error function must be a procedure defined in the Tcl interpreter. This error
+function must take n real-valued numbers as input, not passed in one list, but
+as separate parameters. The error function must return a real-valued number. The
+simplex fitter starts at the initial position and moves through the
+n-dimensional space until it finds a minium, or determines that it has converged
+around a minimum. When it converges, it returns the n-dimensional point at the
+minimum, the final error value, and the number of steps it took to reach the
+minimum. To avoid freezing LWDAQ during a long fitting process, call
+LWDAQ_support in the error function. To permit the user to abort the fit, have
+the error procedure check a global variable that can be set by an abort button.
+When the error procedure sees the abort, it can return a Tcl error to the
+lwdaq_simplex routine, and lwdaq_simplex will abort.</p>
 }
 function lwdaq_simplex_altitude(v:simplex_vertex_type;ep:pointer):real;
 type
@@ -4218,7 +4939,15 @@ begin
 end;
 
 {
-<p>lwdaq_gauge analyzes sixteen-bit adc values by calling lwdaq_A2053_gauge. The routine assumes that two numbers specifying the sample period and the number of channels sampled are saved in the input image's results string. The routine leaves these numbers in the results string after it is done. For each gauge channel in the image, the routine returns a result, according to the result specifiers. With -ave 1, the result for each channel includes the average gauge value. With -stdev 1, the result includes the standard deviation of the gauge value. With both set to zero, the result is an empty string. The default values for ave and stdev are 1 and 0 respectively.</p>
+<p>lwdaq_gauge analyzes sixteen-bit adc values by calling lwdaq_A2053_gauge. The
+routine assumes that two numbers specifying the sample period and the number of
+channels sampled are saved in the input image's results string. The routine
+leaves these numbers in the results string after it is done. For each gauge
+channel in the image, the routine returns a result, according to the result
+specifiers. With -ave 1, the result for each channel includes the average gauge
+value. With -stdev 1, the result includes the standard deviation of the gauge
+value. With both set to zero, the result is an empty string. The default values
+for ave and stdev are 1 and 0 respectively.</p>
 }
 function lwdaq_gauge(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4292,7 +5021,11 @@ begin
 end;
 
 {
-<p>lwdaq_flowmeter analyzes sixteen-bit adc values by calling lwdaq_A2053_flowmeter. It assumes that two numbers specifying the sample period and the number of channels sampled are saved in the input image's results string. The routine leaves these numbers in the results string after it is done.</p>
+<p>lwdaq_flowmeter analyzes sixteen-bit adc values by calling
+lwdaq_A2053_flowmeter. It assumes that two numbers specifying the sample period
+and the number of channels sampled are saved in the input image's results
+string. The routine leaves these numbers in the results string after it is
+done.</p>
 }
 function lwdaq_flowmeter(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4358,16 +5091,31 @@ begin
 end;
 
 {
-<p>lwdaq_graph takes a string of numbers and plots them in the image overlay, displaying them by means of lines between the consecutive points. The string of numbers may contain x-y value pairs, or x values only or y values only. The default is x-y values. With <i>y_only</i> = 1 it assumes y values only and assigns x-value 0 to the first y-value, 1 to the next, and so on. With <i>x_only</i> = 1 it assumes x values only and assigns y-value 0 to the first x-value, &minus;1 to the next, and so on. The negative-going x-values are consistent with the negative-going vertical image coordinates, so that <i>x_only</i> is useful for plotting image properties on top of an image, such as vertical intensity profile. Thus the following code plots the vertical and horizontal intensity profiles in an image overlay</p>
+<p>lwdaq_graph takes a string of numbers and plots them in the image overlay,
+displaying them by means of lines between the consecutive points. The string of
+numbers may contain x-y value pairs, or x values only or y values only. The
+default is x-y values. With <i>y_only</i> = 1 it assumes y values only and
+assigns x-value 0 to the first y-value, 1 to the next, and so on. With
+<i>x_only</i> = 1 it assumes x values only and assigns y-value 0 to the first
+x-value, &minus;1 to the next, and so on. The negative-going x-values are
+consistent with the negative-going vertical image coordinates, so that
+<i>x_only</i> is useful for plotting image properties on top of an image, such
+as vertical intensity profile. Thus the following code plots the vertical and
+horizontal intensity profiles in an image overlay</p>
 
 <pre><small>set profile [lwdaq_image_profile imagname -row 1]
 lwdaq_graph $profile imagname -y_only 1 -color 3
 set profile [lwdaq_image_profile imagname -row 0]
 lwdaq_graph $profile imagname -x_only 1 -color 4</small></pre>
 
-<p>The graph will fill the analysis boundaries of the image unless you set <i>entire</i> = 1, in which case the graph will fill the entire image. The routine returns the number of points it plotted.</p>
+<p>The graph will fill the analysis boundaries of the image unless you set
+<i>entire</i> = 1, in which case the graph will fill the entire image. The
+routine returns the number of points it plotted.</p>
 
-<p>You can specify the values of x and y that correspond to the edges of the plotting area with <i>x_min</i>, <i>x_max</i>, <i>y_min</i>, and <i>y_max</i>. By default, however, the routine will stretch of compress the plot to fit exactly in the available space.</p>
+<p>You can specify the values of x and y that correspond to the edges of the
+plotting area with <i>x_min</i>, <i>x_max</i>, <i>y_min</i>, and <i>y_max</i>.
+By default, however, the routine will stretch of compress the plot to fit
+exactly in the available space.</p>
 
 <center><table border>
 <tr><th>Option</th><th>Function</th></tr>
@@ -4387,11 +5135,30 @@ lwdaq_graph $profile imagname -x_only 1 -color 4</small></pre>
 <tr><td>-entire</td><td>1 use entire image for plot, 0 use analysis bounds, default 0.</td></tr>
 <tr><td>-in_image</td><td>1 draw as a shade of gray in the image rather than overlay, default 0.</td></tr></table></center>
 
-<p>By default, the graph will be drawn in the overlay, so it can use colors, and be accompanied by grid lines that do not interfere with the underlying image data. The overlay can be transparent or white, depending upon whether we have cleared or filled the overlay respectively before calling <i>lwdaq_graph</i>. But if <i>in_image</i> is 1, the color will be treated as a shade of gray and the graph will be drawn in the image itself. By this means, we can create images for two-dimensional analysis out of graphs. When <i>in_image</i> is set, the <i>x_div</i> and <i>y_div</i> options are ignored.</p>
+<p>By default, the graph will be drawn in the overlay, so it can use colors, and
+be accompanied by grid lines that do not interfere with the underlying image
+data. The overlay can be transparent or white, depending upon whether we have
+cleared or filled the overlay respectively before calling <i>lwdaq_graph</i>.
+But if <i>in_image</i> is 1, the color will be treated as a shade of gray and
+the graph will be drawn in the image itself. By this means, we can create images
+for two-dimensional analysis out of graphs. When <i>in_image</i> is set, the
+<i>x_div</i> and <i>y_div</i> options are ignored.</p>
 
-<p>The color codes for a graph in the overlay give 255 unique colors. You can try them out to see which ones you like. The colors 0 to 15 specify a set of distinct colors, as shown <a href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>. The remaining colors are eight-bit RGB codes. If you don't specify a color, the plot will be red.</p>
+<p>The color codes for a graph in the overlay give 255 unique colors. You can
+try them out to see which ones you like. The colors 0 to 15 specify a set of
+distinct colors, as shown <a
+href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.
+The remaining colors are eight-bit RGB codes. If you don't specify a color, the
+plot will be red.</p>
 
-<p>Some data contains occasional error samples, which we call <i>glitches</i>. The <i>lwdaq_graph</i> "-glitch <i>g</i>" option allows you to specify a threshold for glitch filtering. The <i>lwdaq_graph</i> routine calls the <i>glitch_filter_y</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a> to eliminate glitches from the sequence of <i>y</i>-coordinates. We provide the same glitch filter at the command line with the <a href="#glitch_filter_y">glitch_filter_y</a>.</p>
+<p>Some data contains occasional error samples, which we call <i>glitches</i>.
+The <i>lwdaq_graph</i> "-glitch <i>g</i>" option allows you to specify a
+threshold for glitch filtering. The <i>lwdaq_graph</i> routine calls the
+<i>glitch_filter_y</i> from <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a> to
+eliminate glitches from the sequence of <i>y</i>-coordinates. We provide the
+same glitch filter at the command line with the <a
+href="#glitch_filter_y">glitch_filter_y</a>.</p>
 }
 function lwdaq_graph(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4535,9 +5302,19 @@ begin
 end;
 
 {
-<p>lwdaq_filter applies a recursive filter to a sampled signal. The samples are passed to lwdaq_filter as a string of space-delimited real numbers. By default, lwdaq_filter assumes every number in the string is a sample. With the -tv_format option set to 1, lwdaq_filter assumes every other number in the string is a uniformly-spaced sample, in the form "t v ", where "t" is time and "v" is the sample. In this case, lwdaq_filter reads the v-values only.</p>
+<p>lwdaq_filter applies a recursive filter to a sampled signal. The samples are
+passed to lwdaq_filter as a string of space-delimited real numbers. By default,
+lwdaq_filter assumes every number in the string is a sample. With the -tv_format
+option set to 1, lwdaq_filter assumes every other number in the string is a
+uniformly-spaced sample, in the form "t v ", where "t" is time and "v" is the
+sample. In this case, lwdaq_filter reads the v-values only.</p>
 
-<p>The routine returns its answer as a string of space-delimited real numbers. By default, lwdaq_filter returns a signal with as many samples as it received, separated by spaces, and formatted withe the global fsr (field size real) and fsd (field size decimal) values. With -tv_format set to 1, lwdaq_filter copies the t-values from the input string, so as to create an output string with the same t-values, but processed v-values.</p>
+<p>The routine returns its answer as a string of space-delimited real numbers.
+By default, lwdaq_filter returns a signal with as many samples as it received,
+separated by spaces, and formatted withe the global fsr (field size real) and
+fsd (field size decimal) values. With -tv_format set to 1, lwdaq_filter copies
+the t-values from the input string, so as to create an output string with the
+same t-values, but processed v-values.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -4545,7 +5322,11 @@ end;
 <tr><td>-ave_start</td><td>if 1, over-write first sample with average, default 0</td></tr>
 </table></center>
 
-<p>We define the digital signal processing we with lwdaq_filter to perform by means of two strings. The first string gives the coefficients a[0]..a[n] by which the input values x[k]..x[k-n] are multiplied before adding to y[k]. The second string gives the coefficients b[1]..b[n] by which the previous outputs y[k-1]..y[k-n] are multiplied before adding to y[k].</p>
+<p>We define the digital signal processing we with lwdaq_filter to perform by
+means of two strings. The first string gives the coefficients a[0]..a[n] by
+which the input values x[k]..x[k-n] are multiplied before adding to y[k]. The
+second string gives the coefficients b[1]..b[n] by which the previous outputs
+y[k-1]..y[k-n] are multiplied before adding to y[k].</p>
 }
 function lwdaq_filter(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4638,7 +5419,23 @@ begin
 end;
 
 {
-<p>lwdaq_fft applies a fast fourier tranfsorm to a waveform and returns the complete <a href="http://en.wikipedia.org/wiki/Discrete_Fourier_transform">discrete fourier transform</a> (DFT). In general, the DFT transforms a set of <i>N</i> complex-valued samples and returns a set of <i>N</i> complex-valued frequency components. We assume the samples, are uniformly-spaced with respect to some one-dimensional quantity such as time or distance. The <i>sample period</i> is the separation of the samples in this one-dimensional quantity. We denote the sample period with <i>T</i> and the one-dimensional quantity we denote as <i>t</i>. We denote the sample at <i>t</i> = <i>nT</i> with <i>x<sub>n</sub></i>, where <i>n</i> is an integer such that 0&le;<i>n</i>&le;<i>N</i>&minus;1. We denote the transform components <i>X<sub>k</sub></i>, where <i>k</i> is an integer such that 0&le;<i>k</i>&le;<i>N</i>&minus;1. Each transform component represents a complex sinusoidal function in <i>t</i>. The <i>k</i>'th sinusoid, <i>S<sub>k</sub></i>, has frequency <i>k</i>/<i>NT</i>. Its magnitude and phase are given by <i>X<sub>k</sub></i>.</p>
+<p>lwdaq_fft applies a fast fourier tranfsorm to a waveform and returns the
+complete <a
+href="http://en.wikipedia.org/wiki/Discrete_Fourier_transform">discrete fourier
+transform</a> (DFT). In general, the DFT transforms a set of <i>N</i>
+complex-valued samples and returns a set of <i>N</i> complex-valued frequency
+components. We assume the samples, are uniformly-spaced with respect to some
+one-dimensional quantity such as time or distance. The <i>sample period</i> is
+the separation of the samples in this one-dimensional quantity. We denote the
+sample period with <i>T</i> and the one-dimensional quantity we denote as
+<i>t</i>. We denote the sample at <i>t</i> = <i>nT</i> with
+<i>x<sub>n</sub></i>, where <i>n</i> is an integer such that
+0&le;<i>n</i>&le;<i>N</i>&minus;1. We denote the transform components
+<i>X<sub>k</sub></i>, where <i>k</i> is an integer such that
+0&le;<i>k</i>&le;<i>N</i>&minus;1. Each transform component represents a complex
+sinusoidal function in <i>t</i>. The <i>k</i>'th sinusoid, <i>S<sub>k</sub></i>,
+has frequency <i>k</i>/<i>NT</i>. Its magnitude and phase are given by
+<i>X<sub>k</sub></i>.</p>
 
 <big>
 <p>
@@ -4647,7 +5444,13 @@ end;
 </p>
 </big>
 
-<p>In the text-book definition of the <a href="http://en.wikipedia.org/wiki/Discrete_Fourier_transform">discrete fourier transform</a>, <i>X<sub>k</sub></i> is <i>N</i> times larger, and we must divide by <i>N</i> to obtain the sinusoidal amplitude. But we pre-scaled our components by 1/<i>N</i> so we return the sinusoidal comonents directly. If we express <i>X<sub>k</sub></i> as a magnitude, <i>A<sub>k</sub></i>, and a phase &Phi;<sub>k</sub>, we get the following expression for the sinusoid.</p>
+<p>In the text-book definition of the <a
+href="http://en.wikipedia.org/wiki/Discrete_Fourier_transform">discrete fourier
+transform</a>, <i>X<sub>k</sub></i> is <i>N</i> times larger, and we must divide
+by <i>N</i> to obtain the sinusoidal amplitude. But we pre-scaled our components
+by 1/<i>N</i> so we return the sinusoidal comonents directly. If we express
+<i>X<sub>k</sub></i> as a magnitude, <i>A<sub>k</sub></i>, and a phase
+&Phi;<sub>k</sub>, we get the following expression for the sinusoid.</p>
 
 <big>
 <p>
@@ -4662,7 +5465,16 @@ end;
 </p>
 </big>
 
-<p>When our inputs <i>x<sub>n</sub></i> are real-valued, we find that the the <i>k</i>'th component of the transform is the complex conjugate of component <i>N</i>&minus;<i>k</i>. A feature of all discrete transform is <i>X<sub>k</sub></i> = <i>X<sub>k&minus;N</sub></i>. Thus <i>X<sub>N&minus;k</sub></i> = <i>X<sub>&minus;k</sub></i>, the component with frequency &minus;<i>k</i>/<i>NT</i>. We observe that cos(<i>v</i>) = cos(&minus;<i>v</i>) and sin(<i>v</i>) = &minus;sin(&minus;<i>v</i>), so the &minus;<i>k</i>'th component is the complex conjugate of the <i>k</i>'th component. This means that the <i>N</i>&minus;<i>k</i>'th component is equal to the <i>k</i>'th component.</p>
+<p>When our inputs <i>x<sub>n</sub></i> are real-valued, we find that the the
+<i>k</i>'th component of the transform is the complex conjugate of component
+<i>N</i>&minus;<i>k</i>. A feature of all discrete transform is
+<i>X<sub>k</sub></i> = <i>X<sub>k&minus;N</sub></i>. Thus
+<i>X<sub>N&minus;k</sub></i> = <i>X<sub>&minus;k</sub></i>, the component with
+frequency &minus;<i>k</i>/<i>NT</i>. We observe that cos(<i>v</i>) =
+cos(&minus;<i>v</i>) and sin(<i>v</i>) = &minus;sin(&minus;<i>v</i>), so the
+&minus;<i>k</i>'th component is the complex conjugate of the <i>k</i>'th
+component. This means that the <i>N</i>&minus;<i>k</i>'th component is equal to
+the <i>k</i>'th component.</p>
 
 <big>
 <p>
@@ -4671,13 +5483,35 @@ end;
 </p>
 </big>
 
-<p>The 0'th and <i>N</i>/2'th components we cannot sum together using the above trick. But these components always have phase 0 or &pi; when the inputs are real-valued. We can represent them with two real-valued numbers, where the magnitude of the number is the magnitude of the component and the sign is the phase 0 or &pi;.</p>
+<p>The 0'th and <i>N</i>/2'th components we cannot sum together using the above
+trick. But these components always have phase 0 or &pi; when the inputs are
+real-valued. We can represent them with two real-valued numbers, where the
+magnitude of the number is the magnitude of the component and the sign is the
+phase 0 or &pi;.</p>
 
-<p>The <i>lwdaq_fft</i> routine will accept <i>N</i> complex-valued samples in the form <i>x<sub>n</sub></i> = <i>u</i>+<i>iv</i> and return <i>N</i> complex-valued components in the form <i>X<sub>k</sub></i> = <i>U</i>+<i>iV</i>. We specify complex-valued input with option "-complex 1". The default option, however, is "-complex 0", which specifies real-valued input and returns <i>N</i>/2 real-valued components. We obtain the <i>N</i>/2 components by adding each <i>X<sub>k</sub></i> to its complex conjugate <i>X<sub>N&minus;k</sub></i>. We express these real-valued frequency components with two numbers each, 2<i>A<sub>k</sub></i> and &Phi;<sub>k</sub>. These represent a cosine with amplitude 2<i>A<sub>k</sub></i>, angular frequency 2&pi;<i>k</i>/<i>NT</i> (rad/s), and phase shift &Phi;<sub>k</sub> (rad).</p>
+<p>The <i>lwdaq_fft</i> routine will accept <i>N</i> complex-valued samples in
+the form <i>x<sub>n</sub></i> = <i>u</i>+<i>iv</i> and return <i>N</i>
+complex-valued components in the form <i>X<sub>k</sub></i> = <i>U</i>+<i>iV</i>.
+We specify complex-valued input with option "-complex 1". The default option,
+however, is "-complex 0", which specifies real-valued input and returns
+<i>N</i>/2 real-valued components. We obtain the <i>N</i>/2 components by adding
+each <i>X<sub>k</sub></i> to its complex conjugate <i>X<sub>N&minus;k</sub></i>.
+We express these real-valued frequency components with two numbers each,
+2<i>A<sub>k</sub></i> and &Phi;<sub>k</sub>. These represent a cosine with
+amplitude 2<i>A<sub>k</sub></i>, angular frequency 2&pi;<i>k</i>/<i>NT</i>
+(rad/s), and phase shift &Phi;<sub>k</sub> (rad).</p>
 
-<p>The 0'th component of the real-valued transform is an exception. It contains two numbers, but neither of them is a phase. One is the magnitude of the 0'th component, which is the DC component, and the <i>N</i>/2'th component, which is the Nyquist-frequency component.</p>
+<p>The 0'th component of the real-valued transform is an exception. It contains
+two numbers, but neither of them is a phase. One is the magnitude of the 0'th
+component, which is the DC component, and the <i>N</i>/2'th component, which is
+the Nyquist-frequency component.</p>
 
-<p>The <i>lwdaq_fft</i> routine insists upon <i>N</i> being a power of two so that the fast fourier transform algorithm can divide the problem in half repeatedly until it arrives at transforms of length 1. For the fast fourier transform algorithm itself, see the <i>fft</i> routine in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. For its real-valued wrapper see <i>fft_real</i>.</p>
+<p>The <i>lwdaq_fft</i> routine insists upon <i>N</i> being a power of two so
+that the fast fourier transform algorithm can divide the problem in half
+repeatedly until it arrives at transforms of length 1. For the fast fourier
+transform algorithm itself, see the <i>fft</i> routine in <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. For its
+real-valued wrapper see <i>fft_real</i>.</p>
 
 <pre>
 lwdaq_config -fsr 1 -fsd 2
@@ -4685,18 +5519,42 @@ lwdaq_fft "1 1 1 1 1 1 1 0"
 0.88 0.13 0.25 -2.36 0.25 -1.57 0.25 -0.79 
 </pre>
 
-<p>In the example, we supply the routine with eight real-valued samples and obtain a transform of eight numbers. The first number tells us the magnitude and phase of the 0-frequency component. This number is equal to the average value of the samples, and is often called the "DC-component". The second number gives us the Nyquist-frequency component, which is the component with period two sample intervals. Here, the Nyquist-frequency component is the 4-frequency component with period N/4 (N=8). We multiply a cosine by this mangnitude and we obtain the 4-frequency component of the transform. Its phase can be either +&pi; or &minus;&pi;, and so is represented by the signe of the component magnitude.</p>
+<p>In the example, we supply the routine with eight real-valued samples and
+obtain a transform of eight numbers. The first number tells us the magnitude and
+phase of the 0-frequency component. This number is equal to the average value of
+the samples, and is often called the "DC-component". The second number gives us
+the Nyquist-frequency component, which is the component with period two sample
+intervals. Here, the Nyquist-frequency component is the 4-frequency component
+with period N/4 (N=8). We multiply a cosine by this mangnitude and we obtain the
+4-frequency component of the transform. Its phase can be either +&pi; or
+&minus;&pi;, and so is represented by the signe of the component magnitude.</p>
 
-<p>The remaining components in the tranform, 1 through 3, are each represented by two numbers, a magnitude, <i>a</i>, and a phase <i>&Phi;</i>. We obtain the value of component <i>k</i> at time <i>t</i> with <i>a</i>cos(2&pi;<i>kt</i>/<i>NT</i>+&Phi;). If we use sample number, <i>n</i>, instead of time, the component is <i>a</i>cos(2&pi;<i>kn</i>/<i>N</i>+&Phi;).</p>
+<p>The remaining components in the tranform, 1 through 3, are each represented
+by two numbers, a magnitude, <i>a</i>, and a phase <i>&Phi;</i>. We obtain the
+value of component <i>k</i> at time <i>t</i> with
+<i>a</i>cos(2&pi;<i>kt</i>/<i>NT</i>+&Phi;). If we use sample number, <i>n</i>,
+instead of time, the component is
+<i>a</i>cos(2&pi;<i>kn</i>/<i>N</i>+&Phi;).</p>
 
 <pre>
 lwdaq_fft "1 0 1 0 1 0 1 0 1 0 1 0 1 0 0 0" -complex 1
 0.88 0.00 -0.09 -0.09 -0.00 -0.13 0.09 -0.09 0.13 0.00 0.09 0.09 0.00 0.13 -0.09 0.09 
 </pre>
 
-<p>We submit the same data to the complex version of the transform by accompanying each sample with a zero phase, so as to indicate a real value with a complex number. The result is a transform that is equivalent to our first, abbreviated transform. You can see the <i>N</i>/4 component as "0.13 0.00" and the 0 component as "0.88 00". There are two <i>N</i>/1 frequency components "-0.09 -0.09" and "-0.09 0.09". Their magnitude is 0.127 and their phases are &minus;3&pi;/4 and &minus;&pi;/4. When we add these magnitudes together we obtain the <i>N</i>/1 component of the real-valued transform, which is 0.25 as shown above. The phase of the <i>N</i>/1 component is &minus;3&pi;/4 = &minus;2.36 radians, which is also what we see in the real-valued transform above.</p>
+<p>We submit the same data to the complex version of the transform by
+accompanying each sample with a zero phase, so as to indicate a real value with
+a complex number. The result is a transform that is equivalent to our first,
+abbreviated transform. You can see the <i>N</i>/4 component as "0.13 0.00" and
+the 0 component as "0.88 00". There are two <i>N</i>/1 frequency components
+"-0.09 -0.09" and "-0.09 0.09". Their magnitude is 0.127 and their phases are
+&minus;3&pi;/4 and &minus;&pi;/4. When we add these magnitudes together we
+obtain the <i>N</i>/1 component of the real-valued transform, which is 0.25 as
+shown above. The phase of the <i>N</i>/1 component is &minus;3&pi;/4 =
+&minus;2.36 radians, which is also what we see in the real-valued transform
+above.</p>
 
-<p>Here is another example. In this case, the <i>N</i>/4 component is zero, as is the 0 component.</p>
+<p>Here is another example. In this case, the <i>N</i>/4 component is zero, as
+is the 0 component.</p>
 
 <pre>
 lwdaq_fft "1 1 1 1 -1 -1 -1 -1"
@@ -4705,9 +5563,22 @@ lwdaq_fft "1 0 1 0 1 0 1 0 -1 0 -1 0 -1 0 -1 0" -complex 1
 0.00 0.00 0.25 -0.60 0.00 0.00 0.25 -0.10 0.00 0.00 0.25 0.10 0.00 0.00 0.25 0.60 
 </pre>
 
-<p>If the samples were taken over 1 s, the eight components represent frequencies 0, 1, 2, and 3 Hz. So we see the square wave of frequency 1 Hz has harmonics at 1 Hz and 3 Hz. The fourier series expansion of a square wave has harmonics of amplitude 4/<i>n</i>&pi; for the <i>n</i>'th harmonic. The first harmonic in the fourier series would have amplitude 1.27. Our 1-Hz component has amplitude 1.31. The discrete fourier transform is an exact representation of the original data, but it does not provide all the harmonics of the fourier series. Therefore, the existing harmonics are not exactly of the same amplitude as those in the fourier series.</p>
+<p>If the samples were taken over 1 s, the eight components represent
+frequencies 0, 1, 2, and 3 Hz. So we see the square wave of frequency 1 Hz has
+harmonics at 1 Hz and 3 Hz. The fourier series expansion of a square wave has
+harmonics of amplitude 4/<i>n</i>&pi; for the <i>n</i>'th harmonic. The first
+harmonic in the fourier series would have amplitude 1.27. Our 1-Hz component has
+amplitude 1.31. The discrete fourier transform is an exact representation of the
+original data, but it does not provide all the harmonics of the fourier series.
+Therefore, the existing harmonics are not exactly of the same amplitude as those
+in the fourier series.</p>
 
-<p>The phases of the components in our example are also correct. The first harmonic is offset by &minus;1.18 radians, which means it is a cosine delayed by 1.18/2&pi; = 0.188 of a period, or 1.5 samples. We see that a cosine delayed by 1.5 samles will reach its maximum between samples 1 and 2, which matches our input data. In the example below, we change the phase of the input by &pi; and we see the phase of the fundamental harmonic changes by &pi;.</p>
+<p>The phases of the components in our example are also correct. The first
+harmonic is offset by &minus;1.18 radians, which means it is a cosine delayed by
+1.18/2&pi; = 0.188 of a period, or 1.5 samples. We see that a cosine delayed by
+1.5 samles will reach its maximum between samples 1 and 2, which matches our
+input data. In the example below, we change the phase of the input by &pi; and
+we see the phase of the fundamental harmonic changes by &pi;.</p>
 
 <pre>
 lwdaq_fft "1 1 1 1 0 0 0 0"
@@ -4716,7 +5587,9 @@ lwdaq_fft "0 0 0 0 1 1 1 1"
 0.50 0.00 0.65 1.96 0.00 0.00 0.27 2.75 
 </pre>
 
-<p>We can use <i>lwdaq_fft</i> to perform the inverse transform, but we must invoke the "-inverse 1" option or else the inverse does not come out quite right.</p>
+<p>We can use <i>lwdaq_fft</i> to perform the inverse transform, but we must
+invoke the "-inverse 1" option or else the inverse does not come out quite
+right.</p>
 
 <pre>
 set dft [lwdaq_fft "1 0 1 0 1 0 1 0 -1 0 -1 0 -1 0 -1 0" -complex 1]
@@ -4727,9 +5600,16 @@ lwdaq_fft $dft -complex 1 -inverse 1
 1.00 0.00 0.99 -0.00 1.00 -0.00 0.99 -0.00 -1.00 0.00 -0.99 0.00 -1.00 0.00 -0.99 0.00 
 </pre>
 
-<p>The "-inverse 1" option reverses the order of the input components, which is a trick for getting the forward transform to act like an inverse transform, and then multiplies the resulting sample-values by <i>N</i> to account for the fact that our <i>lwdaq_fft</i> routine scales its frequency components by 1/<i>N</i> to make them correspond to sinusoidal amplitudes. The reversal of the input components and the scaling takes place in <i>fft_inverse</i> of <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
+<p>The "-inverse 1" option reverses the order of the input components, which is
+a trick for getting the forward transform to act like an inverse transform, and
+then multiplies the resulting sample-values by <i>N</i> to account for the fact
+that our <i>lwdaq_fft</i> routine scales its frequency components by 1/<i>N</i>
+to make them correspond to sinusoidal amplitudes. The reversal of the input
+components and the scaling takes place in <i>fft_inverse</i> of <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
 
-<p>We can also invert our compact magnitude-phase transforms, which we derive from real-valued inputs with the "-complex 0" option (the default).</p>
+<p>We can also invert our compact magnitude-phase transforms, which we derive
+from real-valued inputs with the "-complex 0" option (the default).</p>
 
 <pre>
 set dft [lwdaq_fft "1 1 1 1 -1 -1 -1 -1"]
@@ -4738,13 +5618,45 @@ lwdaq_fft $dft -inverse 1
 1.00 1.00 1.01 1.00 -1.00 -1.00 -1.01 -1.00 
 </pre>
 
-<p>Note the rounding errors we see because we are using only two decimal places in our examples. For the real-valued inverse transform code, see <i>fft_real_inverse</i> in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
+<p>Note the rounding errors we see because we are using only two decimal places
+in our examples. For the real-valued inverse transform code, see
+<i>fft_real_inverse</i> in <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
 
-<p>The fft, like all discrete fourier transforms, assumes that the <i>N</i> samples are the entire period of a repeating waveform. The <i>N</i> components of the transform, when inverted, give us an exact reproduction of the original <i>N</i> samples. As you are looking at the signal represented by the N samples, be aware that any difference between the 0'th sample and the (<i>N</i>-1)'th sample amounts to a discontinuity at the end of the repeating waveform. A ramp from 0 to 1000 during the <i>N</i> samples gives rise to a sudden drop of 1000. This sudden drop appears as power in all frequency components.</p>
+<p>The fft, like all discrete fourier transforms, assumes that the <i>N</i>
+samples are the entire period of a repeating waveform. The <i>N</i> components
+of the transform, when inverted, give us an exact reproduction of the original
+<i>N</i> samples. As you are looking at the signal represented by the N samples,
+be aware that any difference between the 0'th sample and the (<i>N</i>-1)'th
+sample amounts to a discontinuity at the end of the repeating waveform. A ramp
+from 0 to 1000 during the <i>N</i> samples gives rise to a sudden drop of 1000.
+This sudden drop appears as power in all frequency components.</p>
 
-<p>One way to remove end steps is to apply a <a href="http://en.wikipedia.org/wiki/Window_function">window function</a> to the data before you take the fourier transform. We provide a linear window function with the "-window <i>w</i>" option, where we apply the window function to the first <i>w</i> samples and the final <i>w</i> samples. This window function is the same one we provide separately in our <a href="#window_function">window function</a> routine. We recommend you calculate <i>w</i> as a fraction of <i>N</i> when you call <i>lwdaq_fft</i>. We suggest starting <i>w</i> = <i>N</i>/10. We implement the window function only for real-valued samples passed to the forward transform. If you try to apply the window function during the inverse transform or when passing complex samples to the forward transform, <i>lwdaq_fft</i> returns an error. That's not to say that there is no point in applying a window function in these other circumstances, but our linear window function does not have any obvious utility or meaning when so applied.</p>
+<p>One way to remove end steps is to apply a <a
+href="http://en.wikipedia.org/wiki/Window_function">window function</a> to the
+data before you take the fourier transform. We provide a linear window function
+with the "-window <i>w</i>" option, where we apply the window function to the
+first <i>w</i> samples and the final <i>w</i> samples. This window function is
+the same one we provide separately in our <a href="#window_function">window
+function</a> routine. We recommend you calculate <i>w</i> as a fraction of
+<i>N</i> when you call <i>lwdaq_fft</i>. We suggest starting <i>w</i> =
+<i>N</i>/10. We implement the window function only for real-valued samples
+passed to the forward transform. If you try to apply the window function during
+the inverse transform or when passing complex samples to the forward transform,
+<i>lwdaq_fft</i> returns an error. That's not to say that there is no point in
+applying a window function in these other circumstances, but our linear window
+function does not have any obvious utility or meaning when so applied.</p>
 
-<p>Some data contains occasional error samples, called <i>spikes</i> or <i>glitches</i>. At some point in our data analysis, we must eliminate these glitches. The <i>lwdaq_fft</i> "-glitch <i>g</i>" option allows you to specify a threshold for glitch filtering. The <i>lwdaq_fft</i> routine calls the one-dimensional <i>glitch_filter</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. We provide this routine at the command line with the <a href="#glitch_filter">glitch_filter</a> library command. The "-glitch" option is compatible only with real-valued data passed to the forward transform. A threshold value of 0 disables the filter.</p>
+<p>Some data contains occasional error samples, called <i>spikes</i> or
+<i>glitches</i>. At some point in our data analysis, we must eliminate these
+glitches. The <i>lwdaq_fft</i> "-glitch <i>g</i>" option allows you to specify a
+threshold for glitch filtering. The <i>lwdaq_fft</i> routine calls the
+one-dimensional <i>glitch_filter</i> from <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. We
+provide this routine at the command line with the <a
+href="#glitch_filter">glitch_filter</a> library command. The "-glitch" option is
+compatible only with real-valued data passed to the forward transform. A
+threshold value of 0 disables the filter.</p>
 }
 function lwdaq_fft(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4843,7 +5755,16 @@ begin
 end;
 
 {
-<p>lwdaq_metrics takes a sequence of real numbers as input and returns a list of real-valued properties of the input sequence. The input sequence represent samples of a signal, such as an EEG recording, and the metrics represent properties of the signal, such as average value, standard deviation, maximum, minimum, coastline length, intermittency of high-frequency power, spikiness, asymmetry, and so on. The lwdaq_metrics routine is an interface with the <a href="http://www.bndhep.net/Software/Sources/metrics.pas">metrics.pas</a> library of metric-calculating routines. To select one of these routines, and control its output, we pass a command string into lwdaq_metrics following the data string.</p>
+<p>lwdaq_metrics takes a sequence of real numbers as input and returns a list of
+real-valued properties of the input sequence. The input sequence represent
+samples of a signal, such as an EEG recording, and the metrics represent
+properties of the signal, such as average value, standard deviation, maximum,
+minimum, coastline length, intermittency of high-frequency power, spikiness,
+asymmetry, and so on. The lwdaq_metrics routine is an interface with the <a
+href="http://www.bndhep.net/Software/Sources/metrics.pas">metrics.pas</a>
+library of metric-calculating routines. To select one of these routines, and
+control its output, we pass a command string into lwdaq_metrics following the
+data string.</p>
 }
 function lwdaq_metrics(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4885,7 +5806,14 @@ begin
 end;
 
 {
-<p>The <i>lwdaq</i> command acts as an entry point into our analysis libraries, making various math functions available at the TCL command line. You specify the routine we wish to call, and pass arguments to the routine in strings or byte arrays or both. Most routines return results as text strings in which real numbers are encoded in characters with a fixed number of decimal places, as defined by the global constants <i>fsr</i> and <i>fsd</i>. You can set both of these with <i>lwdaq_config</i>. Beware that these routines can round small values to zero.</p>
+<p>The <i>lwdaq</i> command acts as an entry point into our analysis libraries,
+making various math functions available at the TCL command line. You specify the
+routine we wish to call, and pass arguments to the routine in strings or byte
+arrays or both. Most routines return results as text strings in which real
+numbers are encoded in characters with a fixed number of decimal places, as
+defined by the global constants <i>fsr</i> and <i>fsd</i>. You can set both of
+these with <i>lwdaq_config</i>. Beware that these routines can round small
+values to zero.</p>
 }
 function lwdaq(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4919,14 +5847,32 @@ begin
 	option:=Tcl_ObjString(argv[1]);
 	if option='bcam_from_global_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in BCAM coordinates. The point in BCAM coordinates is returned as a string of three numbers, the BCAM <i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point. You specify the point in global coordinates with the <i>point</i> parameter, which also takes the form of a string of three numbers, these numbers being the global <i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point whose BCAM coordinates we want to determine. You specify how the BCAM and global coordinate systems relate to one another with the <i>mount</i> string. The <i>mount</i> string contains the global coordinates of the BCAM's kinematic mounting balls. You specify the coordinates of the cone, slot, and flat balls, and for each ball we give its <i>x</i>, <i>y</i>, and <i>z</i> coordinates. In the following example, we transform the global point (0,1,0) into BCAM coordinates when our cone, slot and flat balls have coordinates (0,1,0), (-1,1,-1), and (1,1,-1).</p>
+<p>Transforms a point in global coordinates to a point in BCAM coordinates. The
+point in BCAM coordinates is returned as a string of three numbers, the BCAM
+<i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point. You specify the point
+in global coordinates with the <i>point</i> parameter, which also takes the form
+of a string of three numbers, these numbers being the global <i>x</i>, <i>y</i>,
+and <i>z</i> coordinates of the point whose BCAM coordinates we want to
+determine. You specify how the BCAM and global coordinate systems relate to one
+another with the <i>mount</i> string. The <i>mount</i> string contains the
+global coordinates of the BCAM's kinematic mounting balls. You specify the
+coordinates of the cone, slot, and flat balls, and for each ball we give its
+<i>x</i>, <i>y</i>, and <i>z</i> coordinates. In the following example, we
+transform the global point (0,1,0) into BCAM coordinates when our cone, slot and
+flat balls have coordinates (0,1,0), (-1,1,-1), and (1,1,-1).</p>
 
 <pre>
 lwdaq bcam_from_global_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 0.000000 0.000000
 </pre>
 
-<p>For a description of the BCAM coordinate system, and how it is defined with respect to a BCAM's kinematic mounting balls, consult the BCAM <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>. We usually use millimeters to specify coordinates, because we use millimeters in our BCAM camera and source calibration constants. But the routine will work with any units of length, so long as we use the same units for both the point and the mount strings.</p>
+<p>For a description of the BCAM coordinate system, and how it is defined with
+respect to a BCAM's kinematic mounting balls, consult the BCAM <a
+href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>. We
+usually use millimeters to specify coordinates, because we use millimeters in
+our BCAM camera and source calibration constants. But the routine will work with
+any units of length, so long as we use the same units for both the point and the
+mount strings.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -4942,14 +5888,20 @@ lwdaq bcam_from_global_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 	end 
 	else if option='global_from_bcam_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in BCAM coordinates. It is the inverse of <a href="#bcam_from_global_point">bcam_from_global_point</a>. You pass it the global coordinates of a point in the <i>point</i> string, and the coordinates of the BCAM's kinematic mounting balls with the <i>mount</i> string. The routine returns the global coordinates of the point.</p>
+<p>Transforms a point in global coordinates to a point in BCAM coordinates. It
+is the inverse of <a href="#bcam_from_global_point">bcam_from_global_point</a>.
+You pass it the global coordinates of a point in the <i>point</i> string, and
+the coordinates of the BCAM's kinematic mounting balls with the <i>mount</i>
+string. The routine returns the global coordinates of the point.</p>
 
 <pre>
 lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 2.000000 0.000000
 </pre>
 
-<p>For a description of the BCAM coordinate system, and how it is defined with respect to a BCAM's kinematic mounting balls, consult the BCAM <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
+<p>For a description of the BCAM coordinate system, and how it is defined with
+respect to a BCAM's kinematic mounting balls, consult the BCAM <a
+href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -4965,14 +5917,18 @@ lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 	end 
 	else if option='bcam_from_global_vector' then begin
 {
-<p>Transforms a vector in global coordinates to a vector in BCAM coordinates. See <a href="#bcam_from_global_point">bcam_from_global_point</a> for more details.</p>
+<p>Transforms a vector in global coordinates to a vector in BCAM coordinates.
+See <a href="#bcam_from_global_point">bcam_from_global_point</a> for more
+details.</p>
 
 <pre>
 lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 1.000000 0.000000
 </pre>
 
-<p>For a description of the BCAM coordinate system, and how it is defined with respect to a BCAM's kinematic mounting balls, consult the BCAM <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
+<p>For a description of the BCAM coordinate system, and how it is defined with
+respect to a BCAM's kinematic mounting balls, consult the BCAM <a
+href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -4988,14 +5944,18 @@ lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 	end 
 	else if option='global_from_bcam_vector' then begin
 {
-<p>Transforms a vector in global coordinates to a vector in BCAM coordinates. It is the inverse of <a href="#bcam_from_global_vector">bcam_from_global_vector</a>.</p>
+<p>Transforms a vector in global coordinates to a vector in BCAM coordinates. It
+is the inverse of <a
+href="#bcam_from_global_vector">bcam_from_global_vector</a>.</p>
 
 <pre>
 lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 1.000000 0.000000
 </pre>
 
-<p>For a description of the BCAM coordinate system, and how it is defined with respect to a BCAM's kinematic mounting balls, consult the BCAM <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
+<p>For a description of the BCAM coordinate system, and how it is defined with
+respect to a BCAM's kinematic mounting balls, consult the BCAM <a
+href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5011,14 +5971,34 @@ lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 	end 
 	else if option='bcam_source_bearing' then begin
 {
-<p>Calculates the line in BCAM coordinates upon which a light source must lie for its image to be centered at <i>spot_center</i>. The line is returned as a string containing six numbers. The first three numbers are the coordinates of the BCAM pivot point in BCAM coordinates in millimeters. The last three numbers are a unit vector in the direction of the line. The BCAM itself we describe with its calibration constants in the <i>camera</i> string. The <i>camera</i> string contains nine elements. The first is the name of the camera, which might be its serial number. The following eight are the camera calibration constants, as described in the <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User Manual</a>.</p>
+<p>Calculates the line in BCAM coordinates upon which a light source must lie
+for its image to be centered at <i>spot_center</i>. The line is returned as a
+string containing six numbers. The first three numbers are the coordinates of
+the BCAM pivot point in BCAM coordinates in millimeters. The last three numbers
+are a unit vector in the direction of the line. The BCAM itself we describe with
+its calibration constants in the <i>camera</i> string. The <i>camera</i> string
+contains nine elements. The first is the name of the camera, which might be its
+serial number. The following eight are the camera calibration constants, as
+described in the <a
+href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User
+Manual</a>.</p>
 
 <pre>
 lwdaq bcam_source_bearing "1.72 1.22" "P0001 1 0 0 0 0 1 75 0"
 1.000000 0.000000 0.000000 0.000000 0.000000 1.000000
 </pre>
 
-<p>The first element in the <i>camera</i> string is the name of the camera, even though this calculation does not use the camera name. In the example above, P0001 is the camera name, the pivot point is at (1,0,0) in BCAM coordinates, the camera axis is parallel to the BCAM <i>z</i>-axis,  the pivot point is 75 mm from the lens, and the CCD rotation is zero. We transform point (1.72, 1.22)  on the CCD (dimensions are millimeters) into a bearing that passes through the pivot point (1,0,0) in the direction (0,0,1). The point (1.72,1.22) is our aribitrarily-chosen center of the CCD in all currently-available BCAMs (it is close to the center of the TC255P image sensor, but not exactly at the center). The BCAM camera axis is the line passing through the CCD center and the pivot point.</p>
+<p>The first element in the <i>camera</i> string is the name of the camera, even
+though this calculation does not use the camera name. In the example above,
+P0001 is the camera name, the pivot point is at (1,0,0) in BCAM coordinates, the
+camera axis is parallel to the BCAM <i>z</i>-axis,  the pivot point is 75 mm
+from the lens, and the CCD rotation is zero. We transform point (1.72, 1.22)  on
+the CCD (dimensions are millimeters) into a bearing that passes through the
+pivot point (1,0,0) in the direction (0,0,1). The point (1.72,1.22) is our
+aribitrarily-chosen center of the CCD in all currently-available BCAMs (it is
+close to the center of the TC255P image sensor, but not exactly at the center).
+The BCAM camera axis is the line passing through the CCD center and the pivot
+point.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5034,14 +6014,26 @@ lwdaq bcam_source_bearing "1.72 1.22" "P0001 1 0 0 0 0 1 75 0"
 	end 
 	else if option='bcam_source_position' then begin
 {
-<p>Calculates the BCAM coordinates of a light source whose image is centered at <i>spot_center</i>, and which itself lies in the plane <i>z</i> = <i>bcam_z</i> in BCAM coordinates. The routine is similar to <a href="#bcam_source_bearing">bcam_source_bearing</a>, but we specify the BCAM <i>z</i>-coordinate of the source as well, in millimeters. The routine determines the position of the source by calling <a href="#bcam_source_breagin">bcam_source_bearing</a> and intersecting the source bearing with the <i>z</i>=<i>range</i> plane. The <i>camera</i> string contains the camera calibration constants, just as for <a href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
+<p>Calculates the BCAM coordinates of a light source whose image is centered at
+<i>spot_center</i>, and which itself lies in the plane <i>z</i> = <i>bcam_z</i>
+in BCAM coordinates. The routine is similar to <a
+href="#bcam_source_bearing">bcam_source_bearing</a>, but we specify the BCAM
+<i>z</i>-coordinate of the source as well, in millimeters. The routine
+determines the position of the source by calling <a
+href="#bcam_source_breagin">bcam_source_bearing</a> and intersecting the source
+bearing with the <i>z</i>=<i>range</i> plane. The <i>camera</i> string contains
+the camera calibration constants, just as for <a
+href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
 
 <pre>
 lwdaq bcam_source_position "1.72 1.22" 1000 "P0001 1 0 0 0 0 1 75 0"
 1.000000 0.000000 1000.000000
 </pre>
 
-<p>Here we see the source is at (1, 0, 1000) in BCAM coordinates, where all three coordinates are in millimeters. You specify the BCAM itself with its calibration constants using the <i>camera</i> string, just as for <a href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
+<p>Here we see the source is at (1, 0, 1000) in BCAM coordinates, where all
+three coordinates are in millimeters. You specify the BCAM itself with its
+calibration constants using the <i>camera</i> string, just as for <a
+href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
 }
 		if (argc<>5) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5265,7 +6257,9 @@ plane.</p>
 	end 
 	else if option='xyz_line_plane_intersection' then begin
 {
-<p>Determines the point at which a line and a plane intersect. We specify the line with a point and a direction. We specify the plane with a point and a normal vector.</p>
+<p>Determines the point at which a line and a plane intersect. We specify the
+line with a point and a direction. We specify the plane with a point and a
+normal vector.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5281,7 +6275,10 @@ plane.</p>
 	end 
 	else if option='xyz_point_line_vector' then begin
 {
-<p>Determines the shortest vector from a point to a line. We specify the point with three coordinates. We specify the line with a point and a direction vector. The direction vector does not have to be a unit vector. The routine returns the three components of the shortest vector.</p>
+<p>Determines the shortest vector from a point to a line. We specify the point
+with three coordinates. We specify the line with a point and a direction vector.
+The direction vector does not have to be a unit vector. The routine returns the
+three components of the shortest vector.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5319,7 +6316,13 @@ point, and a zero vector.</p>
 	end 
 	else if option='straight_line_fit' then begin
 {
-<p>Fits a straight line to <i>data</i>, where <i>data</i> contains a string of numbers, alternating between <i>x</i> and <i>y</i> coordinates. The routine returns a string of three numbers: slope, intercept, and rms residual. The rms residual is the standard deviation of the difference between the straight line and the data, in the <i>y</i>-direction. The data "0 3 1 5 2 7 5 13" would represent a straight line with slope 2, intercept 3, and rms residual 0. The result would be "2.000000 3.000000 0.000000".</p>
+<p>Fits a straight line to <i>data</i>, where <i>data</i> contains a string of
+numbers, alternating between <i>x</i> and <i>y</i> coordinates. The routine
+returns a string of three numbers: slope, intercept, and rms residual. The rms
+residual is the standard deviation of the difference between the straight line
+and the data, in the <i>y</i>-direction. The data "0 3 1 5 2 7 5 13" would
+represent a straight line with slope 2, intercept 3, and rms residual 0. The
+result would be "2.000000 3.000000 0.000000".</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5335,7 +6338,10 @@ point, and a zero vector.</p>
 	end 
 	else if option='ave_stdev' then begin
 {
-<p>Calculates the average, standard deviation, maximum, minimum, and mean absolute deviation of of <i>data</i>, where <i>data</i> contains a string of numbers. The routine returns values separated by spaces, and formatted to <a href="#lwdaq_config">fsd</a> decimal places.</p>
+<p>Calculates the average, standard deviation, maximum, minimum, and mean
+absolute deviation of of <i>data</i>, where <i>data</i> contains a string of
+numbers. The routine returns values separated by spaces, and formatted to <a
+href="#lwdaq_config">fsd</a> decimal places.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5354,7 +6360,10 @@ point, and a zero vector.</p>
 	end 
 	else if option='linear_interpolate' then begin
 {
-<p>Interpolates between the two-dimensional points of <i>x_y_data</i> to obtain an estimate of <i>y</i> at <i>x</i>=<i>x_position</i>. If we pass "2.5" for the x position, and "0 0 10 10" for the x-y data, the routine will return "2.500000".</p>
+<p>Interpolates between the two-dimensional points of <i>x_y_data</i> to obtain
+an estimate of <i>y</i> at <i>x</i>=<i>x_position</i>. If we pass "2.5" for the
+x position, and "0 0 10 10" for the x-y data, the routine will return
+"2.500000".</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5371,7 +6380,17 @@ point, and a zero vector.</p>
 	end 
 	else if option='nearest_neighbor' then begin
 {
-<p>Finds the closest point to <i>p</i> in a library of points. The point and the members of the library are all points in an <i>n</i>-dimensional space. When we call this routine, we can specify the library with the after the point by passing another string containing the library of <i>m</i> points. If we don't pass the library, the routine uses the library most recently passed. The routine stores the library in a global array so that it can use it again. We pass the point <i>p</i> as a string of <i>n</i> real numbers. The library we pass as a string of <i>m</i>&times;<i>n</i> real numbers separated by spaces. The value returned by the routine is an integer that specifies the library point that is closest to the <i>p</i>. The first library point we specify with integer 1 (one) and the last with integer <i>m</i>.</p>
+<p>Finds the closest point to <i>p</i> in a library of points. The point and the
+members of the library are all points in an <i>n</i>-dimensional space. When we
+call this routine, we can specify the library with the after the point by
+passing another string containing the library of <i>m</i> points. If we don't
+pass the library, the routine uses the library most recently passed. The routine
+stores the library in a global array so that it can use it again. We pass the
+point <i>p</i> as a string of <i>n</i> real numbers. The library we pass as a
+string of <i>m</i>&times;<i>n</i> real numbers separated by spaces. The value
+returned by the routine is an integer that specifies the library point that is
+closest to the <i>p</i>. The first library point we specify with integer 1 (one)
+and the last with integer <i>m</i>.</p>
 }
 		if (argc<>3) and (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5409,7 +6428,11 @@ point, and a zero vector.</p>
 	end 
 	else if option='sum_sinusoids' then begin
 {
-<p>Adds two sinusoidal waves of the same frequency together. You specify the two waves with their amplitude and phase. The phase must be in radians. The amplitude is dimensionless. The result contains the amplitude and phase of the sum of the two waves. If we pass the numbers "1 0 1 0.1" to the routine, it will return "1.997500 0.050000".</p>
+<p>Adds two sinusoidal waves of the same frequency together. You specify the two
+waves with their amplitude and phase. The phase must be in radians. The
+amplitude is dimensionless. The result contains the amplitude and phase of the
+sum of the two waves. If we pass the numbers "1 0 1 0.1" to the routine, it will
+return "1.997500 0.050000".</p>
 }
 		if (argc<>6) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5427,7 +6450,19 @@ point, and a zero vector.</p>
 	end 
 	else if option='frequency_components' then begin
 {
-<p>Calculates components of the <a href="http://en.wikipedia.org/wiki/Discrete_Fourier_transform">discrete fourier transform</a> of a real-valued waveform by repeated calls to <i>frequency_component</i> in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. We specify the <i>M</i> components we want to calculate with a string of <i>M</i> frequencies, each of which is a multiple of the fundamental frequency of the waveform, 1/<i>NT</i>. The frequencies provided by a full discrete fourier transform of <i>N</i> real samples are <i>k</i>/<i>NT</i> for <i>k</i> such that 0&le;<i>k</i>&le;<i>N</i>&minus;1. If we want to obtain all <i>N</i>/2 components, we can use our <a href="#lwdaq_fft">lwdaq_fft</a> routine instead. The <i>frequency_components</i> routine is designed to provide a small number of components for real-valued input data.</p>
+<p>Calculates components of the <a
+href="http://en.wikipedia.org/wiki/Discrete_Fourier_transform">discrete fourier
+transform</a> of a real-valued waveform by repeated calls to
+<i>frequency_component</i> in <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. We
+specify the <i>M</i> components we want to calculate with a string of <i>M</i>
+frequencies, each of which is a multiple of the fundamental frequency of the
+waveform, 1/<i>NT</i>. The frequencies provided by a full discrete fourier
+transform of <i>N</i> real samples are <i>k</i>/<i>NT</i> for <i>k</i> such that
+0&le;<i>k</i>&le;<i>N</i>&minus;1. If we want to obtain all <i>N</i>/2
+components, we can use our <a href="#lwdaq_fft">lwdaq_fft</a> routine instead.
+The <i>frequency_components</i> routine is designed to provide a small number of
+components for real-valued input data.</p>
 
 <pre>
 lwdaq_config -fsr 1 -fsd 2
@@ -5435,19 +6470,47 @@ lwdaq frequency_components "0 1 2 3 4 5" "0 0 0 0 1 1 1 1"
 0.50 0.00 0.65 3.50 0.00 -1.91 0.27 0.83 0.00 0.00 0.27 0.30 
 </pre>
 
-<p>Here we ask for components with frequencies "0 1 2 3 4 5" and we specify data "0 0 0 0 1 1 1 1". The routine returns a string containg the amplitude, <i>a</i>, and phase, &phi;, of each specified component, separated by spaces.</p>
+<p>Here we ask for components with frequencies "0 1 2 3 4 5" and we specify data
+"0 0 0 0 1 1 1 1". The routine returns a string containg the amplitude,
+<i>a</i>, and phase, &phi;, of each specified component, separated by
+spaces.</p>
 
-<p>Because the <i>frequency_component</i> routine accepts only real-valued inputs, we are certain that component <i>k</i> for <i>K</i>&gt;0 will be the complex conjugate of component <i>N</i>&minus;<i>k</i>, which means the two components add together to form one component of double the maginitude but with the same phase as component <i>k</i>. Thus <i>frequency_component</i> doubles the magnitude of the <i>k</i>'th component for <i>k</i> equal to 1, 2,..<i>N</i>/2&minus;1 and leaves the phase unchanged.</p>
+<p>Because the <i>frequency_component</i> routine accepts only real-valued
+inputs, we are certain that component <i>k</i> for <i>K</i>&gt;0 will be the
+complex conjugate of component <i>N</i>&minus;<i>k</i>, which means the two
+components add together to form one component of double the maginitude but with
+the same phase as component <i>k</i>. Thus <i>frequency_component</i> doubles
+the magnitude of the <i>k</i>'th component for <i>k</i> equal to 1,
+2,..<i>N</i>/2&minus;1 and leaves the phase unchanged.</p>
 
-<p>The phase, &phi;, is in units of <i>T</i>, and refers to the phase of a sinusoid, so that the frequency component is</p>
+<p>The phase, &phi;, is in units of <i>T</i>, and refers to the phase of a
+sinusoid, so that the frequency component is</p>
 
 <p><i>a</i>sin(2&pi;(<i>t</i>&minus;&phi;)<i>f</i>/<i>N</i>)</p>
 
-<p>where <i>f</i> is the frequency we specified and <i>t</i> is the quantity that separates the samples. The quantity <i>t</i> might be time or distance.</p>
+<p>where <i>f</i> is the frequency we specified and <i>t</i> is the quantity
+that separates the samples. The quantity <i>t</i> might be time or distance.</p>
 
-<p>The frequency need not be an integer, but if it is an integer, then this frequency will be one of those defined for the discrete fourier transform. There are times when choosing an exact frequency outside that finite set of periods is useful. For example, if we have 512 samples taken over 1 s, the discrete fourier transform contains components with frequencies 1 Hz, 2 Hz,.. 255 Hz. If we want to look for a signal at 33.3 Hz, we will find that the discrete fourier transform spreads 33.3 Hz into 33 Hz and 34 Hz, but neither component has the correct amplitude. By specifying a frequency of 33.3 Hz, we will obtain a more accurate estimate of a 33.3 Hz signal. Most of the time, however, the value of the transform outside the frequencies defined in the discrete transform is unreliable.</p>
+<p>The frequency need not be an integer, but if it is an integer, then this
+frequency will be one of those defined for the discrete fourier transform. There
+are times when choosing an exact frequency outside that finite set of periods is
+useful. For example, if we have 512 samples taken over 1 s, the discrete fourier
+transform contains components with frequencies 1 Hz, 2 Hz,.. 255 Hz. If we want
+to look for a signal at 33.3 Hz, we will find that the discrete fourier
+transform spreads 33.3 Hz into 33 Hz and 34 Hz, but neither component has the
+correct amplitude. By specifying a frequency of 33.3 Hz, we will obtain a more
+accurate estimate of a 33.3 Hz signal. Most of the time, however, the value of
+the transform outside the frequencies defined in the discrete transform is
+unreliable.</p>
 
-<p>To improve its accuracy, the routine subtracts the average value of the waveform from each sample before it calculates the frequency components. To further improve the accuracy of the transform, we can apply a <a href="http://en.wikipedia.org/wiki/Window_function">window function</a> to <i>waveform</i> before it we call <i>frequency_component</i>. The window function smooths off the first and final few samples so that they converge upon the waveform's average value. We provide a linear window function with <a href="#window_function">window_function</a>.</p>
+<p>To improve its accuracy, the routine subtracts the average value of the
+waveform from each sample before it calculates the frequency components. To
+further improve the accuracy of the transform, we can apply a <a
+href="http://en.wikipedia.org/wiki/Window_function">window function</a> to
+<i>waveform</i> before it we call <i>frequency_component</i>. The window
+function smooths off the first and final few samples so that they converge upon
+the waveform's average value. We provide a linear window function with <a
+href="#window_function">window_function</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5481,7 +6544,16 @@ lwdaq frequency_components "0 1 2 3 4 5" "0 0 0 0 1 1 1 1"
 	end 
 	else if option='window_function' then begin
 {
-<p>Applies a linear <a href="http://en.wikipedia.org/wiki/Window_function">window function</a> to a series of samples. The window function affects the first and last <i>extent</i> samples in <i>data</i>. The window function calculates the average value of the data, and then scales the deviation of the first and last <i>extent</i> samples so that the first sample and the last sample are now equal to the average, while the deviation of the other affected samples increases linearly up to the edge of the affected sample range. The function returns a new data string with the same number of samples, but the first and last samples are guaranteed to be the same. The window function is useful for preparing data for fourier transforms.</p>
+<p>Applies a linear <a
+href="http://en.wikipedia.org/wiki/Window_function">window function</a> to a
+series of samples. The window function affects the first and last <i>extent</i>
+samples in <i>data</i>. The window function calculates the average value of the
+data, and then scales the deviation of the first and last <i>extent</i> samples
+so that the first sample and the last sample are now equal to the average, while
+the deviation of the other affected samples increases linearly up to the edge of
+the affected sample range. The function returns a new data string with the same
+number of samples, but the first and last samples are guaranteed to be the same.
+The window function is useful for preparing data for fourier transforms.</p>
 
 <p>As an example, we would have:</p>
 
@@ -5491,7 +6563,10 @@ lwdaq window_function 5 "0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
 0.50 0.40 0.30 0.20 0.10 0.00 0.00 0.00 0.00 0.00 1.00 1.00 1.00 1.00 1.00 0.90 0.80 0.70 0.60 0.50 
 </pre>
 
-<p>Here we see a step function being windowed so that the ends are at the average value. Note that we set the <i>fsd</i> (field size decimal) and <i>fsr</i> (field size real) configuration parameters so that we can get the output data all on one line.</p>
+<p>Here we see a step function being windowed so that the ends are at the
+average value. Note that we set the <i>fsd</i> (field size decimal) and
+<i>fsr</i> (field size real) configuration parameters so that we can get the
+output data all on one line.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5507,13 +6582,36 @@ lwdaq window_function 5 "0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
 	end 
 	else if option='glitch_filter' then begin
 {
-<p>Applies a glitch filter to a sequence of real-valued samples. The glitch filter takes a real-valued threshold as its first parameter, followed by a list of real-valued samples. The routine calls <i>glitch_filter</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. A "glitch" is a corruption of one or more adjacent points in a signal. Our implementation of the glitch filter is designed to eliminate glitches that arise from missing samples being replaced by corrupt or interference samples in telemetry systems. When the absolute change in value from sample n-1 to sample n exceeds the threshold, we look to see if there is another threshold-exceeding change from sample n to n+1 in the opposite direction. If so, we replace sample n with sample n-1. Otherwise, we check to see if sample n+1 has exactly the same value as sample n, and if so, we replace sample n with sample n-1. Thus a jump up or down by more than the threshold, followed by any number of identical samples, will be treated as a glitch and eliminated entirely, replaced by the sample before the jump. A threshold of 0 disables the filter. As an example, we could have:</p>
+<p>Applies a glitch filter to a sequence of real-valued samples. The glitch
+filter takes a real-valued threshold as its first parameter, followed by a list
+of real-valued samples. The routine calls <i>glitch_filter</i> from <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. A
+"glitch" is a corruption of one or more adjacent points in a signal. Our
+implementation of the glitch filter is designed to eliminate glitches that arise
+from missing samples being replaced by corrupt or interference samples in
+telemetry systems. When the absolute change in value from sample n-1 to sample n
+exceeds the threshold, we look to see if there is another threshold-exceeding
+change from sample n to n+1 in the opposite direction. If so, we replace sample
+n with sample n-1. Otherwise, we check to see if sample n+1 has exactly the same
+value as sample n, and if so, we replace sample n with sample n-1. Thus a jump
+up or down by more than the threshold, followed by any number of identical
+samples, will be treated as a glitch and eliminated entirely, replaced by the
+sample before the jump. A threshold of 0 disables the filter. As an example, we
+could have:</p>
 
 <pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
 0 1 1 1 0 3 1 2 3 2 2 0 8 6 7 7 7 </pre>
 
-<p>Here we see a glitch in the third sample being removed, and later we have another glitch: a jump downwards of 7 when our threshold is 3, followed by two zeros. The repetition of the exact same value is a signature of glitches in unreliable signals. When several samples go missing, and the first is a corrupted sample, the reconstruction routine we apply to the raw telemetry signal will fill in the missing samples with the value of the corrupted sample. If we specify a negative threshold, the routine still uses its absolute value, but in addition it will append to the end of the output string the number of glitches removed.</p>
+<p>Here we see a glitch in the third sample being removed, and later we have
+another glitch: a jump downwards of 7 when our threshold is 3, followed by two
+zeros. The repetition of the exact same value is a signature of glitches in
+unreliable signals. When several samples go missing, and the first is a
+corrupted sample, the reconstruction routine we apply to the raw telemetry
+signal will fill in the missing samples with the value of the corrupted sample.
+If we specify a negative threshold, the routine still uses its absolute value,
+but in addition it will append to the end of the output string the number of
+glitches removed.</p>
 
 <pre>lwdaq glitch_filter -3.0 "0 0 0 0 10 0 1 2 0 0 0 0 0"
 0 0 0 0 0 0 1 2 0 0 0 0 0 1</pre>
@@ -5542,13 +6640,22 @@ lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
 	end 
 	else if option='glitch_filter_y' then begin
 {
-<p>Applies a glitch filter to the y-values of a sequence of x-y points. The routine calls <i>glitch_filter_y</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The result is equivalent to taking the y-values, passing them through the one-dimensional <a href="#glitch_filter">glitch_filter</a> and re-combining the result with their x-values. We replace the glitch point in the data sequence with a point whose y-coordinate is the same as the previous point's y-coordinate. A threshold of 0 disables the filter. A negative threshold causes the number of glitches to be appended to the signal values.</p>
+<p>Applies a glitch filter to the y-values of a sequence of x-y points. The
+routine calls <i>glitch_filter_y</i> from <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The
+result is equivalent to taking the y-values, passing them through the
+one-dimensional <a href="#glitch_filter">glitch_filter</a> and re-combining the
+result with their x-values. We replace the glitch point in the data sequence
+with a point whose y-coordinate is the same as the previous point's
+y-coordinate. A threshold of 0 disables the filter. A negative threshold causes
+the number of glitches to be appended to the signal values.</p>
 
 <pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 13 0"
 1 0 2 0 3 0 4 0 5 0 6 0 7 0 8 0 9 0 10 0 11 0 12 0 13 0 3</pre>
 
-<p>In the example above, the final number in the output is the number of glitches removed.</p>
+<p>In the example above, the final number in the output is the number of
+glitches removed.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5572,18 +6679,30 @@ lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 
 	end 
 	else if option='glitch_filter_xy' then begin
 {
-<p>Applies a glitch filter to the a sequence of x-y points. The routine calls <i>glitch_filter_xy</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The distance between consecutive points is their two-dimensional separation. The routine works in the same way as the one-dimensional <a href="#glitch_filter">glitch_filter</a> except it uses the separation of consecutive two-dimentional points rather than the absolute change in the value of a one-dimensional coordinate. A single-point glitch is a jump of length greater than the threshold followed by another jump of length greater than the threshold in a direction that is at least ninety degrees rotated with respect to the original jump. A threshold of 0 disables the filter.</p>
+<p>Applies a glitch filter to the a sequence of x-y points. The routine calls
+<i>glitch_filter_xy</i> from <a
+href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The
+distance between consecutive points is their two-dimensional separation. The
+routine works in the same way as the one-dimensional <a
+href="#glitch_filter">glitch_filter</a> except it uses the separation of
+consecutive two-dimentional points rather than the absolute change in the value
+of a one-dimensional coordinate. A single-point glitch is a jump of length
+greater than the threshold followed by another jump of length greater than the
+threshold in a direction that is at least ninety degrees rotated with respect to
+the original jump. A threshold of 0 disables the filter.</p>
 
 <pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 0 0 1 0 0 2 3 2 3 2 2 2 1 4 3 3</pre>
 
-<p>A negative threshold causes the number of glitches to be appended to the end of the return string.</p>
+<p>A negative threshold causes the number of glitches to be appended to the end
+of the return string.</p>
 
 <pre>lwdaq glitch_filter_xy -10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 0 0 1 0 0 2 3 2 3 2 2 2 1 4 3 3 1</pre>
 
-<p>The last number in the example above is not a sample, it is the number of glitches removed.</p>
+<p>The last number in the example above is not a sample, it is the number of
+glitches removed.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5607,13 +6726,34 @@ lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 	end 
 	else if option='spikes_x' then begin
 {
-<p>Returns a list of spikes found by path-finding in a one-dimensional graph array. The values in the array represent the vertical position of a sequence of points in a two-dimensional map, while the horizontal position we construct by arranging the points in sequence with uniform spacing. The height of a map square is one mean absolute step size of the array values. The width of the map squares is the horizontal separation of consecutive points. The routine takes three parameters: data, threshold, and extent. The data is a list of real numbers. The threshold is the minimum size for spikes, in units of mean absolute steps. The extent is the maximum width for spikes. The result of the routine is a list of spikes, each of which is the index of a spike location and the size of the spike in units of mean absolute steps.</p>
+<p>Returns a list of spikes found by path-finding in a one-dimensional graph
+array. The values in the array represent the vertical position of a sequence of
+points in a two-dimensional map, while the horizontal position we construct by
+arranging the points in sequence with uniform spacing. The height of a map
+square is one mean absolute step size of the array values. The width of the map
+squares is the horizontal separation of consecutive points. The routine takes
+three parameters: data, threshold, and extent. The data is a list of real
+numbers. The threshold is the minimum size for spikes, in units of mean absolute
+steps. The extent is the maximum width for spikes. The result of the routine is
+a list of spikes, each of which is the index of a spike location and the size of
+the spike in units of mean absolute steps.</p>
 
 <pre>% lwdaq_config -fsd 2
 % lwdaq spikes_x "0 0 0 0 2 9 1 0 0 7 0 7 0 9 0 0 0 0" 2 4
 5.00 2.46 9.00 2.21 11.00 2.21 13.00 2.72</pre>
 
-<p>Above we specify a threshold of two mean absolute steps and an extent of four samples. The one-dimensional coastline of the data is 64 and there are 18 data points, so the mean absolute step size is 3.6. Sample five have value 9. We can step around sample five to sample six, missing out the spike on sample five. So our first spike has location five (5.00). To calculate the size of the first spike, we must convert the height of the spike into units of mean absolute steps, and we use the trailing edge of the spike to measure height, not the leading edge. So we have 9 as the highest point in the spike and 1 as the end of the spike to give us a height of 8 in original units, or 2.2 mean absolute steps. The horizontal distance from the peak to the trailing edge is 1 sample period, so the spike size is sqrt(sqr(2.2)+sqr(1)) = 2.46. The same logic is used to calculate the locations and heights of the remaining three spikes.</p>
+<p>Above we specify a threshold of two mean absolute steps and an extent of four
+samples. The one-dimensional coastline of the data is 64 and there are 18 data
+points, so the mean absolute step size is 3.6. Sample five have value 9. We can
+step around sample five to sample six, missing out the spike on sample five. So
+our first spike has location five (5.00). To calculate the size of the first
+spike, we must convert the height of the spike into units of mean absolute
+steps, and we use the trailing edge of the spike to measure height, not the
+leading edge. So we have 9 as the highest point in the spike and 1 as the end of
+the spike to give us a height of 8 in original units, or 2.2 mean absolute
+steps. The horizontal distance from the peak to the trailing edge is 1 sample
+period, so the spike size is sqrt(sqr(2.2)+sqr(1)) = 2.46. The same logic is
+used to calculate the locations and heights of the remaining three spikes.</p>
 
 }
 		if (argc<>5) then begin
@@ -5632,7 +6772,9 @@ lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 	end
 	else if option='coastline_x' then begin
 {
-<p>Returns the cumulative absolute difference in consecutive values of a sequence of real numbers. If we pass the routine "0 1 2 3 2 1 6" it returns value 10.0.</p>
+<p>Returns the cumulative absolute difference in consecutive values of a
+sequence of real numbers. If we pass the routine "0 1 2 3 2 1 6" it returns
+value 10.0.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5647,7 +6789,10 @@ lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 	end
 	else if option='coastline_x_progress' then begin
 {
-<p>Returns a sequence of real numbers in which the n'th value is the coastline_x of the first n numbers passed into the routine. If we pass the routine "0 1 2 3 2 1 6" it returns "0 1 2 3 4 5 10". Thus the coastline_x of the entire sequence is the final number in the output sequence.</p>
+<p>Returns a sequence of real numbers in which the n'th value is the coastline_x
+of the first n numbers passed into the routine. If we pass the routine "0 1 2 3
+2 1 6" it returns "0 1 2 3 4 5 10". Thus the coastline_x of the entire sequence
+is the final number in the output sequence.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5663,7 +6808,10 @@ lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 	end
 	else if option='coastline_xy' then begin
 {
-<p>Returns the cumulative separation of consecutive values of a sequence of two-dimensional points. The routine accepts a sequence of two-dimensional points as pairs of real numbers. If we pass the routine "0 0 0 1 0 0 4 0" it returns value 6.0.</p>
+<p>Returns the cumulative separation of consecutive values of a sequence of
+two-dimensional points. The routine accepts a sequence of two-dimensional points
+as pairs of real numbers. If we pass the routine "0 0 0 1 0 0 4 0" it returns
+value 6.0.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5678,7 +6826,11 @@ lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 	end
 	else if option='coastline_xy_progress' then begin
 {
-<p>Takes a two-dimensional graph as input and returns a two-dimensional graph in which the y-coordinate of the n'th point represents the coastline_xy of the first n points in the input graph and the x-coordinate of the n'th point is the same as the x-coordinate of the n'th input point. Thus the coastline_xy of the entire input graph is the final y-value of the output sequence.</p>
+<p>Takes a two-dimensional graph as input and returns a two-dimensional graph in
+which the y-coordinate of the n'th point represents the coastline_xy of the
+first n points in the input graph and the x-coordinate of the n'th point is the
+same as the x-coordinate of the n'th input point. Thus the coastline_xy of the
+entire input graph is the final y-value of the output sequence.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5694,7 +6846,19 @@ lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 	end
 	else if option='matrix_inverse' then begin
 {
-<p>Calculates the inverse of a square matrix. You pass the original matrix as a string of real numbers in <i>matrix</i>. The first number should be the top-left element in the matrix, the second number should be the element immediately to the right of the top-left element, and so on, proceeding from left to right, and then downwards to the bottom-right element. The command deduces the dimensions of the matrix from the number of elements, which must be an integer square. For more information about the matrix inverter, see matrix_inverse in utils.pas. The "lwdaq matrix_inverse" routine is inefficient in its use of the matrix_inverse function. The routine spends most of its time translating between TCL strings and Pascal floating point numbers. A 10x10 matrix inversion with random elements takes 1800 &mu;s on our 1 GHz iBook, of which only 100 &mu;s is spent calculating the inverse. The routine returns the inverse as a string of real numbers, in the same format as the original <i>matrix</i>.</p>
+<p>Calculates the inverse of a square matrix. You pass the original matrix as a
+string of real numbers in <i>matrix</i>. The first number should be the top-left
+element in the matrix, the second number should be the element immediately to
+the right of the top-left element, and so on, proceeding from left to right, and
+then downwards to the bottom-right element. The command deduces the dimensions
+of the matrix from the number of elements, which must be an integer square. For
+more information about the matrix inverter, see matrix_inverse in utils.pas. The
+"lwdaq matrix_inverse" routine is inefficient in its use of the matrix_inverse
+function. The routine spends most of its time translating between TCL strings
+and Pascal floating point numbers. A 10x10 matrix inversion with random elements
+takes 1800 &mu;s on our 1 GHz iBook, of which only 100 &mu;s is spent
+calculating the inverse. The routine returns the inverse as a string of real
+numbers, in the same format as the original <i>matrix</i>.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5720,7 +6884,9 @@ lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 	end
 	else if option='tkcolor' then begin
 {
-<p>Returns the Tk color that matches an internal lwdaq color value. The TK color is returned as a string of the form #RRGGBB, where R, G, and B are each hexadecimal digits specifying the intensity of red, blue, and green.</p>
+<p>Returns the Tk color that matches an internal lwdaq color value. The TK color
+is returned as a string of the form #RRGGBB, where R, G, and B are each
+hexadecimal digits specifying the intensity of red, blue, and green.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5740,8 +6906,9 @@ lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"
 		Tcl_SetReturnString(interp,result);
 	end 
 {
-	A bad option returns a list in double-quotes containing all the valid option names. This list is
-	used by the LWDAQ_command_reference routine to generate the library routine reference manual.
+	A bad option returns a list in double-quotes containing all the valid option
+	names. This list is used by the LWDAQ_command_reference routine to generate
+	the library routine reference manual.
 }
 	else begin
 		Tcl_SetReturnString(interp,'Bad option "'+option+'", must be one of "'
