@@ -3456,6 +3456,7 @@ var
 	camera:bcam_camera_type;
 	sphere:xyz_sphere_type;
 	cylinder:xyz_cylinder_type;
+	disagreement:integer=0;
 		
 begin
 	error_string:='';
@@ -3539,7 +3540,8 @@ begin
 	end;
 	
 	if command='classify' then begin
-		scam_classify(ip,rule);
+		disagreement:=scam_classify(ip,rule);
+		writestr(result,disagreement:1);
 	end;
 	
 	if error_string='' then Tcl_SetReturnString(interp,result)

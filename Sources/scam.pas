@@ -42,13 +42,20 @@ interface
 
 uses
 	utils,images,transforms,bcam;
+	
+const
+{
+	Classification and projection color codes.
+}
+	scam_sphere_color=green_color;
+	scam_cylinder_color=blue_color;
+	scam_silhouette_color=orange_color;
 
 {
-	Routines that project hypothetical objects in SCAM coordinates onto SCAM
-	image sensors to produce simulated views of the hypothetical objects. We
-	pass an image pointer to the routines, and the routine works on this image.
-	We specify an object in SCAM coordinates and we give the calibration of the
-	SCAM itself, which is also in SCAM coordinates.
+	Routines that project hypothetical objects onto the overlays of our SCAM
+	images. We pass an image pointer to the routines, and the routine works on
+	this image. We specify an object in SCAM coordinates and we give the
+	calibration of the camera in SCAM coordinates too.
 }
 procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
@@ -56,20 +63,13 @@ procedure scam_project_sphere(ip:image_ptr_type;
 procedure scam_project_cylinder(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
 	camera:bcam_camera_type);
+	
 {
 	Routines that analyze the image.
 }
-procedure scam_classify(ip:image_ptr_type;rule:string);
+function scam_classify(ip:image_ptr_type;rule:string):integer;
 
 implementation
-
-const
-	
-{
-	Colors for various shapes.
-}
-	sphere_color=green_color;
-	cylinder_color=blue_color;
 
 {
 	scam_decode_rule takes a string like "10 &" and returns, for
@@ -121,20 +121,22 @@ end;
 
 	
 {
-	scam_project_sphere takes a sphere in SCAM coordinates and projects it onto the
-	image sensor of a camera. The image sensor's center and pixel size are specified by
-	the sensor code in the camera_type. The pixels of the image sensor we obtain from the image, 
-	which defines its own width and height. The routine draws in the overlay, not the
-	actual image. I draws only within the analysis boundaries.
+	scam_project_sphere takes a sphere in SCAM coordinates and projects it onto
+	the image sensor of a camera. The image sensor's center and pixel size are
+	specified by the sensor code in the camera_type. The pixels of the image
+	sensor we obtain from the image, which defines its own width and height. The
+	routine draws in the overlay, not the actual image. It represents the
+	projection as a solid fill in the sphere color.
 }
 procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
 	camera:bcam_camera_type);
+
 var
 	i,j:integer;
 	q:xy_point_type;
-	r:xyz_point_type;
 	w:real;
+	
 begin
 	case round(camera.code) of 
 		bcam_icx424_code: w:=bcam_icx424_pixel_um/um_per_mm;
@@ -148,23 +150,25 @@ begin
 				q.x:=(i+ccd_origin_x)*w;
 				q.y:=(j+ccd_origin_y)*w;
 				if xyz_line_crosses_sphere(bcam_source_bearing(q,camera),sphere) then
-					set_ov(ip,j,i,sphere_color);
+					set_ov(ip,j,i,scam_sphere_color);
 			end;
 		end;
 	end;
 end;
 
 {
-	scam_project_cylinder does for cylinders what scam_project_sphere does for spheres.
+	scam_project_cylinder does for cylinders what scam_project_sphere does for
+	spheres. We get a solid fill in the cylinder color in the overlay.
 }
 procedure scam_project_cylinder(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
 	camera:bcam_camera_type);
+	
 var
 	i,j:integer;
 	q:xy_point_type;
-	r:xyz_point_type;
 	w:real;
+	
 begin
 	case round(camera.code) of 
 		bcam_icx424_code: w:=bcam_icx424_pixel_um/um_per_mm;
@@ -178,35 +182,49 @@ begin
 				q.x:=(i+ccd_origin_x)*w;
 				q.y:=(j+ccd_origin_y)*w;
 				if xyz_line_crosses_cylinder(bcam_source_bearing(q,camera),cylinder) then
-					set_ov(ip,j,i,cylinder_color);
+					set_ov(ip,j,i,scam_cylinder_color);
 			end;
 		end;
 	end;
 end;
 
 {
-	scam_classify takes a rule string, goes through the image, and marks the
-	overlay according to the rule. The rule sets a threshold intensity above
-	which we classify pixels as part of the background, and below which they are
-	part of a silhouette.
-	
+	scam_classify goes through an image and marks the overlay to show pixels
+	that lie within a silhouette image. To classify the image as silhouette or
+	background, it uses the rule string, which we interpreet with a
+	scam_decode_rule. Where the overlay is clear, it will be filled with the
+	silhouette color. Where the overlay is filled already with a projected
+	object, it will be cleared in the region of overlap. Once the classification
+	is complete, we will see the silhouette and projection colors where the
+	image and simulation disagree. We will see the a clear overlay where
+	projection and classification agree. As the routine proceeds through the
+	image, it counts the number of pixels in which the image and projections
+	disagree and returns this count as our measurement of projection error.
 }
-procedure scam_classify(ip:image_ptr_type;rule:string);
+function scam_classify(ip:image_ptr_type;rule:string):integer;
 
 var
 	i,j:integer;
 	t:integer;
+	count:integer;
 
 begin
+	count:=0;
 	t:=scam_decode_rule(ip,rule);
 	with ip^.analysis_bounds do begin
 		for j:=top to bottom do begin
 			for i:=left to right do begin
-				if get_px(ip,j,i)<=t then
-					set_ov(ip,j,i,orange_color);
+				if get_px(ip,j,i)<=t then begin
+					if get_ov(ip,j,i)=clear_color then
+						set_ov(ip,j,i,scam_silhouette_color)
+					else
+						set_ov(ip,j,i,clear_color);
+				end;
+				if get_ov(ip,j,i)<>clear_color then inc(count)
 			end;
 		end;
 	end;
+	scam_classify:=count;
 end;
 
 end.
