@@ -2123,7 +2123,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 				} else {
 					# We don't expect to end up here. If we have more than one
 					# segment, we must have at least one that we can transfer.
-					# But if file names are corrupted, we could end up here. 
+					# But we find that we can end up here if we change the 
+					# recording length while we are recording.
 					error "Expected segments but found none"
 				}
 			}
