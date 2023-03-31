@@ -4772,8 +4772,7 @@ begin
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"image -payload -extent -scale -background -percentile -slices'
-				+'-previous -filter" in lwdaq_tcb.');
+				+'"-slices" in lwdaq_tcb.');
 			exit;
 		end;
 	end;
@@ -4848,8 +4847,27 @@ simplex fitter starts at the initial position and moves through the
 n-dimensional space until it finds a minium, or determines that it has converged
 around a minimum. When it converges, it returns the n-dimensional point at the
 minimum, the final error value, and the number of steps it took to reach the
-minimum. To avoid freezing LWDAQ during a long fitting process, call
-LWDAQ_support in the error function. To permit the user to abort the fit, have
+minimum.</p>
+
+<p>The simplex routine assumes that the sensitivity of the error to each of the
+n coordinates is similar, so that it sets up its simplex triangle with equal
+length in all n dimensions. For efficient convergeance, we must scale our
+parameters in the error function. For example, if the error function is ten
+times less sensitive to the x then y or z in a three-dimensional fit, we pass
+x/10, y, z/10 as the starting point, and we multiply the value for for the first
+coordinate by ten in our error function before we calculate the error.</p>
+
+<p>When the fit takes a long time, or when we are trying to figure out why it
+won't converge, it's nice to have the fit print out the coordinates and the
+error value every m'th step. We instruct the fit to do this with the -report m
+option. By default m is zero and there will be no reporting. The reporting takes
+place in the Tk text widget named in gui_text_name.</p>
+
+<p>The -max_steps option allows us to limit the number of steps before the fit 
+aborts.</p>
+
+<p>To avoid freezing LWDAQ during a long fitting process, call
+LWDAQ_support in the error procedure. To permit the user to abort the fit, have
 the error procedure check a global variable that can be set by an abort button.
 When the error procedure sees the abort, it can return a Tcl error to the
 lwdaq_simplex routine, and lwdaq_simplex will abort.</p>
@@ -4881,22 +4899,26 @@ end;
 function lwdaq_simplex(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 const
-	max_n = 1000;
-	max_iterations = 1000000;
+	max_n=1000;
 	
 var 
 	error_proc:string='';
 	simplex:simplex_type;
-	i,n,calculation_num:integer;
+	i,n,interation_num:integer;
 	result:string;
 	setup:string;
-
+	report:integer=0;
+	max_steps:integer=1000000;
+	option:string='';
+	arg_index:integer;
+	vp:pointer;	
+	
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_simplex:=Tcl_Error;
 	
-	if argc<>3 then begin
+	if argc<3 then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Wrong number of arguments, must be "'
 			+'lwdaq_simplex start_point error_proc".');
@@ -4918,22 +4940,45 @@ begin
 
 	error_proc:=Tcl_ObjString(argv[2]);
 	
+	arg_index:=3;
+	while (arg_index<argc-1) do begin
+		option:=Tcl_ObjString(argv[arg_index]);
+		inc(arg_index);
+		vp:=argv[arg_index];
+		inc(arg_index);
+		if (option='-report') then report:=Tcl_ObjInteger(vp)			
+		else if (option='-max_steps') then max_steps:=Tcl_ObjInteger(vp)			
+		else begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Bad option "'+option+'", must be one of '
+				+'"-report -max_steps" in lwdaq_tcb.');
+			exit;
+		end;
+	end;
+	
 	simplex:=new_simplex(n);
 	for i:=1 to n do simplex.vertices[1,i]:=read_real(setup);
 	simplex_construct(simplex,lwdaq_simplex_altitude,@error_proc);
 	
-	calculation_num:=0;
+	interation_num:=0;
 	repeat
+		if (report>0) and (interation_num mod report = 0) then begin
+			result:='';
+			for i:=1 to n do
+				writestr(result,result,simplex.vertices[1,i]:fsr:fsd,' ');
+			writestr(result,result,simplex.errors[1]:fsr:fsd,' ',interation_num:1);
+			gui_writeln(result);
+		end;
 		simplex_step(simplex,lwdaq_simplex_altitude,@error_proc);
-		inc(calculation_num);
+		inc(interation_num);
 	until (simplex.done_counter>=simplex.max_done_counter) 
-		or (calculation_num>max_iterations)
+		or (interation_num>=max_steps)
 		or (error_string<>'');
 		
 	result:='';
 	for i:=1 to n do
 		writestr(result,result,simplex.vertices[1,i]:fsr:fsd,' ');
-	writestr(result,result,simplex.errors[1]:fsr:fsd,' ',calculation_num:1);
+	writestr(result,result,simplex.errors[1]:fsr:fsd,' ',interation_num:1);
 
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
