@@ -593,6 +593,8 @@ function xyz_matrix_inverse(A:xyz_matrix_type):xyz_matrix_type;
 function xyz_matrix_difference(A,B:xyz_matrix_type):xyz_matrix_type;
 function xyz_rotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_unrotate(point,rotation:xyz_point_type):xyz_point_type;
+function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;
+	rotation:real):xyz_point_type;
 
 {
 	Memory Access. We use byte arrays as a data structure for copying blocks of
@@ -5841,12 +5843,11 @@ begin
 end;
 
 {
-	xyz_rotate rotates a point about the x, y, and z axes. First, we
-	rotate the point by an angle rotation.x about the x-axis. Next, we
-	rotate the point by rotation.y about the y-axis. Last, we rotate
-	by rotation.z about the z-axis. Positive rotation about an axis is
-	in the direction a right-handed screw would turn to move in the 
-	positive direction of the axis.
+	xyz_rotate rotates a point about the x, y, and z axes. First, we rotate the
+	point by an angle rotation.x about the x-axis. Next, we rotate the point by
+	rotation.y about the y-axis. Last, we rotate by rotation.z about the z-axis.
+	Positive rotation about an axis is clockwise when looking in the positive
+	direction along the axis.
 }
 function xyz_rotate(point,rotation:xyz_point_type):xyz_point_type;
 
@@ -5881,22 +5882,70 @@ var
 	p:xyz_point_type;
 	
 begin
-	{rotate about z-axis}
+	{unrotate about z-axis}
 	p.x:=point.x*cos(-rotation.z)-point.y*sin(-rotation.z);
 	p.y:=point.x*sin(-rotation.z)+point.y*cos(-rotation.z);
 	p.z:=point.z;
-	{rotate about y-axis}
+	{unrotate about y-axis}
 	point:=p;
 	p.x:=point.x*cos(-rotation.y)+point.z*sin(-rotation.y);
 	p.y:=point.y;
 	p.z:=-point.x*sin(-rotation.y)+point.z*cos(-rotation.y);
-	{rotate about x-axis}
+	{unrotate about x-axis}
 	point:=p;
 	p.x:=point.x;
 	p.y:=point.y*cos(-rotation.x)-point.z*sin(-rotation.x);
 	p.z:=point.y*sin(-rotation.x)+point.z*cos(-rotation.x);
 	{return result}
 	xyz_unrotate:=p;	
+end;
+
+{
+	xyz_axis_rotate rotates a subject point about an axis line. We take the
+	vector from the axis to the subject point and rotate it about the axis.
+	Positive rotatin is right-handed about the axis direction.
+}
+function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;
+	rotation:real):xyz_point_type;
+
+var
+	local,perpendicular,parallel:xyz_point_type;
+	ni,nj,nk,p,pp:xyz_point_type;
+	parallel_length,perpendicular_length:real;
+	
+begin
+{
+	Determine the shortest vector from the axis to the subject point. This vector
+	is perpendicular to the axis. Our k-direction is parallel to the axis direction.
+}
+	local:=xyz_difference(point,axis.point);
+	nk:=xyz_unit_vector(axis.direction);
+	parallel_length:=xyz_dot_product(local,nk);
+	parallel:=xyz_scale(nk,parallel_length);
+	perpendicular:=xyz_difference(local,parallel);
+	perpendicular_length:=xyz_length(perpendicular);
+{
+	Set our i-direction unit vector is parallel to our shortest vector, and our
+	j-direction completes a new coordinate system with origin on the axis.
+}
+	ni:=xyz_unit_vector(perpendicular);
+	nj:=xyz_cross_product(nk,ni);
+{
+	Rotate the perpendicular vector in our axis coordinates.
+}
+	p.z:=0;
+	p.x:=perpendicular_length*cos(rotation);
+	p.y:=perpendicular_length*sin(rotation);
+{
+	Transform back into original coordinates.
+}
+	pp:=xyz_sum(parallel,xyz_scale(ni,p.x));
+	pp:=xyz_sum(pp,xyz_scale(nj,p.y));
+	pp:=xyz_sum(axis.point,pp);
+{
+	Return result.
+}
+	xyz_axis_rotate:=pp;
 end;
 
 {	

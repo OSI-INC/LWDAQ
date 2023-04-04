@@ -18,7 +18,7 @@ const
 var
 	sc:bcam_camera_type;
 	q,qq:xy_point_type;
-	r:xyz_point_type;
+	r,rr:xyz_point_type;
 	line:xyz_line_type;
 	sphere:xyz_sphere_type;
 	cylinder:xyz_cylinder_type;
@@ -28,6 +28,20 @@ var
 	i_ext,j_ext:integer;
 	
 begin
+	writeln('Testing xyz_axis_rotate');
+	line.point.x:=10;
+	line.point.y:=0;
+	line.point.z:=0;
+	line.direction.x:=0;
+	line.direction.y:=0;
+	line.direction.z:=1;
+	repeat 
+		readln(r.x,r.y,r.z);
+		rr:=xyz_axis_rotate(r,line,pi*0.5);
+		writeln(string_from_xyz(rr),' ',xyz_length(rr):fsr:fsd);
+	until (r.x=-1);
+	exit;
+	
 	writeln('Testing projection, mount +x left, mount +y up in view.');
 	ip:=new_image(height,width);
 	with ip^.analysis_bounds do begin

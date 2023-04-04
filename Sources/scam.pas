@@ -48,6 +48,7 @@ const
 	Classification and projection color codes.
 }
 	scam_sphere_color=green_color;
+	scam_sphere_outline_color=dark_green_color;
 	scam_cylinder_color=blue_color;
 	scam_silhouette_color=orange_color;
 
@@ -62,6 +63,9 @@ procedure scam_project_sphere(ip:image_ptr_type;
 	camera:bcam_camera_type);
 procedure scam_project_cylinder(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
+	camera:bcam_camera_type);
+procedure scam_project_sphere_outline(ip:image_ptr_type;
+	sphere:xyz_sphere_type;
 	camera:bcam_camera_type);
 	
 {
@@ -119,14 +123,14 @@ begin
 	scam_decode_rule:=threshold;
 end;
 
+
 	
 {
 	scam_project_sphere takes a sphere in SCAM coordinates and projects it onto
-	the image sensor of a camera. The image sensor's center and pixel size are
-	specified by the sensor code in the camera_type. The pixels of the image
-	sensor we obtain from the image, which defines its own width and height. The
-	routine draws in the overlay, not the actual image. It represents the
-	projection as a solid fill in the sphere color.
+	the image plane of a camera. The image plane's center and pixel size are
+	specified by the sensor code in the camera record. The routine draws in the
+	overlay, not the actual image. It represents the projection as a solid fill
+	in the sphere color.
 }
 procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
@@ -186,6 +190,25 @@ begin
 			end;
 		end;
 	end;
+end;
+
+{
+	scam_project_sphere_outline takes a sphere in SCAM coordinates and draws the
+	outline of its projection onto the image plane of a camera. The routine
+	draws in the overlay, not the actual image. It represents the outline with a
+	finite number of straight lines joining points on the projection's
+	perimiter.
+}
+procedure scam_project_sphere_outline(ip:image_ptr_type;
+	sphere:xyz_sphere_type;
+	camera:bcam_camera_type);
+
+var
+	i,j:integer;
+	q:xy_point_type;
+	w:real;
+	
+begin
 end;
 
 {
