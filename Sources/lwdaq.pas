@@ -3486,6 +3486,10 @@ begin
 		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then body:=Tcl_ObjString(argv[4]);
 		arg_index:=5;
+	end else if (command='project_outline') then begin
+		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
+		if argc>4 then body:=Tcl_ObjString(argv[4]);
+		arg_index:=5;
 	end else if (command='classify') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
 		arg_index:=4;
@@ -3529,6 +3533,25 @@ begin
 			end else if option='cylinder' then begin
 				cylinder:=read_xyz_cylinder(body);
 				scam_project_cylinder(ip,cylinder,camera);
+			end else begin
+				Tcl_SetReturnString(interp,error_prefix
+					+'Invalid shape "'+option+'", must be one of '
+					+'"sphere cylinder" in '
+					+'lwdaq_scam.');
+				exit;
+			end;
+		end;
+	end;
+	
+	if command='project_outline' then begin
+		while body<>'' do begin
+			option:=read_word(body);
+			if option='sphere' then begin
+				sphere:=read_xyz_sphere(body);
+				scam_project_sphere_outline(ip,sphere,camera);
+			end else if option='cylinder' then begin
+				cylinder:=read_xyz_cylinder(body);
+				scam_project_cylinder_outline(ip,cylinder,camera);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Invalid shape "'+option+'", must be one of '

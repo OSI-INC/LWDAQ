@@ -41,14 +41,14 @@ unit scam;
 interface
 
 uses
-	utils,images,transforms,bcam;
+	math,utils,images,transforms,bcam;
 	
 const
 {
 	Classification and projection color codes.
 }
 	scam_sphere_color=green_color;
-	scam_sphere_outline_color=dark_green_color;
+	scam_sphere_outline_color=red_color;
 	scam_cylinder_color=blue_color;
 	scam_silhouette_color=orange_color;
 
@@ -66,6 +66,9 @@ procedure scam_project_cylinder(ip:image_ptr_type;
 	camera:bcam_camera_type);
 procedure scam_project_sphere_outline(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
+	camera:bcam_camera_type);
+procedure scam_project_cylinder_outline(ip:image_ptr_type;
+	cylinder:xyz_cylinder_type;
 	camera:bcam_camera_type);
 	
 {
@@ -197,16 +200,85 @@ end;
 	outline of its projection onto the image plane of a camera. The routine
 	draws in the overlay, not the actual image. It represents the outline with a
 	finite number of straight lines joining points on the projection's
-	perimiter.
+	perimeter.
 }
 procedure scam_project_sphere_outline(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
 	camera:bcam_camera_type);
+	
+const
+	num_tangents=100;
 
 var
-	i,j:integer;
-	q:xy_point_type;
+	step:integer;
+	projection:xy_point_type;
+	line:ij_line_type;
+	unit_x:xyz_point_type;
+	axis,tangent,center_line:xyz_line_type;
+	theta:real;
 	w:real;
+	
+begin
+{
+	Find a tangent to the sphere that intersects the pivot point of the camera.
+	We start by constructing a line from the pivot point to the sphere center.
+	We obtain the angle between the tangent and the center line. We rotate the
+	sphere center about an axis perpendicular to the center line and passing
+	through the camera pivot point. The result is our tangent point, which is
+	not the point of contact of the tangent on the sphere, but slightly farter
+	along the tangent from the pivot point. The tangent line is the line passing
+	through the pivot point in the direction of the tangent point. 
+}
+	center_line.point:=camera.pivot;
+	center_line.direction:=xyz_difference(sphere.center,camera.pivot);
+	theta:=arcsin(sphere.radius/xyz_length(center_line.direction));
+	with unit_x do begin x:=1; y:=0; z:=0; end;
+	axis.point:=camera.pivot;
+	axis.direction:=xyz_cross_product(center_line.direction,unit_x);
+	tangent.point:=xyz_axis_rotate(sphere.center,axis,theta);
+	tangent.direction:=xyz_difference(tangent.point,camera.pivot);
+{
+	When we project tangents onto our image sensor, we are going to mark them in the
+	overlay, for which we need the size of the pixels.
+}
+	case round(camera.code) of 
+		bcam_icx424_code: w:=bcam_icx424_pixel_um/um_per_mm;
+		bcam_tc255_code: w:=bcam_tc255_pixel_um/um_per_mm;
+		bcam_generic_code: w:=bcam_generic_pixel_um/um_per_mm;
+		otherwise w:=bcam_tc255_pixel_um/um_per_mm;
+	end;
+{
+	Rotate our tangent about the center vector in steps to complete a circuit of
+	the projection cone. At each step, we project the tangent point onto our
+	image plane and mark in the overlay pixel that contains the projected point.
+	We restrict our drawing to lie within the analysis boundaries of the image.
+}
+	for step:=0 to num_tangents do begin
+		with ip^.analysis_bounds do begin
+			projection:=bcam_image_position(tangent.point,camera);
+			line.b.i:=round(projection.x/w-ccd_origin_x);
+			line.b.j:=round(projection.y/w-ccd_origin_y);
+			if step=0 then line.a:=line.b;
+			if valid_image_analysis_point(line.a,ip) and
+					valid_image_analysis_point(line.b,ip) then
+				draw_overlay_line(ip,line,scam_sphere_outline_color);
+			line.a:=line.b;
+		end;
+		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/num_tangents);
+		tangent.direction:=xyz_difference(tangent.point,camera.pivot);
+	end;
+end;
+
+{
+	scam_project_cylinder_outline takes a cylinder in SCAM coordinates and draws the
+	outline of its projection onto the image plane of a camera. The routine
+	draws in the overlay, not the actual image. It represents the outline with a
+	finite number of straight lines joining points on the projection's
+	perimeter.
+}
+procedure scam_project_cylinder_outline(ip:image_ptr_type;
+	cylinder:xyz_cylinder_type;
+	camera:bcam_camera_type);
 	
 begin
 end;
