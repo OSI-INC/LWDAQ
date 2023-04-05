@@ -48,14 +48,14 @@ const
 	Classification and projection color codes.
 }
 	scam_sphere_color=green_color;
-	scam_sphere_outline_color=red_color;
+	scam_sphere_outline_color=green_color;
 	scam_cylinder_color=blue_color;
-	scam_cylinder_outline_color=dark_blue_color;
+	scam_cylinder_outline_color=blue_color;
 	scam_silhouette_color=orange_color;
 {
 	Projection of outlines.
 }
-	scam_num_tangents=20;
+	scam_num_tangents=100;
 
 {
 	Routines that project hypothetical objects onto the overlays of our SCAM
@@ -211,14 +211,18 @@ procedure scam_project_sphere_outline(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
 	camera:bcam_camera_type);
 	
+const
+	draw_radials=true;
+	
 var
 	unit_x:xyz_point_type;
 	axis,tangent,center_line:xyz_line_type;
 	theta:real;
 	w:real;
 	step:integer;
-	projection:xy_point_type;
+	pt,pc:xy_point_type;
 	line:ij_line_type;
+	ic:ij_point_type;
 	
 begin
 {
@@ -252,20 +256,22 @@ begin
 {
 	Rotate our tangent about the center vector in steps to complete a circuit of
 	the projection cone. At each step, we project the tangent point onto our
-	image plane draw a line from the previous tangent point to the new point. We
-	restrict our drawing to lie within the analysis boundaries of the image.
+	image plane and draw a line to the center of the circle.
 }
+	pc:=bcam_image_position(sphere.center,camera);
+	ic.i:=round(pc.x/w-ccd_origin_x);
+	ic.j:=round(pc.y/w-ccd_origin_y);
 	for step:=0 to scam_num_tangents do begin
-		with ip^.analysis_bounds do begin
-			projection:=bcam_image_position(tangent.point,camera);
-			line.b.i:=round(projection.x/w-ccd_origin_x);
-			line.b.j:=round(projection.y/w-ccd_origin_y);
-			if step=0 then line.a:=line.b;
-			if valid_image_analysis_point(line.a,ip) and
-					valid_image_analysis_point(line.b,ip) then
-				draw_overlay_line(ip,line,scam_sphere_outline_color);
-			line.a:=line.b;
+		pt:=bcam_image_position(tangent.point,camera);
+		line.a.i:=round(pt.x/w-ccd_origin_x);
+		line.a.j:=round(pt.y/w-ccd_origin_y);
+		if step>0 then
+			draw_overlay_line(ip,line,scam_sphere_outline_color);
+		if draw_radials then begin
+			line.b:=ic;
+			draw_overlay_line(ip,line,scam_sphere_outline_color);
 		end;
+		line.b:=line.a;
 		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/scam_num_tangents);
 		tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 	end;
@@ -308,8 +314,8 @@ begin
 }
 	point_b:=xyz_sum(point_a,xyz_scale(cylinder.face.normal,cylinder.length));
 {
-	When we project tangents onto our image sensor, we are going to mark them in the
-	overlay, for which we need the size of the pixels.
+	When we project tangents onto our image sensor, we are going to mark them in
+	the overlay, for which we need the size of the pixels.
 }
 	case round(camera.code) of 
 		bcam_icx424_code: w:=bcam_icx424_pixel_um/um_per_mm;
@@ -321,29 +327,27 @@ begin
 	Rotate our cicumference point about the cylinder axis. Construct for each
 	cylinder point its opposite point on the second face. Project both points
 	onto the image plane and draw a line from one to the other in the overlay.
-	We restrict our drawing to lie within the analysis boundaries of the image.
 }
 	for step:=0 to scam_num_tangents do begin
-		with ip^.analysis_bounds do begin
-			projection:=bcam_image_position(point_a,camera);
-			line_a.b.i:=round(projection.x/w-ccd_origin_x);
-			line_a.b.j:=round(projection.y/w-ccd_origin_y);
-			if step=0 then line_a.a:=line_a.b;
-			draw_overlay_line(ip,line_a,scam_cylinder_outline_color);
+		projection:=bcam_image_position(point_a,camera);
+		line_a.b.i:=round(projection.x/w-ccd_origin_x);
+		line_a.b.j:=round(projection.y/w-ccd_origin_y);
+		if step=0 then line_a.a:=line_a.b;
+		draw_overlay_line(ip,line_a,scam_cylinder_outline_color);
 
-			projection:=bcam_image_position(point_b,camera);
-			line_b.b.i:=round(projection.x/w-ccd_origin_x);
-			line_b.b.j:=round(projection.y/w-ccd_origin_y);
-			if step=0 then line_b.a:=line_b.b;
-			draw_overlay_line(ip,line_b,scam_cylinder_outline_color);
+		projection:=bcam_image_position(point_b,camera);
+		line_b.b.i:=round(projection.x/w-ccd_origin_x);
+		line_b.b.j:=round(projection.y/w-ccd_origin_y);
+		if step=0 then line_b.a:=line_b.b;
+		draw_overlay_line(ip,line_b,scam_cylinder_outline_color);
 
-			line_c.a:=line_a.b;
-			line_c.b:=line_b.b;
-			draw_overlay_line(ip,line_c,scam_cylinder_outline_color);		
+		line_c.a:=line_a.b;
+		line_c.b:=line_b.b;
+		draw_overlay_line(ip,line_c,scam_cylinder_outline_color);		
 
-			line_a.a:=line_a.b;
-			line_b.a:=line_b.b;
-		end;
+		line_a.a:=line_a.b;
+		line_b.a:=line_b.b;
+
 		point_a:=xyz_axis_rotate(point_a,axis,2*pi/scam_num_tangents);
 		point_b:=xyz_axis_rotate(point_b,axis,2*pi/scam_num_tangents);
 	end;
