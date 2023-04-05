@@ -48,13 +48,18 @@ begin
 		top:=0;
 	end;
 	clear_overlay(ip);
+	
 	sc:=bcam_camera_from_string('scam 0 0 0 0 0 3 25 0');
 	bcam_generic_pixel_um:=100;
 	bcam_generic_center_x:=width*0.5*bcam_generic_pixel_um/um_per_mm;
 	bcam_generic_center_y:=height*0.5*bcam_generic_pixel_um/um_per_mm;
 
+{
 	sphere:=xyz_sphere_from_string('0 0 100 5');
 	scam_project_sphere_outline(ip,sphere,sc);
+}
+	cylinder:=xyz_cylinder_from_string('0 0 1000 -2 0 -1 100 100');
+	scam_project_cylinder_outline(ip,cylinder,sc);
 
 	write(' ');
 	for i:=0 to ip^.i_size-1 do write('--');
@@ -62,9 +67,10 @@ begin
 	for j:=0 to ip^.j_size-1 do begin
 		write('|');
 		for i:=0 to ip^.i_size-1 do begin
-			if get_ov(ip,j,i)=scam_sphere_color then write('SS')
-			else if get_ov(ip,j,i)=scam_cylinder_color then write('CC')
-			else if get_ov(ip,j,i)=scam_sphere_outline_color then write('OO')
+			if get_ov(ip,j,i)=scam_sphere_color then write('ss')
+			else if get_ov(ip,j,i)=scam_cylinder_color then write('cc')
+			else if get_ov(ip,j,i)=scam_sphere_outline_color then write('SS')
+			else if get_ov(ip,j,i)=scam_cylinder_outline_color then write('CC')
 			else write('  ');
 		end;
 		writeln('|');;
@@ -72,5 +78,7 @@ begin
 	write(' ');
 	for i:=0 to ip^.i_size-1 do write('--');
 	writeln;
+
+
 	
 end.
