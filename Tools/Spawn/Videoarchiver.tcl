@@ -1737,6 +1737,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 	
 		if {[catch {
 			# Open a socket to the interface on the camera.
+			set when "opening socket"
 			set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 
 			# Check that the video is still streaming.
@@ -1785,6 +1786,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 			
 				# Open a socket to the camera. We will use the same socket to
 				# download all segment files.
+				set when "opening socket"
 				set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 
 				# Get temperature and frequency of CPU.
