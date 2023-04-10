@@ -212,7 +212,7 @@ echo "SUCCESS"
 	
 	# Lag thresholds and error log.
 	set config(lag_warning) "10.0"
-	set config(lag_alarm) "30.0"
+	set config(lag_alarm) "20.0"
 	set config(lag_reset) "40.0"
 	set config(error_log) [file join $info(scratch_dir) error_log.txt]
 	set info(previous_line) ""
@@ -1977,9 +1977,9 @@ proc Videoarchiver_transfer {n {init 0}} {
 					if {$lag > $config(lag_reset)} {
 						error "Lagging by $lag seconds"
 					} elseif {$lag > $config(lag_alarm)} {
-						if {[$info(cam$n\_laglabel) cget -fg] != red} {
-							Videoarchiver_print "WARNING: Lag exceeds\
-								$config(lag_alarm) for $info(cam$n\_id)." norepeat
+						if {[$info(cam$n\_laglabel) cget -fg] != "red"} {
+							Videoarchiver_print "WARNING: Lag exceeds alarm level\
+								$config(lag_alarm) s for $info(cam$n\_id)." 
 						}
 						LWDAQ_set_fg $info(cam$n\_laglabel) red
 						if {$config(verbose)} {
@@ -1988,9 +1988,9 @@ proc Videoarchiver_transfer {n {init 0}} {
 							set config(verbose) 0
 						}
 					} elseif {$lag > $config(lag_warning)} {
-						if {[$info(cam$n\_laglabel) cget -fg] != orange} {
-							Videoarchiver_print "WARNING: Lag exceeds\
-								$config(lag_warning) for $info(cam$n\_id)." norepeat
+						if {[$info(cam$n\_laglabel) cget -fg] != "orange"} {
+							Videoarchiver_print "WARNING: Lag exceeds warning level\
+								$config(lag_warning) s for $info(cam$n\_id)."
 						}
 						LWDAQ_set_fg $info(cam$n\_laglabel) orange
 					} else {
