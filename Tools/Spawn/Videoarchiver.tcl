@@ -315,8 +315,8 @@ proc Videoarchiver_segdir {n} {
 # to the error log file.
 #
 proc Videoarchiver_print {line {color "black"}} {
-	upvar #0 Neurorecorder_config config
-	upvar #0 Neurorecorder_info info
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
 	
 	if {$color == "norepeat"} {
 		if {$info(previous_line) == $line} {return ""}
@@ -325,7 +325,7 @@ proc Videoarchiver_print {line {color "black"}} {
 	set info(previous_line) $line
 	
 	if {[regexp "^WARNING: " $line] || [regexp "^ERROR: " $line]} {
-		append line " ([Neurorecorder_clock_convert [clock seconds]]\)"
+		append line " ([clock format [clock seconds]]\)"
 		LWDAQ_print $config(error_log) "$line"
 	}
 	if {$config(verbose) \
@@ -333,7 +333,7 @@ proc Videoarchiver_print {line {color "black"}} {
 			|| [regexp "^ERROR: " $line] \
 			|| ($color != "verbose")} {
 		if {$color == "verbose"} {set color black}
-		Videoarchiver_print $line $color
+		LWDAQ_print $info(text) $line $color
 	}
 	return ""
 }
@@ -433,8 +433,7 @@ proc Videoarchiver_camera_init {n} {
 		} else {
 			set info(cam$n\_ver) "A3034C1"
 		}
-		Videoarchiver_print "$info(cam$n\_id)\
-			Camera is version [set info(cam$n\_ver)]."
+		Videoarchiver_print "$info(cam$n\_id) Camera is version [set info(cam$n\_ver)]."
 		
 		# We look at the compressor.config file. If it's not present, or if the version
 		# number it contains is obsolete, the camera must be updated.
@@ -573,7 +572,7 @@ proc Videoarchiver_query {n} {
 		LWDAQ_print $t "\n"
 		LWDAQ_socket_close $sock
 	} message]} {
-		set message [regsub "ERROR: " $message ""]
+		set message [string trim [regsub "ERROR: " $message ""]]
 		Videoarchiver_print "ERROR: $message"
 		catch {LWDAQ_socket_close $sock}
 		return ""	
@@ -660,7 +659,7 @@ proc Videoarchiver_setlamp {n color intensity} {
 		LWDAQ_socket_write $sock "setlamp $color $intensity\n"
 		set result [LWDAQ_socket_read $sock line]
 		if {$result != $intensity} {
-			set message [regsub "ERROR: " $result ""]
+			set message [string trim [regsub "ERROR: " $result ""]]
 			error $message
 		}
 		
@@ -1073,7 +1072,7 @@ proc Videoarchiver_stream {n} {
 		}
 		set result [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $result]} {
-			set message [regsub "ERROR: " $result ""]
+			set message [string trim [regsub "ERROR: " $result ""]]
 			error $message
 		} 
 		
@@ -1476,7 +1475,7 @@ proc Videoarchiver_compress {n} {
 			>& manager_log.txt & \n"
 		set result [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $result]} {
-			set message [regsub "ERROR: " $result ""]
+			set message [string trim [regsub "ERROR: " $result ""]]
 			error $message
 		}
 
@@ -1539,7 +1538,7 @@ proc Videoarchiver_segment {n} {
 			>& segmentation_log.txt & \n"
 		set result [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $result]} {
-			set message [regsub "ERROR: " $result ""]
+			set message [string trim [regsub "ERROR: " $result ""]]
 			error $message
 		}
 
@@ -2352,14 +2351,14 @@ proc Videoarchiver_suggest_download {} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 
-	Videoarchiver_print ""
-	Videoarchiver_print "  Click on link below to download Videoarchiver\
+	LWDAQ_print $info(text) ""
+	LWDAQ_print $info(text) "  Click on link below to download Videoarchiver\
 		library zip archive."
 	$info(text) insert end "           "
 	$info(text) insert end "$info(library_archive)" "textbutton download"
 	$info(text) tag bind download <Button> Videoarchiver_download_libraries
 	$info(text) insert end "\n"
-	Videoarchiver_print {
+	LWDAQ_print $info(text) {
 After download, expand the zip archive. Move the entire Videoarchiver directory
 into the same directory as your LWDAQ installation, so the LWDAQ and
 Videoarchiver directories will be next to one another. You now have ffmpeg and
@@ -2379,34 +2378,34 @@ proc Videoarchiver_check_libraries {} {
 	set suggest 0
 	LWDAQ_print -nonewline $info(text) "Checking for Videoarchiver directory... "
 	if {![file exists $info(main_dir)]} {
-		Videoarchiver_print "FAIL."
+		LWDAQ_print $info(text) "FAIL."
 		set suggest 1
 	} else {
-		Videoarchiver_print "success."
+		LWDAQ_print $info(text) "success."
 		LWDAQ_print -nonewline $info(text) "Checking ssh utility... " 
 		catch {exec $info(ssh) -V} message
 		if {[regexp "OpenSSH" $message]} {
-			Videoarchiver_print "success."
+			LWDAQ_print $info(text) "success."
 		} else {
-			Videoarchiver_print "FAIL."
-			Videoarchiver_print "ERROR: $message"
+			LWDAQ_print $info(text) "FAIL."
+			LWDAQ_print $info(text) "ERROR: $message"
 			if {$info(os) == "Windows"} {
-				Videoarchiver_print "The ssh executable should be in\
+				LWDAQ_print $info(text)"The ssh executable should be in\
 					[file dirname $info(ssh)]."
 				set suggest 1
 			} else {
-				Videoarchiver_print "Install ssh in\
+				LWDAQ_print $info(text) "Install ssh in\
 					[file dirname $info(ssh)]."
 			}
 		}
 		LWDAQ_print -nonewline $info(text) "Checking ffmpeg utility... " 
 		catch {exec $info(ffmpeg) -h} message
 		if {[regexp "Hyper" $message]} {
-			Videoarchiver_print "success."
+			LWDAQ_print $info(text) "success."
 		} else {
-			Videoarchiver_print "FAIL."
-			Videoarchiver_print "ERROR: $message"
-			Videoarchiver_print "The ffmpeg executable should be in\
+			LWDAQ_print $info(text) "FAIL."
+			LWDAQ_print $info(text) "ERROR: $message"
+			LWDAQ_print $info(text) "The ffmpeg executable should be in\
 				[file dirname $info(ffmpeg)]."
 			set suggest 1
 		}
@@ -3088,6 +3087,7 @@ proc Videoarchiver_open {} {
 	$info(text) tag bind textbutton <Leave> {%W configure -cursor xterm} 
 
 	Videoarchiver_print "$info(name) Version $info(version)" purple
+	
 	
 	# If the camera list file exist, load it.
 	if {[file exists $config(cam_list_file)]} {
