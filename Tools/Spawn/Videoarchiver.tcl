@@ -1791,7 +1791,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 			# Close the socket.
 			LWDAQ_socket_close $sock
 		} message]} {
-			set error_description "ERROR: $message while $when for $info(cam$n\_id)."
+			set error_description "ERROR: [string trim $message]\
+				while $when for $info(cam$n\_id)."
 			Videoarchiver_print $error_description
 			LWDAQ_print $config(error_log) $error_description
 			catch {LWDAQ_socket_close $sock}
@@ -1993,7 +1994,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 				}
 				
 			} message]} {
-				set error_description "ERROR: $message while $when for $info(cam$n\_id)."
+				set error_description "ERROR: [string trim $message]\
+					while $when for $info(cam$n\_id)."
 				Videoarchiver_print $error_description
 				LWDAQ_print $config(error_log) $error_description
 				catch {LWDAQ_socket_close $sock}
@@ -2160,7 +2162,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 		}
 
 	} message]} {
-		set error_description "ERROR: $message while $when for $info(cam$n\_id)."
+		set error_description "ERROR: [string trim $message]\
+			while $when for $info(cam$n\_id)."
 		Videoarchiver_print $error_description
 		LWDAQ_print $config(error_log) $error_description
 		LWDAQ_post [list Videoarchiver_restart_recording $n]
