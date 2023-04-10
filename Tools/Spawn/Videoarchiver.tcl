@@ -210,11 +210,12 @@ echo "SUCCESS"
 		set config(display_scale) "0.5"
 	}
 	
-	# Lag thresholds and restart log.
+	# Lag thresholds and error log.
 	set config(lag_warning) "15.0"
 	set config(lag_alarm) "30.0"
 	set config(lag_reset) "40.0"
-	set config(restart_log) [file join $info(scratch_dir) restart_log.txt]
+	set config(error_log) [file join $info(scratch_dir) error_log.txt]
+	set info(previous_line) ""
 	
 	# Text window colors.
 	set config(v_col) "green"
@@ -309,6 +310,67 @@ proc Videoarchiver_segdir {n} {
 }
 
 #
+# Videoarchiver_print prints a message to the text window. If the message is an
+# error, the routine writes the error message with the current date and time
+# to the error log file.
+#
+proc Videoarchiver_print {line {color "black"}} {
+	upvar #0 Neurorecorder_config config
+	upvar #0 Neurorecorder_info info
+	
+	if {$color == "norepeat"} {
+		if {$info(previous_line) == $line} {return ""}
+		set color black
+	}
+	set info(previous_line) $line
+	
+	if {[regexp "^WARNING: " $line] || [regexp "^ERROR: " $line]} {
+		append line " ([Neurorecorder_clock_convert [clock seconds]]\)"
+		LWDAQ_print $config(error_log) "$line"
+	}
+	if {$config(verbose) \
+			|| [regexp "^WARNING: " $line] \
+			|| [regexp "^ERROR: " $line] \
+			|| ($color != "verbose")} {
+		if {$color == "verbose"} {set color black}
+		Videoarchiver_print $line $color
+	}
+	return ""
+}
+
+#
+# Videoarchiver_view_error_log opens a text window that allows us to view the 
+# error log, edit it, and save it if needed.
+#
+proc Videoarchiver_view_error_log {} {
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
+
+	set result [LWDAQ_view_text_file $config(error_log)]
+	if {[LWDAQ_is_error_result $result]} {
+		Videoarchiver_print $result
+		return ""
+	}
+	
+	return ""
+}
+
+#
+# Videoarchiver_clear_error_log clears the error log, leaving only a line
+# stating the time at which the log was cleared.
+#
+proc Videoarchiver_clear_error_log {} {
+	upvar #0 Videoarchiver_config config
+	upvar #0 Videoarchiver_info info
+
+	set f [open $config(error_log) w]
+	puts $f "Cleared restart log at [clock format [clock seconds]]."
+	close $f
+	
+	return ""
+}
+
+#
 # Videoarchiver_camera_init initializes a camera by stopping all ffmpeg and
 # tclsh processes, deleting old files, and starting up the interface process on
 # the camera. The routine determines the camera version so we can set the
@@ -346,7 +408,7 @@ proc Videoarchiver_camera_init {n} {
 		"$info(camera_login)@$ip" \
 		 $command]} message
 	if {[regexp "SUCCESS" $message]} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Initialized,\
+		Videoarchiver_print "$info(cam$n\_id) Initialized,\
 			tcpip interface started."
 	} else {
 		error $message
@@ -371,7 +433,7 @@ proc Videoarchiver_camera_init {n} {
 		} else {
 			set info(cam$n\_ver) "A3034C1"
 		}
-		LWDAQ_print $info(text) "$info(cam$n\_id)\
+		Videoarchiver_print "$info(cam$n\_id)\
 			Camera is version [set info(cam$n\_ver)]."
 		
 		# We look at the compressor.config file. If it's not present, or if the version
@@ -403,38 +465,6 @@ proc Videoarchiver_camera_init {n} {
 }
 
 #
-# Videoarchiver_view_restart_log opens a text window that allows us to view the 
-# restart log, edit it, and save it if needed.
-#
-proc Videoarchiver_view_restart_log {} {
-	upvar #0 Videoarchiver_config config
-	upvar #0 Videoarchiver_info info
-
-	set result [LWDAQ_view_text_file $config(restart_log)]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(text) $result
-		return ""
-	}
-	
-	return ""
-}
-
-#
-# Videoarchiver_clear_restart_log clears the restart log, leaving only a line
-# stating the time at which the log was cleared.
-#
-proc Videoarchiver_clear_restart_log {} {
-	upvar #0 Videoarchiver_config config
-	upvar #0 Videoarchiver_info info
-
-	set f [open $config(restart_log) w]
-	puts $f "Cleared restart log at [clock format [clock seconds]]."
-	close $f
-	
-	return ""
-}
-
-#
 # Videoarchiver_query prints the local and remote process log files.
 #
 proc Videoarchiver_query {n} {
@@ -446,7 +476,7 @@ proc Videoarchiver_query {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 	
@@ -544,7 +574,7 @@ proc Videoarchiver_query {n} {
 		LWDAQ_socket_close $sock
 	} message]} {
 		set message [regsub "ERROR: " $message ""]
-		LWDAQ_print $info(text) "ERROR: $message"
+		Videoarchiver_print "ERROR: $message"
 		catch {LWDAQ_socket_close $sock}
 		return ""	
 	}	
@@ -562,19 +592,19 @@ proc Videoarchiver_reboot {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
 	if {$info(cam$n\_state) != "Idle"} {
-		LWDAQ_print $info(text) "ERROR: Wait until $info(cam$n\_id) is Idle\
+		Videoarchiver_print "ERROR: Wait until $info(cam$n\_id) is Idle\
 			before trying a reboot."
 		return ""
 	}	
 	set info(cam$n\_state) "Reboot"
 	
-	LWDAQ_print $info(text) "\nRebooting $info(cam$n\_id)" purple
-	LWDAQ_print $info(text) "$info(cam$n\_id) Sending reboot command..."
+	Videoarchiver_print "\nRebooting $info(cam$n\_id)" purple
+	Videoarchiver_print "$info(cam$n\_id) Sending reboot command..."
 	LWDAQ_update
 	
 	catch {exec $info(ssh) \
@@ -586,10 +616,10 @@ proc Videoarchiver_reboot {n} {
 		"$info(camera_login)@$ip" \
 		 $info(reboot)} message
 	if {[regexp "SUCCESS" $message]} {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Rebooting,\
+		Videoarchiver_print "$info(cam$n\_id) Rebooting,\
 			done when lights flash three times."
 	} else {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 	}
 	
 	set info(cam$n\_state) "Idle"
@@ -611,7 +641,7 @@ proc Videoarchiver_setlamp {n color intensity} {
 		if {![string is integer -strict $intensity] \
 				|| ($intensity < [lindex $info(lamp_dac_values) 0]) \
 				|| ($intensity > [lindex $info(lamp_dac_values) end])} {
-			LWDAQ_print $info(text) "ERROR: Invalid lamp intensity \"$intensity\"."
+			Videoarchiver_print "ERROR: Invalid lamp intensity \"$intensity\"."
 		}
 		
 		# Get IP address and open an interface socket.
@@ -619,7 +649,7 @@ proc Videoarchiver_setlamp {n color intensity} {
 	
 		# Don't try to contact a non-existent camera.
 		if {$ip == $info(null_addr)} {
-			LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+			Videoarchiver_print "ERROR: No camera with list index $n."
 			return ""
 		}
 
@@ -638,14 +668,12 @@ proc Videoarchiver_setlamp {n color intensity} {
 		LWDAQ_socket_close $sock
 	
 		# Report the change, provided verbose flag is set. Set the menubutton value.
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Set $color lamps to\
-				intensity $intensity." 
-		}
+		Videoarchiver_print "$info(cam$n\_id) Set $color lamps to\
+			intensity $intensity." verbose
 		set info(cam$n\_$color) $intensity
 	} message]} {
 		catch {LWDAQ_socket_close $sock}
-		LWDAQ_print $info(text) "ERROR: $message"
+		Videoarchiver_print "ERROR: $message"
 	}
 	return ""
 }
@@ -665,7 +693,7 @@ proc Videoarchiver_cleanup {n} {
 	if {$num_old_files > 0} {
 		foreach fn $file_list {
 			if {[catch {file delete $fn} message]} {
-				LWDAQ_print $info(text) "ERROR: $message."
+				Videoarchiver_print "ERROR: $message."
 				return ""
 			}
 		}
@@ -675,8 +703,8 @@ proc Videoarchiver_cleanup {n} {
 	if {$num_old_files > 0} {
 		foreach fn $file_list {
 			if {[catch {file delete $fn} message]} {
-				LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
-				LWDAQ_print $info(text) "WARNING: Kill rogue process that\
+				Videoarchiver_print "ERROR: $info(cam$n\_id) $message."
+				Videoarchiver_print "WARNING: Kill rogue process that\
 					ownes [file tail $fn] or recording will crash."
 				return ""
 			}
@@ -701,15 +729,15 @@ proc Videoarchiver_update {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
-	LWDAQ_print $info(text) "\nUpdating Software on $info(cam$n\_id)" purple
+	Videoarchiver_print "\nUpdating Software on $info(cam$n\_id)" purple
 	if {[catch {	
 	
 		# Stop all camera activity in preparation for the update.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Stopping all activity..."
+		Videoarchiver_print "$info(cam$n\_id) Stopping all activity..."
 		LWDAQ_update
 		catch {[exec $info(ssh) \
 			-o ConnectTimeout=$config(connect_timeout_s) \
@@ -722,7 +750,7 @@ proc Videoarchiver_update {n} {
 		if {![regexp "SUCCESS" $message]} {error $message}
 		
 		# Use ssh to send a new tcpip interface script to the camera.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Updating tcpip interface script..."
+		Videoarchiver_print "$info(cam$n\_id) Updating tcpip interface script..."
 		LWDAQ_update
 		set message [exec $info(ssh) \
 			-o ConnectTimeout=$config(connect_timeout_s) \
@@ -735,7 +763,7 @@ proc Videoarchiver_update {n} {
 		if {$message != ""} {error $message}
 	
 		# Start the tcpip interface using the camera initialization command.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Starting tcpip interface..."
+		Videoarchiver_print "$info(cam$n\_id) Starting tcpip interface..."
 		LWDAQ_update
 		set command $info(camera_init)
 		set command [regsub -all {%Q} $command $info(tcl_port)]
@@ -757,7 +785,7 @@ proc Videoarchiver_update {n} {
 		set sock [LWDAQ_socket_open $ip\:$info(tcl_port) basic]
 		
 		# Make sure the test subdirectory exists.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Creating test directory..."
+		Videoarchiver_print "$info(cam$n\_id) Creating test directory..."
 		LWDAQ_socket_write $sock "mkdir test\n"
 		set result [LWDAQ_socket_read $sock line]
 		if {$result != "test"} {
@@ -777,7 +805,7 @@ proc Videoarchiver_update {n} {
 				single test/single.tcl \
 				compress test/compress.tcl \
 				colors colors.json} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Updating $fn..."
+			Videoarchiver_print "$info(cam$n\_id) Updating $fn..."
 			LWDAQ_update
 			set size [string length $info($sn\_script)]
 			LWDAQ_socket_write $sock "putfile $fn $size\n$info($sn\_script)"
@@ -802,13 +830,13 @@ proc Videoarchiver_update {n} {
 		LWDAQ_socket_close $sock
 
 		# Synchronize the clock on the camera.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Synchronizing camera clock..."
+		Videoarchiver_print "$info(cam$n\_id) Synchronizing camera clock..."
 		Videoarchiver_synchronize $n
 		
 		# Update is complete.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Update complete.\n"
+		Videoarchiver_print "$info(cam$n\_id) Update complete.\n"
 	} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message.\n"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message.\n"
 		catch {LWDAQ_socket_close $sock}
 		return ""
 	}
@@ -828,7 +856,7 @@ proc Videoarchiver_ask_ip {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
@@ -871,7 +899,7 @@ proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 
 	# If the state of the camera is not Idle, don't allow IP change.
 	if {$info(cam$n\_state) != "Idle"} {
-		LWDAQ_print $info(text) "ERROR: Wait until $info(cam$n\_id) is Idle\
+		Videoarchiver_print "ERROR: Wait until $info(cam$n\_id) is Idle\
 			before changing camera IP address."
 		return ""
 	}	
@@ -887,7 +915,7 @@ proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
@@ -896,7 +924,7 @@ proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 	if {$new_ip == ""} {set new_ip $info(new_ip_addr)}
 	if {$new_router == ""} {set new_router $info(new_router_addr)}
 	
-	LWDAQ_print $info(text) "\n$info(cam$n\_id) Setting IP address to $new_ip" purple
+	Videoarchiver_print "\n$info(cam$n\_id) Setting IP address to $new_ip" purple
 	if {[catch {	
 		# Start by checking the new IP addresses.
 		if {![regexp {([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+} $new_ip match subnet_ip]} {
@@ -907,7 +935,7 @@ proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 		}
 			
 		# Stop all camera activity in preparation for the update.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Stopping all activity..."
+		Videoarchiver_print "$info(cam$n\_id) Stopping all activity..."
 		LWDAQ_update
 		catch {[exec $info(ssh) \
 			-o ConnectTimeout=$config(connect_timeout_s) \
@@ -920,7 +948,7 @@ proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 		if {![regexp "SUCCESS" $message]} {error $message}
 		
 		# Start the tcpip interface using the camera initialization command.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Starting tcpip interface..."
+		Videoarchiver_print "$info(cam$n\_id) Starting tcpip interface..."
 		LWDAQ_update
 		set command $info(camera_init)
 		set command [regsub -all {%Q} $command $info(tcl_port)]
@@ -950,10 +978,10 @@ proc Videoarchiver_set_ip {n {new_ip ""} {new_router ""}} {
 		# Update is complete.
 		set info(cam$n\_addr) $new_ip
 		
-		LWDAQ_print $info(text) "$info(cam$n\_id) New IP address is $new_ip,\
+		Videoarchiver_print "$info(cam$n\_id) New IP address is $new_ip,\
 			new router address is $new_router, ready in a few seconds."
 	} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message."
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message."
 		catch {LWDAQ_socket_close $sock}
 		return ""
 	}
@@ -988,7 +1016,7 @@ proc Videoarchiver_stream {n} {
 		version width height framerate crf sl
 		
 	# Report what we are doing.
-	LWDAQ_print $info(text) "$info(cam$n\_id) Starting video,\
+	Videoarchiver_print "$info(cam$n\_id) Starting video,\
 		$width X $height, $framerate fps, $info(cam$n\_rot) deg,\
 		sat $info(cam$n\_sat), exp $info(cam$n\_ec)."
 	LWDAQ_update
@@ -1052,7 +1080,7 @@ proc Videoarchiver_stream {n} {
 		# Close socket.
 		LWDAQ_socket_close $sock
 	} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		catch {LWDAQ_socket_close $sock}
 		return ""
 	}
@@ -1080,7 +1108,7 @@ proc Videoarchiver_synchronize {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
@@ -1094,7 +1122,7 @@ proc Videoarchiver_synchronize {n} {
 		LWDAQ_socket_write $sock "clock milliseconds\n"
 		set camera_time_ms [LWDAQ_socket_read $sock line]
 		if {![regexp {[0-9]{13}} $camera_time_ms]} {
-			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $camera_time_ms"
+			Videoarchiver_print "ERROR: $info(cam$n\_id) $camera_time_ms"
 			catch {LWDAQ_socket_close $sock}
 			return ""
 		}
@@ -1116,19 +1144,17 @@ proc Videoarchiver_synchronize {n} {
 		# Close the socket.	
 		LWDAQ_socket_close $sock
 	} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		catch {LWDAQ_socket_close $sock}
 		return ""
 	}
 	
 	# Report.
 	if {![regexp {invalid} $result]} {
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Synchronized at time $sync_time,\
-				correcting offset of $offset_ms ms."
-		}
+		Videoarchiver_print "$info(cam$n\_id) Synchronized at time $sync_time,\
+			correcting offset of $offset_ms ms." verbose
 	} else {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $result"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $result"
 		return ""
 	}
 	
@@ -1150,13 +1176,13 @@ proc Videoarchiver_live {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
 	# Check the camera state.
 	if {$info(cam$n\_state) != "Idle"} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot provide live\
+		Videoarchiver_print "ERROR: $info(cam$n\_id) Cannot provide live\
 			image during \"$info(cam$n\_state)\"."
 		return ""
 	}
@@ -1166,14 +1192,14 @@ proc Videoarchiver_live {n} {
 	
 	# Initialize the camera.
 	if {[catch {Videoarchiver_camera_init $n} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		Videoarchiver_stop $n
 		return ""	
 	} 
 	
 	# Start streaming video from camera.
 	if {[catch {Videoarchiver_stream $n} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		Videoarchiver_stop $n
 		return ""	
 	} 
@@ -1190,7 +1216,7 @@ proc Videoarchiver_live {n} {
 		version width height framerate crf sl
 		
 	# Spawn a Videoplayer and use it to stream the incoming video.
-	LWDAQ_print $info(text) "$info(cam$n\_id) Starting live view." $config(v_col)
+	Videoarchiver_print "$info(cam$n\_id) Starting live view." $config(v_col)
 	cd $LWDAQ_Info(program_dir)
 	set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
 	set info(cam$n\_vchan) $ch
@@ -1208,7 +1234,7 @@ proc Videoarchiver_live {n} {
 		-title \"Live View From $info(cam$n\_id) $ip\""
 	while {[gets $ch message] > 0} {
 		if {[LWDAQ_is_error_result $line]} {
-			LWDAQ_print $info(text) "$message"
+			Videoarchiver_print "$message"
 		}
 		Videoarchiver_stop $n
 		return ""
@@ -1216,7 +1242,7 @@ proc Videoarchiver_live {n} {
 			
 	# We start the live video watchdog process that looks to see if the 
 	# videoplayer process has been stopped by a user closing its window. 
-	LWDAQ_print $info(text) "$info(cam$n\_id)\
+	Videoarchiver_print "$info(cam$n\_id)\
 		Starting live view watchdog." $config(v_col)
 	LWDAQ_post [list Videoarchiver_live_watchdog $n 1]
 	return ""
@@ -1239,13 +1265,13 @@ proc Videoarchiver_live_watchdog {n {first 0}} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
 	# Don't do anything if the state is not "Live".
 	if {$info(cam$n\_state) != "Live"} {
-		LWDAQ_print $info(text) "$info(cam$n\_id)\
+		Videoarchiver_print "$info(cam$n\_id)\
 			Stopped live view watchdog." $config(v_col)
 		return ""
 	} 
@@ -1263,7 +1289,7 @@ proc Videoarchiver_live_watchdog {n {first 0}} {
 	} 
 	
 	if {[catch {puts $info(cam$n\_vchan) ""}]} {
-		LWDAQ_print $info(text) "$info(cam$n\_id)\
+		Videoarchiver_print "$info(cam$n\_id)\
 			Live view has stopped running, stopping watchdog." \
 			$config(v_col)
 		Videoarchiver_stop $n
@@ -1284,7 +1310,7 @@ proc Videoarchiver_live_watchdog {n {first 0}} {
 			LWDAQ_socket_close $sock
 		} message]} {
 			catch {LWDAQ_socket_close $sock}
-			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message\."
+			Videoarchiver_print "ERROR: $info(cam$n\_id) $message\."
 			Videoarchiver_stop $n
 			return ""
 		}
@@ -1310,7 +1336,7 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
@@ -1319,7 +1345,7 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 
 		# Check we are recording.
 		if {$info(cam$n\_state) != "Record"} {
-			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot start recording\
+			Videoarchiver_print "ERROR: $info(cam$n\_id) Cannot start recording\
 				view during \"$info(cam$n\_state)\"."
 			return ""
 		}
@@ -1330,7 +1356,7 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 			catch {puts $info(cam$n\_vchan) "exit"}
 			catch {close $info(cam$n\_vchan)}
 			LWDAQ_process_stop $info(cam$n\_vpid)
-			LWDAQ_print $info(text) "$info(cam$n\_id)\
+			Videoarchiver_print "$info(cam$n\_id)\
 				Stopped pre-existing monitor view, starting another." $config(v_col)
 		}
 		
@@ -1346,7 +1372,7 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 		# normal so the view will catch up with recording. We allow for scaling
 		# of the view, and we tell the viewer the correct dimensions of the
 		# video and its framerate.
-		LWDAQ_print $info(text) "$info(cam$n\_id) Starting recording view." $config(v_col)
+		Videoarchiver_print "$info(cam$n\_id) Starting recording view." $config(v_col)
 		cd $LWDAQ_Info(program_dir)
 		set ch [open "| ./lwdaq --quiet --gui --no-prompt" w+]
 		fconfigure $ch -translation auto -buffering line -blocking 0
@@ -1368,7 +1394,7 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 		# Check to see if the Videoplayer returned any errors.
 		while {[gets $ch message] > 0} {
 			if {[LWDAQ_is_error_result $line]} {
-				LWDAQ_print $info(text) "$message"
+				Videoarchiver_print "$message"
 			}
 			return ""
 		}
@@ -1378,33 +1404,33 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 			catch {puts $info(cam$n\_vchan) "exit"}
 			catch {close $info(cam$n\_vchan)}
 			LWDAQ_process_stop $info(cam$n\_vpid)
-			LWDAQ_print $info(text) "$info(cam$n\_id)\
+			Videoarchiver_print "$info(cam$n\_id)\
 				Stopped monitor view." $config(v_col)
 		}
 		set info(cam$n\_vchan) "none"
 		set info(cam$n\_vpid) "0"
 	} elseif {$command == "Add"} {
 		if {[clock seconds] - $info(monitor_start) > $config(monitor_longevity)} {
-			LWDAQ_print $info(text) "Closing recording view automatically after\
+			Videoarchiver_print "Closing recording view automatically after\
 				$config(monitor_longevity) s." $config(v_col)
 			LWDAQ_post [list Videoarchiver_monitor $n "Stop"]
 			return "" 
 		}
 		if {[catch {
 			while {[gets $info(cam$n\_vchan) result] > 0} {
-				LWDAQ_print $info(text) $result orange
+				Videoarchiver_print $result orange
 			}
 			if {$fn != ""} {
 				puts $info(cam$n\_vchan) "videoplayer play -file $fn -start 0 -end *"
 			}
 		} message]} {
-			LWDAQ_print $info(text) "$info(cam$n\_id) Recording view has been closed." \
+			Videoarchiver_print "$info(cam$n\_id) Recording view has been closed." \
 				$config(v_col)
 			LWDAQ_post [list Videoarchiver_monitor $n "Stop"]
 			return "" 
 		}		
 	} else {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Unknown recording view\
+		Videoarchiver_print "ERROR: $info(cam$n\_id) Unknown recording view\
 			command \"$command\"." $config(v_col)
 		return ""
 	}
@@ -1423,7 +1449,7 @@ proc Videoarchiver_compress {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
@@ -1456,10 +1482,10 @@ proc Videoarchiver_compress {n} {
 
 		# Close socket and report.
 		LWDAQ_socket_close $sock
-		LWDAQ_print $info(text) "$info(cam$n\_id) Started compression manager\
+		Videoarchiver_print "$info(cam$n\_id) Started compression manager\
 			on camera with crf $crf."
 	} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		catch {LWDAQ_socket_close $sock}
 		return ""
 	}
@@ -1479,7 +1505,7 @@ proc Videoarchiver_segment {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
@@ -1519,10 +1545,10 @@ proc Videoarchiver_segment {n} {
 
 		# Close socket and report.
 		LWDAQ_socket_close $sock
-		LWDAQ_print $info(text) "$info(cam$n\_id) Started segmentation process\
+		Videoarchiver_print "$info(cam$n\_id) Started segmentation process\
 			on camera with segment length $config(seg_length_s) s."
 	} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		catch {LWDAQ_socket_close $sock}
 		return ""
 	}
@@ -1546,7 +1572,7 @@ proc Videoarchiver_record {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 	
@@ -1565,11 +1591,11 @@ proc Videoarchiver_record {n} {
 		set info(cam$n\_dir) [file join $config(recording_dir) $info(cam$n\_id)]
 		if {![file exists $info(cam$n\_dir)]} {
 			file mkdir $info(cam$n\_dir)
-			LWDAQ_print $info(text) "$info(cam$n\_id) Created directory \
+			Videoarchiver_print "$info(cam$n\_id) Created directory \
 				$info(cam$n\_dir) for video files."
 		} 
 	} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message ."
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message ."
 		return ""	
 	}
 
@@ -1580,40 +1606,40 @@ proc Videoarchiver_record {n} {
 
 	# Initialize the camera.
 	if {[catch {Videoarchiver_camera_init $n} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		return ""	
 	} 
 	
 	# Start streaming video on the camera as well as the interface process.
 	if {[catch {Videoarchiver_stream $n} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		return ""	
 	} 
 	
 	# Synchronize the camera clock. The segments will be timestamped on the camera, 
 	# so the remote clock must be accurate. We synchronize it now, and periodically
 	# in the transfer process.
-	LWDAQ_print $info(text) "$info(cam$n\_id) Synchronizing camera clock."
+	Videoarchiver_print "$info(cam$n\_id) Synchronizing camera clock."
 	if {[Videoarchiver_synchronize $n] == "ERROR"} {
 		return ""
 	}
 
 	# Start compression on the camera.
 	if {[catch {Videoarchiver_compress $n} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		Videoarchiver_stop $n
 		return ""	
 	} 
 	
 	# Start the segmentation on the camera.
 	if {[catch {Videoarchiver_segment $n} message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) $message"
+		Videoarchiver_print "ERROR: $info(cam$n\_id) $message"
 		Videoarchiver_stop $n
 		return ""	
 	} 
 
 	# Start transfer of files from camera with concatination.
-	LWDAQ_print $info(text) "$info(cam$n\_id) Starting remote transfer process\
+	Videoarchiver_print "$info(cam$n\_id) Starting remote transfer process\
 		 with period $config(transfer_period_s) s." 
 	LWDAQ_post [list Videoarchiver_transfer $n 1]
 
@@ -1633,7 +1659,7 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 	
 	# Don't try to contact a non-existent camera.
 	if {[lsearch $info(cam_list) $n] < 0} {
-		LWDAQ_print $info(text) "ERROR: No camera with index $n to restart."
+		Videoarchiver_print "ERROR: No camera with index $n to restart."
 		return ""
 	}
 
@@ -1657,10 +1683,10 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 	# time and write a message to the screen and the restart log.
 	if {$start_time == ""} {
 		set start_time [clock seconds]
-		LWDAQ_print $info(text) "$info(cam$n\_id) Will try to restart recording every\
-			$config(restart_wait_s) seconds."
-		LWDAQ_print $config(restart_log) \
+		LWDAQ_print $config(error_log) \
 			"$info(cam$n\_id) Recording stalled at [clock format $start_time]."
+		Videoarchiver_print "$info(cam$n\_id) Recording stalled,\
+			will try to restart every $config(restart_wait_s) seconds."
 	}
 
 	# If restart_wait_s seconds have not yet passed since start time, post the
@@ -1674,8 +1700,7 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 	# To re-start, we stop the camera and then try to start recording using
 	# existing routines that catch their own errors and return the ERROR word
 	# when they fail. 
-	LWDAQ_print $info(text) "$info(cam$n\_id) Trying to re-start\
-		video recording after fatal error."
+	Videoarchiver_print "$info(cam$n\_id) Trying to re-start recording after fatal error."
 	set result [Videoarchiver_record $n]
 	
 	# If the recording process returned an error, we try again later.
@@ -1686,7 +1711,9 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 	}
 	
 	# If we get here, we were successful. Note the time we re-started recording
-	LWDAQ_print $config(restart_log) \
+	Videoarchiver_print \
+		"$info(cam$n\_id) Recording restarted at [clock format [clock seconds]]."
+	LWDAQ_print $config(error_log) \
 		"$info(cam$n\_id) Recording restarted at [clock format [clock seconds]]."
 	return ""
 }
@@ -1721,7 +1748,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 
@@ -1761,8 +1788,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 			LWDAQ_socket_close $sock
 		} message]} {
 			set error_description "ERROR: $message while $when for $info(cam$n\_id)."
-			LWDAQ_print $info(text) $error_description
-			LWDAQ_print $config(restart_log) $error_description
+			Videoarchiver_print $error_description
+			LWDAQ_print $config(error_log) $error_description
 			catch {LWDAQ_socket_close $sock}
 			LWDAQ_post [list Videoarchiver_restart_recording $n]
 			return ""
@@ -1872,12 +1899,10 @@ proc Videoarchiver_transfer {n {init 0}} {
 					}
 				
 					# If verbose, report to text window.
-					if {$config(verbose)} {
-						LWDAQ_print $info(text) "$info(cam$n\_id)\
-							Downloaded $sf in $download_ms ms,\
-							[format %.1f [expr 0.001*$size]] kByte, $duration s,\
-							lag $lag s, $freq GHz, $temp C."
-					}				
+					Videoarchiver_print "$info(cam$n\_id)\
+						Downloaded $sf in $download_ms ms,\
+						[format %.1f [expr 0.001*$size]] kByte, $duration s,\
+						lag $lag s, $freq GHz, $temp C." verbose
 
 					# If a segment is too short, we append the blank video to
 					# the end, then extract a segment-length video from the
@@ -1901,12 +1926,10 @@ proc Videoarchiver_transfer {n {init 0}} {
 							-i Long_$sf -c copy Lengthened_$sf > transfer_log.txt
 						file delete Long_$sf
 						file rename Lengthened_$sf $sf
-						if {$config(verbose)} {
-							LWDAQ_print $info(text) "$info(cam$n\_id)\
-								Extended segment $sf duration from\
-								$duration s to [format %.2f $config(seg_length_s)] s,\
-								in [expr [clock milliseconds] - $st] ms."
-						}
+						Videoarchiver_print "$info(cam$n\_id)\
+							Extended segment $sf duration from\
+							$duration s to [format %.2f $config(seg_length_s)] s,\
+							in [expr [clock milliseconds] - $st] ms."
 					} 
 
 					# If a segment is too long, we extract the correct length and
@@ -1918,12 +1941,10 @@ proc Videoarchiver_transfer {n {init 0}} {
 							-i $sf -c copy Shortened_$sf > transfer_log.txt
 						file delete $sf
 						file rename Shortened_$sf $sf
-						if {$config(verbose)} {
-							LWDAQ_print $info(text) "$info(cam$n\_id)\
-								Shortened segment $sf duration from\
-								$duration s to [format %.2f $config(seg_length_s)] s,\
-								in [expr [clock milliseconds] - $st] ms."
-						}
+						Videoarchiver_print "$info(cam$n\_id)\
+							Shortened segment $sf duration from\
+							$duration s to [format %.2f $config(seg_length_s)] s,\
+							in [expr [clock milliseconds] - $st] ms."
 					}	
 				}
 				
@@ -1937,13 +1958,11 @@ proc Videoarchiver_transfer {n {init 0}} {
 					foreach sf $seg_list {
 						Videoarchiver_monitor $n Add $sf
 					}
-					if {$config(verbose)} {
-						regexp {V([0-9]{10})} [lindex $seg_list 0] match tfirst
-						set tnow [clock seconds]
-						LWDAQ_print $info(text) "$info(cam$n\_id)\
-							Added [llength $seg_list] segments to monitor playlist,\
-							monitor lagging by [expr $tnow-$tfirst+1] s."
-					}
+					regexp {V([0-9]{10})} [lindex $seg_list 0] match tfirst
+					set tnow [clock seconds]
+					Videoarchiver_print "$info(cam$n\_id)\
+						Added [llength $seg_list] segments to monitor playlist,\
+						monitor lagging by [expr $tnow-$tfirst+1] s."
 				}
 				
 				# Check the lag and set the lag label accordingly.
@@ -1955,7 +1974,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 					} elseif {$lag > $config(lag_alarm)} {
 						LWDAQ_set_fg $info(cam$n\_laglabel) red
 						if {$config(verbose)} {
-							LWDAQ_print $info(text) "WARNING: Turning off verbose\
+							Videoarchiver_print "WARNING: Turning off verbose\
 								reporting in an effort to reduce camera lag."
 							set config(verbose) 0
 						}
@@ -1971,8 +1990,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 				
 			} message]} {
 				set error_description "ERROR: $message while $when for $info(cam$n\_id)."
-				LWDAQ_print $info(text) $error_description
-				LWDAQ_print $config(restart_log) $error_description
+				Videoarchiver_print $error_description
+				LWDAQ_print $config(error_log) $error_description
 				catch {LWDAQ_socket_close $sock}
 				LWDAQ_post [list Videoarchiver_restart_recording $n]
 				return ""
@@ -2014,11 +2033,9 @@ proc Videoarchiver_transfer {n {init 0}} {
 			# segment.
 			if {![file exists $fname]} {			
 				set when "creating recording file"
-				if {$config(verbose)} {
-					LWDAQ_print $info(text) "$info(cam$n\_id)\
-						Creating [file tail $fname],\
-						start [clock format $info(cam$n\_ftime)]."
-				}
+				Videoarchiver_print "$info(cam$n\_id)\
+					Creating [file tail $fname],\
+					start [clock format $info(cam$n\_ftime)]." verbose
 				file rename [lindex $seg_list 0] $fname
 				set info(cam$n\_fsegs) 1
 				
@@ -2077,10 +2094,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 				# more at this point.
 				set num_segments [llength $transfer_segments]
 				if {$num_segments > 0} {
-					if {$config(verbose)} {
-						LWDAQ_print $info(text) "$info(cam$n\_id) Adding $num_segments\
-							segments to [file tail $fname]."
-					}
+					Videoarchiver_print "$info(cam$n\_id) Adding $num_segments\
+						segments to [file tail $fname]." verbose
 	
 					# We take this opportunity to remove excess lines from the
 					# text window.
@@ -2142,8 +2157,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 
 	} message]} {
 		set error_description "ERROR: $message while $when for $info(cam$n\_id)."
-		LWDAQ_print $info(text) $error_description
-		LWDAQ_print $config(restart_log) $error_description
+		Videoarchiver_print $error_description
+		LWDAQ_print $config(error_log) $error_description
 		LWDAQ_post [list Videoarchiver_restart_recording $n]
 		catch {file delete $tempfile}
 		return ""
@@ -2158,7 +2173,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 		LWDAQ_post [list Videoarchiver_transfer $n $init]
 		return ""
 	} else {
-		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped remote\
+		Videoarchiver_print "$info(cam$n\_id) Stopped remote\
 			transfer process." 
 		return ""
 	}	
@@ -2176,7 +2191,7 @@ proc Videoarchiver_stop {n} {
 	
 	# Exit if the camera does not exist.
 	if {$index < 0} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 	
@@ -2196,11 +2211,11 @@ proc Videoarchiver_stop {n} {
 		catch {puts $info(cam$n\_vchan) "videoplayer stop"}
 		catch {puts $info(cam$n\_vchan) "exit"}
 		catch {close $info(cam$n\_vchan)}
-		LWDAQ_print $info(text) "$info(cam$n\_id) Stopped live view." $config(v_col)
+		Videoarchiver_print "$info(cam$n\_id) Stopped live view." $config(v_col)
 	}
 	LWDAQ_process_stop $info(cam$n\_vpid)
 	
-	LWDAQ_print $info(text) "$info(cam$n\_id) Stopping streaming, segmentation,\
+	Videoarchiver_print "$info(cam$n\_id) Stopping streaming, segmentation,\
 		and compression."
 	LWDAQ_update
 	cd $info(main_dir)
@@ -2214,7 +2229,7 @@ proc Videoarchiver_stop {n} {
 		"$info(camera_login)@$ip" \
 		$info(stop)]} message
 	if {![regexp "SUCCESS" $message]} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id)\
+		Videoarchiver_print "ERROR: $info(cam$n\_id)\
 			Failed to connect to $ip with ssh."
 	}
 	
@@ -2260,12 +2275,12 @@ proc Videoarchiver_killall {ip} {
 	if {$info(os) == "Windows"} {
 		catch {eval exec [auto_execok taskkill] /IM ffmpeg.exe /F} message
 		if {[regexp "SUCCESS" $message]} {
-			LWDAQ_print $info(text) "Stopped additional ffmpeg processes." 
+			Videoarchiver_print "Stopped additional ffmpeg processes." 
 		}
 	} else {
 		catch {eval exec [auto_execok killall] -9 ffmpeg} message
 		if {$message == ""} {
-			LWDAQ_print $info(text) "Stopped additional ffmpeg processes." 
+			Videoarchiver_print "Stopped additional ffmpeg processes." 
 		}
 	}
 	return ""
@@ -2291,7 +2306,7 @@ proc Videoarchiver_directory {{post 1}} {
 	# currently recording or even stalled.
 	foreach n $info(cam_list) {
 		if {($info(cam$n\_state) == "Record") || ($info(cam$n\_state) == "Stalled")} {
-			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot change recording\
+			Videoarchiver_print "ERROR: $info(cam$n\_id) Cannot change recording\
 				directory during \"$info(cam$n\_state)\"."
 			return ""
 		}
@@ -2302,7 +2317,7 @@ proc Videoarchiver_directory {{post 1}} {
 	# error message.
 	set dn [LWDAQ_get_dir_name $config(recording_dir)]
 	if {![file exists $dn]} {
-		LWDAQ_print $info(text) "ERROR: Proposed recording directory \"$dn\"\
+		Videoarchiver_print "ERROR: Proposed recording directory \"$dn\"\
 			does not exist."
 		return ""
 	} else {
@@ -2324,7 +2339,7 @@ proc Videoarchiver_download_libraries {} {
 
 	set result [LWDAQ_url_open $info(library_archive)]
 	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(text) $result
+		Videoarchiver_print $result
 	}
 	return ""
 }
@@ -2337,14 +2352,14 @@ proc Videoarchiver_suggest_download {} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 
-	LWDAQ_print $info(text) ""
-	LWDAQ_print $info(text) "  Click on link below to download Videoarchiver\
+	Videoarchiver_print ""
+	Videoarchiver_print "  Click on link below to download Videoarchiver\
 		library zip archive."
 	$info(text) insert end "           "
 	$info(text) insert end "$info(library_archive)" "textbutton download"
 	$info(text) tag bind download <Button> Videoarchiver_download_libraries
 	$info(text) insert end "\n"
-	LWDAQ_print $info(text) {
+	Videoarchiver_print {
 After download, expand the zip archive. Move the entire Videoarchiver directory
 into the same directory as your LWDAQ installation, so the LWDAQ and
 Videoarchiver directories will be next to one another. You now have ffmpeg and
@@ -2364,34 +2379,34 @@ proc Videoarchiver_check_libraries {} {
 	set suggest 0
 	LWDAQ_print -nonewline $info(text) "Checking for Videoarchiver directory... "
 	if {![file exists $info(main_dir)]} {
-		LWDAQ_print $info(text) "FAIL."
+		Videoarchiver_print "FAIL."
 		set suggest 1
 	} else {
-		LWDAQ_print $info(text) "success."
+		Videoarchiver_print "success."
 		LWDAQ_print -nonewline $info(text) "Checking ssh utility... " 
 		catch {exec $info(ssh) -V} message
 		if {[regexp "OpenSSH" $message]} {
-			LWDAQ_print $info(text) "success."
+			Videoarchiver_print "success."
 		} else {
-			LWDAQ_print $info(text) "FAIL."
-			LWDAQ_print $info(text) "ERROR: $message"
+			Videoarchiver_print "FAIL."
+			Videoarchiver_print "ERROR: $message"
 			if {$info(os) == "Windows"} {
-				LWDAQ_print $info(text) "The ssh executable should be in\
+				Videoarchiver_print "The ssh executable should be in\
 					[file dirname $info(ssh)]."
 				set suggest 1
 			} else {
-				LWDAQ_print $info(text) "Install ssh in\
+				Videoarchiver_print "Install ssh in\
 					[file dirname $info(ssh)]."
 			}
 		}
 		LWDAQ_print -nonewline $info(text) "Checking ffmpeg utility... " 
 		catch {exec $info(ffmpeg) -h} message
 		if {[regexp "Hyper" $message]} {
-			LWDAQ_print $info(text) "success."
+			Videoarchiver_print "success."
 		} else {
-			LWDAQ_print $info(text) "FAIL."
-			LWDAQ_print $info(text) "ERROR: $message"
-			LWDAQ_print $info(text) "The ffmpeg executable should be in\
+			Videoarchiver_print "FAIL."
+			Videoarchiver_print "ERROR: $message"
+			Videoarchiver_print "The ffmpeg executable should be in\
 				[file dirname $info(ffmpeg)]."
 			set suggest 1
 		}
@@ -2430,7 +2445,7 @@ proc Videoarchiver_view {n} {
 
 	# Don't try to contact a non-existent camera.
 	if {$ip == $info(null_addr)} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 	
@@ -2439,7 +2454,7 @@ proc Videoarchiver_view {n} {
 		"Record" {LWDAQ_post "Videoarchiver_monitor $n" front}
 		"Live" {return ""}
 		default {
-			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id)\
+			Videoarchiver_print "ERROR: $info(cam$n\_id)\
 				Cannot view during \"$info(cam$n\_state)\"."
 			return ""
 		}
@@ -2472,7 +2487,6 @@ proc Videoarchiver_draw_list {} {
 			set info(cam$n\_state) "Idle"
 			set info(cam$n\_vchan) "none"
 			set info(cam$n\_vpid) "0"
-			set info(cam$n\_rstart) "0"
 			set info(cam$n\_prevseg) "V0000000000.mp4"
 			set info(cam$n\_white) "0"
 			set info(cam$n\_infrared) "0"
@@ -2589,7 +2603,7 @@ proc Videoarchiver_ask_remove {n} {
 	
 	# Exit if the camera does not exist.
 	if {$index < 0} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 	
@@ -2627,13 +2641,13 @@ proc Videoarchiver_remove {n} {
 
 	# Exit if the camera does not exist.
 	if {$index < 0} {
-		LWDAQ_print $info(text) "ERROR: No camera with list index $n."
+		Videoarchiver_print "ERROR: No camera with list index $n."
 		return ""
 	}
 	
 	# Check the state of the camera.
 	if {$info(cam$n\_state) != "Idle"} {
-		LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Wait until Idle\
+		Videoarchiver_print "ERROR: $info(cam$n\_id) Wait until Idle\
 			before removing camera from list."
 		return ""
 	}
@@ -2650,7 +2664,6 @@ proc Videoarchiver_remove {n} {
 		unset info(cam$n\_state)
 		unset info(cam$n\_vchan)
 		unset info(cam$n\_vpid)
-		unset info(cam$n\_rstart)
 		unset info(cam$n\_prevseg)
 		unset info(cam$n\_white)
 		unset info(cam$n\_infrared)
@@ -2691,7 +2704,6 @@ proc Videoarchiver_add_camera {} {
 	set info(cam$n\_state) "Idle"
 	set info(cam$n\_vchan) "none"
 	set info(cam$n\_vpid) "0"
-	set info(cam$n\_rstart) "0"
 	set info(cam$n\_prevseg) "V0000000000.mp4"
 	set info(cam$n\_white) "0"
 	set info(cam$n\_infrared) "0"
@@ -2746,7 +2758,7 @@ proc Videoarchiver_load_list {{fn ""}} {
 	# We won't load a new list so long as even one camera is not idle.
 	foreach n $info(cam_list) {
 		if {$info(cam$n\_state) != "Idle"} {
-			LWDAQ_print $info(text) "ERROR: $info(cam$n\_id) Cannot load new camera\
+			Videoarchiver_print "ERROR: $info(cam$n\_id) Cannot load new camera\
 				list during \"$info(cam$n\_state)\"."
 			return ""
 		}
@@ -2771,7 +2783,7 @@ proc Videoarchiver_load_list {{fn ""}} {
 			set info(cam$n\_lag) "?"
 		}
 	} error_message]} {
-		LWDAQ_print $info(text) "ERROR: $error_message."
+		Videoarchiver_print "ERROR: $error_message."
 		return
 	}
 	
@@ -2793,10 +2805,10 @@ proc Videoarchiver_configure {} {
 	# of a frame widget into which we can put more buttons.
 	set f [LWDAQ_tool_configure $info(name) 2]
 	
-	# Routines to view and clear the restart log. We make sure they run
+	# Routines to view and clear the error log. We make sure they run
 	# in the LWDAQ event queue so we don't get a file access conflict
 	# with the recording processes.
-	foreach a {View_Restart_Log Clear_Restart_Log} {
+	foreach a {View_Error_Log Clear_Error_Log} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Videoarchiver_$b"
 		pack $f.$b -side top -expand 1
@@ -2816,7 +2828,7 @@ proc Videoarchiver_lamps_adjust {color intensity {step "1"} {previous "0"}} {
 	upvar #0 Videoarchiver_info info
 	
 	if {$previous == 0} {
-		LWDAQ_print $info(text) "Started adjustment of $color lamps to intensity\
+		Videoarchiver_print "Started adjustment of $color lamps to intensity\
 			$intensity with step $step s at\
 			[clock format [clock seconds] -format $config(datetime_format)]."
 	}
@@ -2841,7 +2853,7 @@ proc Videoarchiver_lamps_adjust {color intensity {step "1"} {previous "0"}} {
 				$color $intensity $step [clock seconds]]
 			return ""
 		} else {
-			LWDAQ_print $info(text) "Completed adjustment of $color lamps to intensity\
+			Videoarchiver_print "Completed adjustment of $color lamps to intensity\
 				$intensity at [clock format [clock seconds] \
 				-format $config(datetime_format)]."
 			return ""
@@ -2990,7 +3002,7 @@ proc Videoarchiver_schedule_start {} {
 		LWDAQ_schedule_task $a $schedule \
 			"Videoarchiver_lamps_adjust [regsub {_.*} $a ""]\
 				$info($a\_int) $info($a\_step)"
-		LWDAQ_print $info(text) "Scheduled task $a\
+		Videoarchiver_print "Scheduled task $a\
 			with schedule \"$schedule\"\
 			intensity $info($a\_int)\
 			and step interval $info($a\_step) s."
@@ -3013,7 +3025,7 @@ proc Videoarchiver_schedule_stop {} {
 	LWDAQ_unschedule_task "infrared_off"
 	LWDAQ_queue_clear "Videoarchiver_lamps_*"
 	set info(scheduler_state) "Stop"
-	LWDAQ_print $info(text) "Unscheduled all tasks, aborted all tasks,\
+	Videoarchiver_print "Unscheduled all tasks, aborted all tasks,\
 		aborted tasks remain incomplete."
 	return ""
 }
@@ -3075,7 +3087,7 @@ proc Videoarchiver_open {} {
 	$info(text) tag bind textbutton <Enter> {%W configure -cursor arrow} 
 	$info(text) tag bind textbutton <Leave> {%W configure -cursor xterm} 
 
-	LWDAQ_print $info(text) "$info(name) Version $info(version)" purple
+	Videoarchiver_print "$info(name) Version $info(version)" purple
 	
 	# If the camera list file exist, load it.
 	if {[file exists $config(cam_list_file)]} {
