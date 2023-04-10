@@ -346,6 +346,11 @@ proc Videoarchiver_view_error_log {} {
 	upvar #0 Videoarchiver_config config
 	upvar #0 Videoarchiver_info info
 
+	if {![file exists $config(error_log)]} {
+		set f [open $config(error_log) w]
+		puts $f "Videoarchiver Error Log, Created [clock format [clock seconds]]."
+		close $f
+	}
 	set result [LWDAQ_view_text_file $config(error_log)]
 	if {[LWDAQ_is_error_result $result]} {
 		Videoarchiver_print $result
@@ -364,7 +369,7 @@ proc Videoarchiver_clear_error_log {} {
 	upvar #0 Videoarchiver_info info
 
 	set f [open $config(error_log) w]
-	puts $f "Cleared restart log at [clock format [clock seconds]]."
+	puts $f "Videoarchiver Error Log, Cleared [clock format [clock seconds]]."
 	close $f
 	
 	return ""
@@ -1642,7 +1647,7 @@ proc Videoarchiver_record {n} {
 		 with period $config(transfer_period_s) s." 
 	LWDAQ_post [list Videoarchiver_transfer $n 1]
 
-	# We can now say that we are recording, and return a success flag.
+	# We can now say that we are recording.
 	set info(cam$n\_state) "Record"	
 	return ""
 }
@@ -1702,8 +1707,8 @@ proc Videoarchiver_restart_recording {n {start_time ""}} {
 	Videoarchiver_print "$info(cam$n\_id) Trying to re-start recording after fatal error."
 	set result [Videoarchiver_record $n]
 	
-	# If the recording process returned an error, we try again later.
-	if {$result == "ERROR"} {
+	# If recording has not started, we will try to restart again soon.
+	if {$info(cam$n\_state) != "Record"} {
 		set info(cam$n\_state) "Stalled"
 		LWDAQ_post [list Videoarchiver_restart_recording $n [clock seconds]]
 		return ""
