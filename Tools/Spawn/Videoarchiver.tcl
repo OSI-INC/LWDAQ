@@ -1917,6 +1917,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 					# extraction by two frames. The result is a segment of the
 					# correct length.
 					if {$duration < $config(seg_length_s)*$config(min_seg_frac)} {
+						set when "padding segment"
 						set st [clock milliseconds]
 						set ifl [open transfer_list.txt w]
 						puts $ifl "file $sf"
@@ -1940,6 +1941,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 					# If a segment is too long, we extract the correct length and
 					# use this to replace the original segment.
 					if {$duration > $config(seg_length_s)/$config(min_seg_frac)} {
+						set when "clipping segment"
 						set st [clock milliseconds]
 						set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
 						exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
@@ -1954,6 +1956,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 				}
 				
 				# Close the socket.
+				set when "closing socket"
 				LWDAQ_socket_close $sock
 
 				# If the recording monitor is running for this channel, load the
