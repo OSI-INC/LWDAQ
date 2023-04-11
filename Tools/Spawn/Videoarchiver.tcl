@@ -1941,6 +1941,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 							set message [string trim [regsub -all {\n+} $message " "]]
 							set error_description "ERROR: $message while\
 								padding segment for $info(cam$n\_id)."
+							Videoarchiver_print $error_description
 						}
 					} 
 
