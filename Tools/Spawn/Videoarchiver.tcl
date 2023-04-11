@@ -1922,19 +1922,26 @@ proc Videoarchiver_transfer {n {init 0}} {
 						puts $ifl "file $sf"
 						puts $ifl "file Blank.mp4"
 						close $ifl
-						exec $info(ffmpeg) -nostdin -loglevel error \
-							-f concat -safe 0 -i transfer_list.txt -c copy \
-							Long_$sf > transfer_log.txt
-						file delete $sf
-						set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
-						exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
-							-i Long_$sf -c copy Lengthened_$sf > transfer_log.txt
-						file delete Long_$sf
-						file rename Lengthened_$sf $sf
-						Videoarchiver_print "$info(cam$n\_id)\
-							Extended segment $sf duration from\
-							$duration s to [format %.2f $config(seg_length_s)] s,\
-							in [expr [clock milliseconds] - $st] ms."
+						if {[catch {
+							exec $info(ffmpeg) -nostdin -loglevel error \
+								-f concat -safe 0 -i transfer_list.txt -c copy \
+								Long_$sf > transfer_log.txt
+							set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
+							catch {file delete Lengthened_$sf}
+							exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
+								-i Long_$sf -c copy Lengthened_$sf > transfer_log.txt
+							file delete $sf
+							file delete Long_$sf
+							file rename Lengthened_$sf $sf
+							Videoarchiver_print "$info(cam$n\_id)\
+								Extended segment $sf duration from\
+								$duration s to [format %.2f $config(seg_length_s)] s,\
+								in [expr [clock milliseconds] - $st] ms." verbose
+						} message]} {
+							set message [string trim [regsub -all {\n+} $message " "]]
+							set error_description "ERROR: $message while\
+								padding segment for $info(cam$n\_id)."
+						}
 					} 
 
 					# If a segment is too long, we extract the correct length and
@@ -1950,7 +1957,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 						Videoarchiver_print "$info(cam$n\_id)\
 							Shortened segment $sf duration from\
 							$duration s to [format %.2f $config(seg_length_s)] s,\
-							in [expr [clock milliseconds] - $st] ms."
+							in [expr [clock milliseconds] - $st] ms." verbose
 					}	
 				}
 				
@@ -2188,8 +2195,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 		LWDAQ_post [list Videoarchiver_transfer $n $init]
 		return ""
 	} else {
-		Videoarchiver_print "$info(cam$n\_id) Stopped remote\
-			transfer process." 
+		Videoarchiver_print "$info(cam$n\_id) Stopped remote transfer process." 
 		return ""
 	}	
 }
