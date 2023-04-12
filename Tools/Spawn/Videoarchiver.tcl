@@ -1935,10 +1935,10 @@ proc Videoarchiver_transfer {n {init 0}} {
 								$duration s to [format %.2f $config(seg_length_s)] s,\
 								in [expr [clock milliseconds] - $st] ms." verbose
 						} message]} {
+							Videoarchiver_print "WARNING: Attempt to pad $sf\
+								failed for $info(cam$n\_id)."
 							set message [string trim [regsub -all {\n+} $message " "]]
-							set error_description "WARNING: $message while\
-								padding $sf for $info(cam$n\_id)."
-							Videoarchiver_print $error_description
+							LWDAQ_print $config(error_log) "DETAIL: $message"
 						} else {
 							file delete $sf
 							file rename Extended.mp4 $sf
@@ -1978,7 +1978,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 					set tnow [clock seconds]
 					Videoarchiver_print "$info(cam$n\_id)\
 						Added [llength $seg_list] segments to monitor playlist,\
-						monitor lagging by [expr $tnow-$tfirst+1] s."
+						monitor lagging by [expr $tnow-$tfirst+1] s." verbose
 				}
 				
 				# Check the lag and set the lag label accordingly.
@@ -2833,7 +2833,7 @@ proc Videoarchiver_configure {} {
 	# with the recording processes.
 	foreach a {View_Error_Log Clear_Error_Log} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post Videoarchiver_$b"
+		button $f.$b -text $a -command "LWDAQ_post Videoarchiver_$b front"
 		pack $f.$b -side top -expand 1
 	}
 	
