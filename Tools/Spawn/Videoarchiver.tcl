@@ -1832,7 +1832,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 				foreach sf $seg_list {
 					# Download the segment.
 					set start_ms [clock milliseconds]
-					set when "downloading $sf"
+					set when "downloading segment"
 					LWDAQ_socket_write $sock "getfile tmp/$sf\n"
 					set size [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $size]} {error $size}
@@ -1840,7 +1840,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 					set download_ms [expr [clock milliseconds] - $start_ms]
 
 					# Delete the original segment file.
-					set when "deleting original $sf"
+					set when "deleting original"
 					LWDAQ_socket_write $sock "file delete tmp/$sf\n"
 					set result [LWDAQ_socket_read $sock line]
 					if {[LWDAQ_is_error_result $result]} {error $result}
@@ -1874,7 +1874,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 					}
 					
 					# Write the segment to disk.
-					set when "saving $sf to disk"
+					set when "saving segment"
 					set f [open $sf w]
 					fconfigure $f -translation binary
 					puts -nonewline $f $contents
@@ -1893,9 +1893,8 @@ proc Videoarchiver_transfer {n {init 0}} {
 					}
 					
 					# Calculate the time lag between the current time and the
-					# timestamp of the last segment we downloaded and saved.
-					set when "reporting"
-					set sf [lindex $seg_list end]
+					# timestamp of the segment we just downloaded and saved.
+					set when "calculating lag"
 					if {[regexp {V([0-9]{10})} $sf match timestamp]} {
 						set lag [expr [clock seconds] - $timestamp]
 					} else {
@@ -1922,28 +1921,20 @@ proc Videoarchiver_transfer {n {init 0}} {
 						puts $ifl "file $sf"
 						puts $ifl "file Blank.mp4"
 						close $ifl
-						if {[catch {
-							catch {file delete Extended.mp4}
-							catch {file delete With_Blank.mp4}
-							exec $info(ffmpeg) -nostdin -loglevel error \
-								-f concat -safe 0 -i extend_list.txt -c copy \
-								With_Blank.mp4 > extend_log.txt
-							set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
-							exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
-								-i With_Blank.mp4 -c copy Extended.mp4 > extend_log.txt
-							file delete $sf
-							file rename Extended.mp4 $sf
-							Videoarchiver_print "$info(cam$n\_id)\
-								Extended segment $sf duration from\
-								$duration s to [format %.2f $config(seg_length_s)] s,\
-								in [expr [clock milliseconds] - $st] ms." verbose
-						} message]} {
-							Videoarchiver_print "WARNING: Attempt to pad $sf\
-								failed for $info(cam$n\_id)."
-							LWDAQ_print $config(error_log) "DETAIL: $message"
-							LWDAQ_print $config(error_log) [pwd]
-							LWDAQ_print $config(error_log) [glob *]
-						}
+						catch {file delete Extended.mp4}
+						catch {file delete With_Blank.mp4}
+						exec $info(ffmpeg) -nostdin -loglevel error \
+							-f concat -safe 0 -i extend_list.txt -c copy \
+							With_Blank.mp4 > extend_log.txt
+						set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
+						exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
+							-i With_Blank.mp4 -c copy Extended.mp4 > extend_log.txt
+						file delete $sf
+						file rename Extended.mp4 $sf
+						Videoarchiver_print "$info(cam$n\_id)\
+							Extended segment $sf duration from\
+							$duration s to [format %.2f $config(seg_length_s)] s,\
+							in [expr [clock milliseconds] - $st] ms." verbose
 					} 
 
 					# If a segment is too long, we extract the correct length and
