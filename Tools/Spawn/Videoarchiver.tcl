@@ -1923,13 +1923,16 @@ proc Videoarchiver_transfer {n {init 0}} {
 						puts $ifl "file Blank.mp4"
 						close $ifl
 						if {[catch {
+							catch {file delete Extended.mp4}
+							catch {file delete With_Blank.mp4}
 							exec $info(ffmpeg) -nostdin -loglevel error \
 								-f concat -safe 0 -i extend_list.txt -c copy \
 								With_Blank.mp4 > extend_log.txt
 							set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
-							catch {file delete Extended.mp4}
 							exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
 								-i With_Blank.mp4 -c copy Extended.mp4 > extend_log.txt
+							file delete $sf
+							file rename Extended.mp4 $sf
 							Videoarchiver_print "$info(cam$n\_id)\
 								Extended segment $sf duration from\
 								$duration s to [format %.2f $config(seg_length_s)] s,\
@@ -1937,13 +1940,10 @@ proc Videoarchiver_transfer {n {init 0}} {
 						} message]} {
 							Videoarchiver_print "WARNING: Attempt to pad $sf\
 								failed for $info(cam$n\_id)."
-							set message [string trim [regsub -all {\n+} $message " "]]
 							LWDAQ_print $config(error_log) "DETAIL: $message"
-						} else {
-							file delete $sf
-							file rename Extended.mp4 $sf
+							LWDAQ_print $config(error_log) [pwd]
+							LWDAQ_print $config(error_log) [glob *]
 						}
-						catch {file delete With_Blank.mp4}
 					} 
 
 					# If a segment is too long, we extract the correct length and
