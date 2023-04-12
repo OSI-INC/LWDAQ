@@ -1918,31 +1918,32 @@ proc Videoarchiver_transfer {n {init 0}} {
 					if {$duration < $config(seg_length_s)*$config(min_seg_frac)} {
 						set when "padding segment"
 						set st [clock milliseconds]
-						set ifl [open transfer_list.txt w]
+						set ifl [open extend_list.txt w]
 						puts $ifl "file $sf"
 						puts $ifl "file Blank.mp4"
 						close $ifl
 						if {[catch {
 							exec $info(ffmpeg) -nostdin -loglevel error \
-								-f concat -safe 0 -i transfer_list.txt -c copy \
-								Long_$sf > transfer_log.txt
+								-f concat -safe 0 -i extend_list.txt -c copy \
+								With_Blank.mp4 > extend_log.txt
 							set dur [format %.3f [expr $config(seg_length_s)-2.0/$framerate]]
-							catch {file delete Lengthened_$sf}
+							catch {file delete Extended.mp4}
 							exec $info(ffmpeg) -nostdin -loglevel error -t $dur \
-								-i Long_$sf -c copy Lengthened_$sf > transfer_log.txt
-							file delete $sf
-							file delete Long_$sf
-							file rename Lengthened_$sf $sf
+								-i With_Blank.mp4 -c copy Extended.mp4 > extend_log.txt
 							Videoarchiver_print "$info(cam$n\_id)\
 								Extended segment $sf duration from\
 								$duration s to [format %.2f $config(seg_length_s)] s,\
 								in [expr [clock milliseconds] - $st] ms." verbose
 						} message]} {
 							set message [string trim [regsub -all {\n+} $message " "]]
-							set error_description "ERROR: $message while\
-								padding segment for $info(cam$n\_id)."
+							set error_description "WARNING: $message while\
+								padding $sf for $info(cam$n\_id)."
 							Videoarchiver_print $error_description
+						} else {
+							file delete $sf
+							file rename Extended.mp4 $sf
 						}
+						catch {file delete With_Blank.mp4}
 					} 
 
 					# If a segment is too long, we extract the correct length and
