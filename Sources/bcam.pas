@@ -1472,8 +1472,8 @@ begin
 end;
 
 {
-	bcam_image_position takes the position of a source in bcam coordiates and returns the 
-	position of the center of its image (the spot) on the ccd.
+	bcam_image_position takes the position of a source in bcam coordiates and
+	returns the position of the center of its image on the ccd.
 }
 function bcam_image_position(source_position:xyz_point_type;
 	camera:bcam_camera_type):xy_point_type;
