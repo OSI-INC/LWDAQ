@@ -16,52 +16,47 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# The Sudoku logic is in the procedures at the bottom of the file. The
-# initial code just opens a window and sets up the user interface. You
-# can define non-standard size Sudoku's by changing box_side to 2 or 4
-# instead of 3.
+# The Sudoku logic is in the procedures at the bottom of the file. The initial
+# code just opens a window and sets up the user interface. You can define
+# non-standard size Sudoku's by changing box_side to 2 or 4 instead of 3.
 
-# You enter the puzzel in the window by entering numbers and skipping
-# blank. As soon as the solver starts working on a blank cell, it will
-# substitute a full list of symbols for the blank, meaning that the
-# value of the cell is undefined.
+# You enter the puzzel in the window by entering numbers and skipping blank. As
+# soon as the solver starts working on a blank cell, it will substitute a full
+# list of symbols for the blank, meaning that the value of the cell is
+# undefined.
 
-# Each cell is a list of symbols that the solver has not yet eliminated
-# as possible values for the cell. The symbols are separated by spaces.
-# At the beginning, you enter single symbols for the initial clues, and
-# blanks for undefined cells. The solver fills in the blanks for you with
-# the symbol list.
+# Each cell is a list of symbols that the solver has not yet eliminated as
+# possible values for the cell. The symbols are separated by spaces. At the
+# beginning, you enter single symbols for the initial clues, and blanks for
+# undefined cells. The solver fills in the blanks for you with the symbol list.
 
-# The solving logic works by expressing the Sudoku rules with six
-# simple logical actions, and applying each action to every cell in 
-# the puzzle, starting at the top-left, and working down to the bottom-
-# right. The application of the six rules to all cells is one Step
-# in the solving process. 
+# The solving logic works by expressing the Sudoku rules with six simple logical
+# actions, and applying each action to every cell in the puzzle, starting at the
+# top-left, and working down to the bottom- right. The application of the six
+# rules to all cells is one Step in the solving process. 
 
-# After the step, you will see each cell has a new list of possible
-# values. You can edit these as you see fit.
+# After the step, you will see each cell has a new list of possible values. You
+# can edit these as you see fit.
 
-# You press the Step button to apply the rules again, and eventually 
-# the process will converge or arrive at a contradiction. The solver
-# notifies you of a contradiction in its text window. The contradiction
-# means that the starting values for the Step are not consistent with
-# any pattern that satisfies the Sudoku rules.
+# You press the Step button to apply the rules again, and eventually the process
+# will converge or arrive at a contradiction. The solver notifies you of a
+# contradiction in its text window. The contradiction means that the starting
+# values for the Step are not consistent with any pattern that satisfies the
+# Sudoku rules.
 
-# If, instead of a contradiction, you have a unique solution to the 
-# puzzle, you are done. But if there are some cells with two symbols,
-# you must pick one such cell and delete one of the symbols. By doing 
-# this, you instruct the solver to proceed on the assumption that your 
-# choice of symbol is correct. Now you press Step again, and you will
-# either get convergance or a contradiction. If it converges, the
-# solution will either be unique (in which case you are finished), or
-# you will have to pick one of two again. If you get a contradictio, you
-# use the Back button to go back to the place where you picked one of
-# two values, and you pick the other value.
+# If, instead of a contradiction, you have a unique solution to the puzzle, you
+# are done. But if there are some cells with two symbols, you must pick one such
+# cell and delete one of the symbols. By doing this, you instruct the solver to
+# proceed on the assumption that your choice of symbol is correct. Now you press
+# Step again, and you will either get convergance or a contradiction. If it
+# converges, the solution will either be unique (in which case you are
+# finished), or you will have to pick one of two again. If you get a
+# contradictio, you use the Back button to go back to the place where you picked
+# one of two values, and you pick the other value.
 
-# The six Sudoku rules are as follows, where a "symbol" is any of the
-# numbers 1 to 9 in a 3x3 Sudoku, a "box" is one of the nine 3x3 boxes,
-# a "column" is one of the nine columns, and a "row" is one of the
-# nine rows.
+# The six Sudoku rules are as follows, where a "symbol" is any of the numbers 1
+# to 9 in a 3x3 Sudoku, a "box" is one of the nine 3x3 boxes, a "column" is one
+# of the nine columns, and a "row" is one of the nine rows.
 
 # There may be no more than one instance of a symbol in any box.
 # There may be no less than one instance of a symbol in any box.
@@ -74,14 +69,14 @@
 set w .s
 catch {destroy $w}
 toplevel $w
-wm title $w "Sudoku, Version III"
+wm title $w "Sudoku Solver, Version III"
 
 # define symbol set
 set box_side 3
 set puzzle_side [expr $box_side * $box_side]
-set symbols ""
+set symbols [list]
 for {set i 1} {$i <= $puzzle_side} {incr i} {
-	append symbols "$i "
+	lappend symbols $i
 }
 
 # define blank puzzle made up of rows and columns of cells.
@@ -155,13 +150,8 @@ $t configure -tabs "0.25i left"
 # define routine to write in text window
 proc sudoku_print {args} {
 	set text_win ".s.t"
-	puts "sp1 $text_win"
-	if {![winfo exists $text_win]} {
-		puts "cannot find $tex_win"
-		return ""
-	}
+	if {![winfo exists $text_win]} {return ""}
 
-	puts "sp2"
 	set option "-newline"
 	if {[string match "-nonewline" [lindex $args 0]]} {
 		set option "-nonewline"
@@ -171,19 +161,15 @@ proc sudoku_print {args} {
 		set args [lreplace $args 0 0]
 	}
 	
-	puts "sp3 $args"
 	set print_str [lindex $args 0]
 	if {$option == "-newline"} {append print_str \n}
 	
 	set color [lindex $args 1]
 	if {$color == ""} {set color black}
 	
-	puts "sp4 $print_str $color"
 	$text_win insert end "$print_str" $color
 	$text_win yview moveto 1
 	
-	puts "sp5"
-	update
 	return ""
 }
 
@@ -210,14 +196,11 @@ proc sudoku_save {} {
 
 # step procedure
 proc sudoku_step {} {
-	global symbols sudoku_progress
-	sudoku_print "Point 0" green
+	global symbols sudoku_progress change_flag
+	set change_flag 0
 	sudoku_print "\nStep..." purple
-	sudoku_print "Point 1"
-	lappend sudoku_progress [extract_sudoku]
-	sudoku_print "Point 2"
+	set prev [extract_sudoku]
 	foreach j $symbols {
-		sudoku_print "Point 3 $j"
 		foreach i $symbols {
 			upvar #0 cell_$j\_$i cell
 			if {[string trim $cell] == ""} {
@@ -226,7 +209,6 @@ proc sudoku_step {} {
 		}
 	}
 	foreach j $symbols {
-		sudoku_print "Point 4 $j"
 		foreach i $symbols {
 			eliminate_box $j $i
 			eliminate_column $j $i
@@ -235,6 +217,12 @@ proc sudoku_step {} {
 			force_column $j $i
 			force_row $j $i
 		}
+	}
+	if {$change_flag} {
+		lappend sudoku_progress $prev
+		sudoku_print "Appended"
+	} else {
+		sudoku_print "No changes made"
 	}
 	sudoku_print "Done." purple
 }
@@ -265,7 +253,7 @@ proc sudoku_back {} {
 # any symbol in a box.
 proc eliminate_box {j i} {
 	upvar #0 cell_$j\_$i cell
-	global box_side puzzle_side symbols
+	global box_side puzzle_side symbols change_flag
 	set left [expr round(($i-1) - fmod(($i-1),$box_side)) + 1]
 	set top [expr round(($j-1) - fmod(($j-1),$box_side)) + 1]
 	foreach s $symbols {
@@ -277,9 +265,13 @@ proc eliminate_box {j i} {
 					set index [lsearch $cell $s]
 					if {$index >= 0} {
 						if {[llength $cell] == 1} {
-							sudoku_print "Sudoku: contradiction eliminating box in cell $j $i"
+							sudoku_print \
+								"Contradiction in cell ($j,$i), cannot be \"$s\"." red
 						} {
+							sudoku_print \
+								"Removed \"$s\" from cell ($j,$i), box elimination"
 							set cell [lreplace $cell $index $index]
+							set change_flag 1
 						}
 					}
 				}
@@ -296,7 +288,7 @@ proc eliminate_box {j i} {
 # less than one instance of any symbol in a box.
 proc force_box {j i} {
 	upvar #0 cell_$j\_$i cell
-	global box_side puzzle_side symbols
+	global box_side puzzle_side symbols change_flag
 	set left [expr round(($i-1) - fmod(($i-1),$box_side)) + 1]
 	set top [expr round(($j-1) - fmod(($j-1),$box_side)) + 1]
 	foreach s $symbols {
@@ -313,9 +305,13 @@ proc force_box {j i} {
 		if {$other_place == 0} {
 			set index [lsearch $cell $s]
 			if {$index < 0} {
-				sudoku_print "Sudoku: contradiction forcing box in cell $j $i"
+				sudoku_print "Contradiction in cell ($j,$i), box has no \"$s\"." red
 			} {
-				set cell $s
+				if {[llength $cell] > 1} {
+					set cell $s
+					set change_flag 1
+					sudoku_print "Set cell ($j,$i) to \"$s\", box forcing."
+				}
 			}
 			break
 		}
@@ -325,7 +321,7 @@ proc force_box {j i} {
 # As eliminate_box, but for columns.
 proc eliminate_column {j i} {
 	upvar #0 cell_$j\_$i cell
-	global box_side puzzle_side symbols
+	global box_side puzzle_side symbols change_flag
 	foreach s $symbols {
 		for {set jc 1} {$jc <= $puzzle_side} {incr jc} {
 			if {($j == $jc)} {continue}
@@ -334,9 +330,13 @@ proc eliminate_column {j i} {
 				set index [lsearch $cell $s]
 				if {$index >= 0} {
 					if {[llength $cell] == 1} {
-						sudoku_print "Sudoku: contradiction eliminating column in cell $j $i"
+						sudoku_print \
+							"Contradiction in cell ($j,$i), cannot be \"$s\"." red
 					} {
+						sudoku_print \
+							"Removed \"$s\" from cell ($j,$i), column elimination"
 						set cell [lreplace $cell $index $index]
+						set change_flag 1
 					}
 				}
 			}
@@ -347,7 +347,7 @@ proc eliminate_column {j i} {
 # As force_box, but for columns.
 proc force_column {j i} {
 	upvar #0 cell_$j\_$i cell
-	global box_side puzzle_side symbols
+	global box_side puzzle_side symbols change_flag
 	foreach s $symbols {
 		set other_place 0
 		for {set jc 1} {$jc <= $puzzle_side} {incr jc} {
@@ -360,9 +360,13 @@ proc force_column {j i} {
 		if {$other_place == 0} {
 			set index [lsearch $cell $s]
 			if {$index < 0} {
-				sudoku_print "Sudoku: contradiction forcing column in cell $j $i"
+				sudoku_print "Contradiction in cell ($j,$i), column has no \"$s\"." red
 			} {
-				set cell $s
+				if {[llength $cell] > 1} {
+					set cell $s
+					set change_flag 1
+					sudoku_print "Set cell ($j,$i) to \"$s\", column forcing."
+				}
 			}
 			break
 		}
@@ -372,7 +376,7 @@ proc force_column {j i} {
 # As eliminate_box, but for rows.
 proc eliminate_row {j i} {
 	upvar #0 cell_$j\_$i cell
-	global box_side puzzle_side symbols
+	global box_side puzzle_side symbols change_flag
 	foreach s $symbols {
 		for {set ir 1} {$ir <= $puzzle_side} {incr ir} {
 			if {($i == $ir)} {continue}
@@ -381,9 +385,13 @@ proc eliminate_row {j i} {
 				set index [lsearch $cell $s]
 				if {$index >= 0} {
 					if {[llength $cell] == 1} {
-						sudoku_print "Sudoku: contradiction eliminating row in cell $j $i"
+						sudoku_print \
+							"Contradiction in cell ($j,$i), cannot be \"$s\"." red
 					} {
+						sudoku_print \
+							"Removed \"$s\" from cell ($j,$i), row elimination"
 						set cell [lreplace $cell $index $index]
+						set change_flag 1
 					}
 				}
 			}
@@ -394,7 +402,7 @@ proc eliminate_row {j i} {
 # As force_box, but for rows.
 proc force_row {j i} {
 	upvar #0 cell_$j\_$i cell
-	global box_side puzzle_side symbols
+	global box_side puzzle_side symbols change_flag
 	foreach s $symbols {
 		set other_place 0
 		for {set ir 1} {$ir <= $puzzle_side} {incr ir} {
@@ -407,9 +415,13 @@ proc force_row {j i} {
 		if {$other_place == 0} {
 			set index [lsearch $cell $s]
 			if {$index < 0} {
-				sudoku_print "Sudoku: contradiction forcing row in cell $j $i"
+				sudoku_print "Contradiction in cell ($j,$i), row has no \"$s\"." red
 			} {
-				set cell $s
+				if {[llength $cell] > 1} {
+					set cell $s
+					set change_flag 1
+					sudoku_print "Set cell ($j,$i) to \"$s\", row forcing."
+				}
 			}
 			break
 		}
@@ -417,17 +429,14 @@ proc force_row {j i} {
 }
 
 # welcome message.
-sudoku_print {
-Enter starting values into boxes. Press Step. Multiple numbers will appear in
-other boxes, showing possibilities. Press Step repeatedly. If only one number
-remains in each box, we have our solution. If two or more numbers remain in
-several boxes, we choose a box with the fewest choices and eliminate one number.
-Proceed with Step until we until we reach a solution or a contradiction. If
-contradiction, use Back button to return to the point where we chose a number to
-eliminate, and choose another to eliminate. Proceed with Step. If no choice
-leads to a solution, the original numbers we entered are not consistent with any
-solution. For more details of the program, open Tools/Sudoku.tcl with text
-editor and read comments at top of script.
-}
+sudoku_print {Enter starting values into boxes. Press Step. Multiple numbers will appear in other boxes, showing
+possibilities. Press Step repeatedly. If only one number remains in each box, we have our solution.
+If two or more numbers remain in several boxes, we choose a box with the fewest choices and
+eliminate one number. Proceed with Step until we until we reach a solution or a contradiction. If
+contradiction, use Back button to return to the point where we chose a number to eliminate, and
+choose another to eliminate. Proceed with Step. If no choice leads to a solution, the original
+numbers we entered are not consistent with any solution. For more details of the program, open
+Tools/Sudoku.tcl with text editor and read comments at top of script.
+} green
 
 
