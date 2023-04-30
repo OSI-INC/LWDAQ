@@ -228,15 +228,21 @@ proc LWDAQ_tool_init {name version} {
 
 #
 # LWDAQ_tool_open opens a tool window if none exists, and returns the name of
-# the window. If the tool window does exist, the routine raises the tool window
-# and returns an empty string. If graphics are disabled, the routine returns an
-# empty string. The routine recognises two special opening modes, Standalone and
-# Slave, in which the tool will take over the main window and delete the Quit
-# button.
+# the window. The routine assumes that the tool has already been initialized. If
+# the tool window does exist, the routine raises the tool window and returns an
+# empty string. If graphics are disabled, the routine returns an empty string.
+# The routine recognises two special opening modes, Standalone and Slave, in
+# which the tool will take over the main window and delete the Quit button.
 #
 proc LWDAQ_tool_open {name} {
 	upvar #0 $name\_info info
+	
+	# Report an error if the tool has not been initialized.
+	if {![info exists info]} {
+		error "Cannot open $name window before initialization."
+	}
 
+	# Return if the tool is not supposed to be opened with graphics.
 	if {!$info(gui)} {return ""}
 
 	# Get the maximum size of the root window. We are going to double this

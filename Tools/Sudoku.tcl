@@ -1,6 +1,6 @@
 # Sudoku.tcl, Solves Sudoku Puzzles
 #
-# Copyright (C) 2006 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2006-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -72,9 +72,9 @@
 
 # make window
 set w .s
-destroy $w
+catch {destroy $w}
 toplevel $w
-wm title $w Sudoku
+wm title $w "Sudoku, Version III"
 
 # define symbol set
 set box_side 3
@@ -83,7 +83,6 @@ set symbols ""
 for {set i 1} {$i <= $puzzle_side} {incr i} {
 	append symbols "$i "
 }
-
 
 # define blank puzzle made up of rows and columns of cells.
 # each cell is a list of possible values.
@@ -155,6 +154,14 @@ $t configure -tabs "0.25i left"
 
 # define routine to write in text window
 proc sudoku_print {args} {
+	set text_win ".s.t"
+	puts "sp1 $text_win"
+	if {![winfo exists $text_win]} {
+		puts "cannot find $tex_win"
+		return ""
+	}
+
+	puts "sp2"
 	set option "-newline"
 	if {[string match "-nonewline" [lindex $args 0]]} {
 		set option "-nonewline"
@@ -163,31 +170,21 @@ proc sudoku_print {args} {
 	if {[string match "-newline" [lindex $args 0]]} {
 		set args [lreplace $args 0 0]
 	}
-	set text_win [lindex $args 0]
-	set print_str [lindex $args 1]
+	
+	puts "sp3 $args"
+	set print_str [lindex $args 0]
 	if {$option == "-newline"} {append print_str \n}
-	if {![winfo exists $text_win]} {
-		return ""
-	}
-	set color [lindex $args 2]
+	
+	set color [lindex $args 1]
+	if {$color == ""} {set color black}
+	
+	puts "sp4 $print_str $color"
 	$text_win insert end "$print_str" $color
 	$text_win yview moveto 1
+	
+	puts "sp5"
+	update
 	return ""
-}
-
-# welcome message.
-sudoku_print .s.t "Welcome to Sudoku Version II" blue
-sudoku_print .s.t {
-Enter starting values into boxes. Press Step. Multiple numbers will appear in
-other boxes, showing possibilities. Press Step repeatedly. If only one number
-remains in each box, we have our solution. If two or more numbers remain in
-several boxes, we choose a box with the fewest choices and eliminate one number.
-Proceed with Step until we until we reach a solution or a contradiction. If
-contradiction, use Back button to return to the point where we chose a number to
-eliminate, and choose another to eliminate. Proceed with Step. If no choice
-leads to a solution, the original numbers we entered are not consistent with any
-solution. For more details of the program, open Tools/Sudoku.tcl with text
-editor and read comments at top of script.
 }
 
 # routine to read a saved sudoku.
@@ -214,10 +211,13 @@ proc sudoku_save {} {
 # step procedure
 proc sudoku_step {} {
 	global symbols sudoku_progress
-	sudoku_print .s.t "\nStep..." purple
-	update
+	sudoku_print "Point 0" green
+	sudoku_print "\nStep..." purple
+	sudoku_print "Point 1"
 	lappend sudoku_progress [extract_sudoku]
+	sudoku_print "Point 2"
 	foreach j $symbols {
+		sudoku_print "Point 3 $j"
 		foreach i $symbols {
 			upvar #0 cell_$j\_$i cell
 			if {[string trim $cell] == ""} {
@@ -226,6 +226,7 @@ proc sudoku_step {} {
 		}
 	}
 	foreach j $symbols {
+		sudoku_print "Point 4 $j"
 		foreach i $symbols {
 			eliminate_box $j $i
 			eliminate_column $j $i
@@ -235,7 +236,7 @@ proc sudoku_step {} {
 			force_row $j $i
 		}
 	}
-	sudoku_print .s.t "Done." purple
+	sudoku_print "Done." purple
 }
 
 # back procedure
@@ -253,7 +254,7 @@ proc sudoku_back {} {
 			}
 		}
 	} {
-		sudoku_print .s.t  "Sudoku: cannot go back farther"
+		sudoku_print "Sudoku: cannot go back farther"
 	}
 }
 
@@ -276,7 +277,7 @@ proc eliminate_box {j i} {
 					set index [lsearch $cell $s]
 					if {$index >= 0} {
 						if {[llength $cell] == 1} {
-							sudoku_print .s.t  "Sudoku: contradiction eliminating box in cell $j $i"
+							sudoku_print "Sudoku: contradiction eliminating box in cell $j $i"
 						} {
 							set cell [lreplace $cell $index $index]
 						}
@@ -312,7 +313,7 @@ proc force_box {j i} {
 		if {$other_place == 0} {
 			set index [lsearch $cell $s]
 			if {$index < 0} {
-				sudoku_print .s.t  "Sudoku: contradiction forcing box in cell $j $i"
+				sudoku_print "Sudoku: contradiction forcing box in cell $j $i"
 			} {
 				set cell $s
 			}
@@ -333,7 +334,7 @@ proc eliminate_column {j i} {
 				set index [lsearch $cell $s]
 				if {$index >= 0} {
 					if {[llength $cell] == 1} {
-						sudoku_print .s.t  "Sudoku: contradiction eliminating column in cell $j $i"
+						sudoku_print "Sudoku: contradiction eliminating column in cell $j $i"
 					} {
 						set cell [lreplace $cell $index $index]
 					}
@@ -359,7 +360,7 @@ proc force_column {j i} {
 		if {$other_place == 0} {
 			set index [lsearch $cell $s]
 			if {$index < 0} {
-				sudoku_print .s.t  "Sudoku: contradiction forcing column in cell $j $i"
+				sudoku_print "Sudoku: contradiction forcing column in cell $j $i"
 			} {
 				set cell $s
 			}
@@ -380,7 +381,7 @@ proc eliminate_row {j i} {
 				set index [lsearch $cell $s]
 				if {$index >= 0} {
 					if {[llength $cell] == 1} {
-						sudoku_print .s.t  "Sudoku: contradiction eliminating row in cell $j $i"
+						sudoku_print "Sudoku: contradiction eliminating row in cell $j $i"
 					} {
 						set cell [lreplace $cell $index $index]
 					}
@@ -406,7 +407,7 @@ proc force_row {j i} {
 		if {$other_place == 0} {
 			set index [lsearch $cell $s]
 			if {$index < 0} {
-				sudoku_print .s.t  "Sudoku: contradiction forcing row in cell $j $i"
+				sudoku_print "Sudoku: contradiction forcing row in cell $j $i"
 			} {
 				set cell $s
 			}
@@ -414,4 +415,19 @@ proc force_row {j i} {
 		}
 	}
 }
+
+# welcome message.
+sudoku_print {
+Enter starting values into boxes. Press Step. Multiple numbers will appear in
+other boxes, showing possibilities. Press Step repeatedly. If only one number
+remains in each box, we have our solution. If two or more numbers remain in
+several boxes, we choose a box with the fewest choices and eliminate one number.
+Proceed with Step until we until we reach a solution or a contradiction. If
+contradiction, use Back button to return to the point where we chose a number to
+eliminate, and choose another to eliminate. Proceed with Step. If no choice
+leads to a solution, the original numbers we entered are not consistent with any
+solution. For more details of the program, open Tools/Sudoku.tcl with text
+editor and read comments at top of script.
+}
+
 

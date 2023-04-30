@@ -1838,7 +1838,8 @@ end;
 	Coherence: The ratio of the combined area of the biggest coherence_regions
 	peaks and valleys to the total area of the signal.
 
-	Asymmetry: Absolute value of the third moment of the signal.
+	Asymmetry: Absolute value of the third moment of the signal, normalised by
+	dividing by the third power of the range.
 
 	Spikiness: We divide the interval into sections. Each section has width
 	2*spikiness_extent+1. The sections are evenly spaced and overlapping. There
@@ -1853,6 +1854,7 @@ const
 	intermittency_fraction=0.1;
 	coherence_regions=10;
 	small_value=0.0001;
+	asymmetry_scale=100;
 	
 var 
 	print_diagnostics:boolean=false;
@@ -1874,10 +1876,10 @@ var
 	ave, {average value}
 	stdev, {standard deviation}
 	mad, {mean absolute deviation}
-	min, {minimum}
-	max, {maximum}
-	range, {maximum-minimum}
-	mas {mean absolute step size, coastline divided by number of points}
+	min, {minimum value}
+	max, {maximum value}
+	range, {max-min}
+	mas {mean absolute step = coastline divided by number of points}
 	:real;
 	list_gp,pv_gp:x_graph_type;
 	s:string='';
@@ -2058,14 +2060,14 @@ begin
 	Calculate the asymmetry measure using the third moment of the signal.
 }
 	asymmetry_score:=0;
-	for i:=0 to length(gp)-1 do begin
-		asymmetry_score:=asymmetry_score+xpyi((gp[i]-ave)/stdev,3);
-	end;
+	for i:=0 to length(gp)-1 do 
+		asymmetry_score:=asymmetry_score+xpyi((gp[i]-ave),3);
+	asymmetry_score:=asymmetry_scale*asymmetry_score/xpyi(range,3);
 	asymmetry:=abs(asymmetry_score/length(gp));
 	if print_diagnostics then begin
 		writestr(s,'Asymmetry: ',asymmetry:0:3,' ',
 			'score=',asymmetry_score:0:3,' num_points=',length(gp):0,
-				' ave=',ave:0:3,' stdev=',stdev:0:3);
+				' ave=',ave:0:3,' range=',range:0:1);
 		gui_writeln(s);
 	end;
 {
