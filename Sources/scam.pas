@@ -79,28 +79,28 @@ procedure scam_project_cylinder_outline(ip:image_ptr_type;
 {
 	Routines that analyze the image.
 }
-function scam_disagreement(ip:image_ptr_type;rule:string):real;
-function scam_classify(ip:image_ptr_type):integer;
+function scam_decode_rule(ip:image_ptr_type;rule:string):real;
+function scam_disagreement(ip:image_ptr_type;threshold,spread:real):real;
 
 implementation
 
 {
-	scam_decode_rule takes a string like "10 &" and returns, for
-	the specified image, an intensity threshold for backlight pixels in the
-	image. The first parameter in the command string must be an integer
-	specifying the threshold intensity. The integer may be followed by of the
-	symbols *, %, #, $, or &. Each of these symbols gives a different meaning to
-	the threshold value, in the same way they do for spot analysis, see the
-	spot_decode_command_string for details.
+	scam_decode_rule takes a string like "10 &" and returns, for the specified
+	image, an intensity threshold for backlight pixels in the image. The first
+	parameter in the command string must be an integer specifying the threshold
+	intensity. The integer may be followed by of the symbols *, %, #, $, or &.
+	Each of these symbols gives a different meaning to the threshold value, in
+	the same way they do for spot analysis, see the spot_decode_command_string
+	for details.
 }
-function scam_decode_rule(ip:image_ptr_type;rule:string):integer;
+function scam_decode_rule(ip:image_ptr_type;rule:string):real;
 
 const
 	percent_unit=100;
 
 var
 	word:string;
-	background,threshold:integer;
+	background,threshold:real;
 	
 begin
 {
@@ -111,28 +111,24 @@ begin
 	word:=read_word(rule);
 	if word='%' then begin
 		background:=round(image_minimum(ip));
-		threshold:=
-			round((1-threshold/percent_unit)*background
-			+threshold/percent_unit*image_maximum(ip));
+		threshold:=(1-threshold/percent_unit)*background
+			+threshold/percent_unit*image_maximum(ip);
 	end else if word='#' then begin
-		background:=round(image_average(ip));
-		threshold:=
-			round((1-threshold/percent_unit)*background
-			+threshold/percent_unit*image_maximum(ip));
+		background:=image_average(ip);
+		threshold:=(1-threshold/percent_unit)*background
+			+threshold/percent_unit*image_maximum(ip);
 	end else if word='*' then begin
 		background:=0;
 		threshold:=threshold-background;
 	end else if word='$' then begin
-		background:=round(image_average(ip));
+		background:=image_average(ip);
 		threshold:=background+threshold;
 	end else if word='&' then begin
-		background:=round(image_median(ip));
+		background:=image_median(ip);
 		threshold:=background+threshold;
 	end;
 	scam_decode_rule:=threshold;
 end;
-
-
 	
 {
 	scam_project_sphere takes a sphere in SCAM coordinates and projects it onto
@@ -355,58 +351,56 @@ begin
 end;
 
 {
-	scam_disagreement measures the disagreement between a silhouette image and a
-	collection of projected objets. A pixel is occupied by a projected object if
-	its overlay is any color other than clear. A pixel is part of a silhouette
-	if its intensity is less than the silhouette threshold. We obtain the
-	silhouette threshold using the threshold rule, which we pass to
-	scam_decode_rule. When a pixel is occupied by silhouette and projection, we
-	clear its overlay, to show there is no disagreement. If it is occupied by
-	neither silhouette nor projection, we leave its overlay clear, to show there
-	is no disagreement. If it is silhouette but not projection, we mark its
-	overlay with the silhouette color to show disagreement. If it is projection
-	but not silhouette, we leave its overlay marked with the projection color to
-	show disagreement. We will see the a clear overlay where projection and
-	classification agree. 
+	scam_disagreement measures the disagreement between a silhouette and a
+	collection of projected objets. So far as the routine is concerned, a pixel
+	is part of a projection if and only if its overlay is some color other than
+	clear. A pixel is part of a silhouette if and only if its intensity is less
+	than the specified threshold. When a pixel is occupied by silhouette and
+	projection, we clear its overlay, to show there is no disagreement. If it is
+	occupied by neither silhouette nor projection, we leave its overlay clear,
+	to show there is no disagreement. If it is silhouette but not projection, we
+	mark its overlay with the silhouette color to show disagreement. If it is
+	projection but not silhouette, we leave its overlay marked with the
+	projection color to show disagreement. We will see clear overlay where
+	projection and classification agree, and colored overlay otherwise.
 	
 	The routine returns a measures of the disagreement between the image and
 	projections. To obtain the disagreement we use the intensity threshold, "t",
-	the pixel intensity "b", and the minimum intensity in the image, "m". We let
-	w = (t-m)*w_factor. If the projected object occupies the pixel, we use the
-	following three rules. If b < t-w, we add 0.0 to the disagreement. If b >
-	t+w we add 1.0. In between we add (b-t+w)/2w. When the projected object does
-	not occupy the pixel, we use the following three rules. If b > t+w we add
-	0.0. If b < t-w we add one. In between we add (t+w-b)/2w. We add the
-	disagreement of all pixels together to obtain the total disagreement.
+	the pixel intensity "b", the minimum intensity in the image, "m", and the
+	specified spread. We let e = (t-m)*spread. If the projected object occupies
+	the pixel, we use the following three rules. If b < t-e, we add 0.0 to the
+	disagreement. If b > t+e we add 1.0. In between we add (b-t+e)/2e. When the
+	projected object does not occupy the pixel, we use the following three
+	rules. If b > t+e we add 0.0. If b < t-e we add one. In between we add
+	(t+e-b)/2e. We add the disagreement of all pixels together to obtain the
+	total disagreement. With spread=0, the disagreement is the number of pixels
+	that are silhouette or projection but not both, using a binary threshold. 
 }
-function scam_disagreement(ip:image_ptr_type;rule:string):real;
+function scam_disagreement(ip:image_ptr_type;threshold,spread:real):real;
 
-const
-	w_factor=0.2;
 var
 	i,j:integer;
-	t,b:integer;
-	w,d,m:real;
+	t,b,e,d,m:real;
 	p:boolean;
 	
 begin
 	d:=0;
-	t:=scam_decode_rule(ip,rule);
 	m:=image_minimum(ip);
-	w:=(t-m)*w_factor;
+	t:=threshold;
+	e:=(t-m)*spread;
 	with ip^.analysis_bounds do begin
 		for j:=top to bottom do begin
 			for i:=left to right do begin
 				p:=(get_ov(ip,j,i)<>clear_color);
 				b:=get_px(ip,j,i);
 				if p then begin
-					if b>t+w then d:=d+1.0
-					else if (b>t-w) then d:=d+(b-t+w)/(2.0*w);
+					if b>t+e then d:=d+1.0
+					else if (b>t-e) then d:=d+(b-t+e)/(2.0*e);
 				end else begin
-					if b<t-w then d:=d+1.0
-					else if (b<t+w) then d:=d+(t-b+w)/(2.0*w);
+					if b<t-e then d:=d+1.0
+					else if (b<t+e) then d:=d+(t-b+e)/(2.0*e);
 				end;
-				if b<=t then begin
+				if (b<=t) then begin
 					if not p then set_ov(ip,j,i,scam_silhouette_color)
 					else set_ov(ip,j,i,clear_color);
 				end;
@@ -416,27 +410,6 @@ begin
 	scam_disagreement:=d;
 end;
 
-{
-	scam_binary_disagreement counts the number of pixels in an image with overlay
-	anything other than clear. This routine should be applied to an image after
-	we apply scam_disagreement.
-}
-function scam_classify(ip:image_ptr_type):integer;
-
-var
-	i,j,count:integer;
-	
-begin
-	count:=0;
-	with ip^.analysis_bounds do begin
-		for j:=top to bottom do begin
-			for i:=left to right do begin
-				if get_ov(ip,j,i)<>clear_color then inc(count);
-			end;
-		end;
-	end;
-	scam_classify:=count;
-end;
 
 end.
 

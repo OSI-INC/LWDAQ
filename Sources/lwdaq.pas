@@ -3423,23 +3423,18 @@ function lwdaq_scam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integ
 
 var 
 	ip:image_ptr_type=nil;
-	iip:image_ptr_type=nil;
-	sip:image_ptr_type=nil;
 	image_name:string='';
 	result:string='';
 	command:string='';
 	option:string='';
 	body:string='';
-	arg_index:integer;
-	vp:pointer;	
-	show_edges:boolean=false;
-	pre_smooth:boolean=false;
-	pixel_size_um:real=7.4;
-	rule:string='50 #';
+	rule:string='10 %';
 	camera:bcam_camera_type;
 	sphere:xyz_sphere_type;
 	cylinder:xyz_cylinder_type;
-	disagreement:real;
+	disagreement:real=0;
+	spread:real=0;
+	threshold:real=0;
 		
 begin
 	error_string:='';
@@ -3468,21 +3463,16 @@ begin
 	if (command='project') then begin
 		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then body:=Tcl_ObjString(argv[4]);
-		arg_index:=5;
 	end else if (command='project_outline') then begin
 		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then body:=Tcl_ObjString(argv[4]);
-		arg_index:=5;
 	end else if (command='disagreement') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
-		arg_index:=4;
-	end else if (command='classify') then begin
-		if argc>3 then rule:=Tcl_ObjString(argv[3]);
-		arg_index:=4;
+		if argc>4 then spread:=Tcl_ObjReal(argv[4]);
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Invalid command "'+command+'", must be one of '
-			+'"project project_outline disagreement classify" in '
+			+'"project project_outline disagreement" in '
 			+'lwdaq_scam.');
 		exit;
 	end;
@@ -3526,16 +3516,11 @@ begin
 	end;
 	
 	if command='disagreement' then begin
-		disagreement:=scam_disagreement(ip,rule);
+		threshold:=scam_decode_rule(ip,rule);
+		disagreement:=scam_disagreement(ip,threshold,spread);
 		writestr(result,disagreement:1:1);
 	end;
 	
-	if command='classify' then begin
-		disagreement:=scam_disagreement(ip,rule);
-		disagreement:=scam_classify(ip);
-		writestr(result,disagreement:1:0);
-	end;
-
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
 	lwdaq_scam:=Tcl_OK;
