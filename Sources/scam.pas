@@ -48,14 +48,10 @@ const
 	Classification and projection color codes.
 }
 	scam_sphere_color=green_color;
-	scam_sphere_outline_color=green_color;
+	scam_sphere_outline_color=yellow_color;
 	scam_cylinder_color=blue_color;
-	scam_cylinder_outline_color=blue_color;
+	scam_cylinder_outline_color=red_color;
 	scam_silhouette_color=orange_color;
-{
-	Projection of outlines.
-}
-	scam_num_tangents=100;
 
 {
 	Routines that project hypothetical objects onto the overlays of our SCAM
@@ -71,10 +67,12 @@ procedure scam_project_cylinder(ip:image_ptr_type;
 	camera:bcam_camera_type);
 procedure scam_project_sphere_outline(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
-	camera:bcam_camera_type);
+	camera:bcam_camera_type;
+	num_tangents:integer);
 procedure scam_project_cylinder_outline(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
-	camera:bcam_camera_type);
+	camera:bcam_camera_type;
+	num_tangents:integer);
 	
 {
 	Routines that analyze the image.
@@ -206,13 +204,15 @@ end;
 }
 procedure scam_project_sphere_outline(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
-	camera:bcam_camera_type);
+	camera:bcam_camera_type;
+	num_tangents:integer);
 	
 const
-	draw_radials=true;
+	draw_radials=false;
+	min_coord=0.2;
 	
 var
-	unit_x:xyz_point_type;
+	v:xyz_point_type;
 	axis,tangent,center_line:xyz_line_type;
 	theta:real;
 	w:real;
@@ -235,9 +235,12 @@ begin
 	center_line.point:=camera.pivot;
 	center_line.direction:=xyz_difference(sphere.center,camera.pivot);
 	theta:=arcsin(sphere.radius/xyz_length(center_line.direction));
-	with unit_x do begin x:=1; y:=0; z:=0; end;
 	axis.point:=camera.pivot;
-	axis.direction:=xyz_cross_product(center_line.direction,unit_x);
+	v:=center_line.direction;
+	if abs(center_line.direction.x) > min_coord then v.x:=-v.x
+	else if abs(center_line.direction.y) > min_coord then v.y:=-v.y
+	else v.z:=-v.z;
+	axis.direction:=xyz_cross_product(center_line.direction,v);
 	tangent.point:=xyz_axis_rotate(sphere.center,axis,theta);
 	tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 {
@@ -258,7 +261,7 @@ begin
 	pc:=bcam_image_position(sphere.center,camera);
 	ic.i:=round(pc.x/w-ccd_origin_x);
 	ic.j:=round(pc.y/w-ccd_origin_y);
-	for step:=0 to scam_num_tangents do begin
+	for step:=0 to num_tangents do begin
 		pt:=bcam_image_position(tangent.point,camera);
 		line.a.i:=round(pt.x/w-ccd_origin_x);
 		line.a.j:=round(pt.y/w-ccd_origin_y);
@@ -269,7 +272,7 @@ begin
 			draw_overlay_line(ip,line,scam_sphere_outline_color);
 		end;
 		line.b:=line.a;
-		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/scam_num_tangents);
+		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/num_tangents);
 		tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 	end;
 end;
@@ -282,11 +285,15 @@ end;
 }
 procedure scam_project_cylinder_outline(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
-	camera:bcam_camera_type);
+	camera:bcam_camera_type;
+	num_tangents:integer);
+	
+const
+	min_coord=0.2;
 	
 var
 	step:integer;
-	unit_x,point_a,point_b:xyz_point_type;
+	v,point_a,point_b:xyz_point_type;
 	radial,axis:xyz_line_type;
 	w:real;
 	projection:xy_point_type;
@@ -300,9 +307,12 @@ begin
 	cylinder.face.normal:=xyz_unit_vector(cylinder.face.normal);
 	axis.point:=cylinder.face.point;
 	axis.direction:=cylinder.face.normal;
-	with unit_x do begin x:=1; y:=0; z:=0; end;
+	v:=axis.direction;
+	if abs(axis.direction.x) > min_coord then v.x:=-v.x
+	else if abs(axis.direction.y) > min_coord then v.y:=-v.y
+	else v.z:=-v.z;
 	radial.direction:=
-		xyz_scale(xyz_cross_product(axis.direction,unit_x),cylinder.radius);
+		xyz_scale(xyz_unit_vector(xyz_cross_product(axis.direction,v)),cylinder.radius);
 	point_a:=xyz_sum(radial.point,radial.direction);
 {
 	Find the matching point on the opposite end of the cylinder. These two
@@ -325,7 +335,7 @@ begin
 	cylinder point its opposite point on the second face. Project both points
 	onto the image plane and draw a line from one to the other in the overlay.
 }
-	for step:=0 to scam_num_tangents do begin
+	for step:=0 to num_tangents do begin
 		projection:=bcam_image_position(point_a,camera);
 		line_a.b.i:=round(projection.x/w-ccd_origin_x);
 		line_a.b.j:=round(projection.y/w-ccd_origin_y);
@@ -345,8 +355,8 @@ begin
 		line_a.a:=line_a.b;
 		line_b.a:=line_b.b;
 
-		point_a:=xyz_axis_rotate(point_a,axis,2*pi/scam_num_tangents);
-		point_b:=xyz_axis_rotate(point_b,axis,2*pi/scam_num_tangents);
+		point_a:=xyz_axis_rotate(point_a,axis,2*pi/num_tangents);
+		point_b:=xyz_axis_rotate(point_b,axis,2*pi/num_tangents);
 	end;
 end;
 

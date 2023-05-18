@@ -3435,6 +3435,7 @@ var
 	disagreement:real=0;
 	spread:real=0;
 	threshold:real=0;
+	num_tangents:integer=10;
 		
 begin
 	error_string:='';
@@ -3466,6 +3467,7 @@ begin
 	end else if (command='project_outline') then begin
 		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then body:=Tcl_ObjString(argv[4]);
+		if argc>5 then num_tangents:=Tcl_ObjInteger(argv[5]);
 	end else if (command='disagreement') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
 		if argc>4 then spread:=Tcl_ObjReal(argv[4]);
@@ -3501,10 +3503,10 @@ begin
 			option:=read_word(body);
 			if option='sphere' then begin
 				sphere:=read_xyz_sphere(body);
-				scam_project_sphere_outline(ip,sphere,camera);
+				scam_project_sphere_outline(ip,sphere,camera,num_tangents);
 			end else if option='cylinder' then begin
 				cylinder:=read_xyz_cylinder(body);
-				scam_project_cylinder_outline(ip,cylinder,camera);
+				scam_project_cylinder_outline(ip,cylinder,camera,num_tangents);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Invalid shape "'+option+'", must be one of '

@@ -383,6 +383,8 @@ type
 
 var
 	simplex_enable_shrink:boolean=false;
+	simplex_small_size_factor:real=1e-5;
+	simplex_max_done_counter:integer=5;
 
 function new_simplex(num_coords:integer):simplex_type;
 procedure simplex_step(var simplex:simplex_type;
@@ -4272,7 +4274,7 @@ begin
 		for i:=1 to n do vertices[1,i]:=0;
 		construct_size:=1;
 		done_counter:=0;
-		max_done_counter:=10;
+		max_done_counter:=simplex_max_done_counter;
 	end;
 	new_simplex:=s;
 end;
@@ -4430,7 +4432,6 @@ const
 	contract_scale=0.5;
 	shrink_scale=0.5;
 	report=false;
-	small_size_factor=1e-5;
 	
 var 
 	i,j:integer;
@@ -4480,7 +4481,7 @@ begin
 {
 	If the error of this new vertex is lower than all the other vertices, we
 	try to expand our reflection in the hope of getting an even lower error.
-	Otherwise we go back to the original reflected vertex and use is to replace
+	Otherwise we go back to the original reflected vertex and use it to replace
 	the highest vertex.
 }
 		if (a_reflect<errors[1]) then begin
@@ -4523,7 +4524,7 @@ begin
 			if a_contract<=errors[n+1] then begin
 				vertices[n+1]:=simplex_vertex_copy(v_contract);
 				errors[n+1]:=a_contract;
-				if (simplex_size(simplex)<construct_size*small_size_factor) then 
+				if (simplex_size(simplex)<construct_size*simplex_small_size_factor) then 
 					inc(done_counter);
 				if show_details then gui_writeln('c: '+string_from_real(a_contract,fsr,fsd));
 			end else begin
