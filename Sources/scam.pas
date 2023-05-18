@@ -79,7 +79,8 @@ procedure scam_project_cylinder_outline(ip:image_ptr_type;
 {
 	Routines that analyze the image.
 }
-function scam_classify(ip:image_ptr_type;rule:string):integer;
+function scam_disagreement(ip:image_ptr_type;rule:string):real;
+function scam_classify(ip:image_ptr_type):integer;
 
 implementation
 
@@ -354,38 +355,81 @@ begin
 end;
 
 {
-	scam_classify goes through an image and marks the overlay to show pixels
-	that lie within a silhouette image. To classify the image as silhouette or
-	background, it uses the rule string, which we interpreet with a
-	scam_decode_rule. Where the overlay is clear, it will be filled with the
-	silhouette color. Where the overlay is filled already with a projected
-	object, it will be cleared in the region of overlap. Once the classification
-	is complete, we will see the silhouette and projection colors where the
-	image and simulation disagree. We will see the a clear overlay where
-	projection and classification agree. As the routine proceeds through the
-	image, it counts the number of pixels in which the image and projections
-	disagree and returns this count as our measurement of projection error.
+	scam_disagreement measures the disagreement between a silhouette image and a
+	collection of projected objets. A pixel is occupied by a projected object if
+	its overlay is any color other than clear. A pixel is part of a silhouette
+	if its intensity is less than the silhouette threshold. We obtain the
+	silhouette threshold using the threshold rule, which we pass to
+	scam_decode_rule. When a pixel is occupied by silhouette and projection, we
+	clear its overlay, to show there is no disagreement. If it is occupied by
+	neither silhouette nor projection, we leave its overlay clear, to show there
+	is no disagreement. If it is silhouette but not projection, we mark its
+	overlay with the silhouette color to show disagreement. If it is projection
+	but not silhouette, we leave its overlay marked with the projection color to
+	show disagreement. We will see the a clear overlay where projection and
+	classification agree. 
+	
+	The routine returns a measures of the disagreement between the image and
+	projections. To obtain the disagreement we use the intensity threshold,
+	"t", the pixel intensity "b", and the minimum intensity in the image, "m".
+	We let w = (t-m)/2. If the projected object occupies the pixel, we use the
+	following three rules. If b <= t, we add 0.0 to the disagreement. If t < b
+	<= t + w we add (b-t)/w. If b > t + w we add one. When the projected object
+	does not occupy the pixel, we use the following three rules. If b > t we add
+	0.0. If t > b > t - w we add (t-b)/w. If b < t - w we add 1.0. We add the
+	disagreement of all pixels together to obtain the total disagreement.
 }
-function scam_classify(ip:image_ptr_type;rule:string):integer;
+function scam_disagreement(ip:image_ptr_type;rule:string):real;
 
 var
 	i,j:integer;
-	t:integer;
-	count:integer;
-
+	t,b:integer;
+	w,d,m:real;
+	p:boolean;
+	
 begin
-	count:=0;
+	d:=0;
 	t:=scam_decode_rule(ip,rule);
+	m:=image_minimum(ip);
+	w:=(t-m)*one_half;
 	with ip^.analysis_bounds do begin
 		for j:=top to bottom do begin
 			for i:=left to right do begin
-				if get_px(ip,j,i)<=t then begin
-					if get_ov(ip,j,i)=clear_color then
-						set_ov(ip,j,i,scam_silhouette_color)
-					else
-						set_ov(ip,j,i,clear_color);
+				p:=(get_ov(ip,j,i)<>clear_color);
+				b:=get_px(ip,j,i);
+				if p then begin
+					if b>t+w then d:=d+1.0
+					else if (b>t) then d:=d+(b-t)/w;
+				end else begin
+					if b<t-w then d:=d+1.0
+					else if (b<t) then d:=d+(t-b)/w;
 				end;
-				if get_ov(ip,j,i)<>clear_color then inc(count)
+				if b<=t then begin
+					if not p then set_ov(ip,j,i,scam_silhouette_color)
+					else set_ov(ip,j,i,clear_color);
+				end;
+			end;
+		end;
+	end;
+	scam_disagreement:=d;
+end;
+
+{
+	scam_binary_disagreement counts the number of pixels in an image with overlay
+	anything other than clear. This routine should be applied to an image after
+	we apply scam_disagreement.
+}
+function scam_classify(ip:image_ptr_type):integer;
+
+var
+	i,j,count:integer;
+	
+begin
+	count:=0;
+	with ip^.analysis_bounds do begin
+		for j:=top to bottom do begin
+			for i:=left to right do begin
+				if get_ov(ip,j,i)<>clear_color then inc(count);
 			end;
 		end;
 	end;

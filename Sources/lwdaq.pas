@@ -3417,24 +3417,7 @@ begin
 end;
 
 {
-<p>lwdaq_scam analyzes Silhouette Camera (SCAM) images. It clears the overlay
-for its own use.</p>
-
-<center><table border cellspacing=2>
-<tr><th>Option</th><th>Function</th></tr>
-<tr><td>-pixel_size_um</td><td>Width and height of image pixels in microns.</td></tr>
-<tr><td>-show_edges</td><td>If 1, show edge pixesls in image, defalut 0</td></tr>
-<tr><td>-pre_smooth</td><td>Smooth the image before you take the derivative.</td></tr>
-<tr><td>-threshold</td><td>Criteria for selecting silhouette pixels.</td></tr>
-pixels.</td></tr>
-</table></center>
-
-<p>The -threshold string is used in the same way as in <a
-href="#lwdaq_bcam">lwdaq_bcam</a>. It can contain an intensity threshold or it
-can define a means to calculate the threshold. With -pre_smooth set to 1, the
-routine smooths the original image with a box filter before it applies the
-gradient and threshold. With <i>show_edges</i> equal to one, the routine plots
-all the edge pixels in color.</p>
+<p>lwdaq_scam analyzes Silhouette Camera (SCAM) images.</p>
 }
 function lwdaq_scam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3456,7 +3439,7 @@ var
 	camera:bcam_camera_type;
 	sphere:xyz_sphere_type;
 	cylinder:xyz_cylinder_type;
-	disagreement:integer=0;
+	disagreement:real;
 		
 begin
 	error_string:='';
@@ -3468,7 +3451,7 @@ begin
 	if (argc<3) then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Wrong number of arguments, must be "'
-			+'lwdaq_wps image command ?arguments? ?option value?".');
+			+'lwdaq_wps image command ?arguments?".');
 		exit;
 	end;
 	
@@ -3490,38 +3473,18 @@ begin
 		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then body:=Tcl_ObjString(argv[4]);
 		arg_index:=5;
+	end else if (command='disagreement') then begin
+		if argc>3 then rule:=Tcl_ObjString(argv[3]);
+		arg_index:=4;
 	end else if (command='classify') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
 		arg_index:=4;
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Invalid command "'+command+'", must be one of '
-			+'"project" in '
+			+'"project project_outline disagreement classify" in '
 			+'lwdaq_scam.');
 		exit;
-	end;
-	
-	if odd(argc-arg_index) then begin
-		Tcl_SetReturnString(interp,error_prefix
-			+'Wrong number of arguments, must be "'
-			+'lwdaq_wps image command ?arguments? ?option value?".');
-		exit;
-	end;
-	
-	while (arg_index<argc-1) do begin
-		option:=Tcl_ObjString(argv[arg_index]);
-		inc(arg_index);
-		vp:=argv[arg_index];
-		inc(arg_index);
-		if (option='-show_edges') then show_edges:=Tcl_ObjBoolean(vp)
-		else if (option='-pre_smooth') then pre_smooth:=Tcl_ObjBoolean(vp)
-		else begin
-			Tcl_SetReturnString(interp,error_prefix
-				+'Bad option "'+option+'", must be one of '
-				+'"-show_edges -pre_smooth" in '
-				+'lwdaq_scam.');
-			exit;
-		end;
 	end;
 	
 	if command='project' then begin
@@ -3562,11 +3525,17 @@ begin
 		end;
 	end;
 	
-	if command='classify' then begin
-		disagreement:=scam_classify(ip,rule);
-		writestr(result,disagreement:1);
+	if command='disagreement' then begin
+		disagreement:=scam_disagreement(ip,rule);
+		writestr(result,disagreement:1:1);
 	end;
 	
+	if command='classify' then begin
+		disagreement:=scam_disagreement(ip,rule);
+		disagreement:=scam_classify(ip);
+		writestr(result,disagreement:1:0);
+	end;
+
 	if error_string='' then Tcl_SetReturnString(interp,result)
 	else Tcl_SetReturnString(interp,error_string);
 	lwdaq_scam:=Tcl_OK;
