@@ -370,17 +370,19 @@ end;
 	classification agree. 
 	
 	The routine returns a measures of the disagreement between the image and
-	projections. To obtain the disagreement we use the intensity threshold,
-	"t", the pixel intensity "b", and the minimum intensity in the image, "m".
-	We let w = (t-m)/2. If the projected object occupies the pixel, we use the
-	following three rules. If b <= t, we add 0.0 to the disagreement. If t < b
-	<= t + w we add (b-t)/w. If b > t + w we add one. When the projected object
-	does not occupy the pixel, we use the following three rules. If b > t we add
-	0.0. If t > b > t - w we add (t-b)/w. If b < t - w we add 1.0. We add the
+	projections. To obtain the disagreement we use the intensity threshold, "t",
+	the pixel intensity "b", and the minimum intensity in the image, "m". We let
+	w = (t-m)*w_factor. If the projected object occupies the pixel, we use the
+	following three rules. If b < t-w, we add 0.0 to the disagreement. If b >
+	t+w we add 1.0. In between we add (b-t+w)/2w. When the projected object does
+	not occupy the pixel, we use the following three rules. If b > t+w we add
+	0.0. If b < t-w we add one. In between we add (t+w-b)/2w. We add the
 	disagreement of all pixels together to obtain the total disagreement.
 }
 function scam_disagreement(ip:image_ptr_type;rule:string):real;
 
+const
+	w_factor=0.2;
 var
 	i,j:integer;
 	t,b:integer;
@@ -391,7 +393,7 @@ begin
 	d:=0;
 	t:=scam_decode_rule(ip,rule);
 	m:=image_minimum(ip);
-	w:=(t-m)*one_half;
+	w:=(t-m)*w_factor;
 	with ip^.analysis_bounds do begin
 		for j:=top to bottom do begin
 			for i:=left to right do begin
@@ -399,10 +401,10 @@ begin
 				b:=get_px(ip,j,i);
 				if p then begin
 					if b>t+w then d:=d+1.0
-					else if (b>t) then d:=d+(b-t)/w;
+					else if (b>t-w) then d:=d+(b-t+w)/(2.0*w);
 				end else begin
 					if b<t-w then d:=d+1.0
-					else if (b<t) then d:=d+(t-b)/w;
+					else if (b<t+w) then d:=d+(t-b+w)/(2.0*w);
 				end;
 				if b<=t then begin
 					if not p then set_ov(ip,j,i,scam_silhouette_color)
