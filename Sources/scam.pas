@@ -48,9 +48,7 @@ const
 	Classification and projection color codes.
 }
 	scam_sphere_color=green_color;
-	scam_sphere_outline_color=green_color;
 	scam_cylinder_color=blue_color;
-	scam_cylinder_outline_color=blue_color;
 	scam_silhouette_color=orange_color;
 
 {
@@ -68,11 +66,11 @@ procedure scam_project_cylinder(ip:image_ptr_type;
 procedure scam_project_sphere_outline(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
 	camera:bcam_camera_type;
-	num_tangents:integer);
+	num_points:integer);
 procedure scam_project_cylinder_outline(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
 	camera:bcam_camera_type;
-	num_tangents:integer);
+	num_points:integer);
 	
 {
 	Routines that analyze the image.
@@ -205,7 +203,7 @@ end;
 procedure scam_project_sphere_outline(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
 	camera:bcam_camera_type;
-	num_tangents:integer);
+	num_points:integer);
 	
 const
 	draw_radials=false;
@@ -226,23 +224,20 @@ var
 begin
 {
 	Find a tangent to the sphere that intersects the pivot point of the camera.
-	We start by constructing a line from the pivot point to the sphere center.
-	We obtain the angle between the tangent and the center line. We rotate the
-	sphere center about an axis perpendicular to the center line and passing
-	through the camera pivot point. The result is our tangent point, which is
-	not the point of contact of the tangent on the sphere, but slightly farter
-	along the tangent from the pivot point. The tangent line is the line passing
-	through the pivot point in the direction of the tangent point. 
+	We start by constructing a line from the pivot point to the sphere center,
+	which we call the center line. We obtain the angle between the tangent and
+	the center line. We rotate the sphere center about an axis perpendicular to
+	the center line and passing through the camera pivot point. The result is
+	our tangent point, which is not the point of contact of the tangent on the
+	sphere, but slightly farther along the tangent from the pivot point. The
+	tangent line is the line passing through the pivot point in the direction of
+	the tangent point. 
 }
 	center_line.point:=camera.pivot;
 	center_line.direction:=xyz_difference(sphere.center,camera.pivot);
 	theta:=arcsin(sphere.radius/xyz_length(center_line.direction));
 	axis.point:=camera.pivot;
-	v:=center_line.direction;
-	if abs(center_line.direction.x) > min_coord then v.x:=-v.x
-	else if abs(center_line.direction.y) > min_coord then v.y:=-v.y
-	else v.z:=-v.z;
-	axis.direction:=xyz_cross_product(center_line.direction,v);
+	axis.direction:=xyz_perpendicular(center_line.direction);
 	tangent.point:=xyz_axis_rotate(sphere.center,axis,theta);
 	tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 {
@@ -260,12 +255,12 @@ begin
 	the projection cone. At each step, we project the tangent point onto our
 	image plane and store this image point in a perimieter array.
 }
-	setlength(perimeter,num_tangents);
-	for step:=0 to num_tangents-1 do begin
+	setlength(perimeter,num_points);
+	for step:=0 to num_points-1 do begin
 		pt:=bcam_image_position(tangent.point,camera);
 		perimeter[step].i:=round(pt.x/w-ccd_origin_x);
 		perimeter[step].j:=round(pt.y/w-ccd_origin_y);
-		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/num_tangents);
+		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/num_points);
 		tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 	end;
 {
@@ -276,19 +271,19 @@ begin
 	pc:=bcam_image_position(sphere.center,camera);
 	ic.i:=round(pc.x/w-ccd_origin_x);
 	ic.j:=round(pc.y/w-ccd_origin_y);
-	for step:=0 to num_tangents-1 do begin
+	for step:=0 to num_points-1 do begin
 		line.a:=perimeter[step];
 		if step>0 then begin
 			line.b:=perimeter[step-1];
-			draw_overlay_line(ip,line,scam_sphere_outline_color);
+			draw_overlay_line(ip,line,scam_sphere_color);
 		end;
 		if draw_radials then begin
 			line.b:=ic;
-			draw_overlay_line(ip,line,scam_sphere_outline_color);
+			draw_overlay_line(ip,line,scam_sphere_color);
 		end;
 		if draw_chords then begin
-			line.b:=perimeter[num_tangents-step-1];
-			draw_overlay_line(ip,line,scam_sphere_outline_color);
+			line.b:=perimeter[num_points-step-1];
+			draw_overlay_line(ip,line,scam_sphere_color);
 		end;
 	end;
 end;
@@ -302,16 +297,18 @@ end;
 procedure scam_project_cylinder_outline(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
 	camera:bcam_camera_type;
-	num_tangents:integer);
+	num_points:integer);
 	
 const
-	draw_radials=true;
-	draw_chords=true;
+	draw_perimeter=true;
+	draw_axials=true;
+	draw_chords=false;
+	draw_radials=false;
 	min_coord=0.2;
 	
 var
 	step:integer;
-	v,point_a,point_b,center_a,center_b,radial:xyz_point_type;
+	point_a,point_b,center_a,center_b,radial:xyz_point_type;
 	w:real;
 	projection:xy_point_type;
 	perimeter_a,perimeter_b:array of ij_point_type;
@@ -325,26 +322,24 @@ begin
 	Find a point on the circumference of the first end of the cylinder.
 }
 	cylinder.face.normal:=xyz_unit_vector(cylinder.face.normal);
-	v:=cylinder.face.normal;
-	if abs(v.x) > min_coord then v.x:=-v.x
-	else if abs(v.y) > min_coord then v.y:=-v.y
-	else v.z:=-v.z;
 	radial:=
 		xyz_scale(
 			xyz_unit_vector(
-				xyz_cross_product(cylinder.face.normal,v)),
+				xyz_cross_product(
+					cylinder.face.normal,
+					xyz_perpendicular(cylinder.face.normal))),
 			cylinder.radius);
 	point_a:=xyz_sum(cylinder.face.point,radial);
 	center_a:=cylinder.face.point;
 	axis.point:=cylinder.face.point;
-	axis.direction:=cylinder.face.normal;
+	axis.direction:=xyz_scale(cylinder.face.normal,cylinder.length);
 {
 	Find the matching point and center on the opposite end of the cylinder.
 	These two points are joined by a line parallel to the cylinder axis, of
 	length equal to the cylinder length, which could be zero or negative.
 }
-	point_b:=xyz_sum(point_a,xyz_scale(cylinder.face.normal,cylinder.length));
-	center_b:=xyz_sum(center_a,xyz_scale(cylinder.face.normal,cylinder.length));
+	point_b:=xyz_sum(point_a,axis.direction);
+	center_b:=xyz_sum(center_a,axis.direction);
 {
 	When we project tangents onto our image sensor, we are going to mark them in
 	the overlay, for which we need the size of the pixels.
@@ -358,11 +353,12 @@ begin
 {
 	Rotate our cicumference points about the cylinder axis. Project them both
 	into the image plane and store in two arrays, one for the a-face, one for
-	the b-face.
+	the b-face. Our objective is to produce num_points pairs of points along the
+	perimeter of the two faces of the cylinder.
 }
-	setlength(perimeter_a,num_tangents);
-	setlength(perimeter_b,num_tangents);
-	for step:=0 to num_tangents-1 do begin
+	setlength(perimeter_a,num_points);
+	setlength(perimeter_b,num_points);
+	for step:=0 to num_points-1 do begin
 		projection:=bcam_image_position(point_a,camera);
 		perimeter_a[step].i:=round(projection.x/w-ccd_origin_x);
 		perimeter_a[step].j:=round(projection.y/w-ccd_origin_y);
@@ -371,8 +367,8 @@ begin
 		perimeter_b[step].i:=round(projection.x/w-ccd_origin_x);
 		perimeter_b[step].j:=round(projection.y/w-ccd_origin_y);
 		
-		point_a:=xyz_axis_rotate(point_a,axis,2*pi/num_tangents);
-		point_b:=xyz_axis_rotate(point_b,axis,2*pi/num_tangents);
+		point_a:=xyz_axis_rotate(point_a,axis,2*pi/num_points);
+		point_b:=xyz_axis_rotate(point_b,axis,2*pi/num_points);
 	end;
 {
 	Draw lines between the circumference points on the image plane, and also
@@ -384,36 +380,39 @@ begin
 	pc:=bcam_image_position(center_b,camera);
 	icb.i:=round(pc.x/w-ccd_origin_x);
 	icb.j:=round(pc.y/w-ccd_origin_y);
-	for step:=0 to num_tangents-1 do begin
-		line.a:=perimeter_a[step];
-		line.b:=perimeter_b[step];
-		draw_overlay_line(ip,line,scam_cylinder_outline_color);
+	for step:=0 to num_points-1 do begin
 	
-		if step>0 then begin
-			line.a:=perimeter_a[step-1];
-			line.b:=perimeter_a[step];		
-			draw_overlay_line(ip,line,scam_cylinder_outline_color);
-			line.a:=perimeter_b[step-1];
-			line.b:=perimeter_b[step];		
-			draw_overlay_line(ip,line,scam_cylinder_outline_color);
+		if draw_perimeter then begin
+			line.a:=perimeter_a[step];		
+			line.b:=perimeter_a[(step+1) mod num_points];
+			draw_overlay_line(ip,line,scam_cylinder_color);
+			line.a:=perimeter_b[step];		
+			line.b:=perimeter_b[(step+1) mod num_points];
+			draw_overlay_line(ip,line,scam_cylinder_color);
+		end;
+				
+		if draw_axials then begin
+			line.a:=perimeter_a[step];
+			line.b:=perimeter_b[step];
+			draw_overlay_line(ip,line,scam_cylinder_color);
+		end;
+	
+		if draw_chords then begin
+			line.a:=perimeter_a[step];		
+			line.b:=perimeter_a[num_points-step-1];
+			draw_overlay_line(ip,line,scam_cylinder_color);
+			line.a:=perimeter_b[step];		
+			line.b:=perimeter_b[num_points-step-1];
+			draw_overlay_line(ip,line,scam_cylinder_color);
 		end;
 		
 		if draw_radials then begin
 			line.a:=perimeter_a[step];		
 			line.b:=ica;
-			draw_overlay_line(ip,line,scam_cylinder_outline_color);
+			draw_overlay_line(ip,line,scam_cylinder_color);
 			line.a:=perimeter_b[step];		
 			line.b:=icb;
-			draw_overlay_line(ip,line,scam_cylinder_outline_color);
-		end;
-		
-		if draw_chords then begin
-			line.a:=perimeter_a[step];		
-			line.b:=perimeter_a[num_tangents-step-1];
-			draw_overlay_line(ip,line,scam_cylinder_outline_color);
-			line.a:=perimeter_b[step];		
-			line.b:=perimeter_b[num_tangents-step-1];
-			draw_overlay_line(ip,line,scam_cylinder_outline_color);
+			draw_overlay_line(ip,line,scam_cylinder_color);
 		end;
 	end;
 end;

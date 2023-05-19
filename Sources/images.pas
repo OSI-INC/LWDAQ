@@ -759,7 +759,7 @@ procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
 	color:overlay_pixel_type);
 	
 const
-	rough_step_size=0.8;{pixels}
+	rough_step_size=0.5;{pixels}
 	
 var
 	num_steps,step_num:integer;
@@ -772,8 +772,6 @@ begin
 	if not valid_analysis_bounds(ip) then exit;
 	ij_clip_line(line,outside,ip^.analysis_bounds);
 	if outside then exit;
-	if not ij_in_rectangle(line.a,ip^.analysis_bounds) then exit;
-	if not ij_in_rectangle(line.b,ip^.analysis_bounds) then exit;
 	
 	with line,ip^ do begin
 		set_ov(ip,a.j,a.i,color);
@@ -808,7 +806,7 @@ procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;
 	shade:intensity_pixel_type);
 	
 const
-	rough_step_size=0.8;{pixels}
+	rough_step_size=0.5;{pixels}
 	
 var
 	num_steps,step_num:integer;
@@ -821,8 +819,6 @@ begin
 	if not valid_analysis_bounds(ip) then exit;
 	ij_clip_line(line,outside,ip^.analysis_bounds);
 	if outside then exit;
-	if not ij_in_rectangle(line.a,ip^.analysis_bounds) then exit;
-	if not ij_in_rectangle(line.b,ip^.analysis_bounds) then exit;
 	
 	with line,ip^ do begin
 		set_px(ip,a.j,a.i,shade);

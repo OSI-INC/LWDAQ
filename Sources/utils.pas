@@ -579,6 +579,7 @@ function xyz_origin:xyz_point_type;
 function xyz_difference(p,q:xyz_point_type):xyz_point_type;
 function xyz_separation(p,q:xyz_point_type):real;
 function xyz_z_plane(z:real):xyz_plane_type;
+function xyz_perpendicular(v:xyz_point_type):xyz_point_type;
 function xyz_transform(M:xyz_matrix_type;p:xyz_point_type):xyz_point_type;
 function xyz_matrix_from_points(p,q,r:xyz_point_type):xyz_matrix_type;
 function xyz_plane_plane_plane_intersection(p,q,r:xyz_plane_type):xyz_point_type;
@@ -5568,6 +5569,29 @@ begin
 		normal.x:=0;normal.y:=0;normal.z:=1;
 	end;
 	xyz_z_plane:=plane;
+end;
+
+{
+	xyz_perpendicular_vector generates a normal vector perpendicular to the
+	vector "v". There are always an infinity of such vectors, but the difficulty
+	is providing an algorithm for producing one such vector regardless of the
+	direction of v. We convert v into a normal vector. At least one of its x, y,
+	and z coordinates must have magnitude less than 0.58, so we find one such
+	coordinate and set it to -1 if it was positive and +1 if it was zero or
+	negative. This new vector is q. The cross product of v and q is a
+	perpendicular. We obtain a unit vector in the same direction.
+}
+function xyz_perpendicular(v:xyz_point_type):xyz_point_type;
+const max=0.6;
+var p,q:xyz_point_type;
+begin
+	v:=xyz_unit_vector(v);
+	q:=v;
+	if (abs(q.x)<max) then if q.x>0 then q.x:=-1 else q.x:=1
+	else if (abs(q.y)<max) then if q.y>0 then q.y:=-1 else q.y:=1
+	else if q.z>0 then q.z:=-1 else q.z:=1;
+	p:=xyz_unit_vector(xyz_cross_product(v,q));
+	xyz_perpendicular:=p;
 end;
 
 {
