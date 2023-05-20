@@ -138,6 +138,8 @@ procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;
 	shade:intensity_pixel_type);
 procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
 	color:overlay_pixel_type);
+procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;
+	color:overlay_pixel_type);
 procedure draw_overlay_pixel(ip:image_ptr_type;pixel:ij_point_type;
 	color:overlay_pixel_type);
 procedure draw_overlay_rectangle(ip:image_ptr_type;rect:ij_rectangle_type;
@@ -751,50 +753,63 @@ begin
 end;
 
 {
-	draw_overlay_line draws a line in two-dimensional integer space onto the overlay
+	draw_overlay_xy_line draws a line in two-dimensional integer space onto the overlay
 	of the specified image. The routine draws the line in the specified color, and
-	clips it to the analysis bounds.
+	clips it to the analysis bounds. The routine takes a line with real-valued 
+	coordinates so as to avoid rounding errors in the start and end of the line 
+	it draws. We use this routine to fill in projected objects with lines.
 }
-procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
+procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;
 	color:overlay_pixel_type);
 	
 const
-	rough_step_size=0.8;{pixels}
+	rough_step_size=0.5;{pixels}
 	
 var
 	num_steps,step_num:integer;
 	p,q,step:xy_point_type;
-	s:ij_point_type;
 	outside:boolean;
 
 begin
 	if not valid_image_ptr(ip) then exit;
 	if not valid_analysis_bounds(ip) then exit;
-	ij_clip_line(line,outside,ip^.analysis_bounds);
+	xy_clip_line(line,outside,ip^.analysis_bounds);
 	if outside then exit;
 	
 	with line,ip^ do begin
-		set_ov(ip,a.j,a.i,color);
-		set_ov(ip,b.j,b.i,color);
-		p.x:=a.i;
-		p.y:=a.j;
-		q.x:=b.i;
-		q.y:=b.j;
-		s:=a;
+		p.x:=a.x;
+		p.y:=a.y;
+		q.x:=b.x;
+		q.y:=b.y;
 	end;
 	
 	if xy_separation(p,q)<rough_step_size then num_steps:=0
 	else num_steps:=round(xy_separation(p,q)/rough_step_size);
 	step:=xy_scale(xy_difference(q,p),1/(num_steps+1));
 
-	for step_num:=1 to num_steps do begin
+	for step_num:=0 to num_steps do begin
 		p:=xy_sum(p,step);
-		if p.x-s.i>0.5 then inc(s.i)
-		else if p.x-s.i<-0.5 then dec(s.i);
-		if p.y-s.j>0.5 then inc(s.j)
-		else if p.y-s.j<-0.5 then dec(s.j);
-		set_ov(ip,s.j,s.i,color);
+		set_ov(ip,round(p.y),round(p.x),color);
 	end;
+end;
+
+{
+	draw_overlay_line draws a line in two-dimensional integer space onto the overlay
+	of the specified image. The routine draws the line in the specified color, and
+	clips it to the analysis bounds. It calls draw_overlay_xy_line.
+}
+procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
+	color:overlay_pixel_type);
+	
+var 
+	lxy:xy_line_type;
+	
+begin
+	lxy.a.x:=line.a.i;
+	lxy.a.y:=line.a.j;
+	lxy.b.x:=line.b.i;
+	lxy.b.y:=line.b.j;
+	draw_overlay_xy_line(ip,lxy,color);
 end;
 
 {

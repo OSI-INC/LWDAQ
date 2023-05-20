@@ -3435,7 +3435,7 @@ var
 	disagreement:real=0;
 	spread:real=0;
 	threshold:real=0;
-	num_tangents:integer=10;
+	num_points:integer=2000;
 		
 begin
 	error_string:='';
@@ -3464,17 +3464,14 @@ begin
 	if (command='project') then begin
 		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then body:=Tcl_ObjString(argv[4]);
-	end else if (command='project_outline') then begin
-		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
-		if argc>4 then body:=Tcl_ObjString(argv[4]);
-		if argc>5 then num_tangents:=Tcl_ObjInteger(argv[5]);
+		if argc>5 then num_points:=Tcl_ObjInteger(argv[5]);
 	end else if (command='disagreement') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
 		if argc>4 then spread:=Tcl_ObjReal(argv[4]);
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Invalid command "'+command+'", must be one of '
-			+'"project project_outline disagreement" in '
+			+'"project disagreement" in '
 			+'lwdaq_scam.');
 		exit;
 	end;
@@ -3484,29 +3481,10 @@ begin
 			option:=read_word(body);
 			if option='sphere' then begin
 				sphere:=read_xyz_sphere(body);
-				scam_project_sphere(ip,sphere,camera);
+				scam_project_sphere(ip,sphere,camera,num_points);
 			end else if option='cylinder' then begin
 				cylinder:=read_xyz_cylinder(body);
-				scam_project_cylinder(ip,cylinder,camera);
-			end else begin
-				Tcl_SetReturnString(interp,error_prefix
-					+'Invalid shape "'+option+'", must be one of '
-					+'"sphere cylinder" in '
-					+'lwdaq_scam.');
-				exit;
-			end;
-		end;
-	end;
-	
-	if command='project_outline' then begin
-		while body<>'' do begin
-			option:=read_word(body);
-			if option='sphere' then begin
-				sphere:=read_xyz_sphere(body);
-				scam_project_sphere_outline(ip,sphere,camera,num_tangents);
-			end else if option='cylinder' then begin
-				cylinder:=read_xyz_cylinder(body);
-				scam_project_cylinder_outline(ip,cylinder,camera,num_tangents);
+				scam_project_cylinder(ip,cylinder,camera,num_points);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Invalid shape "'+option+'", must be one of '

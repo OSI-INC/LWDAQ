@@ -5074,119 +5074,24 @@ end;
 
 {
 	ij_clip_line clips an ij_line_type so that its two end points either lie within
-	the clip rectangle or lie on the boundary of the clip rectangle. 
+	the clip rectangle or lie on the boundary of the clip rectangle. It calls the
+	xy_clip_line routine.
 }
 procedure ij_clip_line(var line:ij_line_type;var outside:boolean;clip:ij_rectangle_type);
 
 var 
-	num_intersections:integer;
-	k:ij_point_type;
-	top_edge,right_edge,bottom_edge,left_edge:ij_line_type;
-	i:array [1..4] of ij_point_type;
-	a_in,b_in:boolean;
+	lxy:xy_line_type;
 	
 begin
-	num_intersections:=0;
-	with clip do begin
-		top_edge.a.i:=left;
-		top_edge.a.j:=top;
-		top_edge.b.i:=right;
-		top_edge.b.j:=top;
-		right_edge.a.i:=right;
-		right_edge.a.j:=top;
-		right_edge.b.i:=right;
-		right_edge.b.j:=bottom;
-		bottom_edge.a.i:=left;
-		bottom_edge.a.j:=bottom;
-		bottom_edge.b.i:=right;
-		bottom_edge.b.j:=bottom;
-		left_edge.a.i:=left;
-		left_edge.a.j:=top;
-		left_edge.b.i:=left;
-		left_edge.b.j:=bottom;
-	end;
-	a_in:=ij_in_rectangle(line.a,clip);
-	b_in:=ij_in_rectangle(line.b,clip);
-
-	if ij_separation(line.a,line.b)>0 then begin
-		if a_in and b_in then begin
-			outside:=false;
-		end else begin
-			if (line.a.i=line.b.i) then begin
-				if (line.a.i>=clip.left) and (line.a.i<=clip.right) then begin
-					inc(num_intersections);
-					i[num_intersections]:=ij_line_line_intersection(line,top_edge);
-					inc(num_intersections);
-					i[num_intersections]:=ij_line_line_intersection(line,bottom_edge);
-				end;
-			end;
-			if (line.a.j=line.b.j) then begin
-				if (line.a.j>=clip.top) and (line.a.j<=clip.bottom) then begin
-					inc(num_intersections);
-					i[num_intersections]:=ij_line_line_intersection(line,left_edge);
-					inc(num_intersections);
-					i[num_intersections]:=ij_line_line_intersection(line,right_edge);
-				end;
-			end;
-			if (line.a.i<>line.b.i) and (line.a.j<>line.b.j) then begin	
-				k:=ij_line_line_intersection(line,top_edge);
-				if ij_in_rectangle(k,clip) then begin
-					inc(num_intersections);
-					i[num_intersections]:=k;
-				end;
-				k:=ij_line_line_intersection(line,right_edge);
-				if ij_in_rectangle(k,clip) then begin
-					inc(num_intersections);
-					i[num_intersections]:=k;
-				end;
-				k:=ij_line_line_intersection(line,bottom_edge);
-				if ij_in_rectangle(k,clip) then begin
-					inc(num_intersections);
-					i[num_intersections]:=k;
-				end;
-				k:=ij_line_line_intersection(line,left_edge);
-				if ij_in_rectangle(k,clip) then begin
-					inc(num_intersections);
-					i[num_intersections]:=k;
-				end;
-			end;
-			if num_intersections>=2 then begin
-				if (num_intersections>2) and 
-						(ij_separation(i[1],i[2])=0) then i[2]:=i[3];
-				if (num_intersections>3) and 
-						(ij_separation(i[1],i[2])=0) then i[2]:=i[4];
-				if not a_in and not b_in then begin
-					outside:=ij_dot_product(
-						ij_difference(line.a,i[1]),
-						ij_difference(line.b,i[1]))>=0;
-					line.a:=i[1];
-					line.b:=i[2];
-				end;
-				if a_in and not b_in then begin
-					if (ij_separation(line.b,i[1])>ij_separation(line.b,i[2])) then 
-						line.b:=i[2]					
-					else 
-						line.b:=i[1];
-					outside:=false;
-				end;
-				if b_in and not a_in then begin
-					if (ij_separation(line.a,i[1])>ij_separation(line.a,i[2])) then 
-						line.a:=i[2]
-					else 
-						line.a:=i[1];
-					outside:=false;
-				end;
-				if (ij_separation(line.a,line.b)=0) and (num_intersections>2) then
-					line.b:=i[3];
-				if (ij_separation(line.a,line.b)=0) and (num_intersections>3) then
-					line.b:=i[4];				
-			end else begin
-				outside:=true;
-			end;
-		end;
-	end else begin
-		outside:=not a_in;
-	end;
+	lxy.a.x:=line.a.i;
+	lxy.a.y:=line.a.j;
+	lxy.b.x:=line.b.i;
+	lxy.b.y:=line.b.j;
+	xy_clip_line(lxy,outside,clip);
+	line.a.i:=round(lxy.a.x);
+	line.a.j:=round(lxy.a.y);
+	line.b.i:=round(lxy.b.x);
+	line.b.j:=round(lxy.b.y);
 end;
 
 {

@@ -59,18 +59,18 @@ const
 }
 procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
-	camera:bcam_camera_type);
+	camera:bcam_camera_type;
+	num_points:integer);
 procedure scam_project_cylinder(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
-	camera:bcam_camera_type);
-procedure scam_project_sphere_outline(ip:image_ptr_type;
+	camera:bcam_camera_type;
+	num_points:integer);
+procedure scam_project_sphere_complete(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
-	camera:bcam_camera_type;
-	num_points:integer);
-procedure scam_project_cylinder_outline(ip:image_ptr_type;
+	camera:bcam_camera_type);
+procedure scam_project_cylinder_complete(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
-	camera:bcam_camera_type;
-	num_points:integer);
+	camera:bcam_camera_type);
 	
 {
 	Routines that analyze the image.
@@ -127,13 +127,17 @@ begin
 end;
 	
 {
-	scam_project_sphere takes a sphere in SCAM coordinates and projects it onto
-	the image plane of a camera. The image plane's center and pixel size are
-	specified by the sensor code in the camera record. The routine draws in the
-	overlay, not the actual image. It represents the projection as a solid fill
-	in the sphere color.
+	scam_project_sphere_complete takes a sphere in SCAM coordinates and projects
+	it onto the image plane of a camera. The image plane's center and pixel size
+	are specified by the sensor code in the camera record. The routine draws in
+	the overlay, not the actual image. It represents the projection as a solid
+	fill in the sphere color. The routine goes through all the pixels within the
+	analysis bounds of the image and seeing if each will be in the silhouette of
+	the object. Its execution time is slow, but it is "complete". We call this
+	routine when we pass zero for the number of projection points to the usual
+	projection routine.
 }
-procedure scam_project_sphere(ip:image_ptr_type;
+procedure scam_project_sphere_complete(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
 	camera:bcam_camera_type);
 
@@ -162,10 +166,15 @@ begin
 end;
 
 {
-	scam_project_cylinder does for cylinders what scam_project_sphere does for
-	spheres. We get a solid fill in the cylinder color in the overlay.
+	scam_project_cylinder_complete does for cylinders what scam_project_sphere
+	does for spheres. We get a solid fill in the cylinder color in the overlay.
+	The routine goes through all the pixels within the analysis bounds of the
+	image and seeing if each will be in the silhouette of the object. Its
+	execution time is slow, but it is "complete". We call this routine when we
+	pass zero for the number of projection points to the usual projection
+	routine.
 }
-procedure scam_project_cylinder(ip:image_ptr_type;
+procedure scam_project_cylinder_complete(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
 	camera:bcam_camera_type);
 	
@@ -194,21 +203,27 @@ begin
 end;
 
 {
-	scam_project_sphere_outline takes a sphere in SCAM coordinates and draws the
-	outline of its projection onto the image plane of a camera. The routine
-	draws in the overlay, not the actual image. It represents the outline with a
-	finite number of straight lines joining points on the projection's
-	perimeter.
+	scam_project_sphere takes a sphere in SCAM coordinates and draws the outline
+	of its projection onto the image plane of a camera, then attempts to fill
+	the projection with lines drawn within the sphere. The num_points prameter
+	is the number of perimeter points the routine will project. The routine
+	represents the outline with a finite number of straight lines joining points
+	on the projection's perimeter. If we pass zero for the number of lines, the
+	routine calls scam_project_sphere_complete. The routine draws in the
+	overlay, not the actual image. If we pass zero for the number of lines, the
+	routine calls scam_project_sphere_complete. The routine draws in the
+	overlay, not the actual image. 
 }
-procedure scam_project_sphere_outline(ip:image_ptr_type;
+procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:xyz_sphere_type;
 	camera:bcam_camera_type;
 	num_points:integer);
 	
 const
+	draw_perimeter=true;
 	draw_radials=false;
 	draw_chords=true;
-	min_coord=0.2;
+	draw_cross_chords=true;
 	
 var
 	axis,tangent,center_line:xyz_line_type;
@@ -216,11 +231,15 @@ var
 	w:real;
 	step:integer;
 	pt,pc:xy_point_type;
-	line:ij_line_type;
-	ic:ij_point_type;
-	perimeter:array of ij_point_type;
+	line:xy_line_type;
+	ic:xy_point_type;
+	perimeter:array of xy_point_type;
 	
 begin
+{
+	If the number of points is zero, we call the complete projection routine.
+}
+	if num_points=0 then scam_project_sphere_complete(ip,sphere,camera);
 {
 	Find a tangent to the sphere that intersects the pivot point of the camera.
 	We start by constructing a line from the pivot point to the sphere center,
@@ -257,8 +276,8 @@ begin
 	setlength(perimeter,num_points);
 	for step:=0 to num_points-1 do begin
 		pt:=bcam_image_position(tangent.point,camera);
-		perimeter[step].i:=round(pt.x/w-ccd_origin_x);
-		perimeter[step].j:=round(pt.y/w-ccd_origin_y);
+		perimeter[step].x:=pt.x/w-ccd_origin_x;
+		perimeter[step].y:=pt.y/w-ccd_origin_y;
 		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/num_points);
 		tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 	end;
@@ -268,70 +287,45 @@ begin
 	between opposite perimeter points.
 }	
 	pc:=bcam_image_position(sphere.center,camera);
-	ic.i:=round(pc.x/w-ccd_origin_x);
-	ic.j:=round(pc.y/w-ccd_origin_y);
+	ic.x:=pc.x/w-ccd_origin_x;
+	ic.y:=pc.y/w-ccd_origin_y;
 	for step:=0 to num_points-1 do begin
-		line.a:=perimeter[step];
-		if step>0 then begin
-			line.b:=perimeter[step-1];
-			draw_overlay_line(ip,line,scam_sphere_color);
+		if draw_perimeter then begin
+			line.a:=perimeter[step];		
+			line.b:=perimeter[(step+1) mod num_points];
+			draw_overlay_xy_line(ip,line,scam_sphere_color);
 		end;
-		if draw_radials then begin
-			line.b:=ic;
-			draw_overlay_line(ip,line,scam_sphere_color);
-		end;
-		if draw_chords then begin
+		
+		if draw_chords and (step<=num_points/2) then begin
+			line.a:=perimeter[step];		
 			line.b:=perimeter[num_points-step-1];
-			draw_overlay_line(ip,line,scam_sphere_color);
+			draw_overlay_xy_line(ip,line,scam_sphere_color);
+		end;	
+			
+		if draw_cross_chords and (step<=num_points/2) then begin
+			line.a:=perimeter[step+round(num_points/4)];		
+			line.b:=perimeter[(num_points+round(num_points/4)-step-1) mod num_points];
+			draw_overlay_xy_line(ip,line,scam_sphere_color);
+		end;
+
+		if draw_radials then begin
+			line.a:=perimeter[step];		
+			line.b:=ic;
+			draw_overlay_xy_line(ip,line,scam_sphere_color);
 		end;
 	end;
 end;
 
 {
-	draw_overlay_line draws a line in two-dimensional integer space onto the overlay
-	of the specified image. The routine draws the line in the specified color, and
-	clips it to the analysis bounds.
+	scam_project_cylinder takes a cylinder in SCAM coordinates and draws the
+	outline of its projection onto the image plane of a camera, then attempts to
+	fill in the outline with lines. The num_points parameter tells the routine
+	how many points around the perimiter of the cylinder faces it should project
+	into the image plane. The routine operates in such a way that if the length
+	of the cylinder is zero, the routine draws a single ellipse. If we pass zero
+	for num_points, the routine calls scam_project_cylinder_complete.
 }
-procedure draw_line(ip:image_ptr_type;line:xy_line_type;color:overlay_pixel_type);
-	
-const
-	rough_step_size=0.5;{pixels}
-	
-var
-	num_steps,step_num:integer;
-	p,q,step:xy_point_type;
-	outside:boolean;
-
-begin
-	if not valid_image_ptr(ip) then exit;
-	if not valid_analysis_bounds(ip) then exit;
-	xy_clip_line(line,outside,ip^.analysis_bounds);
-	if outside then exit;
-	
-	with line,ip^ do begin
-		p.x:=a.x;
-		p.y:=a.y;
-		q.x:=b.x;
-		q.y:=b.y;
-	end;
-	
-	if xy_separation(p,q)<rough_step_size then num_steps:=0
-	else num_steps:=round(xy_separation(p,q)/rough_step_size);
-	step:=xy_scale(xy_difference(q,p),1/(num_steps+1));
-
-	for step_num:=0 to num_steps do begin
-		p:=xy_sum(p,step);
-		set_ov(ip,round(p.y),round(p.x),color);
-	end;
-end;
-
-{
-	scam_project_cylinder_outline takes a cylinder in SCAM coordinates and draws
-	the outline of its projection onto the image plane of a camera. The routine
-	operates in such a way that if the length of the cylinder is zero, the routine
-	draws a single ellipse.
-}
-procedure scam_project_cylinder_outline(ip:image_ptr_type;
+procedure scam_project_cylinder(ip:image_ptr_type;
 	cylinder:xyz_cylinder_type;
 	camera:bcam_camera_type;
 	num_points:integer);
@@ -339,9 +333,9 @@ procedure scam_project_cylinder_outline(ip:image_ptr_type;
 const
 	draw_perimeter=true;
 	draw_axials=true;
-	draw_chords=false;
+	draw_chords=true;
+	draw_cross_chords=true;
 	draw_radials=false;
-	min_coord=0.2;
 	
 var
 	step:integer;
@@ -355,6 +349,10 @@ var
 	pc:xy_point_type;
 
 begin
+{
+	If the number of points is zero, we call the complete projection routine.
+}
+	if num_points=0 then scam_project_cylinder_complete(ip,cylinder,camera);
 {
 	Find a point on the circumference of the first end of the cylinder.
 }
@@ -422,34 +420,43 @@ begin
 		if draw_perimeter then begin
 			line.a:=perimeter_a[step];		
 			line.b:=perimeter_a[(step+1) mod num_points];
-			draw_line(ip,line,scam_cylinder_color);
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
 			line.a:=perimeter_b[step];		
 			line.b:=perimeter_b[(step+1) mod num_points];
-			draw_line(ip,line,scam_cylinder_color);
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
 		end;
 				
 		if draw_axials then begin
 			line.a:=perimeter_a[step];
 			line.b:=perimeter_b[step];
-			draw_line(ip,line,scam_cylinder_color);
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
 		end;
 	
-		if draw_chords then begin
+		if draw_chords and (step<=num_points/2) then begin
 			line.a:=perimeter_a[step];		
 			line.b:=perimeter_a[num_points-step-1];
-			draw_line(ip,line,scam_cylinder_color);
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
 			line.a:=perimeter_b[step];		
 			line.b:=perimeter_b[num_points-step-1];
-			draw_line(ip,line,scam_cylinder_color);
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
 		end;
 		
 		if draw_radials then begin
 			line.a:=perimeter_a[step];		
 			line.b:=ica;
-			draw_line(ip,line,scam_cylinder_color);
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
 			line.a:=perimeter_b[step];		
 			line.b:=icb;
-			draw_line(ip,line,scam_cylinder_color);
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
+		end;
+
+		if draw_cross_chords and (step<=num_points/2) then begin
+			line.a:=perimeter_a[step+round(num_points/4)];		
+			line.b:=perimeter_a[(num_points+round(num_points/4)-step-1) mod num_points];
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
+			line.a:=perimeter_b[step+round(num_points/4)];		
+			line.b:=perimeter_b[(num_points+round(num_points/4)-step-1) mod num_points];
+			draw_overlay_xy_line(ip,line,scam_cylinder_color);
 		end;
 	end;
 end;
