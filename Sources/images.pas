@@ -759,7 +759,7 @@ procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
 	color:overlay_pixel_type);
 	
 const
-	rough_step_size=0.5;{pixels}
+	rough_step_size=0.8;{pixels}
 	
 var
 	num_steps,step_num:integer;
@@ -806,7 +806,7 @@ procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;
 	shade:intensity_pixel_type);
 	
 const
-	rough_step_size=0.5;{pixels}
+	rough_step_size=0.8;{pixels}
 	
 var
 	num_steps,step_num:integer;

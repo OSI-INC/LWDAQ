@@ -211,7 +211,6 @@ const
 	min_coord=0.2;
 	
 var
-	v:xyz_point_type;
 	axis,tangent,center_line:xyz_line_type;
 	theta:real;
 	w:real;
@@ -289,6 +288,44 @@ begin
 end;
 
 {
+	draw_overlay_line draws a line in two-dimensional integer space onto the overlay
+	of the specified image. The routine draws the line in the specified color, and
+	clips it to the analysis bounds.
+}
+procedure draw_line(ip:image_ptr_type;line:xy_line_type;color:overlay_pixel_type);
+	
+const
+	rough_step_size=0.5;{pixels}
+	
+var
+	num_steps,step_num:integer;
+	p,q,step:xy_point_type;
+	outside:boolean;
+
+begin
+	if not valid_image_ptr(ip) then exit;
+	if not valid_analysis_bounds(ip) then exit;
+	xy_clip_line(line,outside,ip^.analysis_bounds);
+	if outside then exit;
+	
+	with line,ip^ do begin
+		p.x:=a.x;
+		p.y:=a.y;
+		q.x:=b.x;
+		q.y:=b.y;
+	end;
+	
+	if xy_separation(p,q)<rough_step_size then num_steps:=0
+	else num_steps:=round(xy_separation(p,q)/rough_step_size);
+	step:=xy_scale(xy_difference(q,p),1/(num_steps+1));
+
+	for step_num:=0 to num_steps do begin
+		p:=xy_sum(p,step);
+		set_ov(ip,round(p.y),round(p.x),color);
+	end;
+end;
+
+{
 	scam_project_cylinder_outline takes a cylinder in SCAM coordinates and draws
 	the outline of its projection onto the image plane of a camera. The routine
 	operates in such a way that if the length of the cylinder is zero, the routine
@@ -311,9 +348,9 @@ var
 	point_a,point_b,center_a,center_b,radial:xyz_point_type;
 	w:real;
 	projection:xy_point_type;
-	perimeter_a,perimeter_b:array of ij_point_type;
-	ica,icb:ij_point_type;
-	line:ij_line_type;
+	perimeter_a,perimeter_b:array of xy_point_type;
+	ica,icb:xy_point_type;
+	line:xy_line_type;
 	axis:xyz_line_type;
 	pc:xy_point_type;
 
@@ -360,12 +397,12 @@ begin
 	setlength(perimeter_b,num_points);
 	for step:=0 to num_points-1 do begin
 		projection:=bcam_image_position(point_a,camera);
-		perimeter_a[step].i:=round(projection.x/w-ccd_origin_x);
-		perimeter_a[step].j:=round(projection.y/w-ccd_origin_y);
+		perimeter_a[step].x:=projection.x/w-ccd_origin_x;
+		perimeter_a[step].y:=projection.y/w-ccd_origin_y;
 		
 		projection:=bcam_image_position(point_b,camera);
-		perimeter_b[step].i:=round(projection.x/w-ccd_origin_x);
-		perimeter_b[step].j:=round(projection.y/w-ccd_origin_y);
+		perimeter_b[step].x:=projection.x/w-ccd_origin_x;
+		perimeter_b[step].y:=projection.y/w-ccd_origin_y;
 		
 		point_a:=xyz_axis_rotate(point_a,axis,2*pi/num_points);
 		point_b:=xyz_axis_rotate(point_b,axis,2*pi/num_points);
@@ -375,44 +412,44 @@ begin
 	radials and chords in the faces themselves, as directed by flags.
 }
 	pc:=bcam_image_position(center_a,camera);
-	ica.i:=round(pc.x/w-ccd_origin_x);
-	ica.j:=round(pc.y/w-ccd_origin_y);
+	ica.x:=pc.x/w-ccd_origin_x;
+	ica.y:=pc.y/w-ccd_origin_y;
 	pc:=bcam_image_position(center_b,camera);
-	icb.i:=round(pc.x/w-ccd_origin_x);
-	icb.j:=round(pc.y/w-ccd_origin_y);
+	icb.x:=pc.x/w-ccd_origin_x;
+	icb.y:=pc.y/w-ccd_origin_y;
 	for step:=0 to num_points-1 do begin
 	
 		if draw_perimeter then begin
 			line.a:=perimeter_a[step];		
 			line.b:=perimeter_a[(step+1) mod num_points];
-			draw_overlay_line(ip,line,scam_cylinder_color);
+			draw_line(ip,line,scam_cylinder_color);
 			line.a:=perimeter_b[step];		
 			line.b:=perimeter_b[(step+1) mod num_points];
-			draw_overlay_line(ip,line,scam_cylinder_color);
+			draw_line(ip,line,scam_cylinder_color);
 		end;
 				
 		if draw_axials then begin
 			line.a:=perimeter_a[step];
 			line.b:=perimeter_b[step];
-			draw_overlay_line(ip,line,scam_cylinder_color);
+			draw_line(ip,line,scam_cylinder_color);
 		end;
 	
 		if draw_chords then begin
 			line.a:=perimeter_a[step];		
 			line.b:=perimeter_a[num_points-step-1];
-			draw_overlay_line(ip,line,scam_cylinder_color);
+			draw_line(ip,line,scam_cylinder_color);
 			line.a:=perimeter_b[step];		
 			line.b:=perimeter_b[num_points-step-1];
-			draw_overlay_line(ip,line,scam_cylinder_color);
+			draw_line(ip,line,scam_cylinder_color);
 		end;
 		
 		if draw_radials then begin
 			line.a:=perimeter_a[step];		
 			line.b:=ica;
-			draw_overlay_line(ip,line,scam_cylinder_color);
+			draw_line(ip,line,scam_cylinder_color);
 			line.a:=perimeter_b[step];		
 			line.b:=icb;
-			draw_overlay_line(ip,line,scam_cylinder_color);
+			draw_line(ip,line,scam_cylinder_color);
 		end;
 	end;
 end;
