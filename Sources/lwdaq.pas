@@ -6241,6 +6241,122 @@ gui_writeln.</p>
 				Tcl_ObjInteger(argv[3]),
 				data_string));
 	end 
+	else if option='xyz_sum' then begin
+{
+<p>Add two xyz vectors together as in a + b.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector_a vector_b".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_sum(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					xyz_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='xyz_difference' then begin
+{
+<p>Subtract a second xyz vector from a first xyx vector, as in a - b.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector_a vector_b".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_difference(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					xyz_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='xyz_rotate' then begin
+{
+<p>Rotate an xyz vector about the x, y, and z axes in that order by three angles
+rx, ry, and rz in radians.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector rotation".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_rotate(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					xyz_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='xyz_unrotate' then begin
+{
+<p>Rotate an xyz vector about the z, y, z axes in that order by three angles rz,
+ry, and rx in radians. We specify the angles with three values in the order rx,
+ry, and rz, opposite to the order in which the angles will be applied to their
+respective axes, hence the name "unrotate".</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector_a vector_b".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_unrotate(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					xyz_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='xyz_dot_product' then begin
+{
+<p>The dot product of a first xyz vector with a second xyz vector, as in a.b.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector_a vector_b".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_real(
+				xyz_dot_product(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					xyz_from_string(Tcl_ObjString(argv[3]))),
+				fsr,fsd));
+	end 
+	else if option='xyz_unit_vector' then begin
+{
+<p>Take a vector and divide it by its length to obtain a unit vector.</p>
+}
+		if (argc<>3) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_unit_vector(
+					xyz_from_string(Tcl_ObjString(argv[2])))));
+	end 
+	else if option='xyz_cross_product' then begin
+{
+<p>The cross product of a first xyz vector with a second xyz vector, as in a X b.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector_a vector_b".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_cross_product(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					xyz_from_string(Tcl_ObjString(argv[3])))));
+	end 
 	else if option='xyz_plane_plane_intersection' then begin
 {
 <p>Determines the line along which two planes intersect. We specify each plane
@@ -6482,7 +6598,7 @@ spaces.</p>
 <p>Because the <i>frequency_component</i> routine accepts only real-valued
 inputs, we are certain that component <i>k</i> for <i>K</i>&gt;0 will be the
 complex conjugate of component <i>N</i>&minus;<i>k</i>, which means the two
-components add together to form one component of double the maginitude but with
+components add together to form one component of double the magnitude but with
 the same phase as component <i>k</i>. Thus <i>frequency_component</i> doubles
 the magnitude of the <i>k</i>'th component for <i>k</i> equal to 1,
 2,..<i>N</i>/2&minus;1 and leaves the phase unchanged.</p>
@@ -6918,13 +7034,14 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 		Tcl_SetReturnString(interp,'Bad option "'+option+'", must be one of "'
 		+' bcam_from_global_point global_from_bcam_point bcam_from_global_vector'
 		+' global_from_bcam_vector bcam_source_bearing bcam_source_position'
-		+' bcam_image_position wps_wire_plane wps_calibrate xyz_plane_plane_intersection'
-		+' xyz_line_plane_intersection xyz_line_line_bridge xyz_point_line_vector'
-		+' linear_interpolate nearest_neighbor sum_sinusoids'
-		+' frequency_components window_function glitch_filter spikes_x'
-		+' glitch_filter_y glitch_filter_xy coastline_x coastline_x_progress'
-		+' coastline_xy coastline_xy_progress matrix_inverse tkcolor'
-		+' straight_line_fit ave_stdev'
+		+' bcam_image_position wps_wire_plane wps_calibrate xyz_sum xyz_difference'
+		+' xyz_rotate xyz_unrotate xyz_unit_vector xyz_cross_product xyz_dot_product'
+		+' xyz_plane_plane_intersection xyz_line_plane_intersection'
+		+' xyz_line_line_bridge xyz_point_line_vector linear_interpolate'
+		+' nearest_neighbor sum_sinusoids frequency_components window_function'
+		+' glitch_filter spikes_x glitch_filter_y glitch_filter_xy coastline_x'
+		+' coastline_x_progress coastline_xy coastline_xy_progress matrix_inverse'
+		+' tkcolor straight_line_fit ave_stdev'
 		+'".');
 		exit;
 	end;
