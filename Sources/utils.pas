@@ -41,7 +41,7 @@ unit utils;
 	i:=real_to_integer(). In the first case, reading left to right, we see that
 	i will be assigned an integer value, and this value will be derived from a
 	real number. In the second case we have to go back and forth across the name
-	to make the same determination. Furthermore, we can concatinate the routines
+	to make the same determination. Furthermore, we can concatenate the routines
 	with others like this: i:=integer_from_real(real_from_string(s)) to create
 	compound transformations, that are lear when read in either direction.
 	
@@ -89,7 +89,7 @@ unit utils;
 	Utils provides a selection of routines that convert between strings and
 	numbers, and visa versa. The procedures beginning with "write_" convert
 	mathematical objects into strings and append them to a string. Functions
-	beginning with "read_" read a numberical object from the beginning of a
+	beginning with "read_" read a numerical object from the beginning of a
 	string and delete it from the string. Functions beginning with
 	"string_from_" take a mathematical parameter and return a string. Functions
 	ending with "from_string" convert a string into a mathematical object.
@@ -382,8 +382,9 @@ type
 		function(vertex:simplex_vertex_type;ep:pointer):real;
 
 var
-	simplex_enable_shrink:boolean=false;
-	simplex_small_size_factor:real=1e-5;
+	simplex_enable_shrink:boolean=true;
+	simplex_small_size_factor:real=0.001;
+	simplex_construct_size:real=1.0;
 	simplex_max_done_counter:integer=5;
 
 function new_simplex(num_coords:integer):simplex_type;
@@ -4252,15 +4253,11 @@ end;
 	new_simplex creates a new simplex fitting structure to operate in a space
 	with "num_coords" coordinates. We use "n" for the number of coordinates in
 	our code, and store the "n" in the simplex array for convenience. We fill
-	the structure with some nominal values. The routine returns the structure,
-	which is a dynamic array, and so will be returned as a pointer to the
-	structure in memory, and the structure itself will keep a reference count so
-	that when it is no longer being referred to, the process will dispose of the
-	structure. Because our FPC dynamic array must start with index 0, but we
-	want to work with 1..n for coordinates and 1..n+1 for vertices, we will make
-	the vertex an array of size n+1, giving us elements 0..n, and using 1..n.
-	For the vertices of the simplex shape, we will allow size n+2 so we can have
-	elements 0..n+1.
+	the structure with some nominal values. The structure is a dynamic array,
+	and inf fpc Pascal, dynamic arrays must start with index 0. We want to work
+	with 1..n for coordinates, and 1..n+1 for vertices. We make the vertex an
+	array of size n+1, giving us elements 0..n, and using 1..n. For the vertices
+	of the simplex shape, we will allow size n+2 so we can have elements 0..n+1.
 }
 function new_simplex(num_coords:integer):simplex_type;
 
@@ -4274,7 +4271,7 @@ begin
 		setlength(vertices,n+2,n+1);
 		setlength(errors,n+2);
 		for i:=1 to n do vertices[1,i]:=0;
-		construct_size:=1;
+		construct_size:=simplex_construct_size;
 		done_counter:=0;
 		max_done_counter:=simplex_max_done_counter;
 	end;
@@ -4301,14 +4298,16 @@ begin
 end;
 
 {
-	simplex_construct constructs a new simplex with sides of length side_length.
-	We assume that the first element in the simplex is already set. We
-	re-calculate the error array using an error function. This function
-	takes a vertex and a generic pointer, so we pass the pointer into
-	simplex_construct as well. The simplex_construct routine makes no use of the
-	pointer other than to pass it into the error function, where the pointer
-	allows the error function to find the values it needs to determine its
-	result.
+	simplex_construct constructs a new simplex within an existing simplex
+	structure, with sides of length given by the construction size field of the
+	simlex structure itself. The routine leaves the first vertex of the simplex
+	unchanged and uses it to create the remaining vertices. We assume the first
+	vertex is the currently-optimal vertex with the lowest altitude. We
+	re-calculate the error array using an error function. This function takes a
+	vertex and a generic pointer, so we pass the pointer into simplex_construct
+	as well. The simplex_construct routine makes no use of the pointer other
+	than to pass it into the error function, where the pointer allows the error
+	function to find the values it needs to determine its result.
 }
 procedure simplex_construct(var simplex:simplex_type;
 	error:simplex_error_function_type;
@@ -4373,10 +4372,10 @@ begin
 end;
 
 {
-	Sort the simplex vertices into order of ascending error. We use
-	quick-sort so we can be efficient when the simplex dimension is large.
-	The simplex sort provides its own swap and after functions, which are
-	here declared globally within the unit implementation.
+	Sort the simplex vertices into order of ascending error. We use quick-sort
+	so we can be efficient when the simplex dimension is large. The simplex sort
+	provides its own swap and after functions, which are here declared globally
+	within the unit implementation.
 }
 function simplex_sort_after(i,j:integer;lp:pointer):boolean;
 begin 
@@ -4407,16 +4406,15 @@ end;
 	simplex_step is the kernel of our simplex fitting algorithm. It takes one
 	simplex step, whereby a simplex shape in the fitting space is either
 	reflected, extended, or contracted. As the fit converges, we re-construct
-	the simplex to make sure we don't get stuck in a false convergance. The
-	routine takes an n-dimensional simlex_type that holds the n+1 vertices of
-	the simplex shape, as well as some counters, limits, and the errors of
-	the vertices. In addition, it takes an error function and a generic
-	pointer. The error function is provided by the process that uses the
-	simplex fit: it returns the alititude of a vertex. We pass the error
-	function the vertex and the generic pointer. The generic pointer allows the
-	alitutude function to function to find the information it needs to determine
-	the error of the vertex. The simplex_step routine does not use the
-	pointer at all.
+	the simplex to make sure we don't get stuck in a false convergence. The
+	routine takes an n-dimensional simplex_type that holds the n+1 vertices of
+	the simplex shape, as well as some counters, limits, and the errors of the
+	vertices. In addition, it takes an error function and a generic pointer. The
+	error function is provided by the process that uses the simplex fit: it
+	returns the altitude of a vertex. We pass the error function the vertex and
+	the generic pointer. The generic pointer allows the altitude function to
+	function to find the information it needs to determine the error of the
+	vertex. The simplex_step routine does not use the pointer at all.
 }
 procedure simplex_step(var simplex:simplex_type;
 	error:simplex_error_function_type;
@@ -4442,9 +4440,9 @@ var
 	
 begin
 {
-	Set up the vertex variables we will use to perform the fitting. We must
-	make sure that each is an independent dynamic array, so we set their
-	lengths in separate instructions.
+	Set up the vertex variables we will use to perform the fitting. We must make
+	sure that each is an independent dynamic array, so we set their lengths in
+	separate instructions.
 }
 	v:=simplex_vertex_copy(simplex.vertices[1]);
 	v_center:=simplex_vertex_copy(simplex.vertices[1]);
@@ -4478,13 +4476,14 @@ begin
 		if (a_reflect>=errors[1]) and (a_reflect<errors[n]) then begin
 			vertices[n+1]:=simplex_vertex_copy(v_reflect);
 			errors[n+1]:=a_reflect;
-			if show_details then gui_writeln('r: '+string_from_real(a_reflect,fsr,fsd));
+			if show_details then 
+				gui_writeln('reflect: '+string_from_real(a_reflect,fsr,fsd));
 		end;
 {
-	If the error of this new vertex is lower than all the other vertices, we
-	try to expand our reflection in the hope of getting an even lower error.
+	If the error of this new vertex is lower than all the other vertices, we try
+	to expand our reflection in the hope of getting an even lower error.
 	Otherwise we go back to the original reflected vertex and use it to replace
-	the highest vertex.
+	the lowest vertex.
 }
 		if (a_reflect<errors[1]) then begin
 			v:=simplex_vertex_copy(v_center);
@@ -4496,23 +4495,26 @@ begin
 			if a_expand<a_reflect then begin
 				vertices[n+1]:=simplex_vertex_copy(v_expand);
 				errors[n+1]:=a_expand;
-				if show_details then gui_writeln('re: '+string_from_real(a_expand,fsr,fsd));
+				if show_details then 
+					gui_writeln('expand and improve: '+string_from_real(a_expand,fsr,fsd));
 			end else begin
 				vertices[n+1]:=simplex_vertex_copy(v_reflect);
 				errors[n+1]:=a_reflect;
-				if show_details then gui_writeln('rl: '+string_from_real(a_reflect,fsr,fsd));
+				if show_details then 
+					gui_writeln('reflect and improve: '
+						+string_from_real(a_reflect,fsr,fsd));
 			end;
 		end;
 {
 	If the reflected vertex is higher than all the others, we contract the
-	simplex by moving the highest original verticex towards the center of mass
+	simplex by moving the highest original vertex towards the center of mass
 	of the others. If the contracted vertex is lower than the highest original
 	vertex, we accept the contracted vertex and reject the highest original
 	vertex. Otherwise, we have encountered a double-ridge and we must do
 	something to get going again. We can shrink the entire simplex or
 	re-construct a new one around the best vertex. The Nelder-Mead method
 	proscribes the shrink. We have code to perform the shrink, but we find that
-	re-constructing the simplex in this situation avoids convergeance in the
+	re-constructing the simplex in this situation avoids convergence in the
 	wrong spot, so we use the re-construction instead of the shrinking. We
 	enable the shrink code with the global simplex_enable_shrink flag.
 }
@@ -4526,9 +4528,17 @@ begin
 			if a_contract<=errors[n+1] then begin
 				vertices[n+1]:=simplex_vertex_copy(v_contract);
 				errors[n+1]:=a_contract;
-				if (simplex_size(simplex)<construct_size*simplex_small_size_factor) then 
+				if (simplex_size(simplex)
+						<construct_size*simplex_small_size_factor) then begin
 					inc(done_counter);
-				if show_details then gui_writeln('c: '+string_from_real(a_contract,fsr,fsd));
+					if show_details then 
+						gui_writeln('contract increment: '
+							+string_from_real(a_contract,fsr,fsd));
+				end else begin
+					if show_details then 
+						gui_writeln('contract: '
+							+string_from_real(a_contract,fsr,fsd));
+				end;
 			end else begin
 				if simplex_enable_shrink then begin
 					for i:=2 to n+1 do begin
@@ -4537,13 +4547,14 @@ begin
 						add(vertices[i],vertices[1]);
 						errors[i]:=error(vertices[i],ep);
 					end;
-					if show_details then writeln('s: '+string_from_real(a_contract,fsr,fsd));
+					if show_details then 
+						gui_writeln('shrink: '+string_from_real(a_contract,fsr,fsd));
+				end else begin
+					simplex_construct(simplex,error,ep);
+					if show_details then
+						gui_writeln('reconstruct: '+string_from_real(a_contract,fsr,fsd))
 				end;
 				inc(done_counter);
-				if done_counter<max_done_counter then begin
-					simplex_construct(simplex,error,ep);
-					if show_details then gui_writeln('x: '+string_from_real(a_contract,fsr,fsd));
-				end else if show_details then gui_writeln('d: '+string_from_real(a_contract,fsr,fsd));
 			end;
 		end;
 	end;
@@ -4556,18 +4567,17 @@ begin
 }
 	if show_details then with simplex do begin
 		for i:=1 to n+1 do begin
-			write(i,': ',errors[i],' ');
-			for j:=1 to n do begin
-				write(vertices[i,j]:1:6,' ');
-			end;
-			gui_writeln('');
+			debug_string:='';
+			writestr(debug_string,i,': ',errors[i]:fsr:fsd,' ');
+			for j:=1 to n do writestr(debug_string,debug_string,vertices[i,j]:1:6,' ');
+			gui_writeln(debug_string);
 		end;
 	end;
 end;
 
 {
 	calculate_ft_term calculates the amplitude and offset of the discrete
-	fourier transform component with sinusoidal period "period". We express
+	Fourier transform component with sinusoidal period "period". We express
 	period as a real-valued multiple of the sample period, T. The special case
 	of period=0 we use to determine the DC component of the waveform. We pass
 	data to the routine in an array of real numbers, each of which represents a
@@ -4583,7 +4593,7 @@ end;
 	the sinusoidal component value at point x with
 	amplitude*sin(2*pi*(x-offset)/period).
 
-	If you want to calculate the entire discrete fourier transform, and you have
+	If you want to calculate the entire discrete Fourier transform, and you have
 	data with N a power of 2, then you can try our fft routine, but note that it
 	returns complex-valued terms, which you have to convert into amplitude and
 	offset. This routine returns amplitude and offset if a format that is
@@ -4627,7 +4637,7 @@ end;
 	multiple of the fundamental signal frequency, or 1/<i>NT</i>, where <i>T</i>
 	is the sample period and <i>N</i> is the number of samples. It returns the
 	amplitude and offset of a sine wave amplitude*sin(2*pi*(x-offset)*f/N). If
-	you want to obtain a true complex-valued discrete fourier transform, try our
+	you want to obtain a true complex-valued discrete Fourier transform, try our
 	fft routine.
 }
 procedure frequency_component(frequency:real;
@@ -4661,13 +4671,13 @@ begin
 end;
 
 {
-	fft is a Fast Fourier Transform routine for determining the discrete fourier
+	fft is a Fast Fourier Transform routine for determining the discrete Fourier
 	transform in Nlog(N) time by a divide-and-conquer algorithm due to Colley
 	and Tokey. The routine operates in the complex plane, taking complex input
-	data and producting complex transform components.
+	data and producing complex transform components.
 
 	fft takes a complex-valued sequence of N data points and returns the N
-	complex-valued components that make up its complete discrete fourier
+	complex-valued components that make up its complete discrete Fourier
 	transform. The routine takes its data in an xy_graph and returns the
 	transform in another xy_graph. The routine is reversible also: if you pass
 	the transform back to fft, you will re-construct the original data. Each
