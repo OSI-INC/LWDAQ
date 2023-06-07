@@ -370,22 +370,20 @@ procedure swap_matrix_rows(var M:matrix_type;row_1,row_2:integer);
 type 
 	simplex_vertex_type = array of real;
 	simplex_type = record 
+		n:integer; {dimensions of the space}
 		vertices:array of simplex_vertex_type; 
 		errors:array of real; 
-		construct_size:real; {length of sides for simplex construction}
-		done_counter:integer; {counter used to detect convergance}
-		max_done_counter:integer; {counter value at convergance, try 10}
-		n:integer; {dimensions of the space}
+		scaling:array of real;
+		start_size:real; {length of sides for construction}
+		end_size:real; {length of longest side for convergeance}
+		restart_cntr:integer; {pop counter}
+		max_restarts:integer; {max number of pops}
+		shrink_factor:real; {coordinate shrinking factor}
+		done:boolean;
 	end;
 	simplex_ptr=^simplex_type;
 	simplex_error_function_type = 
 		function(vertex:simplex_vertex_type;ep:pointer):real;
-
-var
-	simplex_enable_shrink:boolean=true;
-	simplex_small_size_factor:real=0.001;
-	simplex_construct_size:real=1.0;
-	simplex_max_done_counter:integer=5;
 
 function new_simplex(num_coords:integer):simplex_type;
 procedure simplex_step(var simplex:simplex_type;
@@ -4262,29 +4260,33 @@ end;
 function new_simplex(num_coords:integer):simplex_type;
 
 var
-	s:simplex_type;
+	simplex:simplex_type;
 	i:integer;
 	
 begin
-	with s do begin
+	with simplex do begin
 		n:=num_coords;
 		setlength(vertices,n+2,n+1);
 		setlength(errors,n+2);
+		setlength(scaling,n+1);
 		for i:=1 to n do vertices[1,i]:=0;
-		construct_size:=simplex_construct_size;
-		done_counter:=0;
-		max_done_counter:=simplex_max_done_counter;
+		for i:=1 to n do scaling[i]:=1.0;
+		start_size:=1.0;
+		end_size:=0.01;
+		restart_cntr:=0;
+		max_restarts:=10;
+		done:=false;
 	end;
-	new_simplex:=s;
+	new_simplex:=simplex;
 end;
 
 {
 	simplex_vertex_copy creates a new vertex dynamic array and copies the
 	elements of the original vertex into the new one. We cannot use the
-	assignment operator to make copies of dynamic arrays in FPC, because the
-	dynamic arrays are referenced variables and copying merely creates a copy of
-	the pointer to the variable. We don't bother copying the 0'th element
-	because we don't use that element.
+	assignment operator to make copies of dynamic arrays because the dynamic
+	arrays are referenced variables and copying merely creates a copy of the
+	pointer to the variable. We don't bother copying the 0'th element because we
+	don't use that element.
 }
 function simplex_vertex_copy(var a:simplex_vertex_type):simplex_vertex_type;
 var 
@@ -4320,7 +4322,7 @@ begin
 	with simplex do begin
 		for i:=2 to n+1 do begin
 			vertices[i]:=simplex_vertex_copy(vertices[1]);
-			vertices[i,i-1]:=vertices[i,i-1]+construct_size;
+			vertices[i,i-1]:=vertices[i,i-1]+start_size*scaling[i-1];
 		end;
 		for i:=1 to n+1 do errors[i]:=error(vertices[i],ep);
 	end;
@@ -4431,11 +4433,10 @@ const
 	expand_scale=2;
 	contract_scale=0.5;
 	shrink_scale=0.5;
-	report=false;
 	
 var 
 	i,j:integer;
-	v,v_center,v_contract,v_expand,v_reflect:simplex_vertex_type;
+	v,v_center,v_contract,v_extend,v_reflect:simplex_vertex_type;
 	a_reflect,a_contract,a_expand:real;
 	
 begin
@@ -4445,19 +4446,21 @@ begin
 	separate instructions.
 }
 	v:=simplex_vertex_copy(simplex.vertices[1]);
-	v_center:=simplex_vertex_copy(simplex.vertices[1]);
 	v_contract:=simplex_vertex_copy(simplex.vertices[1]);
-	v_expand:=simplex_vertex_copy(simplex.vertices[1]);
+	v_extend:=simplex_vertex_copy(simplex.vertices[1]);
 	v_reflect:=simplex_vertex_copy(simplex.vertices[1]);
 {
-	Sort the vertices in ascending error.
+	Sort the vertices in order of ascending error.
 }
 	simplex_sort(simplex);
+{
+	Select the simplex record for direct reference to its fields.
+}
+	with simplex do begin
 {	
 	Determine the center of mass of the first n vertices. The one remaining
 	vertex, number n+1, is at the highest error following the sort.
 }
-	with simplex do begin
 		v_center:=simplex_vertex_copy(vertices[1]);
 		for i:=2 to n do add(v_center,vertices[i]);
 		scale(v_center,1.0/n);
@@ -4470,91 +4473,88 @@ begin
 		v_reflect:=v;
 		a_reflect:=error(v_reflect,ep);
 {
-	If the error of the new vertex is somewhere between that of the the first
-	n vertices, we keep it in place of the worst vertex.
+	If the error of the new vertex is less than that of our worst vertex,
+	keep it in place of the worst vertex.
 }
-		if (a_reflect>=errors[1]) and (a_reflect<errors[n]) then begin
+		if (a_reflect>=errors[1]) and (a_reflect<errors[n+1]) then begin
 			vertices[n+1]:=simplex_vertex_copy(v_reflect);
 			errors[n+1]:=a_reflect;
 			if show_details then 
 				gui_writeln('reflect: '+string_from_real(a_reflect,fsr,fsd));
-		end;
 {
-	If the error of this new vertex is lower than all the other vertices, we try
-	to expand our reflection in the hope of getting an even lower error.
-	Otherwise we go back to the original reflected vertex and use it to replace
-	the lowest vertex.
+	If the error of the reflected new vertex is lower than all the other
+	vertices, we try to push our reflection farther from the center of the
+	simplex in the hope of getting an even lower error. Otherwise we replace the
+	lowest vertex with the reflected vertex.
 }
-		if (a_reflect<errors[1]) then begin
+		end else if (a_reflect<errors[1]) then begin
 			v:=simplex_vertex_copy(v_center);
 			subtract(v,vertices[n+1]);
 			scale(v,expand_scale);
 			add(v,v_center);
-			v_expand:=simplex_vertex_copy(v);
-			a_expand:=error(v_expand,ep);
+			v_extend:=simplex_vertex_copy(v);
+			a_expand:=error(v_extend,ep);
 			if a_expand<a_reflect then begin
-				vertices[n+1]:=simplex_vertex_copy(v_expand);
+				vertices[n+1]:=simplex_vertex_copy(v_extend);
 				errors[n+1]:=a_expand;
 				if show_details then 
-					gui_writeln('expand and improve: '+string_from_real(a_expand,fsr,fsd));
+					gui_writeln('extend: '+string_from_real(a_expand,fsr,fsd));
 			end else begin
 				vertices[n+1]:=simplex_vertex_copy(v_reflect);
 				errors[n+1]:=a_reflect;
 				if show_details then 
-					gui_writeln('reflect and improve: '
-						+string_from_real(a_reflect,fsr,fsd));
+					gui_writeln('improve: '+string_from_real(a_reflect,fsr,fsd));
 			end;
-		end;
 {
-	If the reflected vertex is higher than all the others, we contract the
-	simplex by moving the highest original vertex towards the center of mass
-	of the others. If the contracted vertex is lower than the highest original
-	vertex, we accept the contracted vertex and reject the highest original
-	vertex. Otherwise, we have encountered a double-ridge and we must do
-	something to get going again. We can shrink the entire simplex or
-	re-construct a new one around the best vertex. The Nelder-Mead method
-	proscribes the shrink. We have code to perform the shrink, but we find that
-	re-constructing the simplex in this situation avoids convergence in the
-	wrong spot, so we use the re-construction instead of the shrinking. We
-	enable the shrink code with the global simplex_enable_shrink flag.
+	If the reflected vertex is higher than all the others, we move the highest
+	original vertex towards the center of mass of the others and see if we obtain
+	an improvement.
 }
-		if (a_reflect>=errors[n]) then begin
+		end else begin
 			v:=simplex_vertex_copy(v_center);
 			subtract(v,vertices[n+1]);
 			scale(v,contract_scale);
 			add(v,vertices[n+1]);
 			v_contract:=simplex_vertex_copy(v);
 			a_contract:=error(v_contract,ep);
-			if a_contract<=errors[n+1] then begin
+{
+	If the contracted vertex is lower than the highest original vertex, we
+	accept the contracted vertex and reject the highest original vertex. 
+}
+			if a_contract<errors[n+1] then begin
 				vertices[n+1]:=simplex_vertex_copy(v_contract);
 				errors[n+1]:=a_contract;
-				if (simplex_size(simplex)
-						<construct_size*simplex_small_size_factor) then begin
-					inc(done_counter);
-					if show_details then 
-						gui_writeln('contract increment: '
-							+string_from_real(a_contract,fsr,fsd));
-				end else begin
-					if show_details then 
-						gui_writeln('contract: '
-							+string_from_real(a_contract,fsr,fsd));
-				end;
+				if show_details then 
+					gui_writeln('contract: '+string_from_real(a_contract,fsr,fsd));						
 			end else begin
-				if simplex_enable_shrink then begin
+{
+	Our contracted vertex has given us no improvement. We are at a double ridge
+	and we must do something to get going again. We can either "restart" the fit
+	by constructing a new simplex around the first vertex, or we can "shrink"
+	the simplex by moving all its vertices towards the first vertex. Our policy
+	restart until max_restarts times and then start shrinking. If shrinking
+	reduces the size of the simplex to our end size, the fit has converged and
+	we set the done flag.
+}
+				if restart_cntr<max_restarts then begin
+					simplex_construct(simplex,error,ep);
+					inc(restart_cntr);
+					if show_details then
+						gui_writeln('restart: '+string_from_real(a_contract,fsr,fsd));
+				end else begin
 					for i:=2 to n+1 do begin
 						subtract(vertices[i],vertices[1]);
 						scale(vertices[i],shrink_scale);
 						add(vertices[i],vertices[1]);
 						errors[i]:=error(vertices[i],ep);
 					end;
+					if simplex_size(simplex)<=end_size then done:=true;
 					if show_details then 
-						gui_writeln('shrink: '+string_from_real(a_contract,fsr,fsd));
-				end else begin
-					simplex_construct(simplex,error,ep);
-					if show_details then
-						gui_writeln('reconstruct: '+string_from_real(a_contract,fsr,fsd))
+						if done then
+							gui_writeln('done: '+string_from_real(a_contract,fsr,fsd))
+						else
+							gui_writeln('shrink: '+string_from_real(a_contract,fsr,fsd));
 				end;
-				inc(done_counter);
 			end;
 		end;
 	end;
@@ -4563,13 +4563,15 @@ begin
 }
 	simplex_sort(simplex);
 {
-	When reporting, we print out the entire list of vertices with their errors.
+	When showing details, we print out the entire list of vertices with their errors.
 }
 	if show_details then with simplex do begin
 		for i:=1 to n+1 do begin
 			debug_string:='';
-			writestr(debug_string,i,': ',errors[i]:fsr:fsd,' ');
-			for j:=1 to n do writestr(debug_string,debug_string,vertices[i,j]:1:6,' ');
+			writestr(debug_string,i,': ');
+			for j:=1 to n do 
+				writestr(debug_string,debug_string,vertices[i,j]:fsr:fsd,' ');
+			writestr(debug_string,debug_string,errors[i]:fsr:fsd);
 			gui_writeln(debug_string);
 		end;
 	end;

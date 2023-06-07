@@ -678,9 +678,9 @@ begin
 	with simplex,shadow do begin
 		vertices[1,1]:=position.x;
 		vertices[1,2]:=rotation_scale*rotation;
-		construct_size:=initial_step;
-		done_counter:=0;
-		max_done_counter:=num_parameters;
+		start_size:=initial_step;
+		end_size:=initial_step*0.001;
+		max_restarts:=2;
 	end;
 	simplex_construct(simplex,simplex_error,dp);	
 {
@@ -691,7 +691,7 @@ begin
 	repeat
 		inc(i);
 		simplex_step(simplex,simplex_error,dp);
-	until (simplex.done_counter>=simplex.max_done_counter) or (i>max_iterations);
+	until simplex.done or (i>max_iterations);
 {
 	Extract the fitted value from the simplex array.
 }

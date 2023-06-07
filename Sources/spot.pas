@@ -443,9 +443,9 @@ begin
 		vertices[1,3]:=b.x;
 		vertices[1,4]:=b.y;
 		vertices[1,5]:=axis_length;
-		construct_size:=10;
-		done_counter:=0;
-		max_done_counter:=2;
+		start_size:=10;
+		end_size:=0.01;
+		max_restarts:=2;
 	end;
 	simplex_construct(simplex,spot_ellipse_error,dp);	
 {
@@ -478,7 +478,7 @@ begin
 				spot_ellipse_error(vertices[1],dp):0:1);
 			gui_writeln(debug_string);
 		end;	
-	until (simplex.done_counter>=simplex.max_done_counter) or (i>max_iterations);
+	until simplex.done or (i>max_iterations);
 {
 	Restore the image bounds.
 }

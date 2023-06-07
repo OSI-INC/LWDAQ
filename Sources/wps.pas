@@ -759,12 +759,10 @@ const
 	pin_radius=1.0/16*25.4/2; {one sixteenth inch steel pin}
 	random_scale=1;
 	num_parameters=9; 
-	max_num_shrinks=10;
 	max_iterations=30000;
 	min_iterations=6000;
 	report_interval=500;
 	support_interval=100;
-	max_done=10;
 	max_num_points=100;
 	
 var
@@ -875,9 +873,9 @@ begin
 		vertices[1,7]:=rot.x;
 		vertices[1,8]:=rot.y;
 		vertices[1,9]:=rot.z;
-		construct_size:=random_scale/10;
-		done_counter:=0;
-		max_done_counter:=max_done;
+		start_size:=random_scale/10;
+		end_size:=start_size/1000;
+		max_restarts:=5;
 	end;
 	simplex_construct(simplex,wps_calibration_error,dp);	
 {
@@ -888,9 +886,7 @@ begin
 	i:=0;
 	while not done do begin
 		simplex_step(simplex,wps_calibration_error,dp);
-		done:=((simplex.done_counter>=simplex.max_done_counter)
-				and (i>=min_iterations))
-			or (i>=max_iterations);
+		done:=(simplex.done and (i>=min_iterations)) or (i>=max_iterations);
 		if (i mod report_interval = 0) or done then begin
 			with simplex,camera do begin
 				pivot.x:=vertices[1,1];

@@ -4,18 +4,18 @@
 	Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software; you can redistribute it and/or modify it
-	under the terms of the GNU General Public License as published by the
-	Free Software Foundation; either version 2 of the License, or (at your
-	option) any later version.
-	
-	This program is distributed in the hope that it will be useful, but
-	WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the GNU
-	General Public License for more details.
-	
-	You should have received a copy of the GNU General Public License along
-	with this program; if not, write to the Free Software Foundation, Inc.,
-	59 Temple Place - Suite 330, Boston, MA	02111-1307, USA.
+	under the terms of the GNU General Public License as published by the Free
+	Software Foundation; either version 2 of the License, or (at your option)
+	any later version.
+
+	This program is distributed in the hope that it will be useful, but WITHOUT
+	ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+	FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+	more details.
+
+	You should have received a copy of the GNU General Public License along with
+	this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+	Place - Suite 330, Boston, MA	02111-1307, USA.
 }
 
 library lwdaq;
@@ -3498,7 +3498,7 @@ begin
 	if command='disagreement' then begin
 		threshold:=scam_decode_rule(ip,rule);
 		disagreement:=scam_disagreement(ip,threshold,spread);
-		writestr(result,disagreement:1:1);
+		writestr(result,disagreement:fsr:fsd);
 	end;
 	
 	if error_string='' then Tcl_SetReturnString(interp,result)
@@ -4792,44 +4792,13 @@ begin
 	lwdaq_tcb:=Tcl_OK;
 end;
 
-
 {
-<p>lwdaq_simplex finds a point in an n-dimensional space at which an error
-function is a minium. The routine has two parameters: the initial position and
-the error function. The initial position must be a list of n real numbers. The
-error function must be a procedure defined in the Tcl interpreter. This error
-function must take n real-valued numbers as input, not passed in one list, but
-as separate parameters. The error function must return a real-valued number. The
-simplex fitter starts at the initial position and moves through the
-n-dimensional space until it finds a minium, or determines that it has converged
-around a minimum. When it converges, it returns the n-dimensional point at the
-minimum, the final error value, and the number of steps it took to reach the
-minimum.</p>
-
-<p>The simplex routine assumes that the sensitivity of the error to each of the
-n coordinates is similar, so that it sets up its simplex triangle with equal
-length in all n dimensions. For efficient convergeance, we must scale our
-parameters in the error function. For example, if the error function is ten
-times less sensitive to the x then y or z in a three-dimensional fit, we pass
-x/10, y, z/10 as the starting point, and we multiply the value for for the first
-coordinate by ten in our error function before we calculate the error.</p>
-
-<p>When the fit takes a long time, or when we are trying to figure out why it
-won't converge, it's nice to have the fit print out the coordinates and the
-error value every m'th step. We instruct the fit to do this with the -report m
-option. By default m is zero and there will be no reporting. The reporting takes
-place in the Tk text widget named in gui_text_name.</p>
-
-<p>The -max_steps option allows us to limit the number of steps before the fit 
-aborts.</p>
-
-<p>To avoid freezing LWDAQ during a long fitting process, call
-LWDAQ_support in the error procedure. To permit the user to abort the fit, have
-the error procedure check a global variable that can be set by an abort button.
-When the error procedure sees the abort, it can return a Tcl error to the
-lwdaq_simplex routine, and lwdaq_simplex will abort.</p>
+	lwdaq_simplex_error takes a simplex vertex type and a pointer to a pointer
+	to a string containing a Tcl command name and executes this command with the
+	numerical values specified in the vertex type. The routine is used exclusively
+	by <a href="#lwdaq_simplex">lwdaq_simplex</a>.
 }
-function lwdaq_simplex_altitude(v:simplex_vertex_type;ep:pointer):real;
+function lwdaq_simplex_error(v:simplex_vertex_type;ep:pointer):real;
 type
 	error_string_ptr=^string;
 var 
@@ -4839,20 +4808,87 @@ var
 	command:string;
 	result:string;
 begin
-	command:=error_string_ptr(ep)^+' ';
+	command:=error_string_ptr(ep)^+' [list ';
 	for j:=1 to length(v)-1 do
 		writestr(command,command,v[j]:fsr:fsd,' ');
+	writestr(command,command,']');
 	error:=Tcl_Eval(gui_interp_ptr,PChar(command));
 	obj_ptr:=Tcl_GetObjResult(gui_interp_ptr);
 	result:=Tcl_ObjString(obj_ptr);
 	if error>0 then begin
 		report_error(result+' in lwdaq_simplex');
-		lwdaq_simplex_altitude:=0;
+		lwdaq_simplex_error:=0;
 	end else begin
-		lwdaq_simplex_altitude:=read_real(result);
+		lwdaq_simplex_error:=read_real(result);
 	end;
 end;
 
+{
+<p>lwdaq_simplex finds a point in an <i>n</i>-dimensional space at which an
+error function is a minium. The routine takes a minimum of two parameters: the
+initial position and an error procedure name. The initial position must be a
+list of <i>n</i> real numbers. The error procedure must be defined in the Tcl
+interpreter, take a list of <i>n</i> real numbers as its input, and return a
+real-valued error measurement. We call the Tcl error routine with the help of
+the <a href="#lwdaq_simplex_error">lwdaq_simplex_error</a> interface function.
+The simplex fitter starts at the initial position and moves through the
+n-dimensional space until it reaches a maximum number of steps specified with
+the "-max_steps <i>m</i>" option. When it stops, it returns the point of
+convergeance as <i>n</i> real numbers, the final error value, and the number of
+steps it took.</p>
+
+<center><table border cellspacing=2>
+<tr>
+	<th>Option</th>
+	<th>Function</th>
+</tr>
+<tr>
+	<td>-report <i>m</i></td>
+	<td>Print progress line every <i>m</i> iterations, default 0 no reporting.</td>
+</tr>
+<tr>
+	<td>-steps <i>m</i></td>
+	<td>Abort after <i>m</i> steps, default 0 is no maximum.</td>
+</tr>
+<tr>
+	<td>-scaling <i>s</i></td>
+	<td>Scaling factors, default <i>s</i> is a string of <i>n</i> ones.</td>
+</tr>
+<tr>
+	<td>-start_size <i>d</i></td>
+	<td>Simplex construction size, default <i>d</i> = 1.0.</td>
+</tr>
+<tr>
+	<td>-end_size <i>d</i></td>
+	<td>Simplex size at convergeance, default <i>d</i> = 0.01.</td>
+</tr>
+<tr>
+	<td>-restarts <i>m</i></td>
+	<td>Number of restarts before starting to shrink, default <i>m</i> = 0.</td>
+</tr>
+</table><small><b>Table:</b> Options Accepted by the Simplex Library Routine.</center>
+
+<p>By default, the simplex routine assumes that the sensitivity of the error to
+each of the n coordinates is similar, so that it sets up its simplex triangle
+with equal length in all n dimensions. If the sensitivity of the error function
+is dramatically different for different coordinates, we can specify the
+sensitivity through the "-scaling <i>s</i>" option. If the error is ten times
+less sensitive to one coordinate than the others, we give it a scaling factor of
+ten and the other coordinates a scaling factor of one. If we do not specify the
+scaling factors, the routine assumes a value of unity for all coordinates.</p>
+
+<p>When the fit takes a long time, or when we are trying to figure out why it
+won't converge, it's nice to have the fit print out the coordinates and the
+error value every <i>m</i>'th iteration, which we achieve with "-report <i>m</i>".
+The report calls gui_writeln, which in turn prints in a Tk text widget called
+gui_text_name. We set gui_text_name with <a href="#lwdaq_config">lwdaq_config</a>.</p>
+
+<p>We avoid freezing LWDAQ during a long fit by calling LWDAQ_support in
+the error procedure. To permit the user to abort the fit, have the error
+procedure check a global abort flag. When the error procedure sees the abort, it
+can return a Tcl error to the lwdaq_simplex routine, and lwdaq_simplex will
+abort.</p>
+}
 function lwdaq_simplex(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 const
@@ -4863,9 +4899,13 @@ var
 	simplex:simplex_type;
 	i,n,interation_num:integer;
 	result:string;
-	setup:string;
+	setup:string='';
 	report:integer=0;
-	max_steps:integer=1000000;
+	scaling:string='';
+	restarts:integer=0;
+	start_size:real=1.0;
+	steps:integer=0;
+	end_size:real=0.01;
 	option:string='';
 	arg_index:integer;
 	vp:pointer;	
@@ -4886,12 +4926,12 @@ begin
 	n:=word_count(setup);
 	if (n<1) then begin
 		Tcl_SetReturnString(interp,error_prefix
-			+'No start coordinates in lwdaq_simplex.');
+			+'No coordinates in lwdaq_simplex.');
 		exit;
 	end;
 	if (n>max_n) then begin
 		Tcl_SetReturnString(interp,error_prefix
-			+'Too many start coordinates in lwdaq_simplex.');
+			+'More than max_n coordinates in lwdaq_simplex.');
 		exit;
 	end;
 
@@ -4904,19 +4944,36 @@ begin
 		vp:=argv[arg_index];
 		inc(arg_index);
 		if (option='-report') then report:=Tcl_ObjInteger(vp)			
-		else if (option='-max_steps') then max_steps:=Tcl_ObjInteger(vp)			
+		else if (option='-steps') then steps:=Tcl_ObjInteger(vp)			
+		else if (option='-scaling') then scaling:=Tcl_ObjString(vp)			
+		else if (option='-restarts') then restarts:=Tcl_ObjInteger(vp)			
+		else if (option='-start_size') then start_size:=Tcl_ObjReal(vp)			
+		else if (option='-end_size') then end_size:=Tcl_ObjReal(vp)			
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"-report -max_steps" in lwdaq_tcb.');
+				+'"-report -steps -scaling -start_size -end_size -restarts"'
+				+' in lwdaq_simplex.');
 			exit;
 		end;
 	end;
 	
 	simplex:=new_simplex(n);
 	for i:=1 to n do simplex.vertices[1,i]:=read_real(setup);
-	simplex_construct(simplex,lwdaq_simplex_altitude,@error_proc);
-	
+	simplex.max_restarts:=restarts;
+	simplex.start_size:=start_size;
+	simplex.end_size:=end_size;
+	if scaling<>'' then begin
+		if word_count(scaling)<>n then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Scaling factors do not match coordinates in lwdaq_simplex.');
+			exit;
+		end;
+		for i:=1 to n do
+			simplex.scaling[i]:=read_real(scaling);
+	end;
+	simplex_construct(simplex,lwdaq_simplex_error,@error_proc);
+
 	interation_num:=0;
 	repeat
 		if (report>0) and (interation_num mod report = 0) then begin
@@ -4926,10 +4983,10 @@ begin
 			writestr(result,result,simplex.errors[1]:fsr:fsd,' ',interation_num:1);
 			gui_writeln(result);
 		end;
-		simplex_step(simplex,lwdaq_simplex_altitude,@error_proc);
+		simplex_step(simplex,lwdaq_simplex_error,@error_proc);
 		inc(interation_num);
-	until (simplex.done_counter>=simplex.max_done_counter) 
-		or (interation_num>=max_steps)
+	until simplex.done 
+		or ((interation_num>=steps) and (steps>0))
 		or (error_string<>'');
 		
 	result:='';

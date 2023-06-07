@@ -461,9 +461,7 @@ begin
 		end;
 		simplex_step(sp,bcam_error);
 		inc(calculation_num);
-	until (sp.done_counter>=sp.max_done_counter) 
-		or (calculation_num>max_iterations)
-		or (error_string<>'');
+	until sp.done or (calculation_num>max_iterations) or (error_string<>'');
 		
 	with calibration do begin
 		pivot.x:=sp.vertices[1,1]/pivot_xy_scale;

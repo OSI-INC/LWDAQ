@@ -522,7 +522,7 @@ begin
 
 		repeat
 			simplex_step(simplex,simplex_error,ptr);
-		until (simplex.done_counter>=simplex.max_done_counter);
+		until simplex.done
 
 		if good then with simplex do begin
 			for i:=1 to n do 
