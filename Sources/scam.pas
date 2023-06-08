@@ -76,7 +76,8 @@ procedure scam_project_cylinder_complete(ip:image_ptr_type;
 	Routines that analyze the image.
 }
 function scam_decode_rule(ip:image_ptr_type;rule:string):real;
-function scam_disagreement(ip:image_ptr_type;threshold,spread:real):real;
+function scam_disagreement(ip:image_ptr_type;threshold:real):real;
+function scam_disagreement_spread(ip:image_ptr_type;threshold,spread:real):real;
 
 implementation
 
@@ -464,16 +465,62 @@ end;
 {
 	scam_disagreement measures the disagreement between a silhouette and a
 	collection of projected objets. So far as the routine is concerned, a pixel
-	is part of a projection if and only if its overlay is some color other than
-	clear. A pixel is part of a silhouette if and only if its intensity is less
-	than the specified threshold. When a pixel is occupied by silhouette and
-	projection, we clear its overlay, to show there is no disagreement. If it is
-	occupied by neither silhouette nor projection, we leave its overlay clear,
-	to show there is no disagreement. If it is silhouette but not projection, we
-	mark its overlay with the silhouette color to show disagreement. If it is
-	projection but not silhouette, we leave its overlay marked with the
-	projection color to show disagreement. We will see clear overlay where
-	projection and classification agree, and colored overlay otherwise.
+	is part of a projection if and only if its overlay is not clear. A pixel is
+	part of a silhouette if and only if its intensity is less than the specified
+	threshold. When a pixel is occupied by silhouette and projection, we clear
+	its overlay, to show there is no disagreement. If it is occupied by neither
+	silhouette nor projection, we leave its overlay clear, to show there is no
+	disagreement. If it is silhouette but not projection, we mark its overlay
+	with the silhouette color to show disagreement. If it is projection but not
+	silhouette, we leave its overlay marked with the projection color to show
+	disagreement. The overlay will be clear except where the silhouette and
+	projection disagree. The routine returns the number of disagreeing pixels
+	as its measure of disagreement.
+}
+function scam_disagreement(ip:image_ptr_type;threshold:real):real;
+
+var
+	i,j:integer;
+	t,b,d:real;
+	p:boolean;
+	
+begin
+	d:=0;
+	t:=threshold;
+	with ip^.analysis_bounds do begin
+		for j:=top to bottom do begin
+			for i:=left to right do begin
+				p:=(get_ov(ip,j,i)<>clear_color);
+				b:=get_px(ip,j,i);
+				if b<=t then begin
+					if not p then begin
+						d:=d+1.0;
+						set_ov(ip,j,i,scam_silhouette_color);
+					end else begin
+						set_ov(ip,j,i,clear_color);
+					end;
+				end else begin
+					if p then d:=d+1.0;
+				end;
+			end;
+		end;
+	end;
+	scam_disagreement:=d;
+end;
+
+{
+	scam_disagreement_spread measures the disagreement between a silhouette and a
+	collection of projected objets. So far as the routine is concerned, a pixel
+	is part of a projection if and only if its overlay is not clear. A pixel is
+	part of a silhouette if and only if its intensity is less than the specified
+	threshold. When a pixel is occupied by silhouette and projection, we clear
+	its overlay, to show there is no disagreement. If it is occupied by neither
+	silhouette nor projection, we leave its overlay clear, to show there is no
+	disagreement. If it is silhouette but not projection, we mark its overlay
+	with the silhouette color to show disagreement. If it is projection but not
+	silhouette, we leave its overlay marked with the projection color to show
+	disagreement. The overlay will be clear except where the silhouette and
+	projection disagree.
 	
 	The routine returns a measures of the disagreement between the image and
 	projections. To obtain the disagreement we use the intensity threshold, "t",
@@ -487,7 +534,7 @@ end;
 	total disagreement. With spread=0, the disagreement is the number of pixels
 	that are silhouette or projection but not both, using a binary threshold. 
 }
-function scam_disagreement(ip:image_ptr_type;threshold,spread:real):real;
+function scam_disagreement_spread(ip:image_ptr_type;threshold,spread:real):real;
 
 var
 	i,j:integer;
@@ -518,7 +565,7 @@ begin
 			end;
 		end;
 	end;
-	scam_disagreement:=d;
+	scam_disagreement_spread:=d;
 end;
 
 

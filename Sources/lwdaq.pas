@@ -3497,7 +3497,8 @@ begin
 	
 	if command='disagreement' then begin
 		threshold:=scam_decode_rule(ip,rule);
-		disagreement:=scam_disagreement(ip,threshold,spread);
+		if spread=0 then disagreement:=scam_disagreement(ip,threshold)
+		else disagreement:=scam_disagreement_spread(ip,threshold,spread);
 		writestr(result,disagreement:fsr:fsd);
 	end;
 	

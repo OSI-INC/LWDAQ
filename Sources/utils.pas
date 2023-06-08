@@ -387,7 +387,7 @@ type
 
 function new_simplex(num_coords:integer):simplex_type;
 procedure simplex_step(var simplex:simplex_type;
-	error:simplex_error_function_type;
+	sef:simplex_error_function_type;
 	ep:pointer);
 function simplex_volume(var simplex:simplex_type):real;
 function simplex_size(var simplex:simplex_type):real;
@@ -4419,7 +4419,7 @@ end;
 	vertex. The simplex_step routine does not use the pointer at all.
 }
 procedure simplex_step(var simplex:simplex_type;
-	error:simplex_error_function_type;
+	sef:simplex_error_function_type;
 	ep:pointer);
 
 	procedure add(var a,b:simplex_vertex_type);
@@ -4471,7 +4471,7 @@ begin
 		subtract(v,vertices[n+1]);
 		add(v,v_center);
 		v_reflect:=v;
-		a_reflect:=error(v_reflect,ep);
+		a_reflect:=sef(v_reflect,ep);
 {
 	If the error of the new vertex is less than that of our worst vertex,
 	keep it in place of the worst vertex.
@@ -4493,7 +4493,7 @@ begin
 			scale(v,expand_scale);
 			add(v,v_center);
 			v_extend:=simplex_vertex_copy(v);
-			a_expand:=error(v_extend,ep);
+			a_expand:=sef(v_extend,ep);
 			if a_expand<a_reflect then begin
 				vertices[n+1]:=simplex_vertex_copy(v_extend);
 				errors[n+1]:=a_expand;
@@ -4516,7 +4516,7 @@ begin
 			scale(v,contract_scale);
 			add(v,vertices[n+1]);
 			v_contract:=simplex_vertex_copy(v);
-			a_contract:=error(v_contract,ep);
+			a_contract:=sef(v_contract,ep);
 {
 	If the contracted vertex is lower than the highest original vertex, we
 	accept the contracted vertex and reject the highest original vertex. 
@@ -4528,16 +4528,18 @@ begin
 					gui_writeln('contract: '+string_from_real(a_contract,fsr,fsd));						
 			end else begin
 {
-	Our contracted vertex has given us no improvement. We are at a double ridge
-	and we must do something to get going again. We can either "restart" the fit
-	by constructing a new simplex around the first vertex, or we can "shrink"
-	the simplex by moving all its vertices towards the first vertex. Our policy
-	restart until max_restarts times and then start shrinking. If shrinking
-	reduces the size of the simplex to our end size, the fit has converged and
-	we set the done flag.
+	Our contracted vertex has given us no improvement. We we must do something
+	to get going again. We can either "restart" the fit by constructing a new
+	simplex around the first vertex, or we can "shrink" the simplex by moving
+	all its vertices towards the first vertex. Our policy restart a number of
+	times and then start shrinking. When we reconstruct, we do so with smaller
+	and smaller simplex sizes, useing the shrink scale. When we shrink, we do so
+	by the shrink scale as well. If shrinking reduces the size of the simplex to
+	our end size, the fit has converged and we set the done flag.
 }
 				if restart_cntr<max_restarts then begin
-					simplex_construct(simplex,error,ep);
+					start_size:=start_size*shrink_scale;
+					simplex_construct(simplex,sef,ep);
 					inc(restart_cntr);
 					if show_details then
 						gui_writeln('restart: '+string_from_real(a_contract,fsr,fsd));
@@ -4546,7 +4548,7 @@ begin
 						subtract(vertices[i],vertices[1]);
 						scale(vertices[i],shrink_scale);
 						add(vertices[i],vertices[1]);
-						errors[i]:=error(vertices[i],ep);
+						errors[i]:=sef(vertices[i],ep);
 					end;
 					if simplex_size(simplex)<=end_size then done:=true;
 					if show_details then 
