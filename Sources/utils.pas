@@ -4432,7 +4432,7 @@ procedure simplex_step(var simplex:simplex_type;
 const
 	expand_scale=2;
 	contract_scale=0.5;
-	shrink_scale=0.5;
+	shrink_scale=0.2;
 	
 var 
 	i,j:integer;
