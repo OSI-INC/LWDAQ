@@ -65,7 +65,6 @@ proc LWDAQ_init_BCAM {} {
 	set info(ambient_exposure_seconds) 0
 	set info(peak_max) 180
 	set info(peak_min) 100
-	set info(flash_soft_max) 0.01
 	set info(file_try_header) 1
 	set info(analysis_pixel_size_um) 10
 	set info(analysis_add_x_um) 0
@@ -332,32 +331,68 @@ proc LWDAQ_daq_BCAM {} {
 		lwdaq_image_destroy $background_image_name
 	}
 	
-	# If we are not adjusting the flash time, we are done.
-	if {!$config(daq_adjust_flash)} {return $config(memory_name)} 
-
-	# We want to increase the flash time when the image is not bright enough,
-	# and reduce the flash time when the image is too bright. We can use the
-	# maximum intensity as our measure of brightness, the average intensity, or
-	# the "soft maximum" intensity, which is the intensity for which only a
-	# fraction flash_soft_max pixels are as bright or brighter.
-	switch $config(daq_adjust_flash) {
+	# We may want to increase the flash time when the image is not bright enough,
+	# or reduce the flash time when the image is too bright. We parse the
+	# daq_adjust_flash option into two parts: a calculation code and an argument.
+	set code [lindex $config(daq_adjust_flash) 0]
+	set argument [lrange $config(daq_adjust_flash) 1 end]
+	
+	# If the code is zero, we do no further adjustment, but return the name of
+	# the image we have acquired. Otherwise, we must start by measuring the
+	# brightness of the image, which we do in a manner controlled by the code
+	# and its argument. In all cases, the brightness measure applies only to the
+	# analysis boundaries.
+	switch $code {
+		"0" {
+			# No flash adjustment.
+			return $config(memory_name)
+		}
 		"1" {
+			# Use maximum intensity in image, argument ignored.
 			set brightness [lindex [lwdaq_image_characteristics $config(memory_name)] 6]
 		}
 		"2" {
+			# Use average intensity in image, argument ignored.
 			set brightness [lindex [lwdaq_image_characteristics $config(memory_name)] 4]
 		}
 		"3" {
+			# Use the minimum intensity for which a specified fraction of pixels
+			# are as bright or brighter. The argument must be a fraction greater
+			# than zero and less than one. We call this brightness a "soft
+			# maximum".
+			if {![string is double -strict $argument] \
+				|| ($argument <= 0.0) || ($argument >= 1.0)} {
+				return "ERROR: Invalid soft maximum fraction \"$argument\"."
+			}
 			set histogram [lwdaq_image_histogram $config(memory_name)]
 			set num_pixels 0
 			foreach {b n} $histogram {
 				set num_pixels [expr $num_pixels + $n]
 			}
-			set num_below 0
+			set num_above $num_pixels
 			foreach {b n} $histogram {
-				set num_below [expr $num_below + $n]
+				set num_above [expr $num_above - $n]
 				set brightness $b
-				if {$num_below >= $num_pixels * (1.0 - $info(flash_soft_max))} {break}
+				if {$num_above <= $num_pixels * $argument} {break}
+			}
+		}
+		"4" {
+			# Use the minimum intensity for which a specified number of pixels
+			# are as bright or brighter. The argument must be an integer greater
+			# than zero. We call this brightness the "optical maximum".
+			if {![string is integer -strict $argument] || ($argument <= 0)} {
+				return "ERROR: Invalid optical maximum quantity \"$argument\"."
+			}
+			set histogram [lwdaq_image_histogram $config(memory_name)]
+			set num_pixels 0
+			foreach {b n} $histogram {
+				set num_pixels [expr $num_pixels + $n]
+			}
+			set num_above $num_pixels
+			foreach {b n} $histogram {
+				set num_above [expr $num_above - $n]
+				set brightness $b
+				if {$num_above <= $argument} {break}
 			}
 		}
 		default {
