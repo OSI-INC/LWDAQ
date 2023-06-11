@@ -172,7 +172,7 @@ type
 }
 	bcam_camera_type=record
 		pivot:xyz_point_type;{bcam coordinates of pivot point (mm)}
-		axis:xyz_point_type;{cosine vectors of camera axis}
+		axis:xyz_point_type;{direction cosines of camera axis}
 		code:real;{camera version code, gives sensor type}
 		ccd_to_pivot:real;{from ccd to pivot along camera axis (mm)}
 		ccd_rotation:real;{rotation of ccd about camera axis (rad)}
@@ -397,8 +397,10 @@ begin
 		with axis do begin
 			x:=x/mrad_per_rad;
 			y:=y/mrad_per_rad;
-			code:=abs(z);
-			if z>0 then z:=1 else z:=-1;
+			code:=z;
+			z:=sqrt(1-sqr(x)-sqr(y));
+			if code<0 then z:=-z;
+			code:=abs(code);
 		end;
 		ccd_to_pivot:=read_real(s);
 		ccd_rotation:=read_real(s);
