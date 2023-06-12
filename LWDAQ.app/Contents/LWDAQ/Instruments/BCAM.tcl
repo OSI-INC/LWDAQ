@@ -361,7 +361,7 @@ proc LWDAQ_daq_BCAM {} {
 			# than zero and less than one. We call this brightness a "soft
 			# maximum".
 			if {![string is double -strict $argument] \
-				|| ($argument <= 0.0) || ($argument >= 1.0)} {
+				|| ($argument < 0.0) || ($argument > 1.0)} {
 				return "ERROR: Invalid soft maximum fraction \"$argument\"."
 			}
 			set histogram [lwdaq_image_histogram $config(memory_name)]
