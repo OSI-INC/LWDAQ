@@ -380,7 +380,7 @@ proc LWDAQ_daq_BCAM {} {
 			# Use the minimum intensity for which a specified number of pixels
 			# are as bright or brighter. The argument must be an integer greater
 			# than zero. We call this brightness the "optical maximum".
-			if {![string is integer -strict $argument] || ($argument <= 0)} {
+			if {![string is integer -strict $argument] || ($argument < 0)} {
 				return "ERROR: Invalid optical maximum quantity \"$argument\"."
 			}
 			set histogram [lwdaq_image_histogram $config(memory_name)]

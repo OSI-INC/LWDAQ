@@ -1228,7 +1228,8 @@ y-coordinate representing frequency. Suppose we apply the histogram routine to a
 The string "0 100 1 210 2 40 3 50" confirms that there are 400 pixels in the
 image, 100 with intensity 0, 210 with intensity 1, and so on.</p>
 }
-function lwdaq_image_histogram(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
+function lwdaq_image_histogram(data,interp:pointer;argc:integer;
+	var argv:Tcl_ArgList):integer;
 
 var 
 	image_name:string='';
