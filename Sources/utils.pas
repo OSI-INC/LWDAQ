@@ -4376,8 +4376,7 @@ end;
 {
 	Sort the simplex vertices into order of ascending error. We use quick-sort
 	so we can be efficient when the simplex dimension is large. The simplex sort
-	provides its own swap and after functions, which are here declared globally
-	within the unit implementation.
+	provides its own swap and after functions.
 }
 function simplex_sort_after(i,j:integer;lp:pointer):boolean;
 begin 
@@ -4391,11 +4390,11 @@ var
 	a:real;
 begin
 	with simplex_ptr(lp)^ do begin
-		v:=simplex_vertex_copy(vertices[i]);
+		v:=vertices[i];
 		a:=errors[i];
-		vertices[i]:=simplex_vertex_copy(vertices[j]);
+		vertices[i]:=vertices[j];
 		errors[i]:=errors[j];
-		vertices[j]:=simplex_vertex_copy(v);
+		vertices[j]:=v;
 		errors[j]:=a;	
 	end;
 end;
@@ -4440,15 +4439,6 @@ var
 	a_reflect,a_contract,a_expand:real;
 	
 begin
-{
-	Set up the vertex variables we will use to perform the fitting. We must make
-	sure that each is an independent dynamic array, so we set their lengths in
-	separate instructions.
-}
-	v:=simplex_vertex_copy(simplex.vertices[1]);
-	v_contract:=simplex_vertex_copy(simplex.vertices[1]);
-	v_extend:=simplex_vertex_copy(simplex.vertices[1]);
-	v_reflect:=simplex_vertex_copy(simplex.vertices[1]);
 {
 	Sort the vertices in order of ascending error.
 }
