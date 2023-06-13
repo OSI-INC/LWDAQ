@@ -51,25 +51,67 @@ const
 	scam_cylinder_color=blue_color;
 	scam_silhouette_color=orange_color;
 
+type
+{
+	Object types for projection. An scam_sphere we define with a point and a
+	radius. An scam_cylinder is a plane containing one of the two circular ends
+	of the cylinder, a radius that gives us the perimiter of the circle, and a
+	length. The length, combined with the direction of the normal vector used to
+	express the plane, give us the direction and terminus of the cylinder axis,
+	and therefore the far face of the cylinder as well. We have no xyz_circle,
+	because we can get a circle by setting the length of a cylinder to zero. 
+}
+	scam_sphere_type=record center:xyz_point_type;radius:real; end;
+	scam_cylinder_type=record face:xyz_plane_type;radius,length:real; end;
+	scam_shaft_type=record 
+		axis:xyz_line_type; {origin and direction of shaft axis}
+		num_faces:integer;{number of faces that define the shaft}
+		centers:array of real;{face centers, distance from origin along axis}
+		radii:array of real;{face radii, perpendicular to axis}
+	end;
+
+{
+	Geometry routines.
+}
+function xyz_line_crosses_sphere(line:xyz_line_type;sphere:scam_sphere_type):boolean;
+function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:scam_cylinder_type):boolean;
+function scam_sphere_from_string(s:string):scam_sphere_type;
+function scam_cylinder_from_string(s:string):scam_cylinder_type;
+function scam_shaft_from_string(s:string):scam_shaft_type;
+function read_scam_sphere(var s:string):scam_sphere_type;
+function read_scam_cylinder(var s:string):scam_cylinder_type;
+function read_scam_shaft(var s:string):scam_shaft_type;
+
 {
 	Routines that project hypothetical objects onto the overlays of our SCAM
 	images. We pass an image pointer to the routines, and the routine works on
 	this image. We specify an object in SCAM coordinates and we give the
-	calibration of the camera in SCAM coordinates too.
+	calibration of the camera in SCAM coordinates too. The default routines
+	project by drawing lines between projected points. 
 }
 procedure scam_project_sphere(ip:image_ptr_type;
-	sphere:xyz_sphere_type;
+	sphere:scam_sphere_type;
 	camera:bcam_camera_type;
 	num_points:integer);
 procedure scam_project_cylinder(ip:image_ptr_type;
-	cylinder:xyz_cylinder_type;
+	cylinder:scam_cylinder_type;
 	camera:bcam_camera_type;
 	num_points:integer);
+procedure scam_project_shaft(ip:image_ptr_type;
+	shaft:scam_shaft_type;
+	camera:bcam_camera_type;
+	num_points:integer);
+
+{
+	These projection routines go through every pixel in the image to see if it
+	should be included in a projected silhouette. They are slow, but they are
+	useful as a check of the line-drawing projection routines.
+}
 procedure scam_project_sphere_complete(ip:image_ptr_type;
-	sphere:xyz_sphere_type;
+	sphere:scam_sphere_type;
 	camera:bcam_camera_type);
 procedure scam_project_cylinder_complete(ip:image_ptr_type;
-	cylinder:xyz_cylinder_type;
+	cylinder:scam_cylinder_type;
 	camera:bcam_camera_type);
 	
 {
@@ -80,6 +122,133 @@ function scam_disagreement(ip:image_ptr_type;threshold:real):real;
 function scam_disagreement_spread(ip:image_ptr_type;threshold,spread:real):real;
 
 implementation
+
+{
+	read_scam_sphere reads the parameters of a sphere from a string and deletes
+	them from the string. It returns a new sphere record.
+}
+function read_scam_sphere(var s:string):scam_sphere_type;
+var sphere:scam_sphere_type;
+begin 
+	sphere.center:=read_xyz(s);
+	sphere.radius:=read_real(s);
+	read_scam_sphere:=sphere;
+end;
+
+{
+	scam_sphere_from_string takes a string and returns a new sphere record. Does
+	not alter the original string.
+}
+function scam_sphere_from_string(s:string):scam_sphere_type;
+begin scam_sphere_from_string:=read_scam_sphere(s); end;
+
+{
+	read_scam_cylinder reads the parameters of a cylinder from a string and deletes
+	them from the string. It returns a new cylinder record.
+}
+function read_scam_cylinder(var s:string):scam_cylinder_type;
+var cylinder:scam_cylinder_type;
+begin 
+	cylinder.face.point:=read_xyz(s);
+	cylinder.face.normal:=read_xyz(s);
+	cylinder.radius:=read_real(s);
+	cylinder.length:=read_real(s);
+	read_scam_cylinder:=cylinder;
+end;
+
+{
+	scam_cylinder_from_string takes a string and returns a new cylinder record. Does
+	not alter the original string.
+}
+function scam_cylinder_from_string(s:string):scam_cylinder_type;
+begin scam_cylinder_from_string:=read_scam_cylinder(s); end;
+
+{
+	read_scam_shaft reads the parameters of a shaft from a string and deletes
+	them from the string. It returns a new shaft record.
+}
+function read_scam_shaft(var s:string):scam_shaft_type;
+var shaft:scam_shaft_type;i:integer;
+begin 
+	with shaft do begin
+		axis.point:=read_xyz(s);
+		axis.direction:=read_xyz(s);
+		num_faces:=word_count(s) div 2;
+		setlength(centers,num_faces);
+		setlength(radii,num_faces);
+		for i:=0 to num_faces-1 do begin
+			centers[i]:=read_real(s);
+			radii[i]:=read_real(s);
+		end;
+	end;
+	read_scam_shaft:=shaft;
+end;
+
+{
+	scam_shaft_from_string takes a string and returns a new shaft record. Does
+	not alter the original string.
+}
+function scam_shaft_from_string(s:string):scam_shaft_type;
+begin scam_shaft_from_string:=read_scam_shaft(s); end;
+
+{
+	xyz_line_crosses_sphere returns true iff the line intersects or touches
+	the sphere.
+}
+function xyz_line_crosses_sphere(line:xyz_line_type;sphere:scam_sphere_type):boolean;
+var
+	range:real;
+begin
+	xyz_line_crosses_sphere:=false;
+	range:=xyz_length(xyz_point_line_vector(sphere.center,line));
+	xyz_line_crosses_sphere:=(range<=sphere.radius);
+end;
+
+{
+	xyz_line_crosses_cylinder returns true iff the line intersects or touches
+	the cylinder. We check to see if the line crosses either flat face of the 
+	cylinder, then to see if it crosses the curved surface. A line crosses a
+	flat face if it intersects with the plane defining the flat surface within
+	the cylinder radius of the face center. If a line crosses neither face, its
+	only means of crossing the cylinder is to enter the curved surface of the
+	cylinder some place and leave the curved surface at another place. The closest
+	approach of the line to the cylinder axis will have length less than the 
+	cylinder radius, and the closest point on the axis will lie between the 
+	two cylinder faces.
+}
+function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:scam_cylinder_type):boolean;
+var
+	f:xyz_plane_type;
+	n,p:xyz_point_type;
+	axis,bridge:xyz_line_type;
+	a:real;
+begin
+	xyz_line_crosses_cylinder:=false;
+	if xyz_separation(
+			xyz_line_plane_intersection(line,cylinder.face),
+			cylinder.face.point) 
+			<= cylinder.radius then 
+		xyz_line_crosses_cylinder:=true
+	else begin
+		n:=xyz_unit_vector(cylinder.face.normal);
+		f.point:=xyz_sum(cylinder.face.point,xyz_scale(n,cylinder.length));
+		f.normal:=n;
+		if xyz_separation(
+				xyz_line_plane_intersection(line,f),
+				f.point) <= cylinder.radius then 
+			xyz_line_crosses_cylinder:=true
+		else begin
+			axis.point:=cylinder.face.point;
+			axis.direction:=n;
+			bridge:=xyz_line_line_bridge(axis,line);
+			p:=xyz_difference(bridge.point,cylinder.face.point);
+			a:=xyz_dot_product(p,n);
+			if (a>=0) and (a<=cylinder.length) 
+					and (xyz_length(bridge.direction)<=cylinder.radius) then
+				xyz_line_crosses_cylinder:=true
+		end;
+	end;
+end;
 
 {
 	scam_decode_rule takes a string like "10 &" and returns, for the specified
@@ -139,7 +308,7 @@ end;
 	projection routine.
 }
 procedure scam_project_sphere_complete(ip:image_ptr_type;
-	sphere:xyz_sphere_type;
+	sphere:scam_sphere_type;
 	camera:bcam_camera_type);
 
 var
@@ -176,7 +345,7 @@ end;
 	routine.
 }
 procedure scam_project_cylinder_complete(ip:image_ptr_type;
-	cylinder:xyz_cylinder_type;
+	cylinder:scam_cylinder_type;
 	camera:bcam_camera_type);
 	
 var
@@ -216,7 +385,7 @@ end;
 	overlay, not the actual image. 
 }
 procedure scam_project_sphere(ip:image_ptr_type;
-	sphere:xyz_sphere_type;
+	sphere:scam_sphere_type;
 	camera:bcam_camera_type;
 	num_points:integer);
 	
@@ -327,7 +496,7 @@ end;
 	for num_points, the routine calls scam_project_cylinder_complete.
 }
 procedure scam_project_cylinder(ip:image_ptr_type;
-	cylinder:xyz_cylinder_type;
+	cylinder:scam_cylinder_type;
 	camera:bcam_camera_type;
 	num_points:integer);
 	
@@ -358,13 +527,9 @@ begin
 	Find a point on the circumference of the first end of the cylinder.
 }
 	cylinder.face.normal:=xyz_unit_vector(cylinder.face.normal);
-	radial:=
-		xyz_scale(
-			xyz_unit_vector(
-				xyz_cross_product(
-					cylinder.face.normal,
-					xyz_perpendicular(cylinder.face.normal))),
-			cylinder.radius);
+	radial:=xyz_scale(
+		xyz_perpendicular(cylinder.face.normal),
+		cylinder.radius);
 	point_a:=xyz_sum(cylinder.face.point,radial);
 	center_a:=cylinder.face.point;
 	axis.point:=cylinder.face.point;
@@ -458,6 +623,65 @@ begin
 			line.a:=perimeter_b[step+round(num_points/4)];		
 			line.b:=perimeter_b[(num_points+round(num_points/4)-step-1) mod num_points];
 			draw_overlay_xy_line(ip,line,scam_cylinder_color);
+		end;
+	end;
+end;
+
+{
+	scam_project_shaft takes a shaft in SCAM coordinates and draws the outline
+	of its projection onto the image plane of a camera, then attempts to fill in
+	the outline with lines. The num_points parameter tells the routine how many
+	points around the perimiter of each shaft face it should project.
+}
+procedure scam_project_shaft(ip:image_ptr_type;
+	shaft:scam_shaft_type;
+	camera:bcam_camera_type;
+	num_points:integer);
+	
+const
+	draw_perimeter=true;
+	draw_axials=true;
+	draw_radials=true;
+	
+var
+	step,face_num:integer;
+	point_a,point_b,center_a,center_b,radial:xyz_point_type;
+	w:real;
+	projection:xy_point_type;
+	perimeter_a,perimeter_b:array of xy_point_type;
+	ica,icb:xy_point_type;
+	line:xy_line_type;
+	axis:xyz_line_type;
+	pc:xy_point_type;
+
+begin
+{
+	If the number of points is zero, or the number of faces is zero, exit.
+}
+	if num_points=0 then exit;
+	if shaft.num_faces<=0 then exit;	
+{
+	When we project tangents onto our image sensor, we are going to mark them in
+	the overlay, for which we need the size of the pixels.
+}
+	case round(camera.code) of 
+		bcam_icx424_code: w:=bcam_icx424_pixel_um/um_per_mm;
+		bcam_tc255_code: w:=bcam_tc255_pixel_um/um_per_mm;
+		bcam_generic_code: w:=bcam_generic_pixel_um/um_per_mm;
+		otherwise w:=bcam_tc255_pixel_um/um_per_mm;
+	end;
+{
+	We are going to work with pairs of faces, joining their two perimeters with lines.
+}
+	setlength(perimeter_a,num_points);
+	setlength(perimeter_b,num_points);
+{
+	Progress through the faces, drawing each perimeter, then joining perimeter points
+	to the perimeter points of the previous face, if it exists.
+}
+	for face_num:=0 to shaft.num_faces-1 do begin
+		with shaft do begin
+			radial:=xyz_scale(xyz_perpendicular(axis.direction),radii[face_num]);
 		end;
 	end;
 end;
