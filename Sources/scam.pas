@@ -66,8 +66,8 @@ type
 	scam_shaft_type=record 
 		axis:xyz_line_type; {origin and direction of shaft axis}
 		num_faces:integer;{number of faces that define the shaft}
-		centers:array of real;{face centers, distance from origin along axis}
-		radii:array of real;{face radii, perpendicular to axis}
+		center:array of real;{face centers, distance from origin along axis}
+		radius:array of real;{face radii, perpendicular to axis}
 	end;
 
 {
@@ -81,6 +81,7 @@ function scam_shaft_from_string(s:string):scam_shaft_type;
 function read_scam_sphere(var s:string):scam_sphere_type;
 function read_scam_cylinder(var s:string):scam_cylinder_type;
 function read_scam_shaft(var s:string):scam_shaft_type;
+function string_from_scam_shaft(shaft:scam_shaft_type):string;
 
 {
 	Routines that project hypothetical objects onto the overlays of our SCAM
@@ -173,12 +174,12 @@ begin
 	with shaft do begin
 		axis.point:=read_xyz(s);
 		axis.direction:=read_xyz(s);
-		num_faces:=word_count(s) div 2;
-		setlength(centers,num_faces);
-		setlength(radii,num_faces);
+		num_faces:=read_integer(s);
+		setlength(center,num_faces);
+		setlength(radius,num_faces);
 		for i:=0 to num_faces-1 do begin
-			centers[i]:=read_real(s);
-			radii[i]:=read_real(s);
+			center[i]:=read_real(s);
+			radius[i]:=read_real(s);
 		end;
 	end;
 	read_scam_shaft:=shaft;
@@ -190,6 +191,24 @@ end;
 }
 function scam_shaft_from_string(s:string):scam_shaft_type;
 begin scam_shaft_from_string:=read_scam_shaft(s); end;
+
+{
+	string_from_scam_shaft converts a shaft into a string for printing.
+}
+function string_from_scam_shaft(shaft:scam_shaft_type):string;
+var s:string='';face_num:integer;
+begin
+	with shaft do begin
+		write_xyz(s,axis.point);
+		s:=s+' ';
+		write_xyz(s,axis.direction);
+		s:=s+' ';
+		writestr(s,s,num_faces:1,' ');
+		for face_num:=0 to num_faces-1 do
+			writestr(s,s,center[face_num]:fsr:fsd,' ',radius[face_num]:fsr:fsd,' ');
+	end;
+	string_from_scam_shaft:=s;
+end;
 
 {
 	xyz_line_crosses_sphere returns true iff the line intersects or touches
@@ -641,7 +660,7 @@ procedure scam_project_shaft(ip:image_ptr_type;
 const
 	draw_perimeter=true;
 	draw_axials=true;
-	draw_radials=true;
+	draw_radials=false;
 	
 var
 	step,face_num:integer;
@@ -655,11 +674,16 @@ var
 	pc:xy_point_type;
 
 begin
+debug_log('entering');
 {
 	If the number of points is zero, or the number of faces is zero, exit.
 }
 	if num_points=0 then exit;
-	if shaft.num_faces<=0 then exit;	
+	if shaft.num_faces<=0 then exit;
+{
+	Make sure the shaft axis direction is a unit vector.
+}
+	shaft.axis.direction:=xyz_unit_vector(shaft.axis.direction);
 {
 	When we project tangents onto our image sensor, we are going to mark them in
 	the overlay, for which we need the size of the pixels.
@@ -671,18 +695,51 @@ begin
 		otherwise w:=bcam_tc255_pixel_um/um_per_mm;
 	end;
 {
-	We are going to work with pairs of faces, joining their two perimeters with lines.
-}
-	setlength(perimeter_a,num_points);
-	setlength(perimeter_b,num_points);
-{
 	Progress through the faces, drawing each perimeter, then joining perimeter points
-	to the perimeter points of the previous face, if it exists.
+	to the perimeter points of the previous face, if it exists. See comments in the
+	cylinder projection routine for details of the calculation.
 }
 	for face_num:=0 to shaft.num_faces-1 do begin
+		setlength(perimeter_a,num_points);
 		with shaft do begin
-			radial:=xyz_scale(xyz_perpendicular(axis.direction),radii[face_num]);
+			radial:=xyz_scale(xyz_perpendicular(axis.direction),radius[face_num]);
+			center_a:=xyz_sum(
+				axis.point,
+				xyz_scale(axis.direction,center[face_num]));
+			point_a:=xyz_sum(center_a,radial);
+			
+			for step:=0 to num_points-1 do begin
+				projection:=bcam_image_position(point_a,camera);
+				perimeter_a[step].x:=projection.x/w-ccd_origin_x;
+				perimeter_a[step].y:=projection.y/w-ccd_origin_y;
+				point_a:=xyz_axis_rotate(point_a,axis,2*pi/num_points);
+			end;
+			
+			pc:=bcam_image_position(center_a,camera);
+			ica.x:=pc.x/w-ccd_origin_x;
+			ica.y:=pc.y/w-ccd_origin_y;
+
+			for step:=0 to num_points-1 do begin
+				if draw_perimeter then begin
+					line.a:=perimeter_a[step];		
+					line.b:=perimeter_a[(step+1) mod num_points];
+					draw_overlay_xy_line(ip,line,scam_cylinder_color);
+				end;
+				
+				if draw_radials then begin
+					line.a:=perimeter_a[step];		
+					line.b:=ica;
+					draw_overlay_xy_line(ip,line,scam_cylinder_color);
+				end;
+				
+				if (face_num>0) and draw_axials then begin
+					line.a:=perimeter_a[step];
+					line.b:=perimeter_b[step];
+					draw_overlay_xy_line(ip,line,scam_cylinder_color);
+				end;
+			end;
 		end;
+		perimeter_b:=perimeter_a;
 	end;
 end;
 
