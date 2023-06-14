@@ -674,7 +674,6 @@ var
 	pc:xy_point_type;
 
 begin
-debug_log('entering');
 {
 	If the number of points is zero, or the number of faces is zero, exit.
 }
@@ -718,7 +717,7 @@ debug_log('entering');
 			pc:=bcam_image_position(center_a,camera);
 			ica.x:=pc.x/w-ccd_origin_x;
 			ica.y:=pc.y/w-ccd_origin_y;
-
+			
 			for step:=0 to num_points-1 do begin
 				if draw_perimeter then begin
 					line.a:=perimeter_a[step];		
@@ -726,7 +725,7 @@ debug_log('entering');
 					draw_overlay_xy_line(ip,line,scam_cylinder_color);
 				end;
 				
-				if draw_radials then begin
+				if (face_num=0) or (face_num=num_faces-1) or draw_radials then begin
 					line.a:=perimeter_a[step];		
 					line.b:=ica;
 					draw_overlay_xy_line(ip,line,scam_cylinder_color);
