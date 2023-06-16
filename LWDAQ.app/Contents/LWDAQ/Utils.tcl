@@ -1103,10 +1103,17 @@ proc LWDAQ_xml_get {xml tag} {
 # the routine treats the image as a container for one-dimensional data, skipping
 # the first row (row zero) and starting from the first pixel of the second row
 # (pixel zero of row one). Otherwise, the routine saves the image in the DAQ
-# format. In a GIF or DAQ file, the LWDAQ image header, with dimensions,
+# format. In a GIF, PNG and DAQ files, the LWDAQ image header, with dimensions,
 # analysis bounds, and results string, will be embedded in the first line of the
 # image. In an NDF file, this header information is lost. The results string is
-# saved in the meta-data string.
+# saved in the meta-data string. When we save to GIF and PNG we use the Tk
+# built-in routines that export photos to GIF and PNG files. We draw the image
+# in a Tk photo using lwdaq_draw. We make sure we draw the pixels one-to-one by
+# looking up the prevailiing display_zoom value and passing its inverse to
+# lwdaq_draw as an additional zoom value. We use the Tk photo's write function
+# to create the GIF or PNG file. Another thing we must do when saving the GIF
+# or PNG files is make sure lwdaq_draw does not draw the analysis bounds on the
+# image, nor anything from the overlay.
 #
 proc LWDAQ_write_image_file {image_name outfile_name} {
 	global LWDAQ_Info
@@ -1114,13 +1121,15 @@ proc LWDAQ_write_image_file {image_name outfile_name} {
 	switch -exact -- $file_type {
 		".gif" {
 			set p [image create photo]
-			lwdaq_draw $image_name $p -show_bounds 0 -clear 1
+			lwdaq_draw $image_name $p -show_bounds 0 -clear 1 \
+				-zoom [expr 1.0/[LWDAQ_get_lwdaq_config display_zoom]]
 			$p write $outfile_name -format GIF
 			image delete $p
 		} 
 		".png" {
 			set p [image create photo]
-			lwdaq_draw $image_name $p -show_bounds 0 -clear 1
+			lwdaq_draw $image_name $p -show_bounds 0 -clear 1 \
+				-zoom [expr 1.0/[LWDAQ_get_lwdaq_config display_zoom]]
 			$p write $outfile_name -format PNG
 			image delete $p
 		} 
@@ -1211,53 +1220,6 @@ proc LWDAQ_read_image_file {infile_name {image_name ""}} {
 		}
 	}
 	return $image_name
-}
-
-#
-# LWDAQ_image_bounds returns a string containing the analysis bounds of an
-# image. You can specify new bounds with four numbers in the order left, top,
-# right, bottom. If you specify zero (0) for the right or bottom bounds, the
-# routine sets them to their maximum values. You can save the result of this
-# routine in a string, change the bounds by calling the routine again, and then
-# restore the earlier values by passing the saved string as its argument. But
-# you have to do this with "eval" so that the TCL interpreter will break the
-# string into four elements before passing it to LWDAQ_image_bounds.
-#
-proc LWDAQ_image_bounds {image {left ""} {top ""} {right ""} {bottom ""}} {
-	set s [lwdaq_image_characteristics $image]
-	set j_max [expr [lindex $s 8] - 1]
-	set i_max [expr [lindex $s 9] - 1]
-	if {[string is integer -strict $left]} {
-		if {$left < 0} {error "left boundary < left edge"}
-		if {$left > $i_max} {error "left boundary > right edge"}
-		lwdaq_image_manipulate $image none -left $left
-	} {
-		if {$left != ""} {error "expected integer, received \"$left\""}
-	}
-	if {[string is integer -strict $top]} {
-		if {$top < 0} {error "top boundary < top edge"}
-		if {$top > $j_max} {error "top boundary > bottom edge"}
-		lwdaq_image_manipulate $image none -top $top
-	} {
-		if {$top != ""} {error "expected integer, received \"$top\""}
-	}
-	if {[string is integer -strict $right]} {
-		if {$right == 0} {set right $i_max}
-		if {$right < $left} {error "right boundary < left boundary"}
-		if {$right > $i_max} {error "right boundary > right edge"}
-		lwdaq_image_manipulate $image none -right $right
-	} {
-		if {$right != ""} {error "expected integer, received \"$right\""}
-	}
-	if {[string is integer -strict $bottom]} {
-		if {$bottom == 0} {set bottom $j_max}
-		if {$bottom < $top} {error "bottom boundary < top boundary"}
-		if {$bottom > $j_max} {error "bottom boundary > bottom edge"}
-		lwdaq_image_manipulate $image none -bottom $bottom
-	} {
-		if {$bottom != ""} {error "expected integer, received \"$bottom\""}
-	}
-	return [lrange [lwdaq_image_characteristics $image] 0 3]
 }
 
 #
