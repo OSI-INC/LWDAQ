@@ -356,7 +356,7 @@ proc LWDAQ_daq_BCAM {} {
 			set brightness [lindex [lwdaq_image_characteristics $config(memory_name)] 4]
 		}
 		"3" {
-			# Use the minimum intensity for which a specified fraction of pixels
+			# Use the maximum intensity for which a specified fraction of pixels
 			# are as bright or brighter. The argument must be a fraction greater
 			# than zero and less than one. We call this brightness a "soft
 			# maximum".
@@ -370,14 +370,15 @@ proc LWDAQ_daq_BCAM {} {
 				set num_pixels [expr $num_pixels + $n]
 			}
 			set num_above $num_pixels
+			set brightness 0
 			foreach {b n} $histogram {
 				set num_above [expr $num_above - $n]
+				if {$num_above < $num_pixels * $argument} {break}
 				set brightness $b
-				if {$num_above <= $num_pixels * $argument} {break}
 			}
 		}
 		"4" {
-			# Use the minimum intensity for which a specified number of pixels
+			# Use the maximum intensity for which a specified number of pixels
 			# are as bright or brighter. The argument must be an integer greater
 			# than zero. We call this brightness the "optical maximum".
 			if {![string is integer -strict $argument] || ($argument < 0)} {
@@ -389,10 +390,11 @@ proc LWDAQ_daq_BCAM {} {
 				set num_pixels [expr $num_pixels + $n]
 			}
 			set num_above $num_pixels
+			set brightness 0
 			foreach {b n} $histogram {
 				set num_above [expr $num_above - $n]
+				if {$num_above < $argument} {break}
 				set brightness $b
-				if {$num_above <= $argument} {break}
 			}
 		}
 		default {
