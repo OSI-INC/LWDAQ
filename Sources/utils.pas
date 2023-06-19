@@ -540,26 +540,17 @@ function xy_rectangle_ellipse(rect:xy_rectangle_type):xy_ellipse_type;
 	intellectually satisfying, but rather to be convenient for programming and
 	debugging. We do note, however, that our definition of an xyz_line is not
 	consistent with our definition of an xy_line. In the xy_line, we use two
-	points, no vector. An xyz_sphere we define with a point and a radius. An
-	xyz_cylinder is a plane containing one of the two circular ends of the
-	cylinder, a radius that gives us the perimiter of the circle, and a length.
-	The length, combined with the direction of the normal vector used to express
-	the plane, give us the direction and terminus of the cylinder axis, and
-	therefore the far face of the cylinder as well. We have no xyz_circle,
-	because we can get a circle by setting the length of a cylinder to zero. We
-	define a three-dimensional coordinate system as an origin point and three
-	unit vectors for the three axes. The coordinate system is over-constrained,
-	but in our code we find that the over-constrained definition serves as a
-	self-consistency check, and is at the same time easier to work with and
-	easier to check.
+	points, no vector. We define a three-dimensional coordinate system as an
+	origin point and three unit vectors for the three axes. The coordinate
+	system is over-constrained, but in our code we find that the
+	over-constrained definition serves as a self-consistency check, and is at
+	the same time easier to work with and easier to check.
 }
 type 
 	xyz_line_type=record point,direction:xyz_point_type; end;
 	xyz_line_ptr_type=^xyz_line_type;
 	xyz_plane_type=record point,normal:xyz_point_type; end;
 	xyz_plane_ptr_type=^xyz_plane_type;
-	xyz_sphere_type=record center:xyz_point_type;radius:real; end;
-	xyz_cylinder_type=record face:xyz_plane_type;radius,length:real; end;
 	coordinates_type=record
 		origin,x_axis,y_axis,z_axis:xyz_point_type;{a point and three unit vectors}
 	end;
@@ -585,8 +576,6 @@ function xyz_matrix_from_points(p,q,r:xyz_point_type):xyz_matrix_type;
 function xyz_plane_plane_plane_intersection(p,q,r:xyz_plane_type):xyz_point_type;
 function xyz_line_plane_intersection(line:xyz_line_type;plane:xyz_plane_type):xyz_point_type;
 function xyz_plane_plane_intersection(p,q:xyz_plane_type):xyz_line_type;
-function xyz_line_crosses_sphere(line:xyz_line_type;sphere:xyz_sphere_type):boolean;
-function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:xyz_cylinder_type):boolean;
 function xyz_line_reflect(line:xyz_line_type;plane:xyz_plane_type):xyz_line_type;
 function xyz_point_line_vector(point:xyz_point_type;line:xyz_line_type):xyz_point_type;
 function xyz_line_line_bridge(p,q:xyz_line_type):xyz_line_type;
@@ -683,8 +672,6 @@ function xy_from_string(s:string):xy_point_type;
 function xyz_from_string(s:string):xyz_point_type;
 function xyz_line_from_string(s:string):xyz_line_type;
 function xyz_plane_from_string(s:string):xyz_plane_type;
-function xyz_sphere_from_string(s:string):xyz_sphere_type;
-function xyz_cylinder_from_string(s:string):xyz_cylinder_type;
 function kinematic_mount_from_string(s:string):kinematic_mount_type;
 function string_from_boolean(value:boolean):string;
 function string_from_integer(value,fsi:integer):string;
@@ -714,8 +701,6 @@ function read_real(var s:string):real;
 function read_integer(var s:string):integer;
 function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
-function read_xyz_sphere(var s:string):xyz_sphere_type;
-function read_xyz_cylinder(var s:string):xyz_cylinder_type;
 function read_x_graph(var s:string):x_graph_type;
 function read_xy_graph(var s:string):xy_graph_type;
 function read_xyz_graph(var s:string):xyz_graph_type;
@@ -1933,30 +1918,6 @@ begin
 	p.normal:=read_xyz(s);
 	xyz_plane_from_string:=p;
 end;
-
-function read_xyz_sphere(var s:string):xyz_sphere_type;
-var sphere:xyz_sphere_type;
-begin 
-	sphere.center:=read_xyz(s);
-	sphere.radius:=read_real(s);
-	read_xyz_sphere:=sphere;
-end;
-
-function xyz_sphere_from_string(s:string):xyz_sphere_type;
-begin xyz_sphere_from_string:=read_xyz_sphere(s); end;
-
-function read_xyz_cylinder(var s:string):xyz_cylinder_type;
-var cylinder:xyz_cylinder_type;
-begin 
-	cylinder.face.point:=read_xyz(s);
-	cylinder.face.normal:=read_xyz(s);
-	cylinder.radius:=read_real(s);
-	cylinder.length:=read_real(s);
-	read_xyz_cylinder:=cylinder;
-end;
-
-function xyz_cylinder_from_string(s:string):xyz_cylinder_type;
-begin xyz_cylinder_from_string:=read_xyz_cylinder(s); end;
 
 function kinematic_mount_from_string(s:string):kinematic_mount_type;
 begin kinematic_mount_from_string:=read_kinematic_mount(s); end;
@@ -5733,65 +5694,6 @@ begin
 	M:=xyz_matrix_from_points(row_x,row_y,row_z);
 	N:=xyz_matrix_inverse(M);
 	xyz_line_plane_intersection:=xyz_transform(N,constants);
-end;
-
-{
-	xyz_line_crosses_sphere returns true iff the line intersects or touches
-	the sphere.
-}
-function xyz_line_crosses_sphere(line:xyz_line_type;sphere:xyz_sphere_type):boolean;
-var
-	range:real;
-begin
-	xyz_line_crosses_sphere:=false;
-	range:=xyz_length(xyz_point_line_vector(sphere.center,line));
-	xyz_line_crosses_sphere:=(range<=sphere.radius);
-end;
-
-{
-	xyz_line_crosses_cylinder returns true iff the line intersects or touches
-	the cylinder. We check to see if the line crosses either flat face of the 
-	cylinder, then to see if it crosses the curved surface. A line crosses a
-	flat face if it intersects with the plane defining the flat surface within
-	the cylinder radius of the face center. If a line crosses neither face, its
-	only means of crossing the cylinder is to enter the curved surface of the
-	cylinder some place and leave the curved surface at another place. The closest
-	approach of the line to the cylinder axis will have length less than the 
-	cylinder radius, and the closest point on the axis will lie between the 
-	two cylinder faces.
-}
-function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:xyz_cylinder_type):boolean;
-var
-	f:xyz_plane_type;
-	n,p:xyz_point_type;
-	axis,bridge:xyz_line_type;
-	a:real;
-begin
-	xyz_line_crosses_cylinder:=false;
-	if xyz_separation(
-			xyz_line_plane_intersection(line,cylinder.face),
-			cylinder.face.point) 
-			<= cylinder.radius then 
-		xyz_line_crosses_cylinder:=true
-	else begin
-		n:=xyz_unit_vector(cylinder.face.normal);
-		f.point:=xyz_sum(cylinder.face.point,xyz_scale(n,cylinder.length));
-		f.normal:=n;
-		if xyz_separation(
-				xyz_line_plane_intersection(line,f),
-				f.point) <= cylinder.radius then 
-			xyz_line_crosses_cylinder:=true
-		else begin
-			axis.point:=cylinder.face.point;
-			axis.direction:=n;
-			bridge:=xyz_line_line_bridge(axis,line);
-			p:=xyz_difference(bridge.point,cylinder.face.point);
-			a:=xyz_dot_product(p,n);
-			if (a>=0) and (a<=cylinder.length) 
-					and (xyz_length(bridge.direction)<=cylinder.radius) then
-				xyz_line_crosses_cylinder:=true
-		end;
-	end;
 end;
 
 {

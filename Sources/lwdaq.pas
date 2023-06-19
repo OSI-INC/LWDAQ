@@ -3431,8 +3431,9 @@ var
 	body:string='';
 	rule:string='10 %';
 	camera:bcam_camera_type;
-	sphere:xyz_sphere_type;
-	cylinder:xyz_cylinder_type;
+	sphere:scam_sphere_type;
+	cylinder:scam_cylinder_type;
+	shaft:scam_shaft_type;
 	disagreement:real=0;
 	spread:real=0;
 	threshold:real=0;
@@ -3481,11 +3482,14 @@ begin
 		while body<>'' do begin
 			option:=read_word(body);
 			if option='sphere' then begin
-				sphere:=read_xyz_sphere(body);
+				sphere:=read_scam_sphere(body);
 				scam_project_sphere(ip,sphere,camera,num_points);
 			end else if option='cylinder' then begin
-				cylinder:=read_xyz_cylinder(body);
+				cylinder:=read_scam_cylinder(body);
 				scam_project_cylinder(ip,cylinder,camera,num_points);
+			end else if option='shaft' then begin
+				shaft:=read_scam_shaft(body);
+				scam_project_shaft(ip,shaft,camera,num_points);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Invalid shape "'+option+'", must be one of '
