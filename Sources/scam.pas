@@ -47,8 +47,9 @@ const
 {
 	Classification and projection color codes.
 }
-	scam_sphere_color=green_color;
+	scam_sphere_color=blue_color;
 	scam_cylinder_color=blue_color;
+	scam_shaft_color=blue_color;
 	scam_silhouette_color=orange_color;
 
 type
@@ -166,7 +167,10 @@ begin scam_cylinder_from_string:=read_scam_cylinder(s); end;
 
 {
 	read_scam_shaft reads the parameters of a shaft from a string and deletes
-	them from the string. It returns a new shaft record.
+	them from the string. It returns a new shaft record. The string must contain
+	with the xyz origin of the shaft axis, the xyz direction of the shaft axis,
+	and one or more faces. Each face is specified by a radius and a distance
+	from the origin along the shaft.	
 }
 function read_scam_shaft(var s:string):scam_shaft_type;
 var shaft:scam_shaft_type;i:integer;
@@ -174,12 +178,12 @@ begin
 	with shaft do begin
 		axis.point:=read_xyz(s);
 		axis.direction:=read_xyz(s);
-		num_faces:=read_integer(s);
+		num_faces:=word_count(s) div 2;
 		setlength(center,num_faces);
 		setlength(radius,num_faces);
 		for i:=0 to num_faces-1 do begin
-			center[i]:=read_real(s);
 			radius[i]:=read_real(s);
+			center[i]:=read_real(s);
 		end;
 	end;
 	read_scam_shaft:=shaft;
@@ -203,9 +207,8 @@ begin
 		s:=s+' ';
 		write_xyz(s,axis.direction);
 		s:=s+' ';
-		writestr(s,s,num_faces:1,' ');
 		for face_num:=0 to num_faces-1 do
-			writestr(s,s,center[face_num]:fsr:fsd,' ',radius[face_num]:fsr:fsd,' ');
+			writestr(s,s,radius[face_num]:fsr:fsd,' ',center[face_num]:fsr:fsd,' ');
 	end;
 	string_from_scam_shaft:=s;
 end;
@@ -722,19 +725,19 @@ begin
 				if draw_perimeter then begin
 					line.a:=perimeter_a[step];		
 					line.b:=perimeter_a[(step+1) mod num_points];
-					draw_overlay_xy_line(ip,line,scam_cylinder_color);
+					draw_overlay_xy_line(ip,line,scam_shaft_color);
 				end;
 				
 				if (face_num=0) or (face_num=num_faces-1) or draw_radials then begin
 					line.a:=perimeter_a[step];		
 					line.b:=ica;
-					draw_overlay_xy_line(ip,line,scam_cylinder_color);
+					draw_overlay_xy_line(ip,line,scam_shaft_color);
 				end;
 				
 				if (face_num>0) and draw_axials then begin
 					line.a:=perimeter_a[step];
 					line.b:=perimeter_b[step];
-					draw_overlay_xy_line(ip,line,scam_cylinder_color);
+					draw_overlay_xy_line(ip,line,scam_shaft_color);
 				end;
 			end;
 		end;

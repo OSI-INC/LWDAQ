@@ -296,7 +296,6 @@ exports
 	swap_matrix_rows name exp_prefix+'swap_matrix_rows',
 	new_simplex name exp_prefix+'new_simplex',
 	simplex_step name exp_prefix+'simplex_step',
-	simplex_volume name exp_prefix+'simplex_volume',
 	simplex_size name exp_prefix+'simplex_size',
 	simplex_construct name exp_prefix+'simplex_construct',
 	simplex_vertex_copy name exp_prefix+'simplex_vertex_copy',

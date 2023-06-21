@@ -389,10 +389,9 @@ function new_simplex(num_coords:integer):simplex_type;
 procedure simplex_step(var simplex:simplex_type;
 	sef:simplex_error_function_type;
 	ep:pointer);
-function simplex_volume(var simplex:simplex_type):real;
 function simplex_size(var simplex:simplex_type):real;
 procedure simplex_construct(var simplex:simplex_type;
-	error:simplex_error_function_type;
+	sef:simplex_error_function_type;
 	ep:pointer);
 function simplex_vertex_copy(var a:simplex_vertex_type):simplex_vertex_type;
 	
@@ -4235,7 +4234,7 @@ begin
 		start_size:=1.0;
 		end_size:=0.01;
 		restart_cntr:=0;
-		max_restarts:=10;
+		max_restarts:=2;
 		done:=false;
 	end;
 	new_simplex:=simplex;
@@ -4273,7 +4272,7 @@ end;
 	function to find the values it needs to determine its result.
 }
 procedure simplex_construct(var simplex:simplex_type;
-	error:simplex_error_function_type;
+	sef:simplex_error_function_type;
 	ep:pointer);
 
 var 
@@ -4281,37 +4280,23 @@ var
 
 begin
 	with simplex do begin
+		errors[1]:=sef(vertices[1],ep);
 		for i:=2 to n+1 do begin
 			vertices[i]:=simplex_vertex_copy(vertices[1]);
-			vertices[i,i-1]:=vertices[i,i-1]+start_size*scaling[i-1];
-		end;
-		for i:=1 to n+1 do errors[i]:=error(vertices[i],ep);
-	end;
-end;
-
-{
-	simplex_volume returns the volume of the current simplex.
-}
-function simplex_volume(var simplex:simplex_type):real;
-
-var
-	M:matrix_type;
-	i,j:integer;
-
-begin
-	with simplex do begin
-		M:=new_matrix(n,n);
-		for j:=1 to n do begin
-			for i:=1 to n do begin
-				M[j,i]:=vertices[j+1,i]-vertices[1,i];
+			if (scaling[i-1]<>0) then begin
+				vertices[i,i-1]:=vertices[i,i-1]+start_size*scaling[i-1];
+				errors[i]:=sef(vertices[i],ep);
+			end else begin
+				errors[i]:=errors[1];
 			end;
 		end;
 	end;
-	simplex_volume:=abs(matrix_determinant(M));
 end;
 
 {
-	simplex_size returns the length of the longest side in a simplex.
+	simplex_size returns the length of the longest side in a simplex, with each
+	coordinate reduced by the simplex scaling factor to get its effective length
+	compared to the other sides.
 }
 function simplex_size(var simplex:simplex_type):real;
 
@@ -4326,7 +4311,7 @@ begin
 			for k:=j+1 to n+1 do begin
 				s:=0;
 				for i:=1 to n do 
-					s:=s+sqr(vertices[j,i]-vertices[k,i]);
+					s:=s+sqr((vertices[j,i]-vertices[k,i])/scaling[i]);
 				if s>max then max:=s;
 			end;
 		end;
