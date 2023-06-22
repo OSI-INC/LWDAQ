@@ -220,7 +220,7 @@ const
 	ignore_remaining_data=-1;
 
 var 
-	show_details:boolean=false;
+	show_details:boolean=true;
 	big_endian:boolean;
 	stdout_available:boolean=true;
 	stdin_available:boolean=true;
@@ -374,6 +374,7 @@ type
 		vertices:array of simplex_vertex_type; 
 		errors:array of real; 
 		scaling:array of real;
+		duplicate:array of boolean;
 		start_size:real; {length of sides for construction}
 		end_size:real; {length of longest side for convergeance}
 		restart_cntr:integer; {pop counter}
@@ -4229,8 +4230,10 @@ begin
 		setlength(vertices,n+2,n+1);
 		setlength(errors,n+2);
 		setlength(scaling,n+1);
+		setlength(duplicate,n+2);
 		for i:=1 to n do vertices[1,i]:=0;
 		for i:=1 to n do scaling[i]:=1.0;
+		for i:=1 to n+1 do duplicate[i]:=false;
 		start_size:=1.0;
 		end_size:=0.01;
 		restart_cntr:=0;
@@ -4254,8 +4257,7 @@ var
 	i:integer;
 begin
 	setlength(v,length(a));
-	for i:=1 to length(v)-1 do
-		v[i]:=a[i];
+	for i:=1 to length(v)-1 do v[i]:=a[i];
 	simplex_vertex_copy:=v;
 end;
 
@@ -4287,6 +4289,8 @@ begin
 				vertices[i,i-1]:=vertices[i,i-1]+start_size*scaling[i-1];
 				errors[i]:=sef(vertices[i],ep);
 			end else begin
+				duplicate[1]:=true;
+				duplicate[i]:=true;
 				errors[i]:=errors[1];
 			end;
 		end;
@@ -4334,14 +4338,18 @@ procedure simplex_sort_swap(i,j:integer;lp:pointer);
 var
 	v:simplex_vertex_type;
 	a:real;
+	d:boolean;
 begin
 	with simplex_ptr(lp)^ do begin
 		v:=vertices[i];
 		a:=errors[i];
+		d:=duplicate[i];
 		vertices[i]:=vertices[j];
 		errors[i]:=errors[j];
+		duplicate[i]:=duplicate[j];
 		vertices[j]:=v;
-		errors[j]:=a;	
+		errors[j]:=a;
+		duplicate[j]:=d;
 	end;
 end;
 procedure simplex_sort(var simplex:simplex_type);
@@ -4380,9 +4388,10 @@ const
 	shrink_scale=0.2;
 	
 var 
-	i,j:integer;
+	i,j,count:integer;
 	v,v_center,v_contract,v_extend,v_reflect:simplex_vertex_type;
-	a_reflect,a_contract,a_expand:real;
+	a_reflect,a_contract,a_extend:real;
+	include_one_duplicate:boolean;
 	
 begin
 {
@@ -4394,12 +4403,23 @@ begin
 }
 	with simplex do begin
 {	
-	Determine the center of mass of the first n vertices. The one remaining
-	vertex, number n+1, is at the highest error following the sort.
+	Determine the center of mass of the first n vertices, adding the duplicate
+	vertex only once, unless the last vertex is a duplicate, in which case we
+	don't add the duplicate vertex at all. The one remaining vertex, number n+1,
+	is at the highest error following the sort.
 }
 		v_center:=simplex_vertex_copy(vertices[1]);
-		for i:=2 to n do add(v_center,vertices[i]);
-		scale(v_center,1.0/n);
+		for j:=1 to n do v_center[j]:=0;
+		count:=0;
+		include_one_duplicate:=not duplicate[n+1];
+		for i:=1 to n do 
+			if (not duplicate[i]) or include_one_duplicate then begin
+				add(v_center,vertices[i]);
+				inc(count);
+				if duplicate[i] then include_one_duplicate:=false;
+			end;
+		if count>0 then scale(v_center,1.0/count)
+		else scale(v_center,1.0/n);
 {
 	Reflect the highest vertex through the center of mass of the others.
 }
@@ -4421,7 +4441,7 @@ begin
 	If the error of the reflected new vertex is lower than all the other
 	vertices, we try to push our reflection farther from the center of the
 	simplex in the hope of getting an even lower error. Otherwise we replace the
-	lowest vertex with the reflected vertex.
+	worste vertex with the reflected vertex.
 }
 		end else if (a_reflect<errors[1]) then begin
 			v:=simplex_vertex_copy(v_center);
@@ -4429,12 +4449,12 @@ begin
 			scale(v,expand_scale);
 			add(v,v_center);
 			v_extend:=simplex_vertex_copy(v);
-			a_expand:=sef(v_extend,ep);
-			if a_expand<a_reflect then begin
+			a_extend:=sef(v_extend,ep);
+			if a_extend<a_reflect then begin
 				vertices[n+1]:=simplex_vertex_copy(v_extend);
-				errors[n+1]:=a_expand;
+				errors[n+1]:=a_extend;
 				if show_details then 
-					gui_writeln('extend: '+string_from_real(a_expand,fsr,fsd));
+					gui_writeln('extend: '+string_from_real(a_extend,fsr,fsd));
 			end else begin
 				vertices[n+1]:=simplex_vertex_copy(v_reflect);
 				errors[n+1]:=a_reflect;
@@ -4495,6 +4515,19 @@ begin
 				end;
 			end;
 		end;
+{
+	Duplicate vertices arise when we pass zero as the scaling factor for one or more of
+	the parameters in the fit. If we pass three zeroes among the scaling factors, we
+	will have three vertices of our simplex equal to the first, and therefore four
+	duplicates. If the n+1'th vertex is a duplicate, we copy its value and its error
+	into all other duplicates now.
+}
+		if duplicate[n+1] then
+			for i:=1 to n do
+				if duplicate[i] then begin
+					vertices[i]:=simplex_vertex_copy(vertices[n+1]);
+					errors[i]:=errors[n+1];
+				end;
 	end;
 {
 	Sort the vertices in order of ascending error again.
@@ -4504,12 +4537,18 @@ begin
 	When showing details, we print out the entire list of vertices with their errors.
 }
 	if show_details then with simplex do begin
+		writestr(debug_string,'S: ');
+		for j:=1 to n do writestr(debug_string,debug_string,scaling[j]:fsr:fsd,' ');
+		gui_writeln(debug_string);
+		writestr(debug_string,'C: ');
+		for j:=1 to n do writestr(debug_string,debug_string,v_center[j]:fsr:fsd,' ');
+		gui_writeln(debug_string);
 		for i:=1 to n+1 do begin
-			debug_string:='';
 			writestr(debug_string,i,': ');
 			for j:=1 to n do 
 				writestr(debug_string,debug_string,vertices[i,j]:fsr:fsd,' ');
-			writestr(debug_string,debug_string,errors[i]:fsr:fsd);
+			writestr(debug_string,debug_string,errors[i]:fsr:fsd,' ');
+			if duplicate[i] then writestr(debug_string,debug_string,'D');
 			gui_writeln(debug_string);
 		end;
 	end;
