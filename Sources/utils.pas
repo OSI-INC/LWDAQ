@@ -220,7 +220,7 @@ const
 	ignore_remaining_data=-1;
 
 var 
-	show_details:boolean=true;
+	show_details:boolean=false;
 	big_endian:boolean;
 	stdout_available:boolean=true;
 	stdin_available:boolean=true;
