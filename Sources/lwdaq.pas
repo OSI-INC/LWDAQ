@@ -3418,7 +3418,62 @@ begin
 end;
 
 {
-<p>lwdaq_scam analyzes Silhouette Camera (SCAM) images.</p>
+<p>lwdaq_scam applies Silhouette Camera (SCAM) routines to SCAM images. The SCAM
+routines are defined in <a
+href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. We pass
+lwdaq_scam the name of a silhouette image name, an instruction name, and
+arguments required by the instruction.</p>
+
+<center><table border cellspacing=2>
+<tr><th>Instruction</th><th>Function</th></tr>
+<tr><td>project</td><td>Project a modelled object into image overlay.</td></tr>
+<tr><td>disagreement</td><td>Measure disagreement between actual and modelled silhouette.</td></tr>
+</table></center>
+
+<p>The <i>project</i> instruction takes three arguments. A <i>camera</i> definition, an
+<i>object</i> definition, and a number of projection lines to use to fill the overlay
+in the silhouette image. If we specify zero for the number of lines, the projection
+algorithm reverts to one where we check every pixel in the silhouette image to see if it
+should or should not be included in the modelled silhouette. For one or more lines, the
+projection picks points on the modelled object and joins them up with lines in the silhouette
+image overlay.</p>
+
+<p>When we project a modelled object onto our SCAM image sensor, we need a
+description of the SCAM to allow us to project the object into the camera's
+image. We specify the SCAM in the same way we specify a BCAM camera. The
+<i>camera</i> string contains nine elements. The first is the name of the
+camera. The following eight are the camera calibration constants, as described
+in the <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User
+Manual</a>. They are the xyz camera pivot position millimeters, the angle
+subtended by the camera axis with the x and y axis in milliradians, a numerical
+code to say if the axis is forward or backwards and to identify the image
+sensor, the distance from the pivot point to the center of the image sensor, and
+the rotation of the image sensor about the camera axis.</p>
+
+<p>The modelled object itself we specify with its own string. The first word in
+the string is the object type, such as "sphere", "cylinder", or "shaft". After
+that are numbers that define the dimensions of the object. For a sphere, we
+specify a center xyz point and a radius, see scam_sphere_from_string in <a
+href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. For a
+cylinder we specify the xyz point at one end of the axis, the xyz direction of
+the cylinder axis, the radius, and the length. If we want to make a circle, we
+use a cylinder of zero length. For a shaft, we specify the xyz point at one end
+of the shaft axis, the xyz direction of the shaft axis, and a sequence of one or
+more faces. Each face is a radius and a distance along the axis from the
+shaft.</p>
+
+<p>When we measure disagreement, the routine counts the number of pixels in the
+analysis boundaries for which the image and the overlay disagree about the
+location and extent of the silhouette. After projecting objects onto the
+overlay, the overlay will be blue to represent the presence of the projections.
+We now check each pixel to see if its intensity is below the silhouette
+threshold or not. If the overlay pixel is clear and the image pixel is above
+threshold, the two agree and we leave the overlay clear. If the overlay pixel is
+blue and the image pixel is below threshold, we have agreement and we clear the
+overlay to show agreement. If the overlay is blue and the image is above
+threshold, we leave the overlay blue and add one to our disagreement. If the
+overlay is clear and the image is below threshold, we add one to our
+disagreement and we set the overlay to the orange.</p>
 }
 function lwdaq_scam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4799,10 +4854,10 @@ begin
 end;
 
 {
-	lwdaq_simplex_error takes a simplex vertex type and a pointer to a pointer
-	to a string containing a Tcl command name and executes this command with the
-	numerical values specified in the vertex type. The routine is used exclusively
-	by <a href="#lwdaq_simplex">lwdaq_simplex</a>.
+	lwdaq_simplex_error takes a simplex vertex type and a pointer to a string
+	containing a Tcl command name and executes this command with the numerical
+	values specified in the vertex type. The routine is used exclusively by <a
+	href="#lwdaq_simplex">lwdaq_simplex</a>.
 }
 function lwdaq_simplex_error(v:simplex_vertex_type;ep:pointer):real;
 type
