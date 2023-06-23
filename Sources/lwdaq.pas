@@ -2093,7 +2093,7 @@ its own use.</p>
 <tr><td>-pixel_size_um</td><td>Tells the analysis the pixel size (assumed square)</td></tr>
 <tr><td>-show_timinig</td><td>If 1, print timing report to gui text window.</td></tr>
 <tr><td>-show_pixels</td><td>If 1, mark pixels above threshold.</td></tr>
-<tr><td>-analysis_type</td><td>Selects centroid, ellipse, line-finding analysis.</td></tr>
+<tr><td>-analysis_type</td><td>Selects analysis type, default weighted centroid.</td></tr>
 <tr><td>-sort_code</td><td>Specifies how the spots are to be sorted in the output string.</td></tr>
 <tr><td>-return_threshold</td><td>If 1, return threshold string results only, default 0.</td></tr>
 <tr><td>-return_bounds</td><td>If 1, return spot bounds only, default 0.</td></tr>
@@ -2190,8 +2190,10 @@ in milliradians. With analysis_type=4, the routine negates the image, turning a
 dark shadow into a bright stripe, and then applies vertical stripe analysis to
 the negated image. With analysis_type=5, the routine obtains the absolute
 horizontal gradient of intensity and applies vertical stripe analyis to the
-gradient image. With analysis_type=5, the routine negates the image, finds
-bright spots, and fits an ellipse to their edges.</p>
+gradient image. With analysis_type=6, the routine negates the image, finds
+bright spots, and fits an ellipse to their edges. With analysis=7, the routine
+applies the threshold and marks every pixel below threshold in the overlay. It
+returns the centroid of the silhouette pixels, giving them all equal weight.</p>
 
 <p>With return_threshold=1, the routine does no spot-finding, but instead
 returns a string of five values obtained by interpreting the threshold string
