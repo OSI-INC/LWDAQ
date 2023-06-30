@@ -39,7 +39,7 @@ proc CPMS_Calibrator_init {} {
 
 	set iconfig(analysis_enable) 0
 	set iconfig(daq_flash_seconds) 0.05
-	set iconfig(analysis_threshold) "15 %"
+	set iconfig(analysis_threshold) "10 %"
 	set iconfig(daq_ip_addr) "71.174.73.187"
 	set iconfig(daq_source_device_element) "1"
 	set iinfo(daq_source_device_type) "1"
@@ -50,8 +50,8 @@ proc CPMS_Calibrator_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230627/LC_100ms.gif" left_img
-	LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230627/RC_100ms.gif" right_img
+	LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230629/LC_1.gif" left_img
+	LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230629/RC_1.gif" right_img
 
 	return ""   
 }
@@ -85,13 +85,7 @@ proc CPMS_Calibrator_go {{params ""}} {
 	lwdaq_image_manipulate left_img none -clear 1
 	lwdaq_image_manipulate right_img none -clear 1
 	
-	set shaft "shaft $center $axis \
-		16.89 0.0 \
-		16.89 7.24  \
-		9.50 7.24 \
-		9.50 28.59 \
-		29.36 28.59 \
-		29.36 100.0"
+	set shaft "sphere $center 34.72"
 	lwdaq_scam left_img project $LC $shaft $config(tangents)
 	lwdaq_scam right_img project $RC $shaft $config(tangents)
 
