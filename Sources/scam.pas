@@ -54,36 +54,51 @@ const
 
 type
 {
-	Object types for projection. An scam_sphere we define with a point and a
-	diameter. An scam_cylinder is a point, a direction, a diameter, and a
+	Object types for projection. Each object begins with an xyz location point
+	and an xyz orientation vector. The orientation vector is present even if the
+	object is symmetric with respect to one or more axes of rotation. The
+	generic object type is one we use for type-casting other object types when
+	we apply rotation and translation. An scam_sphere we define with a point and
+	a diameter. An scam_cylinder is a point, a direction, a diameter, and a
 	length. We have no xyz_circle, because we can get a circle by setting the
 	length of a cylinder to zero. A shaft is an point, a direction, and a list
 	of faces. Each face is defined by a distance along the axis from the axis
 	point and a diameter. 
 }
+	scam_object_type=record 
+		location:xyz_point_type; {center of sphere}
+		orientation:xyz_point_type; {redundant orientation of sphere}
+	end;
 	scam_sphere_type=record 
-		origin:xyz_point_type; {center of sphere}
+		location:xyz_point_type; {center of sphere}
+		orientation:xyz_point_type; {redundant orientation of sphere}
 		diameter:real; {diameter of sphere}
 	end;
 	scam_cylinder_type=record 
-		origin:xyz_point_type; {center of one face}
-		direction:xyz_point_type; {direction of axis}
+		location:xyz_point_type; {center of one face}
+		orientation:xyz_point_type; {direction of axis}
 		diameter:real; {diameter of both faces}
 		length:real; {distance along axis to second face}
 	end;
 	scam_shaft_type=record 
-		origin:xyz_point_type; {origin of shaft}
-		direction:xyz_point_type; {direction of shaft}
-		num_faces:integer;{number of faces that define the shaft}
-		diameter:array of real;{diameter of face}
-		distance:array of real;{distance of face from origin}
+		location:xyz_point_type; {origin of shaft}
+		orientation:xyz_point_type; {direction of shaft}
+		num_faces:integer; {number of faces that define the shaft}
+		diameter:array of real; {diameter of face}
+		distance:array of real; {distance of face from origin}
 	end;
 
 {
 	Geometry routines.
 }
-function xyz_line_crosses_sphere(line:xyz_line_type;sphere:scam_sphere_type):boolean;
-function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:scam_cylinder_type):boolean;
+function xyz_line_crosses_sphere(line:xyz_line_type;
+	sphere:scam_sphere_type):boolean;
+function xyz_line_crosses_cylinder(line:xyz_line_type;
+	cylinder:scam_cylinder_type):boolean;
+
+{
+	String input and output routines.
+}
 function scam_sphere_from_string(s:string):scam_sphere_type;
 function scam_cylinder_from_string(s:string):scam_cylinder_type;
 function scam_shaft_from_string(s:string):scam_shaft_type;
@@ -135,12 +150,17 @@ implementation
 
 {
 	read_scam_sphere reads the parameters of a sphere from a string and deletes
-	them from the string. It returns a new sphere record.
+	them from the string. It returns a new sphere record. Note that the string
+	must contain values for the orientation of the sphere, even though a sphere
+	is symmetric for all rotation. Our sphere strings have the same format as
+	the strings for other objects: they begin with xyz location and xyz
+	orientation.
 }
 function read_scam_sphere(var s:string):scam_sphere_type;
 var sphere:scam_sphere_type;
 begin 
-	sphere.origin:=read_xyz(s);
+	sphere.location:=read_xyz(s);
+	sphere.orientation:=read_xyz(s);
 	sphere.diameter:=read_real(s);
 	read_scam_sphere:=sphere;
 end;
@@ -159,8 +179,8 @@ begin scam_sphere_from_string:=read_scam_sphere(s); end;
 function read_scam_cylinder(var s:string):scam_cylinder_type;
 var cylinder:scam_cylinder_type;
 begin 
-	cylinder.origin:=read_xyz(s);
-	cylinder.direction:=read_xyz(s);
+	cylinder.location:=read_xyz(s);
+	cylinder.orientation:=read_xyz(s);
 	cylinder.diameter:=read_real(s);
 	cylinder.length:=read_real(s);
 	read_scam_cylinder:=cylinder;
@@ -184,8 +204,8 @@ function read_scam_shaft(var s:string):scam_shaft_type;
 var shaft:scam_shaft_type;i:integer;
 begin 
 	with shaft do begin
-		origin:=read_xyz(s);
-		direction:=read_xyz(s);
+		location:=read_xyz(s);
+		orientation:=read_xyz(s);
 		num_faces:=word_count(s) div 2;
 		setlength(diameter,num_faces);
 		setlength(distance,num_faces);
@@ -211,9 +231,9 @@ function string_from_scam_shaft(shaft:scam_shaft_type):string;
 var s:string='';face_num:integer;
 begin
 	with shaft do begin
-		write_xyz(s,origin);
+		write_xyz(s,location);
 		s:=s+' ';
-		write_xyz(s,direction);
+		write_xyz(s,orientation);
 		s:=s+' ';
 		for face_num:=0 to num_faces-1 do
 			writestr(s,s,diameter[face_num]:fsr:fsd,' ',distance[face_num]:fsr:fsd,' ');
@@ -230,7 +250,7 @@ var
 	range:real;
 begin
 	xyz_line_crosses_sphere:=false;
-	range:=xyz_length(xyz_point_line_vector(sphere.origin,line));
+	range:=xyz_length(xyz_point_line_vector(sphere.location,line));
 	xyz_line_crosses_sphere:=(range<=sphere.diameter*one_half);
 end;
 
@@ -254,11 +274,11 @@ var
 	a:real;
 begin
 	xyz_line_crosses_cylinder:=false;
-	face.point:=cylinder.origin;
-	face.normal:=xyz_unit_vector(cylinder.direction);
+	face.point:=cylinder.location;
+	face.normal:=xyz_unit_vector(cylinder.orientation);
 	if xyz_separation(
 			xyz_line_plane_intersection(line,face),
-			cylinder.origin) 
+			cylinder.location) 
 			<= cylinder.diameter*one_half then 
 		xyz_line_crosses_cylinder:=true
 	else begin
@@ -268,10 +288,10 @@ begin
 				face.point) <= cylinder.diameter*one_half then 
 			xyz_line_crosses_cylinder:=true
 		else begin
-			axis.point:=cylinder.origin;
+			axis.point:=cylinder.location;
 			axis.direction:=face.normal;
 			bridge:=xyz_line_line_bridge(axis,line);
-			p:=xyz_difference(bridge.point,cylinder.origin);
+			p:=xyz_difference(bridge.point,cylinder.location);
 			a:=xyz_dot_product(p,face.normal);
 			if (a>=0) and (a<=cylinder.length) and (xyz_length(bridge.direction)
 					<=cylinder.diameter*one_half) then
@@ -452,11 +472,11 @@ begin
 	the tangent point. 
 }
 	center_line.point:=camera.pivot;
-	center_line.direction:=xyz_difference(sphere.origin,camera.pivot);
+	center_line.direction:=xyz_difference(sphere.location,camera.pivot);
 	theta:=arcsin(sphere.diameter*one_half/xyz_length(center_line.direction));
 	axis.point:=camera.pivot;
 	axis.direction:=xyz_perpendicular(center_line.direction);
-	tangent.point:=xyz_axis_rotate(sphere.origin,axis,theta);
+	tangent.point:=xyz_axis_rotate(sphere.location,axis,theta);
 	tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 {
 	When we project tangents onto our image sensor, we are going to mark them in the
@@ -486,7 +506,7 @@ begin
 	from each perimeter point to the center. If draw_chords, we draw parallel lines
 	between opposite perimeter points.
 }	
-	pc:=bcam_image_position(sphere.origin,camera);
+	pc:=bcam_image_position(sphere.location,camera);
 	ic.x:=pc.x/w-ccd_origin_x;
 	ic.y:=pc.y/w-ccd_origin_y;
 	for step:=0 to num_points-1 do begin
@@ -556,14 +576,14 @@ begin
 {
 	Find a point on the circumference of the first end of the cylinder.
 }
-	cylinder.direction:=xyz_unit_vector(cylinder.direction);
+	cylinder.orientation:=xyz_unit_vector(cylinder.orientation);
 	radial:=xyz_scale(
-		xyz_perpendicular(cylinder.direction),
+		xyz_perpendicular(cylinder.orientation),
 		cylinder.diameter*one_half);
-	point_a:=xyz_sum(cylinder.origin,radial);
-	center_a:=cylinder.origin;
-	axis.point:=cylinder.origin;
-	axis.direction:=xyz_scale(cylinder.direction,cylinder.length);
+	point_a:=xyz_sum(cylinder.location,radial);
+	center_a:=cylinder.location;
+	axis.point:=cylinder.location;
+	axis.direction:=xyz_scale(cylinder.orientation,cylinder.length);
 {
 	Find the matching point and center on the opposite end of the cylinder.
 	These two points are joined by a line parallel to the cylinder axis, of
@@ -693,9 +713,9 @@ begin
 {
 	Make sure the shaft axis direction is a unit vector.
 }
-	shaft.direction:=xyz_unit_vector(shaft.direction);
-	axis.point:=shaft.origin;
-	axis.direction:=shaft.direction;
+	shaft.orientation:=xyz_unit_vector(shaft.orientation);
+	axis.point:=shaft.location;
+	axis.direction:=shaft.orientation;
 {
 	When we project tangents onto our image sensor, we are going to mark them in
 	the overlay, for which we need the size of the pixels.
@@ -714,10 +734,10 @@ begin
 	for face_num:=0 to shaft.num_faces-1 do begin
 		setlength(perimeter_a,num_points);
 		with shaft do begin
-			radial:=xyz_scale(xyz_perpendicular(shaft.direction),
+			radial:=xyz_scale(xyz_perpendicular(shaft.orientation),
 				diameter[face_num]*one_half);
-			center:=xyz_sum(shaft.origin,
-				xyz_scale(shaft.direction,distance[face_num]));
+			center:=xyz_sum(shaft.location,
+				xyz_scale(shaft.orientation,distance[face_num]));
 			point:=xyz_sum(center,radial);
 			
 			for step:=0 to num_points-1 do begin
