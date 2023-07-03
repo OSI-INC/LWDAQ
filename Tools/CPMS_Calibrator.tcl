@@ -22,7 +22,6 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
-	global LWDAQ_Info LWDAQ_Driver
 	
 	LWDAQ_tool_init "CPMS_Calibrator" "1.0"
 	if {[winfo exists $info(window)]} {return ""}
@@ -31,20 +30,25 @@ proc CPMS_Calibrator_init {} {
 	set config(cam_left) "83.509 0.000 0.000 -201.372 0.000 2.000 23.748 0.000" 
 	set config(cam_right) "-83.509 0.000 0.000 234.757 0.922 2.000 23.687 0.000" 
 	set config(object) [list "sphere 0 0 0 0 0 0 34.72"]
-	set config(displacements) "0 10 20 30 40 50 60 70 80 90 100"
+	set config(displacements) "0 -40 -70 -100"
+	set config(scaling) "1 1 10 10 10 0"
 
-	set config(steps) "1000"
-	set config(tangents) "2000"
-	set config(fit_pose) 1
+	set config(fit_steps) "1000"
+	set config(fit_restarts) "0"
+	set config(num_lines) "2000"
 	set config(fit_cam_left) 0
 	set config(fit_cam_right) 0
 	set config(stop_fit) 0
+	set config(zoom) 0.5
+	set config(intensify) "exact"
+	set config(project_silhouette) "1"
+	set config(threshold) "8 %"
 	
 	set info(projector_window) "$info(window).cpms_projector"
 
+	set info(state) "Idle"
 	set iconfig(analysis_enable) 0
 	set iconfig(daq_flash_seconds) 0.05
-	set iconfig(analysis_threshold) "10 %"
 	set iconfig(daq_ip_addr) "71.174.73.187"
 	set iconfig(daq_source_device_element) "1"
 	set iinfo(daq_source_device_type) "1"
@@ -55,8 +59,13 @@ proc CPMS_Calibrator_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230629/LC_1.gif" img_left
-	LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230629/RC_1.gif" img_right
+	foreach a {1 2 3 4} {
+		lwdaq_image_create -name img_left_$a -width 700 -height 520
+		lwdaq_image_create -name img_right_$a -width 700 -height 520
+		LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230703/L$a\.gif" img_left_$a
+		LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230703/R$a\.gif" img_right_$a
+	}
+		
 
 	return ""   
 }
@@ -87,33 +96,45 @@ proc CPMS_Calibrator_go {{params ""}} {
 	set rotation "[expr 0.001*[lindex $params 19]]\
 		[expr 0.001*[lindex $params 20]]\
 		[expr 0.001*[lindex $params 21]]"
-
-	lwdaq_image_manipulate img_left none -clear 1
-	lwdaq_image_manipulate img_right none -clear 1
 	
-	foreach obj $config(object) {
-		set objloc [lwdaq xyz_rotate [lrange $obj 1 3] $rotation]
-		set objloc [lwdaq xyz_sum $objloc $location]
-		set objrot [lwdaq xyz_rotate [lrange $obj 4 6] $rotation]
-		lwdaq_scam img_left project $LC \
-			"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(tangents)		
-		lwdaq_scam img_right project $RC \
-			"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(tangents)		
+	set disagreement 0
+	foreach a {1 2 3 4} {
+		lwdaq_image_manipulate img_left_$a none -clear 1
+		lwdaq_image_manipulate img_right_$a none -clear 1
+		set displacement [lindex $config(displacements) [expr $a-1]]
+	
+		foreach obj $config(object) {
+			set objloc [lwdaq xyz_sum [lrange $obj 1 3] "0 0 $displacement"]
+			set objloc [lwdaq xyz_rotate $objloc $rotation]
+			set objloc [lwdaq xyz_sum $objloc $location]
+			set objrot [lwdaq xyz_rotate [lrange $obj 4 6] $rotation]
+			lwdaq_scam img_left_$a project $LC \
+				"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(num_lines)		
+			lwdaq_scam img_right_$a project $RC \
+				"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(num_lines)		
+		}
+
+		set left_count [lwdaq_scam img_left_$a disagreement $config(threshold)]
+		set right_count [lwdaq_scam img_right_$a disagreement $config(threshold)]
+		set disagreement [expr $disagreement + $left_count + $right_count]
+
+		lwdaq_draw img_left_$a photo_left_$a \
+			-intensify $config(intensify) -zoom $config(zoom)
+		lwdaq_draw img_right_$a photo_right_$a \
+			-intensify $config(intensify) -zoom $config(zoom)
 	}
-
-	set left_count [lwdaq_scam img_left disagreement $iconfig(analysis_threshold)]
-	set right_count [lwdaq_scam img_right disagreement $iconfig(analysis_threshold)]
-
-	lwdaq_draw img_left left_photo -intensify $iconfig(intensify)
-	lwdaq_draw img_right right_photo -intensify $iconfig(intensify)
-	return "[expr $left_count + $right_count]"
+	
+	return $disagreement
 }
 
 proc CPMS_Calibrator_altitude {params} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
 
-	if {$config(stop_fit)} {error "Fit aborted by user"}
+	if {$config(stop_fit)} {
+		set info(state) "Idle"
+		error "Fit aborted by user"
+	}
 	if {![winfo exists $info(window)]} {error "Tool window destoryed"}
 	
 	set count [CPMS_Calibrator_go "$params"]
@@ -127,37 +148,40 @@ proc CPMS_Calibrator_fit {} {
 	upvar #0 CPMS_Calibrator_info info
 
 	set config(stop_fit) 0
+	set info(state) "Fitting"
 	set scaling ""
 	if {$config(fit_cam_left)} {
-		append scaling "0 0 0 1 0 0 1 0 "
+		append scaling "1 0 0 1 0 0 1 10 "
 	} else {
 		append scaling "0 0 0 0 0 0 0 0 "
 	}
 	if {$config(fit_cam_left)} {
-		append scaling "0 0 0 1 1 0 1 0 "
+		append scaling "0 0 0 1 1 0 1 10 "
 	} else {
 		append scaling "0 0 0 0 0 0 0 0 "
 	}
-	if {$config(fit_pose)} {
-		append scaling "1 1 10 0 10 10"
-	} else {
-		append scaling "0 0 0 0 0 0"
-	}
+	append scaling $config(scaling)
+	
 	if {$scaling == ""} {
 		LWDAQ_print $info(text) "ERROR: No fit parameters selected."
 		return ""
 	}
  	set params [lwdaq_simplex [CPMS_Calibrator_get_params] \
  		CPMS_Calibrator_altitude \
-		-report 0 -steps $config(steps) -restarts 0 \
+		-report 0 -steps $config(fit_steps) -restarts $config(fit_restarts) \
 		-start_size 1.0 -end_size 0.01 \
 		-scaling $scaling]
 	if {[LWDAQ_is_error_result $params]} {
 		LWDAQ_print $info(text) "$params\."
 		return ""
 	} 
-	
-	LWDAQ_print $info(text) "$params" brown
+
+	for {set i 0} {$i < [llength $params]} {incr i} {
+		if {[lindex $scaling $i] > 0} {
+			LWDAQ_print -nonewline $info(text) "[lindex $params $i] " brown
+		}
+	}
+	LWDAQ_print $info(text) "[lrange $params end-1 end]" black
 
 	set config(cam_left) "[lrange $params 0 7]"
 	set config(cam_right) "[expr -[lindex $params 0]] [lrange $params 9 15]"
@@ -168,6 +192,7 @@ proc CPMS_Calibrator_fit {} {
 proc CPMS_Calibrator_project {param value} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
+	upvar #0 LWDAQ_config_BCAM iconfig
 	
 	set pi 3.141593
 	switch $param {
@@ -186,21 +211,33 @@ proc CPMS_Calibrator_project {param value} {
 
 	set cam_left "LC $config(cam_left)"
 	set cam_right "RC $config(cam_right)"
-	lwdaq_image_manipulate proj_left none -fill 1
-	lwdaq_image_manipulate proj_right none -fill 1
-	foreach obj $config(object) {
-		set objloc [lwdaq xyz_rotate [lrange $obj 1 3] $rotation]
-		set objloc [lwdaq xyz_sum $objloc $location]
-		set objrot [lwdaq xyz_rotate [lrange $obj 4 6] $rotation]
-		lwdaq_scam proj_left project $cam_left \
-			"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(tangents)		
-		lwdaq_scam proj_right project $cam_right \
-			"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(tangents)		
-	}
-	lwdaq_draw proj_left proj_photo_left -zoom 0.5
-	lwdaq_draw proj_right proj_photo_right -zoom 0.5
-}
+	
+	foreach a {1 2 3 4} {
+		lwdaq_image_manipulate img_left_$a none -clear 1
+		lwdaq_image_manipulate img_right_$a none -clear 1
+		set displacement [lindex $config(displacements) [expr $a-1]]
 
+		foreach obj $config(object) {
+			set objloc [lwdaq xyz_sum [lrange $obj 1 3] "0 0 $displacement"]
+			set objloc [lwdaq xyz_rotate $objloc $rotation]
+			set objloc [lwdaq xyz_sum $objloc $location]
+			set objrot [lwdaq xyz_rotate [lrange $obj 4 6] $rotation]
+			lwdaq_scam img_left_$a project $cam_left \
+				"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(num_lines)		
+			lwdaq_scam img_right_$a project $cam_right \
+				"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(num_lines)		
+		}
+		
+		if {$config(project_silhouette)} {
+			lwdaq_scam img_left_$a disagreement $config(threshold)
+			lwdaq_scam img_right_$a disagreement $config(threshold)
+		}
+		lwdaq_draw img_left_$a photo_left_$a \
+			-intensify $config(intensify) -zoom $config(zoom)
+		lwdaq_draw img_right_$a photo_right_$a \
+			-intensify $config(intensify) -zoom $config(zoom)
+	}
+}
 
 proc CPMS_Calibrator_projector {} {
 	upvar #0 CPMS_Calibrator_config config
@@ -214,29 +251,35 @@ proc CPMS_Calibrator_projector {} {
 	
 	set w $info(projector_window)
 	toplevel $w
-	wm title $w "CPMS Projector, Version $info(version)"
+	wm title $w "Object Projector for CPMS Calibrator Version $info(version)"
 
-	set f [frame $w.img]
+	set f [frame $w.controls]
 	pack $f -side top -fill x
-	foreach a {left right} {
-		image create photo "proj_photo_$a"
-		label $f.$a -image proj_photo_$a
-		pack $f.$a -side left 
-		lwdaq_image_create -name proj_$a -width 700 -height 520
-		lwdaq_image_manipulate proj_$a none -fill 1
+	
+	checkbutton $f.cms -text "Silhouette" \
+		-variable CPMS_Calibrator_config(project_silhouette)
+	pack $f.cms -side left -expand yes
+	foreach a {num_lines threshold} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 6
+		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	foreach a {x y rx ry rz} {set config(projector_$a) 0}
-	set config(projector_z) 500
-	
+	set info(projector_x) [lindex $config(pose) 0]
+	set info(projector_y) [lindex $config(pose) 1]
+	set info(projector_z) [lindex $config(pose) 2]
+	set pi 3.141593
+	set info(projector_rx) [format %.3f [expr 0.180*[lindex $config(pose) 3]/$pi]]
+	set info(projector_ry) [format %.3f [expr 0.180*[lindex $config(pose) 4]/$pi]]
+	set info(projector_rz) [format %.3f [expr 0.180*[lindex $config(pose) 5]/$pi]]
+
 	foreach a {x y} {
 		set f [frame $w.$a -border 2 -relief sunken]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
-		set $a 0
-		scale $f.$a -from -100 -to +100 -length 700 \
-			-variable CPMS_Calibrator_config(projector_$a) \
-			-orient horizontal -showvalue false -tickinterval 10 \
+		scale $f.$a -from -50 -to +50 -length 1000 -resolution 0.1 \
+			-variable CPMS_Calibrator_info(projector_$a) \
+			-orient horizontal -showvalue false -tickinterval 5 \
 			-command "CPMS_Calibrator_project $a"
 		pack $f.l$a $f.$a -side left -expand yes
 	}
@@ -244,10 +287,9 @@ proc CPMS_Calibrator_projector {} {
 		set f [frame $w.$a -border 2 -relief sunken]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
-		set $a 500
-		scale $f.$a -from 0 -to 1000 -length 700 \
-			-variable CPMS_Calibrator_config(projector_$a) \
-			-orient horizontal -showvalue false -tickinterval 100 \
+		scale $f.$a -from 0 -to 1000 -length 1000 -resolution 1.0 \
+			-variable CPMS_Calibrator_info(projector_$a) \
+			-orient horizontal -showvalue false -tickinterval 50 \
 			-command "CPMS_Calibrator_project $a"
 		pack $f.l$a $f.$a -side left -expand yes
 	}
@@ -255,17 +297,15 @@ proc CPMS_Calibrator_projector {} {
 		set f [frame $w.$a -border 2 -relief sunken]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
-		set $a 0
-		scale $f.$a -from -180 -to +180 -length 700 \
-			-variable CPMS_Calibrator_config(projector_$a) \
-			-orient horizontal -showvalue false -tickinterval 45 \
+		scale $f.$a -from -10 -to +10 -length 1000 -resolution 0.1 \
+			-variable CPMS_Calibrator_info(projector_$a) \
+			-orient horizontal -showvalue false -tickinterval 1 \
 			-command "CPMS_Calibrator_project $a"
 		pack $f.l$a $f.$a -side left -expand yes
 	}
 
 	CPMS_Calibrator_project none 0
 }
-
 
 proc CPMS_Calibrator_open {} {
 	upvar #0 CPMS_Calibrator_config config
@@ -276,14 +316,17 @@ proc CPMS_Calibrator_open {} {
 	
 	set f [frame $w.controls]
 	pack $f -side top -fill x
+	
+	label $f.state -textvariable CPMS_Calibrator_info(state) -fg blue
+	pack $f.state -side left -expand yes
 
 	button $f.clear -text "Clear" -command {
 		lwdaq_image_manipulate img_left none -clear 1
 		lwdaq_image_manipulate img_right none -clear 1	
-		lwdaq_draw img_left left_photo \
-			-intensify $LWDAQ_config_BCAM(intensify) -zoom 1.0
-		lwdaq_draw img_right right_photo \
-			-intensify $LWDAQ_config_BCAM(intensify) -zoom 1.0
+		lwdaq_draw img_left photo_left \
+			-intensify $CPMS_Calibrator_config(intensify) -zoom 1.0
+		lwdaq_draw img_right photo_right \
+			-intensify $CPMS_Calibrator_config(intensify) -zoom 1.0
 	}
 	pack $f.clear -side left -expand yes
 	
@@ -296,15 +339,11 @@ proc CPMS_Calibrator_open {} {
 	button $f.stop -text "Stop" -command {set CPMS_Calibrator_config(stop_fit) 1}
 	pack $f.go $f.fit $f.stop -side left -expand yes
 	
-	foreach a {steps tangents} {
+	foreach a {threshold} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 6
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
-
-	label $f.lth -text "threshold:"
-	entry $f.eth -textvariable LWDAQ_config_BCAM(analysis_threshold) -width 6
-	pack $f.lth $f.eth -side left -expand yes
 	
 	button $f.projector -text "Projector" -command {CPMS_Calibrator_projector}
 	pack $f.projector -side left -expand yes 
@@ -318,38 +357,53 @@ proc CPMS_Calibrator_open {} {
 	set f [frame $w.parameters]
 	pack $f -side top -fill x
 
-	foreach a {cam_left cam_right pose} {
+	foreach a {cam_left cam_right} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 50
-		checkbutton $f.c$a -variable CPMS_Calibrator_config(fit_$a)
+		checkbutton $f.c$a -text "fit_$a" -variable CPMS_Calibrator_config(fit_$a)
 		pack $f.l$a $f.e$a $f.c$a -side left -expand yes
+	}
+	
+	set f [frame $w.pose]
+	pack $f -side top -fill x
+	
+	foreach a {pose scaling displacements} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 40
+		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
 	set f [frame $w.object]
 	pack $f -side top -fill x
-	
-	label $f.lobj -text "Object Description:"
-	entry $f.eobj -textvariable CPMS_Calibrator_config(object) -width 100
+
+	label $f.lobj -text "object:"
+	entry $f.eobj -textvariable CPMS_Calibrator_config(object) -width 130
 	pack $f.lobj $f.eobj -side left -expand yes
-
-	set f [frame $w.dis]
+		
+	set f [frame $w.images_a]
 	pack $f -side top -fill x
 
-	label $f.ldis -text "Displacements (mm):"
-	entry $f.edis -textvariable CPMS_Calibrator_config(displacements) -width 100
-	pack $f.ldis $f.edis -side left -expand yes
+	foreach a {1 2} {
+		image create photo "photo_left_$a"
+		label $f.left_$a -image "photo_left_$a"
+		pack $f.left_$a -side left
+		image create photo "photo_right_$a"
+		label $f.right_$a -image "photo_right_$a"
+		pack $f.right_$a -side right
+	}
 		
-	set f [frame $w.images]
+	set f [frame $w.images_b]
 	pack $f -side top -fill x
 
-	image create photo "left_photo"
-	label $f.left -image "left_photo"
-	pack $f.left -side left
+	foreach a {3 4} {
+		image create photo "photo_left_$a"
+		label $f.left_$a -image "photo_left_$a"
+		pack $f.left_$a -side left
+		image create photo "photo_right_$a"
+		label $f.right_$a -image "photo_right_$a"
+		pack $f.right_$a -side right
+	}
 		
-	image create photo "right_photo"
-	label $f.right -image "right_photo"
-	pack $f.right -side right
-
 	set info(text) [LWDAQ_text_widget $w 100 15]
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
 	lwdaq_config -text_name $info(text) -fsd 3	
@@ -359,6 +413,7 @@ proc CPMS_Calibrator_open {} {
 
 CPMS_Calibrator_init
 CPMS_Calibrator_open
+CPMS_Calibrator_go
 	
 return ""
 
