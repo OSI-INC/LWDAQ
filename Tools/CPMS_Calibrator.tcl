@@ -27,12 +27,15 @@ proc CPMS_Calibrator_init {} {
 	LWDAQ_tool_init "CPMS_Calibrator" "1.0"
 	if {[winfo exists $info(window)]} {return ""}
 
-	set config(object) "4.684 -8.436 447.944 0 0 0"
+	set config(pose) "4.684 -8.436 447.944 0 0 0"
 	set config(cam_left) "83.509 0.000 0.000 -201.372 0.000 2.000 23.748 0.000" 
 	set config(cam_right) "-83.509 0.000 0.000 234.757 0.922 2.000 23.687 0.000" 
+	set config(object) [list "sphere 0 0 0 0 0 0 34.72"]
+	set config(displacements) "0 10 20 30 40 50 60 70 80 90 100"
+
 	set config(steps) "1000"
 	set config(tangents) "2000"
-	set config(fit_object) 1
+	set config(fit_pose) 1
 	set config(fit_cam_left) 0
 	set config(fit_cam_right) 0
 	set config(stop_fit) 0
@@ -65,7 +68,7 @@ proc CPMS_Calibrator_get_params {} {
 	set params "$config(cam_left)\
 		[expr -[lindex $config(cam_left) 0]]\
 		[lrange $config(cam_right) 1 7] \
-		$config(object)"
+		$config(pose)"
 	return $params
 }
 
@@ -81,17 +84,22 @@ proc CPMS_Calibrator_go {{params ""}} {
 	set LC "LC [lrange $params 0 7]"
 	set RC "RC [expr -[lindex $params 0]] [lrange $params 9 15]"
 	set location "[lrange $params 16 18]"
-	set orientation [lwdaq xyz_rotate "1 0 0" \
-		"[expr 0.001*[lindex $params 19]]\
+	set rotation "[expr 0.001*[lindex $params 19]]\
 		[expr 0.001*[lindex $params 20]]\
-		[expr 0.001*[lindex $params 21]]"]
+		[expr 0.001*[lindex $params 21]]"
 
 	lwdaq_image_manipulate img_left none -clear 1
 	lwdaq_image_manipulate img_right none -clear 1
 	
-	set shaft "sphere $location $orientation 34.72"
-	lwdaq_scam img_left project $LC $shaft $config(tangents)
-	lwdaq_scam img_right project $RC $shaft $config(tangents)
+	foreach obj $config(object) {
+		set objloc [lwdaq xyz_rotate [lrange $obj 1 3] $rotation]
+		set objloc [lwdaq xyz_sum $objloc $location]
+		set objrot [lwdaq xyz_rotate [lrange $obj 4 6] $rotation]
+		lwdaq_scam img_left project $LC \
+			"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(tangents)		
+		lwdaq_scam img_right project $RC \
+			"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(tangents)		
+	}
 
 	set left_count [lwdaq_scam img_left disagreement $iconfig(analysis_threshold)]
 	set right_count [lwdaq_scam img_right disagreement $iconfig(analysis_threshold)]
@@ -130,7 +138,7 @@ proc CPMS_Calibrator_fit {} {
 	} else {
 		append scaling "0 0 0 0 0 0 0 0 "
 	}
-	if {$config(fit_object)} {
+	if {$config(fit_pose)} {
 		append scaling "1 1 10 0 10 10"
 	} else {
 		append scaling "0 0 0 0 0 0"
@@ -153,7 +161,7 @@ proc CPMS_Calibrator_fit {} {
 
 	set config(cam_left) "[lrange $params 0 7]"
 	set config(cam_right) "[expr -[lindex $params 0]] [lrange $params 9 15]"
-	set config(object) "[lrange $params 16 21]"
+	set config(pose) "[lrange $params 16 21]"
 	CPMS_Calibrator_go
 }
 
@@ -163,57 +171,31 @@ proc CPMS_Calibrator_project {param value} {
 	
 	set pi 3.141593
 	switch $param {
-		x {lset config(object) 0 $value}
-		y {lset config(object) 1 $value}
-		z {lset config(object) 2 $value}
-		rx {lset config(object) 3 [format %.3f [expr 1000.0*$pi*$value/180]]}
-		ry {lset config(object) 4 [format %.3f [expr 1000.0*$pi*$value/180]]}
-		rz {lset config(object) 5 [format %.3f [expr 1000.0*$pi*$value/180]]}
-		default {error "unrecognised parameter $param"}
+		x {lset config(pose) 0 $value}
+		y {lset config(pose) 1 $value}
+		z {lset config(pose) 2 $value}
+		rx {lset config(pose) 3 [format %.3f [expr 1000.0*$pi*$value/180]]}
+		ry {lset config(pose) 4 [format %.3f [expr 1000.0*$pi*$value/180]]}
+		rz {lset config(pose) 5 [format %.3f [expr 1000.0*$pi*$value/180]]}
 	}
-	set config(projector_$param) $value
 
-	set location "[lrange $config(object)  0 2]"
-	set rot "[expr 0.001*[lindex $config(object) 3]]\
-		[expr 0.001*[lindex $config(object) 4]]\
-		[expr 0.001*[lindex $config(object) 5]]"
-	set orientation [lwdaq xyz_rotate "1 0 0" $rot]
+	set location "[lrange $config(pose) 0 2]"
+	set rotation "[expr 0.001*[lindex $config(pose) 3]]\
+		[expr 0.001*[lindex $config(pose) 4]]\
+		[expr 0.001*[lindex $config(pose) 5]]"
 
-	set type "other"
-	set diameter "33"
-	
-	if {$type == "cylinder"} {
-		set object [list "cylinder $location $orientation $diameter $length"]
-	} elseif {$type == "sphere"} {
-		set object [list "sphere $location $orientation $diameter"]
-	} elseif {$type == "shaft"} {
-		set object [list "shaft $location $orientation \
-			0 -20 \
-			20 -20 \
-			30 10 \
-			36 10 \
-			40 12 \
-			40 30 \
-			60 30 \
-			60 39 \
-			58 40 \
-			0 40"]
-	} else {
-		set object [list "cylinder $location $orientation 33.78 7.24"]
-		lappend object "cylinder $location $orientation 19.00 -50.0" 
-		set rodpos [lwdaq xyz_rotate "3.62 16.89 0" $rot]
-		set rodpos [lwdaq xyz_sum $rodpos $location]
-		set rodaxis [lwdaq xyz_rotate "0 1 0" $rot]
-		lappend object "cylinder $rodpos $rodaxis 4 10"
-	}
-	
 	set cam_left "LC $config(cam_left)"
 	set cam_right "RC $config(cam_right)"
 	lwdaq_image_manipulate proj_left none -fill 1
 	lwdaq_image_manipulate proj_right none -fill 1
-	foreach obj $object {
-		lwdaq_scam proj_left project $cam_left $obj $config(tangents)		
-		lwdaq_scam proj_right project $cam_right $obj $config(tangents)		
+	foreach obj $config(object) {
+		set objloc [lwdaq xyz_rotate [lrange $obj 1 3] $rotation]
+		set objloc [lwdaq xyz_sum $objloc $location]
+		set objrot [lwdaq xyz_rotate [lrange $obj 4 6] $rotation]
+		lwdaq_scam proj_left project $cam_left \
+			"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(tangents)		
+		lwdaq_scam proj_right project $cam_right \
+			"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(tangents)		
 	}
 	lwdaq_draw proj_left proj_photo_left -zoom 0.5
 	lwdaq_draw proj_right proj_photo_right -zoom 0.5
@@ -226,6 +208,7 @@ proc CPMS_Calibrator_projector {} {
 
 	if {[winfo exists $info(projector_window)]} {
 		raise $info(projector_window)
+		CPMS_Calibrator_project none 0
 		return ""
 	}	
 	
@@ -247,7 +230,7 @@ proc CPMS_Calibrator_projector {} {
 	set config(projector_z) 500
 	
 	foreach a {x y} {
-		set f [frame $w.$a]
+		set f [frame $w.$a -border 2 -relief sunken]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
 		set $a 0
@@ -258,7 +241,7 @@ proc CPMS_Calibrator_projector {} {
 		pack $f.l$a $f.$a -side left -expand yes
 	}
 	foreach a {z} {
-		set f [frame $w.$a]
+		set f [frame $w.$a -border 2 -relief sunken]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
 		set $a 500
@@ -269,7 +252,7 @@ proc CPMS_Calibrator_projector {} {
 		pack $f.l$a $f.$a -side left -expand yes
 	}
 	foreach a {rx ry rz} {
-		set f [frame $w.$a]
+		set f [frame $w.$a -border 2 -relief sunken]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
 		set $a 0
@@ -280,7 +263,7 @@ proc CPMS_Calibrator_projector {} {
 		pack $f.l$a $f.$a -side left -expand yes
 	}
 
-	CPMS_Calibrator_project z 500
+	CPMS_Calibrator_project none 0
 }
 
 
@@ -291,10 +274,10 @@ proc CPMS_Calibrator_open {} {
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}
 	
-	set ff [frame $w.controls]
-	pack $ff -side top -fill x
+	set f [frame $w.controls]
+	pack $f -side top -fill x
 
-	button $ff.clear -text "Clear" -command {
+	button $f.clear -text "Clear" -command {
 		lwdaq_image_manipulate img_left none -clear 1
 		lwdaq_image_manipulate img_right none -clear 1	
 		lwdaq_draw img_left left_photo \
@@ -302,56 +285,70 @@ proc CPMS_Calibrator_open {} {
 		lwdaq_draw img_right right_photo \
 			-intensify $LWDAQ_config_BCAM(intensify) -zoom 1.0
 	}
-	pack $ff.clear -side left -expand yes
+	pack $f.clear -side left -expand yes
 	
-	button $ff.go -text "Go" -command {
+	button $f.go -text "Go" -command {
 		set count [CPMS_Calibrator_go]
 		LWDAQ_print $CPMS_Calibrator_info(text) \
-			"$CPMS_Calibrator_config(object) [format %.0f $count]"
+			"$CPMS_Calibrator_config(pose) [format %.0f $count]"
 	}
-	button $ff.fit -text "Fit" -command {CPMS_Calibrator_fit}
-	button $ff.stop -text "Stop" -command {set CPMS_Calibrator_config(stop_fit) 1}
-	pack $ff.go $ff.fit $ff.stop -side left -expand yes
+	button $f.fit -text "Fit" -command {CPMS_Calibrator_fit}
+	button $f.stop -text "Stop" -command {set CPMS_Calibrator_config(stop_fit) 1}
+	pack $f.go $f.fit $f.stop -side left -expand yes
 	
 	foreach a {steps tangents} {
-		label $ff.l$a -text "$a\:"
-		entry $ff.e$a -textvariable CPMS_Calibrator_config($a) -width 6
-		pack $ff.l$a $ff.e$a -side left -expand yes
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 6
+		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	label $ff.lth -text "threshold:"
-	entry $ff.eth -textvariable LWDAQ_config_BCAM(analysis_threshold) -width 6
-	pack $ff.lth $ff.eth -side left -expand yes
+	label $f.lth -text "threshold:"
+	entry $f.eth -textvariable LWDAQ_config_BCAM(analysis_threshold) -width 6
+	pack $f.lth $f.eth -side left -expand yes
 	
-	button $ff.projector -text "Projector" -command {CPMS_Calibrator_projector}
-	pack $ff.projector -side left -expand yes 
+	button $f.projector -text "Projector" -command {CPMS_Calibrator_projector}
+	pack $f.projector -side left -expand yes 
 
 	foreach a {Help Configure} {
 		set b [string tolower $a]
-		button $ff.$b -text $a -command "LWDAQ_tool_$b $info(name)"
-		pack $ff.$b -side left -expand 1
+		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
+		pack $f.$b -side left -expand 1
 	}
 
-	set ff [frame $w.parameters]
-	pack $ff -side top -fill x
+	set f [frame $w.parameters]
+	pack $f -side top -fill x
 
-	foreach a {cam_left cam_right object} {
-		label $ff.l$a -text "$a\:"
-		entry $ff.e$a -textvariable CPMS_Calibrator_config($a) -width 40
-		checkbutton $ff.c$a -variable CPMS_Calibrator_config(fit_$a)
-		pack $ff.l$a $ff.e$a $ff.c$a -side left -expand yes
+	foreach a {cam_left cam_right pose} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 50
+		checkbutton $f.c$a -variable CPMS_Calibrator_config(fit_$a)
+		pack $f.l$a $f.e$a $f.c$a -side left -expand yes
 	}
+	
+	set f [frame $w.object]
+	pack $f -side top -fill x
+	
+	label $f.lobj -text "Object Description:"
+	entry $f.eobj -textvariable CPMS_Calibrator_config(object) -width 100
+	pack $f.lobj $f.eobj -side left -expand yes
+
+	set f [frame $w.dis]
+	pack $f -side top -fill x
+
+	label $f.ldis -text "Displacements (mm):"
+	entry $f.edis -textvariable CPMS_Calibrator_config(displacements) -width 100
+	pack $f.ldis $f.edis -side left -expand yes
 		
-	set ff [frame $w.images]
-	pack $ff -side top -fill x
+	set f [frame $w.images]
+	pack $f -side top -fill x
 
 	image create photo "left_photo"
-	label $ff.left -image "left_photo"
-	pack $ff.left -side left
+	label $f.left -image "left_photo"
+	pack $f.left -side left
 		
 	image create photo "right_photo"
-	label $ff.right -image "right_photo"
-	pack $ff.right -side right
+	label $f.right -image "right_photo"
+	pack $f.right -side right
 
 	set info(text) [LWDAQ_text_widget $w 100 15]
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
@@ -370,6 +367,19 @@ return ""
 The Contactless Position Measurement System (CPMS) Calibrator takes a series of 
 silhouette images of the same sphere moving in a straight line in uniform steps
 to calibrate a pair of stereo Silhouette Cameras (SCAMs). 
+
+Sphere:
+{sphere 0 0 0 0 0 0 34.72}
+
+Cylinder:
+{cylinder 0 0 0 1 0 0 20 30}
+
+Shaft:
+{shaft 0 0 0 1 0 0 0 -20 20 -20 30 10 36 10 40 12 40 30 60 30 60 39 58 40 0 40}
+			
+Compound:
+{cylinder 0 0 0 1 0 0 33.78 7.24} {cylinder 0 0 0 1 0 0 19.00 -20.0} {cylinder 3.62 16.89 0 0 1 0 4 10}
+
 
 Kevan Hashemi hashemi@brandeis.edu
 ----------End Help----------

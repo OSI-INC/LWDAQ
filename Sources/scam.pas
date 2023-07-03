@@ -727,9 +727,12 @@ begin
 		otherwise w:=bcam_tc255_pixel_um/um_per_mm;
 	end;
 {
-	Progress through the faces, drawing each perimeter, then joining perimeter points
-	to the perimeter points of the previous face, if it exists. See comments in the
-	cylinder projection routine for details of the calculation.
+	Progress through the faces, drawing each perimeter, then joining perimeter
+	points to the perimeter points of the previous face, if it exists. See
+	comments in the cylinder projection routine for details of the calculation.
+	When we draw the first and last faces, we always draw the radial lines,
+	provided that the face diameter is greater than zero. Otherwise, we draw the
+	radials only if the draw_radials flag is set.
 }
 	for face_num:=0 to shaft.num_faces-1 do begin
 		setlength(perimeter_a,num_points);
@@ -758,7 +761,9 @@ begin
 					draw_overlay_xy_line(ip,line,scam_shaft_color);
 				end;
 				
-				if (face_num=0) or (face_num=num_faces-1) or draw_radials then begin
+				if ((face_num=0) and (diameter[face_num]>0))
+					or ((face_num=num_faces-1) and (diameter[face_num]>0))
+					or draw_radials then begin
 					line.a:=perimeter_a[step];		
 					line.b:=ica;
 					draw_overlay_xy_line(ip,line,scam_shaft_color);
