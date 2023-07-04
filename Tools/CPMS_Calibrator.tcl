@@ -42,6 +42,7 @@ proc CPMS_Calibrator_init {} {
 	set config(zoom) 0.5
 	set config(intensify) "exact"
 	set config(project_silhouette) "1"
+	set config(project_fill) "0"
 	set config(threshold) "8 %"
 	
 	set info(projector_window) "$info(window).cpms_projector"
@@ -132,7 +133,6 @@ proc CPMS_Calibrator_altitude {params} {
 	upvar #0 CPMS_Calibrator_info info
 
 	if {$config(stop_fit)} {
-		set info(state) "Idle"
 		error "Fit aborted by user"
 	}
 	if {![winfo exists $info(window)]} {error "Tool window destoryed"}
@@ -149,6 +149,7 @@ proc CPMS_Calibrator_fit {} {
 
 	set config(stop_fit) 0
 	set info(state) "Fitting"
+	
 	set scaling ""
 	if {$config(fit_cam_left)} {
 		append scaling "1 0 0 1 0 0 1 10 "
@@ -171,6 +172,8 @@ proc CPMS_Calibrator_fit {} {
 		-report 0 -steps $config(fit_steps) -restarts $config(fit_restarts) \
 		-start_size 1.0 -end_size 0.01 \
 		-scaling $scaling]
+	set info(state) "Idle"
+
 	if {[LWDAQ_is_error_result $params]} {
 		LWDAQ_print $info(text) "$params\."
 		return ""
@@ -213,8 +216,14 @@ proc CPMS_Calibrator_project {param value} {
 	set cam_right "RC $config(cam_right)"
 	
 	foreach a {1 2 3 4} {
-		lwdaq_image_manipulate img_left_$a none -clear 1
-		lwdaq_image_manipulate img_right_$a none -clear 1
+		if {$config(project_fill)} {
+			lwdaq_image_manipulate img_left_$a none -fill 1
+			lwdaq_image_manipulate img_right_$a none -fill 1
+		} else {
+			lwdaq_image_manipulate img_left_$a none -clear 1
+			lwdaq_image_manipulate img_right_$a none -clear 1
+		}
+		
 		set displacement [lindex $config(displacements) [expr $a-1]]
 
 		foreach obj $config(object) {
@@ -227,7 +236,7 @@ proc CPMS_Calibrator_project {param value} {
 			lwdaq_scam img_right_$a project $cam_right \
 				"[lindex $obj 0] $objloc $objrot [lrange $obj 7 end]" $config(num_lines)		
 		}
-		
+				
 		if {$config(project_silhouette)} {
 			lwdaq_scam img_left_$a disagreement $config(threshold)
 			lwdaq_scam img_right_$a disagreement $config(threshold)
@@ -258,7 +267,9 @@ proc CPMS_Calibrator_projector {} {
 	
 	checkbutton $f.cms -text "Silhouette" \
 		-variable CPMS_Calibrator_config(project_silhouette)
-	pack $f.cms -side left -expand yes
+	checkbutton $f.fill -text "Fill" \
+		-variable CPMS_Calibrator_config(project_fill)
+	pack $f.cms $f.fill -side left -expand yes
 	foreach a {num_lines threshold} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 6
@@ -297,9 +308,9 @@ proc CPMS_Calibrator_projector {} {
 		set f [frame $w.$a -border 2 -relief sunken]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
-		scale $f.$a -from -10 -to +10 -length 1000 -resolution 0.1 \
+		scale $f.$a -from -180 -to +180 -length 1000 -resolution 1 \
 			-variable CPMS_Calibrator_info(projector_$a) \
-			-orient horizontal -showvalue false -tickinterval 1 \
+			-orient horizontal -showvalue false -tickinterval 20 \
 			-command "CPMS_Calibrator_project $a"
 		pack $f.l$a $f.$a -side left -expand yes
 	}
@@ -386,10 +397,10 @@ proc CPMS_Calibrator_open {} {
 	foreach a {1 2} {
 		image create photo "photo_left_$a"
 		label $f.left_$a -image "photo_left_$a"
-		pack $f.left_$a -side left
+		pack $f.left_$a -side left -expand yes
 		image create photo "photo_right_$a"
 		label $f.right_$a -image "photo_right_$a"
-		pack $f.right_$a -side right
+		pack $f.right_$a -side left -expand yes
 	}
 		
 	set f [frame $w.images_b]
@@ -398,10 +409,10 @@ proc CPMS_Calibrator_open {} {
 	foreach a {3 4} {
 		image create photo "photo_left_$a"
 		label $f.left_$a -image "photo_left_$a"
-		pack $f.left_$a -side left
+		pack $f.left_$a -side left -expand yes
 		image create photo "photo_right_$a"
 		label $f.right_$a -image "photo_right_$a"
-		pack $f.right_$a -side right
+		pack $f.right_$a -side left -expand yes
 	}
 		
 	set info(text) [LWDAQ_text_widget $w 100 15]
