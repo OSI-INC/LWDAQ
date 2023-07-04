@@ -44,6 +44,7 @@ proc CPMS_Calibrator_init {} {
 	set config(project_silhouette) "1"
 	set config(project_fill) "0"
 	set config(threshold) "8 %"
+	set config(img_dir) "~/Desktop"
 	
 	set info(projector_window) "$info(window).cpms_projector"
 
@@ -63,12 +64,29 @@ proc CPMS_Calibrator_init {} {
 	foreach a {1 2 3 4} {
 		lwdaq_image_create -name img_left_$a -width 700 -height 520
 		lwdaq_image_create -name img_right_$a -width 700 -height 520
-		LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230703/L$a\.gif" img_left_$a
-		LWDAQ_read_image_file "~/Active/OSI/CPMS/Data/230703/R$a\.gif" img_right_$a
 	}
-		
+	CPMS_Calibrator_read_files $config(img_dir)
 
 	return ""   
+}
+
+proc CPMS_Calibrator_read_files {{img_dir ""}} {
+	upvar #0 CPMS_Calibrator_config config
+	upvar #0 CPMS_Calibrator_info info
+
+	if {$info(state) != "Idle"} {return ""}
+	set info(state) "Reading"
+	LWDAQ_update
+	if {$img_dir == ""} {set img_dir [LWDAQ_get_dir_name]}
+	if {$img_dir == ""} {return ""} {set config(img_dir) $img_dir}
+	foreach a {1 2 3 4} {
+		set lf [file join $config(img_dir) L$a\.gif]
+		if {[file exists $lf]} {LWDAQ_read_image_file $lf img_left_$a}
+		set rf [file join $config(img_dir) R$a\.gif]
+		if {[file exists $rf]} {LWDAQ_read_image_file $rf img_right_$a}
+	}
+	set info(state) "Idle"
+	LWDAQ_post CPMS_Calibrator_go
 }
 
 proc CPMS_Calibrator_get_params {} {
@@ -378,12 +396,19 @@ proc CPMS_Calibrator_open {} {
 	set f [frame $w.pose]
 	pack $f -side top -fill x
 	
-	foreach a {pose scaling displacements} {
+	foreach a {pose} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 40
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
-	
+	foreach a {scaling displacements} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 15
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	button $f.rdf -text "ReadFiles" -command {CPMS_Calibrator_read_files}
+	pack $f.rdf -side left -expand yes
+
 	set f [frame $w.object]
 	pack $f -side top -fill x
 
@@ -430,9 +455,14 @@ return ""
 
 ----------Begin Help----------
 
-The Contactless Position Measurement System (CPMS) Calibrator takes a series of 
-silhouette images of the same sphere moving in a straight line in uniform steps
-to calibrate a pair of stereo Silhouette Cameras (SCAMs). 
+The Contactless Position Measurement System (CPMS) Calibrator takes a series of
+silhouette images of the same object moving in a straight line to calibrate a
+pair of stereo Silhouette Cameras (SCAMs). The origin and direction of the locus
+of the calibration object is the "pose", given as x, y, z, rot_x, rot_y, rot_z
+in mm and mrad. The "scaling" is the size of the fitter simplex in each of the
+pose coordinates. The four positions of the object are given by four distances
+along the direction of the locus, in the "displacements" box. 
+
 
 Sphere:
 {sphere 0 0 0 0 0 0 34.72}
