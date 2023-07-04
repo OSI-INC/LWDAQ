@@ -1,39 +1,36 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #
 # Viewer.tcl defines the Viewer instrument.
 #
 
 #
-# LWDAQ_init_Viewer creates all elements of the Viewer instrument's
-# config and info arrays.
+# LWDAQ_init_Viewer creates all elements of the Viewer instrument's config and
+# info arrays.
 #
 proc LWDAQ_init_Viewer {} {
 	global LWDAQ_Info LWDAQ_Driver
 	upvar #0 LWDAQ_info_Viewer info
 	upvar #0 LWDAQ_config_Viewer config
+	
 	array unset config
 	array unset info
 	
-	# The info array elements will not be displayed in the 
-	# instrument window. The only info variables set in the 
-	# LWDAQ_open_Instrument procedure are those which are checked
-	# only when the instrument window is open.
 	set info(name) "Viewer"
 	set info(control) "Idle"
 	set info(window) [string tolower .$info(name)]
@@ -59,9 +56,6 @@ proc LWDAQ_init_Viewer {} {
 		{Bounds Left} {Bounds Top} {Bounds Right} {Bounds Bottom} \
 		{Results String}"
 	
-	# All elements of the config array will be displayed in the
-	# instrument window. No config array variables can be set in the
-	# LWDAQ_open_Instrument procedure
 	set config(image_source) "Rasnik"
 	set config(analysis_source) "Camera"
 	set config(file_name) ./Images/\*
@@ -82,8 +76,8 @@ proc LWDAQ_daq_Viewer {} {
 } 
 
 #
-# LWDAQ_analysis_Viewer calls the analysis of another instrument to analyze
-# the image in the Viewer panel.
+# LWDAQ_analysis_Viewer calls the analysis of another instrument to analyze the
+# image in the Viewer panel.
 #
 proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
 	global LWDAQ_Info
@@ -135,11 +129,12 @@ proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
 }
 
 #
-#
+# LWDAQ_crop_Viewer crops an image to its analysis boundes. 
 #
 proc LWDAQ_crop_Viewer {{image_name ""}} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
+	
 	if {$image_name == ""} {
 		set image_name $config(memory_name)
 	}
@@ -153,13 +148,14 @@ proc LWDAQ_crop_Viewer {{image_name ""}} {
 }
 
 #
-# LWDAQ_DAQ_to_GIF_Viewer opens a browser in which you select
-# multiple DAQ image files, and converts them to GIF files, writing
-# them into the same directory with suffix ".gif".
+# LWDAQ_DAQ_to_GIF_Viewer opens a browser in which you select multiple DAQ image
+# files, and converts them to GIF files, writing them into the same directory
+# with suffix ".gif".
 #
 proc LWDAQ_DAQ_to_GIF_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
+	
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Convert"
 	set file_list [lsort -dictionary [LWDAQ_get_file_name 1]]
@@ -182,13 +178,14 @@ proc LWDAQ_DAQ_to_GIF_Viewer {} {
 }
 
 #
-# LWDAQ_GIF_to_DAQ_Viewer opens a browser in which you select
-# multiple GIF image files, and converts them to DAQ files, writing
-# them into the same directory with suffix ".daq".
+# LWDAQ_GIF_to_DAQ_Viewer opens a browser in which you select multiple GIF image
+# files, and converts them to DAQ files, writing them into the same directory
+# with suffix ".daq".
 #
 proc LWDAQ_GIF_to_DAQ_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
+	
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Convert"
 	set file_list [lsort -dictionary [LWDAQ_get_file_name 1]]
@@ -211,13 +208,13 @@ proc LWDAQ_GIF_to_DAQ_Viewer {} {
 }
 
 #
-# LWDAQ_set_bounds_Viewer applies the analyisis boundaries
-# specified in the viewer's info array to the image named by config
-# memory_name.
+# LWDAQ_set_bounds_Viewer applies the analyisis boundaries specified in the
+# viewer's info array to the image named by config memory_name.
 #
 proc LWDAQ_set_bounds_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
+	
 	if {[lwdaq_image_exists $config(memory_name)] == ""} {
 		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
 		return ""
@@ -234,14 +231,14 @@ proc LWDAQ_set_bounds_Viewer {} {
 }
 
 #
-# LWDAQ_set_dimensions_Viewer takes the contents of the image
-# named by config(memory_name) and creates a new image with the
-# dimensions specified in the dimension control boxes. The routine
-# keeps the analysis boundaries the same.
+# LWDAQ_set_dimensions_Viewer takes the contents of the image named by
+# memory_name and creates a new image with the dimensions specified in the
+# dimension control boxes. The routine keeps the analysis boundaries the same.
 #
 proc LWDAQ_set_dimensions_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
+	
 	if {[lwdaq_image_exists $config(memory_name)] == ""} {
 		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
 		return ""
@@ -272,6 +269,7 @@ proc LWDAQ_set_dimensions_Viewer {} {
 proc LWDAQ_set_results_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
+	
 	if {[lwdaq_image_exists $config(memory_name)] == ""} {
 		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
 		return ""
@@ -298,9 +296,10 @@ proc LWDAQ_zoom_Viewer {} {
 }
 
 #
-# LWDAQ_xy_Viewer takes as input an x-y position relative to the top-left corner of
-# the image display widget, and sets the info(x) and info(y) parameters with the columen
-# and row of the image pixel displayed at that display widget position.
+# LWDAQ_xy_Viewer takes as input an x-y position relative to the top-left corner
+# of the image display widget, and sets the info(x) and info(y) parameters with
+# the column and row of the image pixel displayed at that display widget
+# position.
 #
 proc LWDAQ_xy_Viewer {x y cmd} {
 	upvar #0 LWDAQ_config_Viewer config
@@ -355,8 +354,7 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 }
 
 #
-# LWDAQ_controls_Viewer creates secial controls for the 
-# Viewer instrument.
+# LWDAQ_controls_Viewer creates secial controls for the Viewer instrument.
 #
 proc LWDAQ_controls_Viewer {} {
 	global LWDAQ_Info LWDAQ_Driver

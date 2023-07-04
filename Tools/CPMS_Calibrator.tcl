@@ -23,13 +23,14 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "1.0"
+	LWDAQ_tool_init "CPMS_Calibrator" "1.1"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(pose) "4.684 -8.436 447.944 0 0 0"
 	set config(cam_left) "83.509 0.000 0.000 -201.372 0.000 2.000 23.748 0.000" 
 	set config(cam_right) "-83.509 0.000 0.000 234.757 0.922 2.000 23.687 0.000" 
 	set config(object) [list "sphere 0 0 0 0 0 0 34.72"]
+
 	set config(displacements) "0 -40 -70 -100"
 	set config(scaling) "1 1 10 10 10 0"
 
@@ -170,12 +171,12 @@ proc CPMS_Calibrator_fit {} {
 	
 	set scaling ""
 	if {$config(fit_cam_left)} {
-		append scaling "1 0 0 1 0 0 1 10 "
+		append scaling "1 0 0 1 0 0 1 0 "
 	} else {
 		append scaling "0 0 0 0 0 0 0 0 "
 	}
 	if {$config(fit_cam_left)} {
-		append scaling "0 0 0 1 1 0 1 10 "
+		append scaling "0 0 0 1 1 0 1 0 "
 	} else {
 		append scaling "0 0 0 0 0 0 0 0 "
 	}
@@ -336,6 +337,20 @@ proc CPMS_Calibrator_projector {} {
 	CPMS_Calibrator_project none 0
 }
 
+proc CPMS_Calibrator_clear {} {
+	upvar #0 CPMS_Calibrator_config config
+	upvar #0 CPMS_Calibrator_info info
+
+	foreach a {1 2 3 4} {
+		lwdaq_image_manipulate img_left_$a none -clear 1
+		lwdaq_image_manipulate img_right_$a none -clear 1	
+		lwdaq_draw img_left_$a photo_left_$a \
+			-intensify $config(intensify) -zoom $config(zoom)
+		lwdaq_draw img_right_$a photo_right_$a \
+			-intensify $config(intensify) -zoom $config(zoom)
+	}
+}
+
 proc CPMS_Calibrator_open {} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
@@ -349,14 +364,7 @@ proc CPMS_Calibrator_open {} {
 	label $f.state -textvariable CPMS_Calibrator_info(state) -fg blue
 	pack $f.state -side left -expand yes
 
-	button $f.clear -text "Clear" -command {
-		lwdaq_image_manipulate img_left none -clear 1
-		lwdaq_image_manipulate img_right none -clear 1	
-		lwdaq_draw img_left photo_left \
-			-intensify $CPMS_Calibrator_config(intensify) -zoom 1.0
-		lwdaq_draw img_right photo_right \
-			-intensify $CPMS_Calibrator_config(intensify) -zoom 1.0
-	}
+	button $f.clear -text "Clear" -command {CPMS_Calibrator_clear}
 	pack $f.clear -side left -expand yes
 	
 	button $f.go -text "Go" -command {
@@ -469,6 +477,9 @@ Sphere:
 
 Cylinder:
 {cylinder 0 0 0 1 0 0 20 30}
+
+Sphere on Post:
+{sphere 0 0 0 0 0 0 34.72} {cylinder 0 -17.36 0 0 -1 0 19.05 50}
 
 Shaft:
 {shaft 0 0 0 1 0 0 0 -20 20 -20 30 10 36 10 40 12 40 30 60 30 60 39 58 40 0 40}

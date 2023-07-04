@@ -2192,8 +2192,8 @@ the negated image. With analysis_type=5, the routine obtains the absolute
 horizontal gradient of intensity and applies vertical stripe analyis to the
 gradient image. With analysis_type=6, the routine negates the image, finds
 bright spots, and fits an ellipse to their edges. With analysis=7, the routine
-applies the threshold and marks every pixel below threshold in the overlay. It
-returns the centroid of the silhouette pixels, giving them all equal weight.</p>
+negates the image, finds the bright spots in the negated image, and calculates
+their centroids.</p>
 
 <p>With return_threshold=1, the routine does no spot-finding, but instead
 returns a string of five values obtained by interpreting the threshold string
@@ -2243,8 +2243,7 @@ contiguous.</p>
 <p>The color we use to mark the image with the results of analysis is given in
 the <i>-color</i> option. You specify the color with an integer. Color codes 0
 to 15 specity a set of distinct colors, shown <a
-href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p
->
+href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
 
 <p>See the <a
 href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM
@@ -2359,7 +2358,9 @@ begin
 	the image passed into the routine.
 }
 	case analysis_type of
-		spot_use_vertical_shadow,spot_use_ellipse_shadow:begin
+		spot_use_vertical_shadow,
+		spot_use_ellipse_shadow,
+		spot_use_centroid_shadow:begin
 			mark_time('negating image','lwdaq_bcam');
 			analysis_image:=image_negate(ip);		
 		end;
@@ -2378,7 +2379,7 @@ begin
 	we calculate it and return it immediately.	
 }
 	if return_threshold then begin
-		spot_decode_command_string(analysis_image,
+		spot_decode_threshold_string(analysis_image,
 			threshold_string,threshold,background,min_p,max_p,max_e);
 		writestr(result,threshold:1,' ',background:1,' ',min_p:1,' ',max_p:1,' ',max_e:1:2);
 		if error_string='' then Tcl_SetReturnString(interp,result)
@@ -2414,7 +2415,7 @@ begin
 		spot_centroid(analysis_image,slp^.spots[spot_num]);
 	spot_list_sort(slp,sort_code);
 {
-	Now that we have the spots, we might re-analyze the spots to obtain some
+	Now that we have the spots, we might re-analyze them to obtain some
 	measurement of their position other than the centroid that we obtained while
 	finding the spots. 
 }
@@ -2456,7 +2457,6 @@ begin
 			spot_list_display_vertical_lines(ip,slp,overlay_color_from_integer(color));
 		end;
 		spot_use_vertical_edge: begin
-		
 			if not show_pixels then begin
 				saved_bounds:=ip^.analysis_bounds;
 				pp:=image_profile_row(analysis_image);
