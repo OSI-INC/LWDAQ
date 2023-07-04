@@ -278,7 +278,8 @@ proc LWDAQ_daq_BCAM {} {
 			LWDAQ_set_device_type $sock_2 $info(daq_source_device_type)
 			LWDAQ_delay_seconds $sock_2 $background_exposure_s
 			if {$sock_1 != $sock_2} {LWDAQ_wait_for_driver $sock_2}
-			LWDAQ_set_driver_mux $sock_1 $config(daq_driver_socket) $config(daq_mux_socket)
+			LWDAQ_set_driver_mux $sock_1 $config(daq_driver_socket) \
+				$config(daq_mux_socket)
 			LWDAQ_set_device_type $sock_1 $info(daq_device_type)
 			LWDAQ_set_device_element $sock_1 $config(daq_device_element)
 			LWDAQ_image_sensor_transfer $sock_1 $info(daq_device_type)
@@ -288,9 +289,11 @@ proc LWDAQ_daq_BCAM {} {
 		}
 		
 		# Put camera and source to sleep.
-		LWDAQ_set_driver_mux $sock_1 $config(daq_driver_socket) $config(daq_mux_socket)
+		LWDAQ_set_driver_mux $sock_1 $config(daq_driver_socket) \
+			$config(daq_mux_socket)
 		LWDAQ_sleep $sock_1		
-		LWDAQ_set_driver_mux $sock_2 $config(daq_source_driver_socket) $config(daq_source_mux_socket)
+		LWDAQ_set_driver_mux $sock_2 $config(daq_source_driver_socket) \
+			$config(daq_source_mux_socket)
 		LWDAQ_sleep $sock_2
 		
 		# Close the sockets.
