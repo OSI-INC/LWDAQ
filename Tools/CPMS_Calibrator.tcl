@@ -23,12 +23,12 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "1.1"
+	LWDAQ_tool_init "CPMS_Calibrator" "1.2"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(pose) "4.684 -8.436 447.944 0 0 0"
-	set config(cam_left) "83.509 0.000 0.000 -201.372 0.000 2.000 23.748 0.000" 
-	set config(cam_right) "-83.509 0.000 0.000 234.757 0.922 2.000 23.687 0.000" 
+	set config(cam_left) "80.9 0.000 0.000 -190.372 0.000 2.000 24.84 0.000" 
+	set config(cam_right) "-80.9 0.000 0.000 212.757 1.2 2.000 24.7 0.000" 
 	set config(object) [list "sphere 0 0 0 0 0 0 34.72"]
 
 	set config(displacements) "0 -40 -70 -100"
@@ -45,7 +45,7 @@ proc CPMS_Calibrator_init {} {
 	set config(project_silhouette) "1"
 	set config(project_fill) "0"
 	set config(threshold) "8 %"
-	set config(img_dir) "~/Desktop"
+	set config(img_dir) "~/Desktop/CPMS"
 	
 	set info(projector_window) "$info(window).cpms_projector"
 
@@ -66,7 +66,6 @@ proc CPMS_Calibrator_init {} {
 		lwdaq_image_create -name img_left_$a -width 700 -height 520
 		lwdaq_image_create -name img_right_$a -width 700 -height 520
 	}
-	CPMS_Calibrator_read_files $config(img_dir)
 
 	return ""   
 }
@@ -78,16 +77,29 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 	if {$info(state) != "Idle"} {return ""}
 	set info(state) "Reading"
 	LWDAQ_update
+	
 	if {$img_dir == ""} {set img_dir [LWDAQ_get_dir_name]}
 	if {$img_dir == ""} {return ""} {set config(img_dir) $img_dir}
-	foreach a {1 2 3 4} {
-		set lf [file join $config(img_dir) L$a\.gif]
-		if {[file exists $lf]} {LWDAQ_read_image_file $lf img_left_$a}
-		set rf [file join $config(img_dir) R$a\.gif]
-		if {[file exists $rf]} {LWDAQ_read_image_file $rf img_right_$a}
+	
+	LWDAQ_print -nonewline $info(text) "Attempting to read image files... "
+	set count 0
+	if {[file exists $img_dir]} {
+		foreach a {1 2 3 4} {
+			foreach {letter word} {L left R right} {
+				set imgf [file join $config(img_dir) $letter$a\.gif]
+				if {[file exists $imgf]} {
+					LWDAQ_read_image_file $imgf img_$word\_$a
+					incr count
+				}
+			}
+		}
+		LWDAQ_print $info(text) "read $count out of 8 calibration images."
+	} else {
+		LWDAQ_print $info(text) "cannot find directory \"$img_dir\"."
 	}
+	
 	set info(state) "Idle"
-	LWDAQ_post CPMS_Calibrator_go
+	CPMS_Calibrator_go
 }
 
 proc CPMS_Calibrator_get_params {} {
@@ -457,7 +469,7 @@ proc CPMS_Calibrator_open {} {
 
 CPMS_Calibrator_init
 CPMS_Calibrator_open
-CPMS_Calibrator_go
+CPMS_Calibrator_read_files $CPMS_Calibrator_config(img_dir)
 	
 return ""
 
