@@ -483,6 +483,8 @@ in mm and mrad. The "scaling" is the size of the fitter simplex in each of the
 pose coordinates. The four positions of the object are given by four distances
 along the direction of the locus, in the "displacements" box. 
 
+The compound object being viewed we describe with a list of objects. Here are
+some example lists.
 
 Sphere:
 {sphere 0 0 0 0 0 0 34.72}
