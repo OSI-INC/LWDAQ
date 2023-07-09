@@ -39,7 +39,7 @@ proc BCAM_Calibrator_init {} {
 	upvar #0 BCAM_Calibrator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "BCAM_Calibrator" "30"
+	LWDAQ_tool_init "BCAM_Calibrator" "31"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(apparatus_file) "apparatus_database.txt"
@@ -1132,7 +1132,7 @@ proc BCAM_Calibrator_open {} {
 	pack $f.control -side left
 	
 	set f $w.controls
-	frame $f -padx 2 -pady 2
+	frame $f 
 	pack $f -side top -fill x
 	
 	foreach a {Execute Backward Forward} {

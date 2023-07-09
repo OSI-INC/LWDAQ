@@ -45,6 +45,7 @@ const
 	spot_use_vertical_shadow=4;
 	spot_use_vertical_edge=5;
 	spot_use_ellipse_shadow=6;
+	spot_use_centroid_shadow=7;
 	max_num_spots=1000;
 	
 type
@@ -105,7 +106,7 @@ function string_from_spot(c:spot_type):string;
 function string_from_spot_list(slp:spot_list_ptr_type):string;
 function bounds_string_from_spot_list(slp:spot_list_ptr_type):string;
 function intensity_string_from_spot_list(slp:spot_list_ptr_type):string;
-procedure spot_decode_command_string(ip:image_ptr_type;
+procedure spot_decode_threshold_string(ip:image_ptr_type;
 	command:string;
 	var threshold,background,min_pixels,max_pixels:integer;
 	var max_eccentricity:real);
@@ -837,7 +838,7 @@ begin
 end;
 
 {
-	spot_decode_command_string takes a string like "10 & 3 > 1.4" and
+	spot_decode_threshold_string takes a string like "10 & 3 > 1.4" and
 	determines, for the specified image, an intensity threshold for selecting
 	bright pixels in the image, minimum and maximum values for the number of
 	pixels in a spot, and a maximu, value for eccentricity.
@@ -863,7 +864,7 @@ end;
 	followed by a "<" the integer is a maximum number. The default is ">". The
 	third integer gives the maximum eccentricity of the spot.
 }
-procedure spot_decode_command_string(ip:image_ptr_type;
+procedure spot_decode_threshold_string(ip:image_ptr_type;
 	command:string;
 	var threshold,background,min_pixels,max_pixels:integer;
 	var max_eccentricity:real);
@@ -933,7 +934,7 @@ end;
 	overlay at the start of execution. A spot is any connected set of pixels
 	with intensity above the threshold specified in the command string.
 
-	We decode the command string with the spot_decode_command_string procedure,
+	We decode the command string with the spot_decode_threshold_string procedure,
 	see comments above. The purpose of the command string is to define a
 	background intensity, a threshold intensity, limits for the number of pixels
 	in the spot, and a limit for the eccentricity of the spot. In the image
@@ -986,7 +987,7 @@ begin
 	for spot intensity, the minimum and maximum number of pixels a spot can contain and
 	be counted, and the maximum eccentricity.
 }
-	spot_decode_command_string(ip,command,
+	spot_decode_threshold_string(ip,command,
 		threshold,background,
 		min_pixels,max_pixels,
 		max_eccentricity);

@@ -286,7 +286,7 @@ const
 	
 	bcam_black_fiber_rs_nominal='nominal -5.029 21.820 -21.029 21.820 -71.211';	
 	bcam_blue_fiber_rs_nominal='nominal -5.029 -21.820 -21.029 -21.820 -71.211';
-	
+		
 	
 implementation
 
