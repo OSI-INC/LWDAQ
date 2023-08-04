@@ -12,40 +12,40 @@
 # The information in this file is specific to a single platform.
 
 # zlibtcl's version number.
-zlibtcl_VERSION='1.2.11'
+zlibtcl_VERSION='1.2.13'
 zlibtcl_MAJOR_VERSION=''
 zlibtcl_MINOR_VERSION=''
 zlibtcl_RELEASE_LEVEL=''
 
 # The name of the zlibtcl library (may be either a .a file or a shared library):
-zlibtcl_LIB_FILE=zlibtcl1211.dll
+zlibtcl_LIB_FILE=zlibtcl1213.dll
 
 # String to pass to linker to pick up the zlibtcl library from its
 # build directory.
-zlibtcl_BUILD_LIB_SPEC='-LD:/CM/tcltk86/rcompile/tkimg/zlib -lzlibtcl1211'
+zlibtcl_BUILD_LIB_SPEC='-LE:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/rcompile/tkimg/zlib -lzlibtcl1213'
 
 # String to pass to linker to pick up the zlibtcl library from its
 # installed directory.
-zlibtcl_LIB_SPEC='-LD:/CM/tcltk86/release/lib/zlibtcl1.2.11 -lzlibtcl1211'
+zlibtcl_LIB_SPEC='-LE:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/release/lib/zlibtcl1.2.13 -lzlibtcl1213'
 
 # The name of the zlibtcl stub library (a .a file):
-zlibtcl_STUB_LIB_FILE=libzlibtclstub1211.a
+zlibtcl_STUB_LIB_FILE=libzlibtclstub1213.a
 
 # String to pass to linker to pick up the zlibtcl stub library from its
 # build directory.
-zlibtcl_BUILD_STUB_LIB_SPEC='-LD:/CM/tcltk86/rcompile/tkimg/zlib -lzlibtclstub1211'
+zlibtcl_BUILD_STUB_LIB_SPEC='-LE:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/rcompile/tkimg/zlib -lzlibtclstub1213'
 
 # String to pass to linker to pick up the zlibtcl stub library from its
 # installed directory.
-zlibtcl_STUB_LIB_SPEC='-LD:/CM/tcltk86/release/lib/zlibtcl1.2.11 -lzlibtclstub1211'
+zlibtcl_STUB_LIB_SPEC='-LE:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/release/lib/zlibtcl1.2.13 -lzlibtclstub1213'
 
 # String to pass to linker to pick up the zlibtcl stub library from its
 # build directory.
-zlibtcl_BUILD_STUB_LIB_PATH='D:/CM/tcltk86/rcompile/tkimg/zlib/libzlibtclstub1211.a'
+zlibtcl_BUILD_STUB_LIB_PATH='E:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/rcompile/tkimg/zlib/libzlibtclstub1213.a'
 
 # String to pass to linker to pick up the zlibtcl stub library from its
 # installed directory.
-zlibtcl_STUB_LIB_PATH='D:/CM/tcltk86/release/lib/zlibtcl1.2.11/libzlibtclstub1211.a'
+zlibtcl_STUB_LIB_PATH='E:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/release/lib/zlibtcl1.2.13/libzlibtclstub1213.a'
 
 # Location of the top-level source directories from which zlibtcl
 # was built.  This is the directory that contains generic, unix, etc.

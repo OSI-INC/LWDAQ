@@ -113,8 +113,8 @@ type
 		specify before looking for a routine.
 	}
 	const tcl_ld_prefix='_';
-	{$define _TCLLIB_:='tcl86'}
-	{$define _TKLIB_:='tk86'}
+	{$define _TCLLIB_:='tcl87'}
+	{$define _TKLIB_:='tk87'}
 	{$define _EXT_:=external}
 {$ENDIF}
 

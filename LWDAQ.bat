@@ -146,10 +146,10 @@ REM Choose the shell based upon the option.
 REM ------------------------------------------
 
 if [%gui_enabled%]==[0] (
-  set shell=%LWDAQ_DIR%LWDAQ.app\Contents\Windows\bin\tclsh86.exe
+  set shell=%LWDAQ_DIR%LWDAQ.app\Contents\Windows\bin\tclsh87.exe
 )
 if [%gui_enabled%]==[1] (
-  set shell=%LWDAQ_DIR%LWDAQ.app\Contents\Windows\bin\wish86.exe
+  set shell=%LWDAQ_DIR%LWDAQ.app\Contents\Windows\bin\wish87.exe
 )
 if not exist "%shell%" (
   echo ERROR: Cannot find shell "%shell%".  
