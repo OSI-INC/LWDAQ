@@ -3,9 +3,9 @@
 # This file defines the default bindings for Tk text widgets and provides
 # procedures that help in implementing the bindings.
 #
-# Copyright (c) 1992-1994 The Regents of the University of California.
-# Copyright (c) 1994-1997 Sun Microsystems, Inc.
-# Copyright (c) 1998 by Scriptics Corporation.
+# Copyright © 1992-1994 The Regents of the University of California.
+# Copyright © 1994-1997 Sun Microsystems, Inc.
+# Copyright © 1998 Scriptics Corporation.
 #
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -42,7 +42,7 @@
 
 # Standard Motif bindings:
 
-bind Text <1> {
+bind Text <Button-1> {
     tk::TextButton1 %W %x %y
     %W tag remove sel 0.0 end
 }
@@ -51,26 +51,26 @@ bind Text <B1-Motion> {
     set tk::Priv(y) %y
     tk::TextSelectTo %W %x %y
 }
-bind Text <Double-1> {
+bind Text <Double-Button-1> {
     set tk::Priv(selectMode) word
     tk::TextSelectTo %W %x %y
     catch {%W mark set insert sel.first}
 }
-bind Text <Triple-1> {
+bind Text <Triple-Button-1> {
     set tk::Priv(selectMode) line
     tk::TextSelectTo %W %x %y
     catch {%W mark set insert sel.first}
 }
-bind Text <Shift-1> {
+bind Text <Shift-Button-1> {
     tk::TextResetAnchor %W @%x,%y
     set tk::Priv(selectMode) char
     tk::TextSelectTo %W %x %y
 }
-bind Text <Double-Shift-1>	{
+bind Text <Double-Shift-Button-1>	{
     set tk::Priv(selectMode) word
     tk::TextSelectTo %W %x %y 1
 }
-bind Text <Triple-Shift-1>	{
+bind Text <Triple-Shift-Button-1>	{
     set tk::Priv(selectMode) line
     tk::TextSelectTo %W %x %y
 }
@@ -86,7 +86,7 @@ bind Text <ButtonRelease-1> {
     tk::CancelRepeat
 }
 
-bind Text <Control-1> {
+bind Text <Control-Button-1> {
     %W mark set insert @%x,%y
     # An operation that moves the insert mark without making it
     # one end of the selection must insert an autoseparator
@@ -95,7 +95,7 @@ bind Text <Control-1> {
     }
 }
 # stop an accidental double click triggering <Double-Button-1>
-bind Text <Double-Control-1> { # nothing }
+bind Text <Double-Control-Button-1> { # nothing }
 # stop an accidental movement triggering <B1-Motion>
 bind Text <Control-B1-Motion> { # nothing }
 bind Text <<PrevChar>> {
@@ -292,23 +292,21 @@ bind Text <<PasteSelection>> {
 bind Text <Insert> {
     catch {tk::TextInsert %W [::tk::GetSelection %W PRIMARY]}
 }
-bind Text <KeyPress> {
+bind Text <Key> {
     tk::TextInsert %W %A
 }
 
 # Ignore all Alt, Meta, and Control keypresses unless explicitly bound.
 # Otherwise, if a widget binding for one of these is defined, the
-# <KeyPress> class binding will also fire and insert the character,
+# <Key> class binding will also fire and insert the character,
 # which is wrong.  Ditto for <Escape>.
 
-bind Text <Alt-KeyPress> {# nothing }
-bind Text <Meta-KeyPress> {# nothing}
-bind Text <Control-KeyPress> {# nothing}
+bind Text <Alt-Key> {# nothing }
+bind Text <Meta-Key> {# nothing}
+bind Text <Control-Key> {# nothing}
 bind Text <Escape> {# nothing}
 bind Text <KP_Enter> {# nothing}
-if {[tk windowingsystem] eq "aqua"} {
-    bind Text <Command-KeyPress> {# nothing}
-}
+bind Text <Command-Key> {# nothing}
 
 # Additional emacs-like bindings:
 
@@ -429,7 +427,7 @@ bind Text <Control-h> {
 	%W see insert
     }
 }
-bind Text <2> {
+bind Text <Button-2> {
     if {!$tk_strictMotif} {
 	tk::TextScanMark %W %x %y
     }
@@ -441,82 +439,17 @@ bind Text <B2-Motion> {
 }
 set ::tk::Priv(prevPos) {}
 
-# The MouseWheel will typically only fire on Windows and MacOS X.
-# However, someone could use the "event generate" command to produce one
-# on other platforms.  We must be careful not to round -ve values of %D
-# down to zero.
-
-if {[tk windowingsystem] eq "aqua"} {
-    bind Text <MouseWheel> {
-        %W yview scroll [expr {-15 * (%D)}] pixels
-    }
-    bind Text <Option-MouseWheel> {
-        %W yview scroll [expr {-150 * (%D)}] pixels
-    }
-    bind Text <Shift-MouseWheel> {
-        %W xview scroll [expr {-15 * (%D)}] pixels
-    }
-    bind Text <Shift-Option-MouseWheel> {
-        %W xview scroll [expr {-150 * (%D)}] pixels
-    }
-} else {
-    # We must make sure that positive and negative movements are rounded
-    # equally to integers, avoiding the problem that
-    #     (int)1/3 = 0,
-    # but
-    #     (int)-1/3 = -1
-    # The following code ensure equal +/- behaviour.
-    bind Text <MouseWheel> {
-	if {%D >= 0} {
-	    %W yview scroll [expr {-%D/3}] pixels
-	} else {
-	    %W yview scroll [expr {(2-%D)/3}] pixels
-	}
-    }
-    bind Text <Shift-MouseWheel> {
-	if {%D >= 0} {
-	    %W xview scroll [expr {-%D/3}] pixels
-	} else {
-	    %W xview scroll [expr {(2-%D)/3}] pixels
-	}
-    }
+bind Text <MouseWheel> {
+    tk::MouseWheel %W y %D -4.0 pixels
 }
-
-if {[tk windowingsystem] eq "x11"} {
-    # Support for mousewheels on Linux/Unix commonly comes through mapping
-    # the wheel to the extended buttons.  If you have a mousewheel, find
-    # Linux configuration info at:
-    #	http://linuxreviews.org/howtos/xfree/mouse/
-    bind Text <4> {
-	if {!$tk_strictMotif} {
-	    %W yview scroll -50 pixels
-	}
-    }
-    bind Text <5> {
-	if {!$tk_strictMotif} {
-	    %W yview scroll 50 pixels
-	}
-    }
-    bind Text <Shift-4> {
-	if {!$tk_strictMotif} {
-	    %W xview scroll -50 pixels
-	}
-    }
-    bind Text <Shift-5> {
-	if {!$tk_strictMotif} {
-	    %W xview scroll 50 pixels
-	}
-    }
-    bind Text <6> {
-	if {!$tk_strictMotif} {
-	    %W xview scroll -50 pixels
-	}
-    }
-    bind Text <7> {
-	if {!$tk_strictMotif} {
-	    %W xview scroll 50 pixels
-	}
-    }
+bind Text <Option-MouseWheel> {
+    tk::MouseWheel %W y %D -1.2 pixels
+}
+bind Text <Shift-MouseWheel> {
+    tk::MouseWheel %W x %D -4.0 pixels
+}
+bind Text <Shift-Option-MouseWheel> {
+    tk::MouseWheel %W x %D -1.2 pixels
 }
 
 # ::tk::TextClosestGap --
@@ -568,12 +501,7 @@ proc ::tk::TextButton1 {w x y} {
     } else {
 	$w mark gravity $anchorname left
     }
-    # Allow focus in any case on Windows, because that will let the
-    # selection be displayed even for state disabled text widgets.
-    if {[tk windowingsystem] eq "win32" \
-	    || [$w cget -state] eq "normal"} {
-	focus $w
-    }
+    focus $w
     if {[$w cget -autoseparators]} {
 	$w edit separator
     }
@@ -1278,7 +1206,11 @@ proc ::tk::TextUndoRedoProcessMarks {w} {
     set nUndoMarks [llength $undoMarks]
     set n [expr {$nUndoMarks / 2}]
     set undoMarks [lsort -dictionary $undoMarks]
-    set Lmarks [lrange $undoMarks 0 [expr {$n - 1}]]
+    if {$n > 0} {
+	set Lmarks [lrange $undoMarks 0 [expr {$n - 1}]]
+    } else {
+	set Lmarks {}
+    }
     set Rmarks [lrange $undoMarks $n [llength $undoMarks]]
     foreach Lmark $Lmarks Rmark $Rmarks {
         lappend indices [$w index $Lmark] [$w index $Rmark]
