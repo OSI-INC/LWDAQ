@@ -4691,7 +4691,7 @@ proc Neuroexporter_edf_read {} {
 	upvar #0 Neuroplayer_config config
 
 	set fn [LWDAQ_get_file_name]
-	if {$fn == ""} {retuen "ABORT"}
+	if {$fn == ""} {return ""}
 	set signals [EDF_header_read $fn]
 	set s [list]
 	foreach {id fq} $signals {
@@ -4701,6 +4701,22 @@ proc Neuroexporter_edf_read {} {
 	}
 	set config(channel_selector) $s
 	Neuroexporter_edf_setup
+	return $fn
+}
+
+#
+# Neuroexporter_edf_rewrite rewrites the EDF headers of one or more EDF files.
+# All entries in the EDF files will be re-written except for the date, time, and
+# the signal names. We use this routine to select one or more files and re-write
+# the description of the signals.
+#
+proc Neuroexporter_edf_rewrite {} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+
+	set fnl [LWDAQ_get_file_name 1]
+	if {$fn == ""} {return ""}
+
 	return $fn
 }
 

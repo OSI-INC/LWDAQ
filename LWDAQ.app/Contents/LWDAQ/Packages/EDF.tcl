@@ -21,11 +21,17 @@
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 
 # Version 1.1 First version.
+#
 # Version 1.2 Change default description strings, add routine to read recording
 # name.
+#
+# Version 1.3 Change default min and max and units to be sixteen-bit unsigned
+# ADC counts, which is never inaccurate for telemetry devices. The EDF_create
+# routine returns the header. If we pass it an empty file name, it does not
+# create a file.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide EDF 1.2
+package provide EDF 1.3
 
 # Clear the global EDF array if it already exists.
 if {[info exists EDF]} {unset EDF}
@@ -36,9 +42,9 @@ if {[info exists EDF]} {unset EDF}
 set EDF(patient) "unspecified"
 set EDF(recording) "unspecified"
 set EDF(transducer) "unspecified"
-set EDF(unit) "uV"
-set EDF(min) "-18000"
-set EDF(max) "+9000"
+set EDF(unit) "cnt"
+set EDF(min) "0"
+set EDF(max) "65535"
 set EDF(lo) "-32768"
 set EDF(hi) "+32767"
 set EDF(filter) "unspecified" 
@@ -46,6 +52,8 @@ set EDF(filter) "unspecified"
 # Global variables that define the location of records in the header, as defined
 # in document http://www.edfplus.info/specs/edf.html.
 set EDF(patient_loc) 8
+set EDF(date_loc) 168
+set EDF(time_loc) 176
 set EDF(num_records_loc) 236
 set EDF(header_size_loc) 184
 
@@ -81,20 +89,23 @@ proc EDF_string_pop {strname len} {
 # intervals, which they call "records", each of which is of a fixed duration in
 # seconds. Each record has a fixed number of signals, and each signal contains a
 # fixed number of samples. All samples are little-endian two-byte signed
-# integers. The minimum value is -32768 and the maxium is 32767. We cannot store
-# values that range from 0-65536, nor can we store real-valued samples. But this
-# routine does not store signals, it creates the header file, in which the
-# number of records is set to zero, in anticipation of later routines adding
-# records to the file and, in doing so, incrementing the number of data records
-# field in the header. The total length of the header will be 256 bytes plus
-# another 256 bytes per signal. If a file already exists with the specified
-# name, this routine will delete and replace the previous file. The routine
-# requires that we tell it the file name, the interval length in seconds, and we
-# provide a list of signal labels with their number of samples per second. For
-# example, "1 512 2 512 4 256 8 1024". Note that the EDF header will specify the
-# number of samples per interval, which we calculate from the sample rate and
-# interval length. If we don't specify a date, we use the current date. The
-# patient and recording strings are optional.
+# integers. The minimum value is -32768 and the maxium is 32767. This routine
+# creates the header file, in which the number of records is set to zero, in
+# anticipation of later routines adding records to the file and, in doing so,
+# incrementing the number of data records field in the header. The total length
+# of the header will be 256 bytes plus another 256 bytes per signal. If a file
+# already exists with the specified name, this routine will delete and replace
+# the previous file. The routine requires that we tell it the file name, the
+# interval length in seconds, and we provide a list of signal labels with their
+# number of samples per second. For example, "1 512 2 512 4 256 8 1024". The EDF
+# header will specify the number of samples per interval, which we calculate
+# from the sample rate and interval length. If we don't specify a date, we use
+# the current date. The patient and recording strings are optional. Each signal
+# gets seven fields in addition to its name and sample rate. These fields are
+# named: transducer, unit, min, max, lo, hi, and filter. This routine will fill
+# in these fields with default values unless global EDF fields have been
+# defined. If EDF(min_7) is defined as "211", for example, any signal named "7"
+# will have its "min" field set to "211". If the file name is empty
 #
 proc EDF_create {file_name interval signals \
 		{date ""} \
@@ -169,19 +180,22 @@ proc EDF_create {file_name interval signals \
 	# characters with a space.
 	set header [regsub -all {[^ -~]} $header " "]
 	
-	# Open the file for writing, and print the header to the file, making sure we don't 
-	# leave a newline character at the end.
-	set f [open $file_name w]
-	puts -nonewline $f $header
-	close $f
+	# If the file name is not an empty string, open the file for writing, and
+	# print the header to the file, making sure we don't leave a newline
+	# character at the end.
+	if {$f != ""} {
+		set f [open $file_name w]
+		puts -nonewline $f $header
+		close $f
+	}
 
-	# Return the length of the header.
-	return $header_len
+	# Return the header.
+	return $header
 }
 
 #
-# EDF_num_records_write sets the number of records field in the header of
-# and EDF file.
+# EDF_num_records_write sets the number of records field in the header of and
+# EDF file.
 #
 proc EDF_num_records_write {file_name num_records} {
 	global EDF
@@ -272,6 +286,42 @@ proc EDF_recording_read {file_name} {
 	
 	# Return the recording name, with white spaces removed
 	return [string trim $recording]
+}
+
+#
+# EDF_date_read gets the recording date field from the header of
+# and EDF file.
+#
+proc EDF_date_read {file_name} {
+	global EDF
+
+	# Find the date field in the header.
+	set f [open $file_name r+]
+	fconfigure $f -translation binary
+	seek $f $EDF(date_loc)
+	set date [read $f 8]
+	close $f
+	
+	# Return the recording name, with white spaces removed
+	return [string trim $date]
+}
+
+#
+# EDF_time_read gets the recording time field from the header of
+# and EDF file.
+#
+proc EDF_time_read {file_name} {
+	global EDF
+
+	# Find the date field in the header.
+	set f [open $file_name r+]
+	fconfigure $f -translation binary
+	seek $f $EDF(time_loc)
+	set rtime [read $f 8]
+	close $f
+	
+	# Return the recording name, with white spaces removed
+	return [string trim $rtime]
 }
 
 #
@@ -443,3 +493,4 @@ proc EDF_merge {outfile_name infile_name_list} {
 	# Return the number of data records in the output file.
 	return $nro
 }
+
