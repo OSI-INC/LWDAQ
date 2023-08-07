@@ -29,7 +29,7 @@ set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.5"
 set LWDAQ_Info(program_patchlevel) "10.5.6"
 set LWDAQ_Info(tcl_version) [info patchlevel]
-set LWDAQ_Info(console_prompt) "LWDAQ$ "
+set LWDAQ_Info(prompt) "LWDAQ$ "
 	
 # Determine architecture.
 package require platform
@@ -101,7 +101,7 @@ set LWDAQ_Info(working_dir) $LWDAQ_Info(program_dir)
 
 # Set the user-defined flags to their default values.
 set LWDAQ_Info(run_mode) "--gui"
-set LWDAQ_Info(console_enabled) "0"
+set LWDAQ_Info(terminal_connected) "0"
 set LWDAQ_Info(configuration_file) ""
 set LWDAQ_Info(argv) ""
 
@@ -117,27 +117,27 @@ foreach a $argv {
 		# We ignore these process serial number arguments.
 		}
 		"--no-console" {
-			set LWDAQ_Info(console_enabled) 0
+			set LWDAQ_Info(terminal_connected) 0
 			set LWDAQ_Info(run_mode) $a
 		}
 		"--gui" {
-			set LWDAQ_Info(console_enabled) 1
+			set LWDAQ_Info(terminal_connected) 1
 			set LWDAQ_Info(run_mode) $a
 		}
 		"--no-gui" {
-			set LWDAQ_Info(console_enabled) 1
+			set LWDAQ_Info(terminal_connected) 1
 			set LWDAQ_Info(run_mode) $a
 		}
 		"--spawn" {
-			set LWDAQ_Info(console_enabled) 0
+			set LWDAQ_Info(terminal_connected) 0
 			set LWDAQ_Info(run_mode) $a
 		}
 		"--pipe" {
-			set LWDAQ_Info(console_enabled) 0
+			set LWDAQ_Info(terminal_connected) 0
 			set LWDAQ_Info(run_mode) $a
 		}
 		"--no-prompt" {
-			set LWDAQ_Info(console_prompt) ""
+			set LWDAQ_Info(prompt) ""
 		}
 		
 		default {
@@ -172,9 +172,11 @@ if {!$LWDAQ_Info(gui_enabled)} {
 	proc winfo {args} {return 0}
 }
 
-# Determine whether or not we have a graphical slave console available through
-# the TK "console" command.
-if {$LWDAQ_Info(console_enabled)} {
+# Determine whether or not we should use a graphical slave console available through
+# the TK "console" command. If we have a terminal connected, we will use the terminal
+# instead of any such slave. But if we have no terminal, we will use the slave console
+# if it is available.
+if {$LWDAQ_Info(terminal_connected)} {
 	set LWDAQ_Info(slave_console) 0
 } {
 	if {[info commands console] == "console"} {
@@ -325,23 +327,27 @@ if {$num_errors > 0} {
 }
 
 #
-# LWDAQ_stdin_console_start turns the standard input, which will exist when
-# we start LWDAQ from a terminal on UNIX, LINUX, and even Windows and MacOS.
-# The console is primitive in its current incarnation: no up or down-arrow 
-# implementation to give you previous commands, no left or right arrows to
-# navigate through the command. But it's better than nothing.
+# LWDAQ_stdin_console_start turns the standard input, which will exist when we
+# start LWDAQ from a terminal on UNIX, LINUX, Windows and MacOS. We check to see
+# if a console package is available to make a full-functioning console interface.
+# If not, we use a crude console with no arrow implementation, no history, and
+# no insertion.
 #
 proc LWDAQ_stdin_console_start {} {
 	global LWDAQ_Info
-	fconfigure stdin -translation auto -buffering line
-	fileevent stdin readable LWDAQ_stdin_console_execute
-	puts -nonewline stdout $LWDAQ_Info(console_prompt)
-	flush stdout
+	if {[catch {package require Console}]} {
+		fconfigure stdin -translation auto -buffering line
+		fileevent stdin readable LWDAQ_stdin_console_execute
+		puts -nonewline stdout $LWDAQ_Info(prompt)
+		flush stdout
+	} {
+		Console_start $LWDAQ_Info(prompt)
+	}
 }
 
 #
-# LWDAQ_stdin_console_execute executes a command supplied from the stdin console,
-# if it exists, and writes the result to the stdout console.
+# LWDAQ_stdin_console_execute executes a command supplied from stdin and writes
+# the result stdout.
 #
 proc LWDAQ_stdin_console_execute {} {
 	global LWDAQ_Info
@@ -349,7 +355,7 @@ proc LWDAQ_stdin_console_execute {} {
 		if {[gets stdin line] >= 0} {
 			set result [uplevel $line]
 			if {$result != ""} {puts stdout $result}
-			puts -nonewline stdout $LWDAQ_Info(console_prompt)
+			puts -nonewline stdout $LWDAQ_Info(prompt)
 			flush stdout
 		}
 	} error_result]} {
@@ -358,23 +364,26 @@ proc LWDAQ_stdin_console_execute {} {
 }
 
 #
-# LWDAQ_stdin_console_stop turns off the file event associated with the standard
-# input and so stops theconsole that uses stdin and stdout.
+# LWDAQ_stdin_console_stop restores the terminal to its original state.
 #
 proc LWDAQ_stdin_console_stop {} {
-	fileevent stdin readable ""
+	if {[catch {package require Console}]} {
+		fileevent stdin readable ""
+	} {
+		Console_stop $LWDAQ_Info(prompt)
+	}
 }
 
 
 # If we have a slave console and we have errors, open it so that the errors will
-# be visible. If we don't have a slave console, and our console interface is
-# enabled, start our standard input console.
+# be visible. If we don't have a slave console, but we do have a terminal connected,
+# then start our standard input console.
 if {$LWDAQ_Info(slave_console)} {
 	if {$num_errors > 0} {
 		console show
 	}
 } {
-	if {$LWDAQ_Info(console_enabled)} {
+	if {$LWDAQ_Info(terminal_connected)} {
 		LWDAQ_stdin_console_start
 	}
 }
