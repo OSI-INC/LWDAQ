@@ -210,7 +210,7 @@ const
 	one_percent=0.01;
 	
 {
-	Debugging and Error Handling. We have routines to measure execution time, to
+	Debugging, Error Handling, and System Routines. We have routines to measure execution time, to
 	write debug messages to a file on disk, and to keep track of pointers.
 }
 const 
@@ -231,6 +231,7 @@ var
 	debug_counter:integer=0;
 	debug_string:string='';
 	log_file_name:string;
+	local_console:boolean=false;
 	
 procedure inc_num_outstanding_ptrs(size:integer;caller:string);
 procedure dec_num_outstanding_ptrs(size:integer;caller:string);
@@ -239,6 +240,8 @@ procedure start_timer(id,caller:string);
 procedure mark_time(id,caller:string);
 procedure report_time_marks;
 function clock_milliseconds:qword;
+procedure terminal_seize(data:pointer); cdecl;
+procedure terminal_release(data:pointer); cdecl;
 
 {
 	Graphical User Interface. We don't implement any kind of graphical user
@@ -718,6 +721,9 @@ procedure write_kinematic_mount(var s:string;mount:kinematic_mount_type);
 
 
 implementation
+
+uses
+	process;
 
 {
 	Execution timer variables. We use these with start_timer and mark_time to
@@ -6208,6 +6214,33 @@ function local_from_little_endian_smallint(i:smallint):smallint;
 begin
 	if (not big_endian) then local_from_little_endian_smallint:=i
 	else local_from_little_endian_smallint:=reverse_smallint_bytes(i);
+end;
+
+{
+	terminal_seize configures a terminal to transmit raw characters and stop echoing 
+	charcaters to its monitor. The routine uses operating system utilities to achiever
+	this end, calling them with the help of FPC's "RunCommand" routine. Right now, th
+	routine supports only Linux, Unix, and Raspian operating systems. The pointer type
+	we pass into the routine may or may not be used.
+}
+procedure terminal_seize(data:pointer); cdecl;
+var s:ansistring;
+begin
+	local_console:=true;
+	if RunCommand('/bin/bash',['-c','echo terminal_seize'],s) then
+		write(s);
+end;
+
+{
+	terminal_release restores a terminal to newline buffering and echoing. We can use 
+	this routine upon exit to restore a terminal we have previously seized.
+}
+procedure terminal_release(data:pointer); cdecl;
+var s:ansistring;
+begin
+	local_console:=false;
+	if RunCommand('/bin/bash',['-c','echo terminal_release'],s) then
+		write(s);
 end;
 
 

@@ -50,7 +50,7 @@ library lwdaq;
 uses
 	utils,images,transforms,image_manip,rasnik,
 	spot,bcam,scam,shadow,wps,electronics,metrics,
-	tcltk;
+	tcltk,process;
 
 const
 	package_name = 'lwdaq';
@@ -258,6 +258,7 @@ variables you specify with 0 for false and 1 for true.</p>
 <tr><td>-log_name</td><td>String</td><td>Name of debugging log file, default "lwdaq_log.txt"</td></tr>
 <tr><td>-log_errors</td><td>Boolean</td><td>Write errors to log file, default 0</td></tr>
 <tr><td>-show_details</td><td>Boolean</td><td>Write execution details to text window, default 0</td></tr>
+<tr><td>-local_console</td><td>Boolean</td><td>Take control of the standard terminal interface, default 0</td></tr>
 </table></center>
 
 <p>The lwdaq library routines can write to Tk text windows through -text_name
@@ -309,6 +310,32 @@ over-writing previous errors with the new error. By default, append_errors is
 false. When we set log_errors to 1, each error reported by the report_error
 routine will, in addition, be written to a log file with the global debug_log
 procedure.</p>
+
+<p>When LWDAQ is running with a tty (teletypwriter) terminal, we have the
+terminal's standard output (stdout) connected to LWDAQ's standard input (stdin),
+while LWDAQ's stout is connected to the terminal's stdin. We would like to give
+ourselves the option of implementing a <i>local shell</i> program in Tcl that
+provides a command history, navigation with arrow keys, insertion, and deletion.
+By default, however, a tty terminal will write each key stroke to its own stdin,
+but refrain from writing key strokes to stdout until it receives a newline
+character, as it will when the user presses "enter" or "return". The writing of
+key strokes to its own stdin is called "echo". When the terminal is connected to
+a monitor, the key strokes are printed in the monitor for the human user to see.
+The terminal allows the user to delete characters so as to edit the line of text
+that will be transmitted when the user presses "enter". In this standard tty
+arrangement, arrow keys cause three characters to be echoed to the screen:
+escape (ESC), left bracket, and capital letter that tells us which arrow key was
+pressed. Upon pressing "enter", these will be written to the terminal's stdout.
+In order to permit LWDAQ to respond to these arrow keys before the user pressed
+"enter", we must re-configure the terminal to provide keystrokes immediately and
+to refrain from echoing key strokes to its monitor. On Unix and Linux, we
+configure the terminal with the stty (set tty) utility, using "stty raw -echo".
+We restore the terminal with the same utility, using "stty -raw echo".</p>
+
+<p>When we specity "-local_console 1", LWDAQ configures the terminal for a local
+shell and installs an exit routine that will restores the terminal upon exit.
+When we specify "-local_console 0", LWDAQ restores the terminal and disables the
+exit routine.</p>
 }
 function lwdaq_config(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -338,6 +365,7 @@ begin
 			+' -track_ptrs '+string_from_boolean(track_ptrs)
 			+' -text_name '+gui_text_name
 			+' -show_details '+string_from_boolean(show_details)
+			+' -local_console '+string_from_boolean(local_console)
 			+' -photo_name '+gui_photo_name
 			+' -display_zoom '+string_from_real(gui_display_zoom,1,2)
 			+' -intensify '+gui_intensify
@@ -361,7 +389,17 @@ begin
 			else if (option='-track_ptrs') then track_ptrs:=Tcl_ObjBoolean(vp)
 			else if (option='-text_name') then gui_text_name:=Tcl_ObjString(vp)
 			else if (option='-show_details') then show_details:=Tcl_ObjBoolean(vp)
-			else if (option='-photo_name') then gui_photo_name:=Tcl_ObjString(vp)
+			else if (option='-local_console') then begin
+				if Tcl_ObjBoolean(vp) then begin
+					local_console:=true;
+					terminal_seize(nil);
+					Tcl_CreateExitHandler(@terminal_release,nil);
+				end else begin
+					local_console:=false;
+					terminal_release(nil);
+					Tcl_DeleteExitHandler(@terminal_release,nil);
+				end;
+			end else if (option='-photo_name') then gui_photo_name:=Tcl_ObjString(vp)
 			else if (option='-display_zoom') then gui_display_zoom:=Tcl_ObjReal(vp)
 			else if (option='-intensify') then gui_intensify:=Tcl_ObjString(vp)
 			else if (option='-wait_ms') then gui_wait_ms:=Tcl_ObjInteger(vp)
@@ -379,7 +417,7 @@ begin
 					+' -track_ptrs ? -text_name ? -show_details ? -photo_name ?'
 					+' -wait_ms ? -gamma_correction ? -rggb_red_scale ?'
 					+' -rggb_blue_scale ? -fsr ? -fsd ? -eol ? -display_zoom ?'
-					+' -intensify ? -log_name ? -log_errors ?".'); 
+					+' -intensify ? -log_name ? -log_errors ? -local_terminal ?".'); 
 				exit;
 			end;
 		end;
@@ -7170,7 +7208,6 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 	lwdaq:=Tcl_OK;
 end;
 
-
 {
 	lwdaq_init initializes our global variables to suit the TclTk interpreter,
 	and installs our lwdaq commands. It is called by TclTk when we load our
@@ -7225,7 +7262,7 @@ begin
 	tcl_createobjcommand(interp,'lwdaq_metrics',lwdaq_metrics,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_calibration',lwdaq_calibration,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_simplex',lwdaq_simplex,0,nil);
-
+	
 	lwdaq_init:=tcl_pkgprovide(interp,package_name,version_num);
 end;
 
