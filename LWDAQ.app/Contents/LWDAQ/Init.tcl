@@ -335,13 +335,15 @@ if {$num_errors > 0} {
 #
 proc LWDAQ_stdin_console_start {} {
 	global LWDAQ_Info
-	if {[catch {package require Console}]} {
+	if {[catch {package require TTY}]} {
 		fconfigure stdin -translation auto -buffering line
 		fileevent stdin readable LWDAQ_stdin_console_execute
 		puts -nonewline stdout $LWDAQ_Info(prompt)
 		flush stdout
 	} {
-		Console_start $LWDAQ_Info(prompt)
+		set TTY(prompt) $LWDAQ_Info(prompt)
+		lwdaq_config -local_console 1
+		TTY_start
 	}
 }
 
@@ -370,7 +372,8 @@ proc LWDAQ_stdin_console_stop {} {
 	if {[catch {package require Console}]} {
 		fileevent stdin readable ""
 	} {
-		Console_stop $LWDAQ_Info(prompt)
+		TTY_stop $LWDAQ_Info(prompt)
+		lwdaq_config -local_console 0
 	}
 }
 
