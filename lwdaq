@@ -65,13 +65,13 @@ fi
 OPTION="--gui"
 VERBOSE=1
 CONFIG_FILE=""
-PROMPT=""
+PROMPT="--prompt"
 while [[ $1 == --* ]];
 do
 	case "$1" in
 		"--quiet") VERBOSE=0;;
 		"--verbose") VERBOSE=1;;
-		"--prompt") PROMPT="";;
+		"--prompt") PROMPT="--prompt";;
 		"--no-prompt") PROMPT="--no-prompt";;
 		*) OPTION=$1;;
 	esac

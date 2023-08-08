@@ -139,6 +139,9 @@ foreach a $argv {
 		"--no-prompt" {
 			set LWDAQ_Info(prompt) ""
 		}
+		"--prompt" {
+		# Leave the prompt as it is.
+		}
 		
 		default {
 			if {$LWDAQ_Info(configuration_file) == ""} {
@@ -335,7 +338,7 @@ if {$num_errors > 0} {
 #
 proc LWDAQ_stdin_console_start {} {
 	global LWDAQ_Info
-	if {[catch {package require TTY}]} {
+	if {[catch {package require TTY}] || ([auto_execok stty] == "")} {
 		fconfigure stdin -translation auto -buffering line
 		fileevent stdin readable LWDAQ_stdin_console_execute
 		puts -nonewline stdout $LWDAQ_Info(prompt)
@@ -352,7 +355,7 @@ proc LWDAQ_stdin_console_start {} {
 # are no longer being used to provide and respond to Tcl commands.
 #
 proc LWDAQ_stdin_console_stop {} {
-	if {[catch {package require Console}]} {
+	if {[catch {package require TTY}] || ([auto_execok stty] == "")} {
 		fileevent stdin readable ""
 	} {
 		TTY_stop 

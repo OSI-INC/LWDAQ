@@ -33,7 +33,7 @@ set TTY(state) "insert"
 
 proc TTY_start {} {
 	global TTY
-	exec stty raw -echo 
+	eval exec [auto_execok stty] raw -echo 
 	fconfigure stdin -translation auto -buffering none
 	fileevent stdin readable TTY_execute
 	set TTY(state) "insert"
@@ -43,7 +43,7 @@ proc TTY_start {} {
 }
 
 proc TTY_stop {} {
-	exec stty -raw echo
+	eval exec [auto_execok stty] -raw echo
 	fconfigure stdin -translation auto -buffering line
 	fileevent stdin readable ""
 }
