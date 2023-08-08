@@ -33,13 +33,19 @@ set TTY(state) "insert"
 
 proc TTY_start {} {
 	global TTY
-	fconfigure stdin -translation auto -buffering none
-	set TTY(state) "insert"
 	exec stty raw -echo 
+	fconfigure stdin -translation auto -buffering none
 	fileevent stdin readable TTY_execute
+	set TTY(state) "insert"
+	set TTY(command) ""
 	puts -nonewline stdout $TTY(prompt)
 	flush stdout
-	set TTY(command) ""
+}
+
+proc TTY_stop {} {
+	exec stty -raw echo
+	fconfigure stdin -translation auto -buffering line
+	fileevent stdin readable ""
 }
 
 proc TTY_execute {} {
@@ -48,10 +54,6 @@ proc TTY_execute {} {
 		if {[set c [read stdin 1]] != ""} {
 			if {$c == "\n"} {
 				puts stdout ""
-				if {[string trim $TTY(command)] == "exit"} {
-					exec stty -raw echo
-					exit
-				}
 				set result [uplevel $TTY(command)]
 				set TTY(command) ""
 				if {$result != ""} {

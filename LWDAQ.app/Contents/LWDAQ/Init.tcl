@@ -341,11 +341,24 @@ proc LWDAQ_stdin_console_start {} {
 		puts -nonewline stdout $LWDAQ_Info(prompt)
 		flush stdout
 	} {
+		global TTY
 		set TTY(prompt) $LWDAQ_Info(prompt)
-		lwdaq_config -local_console 1
 		TTY_start
 	}
 }
+
+#
+# LWDAQ_stdin_console_stop disables the console, so that standard input and output
+# are no longer being used to provide and respond to Tcl commands.
+#
+proc LWDAQ_stdin_console_stop {} {
+	if {[catch {package require Console}]} {
+		fileevent stdin readable ""
+	} {
+		TTY_stop 
+	}
+}
+
 
 #
 # LWDAQ_stdin_console_execute executes a command supplied from stdin and writes
@@ -364,19 +377,6 @@ proc LWDAQ_stdin_console_execute {} {
 		puts $error_result
 	}
 }
-
-#
-# LWDAQ_stdin_console_stop restores the terminal to its original state.
-#
-proc LWDAQ_stdin_console_stop {} {
-	if {[catch {package require Console}]} {
-		fileevent stdin readable ""
-	} {
-		TTY_stop $LWDAQ_Info(prompt)
-		lwdaq_config -local_console 0
-	}
-}
-
 
 # If we have a slave console and we have errors, open it so that the errors will
 # be visible. If we don't have a slave console, but we do have a terminal connected,

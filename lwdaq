@@ -212,6 +212,9 @@ then
 	fi
 fi
 
+# Save the state of the terminal.
+TTY_STATE=`stty -g`
+
 # Launch the shell and pass to it the start-up script and any additional
 # parameters we may have passed to this bash script. On Linux, to make sure that
 # our child process are independent of their parents, we have to launch with the
@@ -235,3 +238,6 @@ then
 else
 	$SHELL $INIT_FILE $OPTION $PROMPT $CONFIG_FILE "$@"
 fi
+
+# Restore the terminal in case we reconfigured it in LWDAQ for a local console.
+stty $TTY_STATE
