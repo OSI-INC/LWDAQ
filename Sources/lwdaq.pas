@@ -54,7 +54,7 @@ uses
 
 const
 	package_name = 'lwdaq';
-	version_num = '10.5';
+	version_num = '10.6';
 
 {
 	The following variables we use to implement the utils gui routines for
@@ -7257,30 +7257,40 @@ begin
 end;
 
 {
-	lwdaq_unload returns an error because we have not yet implemented the
-	unloading of all lwdaq commands from the interpreter.
+	lwdaq_unload calls all finalization routines in the lwdaq library and then
+	returns OK.
 }
-function lwdaq_unload(interp:pointer;flags:integer):integer;
+function lwdaq_unload(interp:pointer;flags:integer):integer; cdecl;
 begin
-	lwdaq_unload:=Tcl_Error;
+	lwdaq_unload:=Tcl_OK;
+	halt;
 end;
 
 {
-	lwdaq_safeinit returns an error because we don't have a safe version of the
-	initialization.
+	lwdaq_safeinit installs only the lwdaq_config routine and then tries to provide
+	this routine to Tcl.
 }
-function lwdaq_safeinit(interp:pointer):integer;
+function lwdaq_safeinit(interp:pointer):integer; cdecl;
 begin
-	lwdaq_safeinit:=Tcl_Error;
+	gui_interp_ptr:=interp;
+	gui_writeln:=lwdaq_gui_writeln;
+	gui_draw:=lwdaq_gui_draw;
+	gui_wait:=lwdaq_gui_wait;
+	gui_support:=lwdaq_gui_support;
+	debug_log:=lwdaq_debug_log;
+	
+	tcl_createobjcommand(interp,'lwdaq_config',lwdaq_config,0,nil);
+
+	lwdaq_safeinit:=tcl_pkgprovide(interp,package_name,version_num);
 end;
 
 {
-	lwdaq_safeunload returns an error because we don't have a safe version of
-	the unload.
+	lwdaq_safeunload does not call the lwdaq finalization routines, in case they
+	are unsafe. So it just returns OK.
 }
-function lwdaq_safeunload(interp:pointer;flags:integer):integer;
+function lwdaq_safeunload(interp:pointer;flags:integer):integer; cdecl;
 begin
-	lwdaq_safeunload:=Tcl_Error;
+	lwdaq_safeunload:=Tcl_OK;
 end;
 
 {

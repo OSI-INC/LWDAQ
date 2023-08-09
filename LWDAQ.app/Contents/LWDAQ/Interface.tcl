@@ -133,7 +133,7 @@ proc LWDAQ_init_main_window {} {
 	catch {destroy $info(file_menu)}
 	menu $info(file_menu) -tearoff 0
 	$m add cascade -menu $info(file_menu) -label "File"
-	if {$info(slave_console)} {
+	if {$info(tk_console)} {
 		$info(file_menu) add command -label "Show Console" -command "console show"
 		$info(file_menu) add command -label "Hide Console" -command "console hide"	
 		$info(file_menu) add separator
