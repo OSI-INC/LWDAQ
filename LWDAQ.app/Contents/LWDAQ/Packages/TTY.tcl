@@ -30,10 +30,12 @@ if {[info exists TTY]} {unset TTY}
 set TTY(prompt) "% "
 set TTY(command) ""
 set TTY(state) "insert"
-set TTY(commandlist) [list]
+set TTY(commandlist) ""
 set TTY(pointer) "0"
 set TTY(index) "0"
 set TTY(newcommand) ""
+set TTY(cursor) "0"
+set TTY(p) ""
 
 proc TTY_start {} {
 	global TTY
@@ -59,9 +61,11 @@ proc TTY_execute {} {
 		if {$c == "\n"} {
 			puts stdout ""
 			set result [uplevel $TTY(command)]
-			lappend TTY(commandlist) $result
-			set TTY(command) ""
+			lappend TTY(commandlist) $TTY(command)
+			set TTY(cursor) "0" 
 			set TTY(pointer) "0"
+			set TTY(command) ""
+			set TTY(cursor) "0"
 			if {$result != ""} {
 				puts stdout $result
 			}
@@ -75,7 +79,7 @@ proc TTY_execute {} {
 				} elseif {$ascii != 27} {
 					puts -nonewline "\x07"		
 					set TTY(state) "insert"
-					}
+				}
 			} elseif {$TTY(state) == "arrow"} {
 				switch $c {
 					"A" {
@@ -85,7 +89,7 @@ proc TTY_execute {} {
 						TTY_down 
 					}
 					"C" {
-						if {$TTY(pointer) > 0} {
+						if {$TTY(cursor) > 0} {
 							TTY_right
 						}
 					}
@@ -98,16 +102,16 @@ proc TTY_execute {} {
 
 			} elseif {$TTY(state) == "insert"} {
 				if {$ascii == 3} {
+					exec stty -raw echo
 					exit
 				} elseif {$ascii == 27} {
 					set TTY(state) "escape"
 				} elseif {$ascii == 127} {
 					TTY_delete
 				} else {
-					if {$TTY(pointer)>0} {
+					if {$TTY(cursor)>0} {
 						TTY_insert $c
-						puts -nonewline $TTY(command)
-						for {set i 0} {$i < $TTY(pointer)} {incr i} {
+						for {set i 0} {$i < $TTY(cursor)} {incr i} {
 							TTY_backspace
 						}
 
@@ -115,10 +119,10 @@ proc TTY_execute {} {
 						puts -nonewline stdout $c
 						append TTY(command) $c
 					}
-			}
-		} else {
+				}
+			} else {
 				error "Unknown console state \"$cstate\"."
-		}
+			}	
 			flush stdout
 		}
 	} error_result]} {
@@ -137,75 +141,71 @@ proc TTY_execute {} {
 
 # Procedures below:
 
-# If the command list is not empty, enact the remove space command.
-# If the global variable "length" is equal to the command list,
-# and the index state is "firstup", the uparrow command will print the 
-# last element of the command list to the terminal, setting the 
-# index state to "nextup", and decrementing the index itself to point to 
-# the next previous command in the list. Regardless of index state,
-# set the length variable equal to the length of the command list.
-# If the index state for the next up arrow press is "nextup", the 
-# index will keep decrementing until the first command in the list shown.
-# Once the very first command is shown, another arrow press will set the index to point to the 
-# most recent command at the end of the list.
-# If the up arrow is followed by a carriage return, which appends a new command 
-# to the command list, then the length variable is no longer equal to the 
-# original length of the list, which then triggers the index to be reset
-# to point to the new final element of the list when the next up arrow is pressed.
+# TTY_clear is used when you want to get rid of all of the text in the command
+# line, while your cursor is not at the end of the text line. It does so by
+# removing every character to the left of the cursor, then printing the
+# previous command text to the text line, which sets the cursor back to zero.
+# From here, the remove space character is able to remove every character
+# from the left of the cursor, which happens to be every character in the
+# command line.
 
+proc TTY_clear {} {
+	global TTY
+	TTY_removespace
+	puts -nonewline $TTY(command)
+	set save $TTY(cursor)
+	set TTY(cursor) "0"
+	TTY_removespace
+	set TTY(cursor) "$save"
+}	
+
+#TTY_up handles the up arrow. It allows you to  navigate through your previous
+#commands that have been added to the TTY(commandlist) list. The pointer is
+#set to zero any time a new line character is recieved, and as long as the
+#pointer is less than the length of the command list, you clear the command
+#line and print the command that is located at the point in the command list
+#determined by the pointer.
 
 proc TTY_up {} {
-	global TTY 
-	if {$TTY(pointer) == 0} {
-		set TTY(index) [llength $TTY(commandlist)]
-		set TTY(command) [lindex $TTY(commandlist) $TTY(index)]
-		puts -nonewline $TTY(command)
-		incr TTY(pointer)
-	} elseif { 0 < $TTY(pointer) < [llength $TTY(commandlist)]} {
-		TTY_removespace
-		set TTY(index) [expr [llength $TTY(commandlist) - $TTY(pointer)]]
-		set TTY(command) [lindex $TTY(commandlist) $TTY(index)]
-		puts -nonewline $TTY(command)
+	global TTY
+	if {$TTY(commandlist) != ""} {
+		if {$TTY(pointer) != [llength $TTY(commandlist)]} {
+			TTY_clear
+			set TTY(command) [lindex $TTY(commandlist) end-$TTY(pointer)]
+			puts -nonewline $TTY(command)
+			incr TTY(pointer)
+		}
 	}
-	
 }
 	
-	
-	
 
 
-# Handle the down arrow. Uses an index to point to the more recent command in
-# the command list, functions in an opposing manner to the up arrow.
+# TTY_down handles the down arrow. It uses the pointer to point to the more
+# recent command in the command list, functions in an opposing manner to the
+# TTY_up procedure.
 
 proc TTY_down {} {
 	global TTY
-	uplevel c
-	if {$TTY(commandlist)!= ""} {
-		TTY_removespace
-	}
 	if {$TTY(pointer) != 0} {
+		TTY_clear
 		incr TTY(pointer) -1
-		set TTY(index) [expr [llength $TTY(commandlist) - $TTY(pointer)]]
-		set TTY(command) [lindex $TTY(commandlist) $TTY(index)]
+		set TTY(command) [lindex $TTY(commandlist) [expr [llength $TTY(commandlist)] - $TTY(pointer)]]
 		puts -nonewline $TTY(command)
 	}
 }
 		
 			
 
-# Remove the most recent command string from the standard output. Call the
-# global variables command and command_list For every character of the
-# command contents, which has been printed to the screen, Set the command
-# to be one less character, and put a back space.
+# Remove whatever command line text is to the left of your cursor. The cursor
+# position, subtracted from the string length of the command denotes the
+# number of back spaces to do.
+
 proc TTY_removespace {} {
 	global TTY
-	for {set i 0} {$i < [expr [string length $TTY(command)] - $TTY(pointer)]} {incr i} {
+	for {set i 0} {$i < [expr [string length $TTY(command)] - $TTY(cursor)]} {incr i} {
 		puts -nonewline "\x08\x20\x08"
 	}
 }
-
-
-
 
 
 
@@ -216,8 +216,8 @@ proc TTY_removespace {} {
 
 proc TTY_insert {c} {
 	global TTY
-	if {$TTY(pointer) < [string length $TTY(command)]} {
-		set TTY(index) [expr [string length $TTY(command)] - $TTY(pointer)]
+	if {$TTY(cursor) < [string length $TTY(command)]} {
+		set TTY(index) [expr [string length $TTY(command)] - $TTY(cursor)]
 		append TTY(newcommand) [string range $TTY(command) 0 [expr $TTY(index) -1]]
 		append TTY(newcommand) $c
 		append TTY(newcommand) [string range $TTY(command) $TTY(index) end]	
@@ -226,59 +226,99 @@ proc TTY_insert {c} {
 	} else {
 		append TTY(newcommand) $c
 		append TTY(newcommand) $TTY(command)
-		TTY_removespace_cmd
+		TTY_removespace
 		set TTY(command) "$TTY(newcommand)"
 	}
+	puts -nonewline $TTY(command)
 	set TTY(newcommand) ""
 }
 
-# Console left navigates through the command line, incrementing the leftstate
+# TTY_left navigates through the command line, incrementing the cursor
 # variable to keep track of the location of the cursor. The left cursor
 # cannot move any more spaces to the left if it is in front of the command
 # line text.
+
 proc TTY_left {} {
 	global TTY
-	if {$TTY(pointer) < [string length $TTY(command)]} {
+	if {$TTY(cursor) < [string length $TTY(command)]} {
 		puts -nonewline "\x08"
-		incr TTY(pointer)
+		incr TTY(cursor)
 	}
 	
 }
 
 
-# Creates a backspace (moves the cursor one place to the left) in text command
-# line.
+# TTY_delete allows you to delete any character from the command line text.
+# From inside a text line: By saving the value of the cursor as the "index",
+# this proc clears all characters from the command line. It then copies the
+# characters to the left and to the right of the delete index to a new
+# command variable. Then, set the command to this newcommand. Print to the
+# screen, and navigate back through the text to the new cursor position. When
+# deleting from a cursor position of zero (end of the command line text), you
+# may delete up to the prompt, which is done by only allowing the backspace
+# procedure to occur if the command exists.
+
 proc TTY_delete {} {
-	puts -nonewline "\x08\x20\x08"
+	global TTY 
+	if {$TTY(cursor) > 0} {
+		set TTY(index) [expr [string length $TTY(command)] - $TTY(cursor)]
+		if {$TTY(index) > 0} {
+			TTY_clear
+			append TTY(newcommand) [string range $TTY(command) 0 [expr $TTY(index) -1]]
+			append TTY(newcommand) [string range $TTY(command) [expr $TTY(index) + 1] end]
+			set TTY(command) "$TTY(newcommand)"
+			puts -nonewline $TTY(command)
+			incr TTY(cursor)) -1 
+			if {$TTY(cursor) > 0} {
+				for {set i 0} {$i < $TTY(cursor)} {incr i} {
+					TTY_backspace
+				}
+			}
+		}
+
+	} elseif {$TTY(cursor) == 0} {
+		if {[string length $TTY(command)] > 0} {
+			puts -nonewline "\x08\x20\x08"
+			if {[string length $TTY(command)] >= 3} {
+				set TTY(command) [string range $TTY(command) 0 end-1]
+			} elseif {[string length $TTY(command)] == 2} {
+				set TTY(command) [string index $TTY(command) 0]
+			} elseif {[string length $TTY(command)] == 1} {
+				set TTY(command) ""
+			}
+		}
+	}	
+	
+	set TTY(newcommand) ""
+	
 }
+
+
+# Deletes the prveious character in the text command line.
 
 proc TTY_backspace {} {
 	puts -nonewline "\x08"
 }
-# Deletes the prveious character in the text command line.
 
 
-# If deleting in the middle of a string:
-# Set the index to point to the character being deleted. Append to a new command
-#the first half of the string up to the character, and the second half of the string which is 
-#after the character. Remove all of the characters from the command line, and print 
-#this new command to the string. Set the left stys
 
-#Right arrow decrements the leftstate, removes the entire command from the
-#screen, rewrites it, then navigates the cursor to the new spot in the text
-#(one space to the right)
+#Right arrow decrements the cursor value, by removeting the entire command
+#from the screen, rewriting it, and then navigating the cursor to the new
+#spot in the text(one space to the right)
 
 proc TTY_right {} {
 	global TTY
-	TTY_removespace
+	TTY_clear
 	puts -nonewline $TTY(command)
-	incr TTY(pointer) -1 
-	if {$TTY(pointer) > 0} {
-		for {set i 0} {$i < $TTY(pointer)} {incr i} {
+	incr TTY(cursor) -1 
+	if {$TTY(cursor) > 0} {
+		for {set i 0} {$i < $TTY(cursor)} {incr i} {
 			TTY_backspace
 		}
 	}
 }
+
+
 
 
 
