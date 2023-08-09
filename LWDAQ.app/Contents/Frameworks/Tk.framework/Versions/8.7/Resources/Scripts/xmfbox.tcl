@@ -4,8 +4,8 @@
 #	Unix platform. This implementation is used only if the
 #	"::tk_strictMotif" flag is set.
 #
-# Copyright (c) 1996 Sun Microsystems, Inc.
-# Copyright (c) 1998-2000 Scriptics Corporation
+# Copyright © 1996 Sun Microsystems, Inc.
+# Copyright © 1998-2000 Scriptics Corporation
 #
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -906,9 +906,9 @@ proc ::tk::MotifFDialog_CancelCmd {w} {
 }
 
 proc ::tk::ListBoxKeyAccel_Set {w} {
-    bind Listbox <Any-KeyPress> ""
+    bind Listbox <Key> ""
     bind $w <Destroy> [list tk::ListBoxKeyAccel_Unset $w]
-    bind $w <Any-KeyPress> [list tk::ListBoxKeyAccel_Key $w %A]
+    bind $w <Key> [list tk::ListBoxKeyAccel_Key $w %A]
 }
 
 proc ::tk::ListBoxKeyAccel_Unset {w} {
