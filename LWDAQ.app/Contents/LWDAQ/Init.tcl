@@ -175,17 +175,17 @@ if {!$LWDAQ_Info(gui_enabled)} {
 	proc winfo {args} {return 0}
 }
 
-# Determine whether or not we should use a graphical slave console available through
-# the TK "console" command. If we have a terminal connected, we will use the terminal
-# instead of any such slave. But if we have no terminal, we will use the slave console
-# if it is available.
+# Determine whether or not we should use a graphical console available through
+# the TK "console" command. If we have a terminal connected, we will use the
+# terminal instead, implementing a console with the TTY package, if it exists,
+# of a primitive line-execution console if there is no TTY package.
 if {$LWDAQ_Info(terminal_connected)} {
-	set LWDAQ_Info(slave_console) 0
+	set LWDAQ_Info(tk_console) 0
 } {
 	if {[info commands console] == "console"} {
-		set LWDAQ_Info(slave_console) 1
+		set LWDAQ_Info(tk_console) 1
 	} {
-		set LWDAQ_Info(slave_console) 0
+		set LWDAQ_Info(tk_console) 0
 	}
 }
 
@@ -194,7 +194,7 @@ if {$LWDAQ_Info(terminal_connected)} {
 #
 if {[catch {
 	# Set the console title, if there is a console.
-	if {$LWDAQ_Info(slave_console)} {
+	if {$LWDAQ_Info(tk_console)} {
 		console title "TCL/TK Console for LWDAQ \
 			$LWDAQ_Info(program_patchlevel) on $LWDAQ_Info(os)"
 	}
@@ -251,7 +251,7 @@ if {[catch {
 	# library defines a bunch of TCL commands whose names start with "lwdaq_". We
 	# can do this only once for each execution of LWDAQ. When we call LWDAQ_init
 	# a second time, the interpreter ignores this load command. 
-	load [file join $LWDAQ_Info(lib_dir) lwdaq.so_$LWDAQ_Info(os)]
+	load [file join $LWDAQ_Info(lib_dir) lwdaq.so_$LWDAQ_Info(os)] lwdaq
 
 	# Set up options for TCL commands defined in our analysis library. These 
 	# vary from one platform to the next.
@@ -381,10 +381,9 @@ proc LWDAQ_stdin_console_execute {} {
 	}
 }
 
-# If we have a slave console and we have errors, open it so that the errors will
-# be visible. If we don't have a slave console, but we do have a terminal connected,
-# then start our standard input console.
-if {$LWDAQ_Info(slave_console)} {
+# If we are using the Tk console and we have errors, open the Tk console so it
+# will show the errors. If we are using a terminal, start our own console.
+if {$LWDAQ_Info(tk_console)} {
 	if {$num_errors > 0} {
 		console show
 	}

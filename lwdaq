@@ -63,7 +63,7 @@ fi
 # configuration file name, if it exits. After that, further arguments will
 # be retained to pass into LWDAQ. The default launch option is --gui.
 OPTION="--gui"
-VERBOSE=1
+VERBOSE=0
 CONFIG_FILE=""
 PROMPT="--prompt"
 while [[ $1 == --* ]];
@@ -156,9 +156,9 @@ then
 	export LD_LIBRARY_PATH
 	if [ $GUI_ENABLED == 1 ]; 
 	then
-		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/wish8.6"
+		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/wish8.7"
 	else
-		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/tclsh8.6"
+		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/tclsh8.7"
 	fi
 fi
 if [ $OS == MacOS ];

@@ -1,0 +1,16 @@
+# tcl pkg-config source file
+
+prefix=/home/kevan/build
+exec_prefix=/home/kevan/build
+libdir=/home/kevan/build/lib
+includedir=${prefix}/include
+libfile=libtcl8.7.so
+
+Name: Tool Command Language
+Description: Tcl is a powerful, easy-to-learn dynamic programming language, suitable for a wide range of uses.
+URL: http://www.tcl.tk/
+Version: 8.7a5
+Requires.private: zlib >= 1.2.3, libtommath >= 1.2.0
+Libs: -L${libdir} -ltcl8.7 -ltclstub8.7
+Libs.private: -ldl -lz  -lpthread -lm
+Cflags: -I${includedir}
