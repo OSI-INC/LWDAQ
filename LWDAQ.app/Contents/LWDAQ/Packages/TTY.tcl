@@ -62,8 +62,7 @@ proc TTY_execute {} {
 			puts stdout ""
 			set result [uplevel $TTY(command)]
 			lappend TTY(commandlist) $TTY(command)
-			set TTY(cursor) "0" 
-			set TTY(pointer) "0"
+			set TTY(pointer) "0"	
 			set TTY(command) ""
 			set TTY(cursor) "0"
 			if {$result != ""} {
@@ -129,6 +128,8 @@ proc TTY_execute {} {
 		puts "ERROR: $error_result"
 		set TTY(command) ""
 		puts -nonewline $TTY(prompt)
+		set TTY(cursor) "0"
+		TTY_clear
 		set TTY(state) "insert"
 	}
 
@@ -216,19 +217,23 @@ proc TTY_removespace {} {
 
 proc TTY_insert {c} {
 	global TTY
-	if {$TTY(cursor) < [string length $TTY(command)]} {
-		set TTY(index) [expr [string length $TTY(command)] - $TTY(cursor)]
-		append TTY(newcommand) [string range $TTY(command) 0 [expr $TTY(index) -1]]
-		append TTY(newcommand) $c
-		append TTY(newcommand) [string range $TTY(command) $TTY(index) end]	
-		TTY_removespace
- 		set TTY(command) "$TTY(newcommand)"
+	if {$TTY(command) != ""} {
+		if {$TTY(cursor) < [string length $TTY(command)]} {
+			set TTY(index) [expr [string length $TTY(command)] - $TTY(cursor)]
+			append TTY(newcommand) [string range $TTY(command) 0 [expr $TTY(index) -1]]
+			append TTY(newcommand) $c
+			append TTY(newcommand) [string range $TTY(command) $TTY(index) end]	
+			TTY_removespace
+	 		set TTY(command) "$TTY(newcommand)"
+		} else {
+			append TTY(newcommand) $c
+			append TTY(newcommand) $TTY(command)
+			TTY_removespace
+			set TTY(command) "$TTY(newcommand)"
+		}
 	} else {
-		append TTY(newcommand) $c
-		append TTY(newcommand) $TTY(command)
-		TTY_removespace
-		set TTY(command) "$TTY(newcommand)"
-	}
+			TTY_clear
+		}
 	puts -nonewline $TTY(command)
 	set TTY(newcommand) ""
 }
@@ -264,8 +269,8 @@ proc TTY_delete {} {
 		set TTY(index) [expr [string length $TTY(command)] - $TTY(cursor)]
 		if {$TTY(index) > 0} {
 			TTY_clear
-			append TTY(newcommand) [string range $TTY(command) 0 [expr $TTY(index) -1]]
-			append TTY(newcommand) [string range $TTY(command) [expr $TTY(index) + 1] end]
+			append TTY(newcommand) [string range $TTY(command) 0 [expr $TTY(index) -2]]
+			append TTY(newcommand) [string range $TTY(command) [expr $TTY(index)] end]
 			set TTY(command) "$TTY(newcommand)"
 			puts -nonewline $TTY(command)
 			incr TTY(cursor)) -1 
