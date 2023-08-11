@@ -130,6 +130,7 @@ proc TTY_execute {} {
 		set TTY(command) ""
 		puts -nonewline $TTY(prompt)
 		set TTY(cursor) "0"
+		set TTY(pointer) "0"
 		TTY_clear
 		set TTY(state) "insert"
 	}
