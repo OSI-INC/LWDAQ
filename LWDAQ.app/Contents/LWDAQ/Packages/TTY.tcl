@@ -21,7 +21,7 @@
 # Version 1.1 First version.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide TTY 1.2
+package provide TTY 1.3
 
 # Clear the global EDF array if it already exists.
 if {[info exists TTY]} {unset TTY}
@@ -61,7 +61,9 @@ proc TTY_execute {} {
 		if {$c == "\n"} {
 			puts stdout ""
 			set result [uplevel $TTY(command)]
-			lappend TTY(commandlist) $TTY(command)
+			if {$TTY(command) != ""} {
+				lappend TTY(commandlist) $TTY(command)
+			}
 			set TTY(pointer) "0"	
 			set TTY(command) ""
 			set TTY(cursor) "0"
