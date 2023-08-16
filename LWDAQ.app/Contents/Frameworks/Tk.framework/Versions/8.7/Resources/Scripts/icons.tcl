@@ -8,7 +8,7 @@
 #
 #	See http://tango.freedesktop.org/Tango_Desktop_Project
 #
-# Copyright © 2009 Pat Thoyts <patthoyts@users.sourceforge.net>
+# Copyright (c) 2009 Pat Thoyts <patthoyts@users.sourceforge.net>
 
 namespace eval ::tk::icons {}
 

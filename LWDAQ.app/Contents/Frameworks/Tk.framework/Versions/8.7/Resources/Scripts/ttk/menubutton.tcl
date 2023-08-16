@@ -5,7 +5,7 @@
 #
 # Pulldown: Press menubutton, drag over menu, release to activate menu entry
 # Popdown: Click menubutton to post menu
-# Keyboard: <space> or accelerator key to post menu
+# Keyboard: <Key-space> or accelerator key to post menu
 #
 # (In addition, when menu system is active, "dropdown" -- menu posts
 # on mouse-over.  Ttk menubuttons don't implement this).
@@ -19,7 +19,7 @@
 # This won't work for Ttk menubuttons in pulldown mode,
 # since we need to process the final <ButtonRelease> event,
 # and this might be delivered to the menu.  So instead we
-# rely on the passive grab that occurs on <Button> events,
+# rely on the passive grab that occurs on <ButtonPress> events,
 # and transition to popdown mode when the mouse is released
 # or dragged outside the menubutton.
 #
@@ -46,15 +46,15 @@ namespace eval ttk {
 
 bind TMenubutton <Enter>	{ %W instate !disabled {%W state active } }
 bind TMenubutton <Leave>	{ %W state !active }
-bind TMenubutton <space>	{ ttk::menubutton::Popdown %W }
+bind TMenubutton <Key-space> 	{ ttk::menubutton::Popdown %W }
 bind TMenubutton <<Invoke>> 	{ ttk::menubutton::Popdown %W }
 
 if {[tk windowingsystem] eq "x11"} {
-    bind TMenubutton <Button-1>  	{ ttk::menubutton::Pulldown %W }
+    bind TMenubutton <ButtonPress-1>  	{ ttk::menubutton::Pulldown %W }
     bind TMenubutton <ButtonRelease-1>	{ ttk::menubutton::TransferGrab %W }
     bind TMenubutton <B1-Leave> 	{ ttk::menubutton::TransferGrab %W }
 } else {
-    bind TMenubutton <Button-1>  \
+    bind TMenubutton <ButtonPress-1>  \
 	{ %W state pressed ; ttk::menubutton::Popdown %W }
     bind TMenubutton <ButtonRelease-1>  \
 	{ if {[winfo exists %W]} { %W state !pressed } }
@@ -83,8 +83,9 @@ if {[tk windowingsystem] eq "aqua"} {
 	set mw [winfo reqwidth $menu]
 	set bw [winfo width $mb]
 	set dF [expr {[winfo width $mb] - [winfo reqwidth $menu] - $menuPad}]
+	set entry ""
 	set entry [::tk::MenuFindName $menu [$mb cget -text]]
-	if {$entry < 0} {
+	if {$entry eq ""} {
 	    set entry 0
 	}
 	set x [winfo rootx $mb]
@@ -123,15 +124,16 @@ if {[tk windowingsystem] eq "aqua"} {
 	    incr mh 6
 	    incr mw 16
 	}
+	set entry {}
 	set entry [::tk::MenuFindName $menu [$mb cget -text]]
-	if {$entry < 0} {
+	if {$entry eq {}} {
 	    set entry 0
 	}
 	set x [winfo rootx $mb]
 	set y [winfo rooty $mb]
 	switch [$mb cget -direction] {
 	    above {
-		set entry ""
+		set entry {}
 		incr y -$mh
 		# if we go offscreen to the top, show as 'below'
 		if {$y < [winfo vrooty $mb]} {
@@ -140,7 +142,7 @@ if {[tk windowingsystem] eq "aqua"} {
 		}
 	    }
 	    below {
-		set entry ""
+		set entry {}
 		incr y $bh
 		# if we go offscreen to the bottom, show as 'above'
 		if {($y + $mh) > ([winfo vrooty $mb] + [winfo vrootheight $mb])} {
@@ -194,7 +196,7 @@ proc ttk::menubutton::Pulldown {mb} {
     $mb state pressed
     $mb configure -cursor [$menu cget -cursor]
     foreach {x y entry} [PostPosition $mb $menu] { break }
-    if {$entry >= 0} {
+    if {$entry ne {}} {
 	$menu post $x $y $entry
     } else {
 	$menu post $x $y
@@ -222,11 +224,11 @@ proc ttk::menubutton::TransferGrab {mb} {
 # FindMenuEntry --
 #	Hack to support tk_optionMenus.
 #	Returns the index of the menu entry with a matching -label,
-#	"" if not found.
+#	-1 if not found.
 #
 proc ttk::menubutton::FindMenuEntry {menu s} {
     set last [$menu index last]
-    if {$last eq "none" || $last < 0} {
+    if {$last eq "none"} {
 	return ""
     }
     for {set i 0} {$i <= $last} {incr i} {

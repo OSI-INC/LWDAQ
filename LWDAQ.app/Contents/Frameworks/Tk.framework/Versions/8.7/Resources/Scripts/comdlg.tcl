@@ -3,7 +3,7 @@
 #	Some functions needed for the common dialog boxes. Probably need to go
 #	in a different file.
 #
-# Copyright © 1996 Sun Microsystems, Inc.
+# Copyright (c) 1996 Sun Microsystems, Inc.
 #
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -29,8 +29,7 @@
 #    {....}
 # }
 #
-# flags = a list of flags. Currently supported flags are:
-#     DONTSETDEFAULTS = skip default values setting
+# flags = currently unused.
 #
 # argList = The list of  "-option value" pairs.
 #
@@ -64,10 +63,8 @@ proc tclParseConfigSpec {w specs flags argList} {
 
     # 2: set the default values
     #
-    if {"DONTSETDEFAULTS" ni $flags} {
-        foreach cmdsw [array names cmd] {
-	    set data($cmdsw) $def($cmdsw)
-        }
+    foreach cmdsw [array names cmd] {
+	set data($cmdsw) $def($cmdsw)
     }
 
     # 3: parse the argument list

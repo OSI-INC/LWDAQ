@@ -4,9 +4,9 @@
 #	message catalog facility for Tcl programs.  It should be
 #	loaded with the command "package require msgcat".
 #
-# Copyright © 2010-2018 Harald Oehlmann.
-# Copyright © 1998-2000 Ajuba Solutions.
-# Copyright © 1998 Mark Harrison.
+# Copyright (c) 2010-2018 by Harald Oehlmann.
+# Copyright (c) 1998-2000 by Ajuba Solutions.
+# Copyright (c) 1998 by Mark Harrison.
 #
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -15,7 +15,7 @@
 package require Tcl 8.7-
 # When the version number changes, be sure to update the pkgIndex.tcl file,
 # and the installation directory in the Makefiles.
-package provide msgcat 1.7.1
+package provide msgcat 1.7.0
 
 namespace eval msgcat {
     namespace export mc mcn mcexists mcload mclocale mcmax\
@@ -360,19 +360,17 @@ proc msgcat::mclocale {args} {
 
 proc msgcat::mcutil::getpreferences {locale} {
     set locale [string tolower $locale]
-    set result [list {}]
-    set el {}
-    foreach e [split $locale _] {
-	if {$el eq {}} {
-	    set el ${e}
-	} else {
-	    set el ${el}_${e}
-	}
-	if {[string index $el end] != {_}} {
-	    set result [linsert $result 0 $el]
+    set loclist [list $locale]
+    while {-1 !=[set pos [string last "_" $locale]]} {
+	set locale [string range $locale 0 $pos-1]
+	if { "_" ne [string index $locale end] } {
+	    lappend loclist $locale
 	}
     }
-    return $result
+    if {"" ne [lindex $loclist end]} {
+	lappend loclist {}
+    }
+    return $loclist
 }
 
 # msgcat::mcpreferences --

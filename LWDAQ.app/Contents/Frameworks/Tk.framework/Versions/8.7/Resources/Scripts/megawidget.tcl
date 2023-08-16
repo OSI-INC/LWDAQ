@@ -4,13 +4,13 @@
 #	the ::tk::IconList megawdget, which is itself only designed for use in
 #	the Unix file dialogs.
 #
-# Copyright © 2009-2010 Donal K. Fellows
+# Copyright (c) 2009-2010 Donal K. Fellows
 #
 # See the file "license.terms" for information on usage and redistribution of
 # this file, and for a DISCLAIMER OF ALL WARRANTIES.
 #
 
-package require tk
+package require Tk 8.6
 
 ::oo::class create ::tk::Megawidget {
     superclass ::oo::class

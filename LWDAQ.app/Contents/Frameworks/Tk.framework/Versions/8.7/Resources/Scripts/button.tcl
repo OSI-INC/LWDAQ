@@ -4,9 +4,9 @@
 # checkbutton, and radiobutton widgets and provides procedures
 # that help in implementing those bindings.
 #
-# Copyright © 1992-1994 The Regents of the University of California.
-# Copyright © 1994-1996 Sun Microsystems, Inc.
-# Copyright © 2002 ActiveState Corporation.
+# Copyright (c) 1992-1994 The Regents of the University of California.
+# Copyright (c) 1994-1996 Sun Microsystems, Inc.
+# Copyright (c) 2002 ActiveState Corporation.
 #
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
@@ -21,7 +21,7 @@ if {[tk windowingsystem] eq "aqua"} {
     bind Radiobutton <Enter> {
 	tk::ButtonEnter %W
     }
-    bind Radiobutton <Button-1> {
+    bind Radiobutton <1> {
 	tk::ButtonDown %W
     }
     bind Radiobutton <ButtonRelease-1> {
@@ -30,7 +30,7 @@ if {[tk windowingsystem] eq "aqua"} {
     bind Checkbutton <Enter> {
 	tk::ButtonEnter %W
     }
-    bind Checkbutton <Button-1> {
+    bind Checkbutton <1> {
 	tk::ButtonDown %W
     }
     bind Checkbutton <ButtonRelease-1> {
@@ -41,16 +41,16 @@ if {[tk windowingsystem] eq "aqua"} {
     }
 }
 if {"win32" eq [tk windowingsystem]} {
-    bind Checkbutton <=> {
+    bind Checkbutton <equal> {
 	tk::CheckRadioInvoke %W select
     }
-    bind Checkbutton <+> {
+    bind Checkbutton <plus> {
 	tk::CheckRadioInvoke %W select
     }
     bind Checkbutton <minus> {
 	tk::CheckRadioInvoke %W deselect
     }
-    bind Checkbutton <Button-1> {
+    bind Checkbutton <1> {
 	tk::CheckRadioDown %W
     }
     bind Checkbutton <ButtonRelease-1> {
@@ -63,7 +63,7 @@ if {"win32" eq [tk windowingsystem]} {
 	tk::ButtonLeave %W
     }
 
-    bind Radiobutton <Button-1> {
+    bind Radiobutton <1> {
 	tk::CheckRadioDown %W
     }
     bind Radiobutton <ButtonRelease-1> {
@@ -84,10 +84,10 @@ if {"x11" eq [tk windowingsystem]} {
 	    tk::CheckRadioInvoke %W
 	}
     }
-    bind Checkbutton <Button-1> {
+    bind Checkbutton <1> {
 	tk::CheckInvoke %W
     }
-    bind Radiobutton <Button-1> {
+    bind Radiobutton <1> {
 	tk::CheckRadioInvoke %W
     }
     bind Checkbutton <Enter> {
@@ -127,7 +127,7 @@ bind Button <Enter> {
 bind Button <Leave> {
     tk::ButtonLeave %W
 }
-bind Button <Button-1> {
+bind Button <1> {
     tk::ButtonDown %W
 }
 bind Button <ButtonRelease-1> {
