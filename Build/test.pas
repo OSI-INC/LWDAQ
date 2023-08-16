@@ -509,39 +509,35 @@ begin
 	writeln('Testing simplex fitter in ',xsize:1,' dimensions.');
 	good:=true;
 	start_ms:=clock_milliseconds;
-	for j:=1 to xreps do begin
-		simplex:=new_simplex(xsize);
-		with simplex do begin
-			for i:=1 to n do
-				vertices[1,i]:=random_0_to_1*n;
-			sv:=simplex_vertex_copy(vertices[1]);
-			construct_size:=1.0;
-			max_done_counter:=2;
+	simplex:=new_simplex(xsize);
+	with simplex do begin
+		for i:=1 to n do
+			vertices[1,i]:=random_0_to_1*n;
+		sv:=simplex_vertex_copy(vertices[1]);
+	end;
+	simplex_construct(simplex,simplex_error,ptr);
+
+	repeat
+		simplex_step(simplex,simplex_error,ptr);
+	until simplex.done;
+
+	if good then with simplex do begin
+		for i:=1 to n do 
+			if abs(vertices[1,i])>0.001 then 
+				good:=false;
+		if not good then begin
+			writestr(s,'Convergeance failure on iteration ',j:1,'.');
+			print_error(s);
 		end;
-		simplex_construct(simplex,simplex_error,ptr);
-
-		repeat
-			simplex_step(simplex,simplex_error,ptr);
-		until simplex.done
-
-		if good then with simplex do begin
-			for i:=1 to n do 
-				if abs(vertices[1,i])>0.001 then 
-					good:=false;
-			if not good then begin
-				writestr(s,'Convergeance failure on iteration ',j:1,'.');
-				print_error(s);
-			end;
-			if (not good) or (j=xreps) then begin
-				write('Initial: ');
-				for i:=1 to n do
-					write(sv[i]:fsr:fsd,' ');
-				writeln;
-				write('Final:   ');
-				for i:=1 to n do
-					write(simplex.vertices[1,i]:fsr:fsd,' ');
-				writeln;
-			end;
+		if (not good) or (j=xreps) then begin
+			write('Initial: ');
+			for i:=1 to n do
+				write(sv[i]:fsr:fsd,' ');
+			writeln;
+			write('Final:   ');
+			for i:=1 to n do
+				write(simplex.vertices[1,i]:fsr:fsd,' ');
+			writeln;
 		end;
 	end;
 	writeln('Each fit takes ',1.0*(clock_milliseconds-start_ms)/xreps:1:1,' ms.');

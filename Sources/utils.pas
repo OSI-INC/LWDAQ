@@ -377,8 +377,8 @@ type
 		duplicate:array of boolean;
 		start_size:real; {length of sides for construction}
 		end_size:real; {length of longest side for convergeance}
-		restart_cntr:integer; {pop counter}
-		max_restarts:integer; {max number of pops}
+		restart_cntr:integer; {restart counter}
+		max_restarts:integer; {max number of restarts before stop}
 		shrink_factor:real; {coordinate shrinking factor}
 		done:boolean;
 	end;
