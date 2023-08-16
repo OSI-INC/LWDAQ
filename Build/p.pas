@@ -10,7 +10,9 @@ var
 begin
 	for j:=1 to height do begin
 		for i:=1 to width do 
-			if i=j then write('X') else write(' ');
+			if i=j then write('X')
+			 else if (i+j=22) then write ('X')
+			else write(' ');
 		writeln;
 	end;
 end.
