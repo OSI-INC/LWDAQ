@@ -27,7 +27,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.9"
+	LWDAQ_tool_init "OSR8_Assembler" "1.10"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return ""
@@ -41,7 +41,7 @@ proc OSR8_Assembler_init {} {
 	set config(opcode_color) "brown"
 	set config(syntax_color) "green"
 	
-	set config(base_address) "0"
+	set config(base_addr_hex) "0000"
 	set config(bytes_per_line) "30"
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -158,7 +158,8 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	set symbol_list [list]
 	set label_list [list]
 
-	# Eliminate comments and make list of lines.
+	# Eliminate comments, replace commas with spaces, reduce multiple spaces 
+	# with single spaces, and trim all lines.
 	set basm [list]
 	foreach line $asm {
 		set line [regsub {;.*} $line ""]
@@ -166,7 +167,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		set line [regsub -all {([\s]+)} $line { }]
 		set line [string trim $line]
 		lappend basm $line
-	}	
+	}
 	
 	# Go through lines finding instructions.
 	set mem ""
@@ -453,8 +454,9 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	# wherever it appears in the code, or a label with a colon, which counts as
 	# nothing because it's just a marker. But when we come to the marker, we add
 	# it to the symbol list.
-	LWDAQ_print $info(text) "\nAssigning addresses to instruction labels:" purple
-	set addr $config(base_address)
+	set addr [expr 0x$config(base_addr_hex)]
+	LWDAQ_print $info(text) "\nCalculating address labels with base\
+		0x$config(base_addr_hex):" purple
 	set new_mem ""
 	foreach m $mem {
 		if {[regexp -nocase {^[0-9A-F]+$} $m]} {
