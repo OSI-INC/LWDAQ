@@ -48,13 +48,15 @@
 #
 # Version 22: Add the Show Signatures button. Help is direct link to Analyzer page.
 #
+# Version 23: Correct A2025 to A3025.
+#
 
 proc Analyzer_init {} {
 	upvar #0 Analyzer_info info
 	upvar #0 Analyzer_config config
 	global LWDAQ_Info
 	
-	LWDAQ_tool_init "Analyzer" "22"
+	LWDAQ_tool_init "Analyzer" "23"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set info(lines_per_measurement) 18
@@ -1100,7 +1102,7 @@ termination yes
 0  39 0 1.8 0  29 increase_with_0480
 0  39 0 1.8 0  29 increase_with_8280
 
-:A2025A A2025B:
+:A3025A A3025B:
 loopback yes
 termination yes
 0   0 0 0.0 0   0 increase_with_0000

@@ -42,7 +42,7 @@ proc Function_Generator_init {} {
 	set config(filter_r) "0000"
 	set config(filter_c) "0000"
 	set config(input_frequency) 1000
-	set config(min_num_clocks) 32
+	set config(min_num_clocks) 64
 	set config(max_num_clocks) 512
 	set config(setup_delay_ms) 2000
 	set config(min_id) 1
