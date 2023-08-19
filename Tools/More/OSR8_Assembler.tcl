@@ -33,8 +33,10 @@ proc OSR8_Assembler_init {} {
 		return ""
 	}
 	
+	set config(hex_output) "1"
 	set config(ifn) "~/Desktop/Program.asm"
 	set config(ofn) "~/Desktop/Program.mem"
+	set config(ofn_write) "1"
 	set info(ifn_ew) $info(window).iew
 	set info(ofn_ew) $info(window).oew
 	
@@ -511,20 +513,31 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	set mem $new_mem
 	LWDAQ_print $info(text) "Resolved $counter address labels." purple
 	
-	# Go through the object code and write bytes to object file.
-	LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
-	LWDAQ_print $info(text) "Machine code bytes written to object file:" purple
-	set f [open $config(ofn) w]
+	# Go through the object code and write bytes to object file if enabled,
+	# and always to the text window. The format is either hex bytes or decimal
+	# bytes, as selected by user.
+	if {$config(ofn_write)} {
+		LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
+		set f [open $config(ofn) w]
+	}
+	if {$config(hex_output)} {
+		LWDAQ_print $info(text) "Machine code bytes in hexadecimal format:" purple
+	} else {
+		LWDAQ_print $info(text) "Machine code bytes in decimal format:" purple
+	}
 	set index 0
 	foreach m $mem {
-		puts $f $m
+		if {!$config(hex_output)} {set m [expr 0x$m]}
+		if {$config(ofn_write)} {puts $f $m}
 		incr index
 		LWDAQ_print -nonewline $info(text) "$m "
 		if {$index % $config(bytes_per_line) == 0} {LWDAQ_print $info(text)}
 	}
-	close $f
 	if {$index % $config(bytes_per_line) != 0} {LWDAQ_print $info(text)}
-	LWDAQ_print $info(text) "Wrote [llength $mem] hex bytes to object file." purple
+	if {$config(ofn_write)} {
+		close $f
+		LWDAQ_print $info(text) "Wrote [llength $mem] bytes to object file." purple	
+	}
 	
 	LWDAQ_print $info(text) "Done.\n" purple
 	return $mem
@@ -665,6 +678,11 @@ proc OSR8_Assembler_open {} {
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
 	}
+	
+	checkbutton $f.hex -variable OSR8_Assembler_config(hex_output) -text "Hex Output"
+	pack $f.hex -side left -expand 1
+	checkbutton $f.fileout -variable OSR8_Assembler_config(ofn_write) -text "Write File"
+	pack $f.fileout -side left -expand 1
 
 	foreach {a b} {ifn Input ofn Output} {
 		set f $w.[set a]
