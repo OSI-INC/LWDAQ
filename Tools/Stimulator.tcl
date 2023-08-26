@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.1"
+	LWDAQ_tool_init "Stimulator" "3.2"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -44,7 +44,6 @@ proc Stimulator_init {} {
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
 	set config(checksum_preload) "1111111111111111"
-	set config(commands) "255 255 1 5 1 71 0 12 205 0 10 0"
 	
 	set config(xon_color) "red"
 	set config(xtimeout_color) "orange"
@@ -64,13 +63,22 @@ proc Stimulator_init {} {
 	set config(bempty) "2.2"
 
 	set config(ack_enable) "1"
+	set config(verbose) "1"
 	set info(id_at) "0"
 	set info(ack_at) "1"
 	set info(batt_at) "2"
 	set info(sync_at) "3"
 	set config(default_ver) "A3041"
-	set config(default_id) "ABCD"
+	set config(default_id) "1234"
+	set config(multicast_id) "FFFF"
 	set config(default_current)	"8"
+	
+	set config(tp_n) "1"
+	set config(tp_commands) "1 5 1 71 0 12 205 0 10 0"
+	set config(tp_program) "~/Desktop/user.asm"
+	set config(tp_base) "0x0C00"
+	set info(tp_ew) $info(window).tpew
+
 	set info(op_stim_stop) "0"
 	set info(op_stim_start) "1"
 	set info(op_xmit) "2"
@@ -78,6 +86,8 @@ proc Stimulator_init {} {
 	set info(op_battery) "4"
 	set info(op_identify) "5"
 	set info(op_setpcn) "6"
+	set info(op_upload) "7"
+	set info(op_progen) "8"
 	set info(ack_stim_stop) "16"
 	set info(ack_stim_start) "17"
 	set info(ack_xon) "18"
@@ -86,6 +96,8 @@ proc Stimulator_init {} {
 	set info(ack_battery) "21"
 	set info(ack_identify) "22"
 	set info(ack_setpcn) "23"
+	set info(ack_upload) "24"
+	set info(ack_progen) "25"
 	
 	set info(state) "Idle"
 	set info(monitor_interval_ms) "100"
@@ -103,27 +115,42 @@ proc Stimulator_init {} {
 }
 
 #
-# Stimulator_transmit takes a string of command bytes and transmits them through a
-# Command Transmitter such as the A3029A. The routine appends a sixteen-bit
-# checksum. The checksum is the two bytes necessary to return a sixteen-bit
-# linear feedback shift register to all zeros, thus performing a sixteen-bit
-# cyclic redundancy check. We assume the destination shift register is preloaded
-# with the checksum_preload value. The shift register has taps at locations 16,
-# 14, 13, and 11.
+# Stimulator_transmit takes a device identifier and a list of command bytes and
+# transmits them through a Command Transmitter such as the A3029A. The device
+# identifier must be a four-digit hex value. The bytes must be decimal values
+# 0..255. The routine appends a sixteen-bit checksum. The checksum is the two
+# bytes necessary to return a sixteen-bit linear feedback shift register to all
+# zeros, thus performing a sixteen-bit cyclic redundancy check. We assume the
+# destination shift register is preloaded with the checksum_preload value. The
+# shift register has taps at locations 16, 14, 13, and 11. When the verbose flag
+# is set, the routine prints the identifier, the commands, and the checksum at
+# the end. The identifier and checksum are given as four-digit hex strings. The
+# other bytes are decimal numbers 0..255.
 #
-proc Stimulator_transmit {{commands ""}} {
+proc Stimulator_transmit {id commands} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 	global LWDAQ_Driver
 	
-	# If we specify no commands, use those in the commands parameter.
-	if {$commands == ""} {
-		set commands $config(commands)
+	# Take the four-digit hex code for an identifier, or a wild card character,
+	# and returns two decimal numbers giving the decimal values of the two bytes
+	# that make up either the specific identifier or the wild card identifier.
+	set id [string trim $id]
+	if {$id == "*"} {set id $config(multicast_id)}
+	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
+		set commands "[expr 0x$b1] [expr 0x$b2] $commands"
+	} else {
+		LWDAQ_print $info(text) "ERROR: Bad device identifier \"$id\", using 0x000."
+		set id "0000"
+		set commands "0 0 $commands"
 	}
-
+	
 	# Print the commands to the text window.
-	LWDAQ_print $info(text) "Transmitting: $commands"
-
+	if {$config(verbose)} {
+		LWDAQ_print -nonewline $info(text) "0x[format %4s $id] " green
+		LWDAQ_print -nonewline $info(text) $commands
+	}
+	
 	# Append a two-byte checksum.
 	set checksum $config(checksum_preload)
 	foreach c "$commands 0 0" {
@@ -141,6 +168,9 @@ proc Stimulator_transmit {{commands ""}} {
 			set checksum $new
 			binary scan [binary format b16 $checksum] cu1cu1 d21 d22
 		}
+	}
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) " 0x[format %04X [expr $d22*255+$d21]]"
 	}
 	append commands " $d22 $d21"
 		
@@ -166,7 +196,7 @@ proc Stimulator_transmit {{commands ""}} {
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]"
+		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]\."
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		return ""
 	}
@@ -177,43 +207,19 @@ proc Stimulator_transmit {{commands ""}} {
 	return ""
 }
 
-#
-# Stimulator_id_bytes returns a list of two bytes as decimal numbers that represent
-# the identifier of the implant.
-#
-proc Stimulator_id_bytes {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
-
-	set id [string trim $info(dev$n\_id)]
-	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
-		return "[expr 0x$b1] [expr 0x$b2]"
-	} elseif {$id == "*"} {
-		return "255 255"
-	} else {
-		LWDAQ_print $info(text) "ERROR: Bad device identifier \"$id\",\
-			defaulting to null identifier."
-		return "0 0"
-	}
-}
-
 # 
 # Stimulator_start_cmd generates a list of bytes to transmit to the device so as
-# to select, configure, and stimulate it according to the parameters in the
-# Stimulator window. It appends a two-byte checksum, which is necessary for the
-# device to accept the command. Each byte is expressed in the return string as a
-# decimal number between 0 and 255.
+# to configure and stimulate it according to the parameters in the Stimulator
+# window. It appends a two-byte checksum, which is necessary for the device to
+# accept the command. Each byte is expressed in the return string as a decimal
+# number between 0 and 255.
 #
 proc Stimulator_start_cmd {n} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
-	# Start by transmitting the two-byte device id, which should be expressed in
-	# the ID field by four hex digits. If the id is set to "*" we transmit FFFF 
-	# for "select all".
-	set commands [Stimulator_id_bytes $n]
-
 	# Append the stimulus start command.
+	set commands [list]
 	lappend commands $info(op_stim_start)
 	
 	# Append the current.
@@ -270,8 +276,8 @@ proc Stimulator_start_cmd {n} {
 	}
 	
 	# We return the command string, which does not yet have the checksum
-	# attached to the end, but is otherwise a sequence of operation codes
-	# and parameter values.
+	# attached to the end, nor the device id bytes at the beginning, but is
+	# otherwise a sequence of operation codes and parameter values.
 	return $commands
 }
 
@@ -307,7 +313,7 @@ proc Stimulator_start {n} {
 	}
 	
 	# Transmit the commands.
-	Stimulator_transmit [Stimulator_start_cmd $n]
+	Stimulator_transmit $info(dev$n\_id) [Stimulator_start_cmd $n]
 
 	# Set state variables.
 	LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
@@ -328,10 +334,8 @@ proc Stimulator_stop {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Select the device and specify a primary channel number for acknowledgement.
-	set commands [Stimulator_id_bytes $n]
-
 	# Send the stimulus stop command, which is just a zero.
+	set commands [list]
 	lappend commands $info(op_stim_stop)
 	
 	# If we want an acknowledgement, specify a primary channel number and
@@ -340,7 +344,9 @@ proc Stimulator_stop {n} {
 		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 		lappend commands $info(op_ack) $info(ack_stim_stop)
 	}
-	Stimulator_transmit $commands
+	
+	# Transmit the commands.
+	Stimulator_transmit $info(dev$n\_id) $commands
 	
 	# Reset the stimulus end time
 	set info(dev$n\_end) 0
@@ -366,7 +372,7 @@ proc Stimulator_xon {n} {
 	set info(state) "Command"
 
 	# Select the device and specify a primary channel number for transmission.
-	set commands [Stimulator_id_bytes $n]
+	set commands [list]
 	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 
 	# Send the Xon command with transmit period. 
@@ -379,7 +385,7 @@ proc Stimulator_xon {n} {
 	}
 	
 	# Transmit the command.
-	Stimulator_transmit $commands
+	Stimulator_transmit $info(dev$n\_id) $commands
 
 	# Set state variables.
 	LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
@@ -399,10 +405,8 @@ proc Stimulator_xoff {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Select device and specify primary channel number.
-	set commands [Stimulator_id_bytes $n]
-	
 	# Send the Xoff command, which is a transmit command with zero period.
+	set commands [list]
 	lappend commands $info(op_xmit) 0
 	
 	# If we want an acknowledgement, specify a primary channel number and
@@ -411,7 +415,9 @@ proc Stimulator_xoff {n} {
 		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 		lappend commands $info(op_ack) $info(ack_xoff)
 	}
-	Stimulator_transmit $commands
+	
+	# Transmit the commands.
+	Stimulator_transmit $info(dev$n\_id) $commands
 
 	# Set state variables.
 	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
@@ -433,7 +439,7 @@ proc Stimulator_battery {n} {
 
 	# Select the device and specify a primary channel number for the
 	# battery report to use.
-	set commands [Stimulator_id_bytes $n]
+	set commands [list]
 	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 
 	# Send battery measurement request.
@@ -445,7 +451,7 @@ proc Stimulator_battery {n} {
 	}
 	
 	# Transmit commands.
-	Stimulator_transmit $commands
+	Stimulator_transmit $info(dev$n\_id) $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -455,7 +461,8 @@ proc Stimulator_battery {n} {
 
 #
 # Stimulator_identify requests a identifying messages from all devices. It uses
-# the data acquisition configuration of the first device in our list.
+# the data acquisition configuration of the first device in our list, but applies
+# the multicast identifier to reach all devices.
 #
 proc Stimulator_identify {} {
 	upvar #0 Stimulator_config config
@@ -469,17 +476,15 @@ proc Stimulator_identify {} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Provide the multicast address.
-	set commands "255 255"
-	
 	# Add the idenfity command.
+	set commands [list]	
 	lappend commands $info(op_identify)
 	
 	# Report to user.
 	LWDAQ_print $info(text) "Sending identification command."
 
-	# Transmit commands.
-	Stimulator_transmit $commands
+	# Transmit commands to multicast address.
+	Stimulator_transmit $config(multicast_id) $commands
 	
 	# Set state variables.
 	set info(state) "Idle"
@@ -696,14 +701,13 @@ proc Stimulator_draw_list {} {
 			set info(dev$n\_end) "0"
 		}
 
-		set g $f.dev$n
-		frame $g -relief sunken -bd 2
-		pack $g -side top -fill x
-
-		set ff $g.a
-		frame $ff
+		set ff $f.dev$n
+		frame $ff -relief sunken -bd 2
 		pack $ff -side top -fill x
 		
+		label $ff.n -text "$n" -width 3
+		pack $ff.n -side left -expand 1
+
 		entry $ff.id -textvariable Stimulator_info(dev$n\_id) -width 5
 		pack $ff.id -side left -expand 1
 		set info(dev$n\_state) $ff.id
@@ -768,7 +772,7 @@ proc Stimulator_ask_remove {n} {
 	
 	# Exit if the stimulator does not exist.
 	if {$index < 0} {
-		LWDAQ_print $info(text) "ERROR: No stimulator with list index $n."
+		LWDAQ_print $info(text) "ERROR: No stimulator with list index $n\."
 		return ""
 	}
 	
@@ -806,7 +810,7 @@ proc Stimulator_remove {n} {
 
 	# Exit if the stimulator does not exist.
 	if {$index < 0} {
-		LWDAQ_print $info(text) "ERROR: No stimulator with list index $n."
+		LWDAQ_print $info(text) "ERROR: No stimulator with list index $n\."
 		return ""
 	}
 	
@@ -926,7 +930,7 @@ proc Stimulator_load_list {{fn ""}} {
 			set info(dev$n\_battery) "?"
 		}
 	} error_message]} {
-		LWDAQ_print $info(text) "ERROR: $error_message."
+		LWDAQ_print $info(text) "ERROR: $error_message\."
 		return
 	}
 	
@@ -937,9 +941,9 @@ proc Stimulator_load_list {{fn ""}} {
 }
 
 #
-# Stimulator_rename_device changes the device name from
-# one value to another, overwriting any pre-existing device of the
-# new name, and deleging the device under the old name.
+# Stimulator_rename_device changes the device name from one value to another,
+# overwriting any pre-existing device of the new name, and deleging the device
+# under the old name.
 #
 proc Stimulator_rename_device {n m} {
 	upvar #0 Stimulator_config config
@@ -993,9 +997,16 @@ proc Stimulator_refresh_list {{fn ""}} {
 }
 
 #
-# Stimulator_transmit_panel opens a new window and provides a button for transmitting 
-# a string of command bytes, each expressed as a decimal value 0..255, to a
-# particular socket on the driver specified in the main window.
+# Stimulator_transmit_panel opens a new window that allows the user to transmit
+# specific commands to a particular device, to assemble and upload user
+# programs, and enable user programs. The transmit panel uses the driver address
+# and socket specified in the Stimulator window, but it uses its own device
+# identifier, which can be set to the wild card FFFF or a specific four-digit
+# hex identifier. Command bytes can be specified either as a two-digit hex value
+# using the 0x prefix, or a decimal value 0..255 with no prefix. User programs
+# are read from a file. The transmit panel loads the OSR8 assembler package and
+# uses it to generate the machine code bytes that it will upload to the
+# stimulator.
 #
 proc Stimulator_transmit_panel {} {
 	upvar #0 Stimulator_config config
@@ -1008,25 +1019,188 @@ proc Stimulator_transmit_panel {} {
 		return ""
 	}
 	toplevel $w
-	wm title $w "Stimulator $info(version) Transmit Command Panel"
+	wm title $w "Stimulator $info(version) Transmit Panel"
+	
+	# If the OSR8 Assembler tool routines are not available, run the OSR8 Assembler
+	# tool with no graphics.
+	if {[info commands OSR8_Assembler_*] == ""} {
+		upvar #0 OSR8_Assembler_info ainfo
+		LWDAQ_run_tool OSR8_Assembler
+		destroy $ainfo(window)
+		if {[info commands OSR8_Assembler_assemble] == ""} {
+			LWDAQ_print $info(text) "ERROR: Failed to open OSR8 Assembler tool."
+		} else {
+			LWDAQ_print $info(text) "Loaded OSR8 Assembler routines.\
+				Open OSR8 Assembler Tool for assembly details."
+		}
+	}
 
-	set f [frame $w.tx]
+	set f [frame $w.id]
+	pack $f -side top -fill x
+	
+	label $f.nl -text "Device Number:"
+	entry $f.ne -textvariable Stimulator_config(tp_n) -width 3
+	pack $f.nl $f.ne -side left -expand yes
+
+	label $f.bl -text "Program Base Address:"
+	entry $f.be -textvariable Stimulator_config(tp_base) -width 8
+	pack $f.bl $f.be -side left -expand yes
+
+	set f [frame $w.controls]
 	pack $f -side top -fill x
 
-	button $f.transmit -text "Transmit" -command {
-		LWDAQ_post "Stimulator_transmit"
-	}
-	pack $f.transmit -side left -expand yes
-	
 	label $f.lcommands -text "Commands:" -fg $config(label_color)
 	entry $f.commands -textvariable Stimulator_config(commands) -width 50
 	pack $f.lcommands $f.commands -side left -expand yes
 
+	button $f.transmit -text "Transmit" \
+		-command "LWDAQ_post Stimulator_tp_transmit"
+	pack $f.transmit -side left -expand yes
+		
+	set f [frame $w.upload]
+	pack $f -side top -fill x
+	
+	label $f.lprogram -text "Program:" -fg $config(label_color)
+	entry $f.eprogram -textvariable Stimulator_config(tp_program) -width 50
+	pack $f.lprogram $f.eprogram -side left -expand yes
+
+	button $f.edit -text "Edit" -command "LWDAQ_post Stimulator_tp_edit"
+	pack $f.edit -side left -expand yes
+	
+	button $f.run -text "Run" -command "LWDAQ_post Stimulator_tp_run"
+	pack $f.run -side left -expand yes
+	
+	button $f.halt -text "Halt" -command "LWDAQ_post Stimulator_tp_halt"
+	pack $f.halt -side left -expand yes
+	
 	return "" 
 }
 
 #
-# Opens the tool window and makes all its controls.
+# Stimulator_tp_edit opens the assembler program in an editor window.
+#
+proc Stimulator_tp_edit {} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+
+	if {[winfo exists $info(tp_ew)]} {
+		raise $info(tp_ew)
+	} else {
+		set info(tp_ew) [LWDAQ_edit_script Open $config(tp_program)]
+	}
+	return $info(tp_ew)
+}
+
+#
+# Stimulator_tp_transmit transmits the commands listed in the transmit
+# panel.
+#
+proc Stimulator_tp_transmit {} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+
+	# Get device number and initialize command list.
+	set n $config(tp_n)
+	set commands [list]
+	
+	# Append all the commands in the transmit list, converting hex values
+	# to decimal values as we go.
+	foreach cmd $config(commands) {lappend commands [expr $cmd]}
+	
+	# Transmit the commands. We don't ask for an acknowledgement because
+	# we want the transmit to consist only of commands entered by the user.
+	Stimulator_transmit $info(dev$n\_id) $commands
+}
+
+#
+# Stimulator_tp_run enables execution of user code on the target device
+# by starting synch transmission at the program frequency and sending the 
+# enable command.
+#
+proc Stimulator_tp_run {} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+	upvar #0 OSR8_Assembler_config aconfig
+	upvar #0 OSR8_Assembler_info ainfo
+	
+	# Get device number and initialize command list.
+	set n $config(tp_n)
+	set commands [list]
+	
+	# Set the device primary channel number.
+	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
+
+	# Send Xon command with transmit period. The program will run every time
+	# the device transmits a message.
+	lappend commands $info(op_xmit) \
+		[expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
+
+	# Read program from file.
+	if {[file exists $config(tp_program)]} {
+		LWDAQ_print $info(text) "Reading and assembling program in $config(tp_program)."
+		set f [open $config(tp_program)]
+		set program [read $f]
+		close $f
+	} else {
+		LWDAQ_print $info(text) "ERROR: Cannot find file \"$config(tp_program)\"."
+		return ""
+	} 
+	
+	# Assemble program, reporting errors to text window.
+	if {[catch {
+		set aconfig(hex_output) 0
+		set aconfig(ofn_write) 0
+		set aconfig(base_addr) $config(tp_base)
+		set prog [OSR8_Assembler_assemble $program]
+	} error_message]} {
+		LWDAQ_print $info(text) "ERROR: $error_message\."
+		return ""
+	}
+	LWDAQ_print $info(text) "Assembly successful, uploading [llength $prog] code bytes."	
+
+	# Add upload command and the number of program bytes.
+	lappend commands $info(op_upload) [llength $prog]
+	
+	# Add all the program bytes.
+	set commands [concat $commands $prog]
+	
+	# Send program enable command.
+	lappend commands $info(op_progen) "1"
+	
+	# If we want acknowledgements, ask for one.
+	if {$config(ack_enable)} {
+		lappend commands $info(op_ack) $info(ack_progen)
+	}
+	
+	# Transmit the commands.
+	Stimulator_transmit $info(dev$n\_id) $commands
+}
+
+#
+# Stimulator_tp_halt disables execution of user code on the target device.
+#
+proc Stimulator_tp_halt {} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+
+	# Get device number and initialize command list.
+	set n $config(tp_n)
+	set commands [list]
+	
+	# Send the program disable command.	
+	lappend commands $info(op_progen) "0"
+
+	# If we want acknowledgements, ask for one.
+	if {$config(ack_enable)} {
+		lappend commands $info(op_ack) $info(ack_progen)
+	}
+	
+	# Transmit the commands.
+	Stimulator_transmit $info(dev$n\_id) $commands
+}
+
+#
+# Stimulator_open opens the tool window and makes all its controls.
 #
 proc Stimulator_open {} {
 	upvar #0 Stimulator_config config
@@ -1067,6 +1241,9 @@ proc Stimulator_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
+	checkbutton $f.verbose -variable Stimulator_config(verbose) -text "Verbose"
+	pack $f.verbose -side left -expand 1
+	
 	set f $w.list
 	frame $f
 	pack $f -side top -fill x
@@ -1077,7 +1254,7 @@ proc Stimulator_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	foreach a {Add_Device Save_List Load_List Refresh_List Identify TxCmd} {
+	foreach a {Add_Device Save_List Load_List Refresh_List Identify} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Stimulator_$b"
 		pack $f.$b -side left -expand 1

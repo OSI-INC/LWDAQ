@@ -44,29 +44,34 @@ proc LWDAQ_read_script {fn} {
 # LWDAQ_run_tool runs a tool script. It takes two optional parameters: the tool
 # name and the mode in which the tool is to run. If pass no paramters, these two
 # default to an empty string and "Communal" mode. With an empty string for the
-# tool name, the routine opens a browser and asks the user to select a file. It
-# deduces the tool name from the file name and runs the tool. If we pass it a
-# tool name, the routine looks for the tool script in Tools, Tools/More,
-# Tools/Spawn, the default directory, and the working directory in that order.
-# The routine deduces the tool name from the root of the file name. Once we have
-# the tool name and its script file name, we prepare to run the tool. The mode
-# can have one of three possible values: Standalone, Slave, or Communal. If the
-# mode is "Standalone" or "Slave", the routine deletes the Instrument and Tool
-# menus. If the mode is Communal, the routine leaves these menus intact. When
-# the tool starts up in Standalone of Slave mode, it should take over the main
-# window for its own interface and delete the usual Quit button. When the tool
-# starts up communal, it should create a new toplevel window for its interface.
-# In Slave mode, the tool should set itself up to receive commands through stdin
-# from its master, and send output through stdout. In Standalone mode, the tool
-# should operate independent of stdin and stdout.
+# tool name, when we are running with graphics, the routine opens a browser and
+# asks the user to select a file. The routine deduces the tool name from the
+# file name and runs the tool. If we pass it a tool name, the routine looks for
+# the tool script in Tools, Tools/More, Tools/Spawn, the default directory, and
+# the working directory in that order. The routine deduces the tool name from
+# the root of the file name. Once we have the tool name and its script file
+# name, we prepare to run the tool. The mode can have one of three possible
+# values: Standalone, Slave, or Communal. If the mode is "Standalone" or
+# "Slave", the routine deletes the Instrument and Tool menus. If the mode is
+# Communal, the routine leaves these menus intact. When the tool starts up in
+# Standalone of Slave mode, it should take over the main window for its own
+# interface and delete the usual Quit button. When the tool starts up communal,
+# it should create a new toplevel window for its interface. In Slave mode, the
+# tool should set itself up to receive commands through stdin from its master,
+# and send output through stdout. In Standalone mode, the tool should operate
+# independent of stdin and stdout.
 #
 proc LWDAQ_run_tool {{tool ""} {mode "Communal"}} {
 	global LWDAQ_Info
 
 	if {$tool == ""} {
 		# Browse for the tool file.
-		set fn [LWDAQ_get_file_name]
-		if {$fn == ""} {return "FAIL"}
+		if {$LWDAQ_Info(gui_enabled)} {
+			set fn [LWDAQ_get_file_name]
+			if {$fn == ""} {return ""}
+		} else {
+			error "No tool name given."
+		}
 	} else {
 		# Search for the tool file. The tool name may already contain the tcl 
 		# extension, and the tool name may include a file path. We strip off
@@ -210,6 +215,8 @@ proc LWDAQ_tool_init {name version} {
 	# in the case of the standalone the main window for the tool will be a frame
 	# inside the root window, rather than its own top-level window.
 	set info(window) [string tolower .$name]
+	
+	# If we are running with graphics, the tool will have its own text widget.
 	set info(text) $info(window).text
 
 	# Fill in elements common to all tools in all modes.

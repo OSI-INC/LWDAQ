@@ -43,7 +43,7 @@ proc OSR8_Assembler_init {} {
 	set config(opcode_color) "brown"
 	set config(syntax_color) "green"
 	
-	set config(base_addr_hex) "0000"
+	set config(base_addr) "0x0000"
 	set config(bytes_per_line) "30"
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -116,6 +116,14 @@ proc OSR8_Assembler_instructions {} {
 	return ""
 }
 
+proc OSR8_Assembler_error {message} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
+
+	LWDAQ_print $info(text) "ERROR: $message\."
+	error $message
+}
+
 proc OSR8_Assembler_find_symbol {line} {
 	upvar #0 OSR8_Assembler_config config
 	upvar #0 OSR8_Assembler_info info
@@ -126,7 +134,7 @@ proc OSR8_Assembler_find_symbol {line} {
 		} elseif {[regexp {^[0-9]+$} $value]} {
 			set value $value
 		} else {
-			return "ERROR: Bad value \"$value\" for \"$symbol\""
+			OSR8_Assembler_error "Bad value \"$value\" for \"$symbol\""
 		}
 		return [list $symbol $value]
 	} else {
@@ -147,8 +155,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			close $f
 			LWDAQ_print $info(text) "Read [llength $asm] lines of assembler code." purple
 		} else {
-			LWDAQ_print $info(text) "ERROR: Cannot find $config(ifn)."
-			return ""
+			OSR8_Assembler_error "Cannot find $config(ifn)."
 		}
 	} else {
 		LWDAQ_print $info(text) "Received assembler code from input string." purple
@@ -413,16 +420,12 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		
 		# See if this is a symbol definition line.
 		set sym_val [OSR8_Assembler_find_symbol $line] 
-		if {[LWDAQ_is_error_result $sym_val]} {
-			LWDAQ_print $info(text) "$sym_val at line $line_index\:\n$line"
-			return ""
-		} elseif {$sym_val != ""} {
+		if {$sym_val != ""} {
 			set sym [lindex $sym_val 0]
 			set val [lindex $sym_val 1]
 			if {[lsearch -index 0 $symbol_list $sym] >= 0} {
-				LWDAQ_print $info(text) "ERROR: Symbol \"$sym\" already defined\
+				OSR8_Assembler_error "Symbol \"$sym\" already defined\
 					at line $line_index\:\n$line"
-				return ""
 			}
 			set match 1
 			lappend symbol_list $sym_val
@@ -444,9 +447,8 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		
 		# Any other characters are an error.
 		if {[regexp {\w+} $line dummy]} {
-			LWDAQ_print $info(text) "ERROR: Unrecognised pneumoic\
-				at line $line_index\:\n$line"
-			return ""
+			OSR8_Assembler_error "Unrecognised pneumoic\
+				at line $line_index\: \"$line\""
 		}
 	}
 	
@@ -456,9 +458,9 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	# wherever it appears in the code, or a label with a colon, which counts as
 	# nothing because it's just a marker. But when we come to the marker, we add
 	# it to the symbol list.
-	set addr [expr 0x$config(base_addr_hex)]
-	LWDAQ_print $info(text) "\nCalculating address labels with base\
-		0x$config(base_addr_hex):" purple
+	set addr [expr $config(base_addr)]
+	LWDAQ_print $info(text) "Resolving address labels,\
+		base address $config(base_addr):" purple
 	set new_mem ""
 	foreach m $mem {
 		if {[regexp -nocase {^[0-9A-F]+$} $m]} {
@@ -470,22 +472,18 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			lappend new_mem $m
 		} elseif {[regexp {^(\w+):$} $m dummy lbl]} {
 			if {[lsearch -index 0 $label_list $lbl] >= 0} {
-				LWDAQ_print $info(text) "ERROR: Label \"$lbl\"\ defined more than once."
-				return ""
+				OSR8_Assembler_error "Label \"$lbl\"\ defined more than once."
 			}
 			set val "[format %02X [expr $addr / 256]] [format %02X [expr $addr % 256]] "
 			lappend label_list [list $lbl $val]	
 			LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
 		} else {
-			LWDAQ_print $info(text) "ERROR: Bad label \"$m\" in object code."
-			return ""
+			OSR8_Assembler_error "Bad label \"$m\" in object code."
 		}
 	}
 	set mem $new_mem
-	LWDAQ_print $info(text) "Assigned addresses to [llength $label_list] labels." purple
 	
 	# Replace labels with their address values.
-	LWDAQ_print $info(text) "Resolving address labels in object code." purple
 	set new_mem ""
 	set counter 0
 	foreach m $mem {
@@ -504,30 +502,30 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			}
 		}
 		if {!$found_label} {
-			LWDAQ_print $info(text) "ERROR: Undefined label \"$m\"."
-			return ""
+			OSR8_Assembler_error "Undefined label \"$m\"."
 		} else {
 			incr counter
 		}
 	}
 	set mem $new_mem
-	LWDAQ_print $info(text) "Resolved $counter address labels." purple
 	
 	# Go through the object code and write bytes to object file if enabled,
 	# and always to the text window. The format is either hex bytes or decimal
 	# bytes, as selected by user.
 	if {$config(ofn_write)} {
-		LWDAQ_print $info(text) "Opening object file $config(ofn)." purple
+		LWDAQ_print $info(text) "Opening output file $config(ofn)." purple
 		set f [open $config(ofn) w]
 	}
 	if {$config(hex_output)} {
-		LWDAQ_print $info(text) "Machine code bytes in hexadecimal format:" purple
+		LWDAQ_print $info(text) "Code bytes in hex format:" purple
 	} else {
-		LWDAQ_print $info(text) "Machine code bytes in decimal format:" purple
+		LWDAQ_print $info(text) "Code bytes in decimal format:" purple
+		set newmem [list]
+		foreach m $mem {lappend newmem [expr 0x$m]}
+		set mem $newmem
 	}
 	set index 0
 	foreach m $mem {
-		if {!$config(hex_output)} {set m [expr 0x$m]}
 		if {$config(ofn_write)} {puts $f $m}
 		incr index
 		LWDAQ_print -nonewline $info(text) "$m "
@@ -536,10 +534,13 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	if {$index % $config(bytes_per_line) != 0} {LWDAQ_print $info(text)}
 	if {$config(ofn_write)} {
 		close $f
-		LWDAQ_print $info(text) "Wrote [llength $mem] bytes to object file." purple	
+		LWDAQ_print $info(text) "Generated [llength $mem] code bytes,\
+			printed to screen, saved to \"$config(ofn)\"." purple	
+	} else {
+		LWDAQ_print $info(text) "Generated [llength $mem] code bytes,\
+			printed to screen, not saved to disk." purple	
 	}
 	
-	LWDAQ_print $info(text) "Done.\n" purple
 	return $mem
 }
 
@@ -556,8 +557,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 			close $f
 			LWDAQ_print $info(text) "Read [llength $mem] instruction bytes." purple
 		} else {
-			LWDAQ_print $info(text) "ERROR: Cannot find file $config(ofn)."
-			return ""
+			OSR8_Assembler_error "Cannot find file $config(ofn)"
 		}
 	} else {
 		LWDAQ_print $info(text) "Received object code from input string." purple
@@ -585,9 +585,8 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 				
 				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 1]]} {
 					if {$index >= [llength $mem] - 2} {
-						LWDAQ_print $info(text) "ERROR: Missing operand bytes for\
-							final instruction $prototype\."
-						break
+						OSR8_Assembler_error "Missing operand bytes for\
+							final instruction $prototype"
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					set n2 [lindex $mem [expr $index + 2]]
@@ -596,9 +595,8 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 					append bytes " $n1 $n2"
 				} elseif {[regexp -nocase {^n$} [lindex $prototype 1]]} {
 					if {$index >= [llength $mem] - 1} {
-						LWDAQ_print $info(text) "ERROR: Missing operand bytes for\
-							final instruction $prototype\."
-						break
+						OSR8_Assembler_error "Missing operand bytes for\
+							final instruction $prototype"
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					lset prototype 1 [regsub {n} [lindex $prototype 1] \
@@ -612,9 +610,8 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 				
 				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 2]]} {
 					if {$index >= [llength $mem] - 2} {
-						LWDAQ_print $info(text) "ERROR: Missing operand bytes for\
-							final instruction $prototype\."
-						break
+						OSR8_Assembler_error "Missing operand bytes\
+							for final instruction $prototype"
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					set n2 [lindex $mem [expr $index + 2]]
@@ -623,8 +620,8 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 					append bytes " $n1 $n2"
 				} elseif {[regexp -nocase {^n$} [lindex $prototype 2]]} {
 					if {$index >= [llength $mem] - 1} {
-						LWDAQ_print $info(text) "ERROR: Missing operand bytes for\
-							final instruction $prototype\."
+						OSR8_Assembler_error "Missing operand bytes\
+							for final instruction $prototype"
 						break
 					}
 					set n1 [lindex $mem [expr $index + 1]]
@@ -638,8 +635,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 		}
 
 		if {!$match} {
-			LWDAQ_print $info(text) "ERROR: Unrecognized opcode \"$byte\"."
-			break
+			OSR8_Assembler_error "Unrecognized opcode \"$byte\""
 		} else {
 			LWDAQ_print -nonewline $info(text) "0x[format %04X $index]: "
 			LWDAQ_print -nonewline $info(text) \
@@ -650,15 +646,14 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 		
 		set index [expr $index + [llength $bytes]]
 	}	
-	
-	LWDAQ_print $info(text) "Done.\n" purple
+
 	return ""
 }
 
 proc OSR8_Assembler_open {} {
 	upvar #0 OSR8_Assembler_config config
 	upvar #0 OSR8_Assembler_info info
-
+	
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}
 	
@@ -668,7 +663,7 @@ proc OSR8_Assembler_open {} {
 	
 	foreach a {Assemble Disassemble Instructions} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post OSR8_Assembler_$b"
+		button $f.$b -text $a -command [list LWDAQ_post "catch OSR8_Assembler_$b"]
 		pack $f.$b -side left -expand 1
 		
 	} 

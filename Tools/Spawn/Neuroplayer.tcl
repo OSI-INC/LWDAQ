@@ -4670,15 +4670,16 @@ proc Neuroplayer_autofill {} {
 		}		
 	}
 	if {$autofill == ""} {
-		LWDAQ_print $info(export_text) "Autofill found no active channels.\
-			Setting channel select to \"*\". Play one interval and try again."
-		Neuroplayer_print "Autofill found no active channels.\
-			Setting channel select to \"*\". Play one interval and try again."
+		set report "Autofill found no active channels,\
+			setting channel select to \"*\".\
+			Play one interval and try again."
+		LWDAQ_print $info(export_text) $report
+		Neuroplayer_print $report
 		set config(channel_selector) "*"
-		return ""
+	} else {
+		set config(channel_selector) [string trim $autofill]
 	}
-	set config(channel_selector) [string trim $autofill]
-	return ""
+	return "$config(channel_selector)"
 }
 
 #
