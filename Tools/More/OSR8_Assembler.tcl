@@ -27,7 +27,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.10"
+	LWDAQ_tool_init "OSR8_Assembler" "1.11"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return ""
@@ -146,22 +146,19 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	upvar #0 OSR8_Assembler_config config
 	upvar #0 OSR8_Assembler_info info
 
-	LWDAQ_print $info(text) "Starting OSR8 Assembler." purple
 	if {$asm == ""} {
 		if {[file exists $config(ifn)]} {
-			LWDAQ_print $info(text) "Reading assembler code from $config(ifn)." purple
 			set f [open $config(ifn) r]
 			set asm [split [read $f] \n]
 			close $f
-			LWDAQ_print $info(text) "Read [llength $asm] lines of assembler code." purple
 		} else {
-			OSR8_Assembler_error "Cannot find $config(ifn)."
+			OSR8_Assembler_error "Cannot find input file \"$config(ifn)\"."
 		}
 	} else {
-		LWDAQ_print $info(text) "Received assembler code from input string." purple
 		set asm [split [string trim $asm] \n]
-		LWDAQ_print $info(text) "Received [llength $asm] instruction bytes." purple
 	}
+	LWDAQ_print $info(text) "Assembling [llength $asm] lines of code." purple
+	
 	
 	# Refresh error, warning, symbol, and label lists.
 	set symbol_list [list]

@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.2"
+	LWDAQ_tool_init "Stimulator" "3.3"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -78,6 +78,7 @@ proc Stimulator_init {} {
 	set config(tp_program) "~/Desktop/user.asm"
 	set config(tp_base) "0x0C00"
 	set info(tp_ew) $info(window).tpew
+	set info(tp_text) $info(tp_ew).text
 
 	set info(op_stim_stop) "0"
 	set info(op_stim_start) "1"
@@ -1030,12 +1031,11 @@ proc Stimulator_transmit_panel {} {
 		if {[info commands OSR8_Assembler_assemble] == ""} {
 			LWDAQ_print $info(text) "ERROR: Failed to open OSR8 Assembler tool."
 		} else {
-			LWDAQ_print $info(text) "Loaded OSR8 Assembler routines.\
-				Open OSR8 Assembler Tool for assembly details."
+			LWDAQ_print $info(text) "Loaded OSR8 Assembler routines."
 		}
 	}
 
-	set f [frame $w.id]
+	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
 	label $f.nl -text "Device Number:"
@@ -1046,18 +1046,21 @@ proc Stimulator_transmit_panel {} {
 	entry $f.be -textvariable Stimulator_config(tp_base) -width 8
 	pack $f.bl $f.be -side left -expand yes
 
-	set f [frame $w.controls]
+	checkbutton $f.verbose -variable Stimulator_config(verbose) -text "Verbose"
+	pack $f.verbose -side left -expand 1
+	
+	set f [frame $w.commands]
 	pack $f -side top -fill x
 
 	label $f.lcommands -text "Commands:" -fg $config(label_color)
-	entry $f.commands -textvariable Stimulator_config(commands) -width 50
+	entry $f.commands -textvariable Stimulator_config(commands) -width 70
 	pack $f.lcommands $f.commands -side left -expand yes
 
 	button $f.transmit -text "Transmit" \
 		-command "LWDAQ_post Stimulator_tp_transmit"
 	pack $f.transmit -side left -expand yes
 		
-	set f [frame $w.upload]
+	set f [frame $w.program]
 	pack $f -side top -fill x
 	
 	label $f.lprogram -text "Program:" -fg $config(label_color)
@@ -1073,6 +1076,8 @@ proc Stimulator_transmit_panel {} {
 	button $f.halt -text "Halt" -command "LWDAQ_post Stimulator_tp_halt"
 	pack $f.halt -side left -expand yes
 	
+	set info(tp_text) [LWDAQ_text_widget $w 80 15]
+
 	return "" 
 }
 
@@ -1137,26 +1142,29 @@ proc Stimulator_tp_run {} {
 
 	# Read program from file.
 	if {[file exists $config(tp_program)]} {
-		LWDAQ_print $info(text) "Reading and assembling program in $config(tp_program)."
+		LWDAQ_print $info(tp_text) "Reading and assembling program in $config(tp_program)."
 		set f [open $config(tp_program)]
 		set program [read $f]
 		close $f
 	} else {
-		LWDAQ_print $info(text) "ERROR: Cannot find file \"$config(tp_program)\"."
+		LWDAQ_print $info(tp_text) "ERROR: Cannot find file \"$config(tp_program)\"."
 		return ""
 	} 
 	
 	# Assemble program, reporting errors to text window.
 	if {[catch {
+		set saved_text $ainfo(text)
+		if {$config(verbose)} {set ainfo(text) $info(tp_text)}
 		set aconfig(hex_output) 0
 		set aconfig(ofn_write) 0
 		set aconfig(base_addr) $config(tp_base)
 		set prog [OSR8_Assembler_assemble $program]
+		set ainfo(text) $saved_text
 	} error_message]} {
-		LWDAQ_print $info(text) "ERROR: $error_message\."
+		LWDAQ_print $info(tp_text) "ERROR: $error_message\."
 		return ""
 	}
-	LWDAQ_print $info(text) "Assembly successful, uploading [llength $prog] code bytes."	
+	LWDAQ_print $info(tp_text) "Assembly successful, uploading [llength $prog] code bytes."	
 
 	# Add upload command and the number of program bytes.
 	lappend commands $info(op_upload) [llength $prog]
