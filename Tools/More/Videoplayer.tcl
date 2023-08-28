@@ -1233,8 +1233,9 @@ The Re-Encode button calls on ffmpeg to create a new video file using H264
 compression. The dimensions of the video will be given by width and height
 multiplied by scale. The time segment extracted will be given by the start and
 end times. The new video will be the original rotated by the rotation entry. The
-framerate will be set by the framerate entry, with the time length of the
-segment remaining unaffected by the framerate. The new file will be written to
-the same directory as the original file, with "_new" appended to its file name.
+framerate will be set by the framerate entry, without affecting the duration of
+the video in seconds. The speed of the video will be given by the speed
+parameter, without affecting the framerate. The new file will be written to the
+same directory as the original file, with "_new" appended to its file name.
 
 ----------End Help----------
