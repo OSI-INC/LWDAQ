@@ -980,7 +980,7 @@ proc Videoplayer_reencode {{vfn ""}} {
 	set ofn [file join [file dirname $vfn] [file root $vfn]_new\.mp4]
 	if {[file exists $ofn]} {
 		file delete $ofn
-		Videoplayer_print "WARNING: Deleted existing \"$ofn\"."
+		Videoplayer_print "Deleted existing \"$ofn\"."
 	}
 	
 	# Determine the ffmpeg time control string.
@@ -1035,10 +1035,18 @@ proc Videoplayer_reencode {{vfn ""}} {
 		-i \"$vfn\" \
 		-c:v libx264 \
 		-vf \"$vf\" \
-		\"$ofn\""
+		\"$ofn\" &"
 			
 	# Launch ffmpeg.
-	eval exec $cmd
+	if {[catch {set pid [exec {*}$cmd]} message]} {
+		Videoplayer_print "ERROR: $message\."
+		return ""
+	}
+	
+	# Wait for completion
+	while {[LWDAQ_process_exists $pid]} {
+		LWDAQ_update
+	}
 	
 	# Report compression.
 	Videoplayer_print "Original file [file tail $vfn],\
