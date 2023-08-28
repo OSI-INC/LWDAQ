@@ -53,7 +53,7 @@ proc Videoplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Videoplayer" "2"
+	LWDAQ_tool_init "Videoplayer" "3"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -68,14 +68,14 @@ proc Videoplayer_init {} {
 #
 # File and directory for videos.
 #
-	set config(video_dir) $LWDAQ_Info(working_dir)
+	set config(video_dir) "~/Desktop/Video"
 	set config(video_file) [file join $config(video_dir) V0000000000.mp4]
 	set config(video_stream) "tcp://192.168.1.31:2222"
 #
 # Video file properties.
 #
 	set config(video_file_time) "0"
-	set config(video_fps) "20"
+	set config(video_framerate) "20"
 	set config(video_width) "820"
 	set config(video_height) "616"
 	set config(video_length_s) "1"
@@ -266,8 +266,8 @@ proc Videoplayer_info {fn} {
 		scan $sec %f sec
 		set duration [expr $hr*3600+$min*60+$sec]
 	}
-
-	if {![regexp { ([0-9\.]+) fps,} $answer match fps]} {
+	
+	if {![regexp { ([0-9\.]+) fps,} $answer match framerate]} {
 		set search_fail 1
 	}
 	
@@ -275,11 +275,19 @@ proc Videoplayer_info {fn} {
 		set search_fail 1
 	}
 
+	if {[regexp { rotation of ([\-0-9\.]+) degrees} $answer match rotation]} {
+		if {$rotation == -90} {
+			set w $width
+			set width $height
+			set height $w
+		}
+	}
+
 	if {$search_fail} {
 		return "0 0 0 -1"
 	}
 	
-	return "$width $height $fps $duration"
+	return "$width $height $framerate $duration"
 }
 
 #
@@ -325,7 +333,7 @@ proc Videoplayer_pickfile {{fn ""}} {
 	set config(video_file) $fn
 	
 	# Get properties of video contained in the file.
-	scan [Videoplayer_info $fn] %d%d%f%f width height fps duration
+	scan [Videoplayer_info $fn] %d%d%f%f width height framerate duration
 	
 	# If the duration is less than zero, we have encountered an error, so we
 	# report on that now, including printing a full ffmpeg output if the verbose
@@ -335,7 +343,7 @@ proc Videoplayer_pickfile {{fn ""}} {
 			check Verbose for details."
 		set config(video_width) 820
 		set config(video_height) 616
-		set config(video_fps) 20
+		set config(video_framerate) 20
 		set config(video_length_s) 0
 		set config(video_length_f) 0
 		if {$config(verbose)} {
@@ -349,15 +357,15 @@ proc Videoplayer_pickfile {{fn ""}} {
 	# can now set configuration parameters to match the file.
 		set config(video_width) $width
 		set config(video_height) $height
-		set config(video_fps) [format %.2f $fps]
+		set config(video_framerate) [format %.2f $framerate]
 		set config(video_length_s) [format %.2f $duration]
-		set config(video_length_f) [expr round($duration * $fps)]
+		set config(video_length_f) [expr round($duration * $framerate)]
 		Videoplayer_print "[file tail $fn]:\
-			width = $config(video_width),\
-			height = $config(video_height),\
-			fps = $config(video_fps) fps,\
-			length_s = $config(video_length_s) s,\
-			length_f = $config(video_length_f) f." verbose
+			width=$config(video_width),\
+			height=$config(video_height),\
+			framerate=$config(video_framerate) fps,\
+			length_s=$config(video_length_s) s,\
+			length_f=$config(video_length_f) f." verbose
 	}	
 	
 	# Reset the start and end codes.
@@ -438,19 +446,19 @@ proc Videoplayer_play {} {
 	# complete the required duration, and construct the ffmpeg time control string.
 	if {$end_code == "*"} {
 		set end $config(video_length_s)
-		set num_frames [expr round(($end - $start)*$config(video_fps))]
+		set num_frames [expr round(($end - $start)*$config(video_framerate))]
 		set time_control "-ss $start"
 	} elseif {$end_code == "+"} {
-		set end [format %.3f $start [expr 2.0/$config(video_fps)]]
+		set end [format %.3f $start [expr 2.0/$config(video_framerate)]]
 		set num_frames 1
-		set time_control "-ss $start -t [format %.3f [expr 2.0/$config(video_fps)]]"
+		set time_control "-ss $start -t [format %.3f [expr 2.0/$config(video_framerate)]]"
 	} else {
 		if {![string is double -strict $end_code]} {
 			Videoplayer_print "ERROR: Invalid end time \"$end_code\"."
 			return ""
 		}
 		set end $end_code
-		set num_frames [expr round(($end_code - $start)*$config(video_fps))]
+		set num_frames [expr round(($end_code - $start)*$config(video_framerate))]
 		set time_control "-ss $start -t [format %.3f [expr $end - $start]]"
 	}
 	
@@ -472,7 +480,7 @@ proc Videoplayer_play {} {
 	}
 	
 	# Calculate the frame time.
-	set frame_ms [format %.1f [expr 1000.0/$config(video_fps)/$config(display_speed)]]
+	set frame_ms [format %.1f [expr 1000.0/$config(video_framerate)/$config(display_speed)]]
 	
 	# Combine dimensions and rotation into one video filter.
 	switch $config(display_rotation) {
@@ -631,7 +639,7 @@ proc Videoplayer_play {} {
 		stopped process $chpid." verbose
 	
 	# Report on outcome of playback if verbose flag is set.
-	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_fps)]]
+	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_framerate)]]
 	set display_s [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]
 	set config(display_start_s) [format %.2f [expr $start + $video_s]]
 	set config(display_end_s) $end_code
@@ -785,7 +793,7 @@ proc Videoplayer_stream {} {
 	# Report on outcome of the streaming if the verbose flag is set.
 	Videoplayer_print "Video streaming halted, closed channel $ch,\
 		stopped process $chpid." verbose
-	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_fps)]]
+	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_framerate)]]
 	set display_s [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]
 	Videoplayer_print "Received $info(frame_count) frames\
 		spanning $video_s s, displayed in $display_s s." verbose
@@ -833,10 +841,10 @@ proc Videoplayer_setup {args} {
 				set config(display_rotation) $value
 			}
 			"-fps" {
-				set config(video_fps) $value
+				set config(video_framerate) $value
 			}
 			"-framerate" {
-				set config(video_fps) $value
+				set config(video_framerate) $value
 			}
 			"-length_s" {
 				set config(video_duration) $value
@@ -929,7 +937,7 @@ proc videoplayer {instruction args} {
 			}
 			set play_time_s [format %.2f \
 				[expr $config(display_start_s) \
-				+ 1.0*$info(frame_count)/$config(video_fps)]]
+				+ 1.0*$info(frame_count)/$config(video_framerate)]]
 			return "busy=$busy\
 				control=$info(control)\
 				file=$config(video_file)\
@@ -941,6 +949,104 @@ proc videoplayer {instruction args} {
 			Videoplayer_print "ERROR: Unrecognised instruction \"$instruction\".
 		}
 	}
+	return ""
+}
+
+#
+# Videoplayer_reencode takes a video file name as input, applies the current
+# scale value, and compresses with H264. The output file will be named as the
+# input file, but with "_new" added to the file name. If we don't specify an
+# input file, the routine uses the current Videoplayer file name.
+#
+proc Videoplayer_reencode {{vfn ""}} {
+	upvar #0 Videoplayer_config config
+	upvar #0 Videoplayer_info info
+
+	if {$info(control) != "Idle"} {
+		Videoplayer_print "ERROR: Wait until Idle to re-encode video file."
+		return ""
+	}
+	set info(control) "Reencode"
+
+
+	# Check the input file exists.
+	if {$vfn == ""} {set vfn $config(video_file)}
+	if {![file exists $vfn]} {
+		Videoplayer_print "ERROR: File \"$vfn\" does not exist."
+		return ""
+	}
+	
+	# Delete the output file if it exists.
+	set ofn [file join [file dirname $vfn] [file root $vfn]_new\.mp4]
+	if {[file exists $ofn]} {
+		file delete $ofn
+		Videoplayer_print "WARNING: Deleted existing \"$ofn\"."
+	}
+	
+	# Determine the ffmpeg time control string.
+	set start $config(display_start_s)
+	set end_code $config(display_end_s)
+	if {$end_code == "*"} {
+		set end $config(video_length_s)
+		set time_control "-ss $start"
+	} elseif {$end_code == "+"} {
+		set end [format %.3f $start [expr 2.0/$config(video_framerate)]]
+		set time_control "-ss $start -t [format %.3f [expr 2.0/$config(video_framerate)]]"
+	} else {
+		set end $end_code
+		set time_control "-ss $start -t [format %.3f [expr $end - $start]]"
+	}
+	
+	# Determine re-encoded video dimensions.
+	set w [expr round($config(video_width)*$config(display_scale))]
+	set h [expr round($config(video_height)*$config(display_scale))]
+
+	# Combine dimensions and rotation into one video filter.
+	switch $config(display_rotation) {
+		"0" {
+			set vf "scale=$w\:$h"
+		}
+		"90" {
+			set vf "scale=$w\:$h, transpose=clock"
+		}
+		"180" {
+			set vf "scale=$w\:$h, transpose=clock, transpose=clock"
+		}
+		"270" {
+			set vf "scale=$w\:$h, transpose=cclock"
+		}
+		default {
+			set vf "scale=$w\:$h"
+			Videoplayer_print "WARNING: Invalid rotation \"$config(display_rotation)\"."
+		}
+	}
+	
+	# Report on output file properties.
+	Videoplayer_print "Reencode [file tail $vfn]:\
+		width=$w, height=$h,\
+		rotation=$config(display_rotation),\
+		extracting from $start to $end." verbose
+	set info(control) "Reencode"
+	LWDAQ_update
+	
+	# Compoese the ffmpeg command.
+	set cmd "$info(ffmpeg) -nostdin -loglevel quiet \
+		$time_control \
+		-i \"$vfn\" \
+		-c:v libx264 \
+		-vf \"$vf\" \
+		\"$ofn\""
+			
+	# Launch ffmpeg.
+	eval exec $cmd
+	
+	# Report compression.
+	Videoplayer_print "Original file [file tail $vfn],\
+		size [format %.2f [expr [file size $vfn]/1e6]] MByte."
+	Videoplayer_print "Re-encoded file [file tail $ofn],\
+		size [format %.2f [expr [file size $ofn]/1e6]] MByte."
+
+	set info(control) "Idle"
 	return ""
 }
 
@@ -1008,6 +1114,9 @@ proc Videoplayer_open {} {
 	}
 	pack $f.pick -side left -expand yes
 
+	button $f.renc -text "Re-Encode" -command {Videoplayer_reencode}
+	pack $f.renc -side left -expand yes
+
 	button $f.config -text "Configure" -command "Videoplayer_configure"
 	pack $f.config -side left -expand yes
 	
@@ -1021,7 +1130,7 @@ proc Videoplayer_open {} {
 	frame $f -relief groove -bd 2
 	pack $f -side top -fill x
 	
-	foreach a {width height fps length_s length_f} {
+	foreach a {width height framerate length_s length_f} {
 		label $f.l$a -text "$a"
 		entry $f.e$a -textvariable Videoplayer_config(video_$a) -width 8
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -1091,5 +1200,11 @@ decypher. It plays without sound. Depending upon your operating system and
 computer speed, you may find that playback cannot proceed at full speed. Use the
 scale value to change the resolution of the image. Use the zoom value to
 increase the size of each pixel when rendered on your screen.
+
+The Re-Encode button calls on ffmpeg to create a new video file using H264
+compression. The dimensions of the video will be the width and height in the
+width and height entries, multiplied by the scaling factor in the scaling entry.
+The video will be rotated by the rotation entry. The new file will be written to
+the same directory as the original file, with "_new" appended to its file name.
 
 ----------End Help----------
