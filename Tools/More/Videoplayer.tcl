@@ -953,9 +953,10 @@ proc videoplayer {instruction args} {
 }
 
 #
-# Videoplayer_reencode takes a video file name as input, applies the current
-# scale value, and compresses with H264. The output file will be named as the
-# input file, but with "_new" added to the file name. If we don't specify an
+# Videoplayer_reencode takes a video file and re-encodes it with H264
+# compression, using the width, height, scale, speed, rotation, framerate, start
+# time, and end time specified in entry boxes. The output file will be named as
+# the input file, but with "_new" added to the file name. If we don't specify an
 # input file, the routine uses the current Videoplayer file name.
 #
 proc Videoplayer_reencode {{vfn ""}} {
@@ -1004,19 +1005,32 @@ proc Videoplayer_reencode {{vfn ""}} {
 	# Combine dimensions and rotation into one video filter.
 	switch $config(display_rotation) {
 		"0" {
-			set vf "scale=$w\:$h"
+			set vf "scale=$w\:$h,\
+				fps=$config(video_framerate),\
+				setpts=PTS/$config(display_speed)"
 		}
 		"90" {
-			set vf "scale=$w\:$h, transpose=clock"
+			set vf "scale=$w\:$h,\
+				transpose=clock,\
+				fps=$config(video_framerate),\
+				setpts=PTS/$config(display_speed)"
 		}
 		"180" {
-			set vf "scale=$w\:$h, transpose=clock, transpose=clock"
+			set vf "scale=$w\:$h, transpose=clock,\
+				transpose=clock,\
+				fps=$config(video_framerate),\
+				setpts=PTS/$config(display_speed)"
 		}
 		"270" {
-			set vf "scale=$w\:$h, transpose=cclock"
+			set vf "scale=$w\:$h,\
+				transpose=cclock,\
+				fps=$config(video_framerate),\
+				setpts=PTS/$config(display_speed)"
 		}
 		default {
-			set vf "scale=$w\:$h"
+			set vf "scale=$w\:$h,\
+				fps=$config(video_framerate),\
+				setpts=PTS/$config(display_speed)"
 			Videoplayer_print "WARNING: Invalid rotation \"$config(display_rotation)\"."
 		}
 	}
@@ -1025,7 +1039,9 @@ proc Videoplayer_reencode {{vfn ""}} {
 	Videoplayer_print "Reencode [file tail $vfn]:\
 		width=$w, height=$h,\
 		rotation=$config(display_rotation),\
-		extracting from $start to $end." verbose
+		framerate=$config(video_framerate),\
+		speed=$config(display_speed),\
+		segment $start s to $end s." verbose
 	set info(control) "Reencode"
 	LWDAQ_update
 	
@@ -1044,9 +1060,7 @@ proc Videoplayer_reencode {{vfn ""}} {
 	}
 	
 	# Wait for completion
-	while {[LWDAQ_process_exists $pid]} {
-		LWDAQ_update
-	}
+	while {[LWDAQ_process_exists $pid]} {LWDAQ_update}
 	
 	# Report compression.
 	Videoplayer_print "Original file [file tail $vfn],\
@@ -1138,9 +1152,15 @@ proc Videoplayer_open {} {
 	frame $f -relief groove -bd 2
 	pack $f -side top -fill x
 	
-	foreach a {width height framerate length_s length_f} {
+	foreach a {width height framerate} {
 		label $f.l$a -text "$a"
 		entry $f.e$a -textvariable Videoplayer_config(video_$a) -width 8
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+
+	foreach a {length_s length_f} {
+		label $f.l$a -text "$a"
+		label $f.e$a -textvariable Videoplayer_config(video_$a) -width 8
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -1210,9 +1230,11 @@ scale value to change the resolution of the image. Use the zoom value to
 increase the size of each pixel when rendered on your screen.
 
 The Re-Encode button calls on ffmpeg to create a new video file using H264
-compression. The dimensions of the video will be the width and height in the
-width and height entries, multiplied by the scaling factor in the scaling entry.
-The video will be rotated by the rotation entry. The new file will be written to
+compression. The dimensions of the video will be given by width and height
+multiplied by scale. The time segment extracted will be given by the start and
+end times. The new video will be the original rotated by the rotation entry. The
+framerate will be set by the framerate entry, with the time length of the
+segment remaining unaffected by the framerate. The new file will be written to
 the same directory as the original file, with "_new" appended to its file name.
 
 ----------End Help----------
