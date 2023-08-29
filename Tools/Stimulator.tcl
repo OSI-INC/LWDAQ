@@ -197,7 +197,7 @@ proc Stimulator_transmit {id commands} {
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]\."
+		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]"
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		return ""
 	}
