@@ -1067,19 +1067,29 @@ proc Stimulator_transmit_panel {} {
 	entry $f.eprogram -textvariable Stimulator_config(tp_program) -width 50
 	pack $f.lprogram $f.eprogram -side left -expand yes
 
-	button $f.edit -text "Edit" -command "LWDAQ_post Stimulator_tp_edit"
-	pack $f.edit -side left -expand yes
-	
-	button $f.run -text "Run" -command "LWDAQ_post Stimulator_tp_run"
-	pack $f.run -side left -expand yes
-	
-	button $f.halt -text "Halt" -command "LWDAQ_post Stimulator_tp_halt"
-	pack $f.halt -side left -expand yes
-	
+	foreach a {Browse Edit Run Halt} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post Stimulator_tp_$b"
+		pack $f.$b -side left -expand yes
+	}
+
 	set info(tp_text) [LWDAQ_text_widget $w 80 15]
 
 	return "" 
 }
+
+#
+# Stimulator_tp_browse opens a file browser to select the program file.
+#
+proc Stimulator_tp_browse {} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+
+	set fn [LWDAQ_get_file_name]
+	if {$fn != ""} {set config(tp_program) $fn}
+	return ""
+}
+
 
 #
 # Stimulator_tp_edit opens the assembler program in an editor window.
@@ -1142,12 +1152,12 @@ proc Stimulator_tp_run {} {
 
 	# Read program from file.
 	if {[file exists $config(tp_program)]} {
-		LWDAQ_print $info(tp_text) "Reading and assembling program in $config(tp_program)."
+		LWDAQ_print $info(tp_text) "Reading and assembling $config(tp_program)."
 		set f [open $config(tp_program)]
 		set program [read $f]
 		close $f
 	} else {
-		LWDAQ_print $info(tp_text) "ERROR: Cannot find file \"$config(tp_program)\"."
+		LWDAQ_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
 		return ""
 	} 
 	
@@ -1198,6 +1208,9 @@ proc Stimulator_tp_halt {} {
 	# Send the program disable command.	
 	lappend commands $info(op_progen) "0"
 
+	# Send Xoff commandl
+	lappend commands $info(op_xmit) 0
+	
 	# If we want acknowledgements, ask for one.
 	if {$config(ack_enable)} {
 		lappend commands $info(op_ack) $info(ack_progen)
