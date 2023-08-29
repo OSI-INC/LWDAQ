@@ -1053,7 +1053,7 @@ proc Stimulator_transmit_panel {} {
 	pack $f -side top -fill x
 
 	label $f.lcommands -text "Commands:" -fg $config(label_color)
-	entry $f.commands -textvariable Stimulator_config(commands) -width 70
+	entry $f.commands -textvariable Stimulator_config(tp_commands) -width 70
 	pack $f.lcommands $f.commands -side left -expand yes
 
 	button $f.transmit -text "Transmit" \
