@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.3"
+	LWDAQ_tool_init "Stimulator" "3.4"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -72,11 +72,12 @@ proc Stimulator_init {} {
 	set config(default_id) "1234"
 	set config(multicast_id) "FFFF"
 	set config(default_current)	"8"
+	set config(max_tx_sps) "1024"
 	
 	set config(tp_n) "1"
 	set config(tp_commands) "1 5 1 71 0 12 205 0 10 0"
 	set config(tp_program) "~/Desktop/user.asm"
-	set config(tp_base) "0x0C00"
+	set config(tp_base) "0x0800"
 	set info(tp_ew) $info(window).tpew
 	set info(tp_text) $info(tp_ew).text
 
@@ -188,6 +189,7 @@ proc Stimulator_transmit {id commands} {
 		LWDAQ_set_driver_mux $sock $config(driver_socket) 1
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
+		set counter 0
 		foreach c $commands {
 			LWDAQ_transmit_command_hex $sock "[format %02X $c]$config(rf_xmit_op)"
 			if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
@@ -376,9 +378,16 @@ proc Stimulator_xon {n} {
 	set commands [list]
 	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 
-	# Send the Xon command with transmit period. 
-	lappend commands $info(op_xmit) \
-		[expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
+	# Send the Xon command with transmit period. 	
+	if {$info(dev$n\_sps) > $config(max_tx_sps)} {
+		LWDAQ_print $info(text) "ERROR: Requested frequency $info(dev$n\_sps) SPS\
+			is greater than maximum $config(max_tx_sps) SPS."
+		set info(state) "Idle"
+		return ""
+	}
+	set tx_p [expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
+	lappend commands $info(op_xmit) $tx_p
+		
 		
 	# We request an acknowledgement.
 	if {$config(ack_enable)} {
@@ -1120,7 +1129,7 @@ proc Stimulator_tp_transmit {} {
 	
 	# Append all the commands in the transmit list, converting hex values
 	# to decimal values as we go.
-	foreach cmd $config(commands) {lappend commands [expr $cmd]}
+	foreach cmd $config(tp_commands) {lappend commands [expr $cmd]}
 	
 	# Transmit the commands. We don't ask for an acknowledgement because
 	# we want the transmit to consist only of commands entered by the user.
@@ -1142,14 +1151,6 @@ proc Stimulator_tp_run {} {
 	set n $config(tp_n)
 	set commands [list]
 	
-	# Set the device primary channel number.
-	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-
-	# Send Xon command with transmit period. The program will run every time
-	# the device transmits a message.
-	lappend commands $info(op_xmit) \
-		[expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
-
 	# Read program from file.
 	if {[file exists $config(tp_program)]} {
 		LWDAQ_print $info(tp_text) "Reading and assembling $config(tp_program)."
@@ -1187,6 +1188,7 @@ proc Stimulator_tp_run {} {
 	
 	# If we want acknowledgements, ask for one.
 	if {$config(ack_enable)} {
+		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 		lappend commands $info(op_ack) $info(ack_progen)
 	}
 	
@@ -1208,11 +1210,9 @@ proc Stimulator_tp_halt {} {
 	# Send the program disable command.	
 	lappend commands $info(op_progen) "0"
 
-	# Send Xoff commandl
-	lappend commands $info(op_xmit) 0
-	
 	# If we want acknowledgements, ask for one.
 	if {$config(ack_enable)} {
+		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
 		lappend commands $info(op_ack) $info(ack_progen)
 	}
 	
@@ -1264,6 +1264,9 @@ proc Stimulator_open {} {
 	
 	checkbutton $f.verbose -variable Stimulator_config(verbose) -text "Verbose"
 	pack $f.verbose -side left -expand 1
+	
+	checkbutton $f.ack -variable Stimulator_config(ack_enable) -text "Acknowledge"
+	pack $f.ack -side left -expand 1
 	
 	set f $w.list
 	frame $f

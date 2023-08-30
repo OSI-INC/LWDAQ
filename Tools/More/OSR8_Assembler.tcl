@@ -704,9 +704,8 @@ return ""
 
 ----------Begin Help----------
 
+http://www.opensourceinstruments.com/Electronics/A3035/OSR8.html#Assembler
 
-
-Kevan Hashemi hashemi@opensourcesintruments.com
 ----------End Help----------
 
 ----------Begin Data----------
