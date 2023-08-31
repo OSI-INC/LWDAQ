@@ -62,8 +62,12 @@ proc Stimulator_init {} {
 	set config(blow) "2.5"
 	set config(bempty) "2.2"
 
+	
 	set config(ack_enable) "1"
 	set config(verbose) "1"
+	
+	set info(transmit_ms) 0
+	set config(max_response_ms) "3000"
 	set info(id_at) "0"
 	set info(ack_at) "1"
 	set info(batt_at) "2"
@@ -74,14 +78,17 @@ proc Stimulator_init {} {
 	set config(default_current)	"8"
 	set config(max_tx_sps) "1024"
 	
+	# Transmit Panel Parameters
 	set config(tp_n) "1"
-	set config(tp_commands) "1 5 1 71 0 12 205 0 10 0"
-	set config(tp_program) "~/Desktop/user.asm"
-	set config(tp_base) "0x0800"
+	set config(tp_commands) "6 3 2 255"
+	set config(tp_program) "~/Desktop/UProg.asm"
+	set config(tp_base_addr) "0x0800"
 	set config(tp_seg_len) "30"
 	set info(tp_ew) $info(window).tpew
 	set info(tp_text) $info(tp_ew).text
 
+	# Stimulator operation codes, which we use to construct instructions, which
+	# we in turn combine to form commands.
 	set info(op_stim_stop) "0"
 	set info(op_stim_start) "1"
 	set info(op_xmit) "2"
@@ -91,6 +98,9 @@ proc Stimulator_init {} {
 	set info(op_setpcn) "6"
 	set info(op_upload) "7"
 	set info(op_progen) "8"
+	set info(op_rstpp) "9"
+	
+	# Acknowledgement codes allow us to deduce the message being acknowledged.
 	set info(ack_stim_stop) "16"
 	set info(ack_stim_start) "17"
 	set info(ack_xon) "18"
@@ -208,6 +218,7 @@ proc Stimulator_transmit {id commands} {
 	# If we get here, we have no reason to believe the transmission failed, although
 	# we could have instructed an empty driver socket or the stimulator could have
 	# failed to receive the command.
+	set info(transmit_ms) [clock milliseconds]
 	return ""
 }
 
@@ -497,7 +508,7 @@ proc Stimulator_identify {} {
 	# Transmit commands to multicast address.
 	Stimulator_transmit $config(multicast_id) $commands
 	
-	# Set state variables.
+	# Set state variable.
 	set info(state) "Idle"
 	
 	return ""
@@ -554,18 +565,19 @@ proc Stimulator_monitor {} {
 	if {$LWDAQ_Info(reset)} {return ""}
 	set f $info(window).state
 
-	set now_time [clock milliseconds]
-	if {$now_time < $info(monitor_ms)} {
+	# We check the auxiliary message list every monitor_ms milliseconds.
+	set now_ms [clock milliseconds]
+	if {$now_ms < $info(monitor_ms)} {
 		LWDAQ_post Stimulator_monitor
 		return ""
 	} {
-		set info(monitor_ms) [expr $now_time + $info(monitor_interval_ms)]
+		set info(monitor_ms) [expr $now_ms + $info(monitor_interval_ms)]
 	}
 	
 	# Check the stimuli and mark device state label when stimulus is complete.
 	foreach n $info(dev_list) {
 		set end_time $info(dev$n\_end)
-		if {($end_time > 0) && ($end_time <= $now_time)} {
+		if {($end_time > 0) && ($end_time <= $now_ms)} {
 			LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 		}	
 	}
@@ -573,6 +585,13 @@ proc Stimulator_monitor {} {
 	# If the Neuroplayer's auxiliary message list does not exist, we have no
 	# hope of finding any auxiliary messages from our stimulators.
 	if {![info exists ninfo(aux_messages)]} {
+		LWDAQ_post Stimulator_monitor
+		return ""
+	}
+	
+	# If the time since the previous transmission of commands is greater
+	# than max_response_ms, we don't bother looking for auxiliary messages.
+	if {$now_ms > $info(transmit_ms) + $config(max_response_ms)} {
 		LWDAQ_post Stimulator_monitor
 		return ""
 	}
@@ -585,7 +604,7 @@ proc Stimulator_monitor {} {
 	foreach am $ninfo(aux_messages) {
 		scan $am %d%d%d%d id fa db ts
 		if {$fa == $info(ack_at)} {
-
+		
 			# Acknowledgements encode the type of command in their data byte.
 			switch $db \
 				$info(ack_stim_stop) {set type "stop"} \
@@ -595,6 +614,8 @@ proc Stimulator_monitor {} {
 				$info(ack_battery) {set type "battery"} \
 				$info(ack_identify) {set type "identify"} \
 				$info(ack_setpcn) {set type "setpcn"} \
+				$info(ack_upload) {set type "upload"} \
+				$info(ack_progen) {set type "progen"} \
 				default {set type $db}
 			LWDAQ_print $info(text) "Command Acknowledgement:\
 				pcn=$id type=$type time=$ts\."
@@ -646,8 +667,6 @@ proc Stimulator_monitor {} {
 			# Report a synchronizing mark.
 			LWDAQ_print $info(text) "Synchronizing Mark: pcn=$id time=$ts\."
 		} elseif {$fa == $info(id_at)} {
-		
-			# Report identity broadcast.
 			set device_id [format %04X [expr $id +  (256 * $db)]]
 			LWDAQ_print $info(text) "Identification Broadcast:\
 				device_id=$device_id time=$ts\." green
@@ -656,6 +675,9 @@ proc Stimulator_monitor {} {
 			lappend new_aux $am
 		}
 	}
+	
+	# Replace the Neuroplayer's auxiliary message list. The Neuroplayer will
+	# create a fresh list when it reads the next interval.
 	set ninfo(aux_messages) $new_aux
 
 	# We post the monitor to the event queue and report success.
@@ -1048,17 +1070,36 @@ proc Stimulator_transmit_panel {} {
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.nl -text "Device Number:"
+	label $f.nl -text "Device:"
 	entry $f.ne -textvariable Stimulator_config(tp_n) -width 3
 	pack $f.nl $f.ne -side left -expand yes
 
-	label $f.bl -text "Program Base Address:"
-	entry $f.be -textvariable Stimulator_config(tp_base) -width 8
+	foreach a {Run Halt} {
+		set b [string tolower $a]
+		button $f.$b -text "$a Program" -command "LWDAQ_post Stimulator_tp_$b"
+		pack $f.$b -side left -expand yes
+	}
+
+	label $f.bl -text "Base Address:"
+	entry $f.be -textvariable Stimulator_config(tp_base_addr) -width 8
 	pack $f.bl $f.be -side left -expand yes
 
 	checkbutton $f.verbose -variable Stimulator_config(verbose) -text "Verbose"
 	pack $f.verbose -side left -expand 1
 	
+	set f [frame $w.program]
+	pack $f -side top -fill x
+	
+	label $f.lprogram -text "Program:" -fg $config(label_color)
+	entry $f.eprogram -textvariable Stimulator_config(tp_program) -width 60
+	pack $f.lprogram $f.eprogram -side left -expand yes
+
+	foreach a {Browse Edit} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post Stimulator_tp_$b"
+		pack $f.$b -side left -expand yes
+	}
+
 	set f [frame $w.commands]
 	pack $f -side top -fill x
 
@@ -1070,19 +1111,6 @@ proc Stimulator_transmit_panel {} {
 		-command "LWDAQ_post Stimulator_tp_transmit"
 	pack $f.transmit -side left -expand yes
 		
-	set f [frame $w.program]
-	pack $f -side top -fill x
-	
-	label $f.lprogram -text "Program:" -fg $config(label_color)
-	entry $f.eprogram -textvariable Stimulator_config(tp_program) -width 50
-	pack $f.lprogram $f.eprogram -side left -expand yes
-
-	foreach a {Browse Edit Run Halt} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post Stimulator_tp_$b"
-		pack $f.$b -side left -expand yes
-	}
-
 	set info(tp_text) [LWDAQ_text_widget $w 80 15]
 
 	return "" 
@@ -1165,7 +1193,7 @@ proc Stimulator_tp_run {} {
 		if {$config(verbose)} {set ainfo(text) $info(tp_text)}
 		set aconfig(hex_output) 0
 		set aconfig(ofn_write) 0
-		set aconfig(base_addr) $config(tp_base)
+		set aconfig(base_addr) $config(tp_base_addr)
 		set prog [OSR8_Assembler_assemble $program]
 		set ainfo(text) $saved_text
 	} error_message]} {
@@ -1175,10 +1203,14 @@ proc Stimulator_tp_run {} {
 	LWDAQ_print $info(tp_text) "Assembly successful,\
 		uploading [llength $prog] code bytes."	
 	
+	# Get device number and initialize command list. Before we send the
+	# first byte of our program, we want to make sure the user program
+	# pointer in the IST is reset.
+	set n $config(tp_n)
+	set commands [list]	
+	lappend commands $info(op_rstpp)
+
 	while {[llength $prog] > 0} {
-		# Get device number and initialize command list.
-		set n $config(tp_n)
-		set commands [list]	
 		
 		# Extract first few bytes.
 		set segment [lrange $prog 0 [expr $config(tp_seg_len)-1]]
@@ -1195,14 +1227,23 @@ proc Stimulator_tp_run {} {
 			lappend commands $info(op_progen) "1"
 		}
 			
-		# If we want acknowledgements, ask for one.
+		# If we want acknowledgements, ask for one. Make the acknowledgement
+		# key reflect whether we are uploading a chunk of code, or uploading
+		# and enabling the final chunk.
 		if {$config(ack_enable)} {
 			lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-			lappend commands $info(op_ack) $info(ack_progen)
+			if {[llength $prog] > 0} {
+				lappend commands $info(op_ack) $info(ack_upload)
+			} else {
+				lappend commands $info(op_ack) $info(ack_progen)
+			}
 		}
 
 		# Transmit the commands.
 		Stimulator_transmit $info(dev$n\_id) $commands
+		
+		# Reset the command list.
+		set commands [list]
 	}
 }
 
