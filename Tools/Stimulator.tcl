@@ -78,6 +78,7 @@ proc Stimulator_init {} {
 	set config(tp_commands) "1 5 1 71 0 12 205 0 10 0"
 	set config(tp_program) "~/Desktop/user.asm"
 	set config(tp_base) "0x0800"
+	set config(tp_seg_len) "30"
 	set info(tp_ew) $info(window).tpew
 	set info(tp_text) $info(tp_ew).text
 
@@ -1137,19 +1138,15 @@ proc Stimulator_tp_transmit {} {
 }
 
 #
-# Stimulator_tp_run enables execution of user code on the target device
-# by starting synch transmission at the program frequency and sending the 
-# enable command.
+# Stimulator_tp_run assembles and uploads user code in chunks. After the final
+# chunk, it enables the program. If acknowledgements are enabled, the routine
+# asks for an acknowledgement for every chunk.
 #
 proc Stimulator_tp_run {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 	upvar #0 OSR8_Assembler_config aconfig
 	upvar #0 OSR8_Assembler_info ainfo
-	
-	# Get device number and initialize command list.
-	set n $config(tp_n)
-	set commands [list]
 	
 	# Read program from file.
 	if {[file exists $config(tp_program)]} {
@@ -1175,25 +1172,38 @@ proc Stimulator_tp_run {} {
 		LWDAQ_print $info(tp_text) "ERROR: $error_message\."
 		return ""
 	}
-	LWDAQ_print $info(tp_text) "Assembly successful, uploading [llength $prog] code bytes."	
+	LWDAQ_print $info(tp_text) "Assembly successful,\
+		uploading [llength $prog] code bytes."	
+	
+	while {[llength $prog] > 0} {
+		# Get device number and initialize command list.
+		set n $config(tp_n)
+		set commands [list]	
+		
+		# Extract first few bytes.
+		set segment [lrange $prog 0 [expr $config(tp_seg_len)-1]]
+		set prog [lrange $prog $config(tp_seg_len) end]
 
-	# Add upload command and the number of program bytes.
-	lappend commands $info(op_upload) [llength $prog]
+		# Add upload command and the number of program bytes.
+		lappend commands $info(op_upload) [llength $segment]
 	
-	# Add all the program bytes.
-	set commands [concat $commands $prog]
+		# Add all the program bytes.
+		set commands [concat $commands $segment]
 	
-	# Send program enable command.
-	lappend commands $info(op_progen) "1"
-	
-	# If we want acknowledgements, ask for one.
-	if {$config(ack_enable)} {
-		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $info(ack_progen)
+		# After the final chunk, we enable the program.
+		if {[llength $prog] == 0} {
+			lappend commands $info(op_progen) "1"
+		}
+			
+		# If we want acknowledgements, ask for one.
+		if {$config(ack_enable)} {
+			lappend commands $info(op_setpcn) $info(dev$n\_pcn)
+			lappend commands $info(op_ack) $info(ack_progen)
+		}
+
+		# Transmit the commands.
+		Stimulator_transmit $info(dev$n\_id) $commands
 	}
-	
-	# Transmit the commands.
-	Stimulator_transmit $info(dev$n\_id) $commands
 }
 
 #
