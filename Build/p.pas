@@ -1,18 +1,24 @@
 program p;
 
-const
-	width=40;
-	height=20;
+uses
+	sysutils;
 
 var
-	i,j:integer;
+	tt:qword;
 	
+function clock_milliseconds:qword;
+var
+	tdt:TDateTime;
+	tts:TTimeStamp;
 begin
-	for j:=1 to height do begin
-		for i:=1 to width do 
-			if i=j then write('X')
-			 else if (i+j=22) then write ('X')
-			else write(' ');
-		writeln;
-	end;
+	tdt:=Now;
+	tts:=DateTimeToTimeStamp(tdt);
+	clock_milliseconds:=round(TimeStampToMSecs(tts));
+end;
+
+begin
+	tt:=clock_milliseconds;
+	write('Pause and press return: ');
+	readln;
+	writeln('You paused for ',clock_milliseconds-tt,' ms.');
 end.

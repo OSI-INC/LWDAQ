@@ -54,8 +54,7 @@ if {[regexp -nocase "Darwin" $tcl_platform(os)]} {
 # Determine the contents directory name. On MacOS, Linux, and Windows we
 # have our bundled TclTk executable as a reference point. For Raspbian, we
 # assume we are calling wish or tclsh with this file as the initialization 
-# script, so we use argv0 to obtain the contents directory. By default we
-# use argv0 also, as for unix.
+# script, so we use argv0 to obtain the contents directory.
 set LWDAQ_Info(exec_dir) [file dirname [info nameofexecutable]]
 switch $LWDAQ_Info(os) {
 	"MacOS" {

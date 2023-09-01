@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "162"
+	LWDAQ_tool_init "Neurorecorder" "163"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -780,6 +780,14 @@ proc Neurorecorder_record {{command ""}} {
 		set config(record_file) [file join $config(record_dir) \
 			"$config(ndf_prefix)$config(record_start_clock)\.ndf"]
 		set info(record_file_tail) [file tail $config(record_file)]
+		if {[file exists $config(record_file)]} {
+			Neurorecorder_print "ERROR: File \"$info(record_file_tail)\"\
+				already exists, recording directory conflict."
+			Neurorecorder_print "SUGGESTION: Make sure all Neurorecorders use\
+				unique recording directories."
+			set info(record_control) "Idle"
+			return ""
+		}
 		LWDAQ_ndf_create $config(record_file) $config(ndf_metadata_size)	
 		LWDAQ_ndf_string_write $config(record_file) [Neurorecorder_metadata_header] 
 		if {($info(record_control) == "Start") || $config(synchronize)} {
