@@ -1062,9 +1062,7 @@ proc Stimulator_transmit_panel {} {
 		destroy $ainfo(window)
 		if {[info commands OSR8_Assembler_assemble] == ""} {
 			LWDAQ_print $info(text) "ERROR: Failed to open OSR8 Assembler tool."
-		} else {
-			LWDAQ_print $info(text) "Loaded OSR8 Assembler routines."
-		}
+		} 
 	}
 
 	set f [frame $w.controls]
