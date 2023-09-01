@@ -41,6 +41,7 @@ proc Stimulator_init {} {
 	set config(spacing_delay_A2071E) "0.0014"
 	set config(spacing_delay_cmd) "0.0"
 	set config(byte_processing_time) "0.0002"
+	set config(rf_off_op) "0080"
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
 	set config(checksum_preload) "1111111111111111"
@@ -200,6 +201,8 @@ proc Stimulator_transmit {id commands} {
 		LWDAQ_set_driver_mux $sock $config(driver_socket) 1
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
+		LWDAQ_transmit_command_hex $sock $config(rf_off_op)
+		LWDAQ_delay_seconds $sock $sd
 		set counter 0
 		foreach c $commands {
 			LWDAQ_transmit_command_hex $sock "[format %02X $c]$config(rf_xmit_op)"
