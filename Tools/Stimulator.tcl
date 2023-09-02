@@ -24,7 +24,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.4"
+	LWDAQ_tool_init "Stimulator" "3.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -32,7 +32,7 @@ proc Stimulator_init {} {
 	
 	set config(device_rck_khz) "32.768"
 	set config(max_pulse_len) [expr (256 * 256) - 1]
-	set config(max_interval_len) [expr (256 * 256 * 256) - 1]
+	set config(max_interval_len) [expr (256 * 256) - 1]
 	set config(max_stimulus_len) [expr (256 * 256) - 1]
 	set config(min_current) "0"
 	set config(max_current) "15"
@@ -247,9 +247,7 @@ proc Stimulator_start_cmd {n} {
 	set info(dev$n\_current) $current
 	lappend commands $current
 	
-	# Append the two bytes of the pulse length, which will prime a 
-	# countdown to zero, so we subtract one from the number of RCK
-	# periods we want the pulse to last for.
+	# Append the two bytes of the pulse length.
 	set len [expr round($config(device_rck_khz) * $info(dev$n\_pulse_ms)) - 1]
 	if {$len > $config(max_pulse_len)} {
 		set len $config(max_pulse_len)
@@ -258,16 +256,14 @@ proc Stimulator_start_cmd {n} {
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
 
-	# Set the three bytes of the interval length.
+	# Set the two bytes of the interval length.
 	set len [expr round($config(device_rck_khz) * $info(dev$n\_period_ms))]
 	if {$len > $config(max_interval_len)} {
 		set len $config(max_interval_len)
 		LWDAQ_print $info(text) "WARNING: Intervals truncated to\
 			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
 	}
-	lappend commands [expr $len / 65536] \
-		[expr ($len / 256) % 256] \
-		[expr $len % 256]
+	lappend commands [expr $len / 256] [expr $len % 256]
 
 	# Set the two bytes of the stimulus length, which is the number of intervals.
 	set len $info(dev$n\_num_pulses)
