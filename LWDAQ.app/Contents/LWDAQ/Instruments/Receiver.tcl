@@ -330,7 +330,7 @@ proc LWDAQ_reset_Receiver {} {
 						set info(daq_block_cntr) 0
 						set channel_select_available 0
 						set send_all_sets_cmd 1
-						set info(purge_duplicates) 0
+						set info(purge_duplicates) 1
 					}
 					2 {
 						set info(receiver_type) "A3032"
