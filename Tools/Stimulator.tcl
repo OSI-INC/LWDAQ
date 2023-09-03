@@ -31,8 +31,11 @@ proc Stimulator_init {} {
 	set config(driver_socket) "8"
 	
 	set config(device_rck_khz) "32.768"
+	set config(device_divisor) "32"
 	set config(max_pulse_len) [expr (256 * 256) - 1]
+	set config(min_pulse_len) "2"
 	set config(max_interval_len) [expr (256 * 256) - 1]
+	set config(min_interval_len) "2"
 	set config(max_stimulus_len) [expr (256 * 256) - 1]
 	set config(min_current) "0"
 	set config(max_current) "15"
@@ -248,20 +251,36 @@ proc Stimulator_start_cmd {n} {
 	lappend commands $current
 	
 	# Append the two bytes of the pulse length.
-	set len [expr round($config(device_rck_khz) * $info(dev$n\_pulse_ms)) - 1]
+	set len [expr round($config(device_rck_khz) \
+		/ $config(device_divisor) \
+		* $info(dev$n\_pulse_ms)) - 1]
 	if {$len > $config(max_pulse_len)} {
 		set len $config(max_pulse_len)
+		set len_ms [expr 1.0*$len/$config(device_rck_khz)*config(device_divisor)]
 		LWDAQ_print $info(text) "WARNING: Pulses truncated to\
-			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
+			[format %.0f $len_ms]  ms."
+	} elseif {$len < $config(min_pulse_len)} {
+		set len $config(min_pulse_len)
+		set len_ms [expr 1.0*$len/$config(device_rck_khz)*config(device_divisor)]
+		LWDAQ_print $info(text) "WARNING: Pulses lengthened to\
+			[format %.0f $len_ms]  ms."
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
 
 	# Set the two bytes of the interval length.
-	set len [expr round($config(device_rck_khz) * $info(dev$n\_period_ms))]
+	set len [expr round($config(device_rck_khz) \
+		/ $config(device_divisor) \
+		* $info(dev$n\_period_ms))]
 	if {$len > $config(max_interval_len)} {
 		set len $config(max_interval_len)
+		set len_ms [expr 1.0*$len/$config(device_rck_khz)*config(device_divisor)]
 		LWDAQ_print $info(text) "WARNING: Intervals truncated to\
-			[format %.0f [expr 1.0*$len/$config(device_rck_khz)]] ms."
+			[format %.0f $len_ms] ms."
+	} elseif {$len < $config(min_interval_len)} {
+		set len $config(min_interval_len)
+		set len_ms [expr 1.0*$len/$config(device_rck_khz)*config(device_divisor)]
+		LWDAQ_print $info(text) "WARNING: Intervals lengthened to\
+			[format %.0f $len_ms]  ms."
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
 
