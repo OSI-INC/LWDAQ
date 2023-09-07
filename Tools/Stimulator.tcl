@@ -30,8 +30,8 @@ proc Stimulator_init {} {
 	set config(ip_addr) "10.0.0.37"
 	set config(driver_socket) "8"
 	
-	set config(device_rck_khz) "32.768"
-	set config(device_divisor) "32"
+	set config(rck_khz) "32.768"
+	set config(rck_divisor) "32"
 	set config(max_pulse_len) [expr (256 * 256) - 1]
 	set config(min_pulse_len) "2"
 	set config(max_interval_len) [expr (256 * 256) - 1]
@@ -251,34 +251,34 @@ proc Stimulator_start_cmd {n} {
 	lappend commands $current
 	
 	# Append the two bytes of the pulse length.
-	set len [expr round($config(device_rck_khz) \
-		/ $config(device_divisor) \
+	set len [expr round($config(rck_khz) \
+		/ $config(rck_divisor) \
 		* $info(dev$n\_pulse_ms)) - 1]
 	if {$len > $config(max_pulse_len)} {
 		set len $config(max_pulse_len)
-		set len_ms [expr 1.0*$len/$config(device_rck_khz)*config(device_divisor)]
+		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
 		LWDAQ_print $info(text) "WARNING: Pulses truncated to\
 			[format %.0f $len_ms]  ms."
 	} elseif {$len < $config(min_pulse_len)} {
 		set len $config(min_pulse_len)
-		set len_ms [expr 1.0*$len/$config(device_rck_khz)*config(device_divisor)]
+		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
 		LWDAQ_print $info(text) "WARNING: Pulses lengthened to\
 			[format %.0f $len_ms]  ms."
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
 
 	# Set the two bytes of the interval length.
-	set len [expr round($config(device_rck_khz) \
-		/ $config(device_divisor) \
+	set len [expr round($config(rck_khz) \
+		/ $config(rck_divisor) \
 		* $info(dev$n\_period_ms))]
 	if {$len > $config(max_interval_len)} {
 		set len $config(max_interval_len)
-		set len_ms [expr 1.0*$len/$config(device_rck_khz)*config(device_divisor)]
+		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
 		LWDAQ_print $info(text) "WARNING: Intervals truncated to\
 			[format %.0f $len_ms] ms."
 	} elseif {$len < $config(min_interval_len)} {
 		set len $config(min_interval_len)
-		set len_ms [expr 1.0*$len/$config(device_rck_khz)*config(device_divisor)]
+		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
 		LWDAQ_print $info(text) "WARNING: Intervals lengthened to\
 			[format %.0f $len_ms]  ms."
 	}
@@ -415,7 +415,7 @@ proc Stimulator_xon {n} {
 		set info(state) "Idle"
 		return ""
 	}
-	set tx_p [expr round($config(device_rck_khz)*1000/$info(dev$n\_sps))-1]
+	set tx_p [expr round($config(rck_khz)*1000/$info(dev$n\_sps))-1]
 	lappend commands $info(op_xmit) $tx_p
 		
 		

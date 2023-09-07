@@ -1198,13 +1198,12 @@ proc LWDAQ_reset {} {
 }
 
 #
-# LWDAQ_server_open opens the remote control window. In the window, you
-# specify an IP address match string to filter incoming connection requests.
-# You specify the IP port to at whith LWDAQ should listen. You provide match
-# strings for the commands that the remote control command interpreter should
-# process. When you press Run, the remote controller is running and listening.
-# When you press Stop, it stops. You cannot adjust the listening port while
-# the remote controller is running.
+# LWDAQ_server_open opens the remote control window. In the window, you specify
+# an IP address match string to filter incoming connection requests. You specify
+# the IP port at which LWDAQ should listen. You provide match strings for the
+# commands that the remote control command interpreter should process. When you
+# press Run, the server is running and listening. When you press Stop, it stops.
+# You cannot adjust the listening port while the server is running.
 #
 proc LWDAQ_server_open {} {
 	global LWDAQ_Info
