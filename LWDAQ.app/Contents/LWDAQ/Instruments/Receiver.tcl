@@ -100,6 +100,8 @@ proc LWDAQ_init_Receiver {} {
 	set info(min_id) 0
 	set info(max_id) 255
 	set info(activity_rows) 32
+	set info(aux_messages) ""
+	set info(set_size) "16"
 	
 	set info(buffer_image) "_receiver_buffer_image_"
 	catch {lwdaq_image_destroy $info(buffer_image)}
@@ -219,6 +221,46 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			set info(channel_activity) $ca
 		} {
 			error $channels
+		}
+		
+		# We clear the auxiliary message list. Our assumption is that tools like
+		# the Stimulator will be do all the work they need to on the list before the
+		# next Receiver acquisition.
+		set info(aux_messages) ""
+
+		# We look for messages in the auxiliary channels.
+		set new_aux_messages [lwdaq_receiver $image_name \
+			"-payload $config(payload_length) auxiliary"]
+
+		# We are going to calculate a timestamp, with resolution one clock tick,
+		# for each auxiliary message. The timestamps can be used as a form of
+		# addressing for slow data transmissions. To get the absolute timestamp,
+		# we get the value of the first clock message in the data, which should
+		# be the first message in the data. This time is a sixteen-bit value
+		# that has counted the number of times a 32.768 kHz clock has counted to
+		# 256 since the data receiver clock was last reset, wrapping around to
+		# zero every time it overflows.
+		scan [lwdaq_receiver $image_name \
+			"-payload $config(payload_length) get 0"] %d%d%d cid bts fvn
+		
+		# We take each new auxiliary message and break it up into three parts. The
+		# first part is a four-bit ID, which is the primary channel number of the
+		# device producing the auxiliary message. The second part is a four-bit
+		# field address. The third is eight bits of data. These sixteen bits are the
+		# contents of the auxiliary message. We add a fourth number, which is the
+		# timestamp of message reception. We give the timestamp modulo 2^16, which
+		# gives us sufficient precision to detect any time-based address encoding of
+		# auxiliary data. These four numbers make one entry in the auxiliary message
+		# list, so we append them to the existing list. If the four-bit ID is zero
+		# or fifteen, this is a bad message, so we don't store it.
+		foreach {cn mt md} $new_aux_messages {
+			set id [expr ($md / 4096)]
+			if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
+			set id [expr (($cn / $info(set_size)) * $info(set_size)) + $id]
+			set fa [expr ($md / 256) % 16]
+			set d [expr $md % 256]
+			set ts  [expr ($mt + $bts * 256) % (65536)]
+			lappend info(aux_messages) "$id $fa $d $ts"
 		}
 		
 		# If requested, we print the first block of raw message data to the screen.

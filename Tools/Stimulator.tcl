@@ -18,7 +18,9 @@
 # this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 
-
+#
+# Stimulator_init initializes the Stimulator Tool.
+#
 proc Stimulator_init {} {
 	upvar #0 Stimulator_info info
 	upvar #0 Stimulator_config config
@@ -62,11 +64,9 @@ proc Stimulator_init {} {
 	set config(ack_received_color) "black"
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
-
+	
 	set config(blow) "2.5"
 	set config(bempty) "2.2"
-
-	
 	set config(ack_enable) "1"
 	set config(verbose) "1"
 	
@@ -117,7 +117,6 @@ proc Stimulator_init {} {
 	set info(ack_progen) "25"
 	
 	set info(state) "Idle"
-	set info(monitor_interval_ms) "100"
 	set info(monitor_ms) "0"
 	set info(button_padx) "0"
 	
@@ -356,7 +355,7 @@ proc Stimulator_start {n} {
 }
 
 #
-# The stop procedure transmits a stop command and sets the stimulus end time
+# Stimulator_stop transmits a stop command and sets the stimulus end time
 # for selected channel to the current time.
 #
 proc Stimulator_stop {n} {
@@ -553,7 +552,7 @@ proc Stimulator_all {action} {
 }
 
 #
-# Clears the status and battery values of an stimulators in the list.
+# Stimulator_clear clears the status and battery values of an stimulators in the list.
 #
 proc Stimulator_clear {n} {
 	upvar #0 Stimulator_config config
@@ -568,13 +567,15 @@ proc Stimulator_clear {n} {
 }
 
 #
-# A background routine, which keeps posting itself to the Tcl event loop, which
-# maintains the colors of the stimulator indicators in the tool window.
+# Stimulator_monitor captures auxiliary messages from stimulators and keeps track
+# of when stimuli end, so it can change the state label colors. The routine looks
+# for auxiliary messages first in the Neuroplayer Tool, if one exists, and second
+# in the Receiver Instrument.
 #
 proc Stimulator_monitor {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
-	global LWDAQ_info_Receiver 
+	upvar #0 LWDAQ_info_Receiver rinfo
 	upvar #0 Neuroplayer_info ninfo
 	upvar #0 Neuroplayer_config nconfig
 	global LWDAQ_Info
@@ -583,14 +584,8 @@ proc Stimulator_monitor {} {
 	if {$LWDAQ_Info(reset)} {return ""}
 	set f $info(window).state
 
-	# We check the auxiliary message list every monitor_ms milliseconds.
+	# note the time.
 	set now_ms [clock milliseconds]
-	if {$now_ms < $info(monitor_ms)} {
-		LWDAQ_post Stimulator_monitor
-		return ""
-	} {
-		set info(monitor_ms) [expr $now_ms + $info(monitor_interval_ms)]
-	}
 	
 	# Check the stimuli and mark device state label when stimulus is complete.
 	foreach n $info(dev_list) {
@@ -600,13 +595,6 @@ proc Stimulator_monitor {} {
 		}	
 	}
 	
-	# If the Neuroplayer's auxiliary message list does not exist, we have no
-	# hope of finding any auxiliary messages from our stimulators.
-	if {![info exists ninfo(aux_messages)]} {
-		LWDAQ_post Stimulator_monitor
-		return ""
-	}
-	
 	# If the time since the previous transmission of commands is greater
 	# than max_response_ms, we don't bother looking for auxiliary messages.
 	if {$now_ms > $info(transmit_ms) + $config(max_response_ms)} {
@@ -614,12 +602,28 @@ proc Stimulator_monitor {} {
 		return ""
 	}
 	
-	# Go through the Neuroplayer's auxiliary message list and find messages that
-	# could be from stimulators. Report them to the text window and delete them
-	# from the list so we don't double-report them.
-	set new_aux [list]
+	# Look for auxiliary message lists. If we find one, copy and clear the
+	# list.
+	set aux_messages ""
+	if {[info exists ninfo(aux_messages)]} {
+		set aux_messages $ninfo(aux_messages)
+		set ninfo(aux_messages) ""
+	} elseif {[info exists rinfo(aux_messages)]} {
+		set aux_messages $rinfo(aux_messages)
+		set rinfo(aux_messages) ""
+	}
+	
+	# If we have no auxiliary messages, we are done.
+	if {[llength $aux_messages] == 0} { 
+		LWDAQ_post Stimulator_monitor
+		return ""
+	}
+	
+	# Go through the auxiliary message list and find messages that could be from
+	# stimulators. Report them to the text window and delete them from the list
+	# so we don't double-report them.
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_pcn)"}
-	foreach am $ninfo(aux_messages) {
+	foreach am $aux_messages {
 		scan $am %d%d%d%d id fa db ts
 		if {$fa == $info(ack_at)} {
 		
@@ -688,16 +692,9 @@ proc Stimulator_monitor {} {
 			set device_id [format %04X [expr $id +  (256 * $db)]]
 			LWDAQ_print $info(text) "Identification Broadcast:\
 				device_id=$device_id time=$ts\." green
-		} else {
-			# Add unrecognised auxiliary message to new list.
-			lappend new_aux $am
-		}
+		} 
 	}
 	
-	# Replace the Neuroplayer's auxiliary message list. The Neuroplayer will
-	# create a fresh list when it reads the next interval.
-	set ninfo(aux_messages) $new_aux
-
 	# We post the monitor to the event queue and report success.
 	LWDAQ_post Stimulator_monitor
 	return ""
@@ -1317,6 +1314,11 @@ proc Stimulator_open {} {
 		LWDAQ_post "LWDAQ_run_tool Neuroplayer"
 	}
 	pack $f.neuroplayer -side left -expand yes
+
+	button $f.receiver -text "Receiver" -command {
+		LWDAQ_post "LWDAQ_open Receiver"
+	}
+	pack $f.receiver -side left -expand yes
 
 	button $f.txcmd -text "Transmit Panel" -command {
 		LWDAQ_post "Stimulator_transmit_panel"
