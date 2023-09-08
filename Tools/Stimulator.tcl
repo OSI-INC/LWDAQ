@@ -69,6 +69,7 @@ proc Stimulator_init {} {
 	set config(bempty) "2.2"
 	set config(ack_enable) "1"
 	set config(verbose) "1"
+	set info(time_format) {%d-%b-%Y %H:%M:%S}
 	
 	set info(transmit_ms) 0
 	set config(max_response_ms) "3000"
@@ -586,6 +587,7 @@ proc Stimulator_monitor {} {
 
 	# note the time.
 	set now_ms [clock milliseconds]
+	set now_time \([clock format [clock seconds] -format $info(time_format)]\)
 	
 	# Check the stimuli and mark device state label when stimulus is complete.
 	foreach n $info(dev_list) {
@@ -595,7 +597,7 @@ proc Stimulator_monitor {} {
 		}	
 	}
 	
-	# If the time since the previous transmission of commands is greater
+	# If the time since the previous transmission of a command is greater
 	# than max_response_ms, we don't bother looking for auxiliary messages.
 	if {$now_ms > $info(transmit_ms) + $config(max_response_ms)} {
 		LWDAQ_post Stimulator_monitor
@@ -640,7 +642,7 @@ proc Stimulator_monitor {} {
 				$info(ack_progen) {set type "progen"} \
 				default {set type $db}
 			LWDAQ_print $info(text) "Command Acknowledgement:\
-				pcn=$id type=$type time=$ts\."
+				cn=$id type=$type ts=$ts $now_time"
 		} elseif {$fa == $info(batt_at)} {
 			
 			# Battery measurements may correspond to a stimulator in our
@@ -683,15 +685,15 @@ proc Stimulator_monitor {} {
 		
 			# Report the battery measurement.
 			LWDAQ_print $info(text) "Battery Measurement:\
-				pcn=$id value=$db time=$ts voltage=$voltage." brown
+				pcn=$id value=$db ts=$ts voltage=$voltage $now_time" brown
 		} elseif {$fa == $info(sync_at)} {
 		
 			# Report a synchronizing mark.
-			LWDAQ_print $info(text) "Synchronizing Mark: pcn=$id time=$ts\."
+			LWDAQ_print $info(text) "Synchronizing Mark: pcn=$id ts=$ts $now_time"
 		} elseif {$fa == $info(id_at)} {
 			set device_id [format %04X [expr $id +  (256 * $db)]]
 			LWDAQ_print $info(text) "Identification Broadcast:\
-				device_id=$device_id time=$ts\." green
+				device_id=$device_id ts=$ts $now_time" green
 		} 
 	}
 	
