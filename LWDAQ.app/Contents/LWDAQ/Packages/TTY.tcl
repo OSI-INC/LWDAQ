@@ -18,8 +18,6 @@
 # this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 
-# Version 1.1 First version.
-
 # Load this package or routines into LWDAQ with "package require EDF".
 package provide TTY 1.3
 
@@ -39,12 +37,12 @@ set TTY(p) ""
 set TTY(saved) [eval exec [auto_execok stty] -g]
 
 #
-# TTY_start calls the global TTY array, and uses the stty command to
-# reconfigure the terminal so that any characters entered are not echoed by
-# the terminal and are passed into the input channel buffer. We configure the
-# standard input channel so that the I//O will flush the channel for every
-# character pressed. The channel becomes readable when a string of text is
-# ready to be read out of it.
+# TTY_start calls the global TTY array, and uses the stty command to reconfigure
+# the terminal so that any characters entered are not echoed by the terminal and
+# are passed into the input channel buffer. We configure the standard input
+# channel so that the I//O will flush the channel for every character pressed.
+# The channel becomes readable when a string of text is ready to be read out of
+# it.
 #
 
 proc TTY_start {} {
@@ -62,21 +60,21 @@ proc TTY_start {} {
 # TTY_execute is called when the stdin channel is readable. It processes all
 # characters sent through the stdin. If the characters are not new line
 # characters, it will take the ascii value of every character that is entered
-# into stdin.   In order to interpret more complex ascii characters, this
+# into stdin. In order to interpret more complex ascii characters, this
 # procedure uses a state machine to trigger specific commands that respond to
-# different ascii values. For example,for the ascii values that are denoted
-# when a button is pressed, the state machine reads each character, adjusting
-# its state each time in accordance with the corresponding ascii value.
-# Eventually, a combination of specific ascci characters will result in a
-# specific command. If the ascii characters coming through stdin are not
-# significant enough to change the state, they are interpreted as normal
-# characters and appended to the command variable, and printed to the screen.
-# When a new line character is received, the command is executed.  Right
-# before the command is executed,  the terminal is reconfigured to its
-# initial state, in case the shell freezes and we need to use CTRL-C to exit.
-# Once the command is executed, the terminal is set back to being "raw", the
-# value of the command is returned, the state is set to insert, the command
-# is added to the command list, and the command variable is cleared.
+# different ascii values. For example,for the ascii values that are denoted when
+# a button is pressed, the state machine reads each character, adjusting its
+# state each time in accordance with the corresponding ascii value. Eventually,
+# a combination of specific ascci characters will result in a specific command.
+# If the ascii characters coming through stdin are not significant enough to
+# change the state, they are interpreted as normal characters and appended to
+# the command variable, and printed to the screen. When a new line character is
+# received, the command is executed. Right before the command is executed,  the
+# terminal is reconfigured to its initial state, in case the shell freezes and
+# we need to use CTRL-C to exit. Once the command is executed, the terminal is
+# set back to being "raw", the value of the command is returned, the state is
+# set to insert, the command is added to the command list, and the command
+# variable is cleared.
 #
 
 proc TTY_execute {} {
@@ -175,18 +173,13 @@ proc TTY_execute {} {
 }
 
 
-
-
-
-
 #
 # TTY_clear is used when you want to get rid of all of the text in the command
 # line, while your cursor is not at the end of the text line. It does so by
-# removing every character to the left of the cursor, then printing the
-# previous command text to the text line, which sets the cursor back to zero.
-# From here, the remove space character is able to remove every character
-# from the left of the cursor, which happens to be every character in the
-# command line.
+# removing every character to the left of the cursor, then printing the previous
+# command text to the text line, which sets the cursor back to zero. From here,
+# the remove space character is able to remove every character from the left of
+# the cursor, which happens to be every character in the command line.
 #
 
 proc TTY_clear {} {
@@ -201,11 +194,11 @@ proc TTY_clear {} {
 
 #
 # TTY_up handles the up arrow. It allows you to  navigate through your previous
-# commands that have been added to the TTY(commandlist) list. The pointer is
-# set to zero any time a new line character is recieved, and as long as the
-# pointer is less than the length of the command list, you clear the command
-# line and print the command that is located at the point in the command list
-#  determined by the pointer.
+# commands that have been added to the TTY(commandlist) list. The pointer is set
+# to zero any time a new line character is recieved, and as long as the pointer
+# is less than the length of the command list, you clear the command line and
+# print the command that is located at the point in the command list determined
+# by the pointer.
 #
 
 proc TTY_up {} {
@@ -231,15 +224,16 @@ proc TTY_down {} {
 	if {$TTY(pointer) != 0} {
 		TTY_clear
 		incr TTY(pointer) -1
-		set TTY(command) [lindex $TTY(commandlist) [expr [llength $TTY(commandlist)] - $TTY(pointer)]]
+		set TTY(command) [lindex $TTY(commandlist) \
+			[expr [llength $TTY(commandlist)] - $TTY(pointer)]]
 		puts -nonewline $TTY(command)
 	}
 }
 		
 #
-# TTY_removespace removes whatever command line text is to the left of your cursor. The cursor
-# position, subtracted from the string length of the command denotes the
-# number of back spaces to do.
+# TTY_removespace removes whatever command line text is to the left of your
+# cursor. The cursor position, subtracted from the string length of the command
+# denotes the number of back spaces to do.
 #
 
 proc TTY_removespace {} {
