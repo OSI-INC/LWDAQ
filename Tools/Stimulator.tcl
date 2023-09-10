@@ -26,7 +26,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.5"
+	LWDAQ_tool_init "Stimulator" "3.6"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -72,11 +72,11 @@ proc Stimulator_init {} {
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
 	
 	set info(transmit_ms) 0
-	set config(max_response_ms) "3000"
-	set info(id_at) "0"
-	set info(ack_at) "1"
-	set info(batt_at) "2"
-	set info(sync_at) "3"
+	set info(at_id) "0"
+	set info(at_ack) "1"
+	set info(at_batt) "2"
+	set info(at_sync) "3"
+	set info(at_conf) "4"
 	set config(default_ver) "A3041"
 	set config(default_id) "1234"
 	set config(multicast_id) "FFFF"
@@ -585,9 +585,8 @@ proc Stimulator_monitor {} {
 	if {$LWDAQ_Info(reset)} {return ""}
 	set f $info(window).state
 
-	# note the time.
+	# Note the time for stimulation tracking.
 	set now_ms [clock milliseconds]
-	set now_time \([clock format [clock seconds] -format $info(time_format)]\)
 	
 	# Check the stimuli and mark device state label when stimulus is complete.
 	foreach n $info(dev_list) {
@@ -597,22 +596,17 @@ proc Stimulator_monitor {} {
 		}	
 	}
 	
-	# If the time since the previous transmission of a command is greater
-	# than max_response_ms, we don't bother looking for auxiliary messages.
-	if {$now_ms > $info(transmit_ms) + $config(max_response_ms)} {
-		LWDAQ_post Stimulator_monitor
-		return ""
-	}
-	
 	# Look for auxiliary message lists. If we find one, copy and clear the
 	# list.
 	set aux_messages ""
 	if {[info exists ninfo(aux_messages)]} {
 		set aux_messages $ninfo(aux_messages)
 		set ninfo(aux_messages) ""
+		set now_time \($ninfo(datetime_play_time)\)
 	} elseif {[info exists rinfo(aux_messages)]} {
 		set aux_messages $rinfo(aux_messages)
 		set rinfo(aux_messages) ""
+		set now_time \([clock format [clock seconds] -format $info(time_format)]\)
 	}
 	
 	# If we have no auxiliary messages, we are done.
@@ -624,10 +618,12 @@ proc Stimulator_monitor {} {
 	# Go through the auxiliary message list and find messages that could be from
 	# stimulators. Report them to the text window and delete them from the list
 	# so we don't double-report them.
+	set id_list ""
+	set broadcast_id 0
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_pcn)"}
 	foreach am $aux_messages {
 		scan $am %d%d%d%d id fa db ts
-		if {$fa == $info(ack_at)} {
+		if {$fa == $info(at_ack)} {
 		
 			# Acknowledgements encode the type of command in their data byte.
 			switch $db \
@@ -643,7 +639,7 @@ proc Stimulator_monitor {} {
 				default {set type $db}
 			LWDAQ_print $info(text) "Command Acknowledgement:\
 				cn=$id type=$type ts=$ts $now_time"
-		} elseif {$fa == $info(batt_at)} {
+		} elseif {$fa == $info(at_batt)} {
 			
 			# Battery measurements may correspond to a stimulator in our
 			# list, and if so we want to update its battery measurement. The
@@ -686,15 +682,20 @@ proc Stimulator_monitor {} {
 			# Report the battery measurement.
 			LWDAQ_print $info(text) "Battery Measurement:\
 				pcn=$id value=$db ts=$ts voltage=$voltage $now_time" brown
-		} elseif {$fa == $info(sync_at)} {
+		} elseif {$fa == $info(at_sync)} {
 		
 			# Report a synchronizing mark.
 			LWDAQ_print $info(text) "Synchronizing Mark: pcn=$id ts=$ts $now_time"
-		} elseif {$fa == $info(id_at)} {
-			set device_id [format %04X [expr $id +  (256 * $db)]]
-			LWDAQ_print $info(text) "Identification Broadcast:\
-				device_id=$device_id ts=$ts $now_time" green
-		} 
+		} elseif {$fa == $info(at_id)} {
+			set broadcast_id [format %04X [expr $id +  (256 * $db)]]
+		} elseif {$fa == $info(at_conf)} {
+			set confirmation_id [format %04X [expr $id +  (256 * $db)]]
+			if {($confirmation_id == $broadcast_id)} {
+				LWDAQ_print $info(text) "Identification Broadcast:\
+					device_id=$broadcast_id ts=$ts $now_time" green
+			}
+			set broadcast_id 0
+		}
 	}
 	
 	# We post the monitor to the event queue and report success.
