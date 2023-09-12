@@ -299,15 +299,21 @@ proc LWDAQ_zoom_Viewer {} {
 # LWDAQ_xy_Viewer takes as input an x-y position relative to the top-left corner
 # of the image display widget, and sets the info(x) and info(y) parameters with
 # the column and row of the image pixel displayed at that display widget
-# position.
+# position. If we pass a command, it also sets the corners of the analysis 
+# boundaries. The motion command adjusts the bottom-right corner. The press 
+# command sets the top-left corner. The release command  sets the image
+# analysis bounds with the rectangle drawn.
 #
 proc LWDAQ_xy_Viewer {x y cmd} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
+	
+	# Get the image column and row.
+	set zoom [expr 1.0 * $info(zoom) * [LWDAQ_get_lwdaq_config display_zoom]]
+	set info(x) [expr round(1.0*($x - 4)/$zoom)] 
+	set info(y) [expr round(1.0*($y - 4)/$zoom)]
 
-	set info(x) [expr round(1.0*($x - 4)/$info(zoom))] 
-	set info(y) [expr round(1.0*($y - 4)/$info(zoom))]
-
+	# Update corners of analysis bounds if we are moving.
 	if {$cmd == "Motion"} {
 		if {$info(select)} {
 			if {$info(x) > $info(corner_x)} {
@@ -330,6 +336,7 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 		}
 	}
 	
+	# Start a rectangle by dropping one corner on the image.
 	if {$cmd == "Press"} {
 		set info(select) 1
 		set info(corner_x) $info(x)
@@ -341,6 +348,7 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 		LWDAQ_set_bounds_Viewer
 	}
 	
+	# Complete and apply a rectangle.
 	if {$cmd == "Release"} {
 		set info(select) 0
 		if {($info(daq_image_right)-$info(daq_image_left) < $info(daq_min_width)) \

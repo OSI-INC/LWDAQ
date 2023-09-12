@@ -644,7 +644,7 @@ const
 	crlf=chr(13)+chr(10);
 	tab=chr(9);
 	hex_digits_per_byte=2;
-	short_string_length=2000;
+	short_string_length=255;
 	long_string_length=300000;
 
 var

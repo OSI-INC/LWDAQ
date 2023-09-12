@@ -1096,9 +1096,10 @@ proc LWDAQ_library_settings {} {
 	pack $f -side top -fill x
 	
 	button $f.lca -text "Apply" -command {
-		set settings ""
+		set settings [list]
 		foreach {op val} [lwdaq_config] {
-			append settings " $op $LWDAQ_lwdaq_config([string map {- ""} $op])"
+			lappend settings $op
+			lappend settings $LWDAQ_lwdaq_config([string map {- ""} $op])
 		}
 		eval lwdaq_config $settings
 		foreach {op val} [lwdaq_config] {

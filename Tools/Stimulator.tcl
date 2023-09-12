@@ -26,7 +26,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.6"
+	LWDAQ_tool_init "Stimulator" "3.7"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -80,7 +80,7 @@ proc Stimulator_init {} {
 	set config(max_tx_sps) "1024"
 	
 	# Transmit Panel Parameters
-	set config(tp_n) "1"
+	set config(tp_id) "FFFF"
 	set config(tp_commands) "6 3 2 255"
 	set config(tp_program) "~/Desktop/UProg.asm"
 	set config(tp_base_addr) "0x0800"
@@ -93,6 +93,7 @@ proc Stimulator_init {} {
 	set info(at_ack) "2"
 	set info(at_batt) "3"
 	set info(at_conf) "4"
+	set info(at_ver) "5"
 	
 	# Stimulator operation codes, which we use to construct instructions, which
 	# we in turn combine to form commands.
@@ -107,6 +108,7 @@ proc Stimulator_init {} {
 	set info(op_pgoff) "8"
 	set info(op_pgrst) "9"
 	set info(op_shdn) "10"
+	set info(op_ver) "11"
 	
 	set info(state) "Idle"
 	set info(monitor_ms) "0"
@@ -230,9 +232,8 @@ proc Stimulator_start_cmd {n} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
-	# Append the stimulus start command.
-	set commands [list]
-	lappend commands $info(op_start)
+	# Begin command with a start instruction code.
+	set commands [list $info(op_start)]
 	
 	# Append the current.
 	set current [expr round($info(dev$n\_current))]
@@ -284,11 +285,7 @@ proc Stimulator_start_cmd {n} {
 	lappend commands [expr $len / 256] [expr $len % 256]
 
 	# Randomize the pulses, or not.
-	if {$info(dev$n\_random)} {
-		lappend commands 1
-	} {
-		lappend commands 0
-	}
+	if {$info(dev$n\_random)} {lappend commands 1} {lappend commands 0}
 	
 	# We return the command string, which does not yet have the checksum
 	# attached to the end, nor the device id bytes at the beginning, but is
@@ -392,7 +389,7 @@ proc Stimulator_xoff {n} {
 	set info(state) "Command"
 
 	# Send the Xoff command, which is a transmit command with zero period.
-	lappend commands [list $info(op_xoff)]
+	set commands [list $info(op_xoff)]
 	
 	# Transmit the commands.
 	Stimulator_transmit $info(dev$n\_id) $commands
@@ -415,7 +412,7 @@ proc Stimulator_battery {n} {
 	set info(state) "Command"
 
 	# Send battery measurement request.
-	lappend commands [list $info(op_batt)]
+	set commands [list $info(op_batt)]
 	
 	# Transmit commands.
 	Stimulator_transmit $info(dev$n\_id) $commands
@@ -1066,8 +1063,8 @@ proc Stimulator_transmit_panel {} {
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.nl -text "Device:"
-	entry $f.ne -textvariable Stimulator_config(tp_n) -width 3
+	label $f.nl -text "Target Identifier (Hex):"
+	entry $f.ne -textvariable Stimulator_config(tp_id) -width 5
 	pack $f.nl $f.ne -side left -expand yes
 
 	foreach a {Run Halt} {
@@ -1148,17 +1145,14 @@ proc Stimulator_tp_transmit {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
-	# Get device number and initialize command list.
-	set n $config(tp_n)
-	set commands [list]
-	
 	# Append all the commands in the transmit list, converting hex values
 	# to decimal values as we go.
+	set commands [list]
 	foreach cmd $config(tp_commands) {lappend commands [expr $cmd]}
 	
 	# Transmit the commands. We don't ask for an acknowledgement because
 	# we want the transmit to consist only of commands entered by the user.
-	Stimulator_transmit $info(dev$n\_id) $commands
+	Stimulator_transmit $config(tp_id) $commands
 }
 
 #
@@ -1202,9 +1196,7 @@ proc Stimulator_tp_run {} {
 	# Get device number and initialize command list. Before we send the
 	# first byte of our program, we want to make sure the user program
 	# pointer in the IST is reset.
-	set n $config(tp_n)
-	set commands [list]	
-	lappend commands $info(op_pgrst)
+	set commands [list $info(op_pgrst)]
 
 	while {[llength $prog] > 0} {
 		
@@ -1224,7 +1216,7 @@ proc Stimulator_tp_run {} {
 		}
 			
 		# Transmit the commands.
-		Stimulator_transmit $info(dev$n\_id) $commands
+		Stimulator_transmit $config(tp_id) $commands
 		
 		# Reset the command list.
 		set commands [list]
@@ -1238,14 +1230,11 @@ proc Stimulator_tp_halt {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
-	# Get device number.
-	set n $config(tp_n)
-	
 	# Send the program disable command.	
-	lappend commands [list $info(op_pgoff)]
+	set commands [list $info(op_pgoff)]
 
 	# Transmit the commands.
-	Stimulator_transmit $info(dev$n\_id) $commands
+	Stimulator_transmit $config(tp_id) $commands
 }
 
 #
