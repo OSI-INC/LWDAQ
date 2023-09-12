@@ -243,16 +243,16 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		scan [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) get 0"] %d%d%d cid bts fvn
 		
-		# We take each new auxiliary message and break it up into three parts. The
-		# first part is a four-bit ID, which is the primary channel number of the
-		# device producing the auxiliary message. The second part is a four-bit
-		# field address. The third is eight bits of data. These sixteen bits are the
-		# contents of the auxiliary message. We add a fourth number, which is the
-		# timestamp of message reception. We give the timestamp modulo 2^16, which
-		# gives us sufficient precision to detect any time-based address encoding of
-		# auxiliary data. These four numbers make one entry in the auxiliary message
-		# list, so we append them to the existing list. If the four-bit ID is zero
-		# or fifteen, this is a bad message, so we don't store it.
+		# We take each new auxiliary message and break it up into three parts.
+		# The first part is a four-bit ID, which is the primary channel number
+		# of the device producing the auxiliary message. The second part is a
+		# four-bit field address. The third is eight bits of data. These sixteen
+		# bits are the contents of the auxiliary message. We add a fourth
+		# number, which is the timestamp of message reception. We give the
+		# timestamp modulo 65536, which means the timestamp resets every two
+		# seconds. These four numbers make one entry in the auxiliary message
+		# list, so we append them to the existing list. If the four-bit ID is
+		# zero or fifteen, this is a bad message, so we don't store it.
 		foreach {cn mt md} $new_aux_messages {
 			set id [expr ($md / 4096)]
 			if {($id == $info(set_size) - 1) || ($id == 0)} {continue}

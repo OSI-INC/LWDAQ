@@ -65,18 +65,14 @@ proc Stimulator_init {} {
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 	
-	set config(blow) "2.5"
-	set config(bempty) "2.2"
-	set config(ack_enable) "1"
+	set config(blow) "2.6"
+	set config(bempty) "2.4"
 	set config(verbose) "1"
+	set config(aux_show) "0"
+	set config(aux_color) "orange"
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
 	
 	set info(transmit_ms) 0
-	set info(at_id) "0"
-	set info(at_ack) "1"
-	set info(at_batt) "2"
-	set info(at_sync) "3"
-	set info(at_conf) "4"
 	set config(default_ver) "A3041"
 	set config(default_id) "1234"
 	set config(multicast_id) "FFFF"
@@ -91,31 +87,26 @@ proc Stimulator_init {} {
 	set config(tp_seg_len) "30"
 	set info(tp_ew) $info(window).tpew
 	set info(tp_text) $info(tp_ew).text
-
+	
+	# Auxiliary message types.
+	set info(at_id) "1"
+	set info(at_ack) "2"
+	set info(at_batt) "3"
+	set info(at_conf) "4"
+	
 	# Stimulator operation codes, which we use to construct instructions, which
 	# we in turn combine to form commands.
-	set info(op_stim_stop) "0"
-	set info(op_stim_start) "1"
-	set info(op_xmit) "2"
-	set info(op_ack) "3"
-	set info(op_battery) "4"
-	set info(op_identify) "5"
-	set info(op_setpcn) "6"
-	set info(op_upload) "7"
-	set info(op_progen) "8"
-	set info(op_rstpp) "9"
-	
-	# Acknowledgement codes allow us to deduce the message being acknowledged.
-	set info(ack_stim_stop) "16"
-	set info(ack_stim_start) "17"
-	set info(ack_xon) "18"
-	set info(ack_xoff) "19"
-	set info(ack_ack) "20"
-	set info(ack_battery) "21"
-	set info(ack_identify) "22"
-	set info(ack_setpcn) "23"
-	set info(ack_upload) "24"
-	set info(ack_progen) "25"
+	set info(op_stop) "0"
+	set info(op_start) "1"
+	set info(op_xon) "2"
+	set info(op_xoff) "3"
+	set info(op_batt) "4"
+	set info(op_id) "5"
+	set info(op_pgld) "6"
+	set info(op_pgon) "7"
+	set info(op_pgoff) "8"
+	set info(op_pgrst) "9"
+	set info(op_shdn) "10"
 	
 	set info(state) "Idle"
 	set info(monitor_ms) "0"
@@ -241,7 +232,7 @@ proc Stimulator_start_cmd {n} {
 
 	# Append the stimulus start command.
 	set commands [list]
-	lappend commands $info(op_stim_start)
+	lappend commands $info(op_start)
 	
 	# Append the current.
 	set current [expr round($info(dev$n\_current))]
@@ -299,15 +290,6 @@ proc Stimulator_start_cmd {n} {
 		lappend commands 0
 	}
 	
-	# Request an acknowledgement. We specify a primary channel number for
-	# the acknowledgment to use. The acknowledgement key will contain 
-	# information that allows our monitor routine to figure out what 
-	# command has been acknowleged.
-	if {$config(ack_enable)} {
-		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $info(ack_stim_start)
-	}
-	
 	# We return the command string, which does not yet have the checksum
 	# attached to the end, nor the device id bytes at the beginning, but is
 	# otherwise a sequence of operation codes and parameter values.
@@ -334,22 +316,10 @@ proc Stimulator_start {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Determine the end-time of a stimulus. We use 0 as a code for "forever".
-	# A finite stimulus ends at after the interval length multiplied by the
-	# stimulus length, the former being in milliseconds and the latter in 
-	# intervals.
-	if {$info(dev$n\_num_pulses) == 0} {
-		set info(dev$n\_end)  0
-	} {
-		set info(dev$n\_end) [expr [clock milliseconds] \
-			+ $info(dev$n\_period_ms) * $info(dev$n\_num_pulses)]
-	}
-	
 	# Transmit the commands.
 	Stimulator_transmit $info(dev$n\_id) [Stimulator_start_cmd $n]
 
 	# Set state variables.
-	LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
 	set info(state) "Idle"
 	
 	return ""
@@ -368,33 +338,20 @@ proc Stimulator_stop {n} {
 	set info(state) "Command"
 
 	# Send the stimulus stop command, which is just a zero.
-	set commands [list]
-	lappend commands $info(op_stim_stop)
-	
-	# If we want an acknowledgement, specify a primary channel number and
-	# request the acknowledgement.
-	if {$config(ack_enable)} {
-		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $info(ack_stim_stop)
-	}
+	set commands [list $info(op_stop)]
 	
 	# Transmit the commands.
 	Stimulator_transmit $info(dev$n\_id) $commands
 	
-	# Reset the stimulus end time
-	set info(dev$n\_end) 0
-	
 	# Set state variables.
-	LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 	set info(state) "Idle"
 	
 	return ""
 }
 
 #
-# Stimulator_xon turns on data transmission with the specified channel number
-# and sample rate for the implant. In ISTs, this will be a synchronizing signal,
-# and in stimulator-sensors a sensor signal.
+# Stimulator_xon turns on data transmission with a specific telemetry channel
+# number and sample rate. In ISTs, this will be a synchronizing signal.
 #
 proc Stimulator_xon {n} {
 	upvar #0 Stimulator_config config
@@ -404,10 +361,6 @@ proc Stimulator_xon {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Select the device and specify a primary channel number for transmission.
-	set commands [list]
-	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-
 	# Send the Xon command with transmit period. 	
 	if {$info(dev$n\_sps) > $config(max_tx_sps)} {
 		LWDAQ_print $info(text) "ERROR: Requested frequency $info(dev$n\_sps) SPS\
@@ -416,19 +369,12 @@ proc Stimulator_xon {n} {
 		return ""
 	}
 	set tx_p [expr round($config(rck_khz)*1000/$info(dev$n\_sps))-1]
-	lappend commands $info(op_xmit) $tx_p
+	set commands [list $info(op_xon) $info(dev$n\_ch) $tx_p]
 		
-		
-	# We request an acknowledgement.
-	if {$config(ack_enable)} {
-		lappend commands $info(op_ack) $info(ack_xon)
-	}
-	
 	# Transmit the command.
 	Stimulator_transmit $info(dev$n\_id) $commands
 
 	# Set state variables.
-	LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
 	set info(state) "Idle"
 	
 	return ""
@@ -446,21 +392,12 @@ proc Stimulator_xoff {n} {
 	set info(state) "Command"
 
 	# Send the Xoff command, which is a transmit command with zero period.
-	set commands [list]
-	lappend commands $info(op_xmit) 0
-	
-	# If we want an acknowledgement, specify a primary channel number and
-	# an acknowledgement key.
-	if {$config(ack_enable)} {
-		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $info(ack_xoff)
-	}
+	lappend commands [list $info(op_xoff)]
 	
 	# Transmit the commands.
 	Stimulator_transmit $info(dev$n\_id) $commands
 
 	# Set state variables.
-	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 	set info(state) "Idle"
 	
 	return ""
@@ -477,18 +414,8 @@ proc Stimulator_battery {n} {
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Command"
 
-	# Select the device and specify a primary channel number for the
-	# battery report to use.
-	set commands [list]
-	lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-
 	# Send battery measurement request.
-	lappend commands $info(op_battery)
-	
-	# Add acknowledgement request if specified.
-	if {$config(ack_enable)} {
-		lappend commands $info(op_ack) $info(ack_battery)
-	}
+	lappend commands [list $info(op_batt)]
 	
 	# Transmit commands.
 	Stimulator_transmit $info(dev$n\_id) $commands
@@ -517,8 +444,7 @@ proc Stimulator_identify {} {
 	set info(state) "Command"
 
 	# Add the idenfity command.
-	set commands [list]	
-	lappend commands $info(op_identify)
+	set commands [list $info(op_id)]
 	
 	# Report to user.
 	LWDAQ_print $info(text) "Sending identification command."
@@ -588,14 +514,6 @@ proc Stimulator_monitor {} {
 	# Note the time for stimulation tracking.
 	set now_ms [clock milliseconds]
 	
-	# Check the stimuli and mark device state label when stimulus is complete.
-	foreach n $info(dev_list) {
-		set end_time $info(dev$n\_end)
-		if {($end_time > 0) && ($end_time <= $now_ms)} {
-			LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
-		}	
-	}
-	
 	# Look for auxiliary message lists. If we find one, copy and clear the
 	# list.
 	set aux_messages ""
@@ -615,39 +533,107 @@ proc Stimulator_monitor {} {
 		return ""
 	}
 	
-	# Go through the auxiliary message list and find messages that could be from
-	# stimulators. Report them to the text window and delete them from the list
-	# so we don't double-report them.
+	# Compose a list of device numbers with their sixteen-bit identifiers.
 	set id_list ""
-	set broadcast_id 0
-	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_pcn)"}
+	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_id)"}
+	
+	# Go through the auxiliary message list and find messages that could be from
+	# stimulators.
 	foreach am $aux_messages {
+	
+		# Scan the auxiliary message for identifier, field address, data byte
+		# and timestamp. The timestamp is a sixteen-bit positive integer that
+		# counts 32.768 kHz clock ticks.
 		scan $am %d%d%d%d id fa db ts
-		if {$fa == $info(at_ack)} {
+		if {$config(aux_show)} {
+			LWDAQ_print $info(text) "Auxiliary Message:\
+				id=$id fa=$fa db=$db ts=$ts" $config(aux_color)
+		}
 		
+		# If this is a confirmation message, proceed to next auxiliary message.
+		if {$fa == $info(at_conf)} {continue}
+
+		# If it is some other sort of message, look for a confirmation. If we 
+		# don't find one, proceed to next auxiliary message. If we do find
+		# one, use it to obtain the full device identifier.
+		set device_id "0"
+		foreach cam $aux_messages {
+			scan $cam %d%d%d%d cid cfa cdb cts
+			if {$cfa != $info(at_conf)} {continue}
+			if {($cid == $id) && (($cts - $ts) % 65536 <= 1)} {
+				set device_id [format %04X [expr $cid + (256 * $cdb)]]
+				break
+			}
+		}
+		if {$device_id == "0"} {continue}
+		
+		# Look for the device in our list. If we find it, set n to the device
+		# number, otherwise set n to zero.
+		set i [lsearch -index 1 $id_list $device_id]
+		if {$i >= 0} {set n [lindex $id_list $i 0]} else {set n 0}
+
+		# Check the auxiliary message type, now that it has been confirmed.
+		if {$fa == $info(at_ack)} {
+			
+			# Acknowledgements confirm that a device has received a command. We 
+			# ignore acknowledgements from devices that are not in our list.
+			if {$n == 0} {continue}
+			
 			# Acknowledgements encode the type of command in their data byte.
 			switch $db \
-				$info(ack_stim_stop) {set type "stop"} \
-				$info(ack_stim_start) {set type "start"} \
-				$info(ack_xon) {set type "xon"} \
-				$info(ack_xoff) {set type "xoff"} \
-				$info(ack_battery) {set type "battery"} \
-				$info(ack_identify) {set type "identify"} \
-				$info(ack_setpcn) {set type "setpcn"} \
-				$info(ack_upload) {set type "upload"} \
-				$info(ack_progen) {set type "progen"} \
-				default {set type $db}
-			LWDAQ_print $info(text) "Command Acknowledgement:\
-				cn=$id type=$type ts=$ts $now_time"
+				$info(op_stop) {
+					set type "stop"
+					LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+				} \
+				$info(op_start) {
+					set type "start"
+					LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
+				} \
+				$info(op_xon) {
+					set type "xon"
+					LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
+				} \
+				$info(op_xoff) {
+					set type "xoff"
+					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+				} \
+				$info(op_batt) {
+					set type "battery"
+				} \
+				$info(op_pgld) {
+					set type "pgld"
+				} \
+				$info(op_pgon) {
+					set type "pgon"
+				} \
+				$info(op_pgoff) {
+					set type "pgoff"
+				} \
+				$info(op_pgrst) {
+					set type "pgrst"
+				} \
+				$info(op_shdn) {
+					set type "shdn"
+					LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+				} \
+				default {
+					set type "invalid"
+				}
+				
+			if {$type != "invalid"} {
+				LWDAQ_print $info(text) "Command Acknowledgement:\
+					device_id=$device_id type=$type ts=$ts $now_time"
+			}
 		} elseif {$fa == $info(at_batt)} {
 			
-			# Battery measurements may correspond to a stimulator in our
-			# list, and if so we want to update its battery measurement. The
-			# measurement is identified only by its primary channel number,
+			# Battery measurements should correspond to a stimulator in our
+			# list. The measurement is identified by its primary channel number,
 			# so we look for the first device entry with a matching id and
-			# assume this is the matching device.
+			# assume this is the matching device. If we don't find a matching
+			# id we discard the battery measurement as invalid.
 			set voltage "?"
-			set i [lsearch -index 1 $id_list $id]
+			set i [lsearch -index 1 $id_list $device_id]
 			if {$i >= 0} {
 				set n [lindex $id_list $i 0]
 				
@@ -677,24 +663,21 @@ proc Stimulator_monitor {} {
 				} else {
 					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bempty_color)
 				}
+
+				# Report the battery measurement.
+				LWDAQ_print $info(text) "Battery Measurement:\
+					device_id=$device_id value=$db ts=$ts\
+					voltage=$voltage $now_time" 
 			}
 		
-			# Report the battery measurement.
-			LWDAQ_print $info(text) "Battery Measurement:\
-				pcn=$id value=$db ts=$ts voltage=$voltage $now_time" brown
-		} elseif {$fa == $info(at_sync)} {
-		
-			# Report a synchronizing mark.
-			LWDAQ_print $info(text) "Synchronizing Mark: pcn=$id ts=$ts $now_time"
 		} elseif {$fa == $info(at_id)} {
-			set broadcast_id [format %04X [expr $id +  (256 * $db)]]
-		} elseif {$fa == $info(at_conf)} {
-			set confirmation_id [format %04X [expr $id +  (256 * $db)]]
-			if {($confirmation_id == $broadcast_id)} {
-				LWDAQ_print $info(text) "Identification Broadcast:\
-					device_id=$broadcast_id ts=$ts $now_time" green
-			}
-			set broadcast_id 0
+			set device_id [format %04X [expr $id +  (256 * $db)]]
+			LWDAQ_print $info(text) "Identification Message:\
+					device_id=$device_id ts=$ts $now_time" green
+		} else {
+			
+			# We don't recognise this type of auxiliary message, so proceed.
+			continue
 		}
 	}
 	
@@ -746,10 +729,9 @@ proc Stimulator_draw_list {} {
 			set info(dev$n\_period_ms) "100"
 			set info(dev$n\_num_pulses) "10"
 			set info(dev$n\_random) "0"
-			set info(dev$n\_pcn) [expr 0x$config(default_id) % 256]
+			set info(dev$n\_ch) [expr 0x$config(default_id) % 256]
 			set info(dev$n\_sps) "128"
 			set info(dev$n\_battery) "?"
-			set info(dev$n\_end) "0"
 		}
 
 		set ff $f.dev$n
@@ -783,7 +765,7 @@ proc Stimulator_draw_list {} {
 			pack $ff.$b -side left -expand 1
 		}
 
-		foreach {a c} {pcn 4 sps 4} {
+		foreach {a c} {ch 4 sps 4} {
 			set b [string tolower $a]
 			label $ff.l$b -text "$a\:" -fg $config(label_color)
 			entry $ff.$b -textvariable Stimulator_info(dev$n\_$b) -width $c
@@ -877,9 +859,8 @@ proc Stimulator_remove {n} {
 	unset info(dev$n\_current) 
 	unset info(dev$n\_num_pulses) 
 	unset info(dev$n\_random)
-	unset info(dev$n\_pcn) 
+	unset info(dev$n\_ch) 
 	unset info(dev$n\_sps)
-	unset info(dev$n\_end)
 	
 	return ""
 }
@@ -910,10 +891,9 @@ proc Stimulator_add_device {} {
 	set info(dev$n\_period_ms) "100"
 	set info(dev$n\_num_pulses) "10"
 	set info(dev$n\_current) $config(default_current)
-	set info(dev$n\_pcn) [expr 0x$config(default_id) % 256]
+	set info(dev$n\_ch) [expr 0x$config(default_id) % 256]
 	set info(dev$n\_sps) "128"
 	set info(dev$n\_random) "0"
-	set info(dev$n\_end) "0"
 	
 	set info(dev$n\_battery) "?"
 	
@@ -1224,7 +1204,7 @@ proc Stimulator_tp_run {} {
 	# pointer in the IST is reset.
 	set n $config(tp_n)
 	set commands [list]	
-	lappend commands $info(op_rstpp)
+	lappend commands $info(op_pgrst)
 
 	while {[llength $prog] > 0} {
 		
@@ -1233,28 +1213,16 @@ proc Stimulator_tp_run {} {
 		set prog [lrange $prog $config(tp_seg_len) end]
 
 		# Add upload command and the number of program bytes.
-		lappend commands $info(op_upload) [llength $segment]
+		lappend commands $info(op_pgld) [llength $segment]
 	
 		# Add all the program bytes.
 		set commands [concat $commands $segment]
 	
 		# After the final chunk, we enable the program.
 		if {[llength $prog] == 0} {
-			lappend commands $info(op_progen) "1"
+			lappend commands $info(op_pgon)
 		}
 			
-		# If we want acknowledgements, ask for one. Make the acknowledgement
-		# key reflect whether we are uploading a chunk of code, or uploading
-		# and enabling the final chunk.
-		if {$config(ack_enable)} {
-			lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-			if {[llength $prog] > 0} {
-				lappend commands $info(op_ack) $info(ack_upload)
-			} else {
-				lappend commands $info(op_ack) $info(ack_progen)
-			}
-		}
-
 		# Transmit the commands.
 		Stimulator_transmit $info(dev$n\_id) $commands
 		
@@ -1270,19 +1238,12 @@ proc Stimulator_tp_halt {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
-	# Get device number and initialize command list.
+	# Get device number.
 	set n $config(tp_n)
-	set commands [list]
 	
 	# Send the program disable command.	
-	lappend commands $info(op_progen) "0"
+	lappend commands [list $info(op_pgoff)]
 
-	# If we want acknowledgements, ask for one.
-	if {$config(ack_enable)} {
-		lappend commands $info(op_setpcn) $info(dev$n\_pcn)
-		lappend commands $info(op_ack) $info(ack_progen)
-	}
-	
 	# Transmit the commands.
 	Stimulator_transmit $info(dev$n\_id) $commands
 }
@@ -1336,9 +1297,6 @@ proc Stimulator_open {} {
 	
 	checkbutton $f.verbose -variable Stimulator_config(verbose) -text "Verbose"
 	pack $f.verbose -side left -expand 1
-	
-	checkbutton $f.ack -variable Stimulator_config(ack_enable) -text "Acknowledge"
-	pack $f.ack -side left -expand 1
 	
 	set f $w.list
 	frame $f

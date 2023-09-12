@@ -7419,7 +7419,7 @@ proc Neuroplayer_play {{command ""}} {
 	# device producing the auxiliary message. The second part is a four-bit
 	# field address. The third is eight bits of data. These sixteen bits are the
 	# contents of the auxiliary message. We add a fourth number, which is the
-	# timestamp of message reception. We give the timestamp modulo 2^16, which
+	# timestamp of message reception. We give the timestamp modulo 65536, which
 	# gives us sufficient precision to detect any time-based address encoding of
 	# auxiliary data. These four numbers make one entry in the auxiliary message
 	# list, so we append them to the existing list. If the four-bit ID is zero

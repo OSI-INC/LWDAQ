@@ -3,19 +3,18 @@ Routines for Analysis of Data Retrieved from Miscellaneous LWDAQ Devices
 Copyright (C) 2004-2019 Kevan Hashemi, Brandeis University
 Copyright (C) 2006-2023 Kevan Hashemi, Open Source Instruments Inc.
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place - Suite 330, Boston, MA  02111-1307, USA.
 }
 
 unit electronics;
@@ -918,10 +917,12 @@ end;
 	separated by spaces.
 	
 	The "auxiliary" instruction extracts and returns all auxiliary messages in a
-	string. An auxiliary message is one in which the lower four bits are equal
-	to fifteen. The instruction returns one message per line. For each message
-	it writes the eight-bit channel number, the sixteen-bit timestamp, and the
-	sixteen-bit contents.
+	string. An auxiliary message is one in which the lower four bits of the
+	channel number are equal to fifteen. The instruction returns one message per
+	line. For each message it writes the eight-bit channel number, the
+	sixteen-bit timestamp, and the sixteen-bit contents of the auxiliary
+	message. The contents contain the bottom nibble of the channel number, a
+	four-bit address, and eight bits of data.
 	
 	The "system" instruction extracts and returns all system messages in a
 	string, excluding the clock messages. An system message is one in which the
