@@ -499,19 +499,24 @@ proc LWDAQ_open {name} {
 	upvar #0 LWDAQ_info_$name info
 	upvar #0 LWDAQ_config_$name config
 	
+	# See if the instrument window already exists, and if it does, bring
+	# it to the front and return.
 	set w $info(window)
 	if {[winfo exists $w]} {
 		raise $w
 		return ""
 	}
 
+	# Create a new toplevel window for the instrument panel.
 	toplevel $w
 	scan [wm maxsize .] %d%d x y
 	wm maxsize $w [expr $x*2] [expr $y*2]
 	wm title $w $name
 	
+	# Start the instrument in the idle state.
 	set info(control) "Idle" 
 
+	# Make the standard instrument buttons along the top.
 	frame $w.buttons
 	pack $w.buttons -side top -fill x
 	label $w.buttons.state -textvariable LWDAQ_info_$name\(control) -width 8
@@ -529,9 +534,10 @@ proc LWDAQ_open {name} {
 		-side left -expand 1
 	set info(state_label) $info(window).buttons.state
 		
+	# Create the image display frame, label, and photo widget. Bind the image 
+	# inspector routine to the display widget.
 	frame $w.ic
 	pack $w.ic -side top -fill x
-	
 	frame $w.ic.i
 	pack $w.ic.i -side left -fill y
 	image create photo $info(photo)
@@ -540,12 +546,11 @@ proc LWDAQ_open {name} {
 	pack $info(image_display) -side left
 	bind $info(image_display) \
 		<Double-ButtonPress> \
-		[list LWDAQ_inspector %x %y $name]
+		[list LWDAQ_instrument_closeup %x %y $name]
 	
+	# List the config variables in the window and associate each with a text entry.	
 	frame $w.ic.c
 	pack $w.ic.c -side right -fill y
-	
-	# List the config variables in the window and associate each with a text entry.
 	set config_list [array names config]
 	set config_list [lsort -dictionary $config_list]
 	foreach c $config_list {
@@ -560,9 +565,9 @@ proc LWDAQ_open {name} {
 		LWDAQ_controls_$name
 	}
 
-	# Make the text output window. We don't enable text undo because this gets us 
-	# into trouble when we write a lot of text to the instrument window while running
-	# for a long time.
+	# Make the text output window. We don't enable text undo because this gets
+	# us into trouble when we write a lot of text to the instrument window while
+	# running for a long time.
 	set info(text) [LWDAQ_text_widget $w 90 10 1 1]
 
 	return $w
@@ -627,25 +632,67 @@ proc LWDAQ_instrument_unsave {name} {
 }
 
 #
-# LWDAQ_inspector allows us to inspect an instrument's image data
-# by moving the mouse over the image in the instrument panel. We activate
-# the inspector by selecting it from the instrument menu. A window opens up
-# and now, whenever we move the mouse over any image we see a magnified 
-# view of a small section of the image in the inspector window.
+# LWDAQ_instrument_closeup deduces column, row, and intensity of the pixel
+# at the tip of our mouse pointer when we double-click on an image in any
+# of the LWDAQ instruments. It prints the column, row, and intensity to 
+# the instrument's text window, which we assume exists or else the 
+# inspector routine would not have been called. This routine is bound to the
+# double-press button event within the instrument image displays. If the
+# Viewer instrument is open, a region around the pixel will be displayed 
+# and zoomed so we can see detail. The routine calls Viewer routines to
+# accomplish the crop and zoom.
 #
-proc LWDAQ_inspector {x y name} {
+proc LWDAQ_instrument_closeup {x y name} {
 	upvar LWDAQ_config_$name config
 	upvar LWDAQ_info_$name info
+	upvar LWDAQ_info_Viewer vinfo
+	upvar LWDAQ_config_Viewer vconfig
+	
+	# Check that the image named in the instrument memory name field does
+	# in fact exists.
+	if {[lwdaq_image_exists $config(memory_name)] == ""} {
+		LWDAQ_print $info(text) "ERROR: Double click for image details,\
+			but image \"$config(memory_name)\" does not exist."
+		return ""
+	}
 	
 	# Get the image column and row.
 	set zoom [expr 1.0 * $info(zoom) * [LWDAQ_get_lwdaq_config display_zoom]]
 	set xi [expr round(1.0*($x - 4)/$zoom)] 
 	set yi [expr round(1.0*($y - 4)/$zoom)]
 	
+	# Get the pixel intensity.
 	set intensity [LWDAQ_image_pixels $config(memory_name) $xi $yi $xi $yi]
 	set intensity [string trim $intensity]
-	LWDAQ_print $info(text) "Image Detail: column=$xi row=$yi intensity=$intensity"
-
+	
+	# If the Viewer panel is open, copy the image, set its analysis bounds to be
+	# a smaller rectangle centered upon the pixel, crop the image to these
+	# bounds, and display in the Viewer panel. To determine the width and height
+	# of the cropped image, we use the Viewer's closeup width and height
+	# parameters.
+	if {[winfo exists $vinfo(window)]} {
+		set wext [expr $vconfig(closeup_width) / 2]
+		set hext [expr $vconfig(closeup_height) / 2]
+		set vconfig(memory_name) \
+			[lwdaq_image_manipulate $config(memory_name) copy \
+			-left [expr $xi-$wext] \
+			-top [expr $yi-$hext] \
+			-right [expr $xi+$wext] \
+			-bottom [expr $yi+$hext] \
+			-name $config(memory_name)_Detail]
+		lwdaq_image_manipulate $vconfig(memory_name) crop -replace 1
+		LWDAQ_zoom_Viewer
+	}
+	
+	# Print message to instrument window reporting pixel details.
+	if {[winfo exists $vinfo(window)]} {
+		LWDAQ_print $info(text) "Pixel: column=$xi row=$yi intensity=$intensity.\
+			Closeup drawn in Viewer Panel."
+	} else {
+		LWDAQ_print $info(text) "Pixel: column=$xi row=$yi intensity=$intensity.\
+			Open Viewer Panel to get closeup."
+	}
+	
 	return ""
 }
 

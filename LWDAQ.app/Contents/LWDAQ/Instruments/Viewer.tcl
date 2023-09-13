@@ -36,8 +36,6 @@ proc LWDAQ_init_Viewer {} {
 	set info(window) [string tolower .$info(name)]
 	set info(text) $info(window).text
 	set info(photo) [string tolower $info(name)\_photo]
-	set info(x) "0"
-	set info(y) "0"
 	set info(select) 0
 	set info(counter) 0 
 	set info(zoom) 1.0
@@ -64,6 +62,8 @@ proc LWDAQ_init_Viewer {} {
 	set config(intensify) exact
 	set config(analysis_enable) 1
 	set config(verbose_result) 0
+	set config(closeup_width) 40
+	set config(closeup_height) 40
 	
 	return ""
 }
@@ -78,13 +78,16 @@ proc LWDAQ_daq_Viewer {} {
 
 #
 # LWDAQ_analysis_Viewer calls the analysis of another instrument to analyze the
-# image in the Viewer panel.
+# Viewer's local image in the Viewer panel. If report is set, the routine draws
+# the image in the Viewer panel and writes the results of analysis to the text
+# window.
 #
-proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
+proc LWDAQ_analysis_Viewer {{report 0}} {
 	global LWDAQ_Info
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
 
+	# Identify the instrument we should use to obtain our analysis routine.
 	set instrument $config(analysis_source)
 	if {[lsearch $LWDAQ_Info(instruments) $instrument] < 0} {
 		return "ERROR: No such instrument \"$instrument\"."
@@ -95,15 +98,15 @@ proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
 	upvar #0 LWDAQ_config_$instrument iconfig
 	upvar #0 LWDAQ_info_$instrument iinfo
 
-	if {$image_name == ""} {
-		set image_name $config(memory_name)
-	}
-	if {[lwdaq_image_exists $image_name] == ""} {
-		return "ERROR: Image \"$image_name\" does not exist."	
+	# Check that the local image exists.
+	set img $config(memory_name)
+	if {[lwdaq_image_exists $img] == ""} {
+		return "ERROR: Image \"$img\" does not exist."	
 	}
 	
+	# Apply the analysis bounds if the use daq bounds flag is set.
 	if {$info(file_use_daq_bounds)} {
-		lwdaq_image_manipulate $image_name none \
+		lwdaq_image_manipulate $img none \
 			-left $info(daq_image_left) \
 			-top $info(daq_image_top) \
 			-right $info(daq_image_right) \
@@ -111,41 +114,24 @@ proc LWDAQ_analysis_Viewer {{image_name ""} {report 0}} {
 			-clear 1
 	}
 
-	set iconfig(memory_name) $image_name
+	# Set the instrument's image name to the Viewer's image name and analyze.
+	# set our result string to the result of analysis.
+	set iconfig(memory_name) $img
 	set result [LWDAQ_instrument_analyze $instrument]
 	if {![LWDAQ_is_error_result $result]} {
 		set result [lrange $result 1 end]
 	}
+	
+	# If the report flag is set, draw the analyzed image in the Viewer panel.
  	if {$report} {
-		lwdaq_draw $image_name $info(photo) \
-			-intensify $config(intensify) -zoom $info(zoom)
+		lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
 		LWDAQ_print -nonewline $info(text) "$instrument: " darkgreen
 		LWDAQ_print $info(text) $result	
 	}	
-	set info(image_results) [lwdaq_image_results $image_name]
-
+	set info(image_results) [lwdaq_image_results $img]
 	set info(verbose_description) $iinfo(verbose_description)
 
 	return $result
-}
-
-#
-# LWDAQ_crop_Viewer crops an image to its analysis boundes. 
-#
-proc LWDAQ_crop_Viewer {{image_name ""}} {
-	upvar #0 LWDAQ_config_Viewer config
-	upvar #0 LWDAQ_info_Viewer info
-	
-	if {$image_name == ""} {
-		set image_name $config(memory_name)
-	}
-	if {[lwdaq_image_exists $image_name] == ""} {
-		return "ERROR: Image \"$config(memory_name)\" does not exist."	
-	}
-	lwdaq_image_manipulate $image_name crop -replace 1
-	lwdaq_draw $image_name $info(photo) \
-		-intensify $config(intensify) -zoom $info(zoom)
-	return ""
 }
 
 #
@@ -209,32 +195,61 @@ proc LWDAQ_GIF_to_DAQ_Viewer {} {
 }
 
 #
-# LWDAQ_set_bounds_Viewer applies the analyisis boundaries specified in the
-# viewer's info array to the image named by config memory_name.
+# LWDAQ_set_bounds_Viewer applies the Viewer's DAQ bounds to its local image and
+# re-draws in the Viewer panel.
 #
 proc LWDAQ_set_bounds_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
 	
+	# Check the image exists. 
 	if {[lwdaq_image_exists $config(memory_name)] == ""} {
 		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
 		return ""
 	}
-	lwdaq_image_manipulate $config(memory_name) none \
-		-left $info(daq_image_left) \
-		-top $info(daq_image_top) \
-		-right $info(daq_image_right) \
-		-bottom $info(daq_image_bottom) \
-		-clear 1
-	lwdaq_draw $config(memory_name) $info(photo) \
-		-intensify $config(intensify) -zoom $info(zoom)
+	
+	# Select new bounds.
+	if {$left < 0} {set left $info(daq_image_left)}
+	if {$top < 0} {set top $info(daq_image_top)}
+	if {$right <0} {set right $info(daq_image_right)}
+	if {$bottom < 0} {set bottom $info(daq_image_bottom)}
+	
+	# Change the image boundaries and draw in the Viewer.
+	lwdaq_image_manipulate $img none \
+		-left $left -top $top -right $right -bottom $bottom -clear 1
+	lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
+	set config(memory_name) $img
+	
+	# Return empty string.
 	return ""
 }
 
 #
-# LWDAQ_set_dimensions_Viewer takes the contents of the image named by
-# memory_name and creates a new image with the dimensions specified in the
-# dimension control boxes. The routine keeps the analysis boundaries the same.
+# LWDAQ_crop_Viewer crops the Viewer's image to its analysis bounds and draws 
+# it in the Viewer panel. 
+#
+proc LWDAQ_crop_Viewer {} {
+	upvar #0 LWDAQ_config_Viewer config
+	upvar #0 LWDAQ_info_Viewer info
+	
+	# Check that the image exists.
+	if {[lwdaq_image_exists $config(memory_name)] == ""} {
+		return "ERROR: Image \"$config(memory_name)\" does not exist."	
+	}
+	
+	# Crop the image and draw in the Viewer.
+	lwdaq_image_manipulate $img crop -replace 1
+	lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
+	
+	# Return empty string.
+	return ""
+}
+
+#
+# LWDAQ_set_dimensions_Viewer creates a new image with dimensions specified in
+# the dimension control boxes. The analysis boundaries remain the same. We 
+# draw the new image in the Viewer panel. If our default is to delete old Viewer
+# images, we do so.
 #
 proc LWDAQ_set_dimensions_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
@@ -288,7 +303,7 @@ proc LWDAQ_set_results_Viewer {} {
 proc LWDAQ_zoom_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
-
+	
 	if {[winfo exists $info(window)]} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
@@ -298,12 +313,12 @@ proc LWDAQ_zoom_Viewer {} {
 
 #
 # LWDAQ_xy_Viewer takes as input an x-y position relative to the top-left corner
-# of the image display widget, and sets the info(x) and info(y) parameters with
-# the column and row of the image pixel displayed at that display widget
-# position. If we pass a command, it also sets the corners of the analysis 
-# boundaries. The motion command adjusts the bottom-right corner. The press 
-# command sets the top-left corner. The release command  sets the image
-# analysis bounds with the rectangle drawn.
+# of the image display widget. By passing one of three commands, it sets the
+# corners of the analysis boundaries. The motion command adjusts the
+# bottom-right corner. The press command sets the top-left corner. The release
+# command sets the image analysis bounds with the rectangle drawn. We bind 
+# this routine to the image widget and remove the binding that exists in all other
+# instruments to the image closeup routine. 
 #
 proc LWDAQ_xy_Viewer {x y cmd} {
 	upvar #0 LWDAQ_config_Viewer config
@@ -311,26 +326,26 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 	
 	# Get the image column and row.
 	set zoom [expr 1.0 * $info(zoom) * [LWDAQ_get_lwdaq_config display_zoom]]
-	set info(x) [expr round(1.0*($x - 4)/$zoom)] 
-	set info(y) [expr round(1.0*($y - 4)/$zoom)]
+	set xi [expr round(1.0*($x - 4)/$zoom)] 
+	set yi [expr round(1.0*($y - 4)/$zoom)]
 
 	# Update corners of analysis bounds if we are moving.
 	if {$cmd == "Motion"} {
 		if {$info(select)} {
-			if {$info(x) > $info(corner_x)} {
-				set info(daq_image_right) $info(x)
+			if {$xi > $info(corner_x)} {
+				set info(daq_image_right) $xi
 				set info(daq_image_left) $info(corner_x)
 			} 
-			if {$info(x) < $info(corner_x)} {
-				set info(daq_image_left) $info(x)
+			if {$xi < $info(corner_x)} {
+				set info(daq_image_left) $xi
 				set info(daq_image_right) $info(corner_x)
 			} 
-			if {$info(y) > $info(corner_y)} {
-				set info(daq_image_bottom) $info(y)
+			if {$yi > $info(corner_y)} {
+				set info(daq_image_bottom) $yi
 				set info(daq_image_top) $info(corner_y)
 			} 
-			if {$info(y) < $info(corner_y)} {
-				set info(daq_image_top) $info(y)
+			if {$yi < $info(corner_y)} {
+				set info(daq_image_top) $yi
 				set info(daq_image_bottom) $info(corner_y)
 			} 
 			LWDAQ_set_bounds_Viewer
@@ -340,8 +355,8 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 	# Start a rectangle by dropping one corner on the image.
 	if {$cmd == "Press"} {
 		set info(select) 1
-		set info(corner_x) $info(x)
-		set info(corner_y) $info(y)
+		set info(corner_x) $xi
+		set info(corner_y) $yi
 		set info(daq_image_left) $info(corner_x)
 		set info(daq_image_top) $info(corner_y)
 		set info(daq_image_right) [expr $info(daq_image_left) + 1]
@@ -378,6 +393,9 @@ proc LWDAQ_controls_Viewer {} {
 	frame $f
 	pack $f -side top -fill x
 	
+	# Crop an image to its existing bounds, set the bounds to a new
+	# rectangle, and enable over-riding the bounds written in a file
+	# header in favor of the bounds in our entry boxes.
 	button $f.crop -text "Crop" -command LWDAQ_crop_Viewer
 	pack $f.crop -side left
 	button $f.setb -text "Set Bounds" -command LWDAQ_set_bounds_Viewer
@@ -388,56 +406,56 @@ proc LWDAQ_controls_Viewer {} {
 			-width 4
 		pack $f.l$l $f.e$l -side left -expand 1
 	}
-	
-	checkbutton $f.fudb -text "Use These Bounds" \
+	checkbutton $f.ofb -text "file_use_daq_bounds" \
 		-variable LWDAQ_info_Viewer(file_use_daq_bounds)
-	pack $f.fudb -side left -expand 1
+	pack $f.ofb -side left -expand 1
 	
 	set f $w.row2
 	frame $f
 	pack $f -side top -fill x
-	
-	button $f.setd -text "Set Size" -command \
-		LWDAQ_set_dimensions_Viewer
+
+	# Change the dimensions of the image and re-draw with the Resize button.	
+	button $f.setd -text "Resize" -command LWDAQ_set_dimensions_Viewer
 	pack $f.setd -side left
 	foreach l {width height} {
 		label $f.l$l -text $l\: -width [string length $l]
-		entry $f.e$l -textvariable LWDAQ_info_Viewer(daq_image_$l) \
-			-width 4
+		entry $f.e$l -textvariable LWDAQ_info_Viewer(daq_image_$l) -width 6
 		pack $f.l$l $f.e$l -side left -expand 1
 	}
-	
-	foreach a {x y} {
-		label $f.cursorl$a -text "[string toupper $a]:"
-		label $f.cursor$a -textvariable LWDAQ_info_Viewer($a) -width 4 -fg black
-		pack $f.cursorl$a $f.cursor$a -side left -expand 1
-	}
+
+	# These bindings allow us to change the analysis boundaries with the mouse.	
 	bind $info(image_display) <Motion> {LWDAQ_xy_Viewer %x %y Motion}
 	bind $info(image_display) <ButtonPress> {LWDAQ_xy_Viewer %x %y Press}
 	bind $info(image_display) <ButtonRelease> {LWDAQ_xy_Viewer %x %y Release}
+	
+	# Delete the default double-press binding that give us pixel detail.
+	bind $info(image_display) <Double-ButtonPress> ""
 
+	# Analyze and zoom buttons that re-analyze and re-draw the image. Provide
+	# buttons to convert between DAQ and GIF.
 	button $f.analyze -text "Analyze" -command {LWDAQ_analysis_Viewer "" 1}
 	pack $f.analyze -side left
-
 	button $f.bzoom -text "Zoom" -command LWDAQ_zoom_Viewer 
 	entry $f.ezoom -textvariable LWDAQ_info_Viewer(zoom) -width 3
 	pack $f.bzoom $f.ezoom -side left -expand 1
-
-	set f $w.row3
-	frame $f
-	pack $f -side top -fill x
-
-	button $f.setr -text "Set Results" -command \
-		LWDAQ_set_results_Viewer
-	pack $f.setr -side left
-	entry $f.results -textvariable LWDAQ_info_Viewer(image_results) -width 40
-	pack $f.results -side left
 	foreach a {"DAQ_to_GIF" "GIF_to_DAQ"} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command \
 			[list LWDAQ_post LWDAQ_$a\_Viewer front]
 		pack $f.$b -side left -expand 1
 	}	
+
+	# Manipulate the results string.
+	set f $w.row3
+	frame $f
+	pack $f -side top -fill x
+	button $f.setr -text "Set Results" -command \
+		LWDAQ_set_results_Viewer
+	pack $f.setr -side left
+	entry $f.results -textvariable LWDAQ_info_Viewer(image_results) -width 80
+	pack $f.results -side left
+	
+	# Return an empty string to show all is well.
 	return ""
 }
 
