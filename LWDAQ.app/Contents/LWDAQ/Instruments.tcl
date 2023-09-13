@@ -669,7 +669,8 @@ proc LWDAQ_instrument_closeup {x y name} {
 	# a smaller rectangle centered upon the pixel, crop the image to these
 	# bounds, and display in the Viewer panel. To determine the width and height
 	# of the cropped image, we use the Viewer's closeup width and height
-	# parameters.
+	# parameters. We are going to replace the local Viewer image with a new
+	# image, thus deleting the previous one from memory.
 	if {[winfo exists $vinfo(window)]} {
 		set wext [expr $vconfig(closeup_width) / 2]
 		set hext [expr $vconfig(closeup_height) / 2]
@@ -687,10 +688,10 @@ proc LWDAQ_instrument_closeup {x y name} {
 	# Print message to instrument window reporting pixel details.
 	if {[winfo exists $vinfo(window)]} {
 		LWDAQ_print $info(text) "Pixel: column=$xi row=$yi intensity=$intensity.\
-			Closeup drawn in Viewer Panel."
+			Closeup drawn in Viewer Instrument."
 	} else {
 		LWDAQ_print $info(text) "Pixel: column=$xi row=$yi intensity=$intensity.\
-			Open Viewer Panel to get closeup."
+			Open Viewer Instrument to get closeup."
 	}
 	
 	return ""

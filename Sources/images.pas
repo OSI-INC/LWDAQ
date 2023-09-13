@@ -80,6 +80,9 @@ const {for intensification}
 	strong_intensify=2;
 	exact_intensify=3;
 
+const {for image files}
+	image_header_len=12;
+
 type {for image storage}
 	overlay_pixel_type=byte;
 	intensity_pixel_type=byte;

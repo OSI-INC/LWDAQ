@@ -77,12 +77,11 @@ proc LWDAQ_daq_Viewer {} {
 } 
 
 #
-# LWDAQ_analysis_Viewer calls the analysis of another instrument to analyze the
-# Viewer's local image in the Viewer panel. If report is set, the routine draws
-# the image in the Viewer panel and writes the results of analysis to the text
-# window.
+# LWDAQ_analysis_Viewer calls the analysis of another instrument to analyze an
+# image in the Viewer panel. If report is set, the routine draws the image in
+# the Viewer panel and writes the results of analysis to the text window.
 #
-proc LWDAQ_analysis_Viewer {{report 0}} {
+proc LWDAQ_analysis_Viewer {{img ""} {report 0}} {
 	global LWDAQ_Info
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
@@ -98,8 +97,8 @@ proc LWDAQ_analysis_Viewer {{report 0}} {
 	upvar #0 LWDAQ_config_$instrument iconfig
 	upvar #0 LWDAQ_info_$instrument iinfo
 
-	# Check that the local image exists.
-	set img $config(memory_name)
+	# Check that the image exists. We use the local image by default.
+	if {$img == ""} {set img $config(memory_name)}
 	if {[lwdaq_image_exists $img] == ""} {
 		return "ERROR: Image \"$img\" does not exist."	
 	}
@@ -116,11 +115,11 @@ proc LWDAQ_analysis_Viewer {{report 0}} {
 
 	# Set the instrument's image name to the Viewer's image name and analyze.
 	# set our result string to the result of analysis.
+	set saved $iconfig(memory_name)
 	set iconfig(memory_name) $img
-	set result [LWDAQ_instrument_analyze $instrument]
-	if {![LWDAQ_is_error_result $result]} {
-		set result [lrange $result 1 end]
-	}
+	set result [LWDAQ_analysis_$instrument]
+	if {![LWDAQ_is_error_result $result]} {set result [lrange $result 1 end]}
+	set iconfig(memory_name) $saved
 	
 	# If the report flag is set, draw the analyzed image in the Viewer panel.
  	if {$report} {
@@ -202,23 +201,23 @@ proc LWDAQ_set_bounds_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
 	
-	# Check the image exists. 
-	if {[lwdaq_image_exists $config(memory_name)] == ""} {
-		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
+	# Check the image exists.
+	set img $config(memory_name)
+	if {[lwdaq_image_exists $img] == ""} {
+		LWDAQ_print $info(text) "ERROR: Image \"$img\" does not exist."
 		return ""
 	}
-	
+
 	# Select new bounds.
-	if {$left < 0} {set left $info(daq_image_left)}
-	if {$top < 0} {set top $info(daq_image_top)}
-	if {$right <0} {set right $info(daq_image_right)}
-	if {$bottom < 0} {set bottom $info(daq_image_bottom)}
+	set left $info(daq_image_left)
+	set top $info(daq_image_top)
+	set right $info(daq_image_right)
+	set bottom $info(daq_image_bottom)
 	
 	# Change the image boundaries and draw in the Viewer.
 	lwdaq_image_manipulate $img none \
 		-left $left -top $top -right $right -bottom $bottom -clear 1
 	lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
-	set config(memory_name) $img
 	
 	# Return empty string.
 	return ""
@@ -232,11 +231,13 @@ proc LWDAQ_crop_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
 	
-	# Check that the image exists.
-	if {[lwdaq_image_exists $config(memory_name)] == ""} {
-		return "ERROR: Image \"$config(memory_name)\" does not exist."	
+	# Check the image exists.
+	set img $config(memory_name)
+	if {[lwdaq_image_exists $img] == ""} {
+		LWDAQ_print $info(text) "ERROR: Image \"$img\" does not exist."
+		return ""
 	}
-	
+
 	# Crop the image and draw in the Viewer.
 	lwdaq_image_manipulate $img crop -replace 1
 	lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
@@ -255,16 +256,20 @@ proc LWDAQ_set_dimensions_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
 	
-	if {[lwdaq_image_exists $config(memory_name)] == ""} {
-		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
+	# Check the image exists.
+	set img $config(memory_name)
+	if {[lwdaq_image_exists $img] == ""} {
+		LWDAQ_print $info(text) "ERROR: Image \"$img\" does not exist."
 		return ""
 	}
-	set data [lwdaq_image_contents $config(memory_name)]
-	set stats [lwdaq_image_characteristics $config(memory_name)]
-	set results [lwdaq_image_results $config(memory_name)]
+
+	# Make a copy with same contents but new dimensions for drawing.	
+	set data [lwdaq_image_contents $img]
+	set stats [lwdaq_image_characteristics $img]
+	set results [lwdaq_image_results $img]
 	incr info(counter)
 	if {$info(delete_old_images)} {lwdaq_image_destroy $info(name)\*}
-	set config(memory_name) [lwdaq_image_create \
+	set img [lwdaq_image_create \
 		-width $info(daq_image_width) \
 		-height $info(daq_image_height) \
 		-left [lindex $stats 0] \
@@ -274,26 +279,43 @@ proc LWDAQ_set_dimensions_Viewer {} {
 		-data $data \
 		-results $results \
 		-name "$info(name)\_$info(counter)"]
-	lwdaq_draw $config(memory_name) $info(photo) \
-		-intensify $config(intensify) -zoom $info(zoom)
+		
+	# Draw the new image.
+	lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
+	
+	# Assign the new image to be the local image.
+	set config(memory_name) $img
+		
 	return ""
 }
 
 #
-# LWDAQ_set_results_Viewer sets the results string of an image.
+# LWDAQ_set_results_Viewer sets the results string of the local image. 
 #
 proc LWDAQ_set_results_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
 	
-	if {[lwdaq_image_exists $config(memory_name)] == ""} {
-		LWDAQ_print $info(text) "ERROR: Image \"$config(memory_name)\" does not exist."
+	# Check the image exists.
+	set img $config(memory_name)
+	if {[lwdaq_image_exists $img] == ""} {
+		LWDAQ_print $info(text) "ERROR: Image \"$img\" does not exist."
 		return ""
 	}
-	lwdaq_image_manipulate $config(memory_name) none \
-		-results $info(image_results)
-	lwdaq_draw $config(memory_name) $info(photo) \
-		-intensify $config(intensify) -zoom $info(zoom)
+	
+	# Set the results string and draw the updated image array. The results
+	# will now be stored in the first row.
+	lwdaq_image_manipulate $img none -results $info(image_results)
+	lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
+	
+	# Issue warning if the results have been curtailed.
+	set results [lwdaq_image_results $img]
+	if {[string length $info(image_results)] > [string length $results]} {
+		LWDAQ_print $info(text) "WARNING: Only \"$results\" fits in header."
+	}
+	
+	# We print the new result string, so as to show if it has been curtailed.
+	
 	return ""
 }
 
@@ -304,10 +326,18 @@ proc LWDAQ_zoom_Viewer {} {
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
 	
-	if {[winfo exists $info(window)]} {
-		lwdaq_draw $config(memory_name) $info(photo) \
-			-intensify $config(intensify) -zoom $info(zoom)
+	# Check the image exists.
+	set img $config(memory_name)
+	if {[lwdaq_image_exists $img] == ""} {
+		LWDAQ_print $info(text) "ERROR: Image \"$img\" does not exist."
+		return ""
 	}
+	
+	# Draw with zoom.
+	if {[winfo exists $info(window)]} {
+		lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
+	}
+	
 	return ""
 }
 

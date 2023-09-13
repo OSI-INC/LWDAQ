@@ -48,6 +48,7 @@ library lwdaq;
 {$LONGSTRINGS ON}
 
 uses
+	sysutils,
 	utils,images,transforms,image_manip,rasnik,
 	spot,bcam,scam,shadow,wps,electronics,metrics,
 	tcltk,process;
@@ -675,8 +676,8 @@ rectangles.</p>
 function lwdaq_draw(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 const
-	min_zoom=0.1;
-	max_zoom=10;
+	min_scale=0.2;
+	max_scale=20;
 	
 var 
 	option:string;
@@ -774,6 +775,9 @@ begin
 	end;
 	
 	scale:=zoom*gui_display_zoom;
+	if scale<min_scale then scale:=min_scale;
+	if scale>max_scale then scale:=max_scale;
+
 	if clear then clear_overlay(ip);
 	if show_bounds then
 		draw_overlay_rectangle(ip,ip^.analysis_bounds,blue_color);
@@ -792,8 +796,6 @@ begin
 		offset[blue]:=offset[green]+sizeof(byte);
 		offset[alpha]:=offset[blue]+sizeof(byte);
 	end;
-	if scale<min_zoom then scale:=min_zoom;
-	if scale>max_zoom then scale:=max_zoom;
 	if scale>=1 then begin
 		subsampleX:=1;
 		subsampleY:=1;
@@ -831,8 +833,8 @@ options.</p>
 function lwdaq_draw_raw(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 const
-	min_zoom=0.1;
-	max_zoom=10;
+	min_scale=0.2;
+	max_scale=20;
 	
 var 
 	option:string;
@@ -929,8 +931,8 @@ begin
 	end;
 	
 	scale:=zoom*gui_display_zoom;
-	if scale<min_zoom then scale:=min_zoom;
-	if scale>max_zoom then scale:=max_zoom;
+	if scale<min_scale then scale:=min_scale;
+	if scale>max_scale then scale:=max_scale;
 	if scale>=1 then begin
 		subsampleX:=1;
 		subsampleY:=1;
@@ -1420,8 +1422,9 @@ begin
 end;
 
 {
-<p>lwdaq_image_results returns an image's results string, which may be up to
-string_length characters long.</p>
+<p>lwdaq_image_results returns an image's results string. When read from disk, and image 
+result string cannot exceed the length of the first row in bytes minus the image header
+bytes.</p>
 }
 function lwdaq_image_results(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1855,7 +1858,9 @@ begin
 		nip^.name:=ip^.name;
 		dispose_image(ip);
 	end;
-	if results<>null_code then nip^.results:=results;
+	if results<>null_code then begin
+		nip^.results:=leftstr(results,nip^.i_size-image_header_len);
+	end;
 	if left<>-1 then begin
 		if (left>0) and (left<nip^.i_size) then
 			nip^.analysis_bounds.left:=left
