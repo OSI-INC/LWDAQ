@@ -52,7 +52,8 @@ proc LWDAQ_init_Viewer {} {
 	set info(daq_image_bottom) -1
 	set info(daq_min_width) 4
 	set info(image_results) ""
-	set info(verbose_description) " {Image Height} {Image Width} \
+	set info(verbose_description) \
+		"{Image Height} {Image Width} \
 		{Bounds Left} {Bounds Top} {Bounds Right} {Bounds Bottom} \
 		{Results String}"
 	
@@ -358,6 +359,7 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 		}
 		LWDAQ_set_bounds_Viewer
 	}
+	
 	return ""
 }
 
@@ -387,7 +389,8 @@ proc LWDAQ_controls_Viewer {} {
 		pack $f.l$l $f.e$l -side left -expand 1
 	}
 	
-	checkbutton $f.fudb -text "Use These Bounds" -variable LWDAQ_info_Viewer(file_use_daq_bounds)
+	checkbutton $f.fudb -text "Use These Bounds" \
+		-variable LWDAQ_info_Viewer(file_use_daq_bounds)
 	pack $f.fudb -side left -expand 1
 	
 	set f $w.row2

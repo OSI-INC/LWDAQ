@@ -60,8 +60,8 @@ proc LWDAQ_init_Dosimeter {} {
 	set info(analysis_pixel_size_um) 10
 	set info(daq_password) "no_password"
 	set info(delete_old_images) 1
-	set info(verbose_description) " \
-			{Dark Current (counts/row)} \
+	set info(verbose_description) \
+			"{Dark Current (counts/row)} \
 			{Charge Density (counts/pixel)} \
 			{Standard Deviation of Intensity (counts)} \
 			{Threshold Intensity (counts)} \

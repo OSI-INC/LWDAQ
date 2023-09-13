@@ -68,7 +68,8 @@ proc LWDAQ_init_Flowmeter {} {
 	set info(cool) 0
 	set info(transfer) 0
 	set infot(analyze) 0
-	set info(verbose_description) " {Inverse Time Constant (1/s)} \
+	set info(verbose_description) \
+		"{Inverse Time Constant (1/s)} \
 		{RMS Residual (C)} \
 		{Ambient Temperature (C)} \
 		{Peak Temperature Above Ambient (C)} \

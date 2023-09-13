@@ -54,8 +54,8 @@ proc LWDAQ_init_Camera {} {
 	set info(daq_wake_ms) 0
 	set info(daq_password) "no_password"
 	set info(delete_old_images) 1
-	set info(verbose_description) " \
-		{Analysis Bounds Left (column)} {Analysis Bounds Top (row)} \
+	set info(verbose_description) \
+		"{Analysis Bounds Left (column)} {Analysis Bounds Top (row)} \
 		{Analysis Bounds Right (column)} {Analysis Bounds Bottom (row)} \
 		{Average of Intensity (counts)} {Standard Deviation of Intensity (counts)} \
 		{Maximum Intensity (counts)} {Minimum Intensity (counts)} \

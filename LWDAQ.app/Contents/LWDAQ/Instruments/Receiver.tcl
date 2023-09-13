@@ -56,7 +56,8 @@ proc LWDAQ_init_Receiver {} {
 	set info(daq_password) "no_password"
 	set info(daq_block_cntr) 0
 	set info(daq_fifo_unit) 512
-	set info(verbose_description) "{Channel Number} \
+	set info(verbose_description) \
+		"{Channel Number} \
 		{Number of Samples Recorded} \
 		{Average Value} \
 		{Standard Deviation} "

@@ -79,8 +79,8 @@ proc LWDAQ_init_Rasnik {} {
 	set info(daq_source_device_type) 1
 	set info(daq_source_power) 7
 	set info(delete_old_images) 1
-	set info(verbose_description) " \
-			{Mask Position X (um in mask coordinates)} \
+	set info(verbose_description) \
+			"{Mask Position X (um in mask coordinates)} \
 			{Mask Position Y (um in mask coordinates)} \
 			{Image Magnification X (mm/mm)} \
 			{Image Magnification Y (mm/mm)} \
@@ -289,16 +289,26 @@ proc LWDAQ_analysis_Rasnik {{image_name ""}} {
 #
 proc LWDAQ_infobuttons_Rasnik {f} {
 	global LWDAQ_Driver
+
+	# Deduce the info panel window name.
+	set iw [regsub {.buttons} $f ""]
+	
+	# Make a frame for the sensor buttons.
+	set ff [frame $iw.sensor]
+	pack $ff -side top -fill x
+	label $ff.sl -text "Image Sensors:"
+	pack $ff.sl -side left -expand yes
 	foreach a "TC255 TC237 KAF0400 KAF0261 ICX424 ICX424Q" {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_set_image_sensor $a Rasnik"
-		pack $f.$b -side left -expand yes
+		button $ff.$b -text $a -command "LWDAQ_set_image_sensor $a Rasnik"
+		pack $ff.$b -side left -expand yes
 	}
+
 	return ""
 }
 
 #
-# LWDAQ_daq_Rasnik ccaptures an image from the LWDAQ electronics and places
+# LWDAQ_daq_Rasnik captures an image from the LWDAQ electronics and places
 # the image in the lwdaq image list. It provides background subtraction by
 # taking a second image while flashing non-existent LEDs. It provides
 # automatic exposure adjustment by calling itself until the maximum image

@@ -58,10 +58,8 @@ proc LWDAQ_init_Inclinometer {} {
 	set info(display_V_per_div) 2
 	set info(A2065_commands) "0094 0093 008E 008B"
 	set info(A2065_settling_delay) 0.05
-	set info(verbose_description) "\
-		{X+	   (V)} {XCNTR (V)} \
-		{Y+	   (V)} {YCNTR (V)} \
-		{X} {Y}"
+	set info(verbose_description) \
+		"{X+ (V)} {XCNTR (V)} {Y+ (V)} {YCNTR (V)} {X} {Y}"
 	
 	# All elements of the config array will be displayed in the
 	# instrument window. No config array variables can be set in the

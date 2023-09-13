@@ -72,8 +72,8 @@ proc LWDAQ_init_Diagnostic {} {
 	set info(commands) "0000"
 	set info(repeat) 0
 	set info(sleepall_params) "8 14"
-	set info(verbose_description) " \
-		{Software Version} {Hardware Type} \
+	set info(verbose_description) \
+		"{Software Version} {Hardware Type} \
 		{Hardware Version} {Firmware Version} \
 		{Most Recent Loop Time (ns)} {Data transfer speed (kBytes/s)} \
 		{+15V Supply Voltage (V)} {+15V Supply Current (mA)} \

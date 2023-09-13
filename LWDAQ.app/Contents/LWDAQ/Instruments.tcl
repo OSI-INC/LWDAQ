@@ -26,6 +26,7 @@
 proc LWDAQ_instruments_init {} {
 	upvar #0 LWDAQ_Info info
 	set info(instrument_info_rows) 20
+	set info(instrument_entry_width) 20
 	set info(num_lines_keep) 1000
 	set info(line_purge_period) 100
 	set info(max_daq_attempts) 5
@@ -87,28 +88,30 @@ proc LWDAQ_info_button {name} {
 		LWDAQ_infobuttons_$name $w.buttons
 	}
 	
-	# List the info variables in the window and associate each with a text entry.
+	# Divide the list of info array names into separate lists of up
+	# to the info_rows value.
 	set info_list [lsort -dictionary [array names info]]
-	set label_width 0
-	foreach l $info_list {
-		if {[string length $l] > $label_width} {
-			set label_width [string length $l]
-		}
+	set n 0
+	set h $LWDAQ_Info(instrument_info_rows)
+	while {[llength $info_list] > 0} {
+		incr n
+		set column$n [lrange $info_list 0 [expr $h-1]]
+		set info_list [lrange $info_list $h end]
 	}
-
-	set count 0
-	set frame_num 1
-	foreach i $info_list {
-		if {$count % $LWDAQ_Info(instrument_info_rows) == 0} {
-			set f [frame $w.f$frame_num]
-			incr frame_num
-			pack $f -side left -fill y
+	
+	# Make a frame for each list and create a label and entry for
+	# each element in the list.
+	for {set c 1} {$c <= $n} {incr c} {
+		set f [frame $w.f$c]
+		pack $f -side left -fill y
+		set count 0
+		foreach i [set column$c] {
+			incr count
+			label $f.l$i -text $i -anchor w
+			entry $f.e$i -textvariable LWDAQ_info_$info(name)\($i) \
+				-relief sunken -bd 1 -width $LWDAQ_Info(instrument_entry_width)
+			grid $f.l$i $f.e$i -sticky news
 		}
-		incr count
-		label $f.l$i -text $i -anchor w -width $label_width
-		entry $f.e$i -textvariable LWDAQ_info_$info(name)\($i) \
-			-relief sunken -bd 1 -width 30
-		grid $f.l$i $f.e$i -sticky news
 	}
 	
 	# Return the name of the window.
@@ -219,16 +222,15 @@ proc LWDAQ_stop_instruments {} {
 }
 
 #
-# LWDAQ_instrument_print prints the result of analysis to an instrument
-# text window using LWDAQ_print. If the verbose_result is set in the
-# instrument's config array, then the routine uses the verbose_description
-# list in the info array to describe each element of the result on
-# on separate lines. We intend for this routine to be used only for
-# printing instrument results in the instrument window. If you want
-# to print anything else in the instrument window, use LWDAQ_print with
-# the text window name $info(text). The info(text) element is set even
-# if the instrument window is not open, and LWDAQ_print checks to
-# see if the text window exists before it prints.
+# LWDAQ_instrument_print prints the result of analysis to an instrument text
+# window using LWDAQ_print. If the verbose_result is set in the instrument's
+# config array, then the routine uses the verbose_description list in the info
+# array to describe each element of the result on on separate lines. We intend
+# for this routine to be used only for printing instrument results in the
+# instrument window. If you want to print anything else in the instrument
+# window, use LWDAQ_print with the text window name $info(text). The info(text)
+# element is set even if the instrument window is not open, and LWDAQ_print
+# checks to see if the text window exists before it prints.
 #
 proc LWDAQ_instrument_print {instrument s {color black}} {
 	upvar #0 LWDAQ_info_$instrument info
@@ -400,7 +402,8 @@ proc LWDAQ_acquire {instrument} {
 		while {!$success && \
 				($error_counter < $LWDAQ_Info(max_daq_attempts)) \
 				&& !$LWDAQ_Info(reset)} {
-			if {$info(daq_extended) && [info commands LWDAQ_extended_$info(name)] != ""} {
+			if {$info(daq_extended) && \
+					[info commands LWDAQ_extended_$info(name)] != ""} {
 				set daq_result [LWDAQ_extended_$info(name)]
 			} {
 				set daq_result [LWDAQ_daq_$info(name)]
@@ -535,6 +538,9 @@ proc LWDAQ_open {name} {
 	set info(image_display) $w.ic.i.image
 	label $info(image_display) -image $info(photo)
 	pack $info(image_display) -side left
+	bind $info(image_display) \
+		<Double-ButtonPress> \
+		[list LWDAQ_inspector %x %y $name]
 	
 	frame $w.ic.c
 	pack $w.ic.c -side right -fill y
@@ -545,7 +551,7 @@ proc LWDAQ_open {name} {
 	foreach c $config_list {
 		label $w.ic.c.l$c -text $c -anchor w
 		entry $w.ic.c.e$c -textvariable LWDAQ_config_$name\($c) \
-			-relief sunken -bd 1 -width 25
+			-relief sunken -bd 1 -width $LWDAQ_Info(instrument_entry_width)
 		grid $w.ic.c.l$c $w.ic.c.e$c -sticky news
 	}
 
@@ -619,3 +625,27 @@ proc LWDAQ_instrument_unsave {name} {
 		return ""
 	}
 }
+
+#
+# LWDAQ_inspector allows us to inspect an instrument's image data
+# by moving the mouse over the image in the instrument panel. We activate
+# the inspector by selecting it from the instrument menu. A window opens up
+# and now, whenever we move the mouse over any image we see a magnified 
+# view of a small section of the image in the inspector window.
+#
+proc LWDAQ_inspector {x y name} {
+	upvar LWDAQ_config_$name config
+	upvar LWDAQ_info_$name info
+	
+	# Get the image column and row.
+	set zoom [expr 1.0 * $info(zoom) * [LWDAQ_get_lwdaq_config display_zoom]]
+	set xi [expr round(1.0*($x - 4)/$zoom)] 
+	set yi [expr round(1.0*($y - 4)/$zoom)]
+	
+	set intensity [LWDAQ_image_pixels $config(memory_name) $xi $yi $xi $yi]
+	set intensity [string trim $intensity]
+	LWDAQ_print $info(text) "Image Detail: column=$xi row=$yi intensity=$intensity"
+
+	return ""
+}
+

@@ -78,8 +78,8 @@ proc LWDAQ_init_BCAM {} {
 	set info(delete_old_images) 1
 	set info(dummy_flash_element) 255
 	set info(dummy_flash_seconds) 0.0
-	set info(verbose_description) " \
-			{Spot Position X (um)} \
+	set info(verbose_description) \
+			"{Spot Position X (um)} \
 			{Spot Position Y (um) or Line Rotation Anticlockwise (mrad)} \
 			{Number of Pixels Above Threshold in Spot} \
 			{Peak Intensity in Spot} \
@@ -143,15 +143,39 @@ proc LWDAQ_analysis_BCAM {{image_name ""}} {
 
 #
 # LWDAQ_infobuttons_BCAM creates buttons that allow us to configure
-# the BCAM for any of the available image sensors.
+# the BCAM for any of the available image sensors. The general-purpose
+# instrument routines will call this procedure when they create the
+# info panel.
 #
 proc LWDAQ_infobuttons_BCAM {f} {
 	global LWDAQ_Driver
+	
+	# Deduce the info panel window name.
+	set iw [regsub {.buttons} $f ""]
+	
+	# Make a frame for the sensor buttons.
+	set ff [frame $iw.sensor]
+	pack $ff -side top -fill x
+	label $ff.sl -text "Image Sensors:"
+	pack $ff.sl -side left -expand yes
 	foreach a "TC255 TC237 KAF0400 KAF0261 ICX424 ICX424Q" {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_set_image_sensor $a BCAM"
-		pack $f.$b -side left -expand yes
+		button $ff.$b -text $a -command "LWDAQ_set_image_sensor $a BCAM"
+		pack $ff.$b -side left -expand yes
 	}
+
+	# Make a frame for the source buttons.
+	set ff [frame $iw.source]
+	pack $ff -side top -fill x
+	label $ff.sl -text "Light Sources:"
+	pack $ff.sl -side left -expand yes
+	foreach {a sdt} "LED 1 A-BCAM 2 D-BCAM 6 H-BCAM 6 P-BCAM 2 MULTISOURCE 9" {
+		set b [string tolower $a]
+		button $ff.$b -text $a -command \
+			[list set LWDAQ_info_BCAM(daq_source_device_type) $sdt]
+		pack $ff.$b -side left -expand yes
+	}
+
 	return ""
 }
 

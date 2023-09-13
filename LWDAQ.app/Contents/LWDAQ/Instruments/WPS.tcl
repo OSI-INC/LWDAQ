@@ -64,8 +64,8 @@ proc LWDAQ_init_WPS {} {
 	set info(daq_device_type) 2
 	set info(daq_password) "no_password"
 	set info(delete_old_images) 1
-	set info(verbose_description) "\
-		{Camera One Left Edge Position (um)}\
+	set info(verbose_description) \
+		"{Camera One Left Edge Position (um)}\
 		{Camera One Left Edge Rotation (mrad)}\
 		{Camera One Right Edge Position (um)}\
 		{Camera One Right Edge Rotation (mrad)}\

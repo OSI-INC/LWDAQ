@@ -1224,19 +1224,22 @@ proc LWDAQ_read_image_file {infile_name {image_name ""}} {
 
 #
 # LWDAQ_image_pixels returns a string containing the intensities of all pixels
-# in the analysis boundaries of an image. The pixels form an array by use of
-# spaces and line breaks. There is a line break at the end of each row of pixels
-# and a space between each column. You can paste the output from this routine
-# directly into a spreadsheet and obtain a two-dimensional intensity array.
+# in a rectangular area in the image. By default, the routine uses the analysis
+# boundaries, but we can also specify our own left, top, right, and bottom
+# boundaries in that order. The pixels form an array by use of spaces and line
+# breaks. There is a line break at the end of each row of pixels and a space
+# between each column. You can paste the output from this routine directly into
+# a spreadsheet and obtain a two-dimensional intensity array.
 #
-proc LWDAQ_image_pixels {image_name} {
+proc LWDAQ_image_pixels {image_name {left -1} {top -1} {right -1} {bottom -1}} {
+	
 	set binary_pixels [lwdaq_image_contents $image_name]
 	binary scan $binary_pixels c* string_pixels
 	set bounds [lwdaq_image_characteristics $image_name] 
-	set left [lindex $bounds 0]
-	set top [lindex $bounds 1]
-	set right [lindex $bounds 2]
-	set bottom [lindex $bounds 3]
+	if {$left < 0} {set left [lindex $bounds 0]}
+	if {$top < 0} {set top [lindex $bounds 1]}
+	if {$right <0} {set right [lindex $bounds 2]}
+	if {$bottom < 0} {set bottom [lindex $bounds 3]}
 	set i_size [lindex $bounds 9]
 	set j_size [lindex $bounds 8]
 	set i 0
