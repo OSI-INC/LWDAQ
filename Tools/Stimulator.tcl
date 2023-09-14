@@ -57,23 +57,16 @@ proc Stimulator_init {} {
 	set config(son_color) "lightgreen"
 	set config(stimeout_color) "orange"
 	set config(soff_color) "lightgray"	
-	set config(bnone_color) "lightgray"
-	set config(bokay_color) "lightgreen"
-	set config(blow_color) "orange"
-	set config(bempty_color) "red"
 	set config(ack_received_color) "black"
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 	
-	set config(blow) "2.6"
-	set config(bempty) "2.4"
 	set config(verbose) "1"
 	set config(aux_show) "0"
 	set config(aux_color) "orange"
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
 	
 	set info(transmit_ms) 0
-	set config(default_ver) "A3041"
 	set config(default_id) "1234"
 	set config(multicast_id) "FFFF"
 	set config(default_current)	"8"
@@ -401,9 +394,10 @@ proc Stimulator_xoff {n} {
 }
 
 #
-# Stimulator_battery requests a battery voltage transmission.
+# Stimulator_check requests a version number and a battery voltage
+# measurement.
 #
-proc Stimulator_battery {n} {
+proc Stimulator_check {n} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
 
@@ -412,7 +406,7 @@ proc Stimulator_battery {n} {
 	set info(state) "Command"
 
 	# Send battery measurement request.
-	set commands [list $info(op_batt)]
+	set commands [list $info(op_ver) $info(op_batt)]
 	
 	# Transmit commands.
 	Stimulator_transmit $info(dev$n\_id) $commands
@@ -484,8 +478,7 @@ proc Stimulator_clear {n} {
 
 	LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
-	LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bnone_color)
-	set info(dev$n\_battery) "?"	
+	set info(dev$n\_batt) "?"	
 
 	return ""
 }
@@ -624,53 +617,31 @@ proc Stimulator_monitor {} {
 			}
 		} elseif {$fa == $info(at_batt)} {
 			
-			# Battery measurements should correspond to a stimulator in our
-			# list. The measurement is identified by its primary channel number,
-			# so we look for the first device entry with a matching id and
-			# assume this is the matching device. If we don't find a matching
-			# id we discard the battery measurement as invalid.
-			set voltage "?"
-			set i [lsearch -index 1 $id_list $device_id]
-			if {$i >= 0} {
-				set n [lindex $id_list $i 0]
+			# Acknowledgements confirm that a device has received a command. We 
+			# ignore acknowledgements from devices that are not in our list.
+			if {$n == 0} {continue}
+			
 				
-				# We interpret battery measurements in a manner particular to the
-				# various supported device versions.
-				set ver $info(dev$n\_ver)
-				switch $ver {
-					"A3041" {
-						set voltage [format %.1f [expr 255.0/$db*1.2]]
-					}
-					default {
-						set voltage [format %.1f [expr 255.0/$db*1.2]]
-					}
-				}
-				
-				# Set the battery voltage indicator and set its background according
-				# to the approximate state of the battery: okay, low, or empty. If
-				# we were unable to interpret the battery voltage, we leave it as a
-				# question mark.
-				set info(dev$n\_battery) $voltage	
-				if {$voltage == "?"} {
-					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bnone_color)
-				} elseif {$voltage > $config(blow)} {
-					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bokay_color)
-				} elseif {$voltage > $config(bempty)} {
-					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(blow_color)
-				} else {
-					LWDAQ_set_bg $info(dev$n\_vbat_label) $config(bempty_color)
-				}
-
-				# Report the battery measurement.
-				LWDAQ_print $info(text) "Battery Measurement:\
-					device_id=$device_id value=$db ts=$ts\
-					voltage=$voltage $now_time" 
+			# We interpret battery measurements in a manner particular to the
+			# various supported device versions.
+			set ver $info(dev$n\_ver)
+			switch $ver {
+				"21" {set voltage [format %.1f [expr 255.0/$db*1.2]]}
+				default {set voltage [format %.1f [expr 255.0/$db*1.2]]}
 			}
-		
+			
+			# Report the battery measurement.
+			set info(dev$n\_batt) $voltage
+			LWDAQ_print $info(text) "Battery Measurement:\
+				device_id=$device_id value=$db ts=$ts\
+				voltage=$voltage $now_time" 
 		} elseif {$fa == $info(at_id)} {
-			set device_id [format %04X [expr $id +  (256 * $db)]]
 			LWDAQ_print $info(text) "Identification Message:\
-					device_id=$device_id ts=$ts $now_time" green
+				device_id=$device_id ts=$ts $now_time" green
+		} elseif {$fa == $info(at_ver)} {
+			set info(dev$n\_ver) "$db"
+			LWDAQ_print $info(text) "Version Number:\
+				device_id=device_id value=$db ts=$ts $now_time"
 		} else {
 			
 			# We don't recognise this type of auxiliary message, so proceed.
@@ -718,8 +689,7 @@ proc Stimulator_draw_list {} {
 	
 		# If this stimulator's state variable does not exist, then create it
 		# now, as well as other system parameters.
-		if {![info exists info(dev$n\_ver)]} {
-			set info(dev$n\_ver) $config(default_ver)
+		if {![info exists info(dev$n\_id)]} {
 			set info(dev$n\_id) $config(default_id)
 			set info(dev$n\_pulse_ms) "10"
 			set info(dev$n\_current) $config(default_current)
@@ -728,23 +698,28 @@ proc Stimulator_draw_list {} {
 			set info(dev$n\_random) "0"
 			set info(dev$n\_ch) [expr 0x$config(default_id) % 256]
 			set info(dev$n\_sps) "128"
-			set info(dev$n\_battery) "?"
+			set info(dev$n\_ver) "?"
+			set info(dev$n\_batt) "?"
 		}
 
 		set ff $f.dev$n
 		frame $ff -relief sunken -bd 2
 		pack $ff -side top -fill x
 		
-		label $ff.n -text "$n" -width 3
-		pack $ff.n -side left -expand 1
-
 		entry $ff.id -textvariable Stimulator_info(dev$n\_id) -width 5
 		pack $ff.id -side left -expand 1
 		set info(dev$n\_state) $ff.id
 		LWDAQ_set_bg $info(dev$n\_state) $config(xoff_color)
 		LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+		
+		foreach {a c} {Start green} {
+			set b [string tolower $a]
+			button $ff.$b -text $a -padx $padx -fg $c -command \
+				[list LWDAQ_post "Stimulator_$b $n" front]
+			pack $ff.$b -side left -expand 1
+		}
 
-		foreach {a c} {pulse_ms 5 period_ms 5 num_pulses 5 current 3 ver 6} {
+		foreach {a c} {pulse_ms 5 period_ms 5 num_pulses 5 current 3} {
 			set b [string tolower $a]
 			label $ff.l$b -text "$a\:" -fg $config(label_color)
 			entry $ff.$b -textvariable Stimulator_info(dev$n\_$b) -width $c
@@ -753,9 +728,16 @@ proc Stimulator_draw_list {} {
 
 		checkbutton $ff.random -text "Random" \
 			-variable Stimulator_info(dev$n\_random)
-		pack $ff.random -side left -expand yes
+		pack $ff.random -side left -expand 1
 
-		foreach {a c} {Start green Stop black} {
+		foreach {a c} {Stop black} {
+			set b [string tolower $a]
+			button $ff.$b -text $a -padx $padx -fg $c -command \
+				[list LWDAQ_post "Stimulator_$b $n" front]
+			pack $ff.$b -side left -expand 1
+		}
+
+		foreach {a c} {Xon green} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Stimulator_$b $n" front]
@@ -769,21 +751,30 @@ proc Stimulator_draw_list {} {
 			pack $ff.l$b $ff.$b -side left -expand 1
 		}
 
-		foreach {a c} {Xon green Xoff black Battery green} {
+		foreach {a c} {Xoff black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Stimulator_$b $n" front]
 			pack $ff.$b -side left -expand 1
 		}
 
-		set info(dev$n\_vbat_label) [label $ff.vbat -textvariable \
-			Stimulator_info(dev$n\_battery) \
-			-width 3 -bg $config(bnone_color) -fg black]
-		pack $ff.vbat -side left -expand 1
+		foreach {a c} {ver 3} {
+			set b [string tolower $a]
+			label $ff.l$b -text "$a\:" -fg $config(label_color)
+			entry $ff.$b -textvariable Stimulator_info(dev$n\_$b) -width $c
+			pack $ff.l$b $ff.$b -side left -expand 1
+		}
+
+		foreach {a c} {batt 3} {
+			set b [string tolower $a]
+			label $ff.l$b -text "$a\:" -fg $config(label_color)
+			label $ff.$b -textvariable Stimulator_info(dev$n\_$b) -width $c
+			pack $ff.l$b $ff.$b -side left -expand 1
+		}
 
 		button $ff.delete -text "X" -padx $padx -command \
 			[list LWDAQ_post "Stimulator_ask_remove $n" front]
-		pack $ff.delete -side left -expand yes
+		pack $ff.delete -side left -expand 1
 	}
 	
 	return ""
@@ -819,7 +810,7 @@ proc Stimulator_ask_remove {n} {
 		[list LWDAQ_post "Stimulator_remove $n" front]
 	button $w.no -text "No" -padx 10 -pady 5 -command \
 		[list LWDAQ_post "destroy $w" front]
-	pack $w.q $w.yes $w.no -side left -expand yes
+	pack $w.q $w.yes $w.no -side left -expand 1
 
 	return ""
 }
@@ -850,7 +841,7 @@ proc Stimulator_remove {n} {
 	set info(dev_list) [lreplace $info(dev_list) $index $index]
 	unset info(dev$n\_id)
 	unset info(dev$n\_ver)
-	unset info(dev$n\_battery)
+	unset info(dev$n\_batt)
 	unset info(dev$n\_pulse_ms) 
 	unset info(dev$n\_period_ms) 
 	unset info(dev$n\_current) 
@@ -883,7 +874,6 @@ proc Stimulator_add_device {} {
 	
 	# Configure the new sensor to default values.
 	set info(dev$n\_id) $config(default_id)
-	set info(dev$n\_ver) $config(default_ver)
 	set info(dev$n\_pulse_ms) "10"
 	set info(dev$n\_period_ms) "100"
 	set info(dev$n\_num_pulses) "10"
@@ -891,8 +881,8 @@ proc Stimulator_add_device {} {
 	set info(dev$n\_ch) [expr 0x$config(default_id) % 256]
 	set info(dev$n\_sps) "128"
 	set info(dev$n\_random) "0"
-	
-	set info(dev$n\_battery) "?"
+	set info(dev$n\_ver) "?"
+	set info(dev$n\_batt) "?"
 	
 	# Re-draw the sensor list.
 	Stimulator_draw_list
@@ -955,7 +945,7 @@ proc Stimulator_load_list {{fn ""}} {
 		foreach n $info(dev_list) {
 			LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 			LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
-			set info(dev$n\_battery) "?"
+			set info(dev$n\_batt) "?"
 		}
 	} error_message]} {
 		LWDAQ_print $info(text) "ERROR: $error_message\."
@@ -1013,7 +1003,7 @@ proc Stimulator_refresh_list {{fn ""}} {
 	foreach dev $new_list {
 		set n [lindex $dev 0]
 		Stimulator_rename_device $n $m
-		set info(dev$m\_battery) "?"
+		set info(dev$m\_batt) "?"
 		lappend info(dev_list) $m
 		incr m
 	}
@@ -1065,17 +1055,17 @@ proc Stimulator_transmit_panel {} {
 	
 	label $f.nl -text "Target Identifier (Hex):"
 	entry $f.ne -textvariable Stimulator_config(tp_id) -width 5
-	pack $f.nl $f.ne -side left -expand yes
+	pack $f.nl $f.ne -side left -expand 1
 
 	foreach a {Run Halt} {
 		set b [string tolower $a]
 		button $f.$b -text "$a Program" -command "LWDAQ_post Stimulator_tp_$b"
-		pack $f.$b -side left -expand yes
+		pack $f.$b -side left -expand 1
 	}
 
 	label $f.bl -text "Base Address:"
 	entry $f.be -textvariable Stimulator_config(tp_base_addr) -width 8
-	pack $f.bl $f.be -side left -expand yes
+	pack $f.bl $f.be -side left -expand 1
 
 	checkbutton $f.verbose -variable Stimulator_config(verbose) -text "Verbose"
 	pack $f.verbose -side left -expand 1
@@ -1085,12 +1075,12 @@ proc Stimulator_transmit_panel {} {
 	
 	label $f.lprogram -text "Program:" -fg $config(label_color)
 	entry $f.eprogram -textvariable Stimulator_config(tp_program) -width 60
-	pack $f.lprogram $f.eprogram -side left -expand yes
+	pack $f.lprogram $f.eprogram -side left -expand 1
 
 	foreach a {Browse Edit} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Stimulator_tp_$b"
-		pack $f.$b -side left -expand yes
+		pack $f.$b -side left -expand 1
 	}
 
 	set f [frame $w.commands]
@@ -1098,11 +1088,11 @@ proc Stimulator_transmit_panel {} {
 
 	label $f.lcommands -text "Commands:" -fg $config(label_color)
 	entry $f.commands -textvariable Stimulator_config(tp_commands) -width 70
-	pack $f.lcommands $f.commands -side left -expand yes
+	pack $f.lcommands $f.commands -side left -expand 1
 
 	button $f.transmit -text "Transmit" \
 		-command "LWDAQ_post Stimulator_tp_transmit"
-	pack $f.transmit -side left -expand yes
+	pack $f.transmit -side left -expand 1
 		
 	set info(tp_text) [LWDAQ_text_widget $w 80 15]
 
@@ -1257,26 +1247,26 @@ proc Stimulator_open {} {
 	
 	label $f.laddr -text "ip_addr:" -fg $config(label_color)
 	entry $f.eaddr -textvariable Stimulator_config(ip_addr) -width 16
-	pack $f.laddr $f.eaddr -side left -expand yes
+	pack $f.laddr $f.eaddr -side left -expand 1
 
 	label $f.lsckt -text "driver_socket:" -fg $config(label_color)
 	entry $f.esckt -textvariable Stimulator_config(driver_socket) -width 4
-	pack $f.lsckt $f.esckt -side left -expand yes
+	pack $f.lsckt $f.esckt -side left -expand 1
 
 	button $f.neuroplayer -text "Neuroplayer" -command {
 		LWDAQ_post "LWDAQ_run_tool Neuroplayer"
 	}
-	pack $f.neuroplayer -side left -expand yes
+	pack $f.neuroplayer -side left -expand 1
 
 	button $f.receiver -text "Receiver" -command {
 		LWDAQ_post "LWDAQ_open Receiver"
 	}
-	pack $f.receiver -side left -expand yes
+	pack $f.receiver -side left -expand 1
 
 	button $f.txcmd -text "Transmit Panel" -command {
 		LWDAQ_post "Stimulator_transmit_panel"
 	}
-	pack $f.txcmd -side left -expand yes
+	pack $f.txcmd -side left -expand 1
 
 	foreach a {Configure Help} {
 		set b [string tolower $a]
@@ -1291,7 +1281,7 @@ proc Stimulator_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
-	foreach {a c} {Start green Stop black Xon green Xoff black Battery green} {
+	foreach {a c} {Start green Stop black Xon green Xoff black Check green} {
 		set b [string tolower $a]
 		button $f.$b -text "$a\_All" -fg $c -command [list LWDAQ_post "Stimulator_all $b"]
 		pack $f.$b -side left -expand 1
