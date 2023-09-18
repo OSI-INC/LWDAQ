@@ -356,59 +356,58 @@ proc LWDAQ_reset_Receiver {} {
 		set info(receiver_type) "?"
 		foreach payload $info(payload_options) {
 			set bb [lwdaq_receiver $img "-payload $payload print 0 1"]
-			if {[regexp {Version ([0-9]+)} $bb match fv]} {
-				set info(receiver_firmware) [expr $fv % $info(fv_range)]
-				switch [expr $fv / $info(fv_range)] {
-					0 {
-						set info(receiver_type) "A3018"
-						set config(payload_length) 0
-						set info(daq_block_cntr) 0
-						set channel_select_available 0
-						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
-					}
-					1 {
-						set info(receiver_type) "A3027"
-						set config(payload_length) 0
-						set info(daq_block_cntr) 0
-						set channel_select_available 0
-						set send_all_sets_cmd 1
-						set info(purge_duplicates) 1
-					}
-					2 {
-						set info(receiver_type) "A3032"
-						set config(payload_length) 16
-						set info(daq_block_cntr) 0
-						set channel_select_available 0
-						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
-					}
-					3 {
-						set info(receiver_type) "A3038"
-						set config(payload_length) 16
-						set info(daq_block_cntr) 1
-						set channel_select_available 1
-						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
-					}
-					4  {
-						set info(receiver_type) "A3042"
-						set config(payload_length) 2
-						set info(daq_block_cntr) 1
-						set channel_select_available 1
-						set send_all_sets_cmd 0
-						set info(purge_duplicates) 1
-					}
-					default {
-						set info(receiver_type) "?"
-						set config(payload_length) 0
-						set info(daq_block_cntr) 0
-						set channel_select_available 0
-						set send_all_sets_cmd 0
-						set info(purge_duplicates) 0
-					}					
+			if {[regexp {Error:} $bb]} {continue}
+			if {![regexp {Version ([0-9]+)} $bb match fv]} {continue}
+			set info(receiver_firmware) [expr $fv % $info(fv_range)]
+			switch [expr $fv / $info(fv_range)] {
+				0 {
+					set info(receiver_type) "A3018"
+					set config(payload_length) 0
+					set info(daq_block_cntr) 0
+					set channel_select_available 0
+					set send_all_sets_cmd 0
+					set info(purge_duplicates) 0
 				}
-				break
+				1 {
+					set info(receiver_type) "A3027"
+					set config(payload_length) 0
+					set info(daq_block_cntr) 0
+					set channel_select_available 0
+					set send_all_sets_cmd 1
+					set info(purge_duplicates) 1
+				}
+				2 {
+					set info(receiver_type) "A3032"
+					set config(payload_length) 16
+					set info(daq_block_cntr) 0
+					set channel_select_available 0
+					set send_all_sets_cmd 0
+					set info(purge_duplicates) 0
+				}
+				3 {
+					set info(receiver_type) "A3038"
+					set config(payload_length) 16
+					set info(daq_block_cntr) 1
+					set channel_select_available 1
+					set send_all_sets_cmd 0
+					set info(purge_duplicates) 0
+				}
+				4  {
+					set info(receiver_type) "A3042"
+					set config(payload_length) 2
+					set info(daq_block_cntr) 1
+					set channel_select_available 1
+					set send_all_sets_cmd 0
+					set info(purge_duplicates) 1
+				}
+				default {
+					set info(receiver_type) "?"
+					set config(payload_length) 0
+					set info(daq_block_cntr) 0
+					set channel_select_available 0
+					set send_all_sets_cmd 0
+					set info(purge_duplicates) 0
+				}					
 			}
 		}
 		lwdaq_image_destroy $img
