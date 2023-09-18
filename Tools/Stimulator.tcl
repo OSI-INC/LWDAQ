@@ -308,7 +308,7 @@ proc Stimulator_start {n} {
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Command"
+	set info(state) "Start"
 
 	# Transmit the commands.
 	Stimulator_transmit $info(dev$n\_id) [Stimulator_start_cmd $n]
@@ -329,7 +329,7 @@ proc Stimulator_stop {n} {
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Command"
+	set info(state) "Stop"
 
 	# Measure battery voltage, check version, and stop stimulus.
 	set commands [list $info(op_batt) $info(op_ver) $info(op_stop)]
@@ -353,7 +353,7 @@ proc Stimulator_xon {n} {
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Command"
+	set info(state) "Xon"
 
 	# Start our command with battery measurement and version request
 	# instructions.
@@ -389,7 +389,7 @@ proc Stimulator_xoff {n} {
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Command"
+	set info(state) "Xoff"
 
 	# Send the Xoff command, which is a transmit command with zero period.
 	# Before stopping transmission, measure battery voltage and check version
@@ -397,30 +397,6 @@ proc Stimulator_xoff {n} {
 	set commands [list $info(op_batt) $info(op_ver) $info(op_xoff)]
 	
 	# Transmit the commands.
-	Stimulator_transmit $info(dev$n\_id) $commands
-
-	# Set state variables.
-	set info(state) "Idle"
-	
-	return ""
-}
-
-#
-# Stimulator_check requests a version number and a battery voltage
-# measurement.
-#
-proc Stimulator_check {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
-
-	# Set the tool state variable.
-	if {$info(state) != "Idle"} {return}
-	set info(state) "Command"
-
-	# Send battery measurement request.
-	set commands [list $info(op_ver) $info(op_batt)]
-	
-	# Transmit commands.
 	Stimulator_transmit $info(dev$n\_id) $commands
 
 	# Set state variables.
@@ -444,7 +420,7 @@ proc Stimulator_identify {} {
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Command"
+	set info(state) "Identify"
 
 	# Add the idenfity command.
 	set commands [list $info(op_id)]
@@ -629,11 +605,9 @@ proc Stimulator_monitor {} {
 			}
 		} elseif {$fa == $info(at_batt)} {
 			
-			# Acknowledgements confirm that a device has received a command. We 
-			# ignore acknowledgements from devices that are not in our list.
+			# Ignore battery measurements from devices that are not in our list.
 			if {$n == 0} {continue}
 			
-				
 			# We interpret battery measurements in a manner particular to the
 			# various supported device versions.
 			set ver $info(dev$n\_version)
@@ -651,9 +625,9 @@ proc Stimulator_monitor {} {
 			LWDAQ_print $info(text) "Identification:\
 				device_id=$device_id ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
-			set info(dev$n\_ver) "$db"
+			set info(dev$n\_version) "$db"
 			LWDAQ_print $info(text) "Version:\
-				device_id=device_id value=$db ts=$ts $now_time"
+				device_id=$device_id value=$db ts=$ts $now_time"
 		} else {
 			
 			# We don't recognise this type of auxiliary message, so proceed.
