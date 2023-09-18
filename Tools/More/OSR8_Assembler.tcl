@@ -532,11 +532,12 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	if {$config(ofn_write)} {
 		close $f
 		LWDAQ_print $info(text) "Generated [llength $mem] code bytes,\
-			printed to screen, saved to \"$config(ofn)\"." purple	
+			printed to screen, saved to \"$config(ofn)\"." purple
 	} else {
 		LWDAQ_print $info(text) "Generated [llength $mem] code bytes,\
 			printed to screen, not saved to disk." purple	
 	}
+	LWDAQ_print $info(text) "Done. \([clock format [clock seconds]]\)" purple
 	
 	return $mem
 }

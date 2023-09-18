@@ -6142,7 +6142,7 @@ type
 		case boolean of
 			true: (a,b:byte);
 			false: (i:smallint);
-	end;
+		end;
 
 var
 	new_i,old_i:si_type;	
@@ -6170,7 +6170,7 @@ type
 		case boolean of
 			true: (b1,b2,b3,b4:byte);
 			false: (c:cardinal);
-	end;
+		end;
 		
 var
 	b:four_byte_cardinal;
