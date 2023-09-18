@@ -599,7 +599,7 @@ proc Stimulator_monitor {} {
 					set type "invalid"
 				}
 				
-			if {$type != "invalid"} {
+			if {($type != "invalid") && $config(verbose)} {
 				LWDAQ_print $info(text) "Acknowledge:\
 					device_id=$device_id type=$type ts=$ts $now_time"
 			}
@@ -618,16 +618,22 @@ proc Stimulator_monitor {} {
 			
 			# Report the battery measurement.
 			set info(dev$n\_battery) $voltage
-			LWDAQ_print $info(text) "Battery:\
-				device_id=$device_id value=$db ts=$ts\
-				voltage=$voltage $now_time" 
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "Battery:\
+					device_id=$device_id value=$db ts=$ts\
+					voltage=$voltage $now_time" 
+			}
 		} elseif {$fa == $info(at_id)} {
-			LWDAQ_print $info(text) "Identification:\
-				device_id=$device_id ts=$ts $now_time" green
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "Identification:\
+					device_id=$device_id ts=$ts $now_time" green
+			}
 		} elseif {$fa == $info(at_ver)} {
 			set info(dev$n\_version) "$db"
-			LWDAQ_print $info(text) "Version:\
-				device_id=$device_id value=$db ts=$ts $now_time"
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "Version:\
+					device_id=$device_id value=$db ts=$ts $now_time"
+			}
 		} else {
 			
 			# We don't recognise this type of auxiliary message, so proceed.
