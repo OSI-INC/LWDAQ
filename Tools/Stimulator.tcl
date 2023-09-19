@@ -221,16 +221,40 @@ proc Stimulator_transmit {id commands} {
 	return ""
 }
 
-# 
-# Stimulator_start_cmd generates a list of bytes to transmit to the device so as
-# to configure and stimulate it according to the parameters in the Stimulator
-# window. It appends a two-byte checksum, which is necessary for the device to
-# accept the command. Each byte is expressed in the return string as a decimal
-# number between 0 and 255.
 #
-proc Stimulator_start_cmd {n} {
+# Stimulator_id takes either a device list index or a four-digit hexadecimal
+# value and returns a four-digit hexadecimal value. If first looks to see if
+# the value it is passed is an element in the device list. If so, it returns
+# the identifier of this device. If not, it checks to see if the value is
+# a four-digit hex string, and if so returns the value. Otherwise, it returns
+# the value 0001 and prints a warning to the stimulator window.
+#
+proc Stimulator_id {n} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
+
+	if {[lsearch $info(dev_list) $n] >= 0} {
+		return $info(dev$n\_id)
+	} elseif {[regexp {[0-9A-Fa-f]{4}} $n]} {
+		return $n
+	} else {
+		LWDAQ_print $info(text) "WARNING: Invalid device identifier \"$n\"."
+		return "0001"
+	}
+}
+
+#
+# Stimulator_start transmits the stimulation commands defined in the tool
+# window to a specific device. We can identify the device either by its
+# list index or by its identifier.
+#
+proc Stimulator_start {n} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+
+	# Set the tool state variable.
+	if {$info(state) != "Idle"} {return}
+	set info(state) "Start"
 
 	# Begin command with a battery measurement and verstion number check, 
 	# then begin the start instruction.
@@ -284,34 +308,8 @@ proc Stimulator_start_cmd {n} {
 	# Randomize the pulses, or not.
 	if {$config(random)} {lappend commands 1} {lappend commands 0}
 	
-	# We return the command string, which does not yet have the checksum
-	# attached to the end, nor the device id bytes at the beginning, but is
-	# otherwise a sequence of operation codes and parameter values.
-	return $commands
-}
-
-#
-# Stimulator_start transmits the stimulation commands defined in the tool
-# window. It opens a socket to the Command Transmitter, turns on the RF power
-# for the initiate delay, which activates all stimulators for command reception,
-# transmits all bytes listed in the commands parameter, transmits the correct
-# cyclic redundancy checksum for the command bytes, turns off RF power for,
-# waits for the termination period, and closes the socket. It calculates the
-# stimulus length in microseconds and sets the stimulus end time for the
-# selected channel or channels. If we have enabled acknowledgements, we add a
-# request for acknowledgement to the start command, and set the timeout value
-# for the selected channels.
-#
-proc Stimulator_start {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
-
-	# Set the tool state variable.
-	if {$info(state) != "Idle"} {return}
-	set info(state) "Start"
-
 	# Transmit the commands.
-	Stimulator_transmit $info(dev$n\_id) [Stimulator_start_cmd $n]
+	Stimulator_transmit [Stimulator_id $n] $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -335,7 +333,7 @@ proc Stimulator_stop {n} {
 	set commands [list $info(op_batt) $info(op_ver) $info(op_stop)]
 	
 	# Transmit the commands.
-	Stimulator_transmit $info(dev$n\_id) $commands
+	Stimulator_transmit [Stimulator_id $n] $commands
 	
 	# Set state variables.
 	set info(state) "Idle"
@@ -372,7 +370,7 @@ proc Stimulator_xon {n} {
 	lappend commands $info(op_xon) $info(dev$n\_channel) $tx_p
 		
 	# Transmit the command.
-	Stimulator_transmit $info(dev$n\_id) $commands
+	Stimulator_transmit [Stimulator_id $n] $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -397,7 +395,7 @@ proc Stimulator_xoff {n} {
 	set commands [list $info(op_batt) $info(op_ver) $info(op_xoff)]
 	
 	# Transmit the commands.
-	Stimulator_transmit $info(dev$n\_id) $commands
+	Stimulator_transmit [Stimulator_id $n] $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -755,8 +753,8 @@ proc Stimulator_ask_remove {n} {
 		return ""
 	}
 	toplevel $w
-	wm title $w "Remove Device Number $info(dev$n\_id)"
-	label $w.q -text "Remove Device Number $info(dev$n\_id)?" \
+	wm title $w "Remove $info(dev$n\_id), Index $n?"
+	label $w.q -text "Remove $info(dev$n\_id), Index $n?" \
 		-padx 10 -pady 5 -fg purple
 	button $w.yes -text "Yes" -padx 10 -pady 5 -command \
 		[list LWDAQ_post "Stimulator_remove $n" front]
