@@ -227,7 +227,7 @@ proc Stimulator_transmit {id commands} {
 # the value it is passed is an element in the device list. If so, it returns
 # the identifier of this device. If not, it checks to see if the value is
 # a four-digit hex string, and if so returns the value. Otherwise, it returns
-# the value 0001 and prints a warning to the stimulator window.
+# the default identifier and prints a warning to the stimulator window.
 #
 proc Stimulator_id {n} {
 	upvar #0 Stimulator_config config
@@ -238,8 +238,9 @@ proc Stimulator_id {n} {
 	} elseif {[regexp {[0-9A-Fa-f]{4}} $n]} {
 		return $n
 	} else {
-		LWDAQ_print $info(text) "WARNING: Invalid device identifier \"$n\"."
-		return "0001"
+		LWDAQ_print $info(text) "WARNING: Invalid device identifier \"$n\",\
+			using $config(default_id) instead."
+		return "$config(default_id)"
 	}
 }
 
