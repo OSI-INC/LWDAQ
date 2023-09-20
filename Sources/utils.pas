@@ -159,6 +159,7 @@ const
 	integer_mask=$FFFFFFFF;
 	smallint_mask=$0000FFFF;
 	byte_mask=$000000FF;
+	byte_shift=256;
 	nibble_mask=$0000000F;
 	small_real=1e-20;
 	large_real=1e40;

@@ -334,11 +334,11 @@ begin
 
 		if ac_couple then
 			display_real_graph(ip,gauge,
-				overlay_color_from_integer(channel_num),
+				overlay_color(channel_num),
 				t_min,t_max,y_min+gauge_ave,y_max+gauge_ave,0,0)
 		else 
 			display_real_graph(ip,gauge,
-				overlay_color_from_integer(channel_num),
+				overlay_color(channel_num),
 				t_min,t_max,y_min,y_max,0,0);
 
 		if ave then writestr(result,result,gauge_ave:5:3,' ');
@@ -635,7 +635,7 @@ begin
 	of the first trigger.
 }
 		display_real_graph(ip,trace,
-			overlay_color_from_integer(channel_num),
+			overlay_color(channel_num),
 			t_min,t_max,v_min,v_max,0,0);
 {
 	Apply a fourier transform to the data to obtain the fundamental frequency, should
@@ -745,7 +745,7 @@ begin
 			signal[n]:=trace[n].y;
 		end;
 		display_real_graph(ip,trace,
-			overlay_color_from_integer(channel_num),
+			overlay_color(channel_num),
 				0,num_samples-1,v_min,v_max,0,0);
 		if (harmonic>0) then period:=num_samples/harmonic
 		else period:=0;
@@ -1819,17 +1819,17 @@ begin
 					max:=max_y_xy_graph(trace);
 					if display_mode='CP' then 
 						display_real_graph(ip,trace,
-							overlay_color_from_integer(id_num),
+							overlay_color(id_num),
 							mlp[0].time,mlp[num_selected-1].time,
 							display_min+ave,display_max+ave,0,0)
 					else if display_mode='NP' then
 						display_real_graph(ip,trace,
-							overlay_color_from_integer(id_num),
+							overlay_color(id_num),
 							mlp[0].time,mlp[num_selected-1].time,
 							0,0,0,0)
 					else 
 						display_real_graph(ip,trace,
-							overlay_color_from_integer(id_num),
+							overlay_color(id_num),
 							mlp[0].time,mlp[num_selected-1].time,
 							display_min,display_max,0,0);
 				end else begin
@@ -1982,7 +1982,7 @@ begin
 			writestr(result,result,' ',(max-min):fsr:fsd);
 		if (max<v_max) and (min>v_min) then 
 			display_real_graph(ip,trace,
-				overlay_color_from_integer(channel_num),
+				overlay_color(channel_num),
 				0,num_samples-1,v_min,v_max,0,0);
 	end;
 {

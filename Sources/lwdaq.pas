@@ -1671,7 +1671,7 @@ the 0-value, the number will be treated like an eight-bit RGB code, with the top
 three bits for red, the middle three for green, and the bottom three for blue.
 Thus $E0 (hex E0) is red, $1C is green, and $03 is blue. Note that paint does
 not convert value into one of LWDAQ's standard graph-plotting colors, as defined
-in the overlay_color_from_integer routine of images.pas, and used in <a
+in the overlay_color routine of images.pas, and used in <a
 href="#lwdaq_graph">lwdaq_graph</a>.</p>
 
 <p>In addition to the pixel manipulations, we also have options to change other
@@ -2483,12 +2483,12 @@ begin
 	end;
 	case analysis_type of 
 		spot_use_ellipse,spot_use_ellipse_shadow:
-			spot_list_display_ellipses(ip,slp,overlay_color_from_integer(color));
+			spot_list_display_ellipses(ip,slp,overlay_color(color));
 		spot_use_vertical_stripe,
 		spot_use_vertical_shadow: begin
 			pp:=image_profile_row(ip);
 			display_profile_row(ip,pp,green_color);
-			spot_list_display_vertical_lines(ip,slp,overlay_color_from_integer(color));
+			spot_list_display_vertical_lines(ip,slp,overlay_color(color));
 		end;
 		spot_use_vertical_edge: begin
 			if not show_pixels then begin
@@ -2507,16 +2507,16 @@ begin
 			ref_line.b.j:=round(reference_um/pixel_size_um);
 			display_ccd_line(ip,ref_line,blue_color);	
 
-			spot_list_display_vertical_lines(ip,slp,overlay_color_from_integer(color));
+			spot_list_display_vertical_lines(ip,slp,overlay_color(color));
 		end;
 		otherwise begin
 			if num_spots>1 then 
-				spot_list_display_bounds(ip,slp,overlay_color_from_integer(color));
+				spot_list_display_bounds(ip,slp,overlay_color(color));
 			if num_spots=1 then 
 				if slp^.spots[1].num_pixels>=min_pixels_for_cross then
-					spot_list_display_crosses(ip,slp,overlay_color_from_integer(color))
+					spot_list_display_crosses(ip,slp,overlay_color(color))
 				else
-					spot_list_display_bounds(ip,slp,overlay_color_from_integer(color));
+					spot_list_display_bounds(ip,slp,overlay_color(color));
 		end;
 	end;
 {
@@ -2731,7 +2731,7 @@ begin
 	
 	mark_time('displaying positions','lwdaq_dosimeter');
 	if not show_pixels then clear_overlay(wip);
-	spot_list_display_bounds(wip,slp,overlay_color_from_integer(color));
+	spot_list_display_bounds(wip,slp,overlay_color(color));
 
 	mark_time('calculating stdev and density','lwdaq_dosimeter');
 	stdev:=image_amplitude(wip);
@@ -5341,7 +5341,7 @@ var
 	saved_width:integer=1;
 	num_points:integer=0;
 	point_num:integer=0;
-	color:cardinal=0;
+	color:integer=0;
 	clear:boolean=false;
 	entire:boolean=false;
 	fill:boolean=false;
@@ -5439,25 +5439,23 @@ begin
 
 	if glitch>0 then glitch_filter_y(gxy,glitch);
 
+	color:=byte_shift*(width-1)+overlay_color(color);	
 	
-	saved_width:=image_draw_width;
-	image_draw_width:=width;
 	if ac_couple then begin
 		average:=average_y_xy_graph(gxy);
 		if not in_image then
-			display_real_graph(ip,gxy,overlay_color_from_integer(color),
+			display_real_graph(ip,gxy,color,
 				x_min,x_max,y_min+average,y_max+average,x_div,y_div)
 		else
 			draw_real_graph(ip,gxy,color,
 				x_min,x_max,y_min+average,y_max+average);
 	end else 
 		if not in_image then
-			display_real_graph(ip,gxy,overlay_color_from_integer(color),
+			display_real_graph(ip,gxy,color,
 				x_min,x_max,y_min,y_max,x_div,y_div)
 		else
 			draw_real_graph(ip,gxy,color,
 				x_min,x_max,y_min,y_max);
-	image_draw_width:=width;
 
 	if entire then ip^.analysis_bounds:=saved_bounds;
 
@@ -7178,7 +7176,7 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 			exit;
 		end;
 		color:=Tcl_ObjInteger(argv[2]);
-		color:=overlay_color_from_integer(color);
+		color:=overlay_color(color);
 		red:=round(max_byte * (color and red_mask) / red_mask);
 		green:=round(max_byte * (color and green_mask) / green_mask);
 		blue:=round(max_byte * (color and blue_mask) / blue_mask);

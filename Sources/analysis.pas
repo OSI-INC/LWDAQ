@@ -329,7 +329,7 @@ exports
 	image_maximum name exp_prefix+'image_maximum',
 	image_minimum name exp_prefix+'image_minimum',
 	image_sum name exp_prefix+'image_sum',
-	overlay_color_from_integer name exp_prefix+'overlay_color_from_integer',
+	overlay_color name exp_prefix+'overlay_color',
 	spread_overlay name exp_prefix+'spread_overlay',
 	paint_overlay_bounds name exp_prefix+'paint_overlay_bounds',
 	new_image name exp_prefix+'new_image',

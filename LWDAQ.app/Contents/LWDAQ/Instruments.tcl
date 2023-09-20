@@ -517,47 +517,49 @@ proc LWDAQ_open {name} {
 	set info(control) "Idle" 
 
 	# Make the standard instrument buttons along the top.
-	frame $w.buttons
-	pack $w.buttons -side top -fill x
-	label $w.buttons.state -textvariable LWDAQ_info_$name\(control) -width 8
-	label $w.buttons.counter -textvariable LWDAQ_info_$name\(counter) -width 6
-	button $w.buttons.acquire -text "Acquire" -command [list LWDAQ_acquire_button $name]
-	button $w.buttons.loop -text "Loop" -command [list LWDAQ_loop_button $name]
-	button $w.buttons.stop -text "Stop" -command [list LWDAQ_stop_button $name]
-	button $w.buttons.write -text "Write" \
+	set f [frame $w.buttons]
+	pack $f -side top -fill x
+	label $f.state -textvariable LWDAQ_info_$name\(control) -width 8
+	label $f.counter -textvariable LWDAQ_info_$name\(counter) -width 6
+	button $f.acquire -text "Acquire" -command [list LWDAQ_acquire_button $name]
+	button $f.loop -text "Loop" -command [list LWDAQ_loop_button $name]
+	button $f.stop -text "Stop" -command [list LWDAQ_stop_button $name]
+	button $f.write -text "Write" \
 		-command [list LWDAQ_post [list LWDAQ_write_button $name]]
-	button $w.buttons.read -text "Read" \
+	button $f.read -text "Read" \
 		-command [list LWDAQ_post [list LWDAQ_read_button $name]]
-	button $w.buttons.info -text "Info" -command [list LWDAQ_info_button $name]
-	pack $w.buttons.state $w.buttons.counter $w.buttons.acquire $w.buttons.loop \
-		$w.buttons.stop $w.buttons.write $w.buttons.read $w.buttons.info \
+	button $f.info -text "Info" -command [list LWDAQ_info_button $name]
+	pack $f.state $f.counter $f.acquire $f.loop \
+		$f.stop $f.write $f.read $f.info \
 		-side left -expand 1
 	set info(state_label) $info(window).buttons.state
-		
+	
+	# Create a frame for the image and configuration parameters.
+	set f [frame $w.ic]
+	pack $f -side top -fill x
+
 	# Create the image display frame, label, and photo widget. Bind the image 
 	# inspector routine to the display widget.
-	frame $w.ic
-	pack $w.ic -side top -fill x
-	frame $w.ic.i
-	pack $w.ic.i -side left -fill y
+	set ff [frame $f.i]
+	pack $ff -side left -fill y
 	image create photo $info(photo)
-	set info(image_display) $w.ic.i.image
+	set info(image_display) $ff.image
 	label $info(image_display) -image $info(photo)
 	pack $info(image_display) -side left
 	bind $info(image_display) \
 		<Double-ButtonPress> \
 		[list LWDAQ_instrument_closeup %x %y $name]
 	
-	# List the config variables in the window and associate each with a text entry.	
-	frame $w.ic.c
-	pack $w.ic.c -side right -fill y
+	# Create the configuration frame and populate with configuration array.
+	set ff [frame $f.c]
+	pack $ff -side right -fill y
 	set config_list [array names config]
 	set config_list [lsort -dictionary $config_list]
 	foreach c $config_list {
-		label $w.ic.c.l$c -text $c -anchor w
-		entry $w.ic.c.e$c -textvariable LWDAQ_config_$name\($c) \
+		label $ff.l$c -text $c -anchor w
+		entry $ff.e$c -textvariable LWDAQ_config_$name\($c) \
 			-relief sunken -bd 1 -width $LWDAQ_Info(instrument_entry_width)
-		grid $w.ic.c.l$c $w.ic.c.e$c -sticky news
+		grid $ff.l$c $ff.e$c -sticky news
 	}
 
 	# Call the instrument's controls creation routine, if it exists.
@@ -651,13 +653,14 @@ proc LWDAQ_instrument_closeup {x y name} {
 	# Check that the image named in the instrument memory name field does
 	# in fact exists.
 	if {[lwdaq_image_exists $config(memory_name)] == ""} {
-		LWDAQ_print $info(text) "ERROR: Double click for image details,\
+		LWDAQ_print $info(text) "ERROR: Double clicked for image details,\
 			but image \"$config(memory_name)\" does not exist."
 		return ""
 	}
 	
 	# Get the image column and row.
 	set zoom [expr 1.0 * $info(zoom) * [LWDAQ_get_lwdaq_config display_zoom]]
+	if {$zoom < 1} {set zoom [expr 1.0/round(1/$zoom)]} {set zoom [expr round($zoom)]}
 	set xi [expr round(1.0*($x - 4)/$zoom)] 
 	set yi [expr round(1.0*($y - 4)/$zoom)]
 	

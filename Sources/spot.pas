@@ -1033,7 +1033,7 @@ begin
 						inc(num_valid_spots);
 						spots[num_valid_spots].pixel_size_um:=pixel_size_um;
 						with spots[num_valid_spots] do begin
-							color_code:=overlay_color_from_integer(num_valid_spots);
+							color_code:=overlay_color(num_valid_spots);
 							bounds.left:=ip^.analysis_bounds.right;
 							bounds.right:=ip^.analysis_bounds.left;
 							bounds.top:=ip^.analysis_bounds.bottom;

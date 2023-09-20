@@ -129,7 +129,7 @@ function c_from_i_ellipse(ellipse:xy_ellipse_type):ij_ellipse_type;
 
 {display transformations}
 procedure display_ccd_cross(ip:image_ptr_type;
-	cross_point:ij_point_type;color:overlay_pixel_type);
+	cross_point:ij_point_type;color:integer);
 procedure display_ccd_line(ip:image_ptr_type;line:ij_line_type;color:integer);
 procedure draw_ccd_line(ip:image_ptr_type;line:ij_line_type;shade:integer);
 procedure display_ccd_pixel(ip:image_ptr_type;pixel:ij_point_type;color:integer);
@@ -436,7 +436,7 @@ end;
 }
 procedure display_ccd_pixel(ip:image_ptr_type;pixel:ij_point_type;color:integer);
 begin
-	draw_overlay_pixel(ip,pixel,overlay_pixel_type(color));
+	draw_overlay_pixel(ip,pixel,color);
 end;
 
 {
@@ -444,7 +444,7 @@ end;
 }
 procedure display_ccd_line(ip:image_ptr_type;line:ij_line_type;color:integer);
 begin
-	draw_overlay_line(ip,line,overlay_pixel_type(color));
+	draw_overlay_line(ip,line,color);
 end;
 
 {
@@ -459,7 +459,7 @@ end;
 }
 procedure display_ccd_rectangle(ip:image_ptr_type;rect:ij_rectangle_type;color:integer);
 begin
-	draw_overlay_rectangle(ip,rect,overlay_pixel_type(color));
+	draw_overlay_rectangle(ip,rect,color);
 end;
 
 {
@@ -470,7 +470,7 @@ end;
 procedure display_ccd_rectangle_ellipse(ip:image_ptr_type;
 	rect:ij_rectangle_type;color:integer);
 begin
-	draw_overlay_rectangle_ellipse(ip,rect,overlay_pixel_type(color));
+	draw_overlay_rectangle_ellipse(ip,rect,color);
 end;
 
 {
@@ -478,7 +478,7 @@ end;
 procedure display_ccd_ellipse(ip:image_ptr_type;
 	ellipse:ij_ellipse_type;color:integer);
 begin
-	draw_overlay_ellipse(ip,ellipse,overlay_pixel_type(color));
+	draw_overlay_ellipse(ip,ellipse,color);
 end;
 
 {
@@ -516,7 +516,7 @@ end;
 	image anslysis bounds.
 }
 procedure display_ccd_cross(ip:image_ptr_type;
-	cross_point:ij_point_type;color:overlay_pixel_type);
+	cross_point:ij_point_type;color:integer);
 	
 var 
 	vertical_line,horizontal_line:ij_line_type;

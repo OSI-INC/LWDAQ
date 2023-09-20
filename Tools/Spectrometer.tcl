@@ -124,7 +124,8 @@ proc Spectrometer_refresh {} {
 	
 	set x_max $config(count_max)
 	set x_min $config(count_min)
-	
+	lwdaq_config -text_name $info(text)
+
 	lwdaq_graph "0 0" $info(image_name) -fill 1 \
 		-x_min $x_min -x_max $x_max \
 		-y_min $config(power_min) -y_max $config(power_max) \

@@ -117,20 +117,19 @@ var {for global use}
 	rggb_blue_scale:real=1;
 	blank_image:image_type;
 	master_image_list:array [0..master_image_list_length-1] of image_type;
-	image_draw_width:integer=1;
 
 {
 	Image creation, drawing, and examination.
 }
 function get_px(ip:image_ptr_type;j,i:integer):intensity_pixel_type;
 procedure set_px(ip:image_ptr_type;j,i:integer;value:intensity_pixel_type);
-function get_ov(ip:image_ptr_type;j,i:integer):overlay_pixel_type;
-procedure set_ov(ip:image_ptr_type;j,i:integer;value:overlay_pixel_type);
+function get_ov(ip:image_ptr_type;j,i:integer):integer;
+procedure set_ov(ip:image_ptr_type;j,i:integer;value:integer);
 function image_data_byte(ip:image_ptr_type;n:integer):integer;
 procedure write_image_data_byte(ip:image_ptr_type;b:byte;n:integer);
 procedure paint_image(ip:image_ptr_type;shade:intensity_pixel_type);
 procedure clear_image(ip:image_ptr_type);
-procedure paint_overlay(ip:image_ptr_type;color:overlay_pixel_type);
+procedure paint_overlay(ip:image_ptr_type;color:integer);
 procedure fill_overlay(ip:image_ptr_type);
 procedure clear_overlay(ip:image_ptr_type);
 procedure dispose_image(ip:image_ptr_type);
@@ -138,20 +137,15 @@ procedure dispose_named_images(key:string);
 procedure draw_image(ip:image_ptr_type);
 procedure draw_rggb_image(ip:image_ptr_type);
 procedure draw_gbrg_image(ip:image_ptr_type);
-procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;
-	shade:intensity_pixel_type);
-procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
-	color:overlay_pixel_type);
-procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;
-	color:overlay_pixel_type);
-procedure draw_overlay_pixel(ip:image_ptr_type;pixel:ij_point_type;
-	color:overlay_pixel_type);
+procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;shade:intensity_pixel_type);
+procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;color:integer);
+procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;color:integer);
+procedure draw_overlay_pixel(ip:image_ptr_type;pixel:ij_point_type;color:integer);
 procedure draw_overlay_rectangle(ip:image_ptr_type;rect:ij_rectangle_type;
-	color:overlay_pixel_type);
+	color:integer);
 procedure draw_overlay_rectangle_ellipse(ip:image_ptr_type;rect:ij_rectangle_type;
-	color:overlay_pixel_type);
-procedure draw_overlay_ellipse(ip:image_ptr_type;
-	ellipse:ij_ellipse_type;color:overlay_pixel_type);
+	color:integer);
+procedure draw_overlay_ellipse(ip:image_ptr_type;ellipse:ij_ellipse_type;color:integer);
 procedure embed_image_header(ip:image_ptr_type);
 function image_ptr_from_name(name:string):image_ptr_type;
 function image_amplitude(ip:image_ptr_type):real;
@@ -160,9 +154,9 @@ function image_median(ip:image_ptr_type):real;
 function image_maximum(ip:image_ptr_type):real;
 function image_minimum(ip:image_ptr_type):real;
 function image_sum(ip:image_ptr_type; threshold:integer):integer;
-function overlay_color_from_integer(i:integer):overlay_pixel_type;
+function overlay_color(i:integer):integer;
 procedure spread_overlay(ip:image_ptr_type;spread:integer);
-procedure paint_overlay_bounds(ip:image_ptr_type;color:overlay_pixel_type);
+procedure paint_overlay_bounds(ip:image_ptr_type;color:integer);
 function new_image(height,width:integer):image_ptr_type;
 function valid_analysis_bounds(ip:image_ptr_type):boolean;
 function valid_image_analysis_point(point:ij_point_type;ip:image_ptr_type):boolean;	
@@ -201,18 +195,19 @@ end;
 	get_ov returns the value of the i'th pixel in the j'th row of the overlay of
 	an image.
 }
-function get_ov(ip:image_ptr_type;j,i:integer):overlay_pixel_type;
+function get_ov(ip:image_ptr_type;j,i:integer):integer;
 begin
 	get_ov:=ip^.overlay[j*ip^.i_size+i];
 end;
 
 {
 	set_ov sets the i'th pixel in the j'th row of the overlay of an image to
-	value.
+	value. We take only the lowest byte of the value we pass in, and use this
+	byte for our color.
 }
-procedure set_ov(ip:image_ptr_type;j,i:integer;value:overlay_pixel_type);
+procedure set_ov(ip:image_ptr_type;j,i:integer;value:integer);
 begin
-	ip^.overlay[j*ip^.i_size+i]:=value;
+	ip^.overlay[j*ip^.i_size+i]:=value and byte_mask;
 end;
 
 {
@@ -420,7 +415,7 @@ end;
 {
 	paint_overlay fills an image's overlay with the specified color.
 }
-procedure paint_overlay(ip:image_ptr_type;color:overlay_pixel_type);
+procedure paint_overlay(ip:image_ptr_type;color:integer);
 var i,j:integer;
 begin
 	with ip^ do 
@@ -449,7 +444,7 @@ end;
 	paint_overlay_bounds fills an image's overlay with the specified color
 	within its analysis bounds.
 }
-procedure paint_overlay_bounds(ip:image_ptr_type;color:overlay_pixel_type);
+procedure paint_overlay_bounds(ip:image_ptr_type;color:integer);
 var i,j:integer;
 begin
 	with ip^ do
@@ -470,7 +465,7 @@ procedure spread_overlay(ip:image_ptr_type;spread:integer);
 var 
 	i,j,m,n,lo,hi:integer;
 	dp:image_ptr_type;
-	color:overlay_pixel_type;
+	color:integer;
 
 begin
 	if spread<=1 then exit;
@@ -493,12 +488,12 @@ begin
 end;
 
 {
-	overlay_color_from_integer returns a unique color depending upon the integer
-	input. We can use it to provide colors for indexed arrays of lines, graphs,
-	or shapes on a white background. The color returned will not be white, nor
-	will it be the clear color, but it can be black.
+	overlay_color takes an integer and returns a unique color using the integer
+	input. We use the routine to provide colors for indexed arrays of lines,
+	graphs, or shapes on a white background. The color returned will not be
+	white, nor will it be the clear color, but it can be black.
 }
-function overlay_color_from_integer(i:integer):overlay_pixel_type;
+function overlay_color(i:integer):integer;
 
 const
 	num_predefined_colors=18;
@@ -509,15 +504,15 @@ const
 		black_color,gray_color,light_gray_color,
 		dark_red_color,dark_green_color,dark_blue_color,
 		dark_brown_color,vdark_green_color,vdark_blue_color);
-	k=67;
+	prime=67;
 
 var
-	c:overlay_pixel_type;
+	c:integer;
 	
 begin
 	if (i>=0) and (i<num_predefined_colors) then c:=colors[i]
-	else c:= (i*k) mod clear_color;
-	overlay_color_from_integer:=c;
+	else c:= (i*prime) mod clear_color;
+	overlay_color:=c;
 end;
 
 {
@@ -746,8 +741,7 @@ end;
 	provided the pixel lies between the image analysis boundries in ij
 	space.
 }
-procedure draw_overlay_pixel(ip:image_ptr_type;pixel:ij_point_type;
-	color:overlay_pixel_type);
+procedure draw_overlay_pixel(ip:image_ptr_type;pixel:ij_point_type;color:integer);
 	
 begin
 	if not valid_image_ptr(ip) then exit;
@@ -761,20 +755,22 @@ end;
 	overlay of the specified image. The routine draws the line in the specified
 	color, and clips it to the analysis bounds. The routine takes a line with
 	real-valued coordinates so as to avoid rounding errors in the start and end
-	of the line it draws. We use this routine to fill in projected objects with
-	lines. The line will have width image_draw_width.
+	of the line it draws. The "color" parameter specifies not only the color
+	of the line but also its width. Byte zero is the color, byte one is the
+	width minus one. We reserve bytes two and three for future use.
 }
 procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;
-	color:overlay_pixel_type);
+	color:integer);
 	
 const
 	rough_step_size=0.5;{pixels}
 	
 var
-	num_steps,step_num,i,j,a,b,ii,jj:integer;
+	num_steps,step_num,width:integer;
+	i,j,a,b,ii,jj:integer;
 	p,q,step:xy_point_type;
 	outside:boolean;
-	bounds:ij_rectangle_type;
+	pixel:integer;
 
 begin
 	if not valid_image_ptr(ip) then exit;
@@ -794,14 +790,17 @@ begin
 	else num_steps:=round(xy_separation(p,q)/rough_step_size);
 	step:=xy_scale(xy_difference(q,p),1/(num_steps+1));
 
-	if image_draw_width<=1 then begin
+	width:=((color div byte_shift) and byte_mask)+1;
+	pixel:=color and byte_mask;
+	
+	if width<=1 then begin
 		for step_num:=0 to num_steps do begin
 			p:=xy_sum(p,step);
 				set_ov(ip,round(p.y),round(p.x),color);
 		end;
 	end else begin
-		a:=-((image_draw_width-1) div 2);
-		b:=a+image_draw_width-1;
+		a:=-((width-1) div 2);
+		b:=a+width-1;
 		for step_num:=0 to num_steps do begin
 			p:=xy_sum(p,step);
 			for i:=a to b do
@@ -811,7 +810,7 @@ begin
 					with ip^.analysis_bounds do begin
 						if (ii>=left) and (ii<=right) 
 								and (jj>=top) and (jj<=bottom) then
-							set_ov(ip,jj,ii,color);
+							set_ov(ip,jj,ii,pixel);
 					end;
 				end;
 		end;
@@ -824,7 +823,7 @@ end;
 	color, and clips it to the analysis bounds. It calls draw_overlay_xy_line.
 }
 procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
-	color:overlay_pixel_type);
+	color:integer);
 	
 var 
 	lxy:xy_line_type;
@@ -890,7 +889,7 @@ end;
 	the specified color, and clips it to the overlay boundries.
 }
 procedure draw_overlay_rectangle(ip:image_ptr_type;rect:ij_rectangle_type;
-	color:overlay_pixel_type);
+	color:integer);
 	
 var
 	line:ij_line_type;
@@ -923,9 +922,9 @@ end;
 	general-purpose ellipse drawing see draw_overlay_ellipse.
 }
 procedure draw_overlay_rectangle_ellipse(ip:image_ptr_type;rect:ij_rectangle_type;
-	color:overlay_pixel_type);
+	color:integer);
 
-	procedure PutPixel(x,y:integer;c:overlay_pixel_type);
+	procedure PutPixel(x,y:integer;c:integer);
 	var
 		p:ij_point_type;
 	begin
@@ -1007,7 +1006,7 @@ end;
 	by draw_overlay_rectangle_ellipse.
 }
 procedure draw_overlay_ellipse(ip:image_ptr_type;
-	ellipse:ij_ellipse_type;color:overlay_pixel_type);
+	ellipse:ij_ellipse_type;color:integer);
 
 var
 	separation:real;
