@@ -5285,6 +5285,7 @@ exactly in the available space.</p>
 <tr><td>-color</td><td>integer code for the color, default 0</td></tr>
 <tr><td>-clear</td><td>1, clear image overlay before plotting, default 0</td></tr>
 <tr><td>-fill</td><td>1, fill image overlay before plotting, default 0</td></tr>
+<tr><td>-width</td><td>width of plot line, default 1</td></tr>
 <tr><td>-x_div</td><td>&gt; 0, plot vertical divisions spaced by this amount, default 0 disabled</td></tr>
 <tr><td>-y_div</td><td>&gt; 0, plot horizontal divisions spaced by this amount, default 0 disabled</td></tr>
 <tr><td>-y_only</td><td>1, data is y-values only, default 0.</td></tr>
@@ -5292,21 +5293,23 @@ exactly in the available space.</p>
 <tr><td>-entire</td><td>1 use entire image for plot, 0 use analysis bounds, default 0.</td></tr>
 <tr><td>-in_image</td><td>1 draw as a shade of gray in the image rather than overlay, default 0.</td></tr></table></center>
 
-<p>By default, the graph will be drawn in the overlay, so it can use colors, and
+<p>By default, the graph will be drawn in the overlay, so it can use colors and
 be accompanied by grid lines that do not interfere with the underlying image
-data. The overlay can be transparent or white, depending upon whether we have
-cleared or filled the overlay respectively before calling <i>lwdaq_graph</i>.
-But if <i>in_image</i> is 1, the color will be treated as a shade of gray and
-the graph will be drawn in the image itself. By this means, we can create images
-for two-dimensional analysis out of graphs. When <i>in_image</i> is set, the
-<i>x_div</i> and <i>y_div</i> options are ignored.</p>
+data. The overlay can be transparent or white, depending upon
+whether we have cleared or filled the overlay respectively before calling
+<i>lwdaq_graph</i>. But if <i>in_image</i> is 1, the color will be treated as a
+shade of gray and the graph will be drawn in the image itself. By this means, we
+can create images for two-dimensional analysis out of graphs. When
+<i>in_image</i> is set, the <i>x_div</i> and <i>y_div</i> options are
+ignored.</p>
 
 <p>The color codes for a graph in the overlay give 255 unique colors. You can
 try them out to see which ones you like. The colors 0 to 15 specify a set of
 distinct colors, as shown <a
 href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.
 The remaining colors are eight-bit RGB codes. If you don't specify a color, the
-plot will be red.</p>
+plot will be red. The line will be one pixel wide unless we specify a larger 
+width with the -width option, which takes an integert value one or greater.</p>
 
 <p>Some data contains occasional error samples, which we call <i>glitches</i>.
 The <i>lwdaq_graph</i> "-glitch <i>g</i>" option allows you to specify a
@@ -5334,6 +5337,8 @@ var
 	y_max:real=0;
 	x_div:real=0;
 	y_div:real=0;
+	width:integer=1;
+	saved_width:integer=1;
 	num_points:integer=0;
 	point_num:integer=0;
 	color:cardinal=0;
@@ -5371,6 +5376,7 @@ begin
 		else if (option='-y_max') then y_max:=Tcl_ObjReal(vp)			
 		else if (option='-y_min') then y_min:=Tcl_ObjReal(vp)			
 		else if (option='-color') then color:=Tcl_ObjInteger(vp)			
+		else if (option='-width') then width:=Tcl_ObjInteger(vp)			
 		else if (option='-clear') then clear:=Tcl_ObjBoolean(vp)			
 		else if (option='-entire') then entire:=Tcl_ObjBoolean(vp)			
 		else if (option='-fill') then fill:=Tcl_ObjBoolean(vp)			
@@ -5385,7 +5391,7 @@ begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
 				+'"-x_max -x_min -y_max -y_min -clear -color -x_div -y_div '
-				+'"-fill -entire -y_only -glitch" in '
+				+'"-fill -width -entire -y_only -glitch" in '
 				+'lwdaq_graph.');
 			exit;
 		end;
@@ -5433,6 +5439,9 @@ begin
 
 	if glitch>0 then glitch_filter_y(gxy,glitch);
 
+	
+	saved_width:=image_draw_width;
+	image_draw_width:=width;
 	if ac_couple then begin
 		average:=average_y_xy_graph(gxy);
 		if not in_image then
@@ -5448,6 +5457,7 @@ begin
 		else
 			draw_real_graph(ip,gxy,color,
 				x_min,x_max,y_min,y_max);
+	image_draw_width:=width;
 
 	if entire then ip^.analysis_bounds:=saved_bounds;
 

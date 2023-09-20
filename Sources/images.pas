@@ -117,6 +117,7 @@ var {for global use}
 	rggb_blue_scale:real=1;
 	blank_image:image_type;
 	master_image_list:array [0..master_image_list_length-1] of image_type;
+	image_draw_width:integer=1;
 
 {
 	Image creation, drawing, and examination.
@@ -532,9 +533,9 @@ begin
 end;
 
 {
-	valid_analysis_bounds checks for self-consistency within an image's 
-	analysis bounds, and also checks that the analysis bounds are 
-	contained entirely within the image.
+	valid_analysis_bounds checks for self-consistency within an image's analysis
+	bounds, and also checks that the analysis bounds are contained entirely
+	within the image.
 }
 function valid_analysis_bounds(ip:image_ptr_type):boolean;
 begin
@@ -756,11 +757,12 @@ begin
 end;
 
 {
-	draw_overlay_xy_line draws a line in two-dimensional integer space onto the overlay
-	of the specified image. The routine draws the line in the specified color, and
-	clips it to the analysis bounds. The routine takes a line with real-valued 
-	coordinates so as to avoid rounding errors in the start and end of the line 
-	it draws. We use this routine to fill in projected objects with lines.
+	draw_overlay_xy_line draws a line in two-dimensional integer space onto the
+	overlay of the specified image. The routine draws the line in the specified
+	color, and clips it to the analysis bounds. The routine takes a line with
+	real-valued coordinates so as to avoid rounding errors in the start and end
+	of the line it draws. We use this routine to fill in projected objects with
+	lines. The line will have width image_draw_width.
 }
 procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;
 	color:overlay_pixel_type);
@@ -769,13 +771,15 @@ const
 	rough_step_size=0.5;{pixels}
 	
 var
-	num_steps,step_num:integer;
+	num_steps,step_num,i,j,a,b,ii,jj:integer;
 	p,q,step:xy_point_type;
 	outside:boolean;
+	bounds:ij_rectangle_type;
 
 begin
 	if not valid_image_ptr(ip) then exit;
 	if not valid_analysis_bounds(ip) then exit;
+	
 	xy_clip_line(line,outside,ip^.analysis_bounds);
 	if outside then exit;
 	
@@ -790,16 +794,34 @@ begin
 	else num_steps:=round(xy_separation(p,q)/rough_step_size);
 	step:=xy_scale(xy_difference(q,p),1/(num_steps+1));
 
-	for step_num:=0 to num_steps do begin
-		p:=xy_sum(p,step);
-		set_ov(ip,round(p.y),round(p.x),color);
+	if image_draw_width<=1 then begin
+		for step_num:=0 to num_steps do begin
+			p:=xy_sum(p,step);
+				set_ov(ip,round(p.y),round(p.x),color);
+		end;
+	end else begin
+		a:=-((image_draw_width-1) div 2);
+		b:=a+image_draw_width-1;
+		for step_num:=0 to num_steps do begin
+			p:=xy_sum(p,step);
+			for i:=a to b do
+				for j:=a to b do begin
+					ii:=round(p.x+i);
+					jj:=round(p.y+j);
+					with ip^.analysis_bounds do begin
+						if (ii>=left) and (ii<=right) 
+								and (jj>=top) and (jj<=bottom) then
+							set_ov(ip,jj,ii,color);
+					end;
+				end;
+		end;
 	end;
 end;
 
 {
-	draw_overlay_line draws a line in two-dimensional integer space onto the overlay
-	of the specified image. The routine draws the line in the specified color, and
-	clips it to the analysis bounds. It calls draw_overlay_xy_line.
+	draw_overlay_line draws a line in two-dimensional integer space onto the
+	overlay of the specified image. The routine draws the line in the specified
+	color, and clips it to the analysis bounds. It calls draw_overlay_xy_line.
 }
 procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
 	color:overlay_pixel_type);
@@ -816,9 +838,9 @@ begin
 end;
 
 {
-	draw_image_line draws a line in two-dimensional integer space into the intensity
-	array of the specified image. The routine draws the line with the specified intensity
-	and clips it to the analysis bounds.
+	draw_image_line draws a line in two-dimensional integer space into the
+	intensity array of the specified image. The routine draws the line with the
+	specified intensity and clips it to the analysis bounds.
 }
 procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;
 	shade:intensity_pixel_type);

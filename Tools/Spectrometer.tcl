@@ -23,35 +23,36 @@
 # A3008 manual for instructions.
 
 # Version 21: Add another decimal place for power measurement.
-
+#
 # Version 22: Add support for SCT power measurements, and change calibration of
 # power to a dB offset.
-
+#
 # Version 23: Remove explanatory words from output text. Add the Spectrometer
 # sample routine to return the output string from other scripts. Update
 # calibration parameters for A3008D assemblies.
 # 
 # Version 24: Add more plot names.
-
+#
 # Version 25: Change plot names from letters to numbers that give them the same
 # colors as SCT channels of the same number.
-
+#
 # Version 26: Support loading multiple spectra.
-
+#
 # Version 27: Limit significant figures in file saving.
-
+#
 # Version 28: Switch active graph selection from menu button to entry box and
 # allow graphs from 0 to 255.
-
+#
 # Version 28: Add increment button.
 #
+# Version 29: Add active and inactive line width parameters.
 
 proc Spectrometer_init {} {
 	upvar #0 Spectrometer_info info
 	upvar #0 Spectrometer_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Spectrometer" "28"
+	LWDAQ_tool_init "Spectrometer" "29"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# Software constants for the Spectrometer Tool.
@@ -94,6 +95,8 @@ proc Spectrometer_init {} {
 	set config(f_color) "2"
 	set config(f_lines) "900 915 930"
 	set config(step) "0"
+	set config(active_width) "5"
+	set config(inactive_width) "2"
 	
 	# Calibration constants for the Sepctrometer A3008 circuit.
 	set config(f_ref) "915"
@@ -149,10 +152,15 @@ proc Spectrometer_refresh {} {
 		if {[llength $graph] < 2} {continue}
 		set graph [join [lsort -increasing -integer -index 0 $graph]]
 		set color [lsearch $info(graph_names) $graph_name]
+		if {$graph_name == $config(active_graph)} {
+			set width $config(active_width)
+		} {
+			set width $config(inactive_width)
+		}
 		lwdaq_graph $graph $info(image_name) \
 			-x_min $x_min -x_max $x_max \
 			-y_min $config(power_min) -y_max $config(power_max) \
-			-color $color
+			-color $color -width $width
 	}
 	
 	if {$config(cursor_enable)} {
@@ -160,7 +168,7 @@ proc Spectrometer_refresh {} {
 		lwdaq_graph $graph $info(image_name) \
 			-x_min $x_min -x_max $x_max \
 			-y_min $config(power_min) -y_max $config(power_max) \
-			-color $config(cursor_color) 
+			-color $config(cursor_color)
 		set graph "$x_min $info(cursor_y) $x_max $info(cursor_y)"
 		lwdaq_graph $graph $info(image_name) \
 			-x_min $x_min -x_max $x_max \
@@ -377,6 +385,7 @@ proc Spectrometer_open {} {
 	
 	button $f.increment -text "Increment" -command {
 		incr Spectrometer_config(active_graph)
+		LWDAQ_post Spectrometer_refresh
 	}
 	pack $f.increment -side left -expand 1
 	
