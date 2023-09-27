@@ -103,7 +103,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(activity_rows) 32
 	set info(aux_messages) ""
 	set info(set_size) "16"
-	
+
 	set info(buffer_image) "_receiver_buffer_image_"
 	catch {lwdaq_image_destroy $info(buffer_image)}
 	set info(scratch_image) "_receiver_scratch_image_"
@@ -153,10 +153,6 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		scan [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) clocks 0"] %d%d%d%d \
 			num_errors num_clocks num_messages first_index
-		if {$num_errors > 0} {
-			LWDAQ_print $info(text) "WARNING: Encountered $num_errors errors\
-				in data interval."
-		}
 		
 		# We determine the display scale boundaries depending upon whether we have simple
 		# plot, centered plot, or normalized plot.
@@ -270,7 +266,14 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 				"-payload $config(payload_length) print 0 $info(show_messages)"]
 			LWDAQ_print $info(text) $raw_data
 		}
-	} error_result]} {return "ERROR: $error_result"}
+		
+		if {$num_errors > 0} {
+			set info(control) "Stop"
+			error "Encountered $num_errors errors in data interval."
+		}		
+	} error_result]} {
+		return "ERROR: $error_result"
+	}
 
 	# Handle the case where we have no messages at all.
 	if {$result == ""} {
@@ -524,13 +527,13 @@ proc LWDAQ_activity_Receiver {} {
 			grid $f.id $f.cc $f.csps -sticky ew
 		}
 
-		label $f.id_$count -text $id -anchor w
+		label $f.id_$id -text $id -anchor w
 		set color [lwdaq tkcolor $id]
-		label $f.cc_$count -text " " -bg $color
-		global LWDAQ_id$count\_Receiver
-		set LWDAQ_id$count\_Receiver 0
-		label $f.csps_$count -textvariable LWDAQ_id$count\_Receiver -width 4
-		grid $f.id_$count $f.cc_$count $f.csps_$count -sticky ew
+		label $f.cc_$id -text " " -bg $color
+		global LWDAQ_id$id\_Receiver
+		set LWDAQ_id$id\_Receiver 0
+		label $f.csps_$id -textvariable LWDAQ_id$id\_Receiver -width 4
+		grid $f.id_$id $f.cc_$id $f.csps_$id -sticky ew
 		incr count
 	}
 	return ""
@@ -727,18 +730,9 @@ proc LWDAQ_daq_Receiver {} {
 			# messages, which is what we estimated will arrive in the next
 			# second, but instead the data receiver generates only one hundred
 			# and twenty eight messages, so we are left hanging. We close any
-			# residual socket to the driver, open a new socket, reset the data
-			# receiver and generate an error to abort this acquisition.
+			# residual socket to the driver and return an error message.
 			if {[catch {LWDAQ_wait_for_driver $sock} read_error]} {
-				if {[info exists sock]} {LWDAQ_socket_close $sock}
-				set sock [LWDAQ_socket_open $config(daq_ip_addr)]
-				LWDAQ_login $sock $info(daq_password)
-				LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
-				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
-				LWDAQ_wait_for_driver $sock
-				LWDAQ_socket_close $sock
-				error "Timeout during transfer from data receiver.\
-					Resetting data receiver."
+				error "Timeout during transfer from data receiver."
 			}
 			
 			# Calculate the block transfer time. If the data was waiting in the
@@ -779,25 +773,21 @@ proc LWDAQ_daq_Receiver {} {
 			}
 				
 			# If we see errors in the new data, we throw away the data we just
-			# downloaded, reset the data receiver, close the socket, abandon
-			# this acquisition, and generate an error. One likely source of 
-			# errors the wrong value for payload length, so we check to see if
-			# one of the other possible payload lengths will reduce the number of
-			# errors to zero, and suggest this value in our error message should
-			# it exist.
+			# downloaded, close the socket, abandon this acquisition, and
+			# generate an error. One likely source of errors the wrong value for
+			# payload length, so we check to see if one of the other possible
+			# payload lengths will reduce the number of errors to zero, and
+			# suggest this value in our error message should it exist.
 			if {$num_errors > 0} {	
-				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
-				LWDAQ_wait_for_driver $sock
 				foreach pl $info(payload_options) {
 					scan [lwdaq_receiver $info(scratch_image) \
 						"-payload $pl clocks"] %d%d%d ne nc nm
 					if {$ne == 0} {break}
 				}
 				if {$ne == 0} {
-					error "Bad payload length \"$config(payload_length)\",\
-						try \"$pl\" instead. Resetting data receiver."
+					error "Bad payload length \"$config(payload_length)\", try \"$pl\"."
 				} {
-					error "Corrupted data. Resetting data receiver."
+					error "Corrupted data, try resetting receiver."
 				}
 			}
 			
@@ -867,17 +857,13 @@ proc LWDAQ_daq_Receiver {} {
 			}
 
 			# Check that we can fit the existing data in the buffer image. If not,
-			# discard the data instead of adding it to the buffer, stop this 
-			# data acquisition, and return the entire buffer as a source
-			# of data.
+			# discard the data instead of adding it to the buffer, abandon acquisition
+			# and return the data we have.
 			if {($num_new_messages + $num_messages) * $message_length > \
 					[expr $info(daq_buffer_width) * ($info(daq_buffer_width) - 1)]} {
-				LWDAQ_print $info(text) "WARNING: Buffer overflow,\
-					too many messages per interval."
-				LWDAQ_socket_close $sock
 				set start_index 0
 				set end_index [expr $num_messages - 1]
-				break
+				error "Buffer overflow, too many messages per interval."
 			}
 			
 			# Append the new messages to buffer image. 
@@ -889,24 +875,17 @@ proc LWDAQ_daq_Receiver {} {
 				"-payload $config(payload_length) clocks 0 $daq_num_clocks"] %d%d%d%d%d \
 				num_errors num_clocks num_messages start_index end_index
 			
-			# If we have too many errors in the message buffer, we reset the
-			# data receiver, wait for the driver to respond, close the socket,
-			# and break out of the acquisition loop, returning the entire
-			# message buffer as data.
+			# If we have too many errors in the message buffer, generate an error
+			# and return the entire message buffer as data.
 			if {$num_errors > $info(errors_for_stop)} {
-				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
-				LWDAQ_wait_for_driver $sock
-				error "Corrupted data. Resetting data receiver."
+				error "Data contains more than $info(errors_for_stop) errors."
 			}
 
 			# Check the block counter to see if we have made too many attempts
-			# to get our data. If so, reset the data receiver and abandon
-			# acquisition.
+			# to get our data. If so, abandon acquisition.
 			incr block_counter
 			if {$block_counter > $info(max_block_reads)} {
-				LWDAQ_transmit_command_hex $sock $info(reset_cmd)
-				LWDAQ_wait_for_driver $sock
-				error "Failed to accumulate clock messages. Resetting data receiver."
+				error "Failed to accumulate clock messages."
 			}
 			
 			# Disable data upload from data receiver and close socket.
@@ -921,6 +900,7 @@ proc LWDAQ_daq_Receiver {} {
 		# open, we close it.
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		set info(messages_per_clock) $info(min_messages_per_clock)
+		set info(control) "Stop"
 		return "ERROR: $error_result"
 	}
 	

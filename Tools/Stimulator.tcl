@@ -37,7 +37,7 @@ proc Stimulator_init {} {
 	set config(max_pulse_len) [expr (256 * 256) - 1]
 	set config(min_pulse_len) "2"
 	set config(max_interval_len) [expr (256 * 256) - 1]
-	set config(min_interval_len) "2"
+	set config(min_interval_len) "4"
 	set config(max_stimulus_len) [expr (256 * 256) - 1]
 	set config(min_current) "0"
 	set config(max_current) "15"
