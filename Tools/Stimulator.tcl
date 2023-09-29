@@ -26,7 +26,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.8"
+	LWDAQ_tool_init "Stimulator" "3.9"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -50,6 +50,8 @@ proc Stimulator_init {} {
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
 	set config(checksum_preload) "1111111111111111"
+	set config(log_enable) "0"
+	set config(log_file) "~/Desktop/Stimulator_Log.txt"
 	
 	set config(xon_color) "red"
 	set config(xtimeout_color) "orange"
@@ -61,7 +63,6 @@ proc Stimulator_init {} {
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 	
-	set config(verbose) "1"
 	set config(aux_show) "0"
 	set config(aux_color) "orange"
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
@@ -124,6 +125,31 @@ proc Stimulator_init {} {
 }
 
 #
+# Stimulator_print writes a line to the text window. In addition, if the
+# log_enable is set, the routine writes all messages to a log file. The routine
+# does not keep an infinite number of lines but instead limits the number of
+# lines in the text window to the global num_lines_keep value.
+#
+proc Stimulator_print {line {color black}} {
+	upvar #0 Stimulator_config config
+	upvar #0 Stimulator_info info
+	global LWDAQ_Info
+
+	LWDAQ_print $info(text) $line $color
+	if {$config(log_enable)} {
+		if {[catch {LWDAQ_print $config(log_file) $line} message]} {
+			LWDAQ_print $info(text) "ERROR: $message writing to \"$config(log_file)\"."
+		}
+	}
+	
+	if {[$info(text) index end] > 1.2 * $LWDAQ_Info(num_lines_keep)} {
+		$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
+	}
+
+	return ""
+}
+
+#
 # Stimulator_transmit takes a device identifier and a list of command bytes and
 # transmits them through a Command Transmitter such as the A3029A. The device
 # identifier must be a four-digit hex value. The bytes must be decimal values
@@ -131,10 +157,10 @@ proc Stimulator_init {} {
 # bytes necessary to return a sixteen-bit linear feedback shift register to all
 # zeros, thus performing a sixteen-bit cyclic redundancy check. We assume the
 # destination shift register is preloaded with the checksum_preload value. The
-# shift register has taps at locations 16, 14, 13, and 11. When the verbose flag
-# is set, the routine prints the identifier, the commands, and the checksum at
-# the end. The identifier and checksum are given as four-digit hex strings. The
-# other bytes are decimal numbers 0..255.
+# shift register has taps at locations 16, 14, 13, and 11. The routine prints
+# the identifier, the commands, and the checksum at the end. The identifier and
+# checksum are given as four-digit hex strings. The other bytes are decimal
+# numbers 0..255.
 #
 proc Stimulator_transmit {id commands} {
 	upvar #0 Stimulator_config config
@@ -149,16 +175,9 @@ proc Stimulator_transmit {id commands} {
 	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
 		set commands "[expr 0x$b1] [expr 0x$b2] $commands"
 	} else {
-		LWDAQ_print $info(text) "ERROR: Bad device identifier \"$id\", using 0x000."
+		Stimulator_print "ERROR: Bad device identifier \"$id\", using 0x000."
 		set id "0000"
 		set commands "0 0 $commands"
-	}
-	
-	# Print the commands to the text window.
-	if {$config(verbose)} {
-		LWDAQ_print -nonewline $info(text) "Transmit: "
-		LWDAQ_print -nonewline $info(text) "0x[format %4s $id] " green
-		LWDAQ_print -nonewline $info(text) $commands
 	}
 	
 	# Append a two-byte checksum.
@@ -179,9 +198,13 @@ proc Stimulator_transmit {id commands} {
 			binary scan [binary format b16 $checksum] cu1cu1 d21 d22
 		}
 	}
-	if {$config(verbose)} {
-		LWDAQ_print $info(text) " 0x[format %04X [expr $d22*255+$d21]]"
-	}
+
+	# Print the commands to the text window before appending checksum, and show
+	# checksum in hex.
+	Stimulator_print "Transmit: 0x[format %4s $id] $commands\
+		0x[format %04X [expr $d22*255+$d21]]" green
+
+	# Append checksum as two bytes.	
 	append commands " $d22 $d21"
 		
 	# Open a socket to the command transmitter's LWDAQ server, select the
@@ -209,7 +232,7 @@ proc Stimulator_transmit {id commands} {
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: Transmit failed, [string tolower $error_result]"
+		Stimulator_print "ERROR: Transmit failed, [string tolower $error_result]"
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		return ""
 	}
@@ -238,7 +261,7 @@ proc Stimulator_id {n} {
 	} elseif {[regexp {[0-9A-Fa-f]{4}} $n]} {
 		return $n
 	} else {
-		LWDAQ_print $info(text) "WARNING: Invalid device identifier \"$n\",\
+		Stimulator_print "WARNING: Invalid device identifier \"$n\",\
 			using $config(default_id) instead."
 		return "$config(default_id)"
 	}
@@ -273,12 +296,12 @@ proc Stimulator_start {n} {
 	if {$len > $config(max_pulse_len)} {
 		set len $config(max_pulse_len)
 		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
-		LWDAQ_print $info(text) "WARNING: Pulses truncated to\
+		Stimulator_print "WARNING: Pulses truncated to\
 			[format %.0f $len_ms]  ms."
 	} elseif {$len < $config(min_pulse_len)} {
 		set len $config(min_pulse_len)
 		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
-		LWDAQ_print $info(text) "WARNING: Pulses lengthened to\
+		Stimulator_print "WARNING: Pulses lengthened to\
 			[format %.0f $len_ms]  ms."
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
@@ -288,12 +311,12 @@ proc Stimulator_start {n} {
 	if {$len > $config(max_interval_len)} {
 		set len $config(max_interval_len)
 		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
-		LWDAQ_print $info(text) "WARNING: Intervals truncated to\
+		Stimulator_print "WARNING: Intervals truncated to\
 			[format %.0f $len_ms] ms."
 	} elseif {$len < $config(min_interval_len)} {
 		set len $config(min_interval_len)
 		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
-		LWDAQ_print $info(text) "WARNING: Intervals lengthened to\
+		Stimulator_print "WARNING: Intervals lengthened to\
 			[format %.0f $len_ms]  ms."
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
@@ -302,7 +325,7 @@ proc Stimulator_start {n} {
 	set len $config(num_pulses)
 	if {$len > $config(max_stimulus_len)} {
 		set len $config(max_stimulus_len)
-		LWDAQ_print $info(text) "WARNING: Stimulus truncated to $len pulses."
+		Stimulator_print "WARNING: Stimulus truncated to $len pulses."
 	}
 	lappend commands [expr $len / 256] [expr $len % 256]
 
@@ -360,7 +383,7 @@ proc Stimulator_xon {n} {
 
 	# Send the Xon command with transmit period. 	
 	if {$config(sps) > $config(max_tx_sps)} {
-		LWDAQ_print $info(text) "ERROR: Requested frequency $config(sps) SPS\
+		Stimulator_print "ERROR: Requested frequency $config(sps) SPS\
 			is greater than maximum $config(max_tx_sps) SPS."
 		set info(state) "Idle"
 		return ""
@@ -425,7 +448,7 @@ proc Stimulator_identify {} {
 	set commands [list $info(op_id)]
 	
 	# Report to user.
-	LWDAQ_print $info(text) "Sending identification command."
+	Stimulator_print "Sending identification command."
 
 	# Transmit commands to multicast address.
 	Stimulator_transmit $config(multicast_id) $commands
@@ -523,7 +546,7 @@ proc Stimulator_monitor {} {
 		# counts 32.768 kHz clock ticks.
 		scan $am %d%d%d%d id fa db ts
 		if {$config(aux_show)} {
-			LWDAQ_print $info(text) "Auxiliary Message:\
+			Stimulator_print "Auxiliary Message:\
 				id=$id fa=$fa db=$db ts=$ts" $config(aux_color)
 		}
 		
@@ -598,8 +621,8 @@ proc Stimulator_monitor {} {
 					set type "invalid"
 				}
 				
-			if {($type != "invalid") && $config(verbose)} {
-				LWDAQ_print $info(text) "Acknowledge:\
+			if {$type != "invalid"} {
+				Stimulator_print "Acknowledge:\
 					device_id=$device_id type=$type ts=$ts $now_time"
 			}
 		} elseif {$fa == $info(at_batt)} {
@@ -611,28 +634,22 @@ proc Stimulator_monitor {} {
 			# various supported device versions.
 			set ver $info(dev$n\_version)
 			switch $ver {
-				"21" {set voltage [format %.1f [expr 255.0/$db*1.2]]}
-				default {set voltage [format %.1f [expr 255.0/$db*1.2]]}
+				"21" {set voltage [format %.2f [expr 255.0/$db*1.2]]}
+				default {set voltage [format %.2f [expr 255.0/$db*1.2]]}
 			}
 			
 			# Report the battery measurement.
 			set info(dev$n\_battery) $voltage
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Battery:\
-					device_id=$device_id value=$db ts=$ts\
-					voltage=$voltage $now_time" 
-			}
+			Stimulator_print "Battery:\
+				device_id=$device_id value=$db ts=$ts\
+				voltage=$voltage $now_time" 
 		} elseif {$fa == $info(at_id)} {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Identification:\
-					device_id=$device_id ts=$ts $now_time" green
-			}
+			Stimulator_print "Identification:\
+				device_id=$device_id ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
 			set info(dev$n\_version) "$db"
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Version:\
-					device_id=$device_id value=$db ts=$ts $now_time"
-			}
+			Stimulator_print "Version:\
+				device_id=$device_id value=$db ts=$ts $now_time"
 		} else {
 			
 			# We don't recognise this type of auxiliary message, so proceed.
@@ -744,7 +761,7 @@ proc Stimulator_ask_remove {n} {
 	
 	# Exit if the stimulator does not exist.
 	if {$index < 0} {
-		LWDAQ_print $info(text) "ERROR: No stimulator with list index $n\."
+		Stimulator_print "ERROR: No stimulator with list index $n\."
 		return ""
 	}
 	
@@ -782,7 +799,7 @@ proc Stimulator_remove {n} {
 
 	# Exit if the stimulator does not exist.
 	if {$index < 0} {
-		LWDAQ_print $info(text) "ERROR: No stimulator with list index $n\."
+		Stimulator_print "ERROR: No stimulator with list index $n\."
 		return ""
 	}
 	
@@ -888,7 +905,7 @@ proc Stimulator_load_list {{fn ""}} {
 			set info(dev$n\_battery) "?"
 		}
 	} error_message]} {
-		LWDAQ_print $info(text) "ERROR: $error_message\."
+		Stimulator_print "ERROR: $error_message\."
 		return
 	}
 	
@@ -986,7 +1003,7 @@ proc Stimulator_transmit_panel {} {
 		LWDAQ_run_tool OSR8_Assembler
 		destroy $ainfo(window)
 		if {[info commands OSR8_Assembler_assemble] == ""} {
-			LWDAQ_print $info(text) "ERROR: Failed to open OSR8 Assembler tool."
+			Stimulator_print "ERROR: Failed to open OSR8 Assembler tool."
 		} 
 	}
 
@@ -1007,9 +1024,6 @@ proc Stimulator_transmit_panel {} {
 	entry $f.be -textvariable Stimulator_config(tp_base_addr) -width 8
 	pack $f.bl $f.be -side left -expand 1
 
-	checkbutton $f.verbose -variable Stimulator_config(verbose) -text "Verbose"
-	pack $f.verbose -side left -expand 1
-	
 	set f [frame $w.program]
 	pack $f -side top -fill x
 	
@@ -1098,29 +1112,29 @@ proc Stimulator_tp_run {} {
 	
 	# Read program from file.
 	if {[file exists $config(tp_program)]} {
-		LWDAQ_print $info(tp_text) "Reading and assembling $config(tp_program)."
+		Stimulator_print $info(tp_text) "Reading and assembling $config(tp_program)."
 		set f [open $config(tp_program)]
 		set program [read $f]
 		close $f
 	} else {
-		LWDAQ_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
+		Stimulator_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
 		return ""
 	} 
 	
 	# Assemble program, reporting errors to text window.
 	if {[catch {
 		set saved_text $ainfo(text)
-		if {$config(verbose)} {set ainfo(text) $info(tp_text)}
+		set ainfo(text) $info(tp_text)
 		set aconfig(hex_output) 0
 		set aconfig(ofn_write) 0
 		set aconfig(base_addr) $config(tp_base_addr)
 		set prog [OSR8_Assembler_assemble $program]
 		set ainfo(text) $saved_text
 	} error_message]} {
-		LWDAQ_print $info(tp_text) "ERROR: $error_message\."
+		Stimulator_print $info(tp_text) "ERROR: $error_message\."
 		return ""
 	}
-	LWDAQ_print $info(tp_text) "Assembly successful,\
+	Stimulator_print $info(tp_text) "Assembly successful,\
 		uploading [llength $prog] code bytes."	
 	
 	# Get device number and initialize command list. Before we send the
@@ -1213,9 +1227,9 @@ proc Stimulator_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	checkbutton $f.verbose -variable Stimulator_config(verbose) -text "Verbose"
-	pack $f.verbose -side left -expand 1
-	
+	checkbutton $f.log -variable Stimulator_config(log_enable) -text "Log"
+	pack $f.log -side left -expand 1
+
 	set f $w.list
 	frame $f
 	pack $f -side top -fill x

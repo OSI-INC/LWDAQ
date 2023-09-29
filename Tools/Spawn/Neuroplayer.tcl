@@ -491,7 +491,7 @@ proc Neuroplayer_init {} {
 	set config(a_max) 100
 	set config(a_min) 0.0
 	set config(f_min) 0.0
-	set config(f_max) 100
+	set config(f_max) 200
 	set config(log_frequency) 0
 	set config(log_amplitude) 0
 #

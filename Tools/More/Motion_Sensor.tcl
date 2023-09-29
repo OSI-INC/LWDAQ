@@ -1,6 +1,7 @@
 # Motion Sensor
 #
 # Copyright (C) 2004-2006, Kevan Hashemi, Brandeis University
+# Copyright (C) 2023, Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,7 +23,7 @@ proc Motion_Sensor_init {} {
 	upvar #0 Motion_Sensor_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Motion_Sensor" "3"
+	LWDAQ_tool_init "Motion_Sensor" "4"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set info(control) "Idle"
@@ -38,7 +39,6 @@ proc Motion_Sensor_init {} {
 	set config(characteristic_index) 6 
 	set config(zoom) 2
 	set config(intensify) exact
-	set config(num_lines_keep) 100
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -86,7 +86,6 @@ proc Motion_Sensor_execute {} {
 	upvar #0 Motion_Sensor_info info
 	upvar #0 Motion_Sensor_config config
 	upvar #0 LWDAQ_config_$config(instrument) iconfig
-
 	global LWDAQ_Info
 	
 	if {![array exists info]} {return ""}
@@ -100,7 +99,7 @@ proc Motion_Sensor_execute {} {
 	}
 	 
 	if {[winfo exists $info(text)]} {
-		$info(text) delete 1.0 "end [expr 0 - $config(num_lines_keep)] lines"
+		$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
 	}
 
 	if {$info(control) == "Run"} {
