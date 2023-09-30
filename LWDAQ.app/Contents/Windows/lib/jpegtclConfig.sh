@@ -12,40 +12,40 @@
 # The information in this file is specific to a single platform.
 
 # jpegtcl's version number.
-jpegtcl_VERSION='9.5.0'
+jpegtcl_VERSION='9.2.0'
 jpegtcl_MAJOR_VERSION=''
 jpegtcl_MINOR_VERSION=''
 jpegtcl_RELEASE_LEVEL=''
 
 # The name of the jpegtcl library (may be either a .a file or a shared library):
-jpegtcl_LIB_FILE=jpegtcl950.dll
+jpegtcl_LIB_FILE=jpegtcl920.dll
 
 # String to pass to linker to pick up the jpegtcl library from its
 # build directory.
-jpegtcl_BUILD_LIB_SPEC='-LE:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/rcompile/tkimg/libjpeg -ljpegtcl950'
+jpegtcl_BUILD_LIB_SPEC='-LD:/CM/tcltk86/rcompile/tkimg/libjpeg -ljpegtcl920'
 
 # String to pass to linker to pick up the jpegtcl library from its
 # installed directory.
-jpegtcl_LIB_SPEC='-LE:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/release/lib/jpegtcl9.5.0 -ljpegtcl950'
+jpegtcl_LIB_SPEC='-LD:/CM/tcltk86/release/lib/jpegtcl9.2.0 -ljpegtcl920'
 
 # The name of the jpegtcl stub library (a .a file):
-jpegtcl_STUB_LIB_FILE=libjpegtclstub950.a
+jpegtcl_STUB_LIB_FILE=libjpegtclstub920.a
 
 # String to pass to linker to pick up the jpegtcl stub library from its
 # build directory.
-jpegtcl_BUILD_STUB_LIB_SPEC='-LE:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/rcompile/tkimg/libjpeg -ljpegtclstub950'
+jpegtcl_BUILD_STUB_LIB_SPEC='-LD:/CM/tcltk86/rcompile/tkimg/libjpeg -ljpegtclstub920'
 
 # String to pass to linker to pick up the jpegtcl stub library from its
 # installed directory.
-jpegtcl_STUB_LIB_SPEC='-LE:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/release/lib/jpegtcl9.5.0 -ljpegtclstub950'
+jpegtcl_STUB_LIB_SPEC='-LD:/CM/tcltk86/release/lib/jpegtcl9.2.0 -ljpegtclstub920'
 
 # String to pass to linker to pick up the jpegtcl stub library from its
 # build directory.
-jpegtcl_BUILD_STUB_LIB_PATH='E:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/rcompile/tkimg/libjpeg/libjpegtclstub950.a'
+jpegtcl_BUILD_STUB_LIB_PATH='D:/CM/tcltk86/rcompile/tkimg/libjpeg/libjpegtclstub920.a'
 
 # String to pass to linker to pick up the jpegtcl stub library from its
 # installed directory.
-jpegtcl_STUB_LIB_PATH='E:/gitlab-runner/builds/Uyyf6o_gt/0/product/tcltk/release/lib/jpegtcl9.5.0/libjpegtclstub950.a'
+jpegtcl_STUB_LIB_PATH='D:/CM/tcltk86/release/lib/jpegtcl9.2.0/libjpegtclstub920.a'
 
 # Location of the top-level source directories from which jpegtcl
 # was built.  This is the directory that contains generic, unix, etc.

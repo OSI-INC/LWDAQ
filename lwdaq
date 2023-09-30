@@ -156,9 +156,9 @@ then
 	export LD_LIBRARY_PATH
 	if [ $GUI_ENABLED == 1 ]; 
 	then
-		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/wish8.7"
+		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/wish8.6"
 	else
-		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/tclsh8.7"
+		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Linux/bin/tclsh8.6"
 	fi
 fi
 if [ $OS == MacOS ];
@@ -174,11 +174,11 @@ if [ $OS == Windows ];
 then
 	if [ $GUI_ENABLED == 1 ];
 	then
-		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Windows/bin/wish87.exe"
+		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Windows/bin/wish86.exe"
 	else
 		PATH="$PATH:$LWDAQ_DIR/LWDAQ.app/Contents/Windows/bin/"
 		export PATH
-		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Windows/bin/tclsh87.exe"
+		SHELL="$LWDAQ_DIR/LWDAQ.app/Contents/Windows/bin/tclsh86.exe"
 	fi
 fi
 
