@@ -8109,8 +8109,7 @@ proc Neuroplayer_video_seek {datetime length} {
 
 	if {$vf != ""} {
 		Neuroplayer_print "Using cached video [file tail $vf]\
-			vtime=$vtime vlen=$vlen clen=$clen width=$width\
-			height=$height framerate=$framerate." verbose
+			vtime=$vtime vlen=$vlen clen=$clen." verbose
 	}
 	
 	# If we have not found a file that includes the start of the requested
@@ -8208,7 +8207,7 @@ proc Neuroplayer_video_play {datetime length} {
 	while {$missing > 0} {
 		# Seek the interval in the video directory.
 		set result [Neuroplayer_video_seek $vpos $missing]
-Neuroplayer_print $result green
+
 		# Extract the file name, seek time, length of the video existing in the
 		# file and the correct length of the file, which is the length of video
 		# that fills the time between the start of this file and the next file
