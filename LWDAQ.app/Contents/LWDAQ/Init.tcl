@@ -29,7 +29,8 @@ set LWDAQ_Info(program_name) "LWDAQ"
 set LWDAQ_Info(program_version) "10.6"
 set LWDAQ_Info(program_patchlevel) "10.6.1"
 set LWDAQ_Info(tcl_version) [info patchlevel]
-set LWDAQ_Info(prompt) "LWDAQ$ "
+set LWDAQ_Init(default_prompt) "LWDAQ$ "
+set LWDAQ_Info(prompt) $LWDAQ_Init(default_prompt)
 	
 # Determine architecture.
 package require platform
@@ -139,7 +140,7 @@ foreach a $argv {
 			set LWDAQ_Info(prompt) ""
 		}
 		"--prompt" {
-		# Leave the prompt as it is.
+			set LWDAQ_Info(prompt) $LWDAQ_Init(default_prompt)
 		}
 		
 		default {
@@ -337,7 +338,9 @@ if {$num_errors > 0} {
 #
 proc LWDAQ_stdin_console_start {} {
 	global LWDAQ_Info
-	if {[catch {package require TTY}] || ([auto_execok stty] == "")} {
+	if {[catch {package require TTY}] \
+			|| ([auto_execok stty] == "") \
+			|| ($LWDAQ_Info(prompt) == "")} {
 		fconfigure stdin -translation auto -buffering line
 		fileevent stdin readable LWDAQ_stdin_console_execute
 		puts -nonewline stdout $LWDAQ_Info(prompt)
@@ -354,7 +357,9 @@ proc LWDAQ_stdin_console_start {} {
 # are no longer being used to provide and respond to Tcl commands.
 #
 proc LWDAQ_stdin_console_stop {} {
-	if {[catch {package require TTY}] || ([auto_execok stty] == "")} {
+	if {[catch {package require TTY}] \
+		|| ([auto_execok stty] == "") \
+		|| ($LWDAQ_Info(prompt) == "")} {
 		fileevent stdin readable ""
 	} {
 		TTY_stop 

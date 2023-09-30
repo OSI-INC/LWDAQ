@@ -69,7 +69,7 @@ if [%op%]==[--verbose] (
 	goto optionloop
 )
 if [%op%]==[--prompt] (
-	set pmt=
+	set pmt=%op%
 	shift
 	goto optionloop
 )
@@ -162,6 +162,7 @@ REM ------------------------------------------
 if [%verbose%]==[1] (
 	echo OS: Windows
 	echo OPTION: %option%
+	echo OPTION: %pmt%
 	echo GUI_ENABLED: %gui_enabled%
 	echo RUN_IN_BACKGROUND: %background%
 	echo LOCAL_DIR: %cd%

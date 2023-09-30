@@ -208,12 +208,22 @@ if [ "$CONFIG_FILE" == "" ];
 then 
 	if [ "$OPTION" == "--no-console" ];
 	then
-		exit "ERROR: No configuration file specified with no-console option."
+		echo "ERROR: No configuration file specified with no-console option."
+		exit 1
 	fi
 fi
 
-# Save the state of the terminal.
-TTY_STATE=`stty -g`
+# Determine if we are likely to have a terminal interface, and if we are, save
+# the state of the terminal interface. 
+case $OPTION in
+	"--no-gui") STTY=1;;
+	"--gui") STTY=1;;
+	*) STTY=0;;
+esac
+if [ $STTY == 1 ] 
+then
+	TTY_STATE=`stty -g`
+fi
 
 # Launch the shell and pass to it the start-up script and any additional
 # parameters we may have passed to this bash script. On Linux, to make sure that
@@ -239,5 +249,11 @@ else
 	$SHELL $INIT_FILE $OPTION $PROMPT $CONFIG_FILE "$@"
 fi
 
-# Restore the terminal in case we reconfigured it in LWDAQ for a local console.
-stty $TTY_STATE
+# If we were using a terminal interface, restore the terminal in case we 
+# reconfigured it in LWDAQ for a local console. If we are running with a 
+# terminal interface, save the state of the terminal.
+if [ $STTY == 1 ] 
+then
+	stty $TTY_STATE
+fi
+
