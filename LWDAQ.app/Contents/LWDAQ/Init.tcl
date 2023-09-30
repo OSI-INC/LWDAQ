@@ -381,7 +381,7 @@ proc LWDAQ_stdin_console_execute {} {
 			flush stdout
 		}
 	} error_result]} {
-		puts $error_result
+		if {[catch {puts $error_result}]} {exit}
 	}
 }
 

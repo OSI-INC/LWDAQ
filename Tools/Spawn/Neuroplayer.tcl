@@ -51,7 +51,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "165"
+	LWDAQ_tool_init "Neuroplayer" "166"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -8108,7 +8108,9 @@ proc Neuroplayer_video_seek {datetime length} {
 	}
 
 	if {$vf != ""} {
-		Neuroplayer_print "Using cached video file [file tail $vf]." verbose
+		Neuroplayer_print "Using cached video [file tail $vf]\
+			vtime=$vtime vlen=$vlen clen=$clen width=$width\
+			height=$height framerate=$framerate." verbose
 	}
 	
 	# If we have not found a file that includes the start of the requested
@@ -8206,7 +8208,7 @@ proc Neuroplayer_video_play {datetime length} {
 	while {$missing > 0} {
 		# Seek the interval in the video directory.
 		set result [Neuroplayer_video_seek $vpos $missing]
-
+Neuroplayer_print $result green
 		# Extract the file name, seek time, length of the video existing in the
 		# file and the correct length of the file, which is the length of video
 		# that fills the time between the start of this file and the next file
@@ -8215,7 +8217,10 @@ proc Neuroplayer_video_play {datetime length} {
 	
 		# If we have no file containing the interval start, give up.
 		if {$vf == "none"} {break}
-	
+		
+		# If our start time is not before the video end time, give up.
+		if {$start_s + $info(video_min_interval) >= $vlen} {break}
+		
 		# Calculate how many seconds of our requested length are missing, and
 		# move the video position to the end of the interval, or the start of
 		# the next file if the file does not cover the interval.
@@ -8228,14 +8233,14 @@ proc Neuroplayer_video_play {datetime length} {
 			set end_s [format %.2f $vlen]
 			set missing [format %.2f [expr $missing - $vlen + $start_s]]
 		}
-
+		
 		# Append the file, play start time, and video position to our playback
 		# list.
 		lappend vfl "$vf $start_s $end_s"
 	}
 		
 	if {$missing > 0} {
-		Neuroplayer_print "ERROR: Missing $missing s of requested video interval."
+		Neuroplayer_print "ERROR: Missing a portion of requested video interval."
 		set info(video_state) "Idle"
 		return ""
 	}
