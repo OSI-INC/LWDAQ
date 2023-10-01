@@ -40,15 +40,23 @@
 # in the LWDAQ directory.
 LWDAQ_DIR=`dirname $0`
 
-# Determine operating system. Default is Unix. 
+# Determine operating system and set default options accordingly.
 OS=Windows
 if [ "`uname -a | grep -i Darwin`" != "" ];
 then 
 	OS=MacOS
+	OPTION="--gui"
+	VERBOSE=0
+	CONFIG_FILE=""
+	PROMPT=""
 fi
 if [ "`uname -a | grep -i Windows`" != "" ];
 then 
 	OS=Windows
+	OPTION="--spawn"
+	VERBOSE=0
+	CONFIG_FILE=""
+	PROMPT=""
 fi
 if [ "`uname -a | grep -i Linux`" != "" ];
 then 
@@ -57,15 +65,15 @@ then
 	then
 		OS=Raspbian
 	fi 
+	OPTION="--gui"
+	VERBOSE=0
+	CONFIG_FILE=""
+	PROMPT=""
 fi
 
 # Go through the options, all of which begin with two dashes, then read the
 # configuration file name, if it exits. After that, further arguments will
 # be retained to pass into LWDAQ. The default launch option is --gui.
-OPTION="--gui"
-VERBOSE=0
-CONFIG_FILE=""
-PROMPT="--prompt"
 while [[ $1 == --* ]];
 do
 	case "$1" in
@@ -90,6 +98,7 @@ then
 	# Run without graphics, without console, in foreground.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
+	PROMPT="--no-prompt"
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--no-console" ]; 
@@ -97,20 +106,31 @@ then
 	# Run without graphics, without console, in background.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=1
+	PROMPT="--no-prompt"
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--no-gui" ]; 
 then 
-	# Run without graphics, with console, in foreground.
+	# Run without graphics, with console, in foreground. If the prompt has not
+	# yet been turned on or off, turn it on.
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
+	if [ "$PROMPT" == "" ]
+	then
+		PROMPT="--prompt"
+	fi
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--gui" ]; 
 then 
-	# Run with graphics, with console, in foreground.
+	# Run with graphics, with console, in foreground. If the prompt has not yet
+	# been turned on or off, turn it on.
 	GUI_ENABLED=1
 	RUN_IN_BACKGROUND=0
+	if [ "$PROMPT" == "" ]
+	then
+		PROMPT="--prompt"
+	fi
 	OPTION_FOUND=1
 fi
 if [ "$OPTION" == "--spawn" ]; 
@@ -118,16 +138,18 @@ then
 	# Run with graphics, without console, background.
 	GUI_ENABLED=1
 	RUN_IN_BACKGROUND=1
+	PROMPT="--no-prompt"
 	OPTION_FOUND=1
 fi
 
-# If the option was not found, we issue a warning and set the three
-# flags that need to be set.
+# If the option was not found, we issue a warning and set the flags that need to
+# be set.
 if [ $OPTION_FOUND == 0 ];
 then
-	echo "WARNING: Unrecognised option '$OPTION', defaulting to --no-gui."
+	echo "WARNING: Unrecognised option '$OPTION', defaulting to --no-gui --no-prompt."
 	GUI_ENABLED=0
 	RUN_IN_BACKGROUND=0
+	PROMPT="--no-prompt"
 fi
 
 # Pick the TclTk shell based upon the options, operating system
@@ -208,19 +230,14 @@ if [ "$CONFIG_FILE" == "" ];
 then 
 	if [ "$OPTION" == "--no-console" ];
 	then
-		echo "ERROR: No configuration file specified with no-console option."
+		echo "ERROR: Option --no-console requires a configuration file."
 		exit 1
 	fi
 fi
 
-# Determine if we are likely to have a terminal interface, and if we are, save
-# the state of the terminal interface. 
-case $OPTION in
-	"--no-gui") STTY=1;;
-	"--gui") STTY=1;;
-	*) STTY=0;;
-esac
-if [ $STTY == 1 ] 
+# If we are going to set up a terminal interface with a prompt, save terminal
+# state now.
+if [ $PROMPT == "--prompt" ] 
 then
 	TTY_STATE=`stty -g`
 fi
@@ -249,10 +266,9 @@ else
 	$SHELL $INIT_FILE $OPTION $PROMPT $CONFIG_FILE "$@"
 fi
 
-# If we were using a terminal interface, restore the terminal in case we 
-# reconfigured it in LWDAQ for a local console. If we are running with a 
-# terminal interface, save the state of the terminal.
-if [ $STTY == 1 ] 
+# If we were using a terminal interface with a prompt, restore the terminal
+# interface now. 
+if [ $PROMPT == "--prompt" ] 
 then
 	stty $TTY_STATE
 fi

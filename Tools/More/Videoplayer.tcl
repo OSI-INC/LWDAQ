@@ -53,7 +53,7 @@ proc Videoplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Videoplayer" "3"
+	LWDAQ_tool_init "Videoplayer" "4"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -97,10 +97,10 @@ proc Videoplayer_init {} {
 	set info(frame_count) "0"
 	set info(display_process) "0"
 	set info(display_channel) "none"
-	set config(file_timeout_ms) "1000"
+	set config(file_timeout_ms) "2000"
 	set config(tcp_timeout_ms) "5000"
 	set config(read_nocomplain) "0"
-	set info(display_max_skip) "2"
+	set info(display_max_skip) "5"
 #
 # Graphical user display configuration.
 #
@@ -225,7 +225,7 @@ proc Videoplayer_print {line {color "black"}} {
 	
 	if {$info(mode) == "Slave"} {
 		if {$color != "verbose"} {
-			catch {puts $line}
+			catch {puts stdout $line}
 		}
 	} else {
 		if {$config(verbose) \
@@ -425,6 +425,7 @@ proc Videoplayer_play {} {
 	set fn $config(video_file)
 	set start $config(display_start_s)
 	set end_code $config(display_end_s)
+	set one_frame_time [format %.3f [expr 1.0/$config(video_framerate)]]
 	
 	# Consistency checks.
 	if {![file exists $fn]} {
@@ -437,8 +438,8 @@ proc Videoplayer_play {} {
 		Videoplayer_print "ERROR: Invalid start time \"$start\"."
 		return ""
 	}
-	if {$start > $config(video_length_s)} {
-		set start $config(video_length_s)
+	if {$start >= $config(video_length_s)} {
+		set start [expr $config(video_length_s) - $one_frame_time]
 		set end_code "+"
 	}
 	
@@ -449,16 +450,20 @@ proc Videoplayer_play {} {
 		set num_frames [expr round(($end - $start)*$config(video_framerate))]
 		set time_control "-ss $start"
 	} elseif {$end_code == "+"} {
-		set end [format %.3f $start [expr 2.0/$config(video_framerate)]]
+		set end [format %.3f [expr $start + $one_frame_time]]
 		set num_frames 1
-		set time_control "-ss $start -t [format %.3f [expr 2.0/$config(video_framerate)]]"
+		set time_control "-ss $start -t $one_frame_time"
 	} else {
 		if {![string is double -strict $end_code]} {
 			Videoplayer_print "ERROR: Invalid end time \"$end_code\"."
 			return ""
 		}
-		set end $end_code
-		set num_frames [expr round(($end_code - $start)*$config(video_framerate))]
+		if {$end_code > $config(video_length_s)} {
+			set end $config(video_length_s)
+		} else {
+			set end $end_code
+		}
+		set num_frames [expr round(($end - $start)*$config(video_framerate))]
 		set time_control "-ss $start -t [format %.3f [expr $end - $start]]"
 	}
 	
@@ -606,9 +611,9 @@ proc Videoplayer_play {} {
 		LWDAQ_support
 		incr timeout
 		
-		# It may take ffmpeg some time to generate the first frame, depending upon
-		# the size of the video file and the exact location between key frames within
-		# the file that we want to start at. 
+		# It may take ffmpeg some time to generate the first frame, depending
+		# upon the size of the video file and the exact location between key
+		# frames within the file that we want to start at. 
 		if {($info(frame_count) == 0)} {
 			if {$timeout > $config(file_timeout_ms)} {
 				Videoplayer_print "ERROR: Timeout waiting for\
@@ -616,12 +621,12 @@ proc Videoplayer_play {} {
 				break
 			}
 		} else {
-		# Once ffmpeg has started producing the video stream, any pause in the 
-		# stream indicates a problem, so we look fore a much shorter timeout. If we
-		# are waiting for the last frame, it may never show up because of a disagreement
-		# between the Videoplayer and ffmpeg about how many frames there are in the
-		# interval. But if we are waiting for any frame 1 to frame_count-1, we generate
-		# an error.
+		# Once ffmpeg has started producing the video stream, any pause in the
+		# stream indicates a problem, so we look for a much shorter timeout. If
+		# we are waiting for the last frame, it may never show up because of a
+		# disagreement between the Videoplayer and ffmpeg about how many frames
+		# there are in the interval. But if we are waiting for any frame 1 to
+		# frame_count-1, we generate an error.
 			if {$timeout > $info(display_max_skip)*$frame_ms} {
 				if {$info(frame_count) < $num_frames - 1} {
 					Videoplayer_print "ERROR: Timeout waiting for\
@@ -1216,18 +1221,21 @@ return ""
 
 ----------Begin Help----------
 
-The Videoplayer's chief function is to act as a video player for the
-Videoarchiver and Neuroplayer. When launched as a standalone process in Slave
-mode, the Videoplayer may be controlled through a Tcl channel, and it in turn
-calls ffmpeg through another channel. In slave mode, the Videoplayer has not
-buttons or entries to control its behavior. All control takes place through the
-master-slave pipe. But when launched from the tool menus, the Videoplayer
-provides us with buttons to pick a file, stream from a server, and present a
-video's characteristics. The Videoplayer will play any video that ffmpeg can
-decypher. It plays without sound. Depending upon your operating system and
-computer speed, you may find that playback cannot proceed at full speed. Use the
-scale value to change the resolution of the image. Use the zoom value to
-increase the size of each pixel when rendered on your screen.
+The Videoplayer's chief function is to play videos for the Videoarchiver and
+Neuroplayer. When launched from the LWDAQ Tool menu, the Videoplayer presents a
+graphical user interface with buttons to select and play videos, adjust playback
+speed, receive a video stream from a TCPIP address, and to apply ffmpeg's H264
+algorithm to compress videos into MP4 containers. The Videoplayer will play any
+video that ffmpeg can decypher. It plays without sound. Depending upon your
+operating system and computer speed, you may find that playback cannot proceed
+at full speed. Use the scale value to change the resolution of the image. Use
+the zoom value to increase the size of each pixel when rendered on your screen.
+
+When launched as a slave tool the Videoplayer provides only a window to display
+videos. The Neuroplayer and Videoarchive operate the Videoplayer as a slave in a
+child process. They direct the Videoplayer to read, receive, and display video
+by sending commands to the Videoarchiver through its standard input and standard
+output channels.
 
 The Re-Encode button calls on ffmpeg to create a new video file using H264
 compression. The dimensions of the video will be given by width and height

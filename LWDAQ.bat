@@ -82,6 +82,9 @@ if [%op%]==[--gui] (
 	set option=%op%
 	set gui_enabled=1
 	set background=0
+	if [%pmt%]==[] (
+		set pmt=--prompt
+	)
 	shift
 	goto optionloop
 )
@@ -89,6 +92,9 @@ if [%op%]==[--no-gui] (
 	set option=%op%
 	set gui_enabled=0
 	set background=0
+	if [%pmt%]==[] (
+		set pmt=--prompt
+	)
 	shift
 	goto optionloop
 ) 
