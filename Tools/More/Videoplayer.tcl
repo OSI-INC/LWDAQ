@@ -485,7 +485,8 @@ proc Videoplayer_play {} {
 	}
 	
 	# Calculate the frame time.
-	set frame_ms [format %.1f [expr 1000.0/$config(video_framerate)/$config(display_speed)]]
+	set frame_ms [format %.1f \
+		[expr 1000.0/$config(video_framerate)/$config(display_speed)]]
 	
 	# Combine dimensions and rotation into one video filter.
 	switch $config(display_rotation) {
@@ -616,8 +617,8 @@ proc Videoplayer_play {} {
 		# frames within the file that we want to start at. 
 		if {($info(frame_count) == 0)} {
 			if {$timeout > $config(file_timeout_ms)} {
-				Videoplayer_print "ERROR: Timeout waiting for\
-					frame 0, time $start s, file [file tail $fn]." 
+				Videoplayer_print "ERROR: Timeout waiting for first frame\
+					of [file tail $fn]." 
 				break
 			}
 		} else {
@@ -630,7 +631,9 @@ proc Videoplayer_play {} {
 			if {$timeout > $info(display_max_skip)*$frame_ms} {
 				if {$info(frame_count) < $num_frames - 1} {
 					Videoplayer_print "ERROR: Timeout waiting for\
-						frame $info(frame_count), time $start s, file [file tail $fn]." 
+						frame [expr $info(frame_count) + 1] at time\
+						[format %.2f [expr $info(frame_count)*$one_frame_time]] s\
+						in file [file tail $fn]." 
 				}
 				break
 			}
@@ -852,10 +855,7 @@ proc Videoplayer_setup {args} {
 				set config(video_framerate) $value
 			}
 			"-length_s" {
-				set config(video_duration) $value
-			}
-			"-duration" {
-				set config(video_duration) $value
+				set config(video_length_s) $value
 			}
 			"-scale" {
 				set config(display_scale) $value

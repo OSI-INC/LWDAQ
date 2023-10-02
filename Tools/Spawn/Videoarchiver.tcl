@@ -1425,7 +1425,8 @@ proc Videoarchiver_monitor {n {command "Start"} {fn ""}} {
 				Videoarchiver_print $result orange
 			}
 			if {$fn != ""} {
-				puts $info(cam$n\_vchan) "videoplayer play -file $fn -start 0 -end *"
+				puts $info(cam$n\_vchan) "videoplayer play \
+					-file $fn -start 0 -end $config(seg_length_s)"
 			}
 		} message]} {
 			Videoarchiver_print "$info(cam$n\_id) Recording view has been closed." \

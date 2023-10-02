@@ -384,6 +384,12 @@ proc Neuroplayer_init {} {
 	set info(sequential_block_length) 100000
 	set config(sequential_play) 0
 #
+# Slow play introduces a delay between display of one interval and the next.
+#
+	set config(slow_play) 0
+	set config(slow_play_ms) 1000
+	set config(fast_play_ms) $LWDAQ_Info(queue_ms)
+#
 # By default, the player moves from one file to the next automatically, or
 # waits for data to be added to a file if there is no other later file. But
 # we can force the player to stop with this configuration parameter. When
@@ -616,6 +622,8 @@ proc Neuroplayer_init {} {
 	set info(video_channel) "none"
 	set info(video_process) "0"
 	set info(video_cache) [list]
+	set info(video_check_ms) "100"
+	set info(video_check_prev) "0"
 	set info(max_video_files) "100"
 	set os_dir [file join $info(videoarchiver_dir) $LWDAQ_Info(os)]
 	if {$LWDAQ_Info(os) == "Windows"} {
@@ -6664,6 +6672,13 @@ proc Neuroplayer_play {{command ""}} {
 
 	# Check if we have an overriding command.
 	if {$command != ""} {set info(play_control) $command}
+	
+	# Configure the event queue for slow or fast play.
+	if {$config(slow_play)} {
+		set LWDAQ_Info(queue_ms) $config(slow_play_ms)
+	} {
+		set LWDAQ_Info(queue_ms) $config(fast_play_ms)
+	}
 
 	# Consider various ways in which we will do nothing and return.
 	if {$LWDAQ_Info(reset)} {
@@ -8009,18 +8024,12 @@ proc Neuroplayer_video_watchdog {} {
 		catch {puts $info(video_channel) "videoplayer stop"}
 		LWDAQ_set_bg $info(play_control_label) white
 		set info(video_state) "Idle"
-		Neuroplayer_print "Video playback aborted by conflicting user command." verbose
+		Neuroplayer_print "Video playback aborted by user command." verbose
 		LWDAQ_post [list Neuroplayer_video_watchdog]
 		return ""
 		
 	} elseif {$info(video_state) == "Play"} {
 	
-		# During video playback, we check to see if the Videoplayer still
-		# exists, and if so, if it's still busy. If the Videoplayer appears to
-		# be closed, or stalled, we force it to close and terminate the
-		# watchdog.
-		set busy 1
-
 		if {[catch {
 		
 			# Check to see if the videoplayer still exists.
@@ -8029,15 +8038,33 @@ proc Neuroplayer_video_watchdog {} {
 				error "Videoplayer closed."
 			}
 			
-			# Get the Videoplayer status. We may not get it this time, we may 
-			# have to wait to get it next time. If we get a string, try to find
-			# the busy code in the string. If there is no busy code, the string
-			# is an error message.
-			puts $info(video_channel) "videoplayer status"
-			if {[gets $info(video_channel) status] > 0} {
-				if {![regexp {busy=([0-1]+)} $status match busy]} {
-					error $status
+			# Read any available answers from the Videoplayer. If we encounter an
+			# error message, print it and generate an error. Otherwise try to extract
+			# busy bit, file name, play time and frame count.
+			set busy 1
+			while {[gets $info(video_channel) message] > 0} {
+				if {[LWDAQ_is_error_result $message]} {error $message}
+				if {![regexp {busy=([0-1]+)} $message match busy]} {
+					Neuroplayer_print "Videoplayer: $message" verbose
 				}
+				if {![regexp {file=.*?(V[0-9]{10}\.mp4)} $message match vf]} {
+					set vf "V0000000000.mp4"
+				}
+				if {![regexp {play_time_s=([^ ]*)} $message match vtime]} {
+					set vtime "0"
+				}
+				if {![regexp {frame_count=([^ ]*)} $message match fcnt]} {
+					set fcnt "0"
+				}
+			} 
+			
+			# Request status from the Videoplayer with a certain period. We don't want
+			# to check too often, because doing so will distract the player from its
+			# job. But we want to do so often enough that we do not delay starting play
+			# of the next interval.
+			if {[clock milliseconds]-$info(video_check_prev) > $info(video_check_ms)} {
+				puts $info(video_channel) "videoplayer status"
+				set invo(video_check_prev) [clock milliseconds]
 			}
 		} message]} {
 
@@ -8056,7 +8083,8 @@ proc Neuroplayer_video_watchdog {} {
 
 		# If not busy, go to Idle state. 
 		if {!$busy} {
-			Neuroplayer_print "Video playback complete." verbose
+			Neuroplayer_print "Playback of $vf complete at video time $vtime s,\
+				played $fcnt frames." verbose
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(video_state) "Idle"
 		} 
@@ -8306,7 +8334,12 @@ proc Neuroplayer_video_play {datetime length} {
 		puts $ch "LWDAQ_run_tool Videoplayer.tcl Slave"
 		
 		# Configure the Videoplayer for our first video file by giving the file
-		# name and our display parameters. 
+		# name and our display parameters. The Videoplayer will configure itself
+		# to suit this first video, and set its speed, scale, and zoom values.
+		# Our assumption is that all videos have the same width, height, and
+		# framerate. But videos can have different lengths: we will pass the
+		# length of each video into the Videoplayer when we instruct it to play
+		# future files.
 		puts $ch "videoplayer pickfile \
 			-file [lindex $vfl 0 0] \
 			-title \"$title\" \
@@ -8325,16 +8358,16 @@ proc Neuroplayer_video_play {datetime length} {
 	# Start playing the files that cover our requested interval.
 	foreach pb $vfl {
 		scan $pb %s%f%f%f%f fn start_s end_s vlen clen
-		puts $info(video_channel) "videoplayer play \
-			-file \"$fn\" -start $start_s -end $end_s"
+		puts $info(video_channel) "videoplayer play -file \"$fn\" \
+			-start $start_s -end $end_s -length_s $vlen"
 		Neuroplayer_print "Playing video [file tail $fn],\
 			start_s=$start_s, end_s=$end_s, vlen=$vlen, clen=$clen\." verbose
 	}
 	
-	# If the Videoplayer existed prior to the execution of this routine, it is likely
-	# to have a bunch of unread status reports left over from the previous playback.
-	# We read all these out now. If the Videoplayer responds to our instructions with
-	# an error, we detect the error and abort playback.
+	# Read out all pending messages from the Videoplayer. If we see an error message,
+	# abort playback. All other messages are obsolete status reports left over from
+	# the previous interval, which we must clear away before the watchdog starts
+	# communicating with the Videoplayer.
 	while {[gets $info(video_channel) message] > 0} {
 		if {[LWDAQ_is_error_result $message]} {
 			Neuroplayer_print "$message"
@@ -8343,7 +8376,7 @@ proc Neuroplayer_video_play {datetime length} {
 			return ""
 		}
 	}
-
+	
 	# Set the video state to play.
 	LWDAQ_set_bg $info(play_control_label) cyan
 	set info(video_state) "Play"
@@ -8478,6 +8511,9 @@ proc Neuroplayer_open {} {
 	checkbutton $f.seq -variable Neuroplayer_config(sequential_play) \
 		-text "Sequential"
 	pack $f.seq -side left -expand yes
+	checkbutton $f.slp -variable Neuroplayer_config(slow_play) \
+		-text "Slow"
+	pack $f.slp -side left -expand yes
 
 	set f $w.play.ac
 	frame $f -bd 1
