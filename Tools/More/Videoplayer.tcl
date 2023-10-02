@@ -1092,6 +1092,16 @@ proc Videoplayer_open {} {
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}
 	
+	# If we are running in slave or standalone mode, we make sure that we send
+	# an exit command when someone closes the main window
+	if {($info(mode) == "Slave") || ($info(mode) == "Standalone")} {
+		wm protocol . WM_DELETE_WINDOW {
+			LWDAQ_process_stop $Videoplayer_info(display_process)
+			catch {close $Videoplayer_info(display_channel)}
+			exit
+		}
+	}	
+
 	# Get on with creating the video display.
 	set f $w.display
 	frame $f -relief flat -bd 0
@@ -1102,22 +1112,10 @@ proc Videoplayer_open {} {
 		-width $info(init_size) -height $info(init_size) 
 	label $f.display -image $info(display_photo)
 	pack $f.display -side top
-
-	# If we are running in slave or standalone mode, we make sure that we send
-	# an exit command when someone closes the main window
-	if {($info(mode) == "Slave") || ($info(mode) == "Standalone")} {
-		wm protocol . WM_DELETE_WINDOW {
-			LWDAQ_process_stop $Videoplayer_info(display_process)
-			catch {close $Videoplayer_info(display_channel)}
-			exit	
-		}
-	}	
 		
 	# If we are running in slave mode, don't open any other widgets in the 
 	# user interface.
-	if {$info(mode) == "Slave"} {
-		return $w
-	}	
+	if {$info(mode) == "Slave"} {return $w}	
 	
 	set f $w.controls
 	frame $f -relief groove -bd 2
@@ -1221,21 +1219,22 @@ return ""
 
 ----------Begin Help----------
 
-The Videoplayer's chief function is to play videos for the Videoarchiver and
-Neuroplayer. When launched from the LWDAQ Tool menu, the Videoplayer presents a
-graphical user interface with buttons to select and play videos, adjust playback
-speed, receive a video stream from a TCPIP address, and to apply ffmpeg's H264
+The Videoplayer provides silent playback of videos, capture and display of
+silent video streams, examination of video characteristics, and re-encoding of
+videos.
+
+When launched from the LWDAQ Tool menu, the Videoplayer presents a graphical
+user interface with buttons to select and play videos, adjust playback speed,
+receive a video stream from a TCPIP address, and to apply ffmpeg's H264
 algorithm to compress videos into MP4 containers. The Videoplayer will play any
 video that ffmpeg can decypher. It plays without sound. Depending upon your
 operating system and computer speed, you may find that playback cannot proceed
 at full speed. Use the scale value to change the resolution of the image. Use
 the zoom value to increase the size of each pixel when rendered on your screen.
-
-When launched as a slave tool the Videoplayer provides only a window to display
-videos. The Neuroplayer and Videoarchive operate the Videoplayer as a slave in a
-child process. They direct the Videoplayer to read, receive, and display video
-by sending commands to the Videoarchiver through its standard input and standard
-output channels.
+When we play a video, we specify a start and end time. The start time should be
+a real number of seconds. The end time can be a real number of seconds, or it
+can be an asterisk "*" to request playback to the end of a file, or a plus sign
+"+" to request that only one frame be played from the start time.
 
 The Re-Encode button calls on ffmpeg to create a new video file using H264
 compression. The dimensions of the video will be given by width and height
@@ -1245,5 +1244,14 @@ framerate will be set by the framerate entry, without affecting the duration of
 the video in seconds. The speed of the video will be given by the speed
 parameter, without affecting the framerate. The new file will be written to the
 same directory as the original file, with "_new" appended to its file name.
+
+When launched as a slave the Videoplayer provides only a window to display
+videos. The Neuroplayer and Videoarchive operate the Videoplayer as a slave.
+They direct the Videoplayer to read, receive, and display video by sending
+commands to the Videoarchiver through its standard input and standard output
+channels. When operating as a slave, the Videoplayer will check occasionaly to
+see if its standard input channel has been closed, and if so, the Videoplayer
+will quit.
+
 
 ----------End Help----------

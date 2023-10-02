@@ -7983,6 +7983,22 @@ proc Neuroplayer_video_info {fn} {
 }
 
 #
+# Neuroplayer_video_close shuts down the video player, causing its window
+# to close.
+#
+proc Neuroplayer_video_close {} {
+	upvar #0 Neuroplayer_config config
+	upvar #0 Neuroplayer_info info
+
+	catch {puts $info(video_channel) "videoplayer stop"}
+	catch {puts $info(video_channel) "exit"}
+	catch {close $info(video_channel)}
+	LWDAQ_process_stop $info(video_process)
+	set info(video_channel) "none"
+	set info(video_process) "0"
+}
+
+#
 # Neuroplayer_video_watchdog monitors video playback. It checks to see if the
 # Videoplayer still exists: the window may have been closed by the user. If the
 # Videoplayer is closed, the watchdog makes sure its channel and process are
@@ -8004,12 +8020,7 @@ proc Neuroplayer_video_watchdog {} {
 	if {![info exists config] \
 		|| ($info(gui) && ![winfo exists $info(window)]) \
 		|| !$config(video_enable)} {
-		catch {puts $info(video_channel) "videoplayer stop"}
-		catch {puts $info(video_channel) "exit"}
-		catch {close $info(video_channel)}
-		LWDAQ_process_stop $info(video_process)
-		set info(video_channel) "none"
-		set info(video_process) "0"
+		Neuroplayer_video_close
 		LWDAQ_set_bg $info(play_control_label) white
 		set info(video_state) "Idle"
 		return ""
@@ -8067,15 +8078,10 @@ proc Neuroplayer_video_watchdog {} {
 				set invo(video_check_prev) [clock milliseconds]
 			}
 		} message]} {
-
+		
 			# Force the Viodeoplayer to close. Terminate the watchdog.
-			Neuroplayer_print "ERROR: $message Video playback aborted." verbose
-			catch {puts $info(video_channel) "videoplayer stop"}
-			catch {puts $info(video_channel) "exit"}
-			catch {close $info(video_channel)}
-			LWDAQ_process_stop $info(video_process)
-			set info(video_channel) "none"
-			set info(video_process) "0"
+			Neuroplayer_print "ERROR: $message\. Video playback aborted." verbose
+			Neuroplayer_video_close
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(video_state) "Idle"
 			return ""
@@ -8405,6 +8411,15 @@ proc Neuroplayer_open {} {
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}
 	
+	# If we are running in slave or standalone mode, we make sure that we close
+	# any existing Videoplayer.
+	if {($info(mode) == "Slave") || ($info(mode) == "Standalone")} {
+		wm protocol . WM_DELETE_WINDOW {
+			Neuroplayer_video_close
+			exit
+		}
+	}	
+
 	# Get on with creating the display in the tool's frame or window.
 	set f $w.displays
 	frame $f -border 2
