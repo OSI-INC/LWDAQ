@@ -5418,7 +5418,6 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					# Add segment to concatination list.
 					lappend info(export_vfl) $vfn				
 				} {
-				
 					# Report on the segment.
 					LWDAQ_print $t "[file tail $vfn]: Using\
 						0 s to [expr round($clen)] s,\
@@ -7302,8 +7301,9 @@ proc Neuroplayer_play {{command ""}} {
 	# them into the interval. The number of clocks should be equal to the 
 	# interval length multiplied by the clock frequency, but in case of 
 	# errors in playback, we print the number we are actually using.
-	Neuroplayer_print "Using $num_messages messages,\
-		including $num_clocks clocks." verbose
+	Neuroplayer_print "Interval $config(play_time) s to\
+		[expr $config(play_time)+$info(play_interval_copy)] s,\
+		using $num_messages messages, including $num_clocks clocks." verbose
 
 	# Clear the Neuroplayer graphs in preparation for new data. Do  not clear the
 	# display, because we want to refresh the display only when we have the new
@@ -8101,9 +8101,9 @@ proc Neuroplayer_video_seek {datetime} {
 		return "none 0 0 0 0 0 0"
 	}
 
-	# Look in our video file cache to see if the start and end of the 
-	# requested interval is contained in a video we have already read
-	# from the video directory and assessed previously.
+	# Look in our video file cache to see if the start of the requested interval
+	# is contained in a video we have already read from the video directory and
+	# assessed previously.
 	set vf ""
 	foreach entry $info(video_cache) {
 		scan $entry %s%d%f%f%d%d%f fn vtime vlen clen width height framerate
@@ -8139,9 +8139,7 @@ proc Neuroplayer_video_seek {datetime} {
 		}
 		
 		# If we still have no file return null values.
-		if {$vf == ""} {
-			return "none 0 0 0 0 0 0"
-		}
+		if {$vf == ""} {return "none 0 0 0 0 0 0"}
 
 		# Calculate the actual video file length.
 		set vfi [Neuroplayer_video_info $vf]
@@ -8160,25 +8158,21 @@ proc Neuroplayer_video_seek {datetime} {
 			set clen [format %.0f [expr floor($vlen)]]
 		}
 		
+		# If the correct span of the video does not contain our requested
+		# video time, we have failed to find a file.
+		if {$vtime + $clen <= $datetime} {return "none 0 0 0 0 0 0"}
+		
 		# Add the video to our cache.
 		lappend info(video_cache) "$vf $vtime $vlen $clen $width $height $framerate"
 		if {[llength $info(video_cache)] > $info(max_video_files)} {
 			set info(video_cache) [lrange $info(video_cache) 10 end]
 		}
-		
-		# Check that the video file's correct length includes the interval start. If 
-		# not, we return a null result.
-		if {$vtime + $clen - $datetime < 0} {return "none 0 0 0 0 0 0"}
 	}
 
 	# We calculate the time within the video recording that corresponds to the 
 	# sought-after moment in the signal recording. 
-	set vseek [expr $datetime - $vtime]
-	if {$vseek < 0.0} {set vseek 0.0}
-
-	# If verbose flag is set, report which video we are usiong.	
-	Neuroplayer_print "Using [file tail $vf], vseek=$vseek, vlen=$vlen, clen=$clen,\
-		datetime=$datetime\." verbose
+	set vseek [format %.2f [expr $datetime - $vtime]]
+	if {$vseek < 0} {set vseek 0.00}
 
 	# Return the file name, seek position, and file length.
 	return "$vf $vseek $vlen $clen $width $height $framerate"
@@ -8210,8 +8204,10 @@ proc Neuroplayer_video_play {datetime length} {
 	# end time, that we can queue up to present the entire "length" seconds
 	# starting at "datetime" in the record.
 	set missing $length
+	set previous_missing $missing
 	set vpos $datetime
 	set vfl [list]
+	set counter 0
 	
 	while {$missing > 0} {
 		# Seek the interval in the video directory and extract the file name,
@@ -8222,11 +8218,12 @@ proc Neuroplayer_video_play {datetime length} {
 		# to the video length.
 		set result [Neuroplayer_video_seek $vpos]
 		scan $result %s%f%f%f%d%d%f vf start_s vlen clen width height framerate
-	
+
 		# If we have no file containing time vpos, print error message and
 		# give up.
 		if {$vf == "none"} {
-			Neuroplayer_print "ERROR: No video containing time $vpos s."
+			Neuroplayer_print "ERROR: Video missing for some or all of\
+				$datetime s to [expr $datetime + $length] s."
 			set info(video_state) "Idle"
 			return ""
 		}
@@ -8236,7 +8233,7 @@ proc Neuroplayer_video_play {datetime length} {
 		# correct time span of the video, we are done. 
 		if {$start_s + $missing <= $clen} {
 			set end_s [format %.2f [expr $start_s + $missing]]
-			set missing "0"
+			set missing "0.00"
 		} else {
 		# If the missing length goes past the end of the correct span of the
 		# file, we take what we can from the correct span and leave the rest to
@@ -8250,11 +8247,12 @@ proc Neuroplayer_video_play {datetime length} {
 		}
 		
 		# Suppose clen is greater than vlen, and the end time of playback has
-		# been placed a significan time after the end of the actual video. For
+		# been placed a significant time after the end of the actual video. For
 		# significance we use the video minimum interval length. In this
 		# situation, we print an error and abort.
 		if {$end_s > $vlen + $info(video_min_interval)} {
-			Neuroplayer_print "ERROR: No video containing time [expr $vpos + $end_s] s."
+			Neuroplayer_print "ERROR: Video missing for some or all of\
+				$datetime s to [expr $datetime + $length] s."
 			set info(video_state) "Idle"
 			return ""
 		}
@@ -8273,10 +8271,16 @@ proc Neuroplayer_video_play {datetime length} {
 		# Append the file, play start time, and video position to our playback
 		# list.
 		lappend vfl "$vf $start_s $end_s $vlen $clen"
-		
-#		Neuroplayer_print "$vpos $start_s $end_s $vlen $clen $missing" green
-#		LWDAQ_update
-#		if {$info(play_control) == "Stop"} {return}
+
+		# If our logic fails to handle correctly a sequence of videos, we will find
+		# that the number of missing seconds does not decrement.
+		if {$missing >= $previous_missing} {
+			Neuroplayer_print "ERROR: Failed to compose video\
+				for $datetime s to [expr $datetime + $length] s."
+			set info(video_state) "Idle"
+			return ""
+		}
+		set previous_missing $missing 
 	}
 
 	# If no video player window is open, we create a new one. 
