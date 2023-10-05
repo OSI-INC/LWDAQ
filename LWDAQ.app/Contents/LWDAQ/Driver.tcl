@@ -397,13 +397,13 @@ proc LWDAQ_byte_poll {sock addr value} {
 #
 proc LWDAQ_login {sock password {error_on_fail 1}} {
 	global LWDAQ_Driver
-	if {$password == "no_password"} {return ""}
+	if {$password == "no_password"} {return "0"}
 	LWDAQ_transmit_message $sock $LWDAQ_Driver(login_id) "$password\x00" 
 	if {![LWDAQ_receive_byte $sock]} {
 		if {$error_on_fail} {error "login failed with \"$password\""}
 		return -1
 	}
-	return ""
+	return "1"
 }
 
 #
