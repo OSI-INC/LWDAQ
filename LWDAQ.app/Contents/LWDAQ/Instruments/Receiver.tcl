@@ -82,8 +82,8 @@ proc LWDAQ_init_Receiver {} {
 	set info(errors_for_stop) 10
 	set info(clock_frequency) 128
 	set info(max_block_reads) 100
-	set info(min_messages_per_clock) 1
-	set info(messages_per_clock) 1
+	set info(min_msg_per_clock) 1
+	set info(msg_per_clock) 1
 	set info(min_clocks) 32
 	set info(empty_fraction) 0.5
 	set info(min_time_fetch) 0.2
@@ -103,6 +103,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(activity_rows) 32
 	set info(aux_messages) ""
 	set info(set_size) "16"
+	set info(loop_on_error) "0"
 
 	set info(buffer_image) "_receiver_buffer_image_"
 	catch {lwdaq_image_destroy $info(buffer_image)}
@@ -268,7 +269,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		}
 		
 		if {$num_errors > 0} {
-			set info(control) "Stop"
+			if {!$info(loop_on_error)} {set info(control) "Stop"}
 			error "Encountered $num_errors errors in data interval."
 		}		
 	} error_result]} {
@@ -479,7 +480,7 @@ proc LWDAQ_reset_Receiver {} {
 		set info(acquire_end_ms) [clock milliseconds]
 		
 		# We reset the number of messages per clock.
-		set info(messages_per_clock) $info(min_messages_per_clock)
+		set info(msg_per_clock) $info(min_msg_per_clock)
 
 		# Notification to user.		
 		LWDAQ_print $info(text) "done."
@@ -703,7 +704,7 @@ proc LWDAQ_daq_Receiver {} {
 				# to download from the data receiver.			
 				set block_length [expr $message_length \
 					* round( $time_fetch * $info(clock_frequency) ) \
-					* $info(messages_per_clock)]
+					* $info(msg_per_clock)]
 			}
 				
 			# We are going to measure how long it takes to transfer the block 
@@ -804,16 +805,16 @@ proc LWDAQ_daq_Receiver {} {
 			
 			# Adjust the number of messages per clock we expect in our next
 			# download.
-			set saved_messages_per_clock $info(messages_per_clock)
+			set saved_msg_per_clock $info(msg_per_clock)
 			if {$num_new_clocks > 1} {
-				set info(messages_per_clock) [expr \
+				set info(msg_per_clock) [expr \
 					round( 1.0 * $block_length / $message_length / $num_new_clocks )]
 			}
-			if {$info(messages_per_clock) < $info(min_messages_per_clock)} {
-				set info(messages_per_clock) $info(min_messages_per_clock)
+			if {$info(msg_per_clock) < $info(min_msg_per_clock)} {
+				set info(msg_per_clock) $info(min_msg_per_clock)
 			}
-			if {$info(messages_per_clock) > 2 * $saved_messages_per_clock} {
-				set info(messages_per_clock) [expr 2 * $saved_messages_per_clock]
+			if {$info(msg_per_clock) > 2 * $saved_msg_per_clock} {
+				set info(msg_per_clock) [expr 2 * $saved_msg_per_clock]
 			}
 			
 			# Adjust the acquire time using the number of new clock messages and
@@ -899,8 +900,8 @@ proc LWDAQ_daq_Receiver {} {
 		# messages we expect per clock to its minimum, and if the socket is still
 		# open, we close it.
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
-		set info(messages_per_clock) $info(min_messages_per_clock)
-		set info(control) "Stop"
+		set info(msg_per_clock) $info(min_msg_per_clock)
+		if {!$info(loop_on_error)} {set info(control) "Stop"}
 		return "ERROR: $error_result"
 	}
 	
