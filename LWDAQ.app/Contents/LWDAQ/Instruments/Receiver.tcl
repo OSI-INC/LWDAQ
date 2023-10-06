@@ -40,22 +40,22 @@ proc LWDAQ_init_Receiver {} {
 	set info(window) [string tolower .$info(name)]
 	set info(text) $info(window).text
 	set info(photo) [string tolower $info(name)\_photo]
-	set info(counter) 0 
-	set info(zoom) 1
-	set info(daq_extended) 0
-	set info(delete_old_images) 1
-	set info(file_use_daq_bounds) 0
-	set info(daq_image_width) 500
-	set info(daq_image_height) 300
-	set info(daq_buffer_width) 1000
-	set info(daq_image_left) -1
-	set info(daq_image_right) -1
-	set info(daq_image_top) 0
-	set info(daq_image_bottom) -1
-	set info(daq_device_type) 3
+	set info(counter) "0" 
+	set info(zoom) "1"
+	set info(daq_extended) "0"
+	set info(delete_old_images) "1"
+	set info(file_use_daq_bounds) "0"
+	set info(daq_image_width) "500"
+	set info(daq_image_height) "300"
+	set info(daq_buffer_width) "1000"
+	set info(daq_image_left) "-1"
+	set info(daq_image_right) "-1"
+	set info(daq_image_top) "0"
+	set info(daq_image_bottom) "-1"
+	set info(daq_device_type) "3"
 	set info(daq_password) "no_password"
-	set info(daq_block_cntr) 0
-	set info(daq_fifo_unit) 512
+	set info(daq_block_cntr) "0"
+	set info(daq_fifo_unit) "512"
 	set info(daq_select_ms) "1.0"
 	set info(verbose_description) \
 		"{Channel Number} \
@@ -64,12 +64,12 @@ proc LWDAQ_init_Receiver {} {
 		{Standard Deviation} "
 	set info(timeout) 0
 	set info(transmit_file_name) "./LWDAQ.tcl"
-	set info(max_sample) 65535
-	set info(min_sample) 0
+	set info(max_sample) "65535"
+	set info(min_sample) "0"
 	set info(display_range) [expr $info(max_sample) - $info(min_sample) + 1]
 	set info(display_offset) $info(min_sample)
 	set info(display_mode) "SP"
-	set info(core_message_length) 4
+	set info(core_message_length) "4"
 	set info(upload_cmd) "00D0"
 	set info(reset_cmd) "0081"
 	set info(sel_ch_cmd) "84"
@@ -80,28 +80,28 @@ proc LWDAQ_init_Receiver {} {
 	set info(config_size) "64"
 	set info(channel_activity) ""
 	set info(activity_threshold) "10"
-	set info(errors_for_stop) 10
-	set info(clock_frequency) 128
-	set info(max_block_reads) 100
-	set info(min_msg_per_clock) 1
-	set info(msg_per_clock) 1
-	set info(min_clocks) 32
-	set info(empty_fraction) 0.5
-	set info(min_time_fetch) 0.2
-	set info(max_time_fetch) 2.0
-	set info(acquire_end_ms) 0
+	set info(errors_for_stop) "10"
+	set info(clock_frequency) "128"
+	set info(max_block_reads) "20"
+	set info(min_msg_per_clock) "1"
+	set info(msg_per_clock) "1"
+	set info(min_clocks) "32"
+	set info(empty_fraction) "0.5"
+	set info(min_time_fetch) "0.2"
+	set info(max_time_fetch) "2.0"
+	set info(acquire_end_ms) "0"
 	set info(payload_options) "0 2 16"
-	set info(purge_duplicates) 1
-	set info(glitch_threshold) 0
+	set info(purge_duplicates) "1"
+	set info(glitch_threshold) "0?"
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
-	set info(fv_range) 30
-	set info(clock_id) 0
-	set info(show_errors) 0
-	set info(show_messages) 0
-	set info(min_id) 0
-	set info(max_id) 255
-	set info(activity_rows) 32
+	set info(fv_range) "30"
+	set info(clock_id) "0"
+	set info(show_errors) "0"
+	set info(show_messages) "0"
+	set info(min_id) "0"
+	set info(max_id) "255"
+	set info(activity_rows) "32"
 	set info(aux_messages) ""
 	set info(set_size) "16"
 	set info(loop_on_error) "0"
@@ -115,18 +115,18 @@ proc LWDAQ_init_Receiver {} {
 	# instrument window. No config array variables can be set in the
 	# LWDAQ_open_Instrument procedure
 	set config(image_source) "daq"
-	set config(file_name) ./Images/$info(name)\*
-	set config(memory_name) lwdaq_image_1
-	set config(daq_ip_addr) 10.0.0.37
-	set config(daq_driver_socket) 1
-	set config(daq_mux_socket) 2
+	set config(file_name) "./Images/$info(name)\*"
+	set config(memory_name) "lwdaq_image_1"
+	set config(daq_ip_addr) "10.0.0.37"
+	set config(daq_driver_socket) "1"
+	set config(daq_mux_socket) "2"
 	set config(daq_channels) "*"
-	set config(analysis_enable) 1
+	set config(analysis_enable) "1"
 	set config(analysis_channels) "*"
-	set config(intensify) none
-	set config(verbose_result) 0
-	set config(daq_num_clocks) 128
-	set config(payload_length) 0
+	set config(intensify) "none"
+	set config(verbose_result) "0"
+	set config(daq_num_clocks) "128"
+	set config(payload_length) "0"
 
 	return ""
 }
@@ -277,7 +277,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
 				set info(control) "Stop"
 			}
-			error "Data corrupted, timestamp errors."
+			error "Data corrupted, timestamp errors found by analysis."
 		}		
 	} error_result]} {
 		return "ERROR: $error_result"
