@@ -56,6 +56,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(daq_password) "no_password"
 	set info(daq_block_cntr) 0
 	set info(daq_fifo_unit) 512
+	set info(daq_select_ms) "1.0"
 	set info(verbose_description) \
 		"{Channel Number} \
 		{Number of Samples Recorded} \
@@ -605,22 +606,21 @@ proc LWDAQ_controls_Receiver {} {
 # LWDAQ_daq_Receiver reads data from a data device. It fetches the data in
 # blocks, and opens and closes a socket to the driver for each block. Although
 # opening and closing sockets introduces a delay into the data acquisition, it
-# allows another LWDAQ process to use the same LWDAQ driver in parallel, as may
-# be required when we have two data receivers running on the same LWDAQ Driver,
-# or a single data receiver and two animal location trackers, or a spectrometer.
-# Some receivers provide a register that gives the number of messages available
-# for download in its memory. But no receiver built before 2021 provides such a
-# register, so there is no way to determine the number of messages available for
-# download. For such receivers, the LWDAQ_daq_Receiver routine estimates the
-# number of messages available using aquire_end_ms, which it updates after every
-# block download to be equal to or greater than the millisecond absolute time of
-# the last clock message in the block. By subtracting the end time from the
-# current time, the routine obtains an estimate of the length of time spanned by
-# the messages available in the data receiver. The routine also maintains an
-# estimate of the number of messages per clock message in the recording. It
-# multiplies this ratio by the available time and the clock frequency to get its
-# estimate of the number of messages avaialable in the data
-# receiver. 
+# allows another LWDAQ process to use the same LWDAQ driver in parallel. Some
+# receivers provide a register that gives the number of messages available for
+# download in its memory. In the absence of such a register, there is no way to
+# determine the number of messages available for download, so this routine
+# estimates the number of messages available using aquire_end_ms, which it
+# updates after every block download to be equal to or greater than the
+# millisecond absolute time of the last clock message in the block. By
+# subtracting the end time from the current time, the routine obtains an
+# estimate of the length of time spanned by the messages available in the data
+# receiver. The routine also maintains an estimate of the number of messages per
+# clock message in the recording. It multiplies this ratio by the available time
+# and the clock frequency to get its estimate of the number of messages
+# avaialable in the data receiver. The routine reports errors with the key
+# word "corrupted" to indicate an error that merits resetting the data receiver.
+# but the routine does not reset the data receiver itself.
 #
 proc LWDAQ_daq_Receiver {} {
 	global LWDAQ_Driver LWDAQ_Info
@@ -670,13 +670,11 @@ proc LWDAQ_daq_Receiver {} {
 			set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 			LWDAQ_login $sock $info(daq_password)
 	
-			# Select the data receiver for communication within the LWDAQ.
+			# Set the device type, select a driver and multiplexer socket. Wait for
+			# a short time so the cables can settle.
 			LWDAQ_set_device_type $sock $info(daq_device_type)
 			LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 			
-			# Configure the data receiver for data download.
-			LWDAQ_transmit_command_hex $sock $info(upload_cmd)
-
 			# If we have a fifo block counter in the receiver, read the number
 			# of bytes available.
 			if {$info(daq_block_cntr)} {
@@ -720,10 +718,16 @@ proc LWDAQ_daq_Receiver {} {
 			LWDAQ_wait_for_driver $sock
 			set block_start_ms [clock milliseconds]
 
+			# Configure the data receiver for data download.
+			LWDAQ_transmit_command_hex $sock $info(upload_cmd)
+
 			# Transfer bytes from receiver to the driver.
 			LWDAQ_set_data_addr $sock 0
 			LWDAQ_set_repeat_counter $sock [expr $block_length - 1]			
 			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
+			
+			# Move data receiver out of upload state.
+			LWDAQ_wake $sock
 			
 			# Wait for the driver to complete the transfer. If we have asked for
 			# too much data, we will get a TCPIP timeout. This error occurs when
@@ -780,7 +784,7 @@ proc LWDAQ_daq_Receiver {} {
 			# If we see errors in the new data, we throw away the data we just
 			# downloaded, close the socket, and abandon this acquisition.
 			if {$num_errors > 0} {	
-				error "Data corrupted, found $num_errors errors, try resetting receiver."
+				error "Data corrupted, found $num_errors errors."
 			}
 			
 			# If purge_duplicates is set, we remove duplicate messages from the 
@@ -855,7 +859,7 @@ proc LWDAQ_daq_Receiver {} {
 					[expr $info(daq_buffer_width) * ($info(daq_buffer_width) - 1)]} {
 				set start_index 0
 				set end_index [expr $num_messages - 1]
-				error "Buffer overflow, too many messages per interval."
+				error "Data corrupted, message buffer overflow."
 			}
 			
 			# Append the new messages to buffer image. 
@@ -870,14 +874,14 @@ proc LWDAQ_daq_Receiver {} {
 			# If we have too many errors in the message buffer, generate an error
 			# and return the entire message buffer as data.
 			if {$num_errors > $info(errors_for_stop)} {
-				error "Data corrupted, found $num_errors errors in message buffer."
+				error "Data corrupted, found $num_errors errors."
 			}
 
 			# Check the block counter to see if we have made too many attempts
 			# to get our data. If so, abandon acquisition.
 			incr block_counter
 			if {$block_counter > $info(max_block_reads)} {
-				error "Acquisition failure, failed to accumulate clock messages."
+				error "Data corrupted, failed to accumulate clock messages."
 			}
 			
 			# Disable data upload from data receiver and close socket.

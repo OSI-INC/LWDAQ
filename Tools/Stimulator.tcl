@@ -26,7 +26,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.9"
+	LWDAQ_tool_init "Stimulator" "3.10"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -429,8 +429,8 @@ proc Stimulator_xoff {n} {
 
 #
 # Stimulator_identify requests a identifying messages from all devices. It uses
-# the data acquisition configuration of the first device in our list, but applies
-# the multicast identifier to reach all devices.
+# the data acquisition configuration of the first device in our list, but
+# applies the multicast identifier to reach all devices.
 #
 proc Stimulator_identify {} {
 	upvar #0 Stimulator_config config
@@ -471,9 +471,8 @@ proc Stimulator_all {action} {
 
 	foreach n $info(dev_list) {
 		if {$info(dev$n\_id) != "*"} {
-			Stimulator_$action $n
+			LWDAQ_post [list Stimulator_$action $n]
 		}
-		LWDAQ_wait_seconds $config(spacing_delay_cmd)
 	}
 
 	return ""
@@ -1212,6 +1211,7 @@ proc Stimulator_open {} {
 	pack $f.neuroplayer -side left -expand 1
 
 	button $f.receiver -text "Receiver" -command {
+		set LWDAQ_config_Receiver(analysis_enable) 1
 		LWDAQ_post "LWDAQ_open Receiver"
 	}
 	pack $f.receiver -side left -expand 1

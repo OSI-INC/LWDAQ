@@ -1032,10 +1032,15 @@ proc Neurorecorder_open {} {
 	}
 	
 	button $f.signals -text "Receiver" -command {
-		LWDAQ_open Receiver
 		set LWDAQ_config_Receiver(analysis_enable) 1
+		LWDAQ_post "LWDAQ_open Receiver"
 	}
 	pack $f.signals -side left -expand yes
+
+	button $f.stimulator -text "Stimulator" -command {
+		LWDAQ_run_tool Stimulator
+	}
+	pack $f.stimulator -side left -expand yes
 
 	button $f.conf -text "Configure" -command "Neurorecorder_configure"
 	pack $f.conf -side left -expand yes
