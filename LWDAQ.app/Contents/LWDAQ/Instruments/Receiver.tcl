@@ -277,7 +277,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
 				set info(control) "Stop"
 			}
-			error "Data corrupted, counted $num_errors errors."
+			error "Data corrupted, timestamp errors."
 		}		
 	} error_result]} {
 		return "ERROR: $error_result"
@@ -786,7 +786,7 @@ proc LWDAQ_daq_Receiver {} {
 			# If we see errors in the new data, we throw away the data we just
 			# downloaded, close the socket, and abandon this acquisition.
 			if {$num_errors > 0} {	
-				error "Data corrupted, found $num_errors errors."
+				error "Data corrupted, clock errors, check payload length."
 			}
 			
 			# If purge_duplicates is set, we remove duplicate messages from the 
@@ -876,7 +876,7 @@ proc LWDAQ_daq_Receiver {} {
 			# If we have too many errors in the message buffer, generate an error
 			# and return the entire message buffer as data.
 			if {$num_errors > $info(errors_for_stop)} {
-				error "Data corrupted, found $num_errors errors."
+				error "Data corrupted, cannot parse messages, check payload length."
 			}
 
 			# Check the block counter to see if we have made too many attempts
@@ -903,10 +903,8 @@ proc LWDAQ_daq_Receiver {} {
 		if {$info(control) == "Loop"} {
 			if {$info(loop_on_error)} {
 				if {[regexp "corrupted" $error_result]} {
-					LWDAQ_post "LWDAQ_reset_Receiver"
-					return "ERROR: $error_result\
-						Resetting recevier and\
-						continuing acquisition."
+					LWDAQ_print $info(text) "ERROR: $error_result Resetting recevier."
+					LWDAQ_reset_Receiver
 				}
 			} {
 				set info(control) "Stop"

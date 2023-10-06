@@ -264,8 +264,6 @@ proc LWDAQ_instrument_analyze {instrument {id ""}} {
 	upvar #0 LWDAQ_info_$instrument info
 	upvar #0 LWDAQ_config_$instrument config
 
-	if {$id == ""} {set id $config(memory_name)}
-
 	if {![string is integer -strict $config(analysis_enable)]} {
 		set result "ERROR: Expected integer for analysis_enable,\
 			got \"$config(analysis_enable)\"."
@@ -281,10 +279,16 @@ proc LWDAQ_instrument_analyze {instrument {id ""}} {
 			lwdaq_config -text_name $info(text) -photo_name $info(photo)
 			set result [LWDAQ_analysis_$info(name) $config(memory_name)]
 			if {![LWDAQ_is_error_result $result]} {
-				set result "$id $result"
+				if {$id != ""} {
+					set result "$id $result"
+				} {
+					set result "$config(memory_name) $result"
+				}
 			} {
-				set result [string replace $result end end]
-				set result "$result on $id\."			
+				if {$id != ""} {
+					set result [string replace $result end end]
+					set result "$result on $id\."
+				}			
 			}
 		} error_report]} {
 			set result "ERROR: $error_report"
@@ -403,7 +407,7 @@ proc LWDAQ_acquire {instrument} {
 				($error_counter < $LWDAQ_Info(max_daq_attempts)) \
 				&& !$LWDAQ_Info(reset)} {
 			if {$info(daq_extended) && \
-					[info commands LWDAQ_extended_$info(name)] != ""} {
+				([info commands LWDAQ_extended_$info(name)] != "")} {
 				set daq_result [LWDAQ_extended_$info(name)]
 			} {
 				set daq_result [LWDAQ_daq_$info(name)]
@@ -411,7 +415,9 @@ proc LWDAQ_acquire {instrument} {
 			if {[LWDAQ_is_error_result $daq_result]} {
 				incr error_counter
 				incr LWDAQ_Info(num_daq_errors)
-				if {[winfo exists $info(window)]} {$info(state_label) config -fg red} 
+				if {[winfo exists $info(window)]} {
+					$info(state_label) config -fg red
+				} 
 				LWDAQ_random_wait_ms 0 $LWDAQ_Info(daq_wait_ms)
 			} {
 				set success 1
