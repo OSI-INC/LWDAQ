@@ -92,7 +92,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(acquire_end_ms) "0"
 	set info(payload_options) "0 2 16"
 	set info(purge_duplicates) "1"
-	set info(glitch_threshold) "0?"
+	set info(glitch_threshold) "0"
 	set info(receiver_firmware) "?"
 	set info(receiver_type) "?"
 	set info(fv_range) "30"
