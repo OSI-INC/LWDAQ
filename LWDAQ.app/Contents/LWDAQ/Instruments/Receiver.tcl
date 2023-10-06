@@ -268,9 +268,13 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			LWDAQ_print $info(text) $raw_data
 		}
 		
+		# With an excessive number of errors, generate an execution error. If
+		# we are looping, and the loop_on_error flag is not set, stop looping.
 		if {$num_errors > 0} {
-			if {!$info(loop_on_error)} {set info(control) "Stop"}
-			error "Encountered $num_errors errors in data interval."
+			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
+				set info(control) "Stop"
+			}
+			error "Data corrupted, counted $num_errors errors."
 		}		
 	} error_result]} {
 		return "ERROR: $error_result"
@@ -774,22 +778,9 @@ proc LWDAQ_daq_Receiver {} {
 			}
 				
 			# If we see errors in the new data, we throw away the data we just
-			# downloaded, close the socket, abandon this acquisition, and
-			# generate an error. One likely source of errors the wrong value for
-			# payload length, so we check to see if one of the other possible
-			# payload lengths will reduce the number of errors to zero, and
-			# suggest this value in our error message should it exist.
+			# downloaded, close the socket, and abandon this acquisition.
 			if {$num_errors > 0} {	
-				foreach pl $info(payload_options) {
-					scan [lwdaq_receiver $info(scratch_image) \
-						"-payload $pl clocks"] %d%d%d ne nc nm
-					if {$ne == 0} {break}
-				}
-				if {$ne == 0} {
-					error "Bad payload length \"$config(payload_length)\", try \"$pl\"."
-				} {
-					error "Corrupted data, try resetting receiver."
-				}
+				error "Data corrupted, found $num_errors errors, try resetting receiver."
 			}
 			
 			# If purge_duplicates is set, we remove duplicate messages from the 
@@ -879,14 +870,14 @@ proc LWDAQ_daq_Receiver {} {
 			# If we have too many errors in the message buffer, generate an error
 			# and return the entire message buffer as data.
 			if {$num_errors > $info(errors_for_stop)} {
-				error "Data contains more than $info(errors_for_stop) errors."
+				error "Data corrupted, found $num_errors errors in message buffer."
 			}
 
 			# Check the block counter to see if we have made too many attempts
 			# to get our data. If so, abandon acquisition.
 			incr block_counter
 			if {$block_counter > $info(max_block_reads)} {
-				error "Failed to accumulate clock messages."
+				error "Acquisition failure, failed to accumulate clock messages."
 			}
 			
 			# Disable data upload from data receiver and close socket.

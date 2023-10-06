@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "163"
+	LWDAQ_tool_init "Neurorecorder" "164"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -891,17 +891,29 @@ proc Neurorecorder_record {{command ""}} {
 		# process to the end of the event queue because our recovery is not
 		# urgent.
 		if {[LWDAQ_is_error_result $daq_result]} {
+			set print_error_and_reset 0
 			if {($info(recorder_error_time) == 0)} {
-				Neurorecorder_print "$daq_result"
-				LWDAQ_set_bg $info(record_control_label) red
+				set print_error_and_reset 1
 				set info(recorder_error_time) [clock seconds]
 				set info(recorder_message_interval) $info(initial_message_interval)
 			} elseif {[clock seconds] - $info(recorder_error_time) \
 				> $info(recorder_message_interval)} {
-				Neurorecorder_print "$daq_result"
+				set print_error_and_reset 1
 				set info(recorder_message_interval) \
 					[expr $info(recorder_message_interval) \
 					* $info(message_interval_multiplier)]
+			}
+			if {$print_error_and_reset} {
+				LWDAQ_set_bg $info(record_control_label) red
+				Neurorecorder_print "$daq_result"
+				if {[regexp "corrupted" $daq_result]} {
+					Neurorecorder_print "WARNING: Attempting to reset data receiver\
+						and stop corruption."
+					set reset_result [LWDAQ_reset_Receiver]
+					if {[LWDAQ_is_error_result $reset_result]} {
+						LWDAQ_print "ERROR: $reset_result"
+					}
+				}
 			}
 			LWDAQ_post Neurorecorder_record end
 			return ""
