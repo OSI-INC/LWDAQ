@@ -271,6 +271,8 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		
 		# With an excessive number of errors, generate an execution error. If
 		# we are looping, and the loop_on_error flag is not set, stop looping.
+		# We use the keyword "corrupted" in our error message, so indicate a 
+		# problem other than a communication failre.
 		if {$num_errors > 0} {
 			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
 				set info(control) "Stop"
@@ -618,9 +620,9 @@ proc LWDAQ_controls_Receiver {} {
 # receiver. The routine also maintains an estimate of the number of messages per
 # clock message in the recording. It multiplies this ratio by the available time
 # and the clock frequency to get its estimate of the number of messages
-# avaialable in the data receiver. The routine reports errors with the key
-# word "corrupted" to indicate an error that merits resetting the data receiver.
-# but the routine does not reset the data receiver itself.
+# avaialable in the data receiver. The routine reports errors with the key word
+# "corrupted" to indicate an error that merits resetting the data receiver. but
+# the routine does not reset the data receiver itself.
 #
 proc LWDAQ_daq_Receiver {} {
 	global LWDAQ_Driver LWDAQ_Info
@@ -889,14 +891,27 @@ proc LWDAQ_daq_Receiver {} {
 			LWDAQ_socket_close $sock
 		}
 	} error_result]} { 
-		# To get here, we have encountered an error that causes us to abandon our
-		# acquisition. We don't attempt to reset the data receiver, because the 
-		# error could be a communication failure. But we do reset the number of
-		# messages we expect per clock to its minimum, and if the socket is still
-		# open, we close it.
+		# To get here, we have encountered an error that causes us to abandon
+		# our acquisition. We reset the number of messages we expect per clock
+		# to its minimum, and if the socket is still open, we close it. We will
+		# not reset the data receiver unless we are looping, and even then, only
+		# if the loop_on_error flag is set and the error contains the key word
+		# "corrupted". If we are looping and this flag is not set, we will stop
+		# looping.
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		set info(msg_per_clock) $info(min_msg_per_clock)
-		if {!$info(loop_on_error)} {set info(control) "Stop"}
+		if {$info(control) == "Loop"} {
+			if {$info(loop_on_error)} {
+				if {[regexp "corrupted" $error_result]} {
+					LWDAQ_post "LWDAQ_reset_Receiver"
+					return "ERROR: $error_result\
+						Resetting recevier and\
+						continuing acquisition."
+				}
+			} {
+				set info(control) "Stop"
+			}
+		}
 		return "ERROR: $error_result"
 	}
 	

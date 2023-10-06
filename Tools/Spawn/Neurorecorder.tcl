@@ -870,7 +870,7 @@ proc Neurorecorder_record {{command ""}} {
 		if {![winfo exists ".receiver"]} {
 			set iconfig(analysis_enable) 0
 		}
-	
+		
 		# Download a block of messages from the data receiver into a LWDAQ
 		# image, the name of which is $iconfig(memory_name). The Receiver
 		# Instrument returns a string that describes the data block, or reports
