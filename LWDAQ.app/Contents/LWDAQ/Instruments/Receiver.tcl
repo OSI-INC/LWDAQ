@@ -54,7 +54,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(daq_image_bottom) "-1"
 	set info(daq_device_type) "3"
 	set info(daq_password) "no_password"
-	set info(daq_block_cntr) "0"
+	set info(daq_avail_cntr) "0"
 	set info(daq_fifo_unit) "512"
 	set info(daq_select_ms) "1.0"
 	set info(verbose_description) \
@@ -374,7 +374,7 @@ proc LWDAQ_reset_Receiver {} {
 				0 {
 					set info(receiver_type) "A3018"
 					set config(payload_length) 0
-					set info(daq_block_cntr) 0
+					set info(daq_avail_cntr) 0
 					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
@@ -382,7 +382,7 @@ proc LWDAQ_reset_Receiver {} {
 				1 {
 					set info(receiver_type) "A3027"
 					set config(payload_length) 0
-					set info(daq_block_cntr) 0
+					set info(daq_avail_cntr) 0
 					set channel_select_available 0
 					set send_all_sets_cmd 1
 					set info(purge_duplicates) 1
@@ -390,7 +390,7 @@ proc LWDAQ_reset_Receiver {} {
 				2 {
 					set info(receiver_type) "A3032"
 					set config(payload_length) 16
-					set info(daq_block_cntr) 0
+					set info(daq_avail_cntr) 0
 					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
@@ -398,7 +398,7 @@ proc LWDAQ_reset_Receiver {} {
 				3 {
 					set info(receiver_type) "A3038"
 					set config(payload_length) 16
-					set info(daq_block_cntr) 1
+					set info(daq_avail_cntr) 1
 					set channel_select_available 1
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
@@ -406,7 +406,7 @@ proc LWDAQ_reset_Receiver {} {
 				4  {
 					set info(receiver_type) "A3042"
 					set config(payload_length) 2
-					set info(daq_block_cntr) 1
+					set info(daq_avail_cntr) 1
 					set channel_select_available 1
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 1
@@ -414,7 +414,7 @@ proc LWDAQ_reset_Receiver {} {
 				default {
 					set info(receiver_type) "?"
 					set config(payload_length) 0
-					set info(daq_block_cntr) 0
+					set info(daq_avail_cntr) 0
 					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
@@ -679,7 +679,7 @@ proc LWDAQ_daq_Receiver {} {
 			
 			# If we have a fifo block counter in the receiver, read the number
 			# of bytes available.
-			if {$info(daq_block_cntr)} {
+			if {$info(daq_avail_cntr)} {
 				set ac [expr [LWDAQ_byte_read $sock $LWDAQ_Driver(fifo_av_addr)] & 0xFF]
 				set block_length [expr \
 					($info(daq_fifo_unit) / $message_length) * $message_length * $ac \
@@ -695,7 +695,7 @@ proc LWDAQ_daq_Receiver {} {
 			# update our acquire time, allows us to overcome a systematic error
 			# in our acquire time estimate, in which we think we have advanced
 			# farther in the data receiver buffer than is actually the case.
-			if {!$info(daq_block_cntr)} {
+			if {!$info(daq_avail_cntr)} {
 				set time_fetch [expr 0.001 * ([clock milliseconds] - $info(acquire_end_ms))]
 				if {$time_fetch < $info(min_time_fetch)} {
 					set time_fetch $info(min_time_fetch)
@@ -728,7 +728,7 @@ proc LWDAQ_daq_Receiver {} {
 			LWDAQ_set_repeat_counter $sock [expr $block_length - 1]			
 			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
 			
-			# Move data receiver out of upload state.
+			# Move data receiver out of download state.
 			LWDAQ_wake $sock
 			
 			# Wait for the driver to complete the transfer. If we have asked for
@@ -835,7 +835,7 @@ proc LWDAQ_daq_Receiver {} {
 			# acquire time suggests. At that point, we will reset the acquire
 			# time to the current time because we detect the empty buffer with
 			# the block transfer time.
-			if {!$info(daq_block_cntr)} {
+			if {!$info(daq_avail_cntr)} {
 				set clock_ms [clock milliseconds]
 				set acquired_ms [expr round( \
 					1000.0 * ($num_new_clocks + 1) / $info(clock_frequency) )]

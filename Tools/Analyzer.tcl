@@ -50,6 +50,10 @@
 #
 # Version 23: Correct A2025 to A3025.
 #
+# Version 24: Add A3086A-HP and A3086-HP for high-power laser versions of the
+# D-BCAM. Update existing A3086A and A3086B to A3086A-LP and A3086B-LP for
+# low-power laser versions.
+#
 
 proc Analyzer_init {} {
 	upvar #0 Analyzer_info info
@@ -1102,7 +1106,7 @@ termination yes
 0  39 0 1.8 0  29 increase_with_0480
 0  39 0 1.8 0  29 increase_with_8280
 
-:A3025A A3025B:
+:A3025A-HP A3025B-HP A2086A-HP A2086B-HP:
 loopback yes
 termination yes
 0   0 0 0.0 0   0 increase_with_0000
@@ -1112,7 +1116,7 @@ termination yes
 0  86 0 1.9 0  34 increase_with_0480
 0  86 0 1.9 0  34 increase_with_8280
 
-:A2086A A2086B:
+:A3025A-LP A3025B-LP A2086A-LP A2086B-LP:
 loopback yes
 termination yes
 0   0 0 0.0 0   0 increase_with_0000

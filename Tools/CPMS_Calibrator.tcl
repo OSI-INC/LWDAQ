@@ -27,9 +27,9 @@ proc CPMS_Calibrator_init {} {
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(pose) "4.684 -8.436 447.944 0 0 0"
-	set config(cam_left) "80.9 0.000 0.000 -190.372 0.000 2.000 24.84 0.000" 
-	set config(cam_right) "-80.9 0.000 0.000 212.757 1.2 2.000 24.7 0.000" 
-	set config(object) [list "sphere 0 0 0 0 0 0 34.72"]
+	set config(cam_left) "12.675 39.312 1.1 0.0 0.0 2 26.0 0.0" 
+	set config(cam_right) "12.675 -39.312 1.1 0.0 0.0 2 26.0 3141.6" 
+	set config(object) [list "sphere 0 0 0 0 0 0 34.072"]
 
 	set config(displacements) "0 -40 -70 -100"
 	set config(scaling) "1 1 10 10 10 0"
