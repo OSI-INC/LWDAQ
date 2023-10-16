@@ -366,7 +366,7 @@ procedure swap_matrix_rows(var M:matrix_type;row_1,row_2:integer);
 	errors of the n+1 vertices are an array of real numbers. We refer to the
 	vertices and real numbers by indices 1..n+1, and to the n coordinates as
 	1..n. But the FPC dynamic arrays support only indices 0..n. So we will
-	create dynamic arrays with zero elements that we don't use.
+	create dynamic arrays with zero-index elements that we don't use.
 }
 type 
 	simplex_vertex_type = array of real;
@@ -374,7 +374,7 @@ type
 		n:integer; {dimensions of the space}
 		vertices:array of simplex_vertex_type; 
 		errors:array of real; 
-		scaling:array of real;
+		scaling:array of real; {sets the size of the simplex in each dimension}
 		duplicate:array of boolean;
 		start_size:real; {length of sides for construction}
 		end_size:real; {length of longest side for convergeance}
@@ -4318,8 +4318,10 @@ begin
 		for j:=1 to n do begin
 			for k:=j+1 to n+1 do begin
 				s:=0;
-				for i:=1 to n do 
-					s:=s+sqr((vertices[j,i]-vertices[k,i])/scaling[i]);
+				for i:=1 to n do begin
+					if scaling[i]<>0 then
+						s:=s+sqr((vertices[j,i]-vertices[k,i])/scaling[i]);
+				end;
 				if s>max then max:=s;
 			end;
 		end;
