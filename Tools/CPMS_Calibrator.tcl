@@ -26,7 +26,6 @@ proc CPMS_Calibrator_init {} {
 	LWDAQ_tool_init "CPMS_Calibrator" "2.1"
 	if {[winfo exists $info(window)]} {return ""}
 
-	set config(pose) "4.684 -8.436 447.944 0 0 0"
 	set config(cam_left) "12.675 39.312 1.1 0.0 0.0 2 26.0 0.0" 
 	set config(mount_left) "92.123 -18.364 -3.450 \
 		83.853 -18.211 -78.940 \
@@ -424,30 +423,8 @@ return ""
 ----------Begin Help----------
 
 The Contactless Position Measurement System (CPMS) Calibrator takes a series of
-silhouette images of the same object moving in a straight line to calibrate a
-pair of stereo Silhouette Cameras (SCAMs). The origin and direction of the locus
-of the calibration object is the "pose", given as x, y, z, rot_x, rot_y, rot_z
-in mm and mrad. The "scaling" is the size of the fitter simplex in each of the
-pose coordinates. The four positions of the object are given by four distances
-along the direction of the locus, in the "displacements" box. 
-
-The compound object being viewed we describe with a list of objects. Here are
-some example lists.
-
-Sphere:
-{sphere 0 0 0 0 0 0 34.72}
-
-Cylinder:
-{cylinder 0 0 0 1 0 0 20 30}
-
-Sphere on Post:
-{sphere 0 0 0 0 0 0 34.72} {cylinder 0 -17.36 0 0 -1 0 19.05 50}
-
-Shaft:
-{shaft 0 0 0 1 0 0 0 -20 20 -20 30 10 36 10 40 12 40 30 60 30 60 39 58 40 0 40}
-			
-Compound:
-{cylinder 0 0 0 1 0 0 33.78 7.24} {cylinder 0 0 0 1 0 0 19.00 -20.0} {cylinder 3.62 16.89 0 0 1 0 4 10}
+silhouette images of the same sphere in various positions as measured by a Coordinate
+Measuring Machine (CMM) and deduces the calibration constants of a pair of Silhouette Cameras (SCAMs). 
 
 
 Kevan Hashemi hashemi@brandeis.edu

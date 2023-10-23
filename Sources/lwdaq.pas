@@ -5073,7 +5073,8 @@ begin
 	if scaling<>'' then begin
 		if word_count(scaling)<>n then begin
 			Tcl_SetReturnString(interp,error_prefix
-				+'Scaling factors do not match coordinates in lwdaq_simplex.');
+				+'Number of scaling factors not equal to number of parameters'
+				+' in lwdaq_simplex.');
 			exit;
 		end;
 		for i:=1 to n do
