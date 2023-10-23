@@ -3488,17 +3488,18 @@ the rotation of the image sensor about the camera axis.</p>
 <p>The modelled object itself we specify with its own string. The first word in
 the string is the object type, such as "sphere", "cylinder", or "shaft". After
 that are mount coordinates of a reference point in the object, the coordinates
-of a vector giving giving the orientation of the object.  x, y, and z axes, and
-finally one or more numbers giving the dimensions of the object. For a sphere,
-the reference point is the sphere center, the orientation is always zero, and
-the only dimension is its diameter. See <i>scam_sphere_from_string</i> in <a
+of a vector giving giving the orientation of the object, and finally one or more
+numbers giving the dimensions of the object. For a sphere, the reference point
+is the sphere center, the orientation is three zeros, and the only dimension is
+its diameter. See <i>scam_sphere_from_string</i> in <a
 href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. For a
 cylinder, the reference point is one end of the axis, the orientation is a unit
 vector pointing along the axis into the cylinder from the reference point, and
-the dimensions are diameter and length. For a shaft, we specify the point at one
-end of the shaft axis, the orienation is the direction of the axis, and the
+the dimensions are diameter followed by length,
+<i>scam_cylinder_from_string</i>.  For a shaft, we specify the point at one end
+of the shaft axis, the orienation is the direction of the axis, and the
 dimensions are a sequence of one or more faces. Each face is a diameter and a
-distance along the axis from the shaft.</p>
+distance along the axis from the shaft, see <i>scam_shaft_from_string</i> </p>
 
 <p>If we specify zero for the number of lines, the projection algorithm reverts
 to one where we check every pixel in the silhouette image to see if it should or
@@ -3506,7 +3507,7 @@ should not be included in the modelled silhouette. For one or more lines, the
 projection picks points on the modelled object and joins them up with lines in
 the silhouette image overlay.</p>
 
-<p>When we measure disagreement, the routine counts the number of pixels in the
+<p>The <i>disagreement</i> instruction counts the number of pixels in the
 analysis boundaries for which the image and the overlay disagree about the
 location and extent of the silhouette. After projecting objects onto the
 overlay, the overlay will be blue to represent the presence of the projections.
@@ -3544,7 +3545,7 @@ begin
 	gui_interp_ptr:=interp;
 	lwdaq_scam:=Tcl_Error;
 	camera:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
-	body:='sphere 0 0 1000 50';
+	body:='sphere 0 0 1000 0 0 0 50';
 	
 	if (argc<3) then begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -3604,7 +3605,7 @@ begin
 		threshold:=scam_decode_rule(ip,rule);
 		if spread=0 then disagreement:=scam_disagreement(ip,threshold)
 		else disagreement:=scam_disagreement_spread(ip,threshold,spread);
-		writestr(result,disagreement:fsr:fsd);
+		writestr(result,disagreement:0:1);
 	end;
 	
 	if error_string='' then Tcl_SetReturnString(interp,result)

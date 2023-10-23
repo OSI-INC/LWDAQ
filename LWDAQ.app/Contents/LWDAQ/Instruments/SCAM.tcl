@@ -1,8 +1,6 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
-# Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2021-2023 Kevan Hashemi, Open Source Instruments Inc.
-# Copyright (C) 2006, Rapha‘l Tieulent, Institut de Physique NuclŽaire de Lyon 
-#
+# Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
+
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
@@ -18,17 +16,17 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #
-# BCAM.tcl defines the BCAM instrument.
+# SCAM.tcl defines the SCAM instrument.
 #
 
 #
-# LWDAQ_init_BCAM creates all elements of the BCAM instrument's
+# LWDAQ_init_SCAM creates all elements of the SCAM instrument's
 # config and info arrays.
 #
-proc LWDAQ_init_BCAM {} {
+proc LWDAQ_init_SCAM {} {
 	global LWDAQ_Info LWDAQ_Driver
-	upvar #0 LWDAQ_info_BCAM info
-	upvar #0 LWDAQ_config_BCAM config
+	upvar #0 LWDAQ_info_SCAM info
+	upvar #0 LWDAQ_config_SCAM config
 	array unset config
 	array unset info
 
@@ -36,26 +34,17 @@ proc LWDAQ_init_BCAM {} {
 	# instrument window. The only info variables set in the 
 	# LWDAQ_open_Instrument procedure are those which are checked
 	# only when the instrument window is open.
-	set info(name) "BCAM"
+	set info(name) "SCAM"
 	set info(control) "Idle"
 	set info(window) [string tolower .$info(name)]
 	set info(text) $info(window).text
 	set info(photo) [string tolower $info(name)\_photo]
 	set info(counter) 0 
 	set info(zoom) 1
-	set info(analysis_show_timing) 0
-	set info(analysis_show_pixels) 0
-	set info(analysis_return_bounds) 0
-	set info(analysis_return_intensity) 0
 	set info(daq_extended) 0
 	set info(extended_parameters) "0.6 0.9 0 1"
 	set info(file_use_daq_bounds) 0
-	set info(daq_image_width) 344
-	set info(daq_image_height) 244
-	set info(daq_image_left) 20
-	set info(daq_image_right) [expr $info(daq_image_width) - 1]
-	set info(daq_image_top) 1
-	set info(daq_image_bottom) [expr $info(daq_image_height) - 1]
+	LWDAQ_set_image_sensor ICX424 SCAM
 	set info(daq_wake_ms) 0
 	set info(flash_seconds_max) 1.0
 	set info(flash_seconds_step) 0.000001
@@ -67,25 +56,16 @@ proc LWDAQ_init_BCAM {} {
 	set info(peak_max) 180
 	set info(peak_min) 100
 	set info(file_try_header) 1
-	set info(analysis_pixel_size_um) 10
 	set info(analysis_add_x_um) 0
 	set info(analysis_add_y_um) 0
 	set info(analysis_reference_um) 0
-	set info(daq_device_type) 2
-	set info(daq_source_device_type) 2
-	set info(daq_source_power) 7
+	set info(daq_source_device_type) 1
 	set info(daq_password) "no_password"
 	set info(daq_source_ip_addr) "*"
 	set info(delete_old_images) 1
 	set info(dummy_flash_element) 255
 	set info(dummy_flash_seconds) 0.0
-	set info(verbose_description) \
-			"{Spot Position X (um)} \
-			{Spot Position Y (um) or Line Rotation Anticlockwise (mrad)} \
-			{Number of Pixels Above Threshold in Spot} \
-			{Peak Intensity in Spot} \
-			{Accuracy (um)} \
-			{Threshold (counts)}"
+	set info(verbose_description) "{Disagreement (pixels)}"
 	
 	# All elements of the config array will be displayed in the
 	# instrument window. No config array variables can be set in the
@@ -96,7 +76,7 @@ proc LWDAQ_init_BCAM {} {
 	set config(daq_ip_addr) 10.0.0.37
 	set config(daq_source_driver_socket) 8
 	set config(daq_source_mux_socket) 1
-	set config(daq_source_device_element) "3 4"
+	set config(daq_source_device_element) 1
 	set config(daq_driver_socket) 5
 	set config(daq_mux_socket) 1
 	set config(daq_device_element) 2
@@ -104,8 +84,7 @@ proc LWDAQ_init_BCAM {} {
 	set config(daq_adjust_flash) 0
 	set config(daq_flash_seconds) 0.000010
 	set config(intensify) exact
-	set config(analysis_threshold) "10 #"
-	set config(analysis_num_spots) 2
+	set config(analysis_threshold) "10 %"
 	set config(analysis_enable) 1
 	set config(verbose_result) 0
 
@@ -113,42 +92,24 @@ proc LWDAQ_init_BCAM {} {
 }		
 
 #
-# LWDAQ_analysis_BCAM applies BCAM analysis to an image 
-# in the lwdaq image list. By default, the routine uses the
-# image $config(memory_name).
-proc LWDAQ_analysis_BCAM {{image_name ""}} {
-	upvar #0 LWDAQ_config_BCAM config
-	upvar #0 LWDAQ_info_BCAM info
+# LWDAQ_analysis_SCAM applies SCAM analysis to an image in the lwdaq image list.
+# By default, the routine uses the image $config(memory_name).
+proc LWDAQ_analysis_SCAM {{image_name ""}} {
+	upvar #0 LWDAQ_config_SCAM config
+	upvar #0 LWDAQ_info_SCAM info
 	if {$image_name == ""} {set image_name $config(memory_name)}
-	set l [LWDAQ_split $config(analysis_num_spots)]
-	set num_spots [lindex $l 0]
-	if {$num_spots == ""} {set num_spots 1}
-	set sort_code [lindex $l 1]
-	if {$sort_code == ""} {set sort_code 1}
-	set result [lwdaq_bcam $image_name \
-		-show_timing $info(analysis_show_timing) \
-		-show_pixels $info(analysis_show_pixels) \
-		-num_spots $num_spots \
-		-pixel_size_um $info(analysis_pixel_size_um) \
-		-threshold $config(analysis_threshold) \
-		-analysis_type $config(analysis_enable) \
-		-add_x_um $info(analysis_add_x_um) \
-		-add_y_um $info(analysis_add_y_um) \
-		-reference_um $info(analysis_reference_um) \
-		-sort_code $sort_code \
-		-return_bounds $info(analysis_return_bounds) \
-		-return_intensity $info(analysis_return_intensity)] 
+	set result [lwdaq_scam $image_name disagreement $config(analysis_threshold)] 
 	if {$result == ""} {set result "ERROR: $info(name) analysis failed."}
 	return $result
 }
 
 #
-# LWDAQ_infobuttons_BCAM creates buttons that allow us to configure
-# the BCAM for any of the available image sensors. The general-purpose
+# LWDAQ_infobuttons_SCAM creates buttons that allow us to configure
+# the SCAM for any of the available image sensors. The general-purpose
 # instrument routines will call this procedure when they create the
 # info panel.
 #
-proc LWDAQ_infobuttons_BCAM {f} {
+proc LWDAQ_infobuttons_SCAM {f} {
 	global LWDAQ_Driver
 	
 	# Deduce the info panel window name.
@@ -157,23 +118,19 @@ proc LWDAQ_infobuttons_BCAM {f} {
 	# Make a frame for the sensor buttons.
 	set ff [frame $iw.sensor]
 	pack $ff -side top -fill x
-	label $ff.sl -text "Image Sensors:"
-	pack $ff.sl -side left -expand yes
-	foreach a "TC255 TC237 KAF0400 KAF0261 ICX424 ICX424Q" {
+	label $ff.cl -text "Image Sensors:"
+	pack $ff.cl -side left -expand yes
+	foreach a "ICX424 ICX424Q" {
 		set b [string tolower $a]
-		button $ff.$b -text $a -command "LWDAQ_set_image_sensor $a BCAM"
+		button $ff.$b -text $a -command "LWDAQ_set_image_sensor $a SCAM"
 		pack $ff.$b -side left -expand yes
 	}
-
-	# Make a frame for the source buttons.
-	set ff [frame $iw.source]
-	pack $ff -side top -fill x
 	label $ff.sl -text "Light Sources:"
 	pack $ff.sl -side left -expand yes
-	foreach {a sdt} "LED 1 A-BCAM 2 D-BCAM 6 H-BCAM 6 P-BCAM 2 MULTISOURCE 9" {
+	foreach {a sdt} "LED 1 A-SCAM 6 MULTISOURCE 9" {
 		set b [string tolower $a]
 		button $ff.$b -text $a -command \
-			[list set LWDAQ_info_BCAM(daq_source_device_type) $sdt]
+			[list set LWDAQ_info_SCAM(daq_source_device_type) $sdt]
 		pack $ff.$b -side left -expand yes
 	}
 
@@ -181,17 +138,17 @@ proc LWDAQ_infobuttons_BCAM {f} {
 }
 
 #
-# LWDAQ_daq_BCAM captures an image from the LWDAQ electronics and places
+# LWDAQ_daq_SCAM captures an image from the LWDAQ electronics and places
 # the image in the lwdaq image list. It provides background subtraction by
 # taking a second image while flashing non-existent lasers. It provides
 # automatic exposure adjustment by calling itself until the maximum image
 # intensity lies within peak_min and peak_max. For detailed comments upon
 # the readout of the image sensors, see the LWDAQ_daq_Camera routine.
 #
-proc LWDAQ_daq_BCAM {} {
+proc LWDAQ_daq_SCAM {} {
 	global LWDAQ_Info LWDAQ_Driver
-	upvar #0 LWDAQ_info_BCAM info
-	upvar #0 LWDAQ_config_BCAM config
+	upvar #0 LWDAQ_info_SCAM info
+	upvar #0 LWDAQ_config_SCAM config
 
 	set image_size [expr $info(daq_image_width) * $info(daq_image_height)]
 	if {$config(daq_flash_seconds) > $info(flash_seconds_max)} {
@@ -244,34 +201,12 @@ proc LWDAQ_daq_BCAM {} {
 		}
 
 		# Select the sources one by one and flash them.
-		foreach e $config(daq_source_device_element) {
-			set en [lindex [split $e *] 0]
-			set ff [lindex [split $e *] 1]
-			if {![string is double -strict $ff]} {
-				set ff 1.0
-			}
-			set ft [expr $config(daq_flash_seconds) * $ff]
-			if {$ft > $info(flash_seconds_max)} {
-				set ft $info(flash_seconds_max)
-			}
-			set background_exposure_s [expr $background_exposure_s + $ft]
-			if {$info(daq_source_device_type) == $LWDAQ_Driver(multisource_device)} {
-				LWDAQ_set_multisource_element $sock_2 $en $info(daq_source_power)
-			} {
-				if {![string is integer -strict $en]} {
-					error "invalid source element number \"$en\"\
-						for device type $info(daq_source_device_type)\."
-				}
-				LWDAQ_set_device_element $sock_2 $en
-			}
-			LWDAQ_flash_seconds $sock_2 $ft
-		}
-		
+		LWDAQ_set_device_element $sock_2 $config(daq_source_device_element)	
+		LWDAQ_flash_seconds $sock_2 $config(daq_flash_seconds)
+			
 		# Add the ambient exposure if it's non-zero.
 		if {$info(ambient_exposure_seconds) > 0.0} {
 			LWDAQ_delay_seconds $sock_2 $info(ambient_exposure_seconds)
-			set background_exposure_s [expr $background_exposure_s \
-				+ $info(ambient_exposure_seconds)]
 		}
 		
 		# If two drivers, wait for the second one to finish.
@@ -301,7 +236,7 @@ proc LWDAQ_daq_BCAM {} {
 			LWDAQ_set_driver_mux $sock_2 $config(daq_source_driver_socket) \
 				$config(daq_source_mux_socket)
 			LWDAQ_set_device_type $sock_2 $info(daq_source_device_type)
-			LWDAQ_delay_seconds $sock_2 $background_exposure_s
+			LWDAQ_delay_seconds $sock_2 $config(daq_flash_seconds)
 			if {$sock_1 != $sock_2} {LWDAQ_wait_for_driver $sock_2}
 			LWDAQ_set_driver_mux $sock_1 $config(daq_driver_socket) \
 				$config(daq_mux_socket)
@@ -487,20 +422,20 @@ proc LWDAQ_daq_BCAM {} {
 } 
 
 #
-# LWDAQ_extended_BCAM tries to assign optimal values to peak_max and 
-# peak_min, and adjust the analysis boundaries to enclose the spots within
-# a number of pixels of their centers. You direct the configuration calculations
-# with the extended_parameters string, which contains parameters
-# as a list. The string "0.6 0.9 20 1" sets peak_min to 60% of saturation, 
-# peak_max to 90% of saturation, shrinks the image bounds to 20 pixels around
-# the spot center, and adjusts individual source exposure times. If you don't
-# want a border, specify bounds to be 0 (instead of 20). If you don't want to
-# adjust multiple sources individually, specify 0 for individual_sources.
+# LWDAQ_extended_SCAM tries to assign optimal values to peak_max and peak_min,
+# and adjust the analysis boundaries to enclose the spots within a number of
+# pixels of their centers. You direct the configuration calculations with the
+# extended_parameters string, which contains parameters as a list. The string
+# "0.6 0.9 20 1" sets peak_min to 60% of saturation, peak_max to 90% of
+# saturation, shrinks the image bounds to 20 pixels around the spot center, and
+# adjusts individual source exposure times. If you don't want a border, specify
+# bounds to be 0 (instead of 20). If you don't want to adjust multiple sources
+# individually, specify 0 for individual_sources.
 #
-proc LWDAQ_extended_BCAM {} {
+proc LWDAQ_extended_SCAM {} {
    	global LWDAQ_Info LWDAQ_Driver
-	upvar #0 LWDAQ_info_BCAM info
-	upvar #0 LWDAQ_config_BCAM config
+	upvar #0 LWDAQ_info_SCAM info
+	upvar #0 LWDAQ_config_SCAM config
 
 	# Check extended parameter string to make sure that its elements
 	# are correct, and insert default values if they are absent.
@@ -540,7 +475,7 @@ proc LWDAQ_extended_BCAM {} {
 
 	# Save the data acquisition parameters we will be altering during
 	# extended acquisition. We used the saved values to make sure that
-	# we restore the BCAM Instrument to its former condition at the end
+	# we restore the SCAM Instrument to its former condition at the end
 	# of extended data acquisition, even if we abort with an error.
 	set saved_daf $config(daq_adjust_flash)
 	set saved_dfs $config(daq_flash_seconds)
@@ -553,7 +488,7 @@ proc LWDAQ_extended_BCAM {} {
 	set config(daq_adjust_flash) 0
 	set config(daq_source_driver_socket) 0
 	set config(daq_flash_seconds) 0
-	set image_name [LWDAQ_daq_BCAM]
+	set image_name [LWDAQ_daq_SCAM]
 	set config(daq_flash_seconds) $saved_dfs
 	set config(daq_source_driver_socket) $saved_dsds
 	set config(daq_adjust_flash) $saved_daf
@@ -572,7 +507,7 @@ proc LWDAQ_extended_BCAM {} {
 	# saturated pixels.
 	set config(daq_adjust_flash) 0
 	set config(daq_flash_seconds) $info(flash_seconds_max)
-	set image_name [LWDAQ_daq_BCAM]
+	set image_name [LWDAQ_daq_SCAM]
 	set config(daq_flash_seconds) $saved_dfs
 	set config(daq_adjust_flash) $saved_daf
 	
@@ -586,7 +521,7 @@ proc LWDAQ_extended_BCAM {} {
 	LWDAQ_print $info(text) "saturation = $sat"
 
 	# Calculate the maximum and minimum acceptable peak spot
-	# intensities for the BCAM, based upon the background
+	# intensities for the SCAM, based upon the background
 	# and saturated image intensities.
 	set info(peak_max) [expr round(($sat - $bg) * $max_frac + $bg)]
 	LWDAQ_print $info(text) "peak_max = $info(peak_max)"
@@ -604,7 +539,7 @@ proc LWDAQ_extended_BCAM {} {
 			set config(daq_source_device_element) $element_num
 			set config(daq_flash_seconds) $info(flash_seconds_max)
 			set config(daq_adjust_flash) 1
-			set image_name [LWDAQ_daq_BCAM]
+			set image_name [LWDAQ_daq_SCAM]
 			set flash_seconds $config(daq_flash_seconds)
 			set config(daq_adjust_flash) $saved_daf
 			set config(daq_flash_seconds) $saved_dfs
@@ -654,7 +589,7 @@ proc LWDAQ_extended_BCAM {} {
 	# Try out the new parameter with an acquisition with automatic
 	# flash adjustement.
 	set config(daq_adjust_flash) 1
-	set image_name [LWDAQ_daq_BCAM]
+	set image_name [LWDAQ_daq_SCAM]
 	set config(daq_adjust_flash) $saved_daf
 	if {[LWDAQ_is_error_result $image_name]} {return $image_name}	
 
@@ -666,7 +601,7 @@ proc LWDAQ_extended_BCAM {} {
 		# Find the coordinates of the spots in units of
 		# image pixels.
 		set info(analysis_pixel_size_um) 1
-		set result [LWDAQ_analysis_BCAM $image_name]
+		set result [LWDAQ_analysis_SCAM $image_name]
 		set info(analysis_pixel_size_um) $saved_apsu
 		if {[LWDAQ_is_error_result $result]} {return $image_name}	
 
