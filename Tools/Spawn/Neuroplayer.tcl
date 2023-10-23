@@ -51,7 +51,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "166"
+	LWDAQ_tool_init "Neuroplayer" "167"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -7979,7 +7979,7 @@ proc Neuroplayer_video_info {fn} {
 		set height 616
 	}
 
-	return "$width $height $framerate $duration"
+	return [list $width $height $framerate $duration]
 }
 
 #
@@ -8080,7 +8080,7 @@ proc Neuroplayer_video_watchdog {} {
 		} message]} {
 		
 			# Force the Viodeoplayer to close. Terminate the watchdog.
-			Neuroplayer_print "ERROR: $message\. Video playback aborted." verbose
+			Neuroplayer_print "ERROR: $message Video playback aborted." verbose
 			Neuroplayer_video_close
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(video_state) "Idle"
@@ -8140,7 +8140,8 @@ proc Neuroplayer_video_seek {datetime} {
 	# assessed previously.
 	set vf ""
 	foreach entry $info(video_cache) {
-		scan $entry %s%d%f%f%d%d%f fn vtime vlen clen width height framerate
+		set fn [lindex $entry 0]
+		scan [lrange $entry 1 end] %d%f%f%d%d%f vtime vlen clen width height framerate
 		if {($vtime <= $datetime) && ($vtime + $clen > $datetime)} {
 			set vf $fn
 			break
@@ -8197,7 +8198,7 @@ proc Neuroplayer_video_seek {datetime} {
 		if {$vtime + $clen <= $datetime} {return "none 0 0 0 0 0 0"}
 		
 		# Add the video to our cache.
-		lappend info(video_cache) "$vf $vtime $vlen $clen $width $height $framerate"
+		lappend info(video_cache) [list $vf $vtime $vlen $clen $width $height $framerate]
 		if {[llength $info(video_cache)] > $info(max_video_files)} {
 			set info(video_cache) [lrange $info(video_cache) 10 end]
 		}
@@ -8209,7 +8210,7 @@ proc Neuroplayer_video_seek {datetime} {
 	if {$vseek < 0} {set vseek 0.00}
 
 	# Return the file name, seek position, and file length.
-	return "$vf $vseek $vlen $clen $width $height $framerate"
+	return [list $vf $vseek $vlen $clen $width $height $framerate]
 }
 
 #
@@ -8251,7 +8252,8 @@ proc Neuroplayer_video_play {datetime length} {
 		# directory. If there is no next file, the correct length will be equal
 		# to the video length.
 		set result [Neuroplayer_video_seek $vpos]
-		scan $result %s%f%f%f%d%d%f vf start_s vlen clen width height framerate
+		set vf [lindex $result 0]
+		scan [lrange $result 1 end] %f%f%f%d%d%f start_s vlen clen width height framerate
 
 		# If we have no file containing time vpos, print error message and
 		# give up.
@@ -8304,7 +8306,7 @@ proc Neuroplayer_video_play {datetime length} {
 		
 		# Append the file, play start time, and video position to our playback
 		# list.
-		lappend vfl "$vf $start_s $end_s $vlen $clen"
+		lappend vfl [list $vf $start_s $end_s $vlen $clen]
 
 		# If our logic fails to handle correctly a sequence of videos, we will find
 		# that the number of missing seconds does not decrement.
@@ -8363,7 +8365,8 @@ proc Neuroplayer_video_play {datetime length} {
 
 	# Start playing the files that cover our requested interval.
 	foreach pb $vfl {
-		scan $pb %s%f%f%f%f fn start_s end_s vlen clen
+		set fn [lindex $pb 0]
+		scan [lrange $pb 1 end] %f%f%f%f start_s end_s vlen clen
 		puts $info(video_channel) "videoplayer play -file \"$fn\" \
 			-start $start_s -end $end_s -length_s $vlen"
 		Neuroplayer_print "Playing video [file tail $fn],\

@@ -20,7 +20,7 @@ proc Wire_Monitor_init {} {
 	upvar #0 Wire_Monitor_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Wire_Monitor" "1.4"
+	LWDAQ_tool_init "Wire_Monitor" "1.5"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(wps_list) "1"	
@@ -31,7 +31,7 @@ proc Wire_Monitor_init {} {
 	set config(wps1_x) "-1"
 	set config(wps1_y) "-1"
 	set config(ref_z) "-5"
-	set config(wps_calib_addr) "http://www.opensourceinstruments.com/WPS/WPS_Calibrations.txt"
+	set config(wps_calib_addr) "http://www.bndhep.net/Devices/Calibration/WPS_Calibrations.txt"
 	
 	set config(version_list) [list \
 		"WPS1B 0 2 0.05 TC255 None" "WPS2A 1 1 0.02 TC255 A3022" \
