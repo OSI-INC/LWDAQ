@@ -25,10 +25,6 @@
 # processing.
 #
 
-# [17-MAR-23] Videoplayer should detect when live streaming falls behind, which
-# is to say: it needs to know the frame rate and to keep track of time. When the
-# lag exceeds a limit, the streaming or playing should quit and issue an error.
-
 #
 # Videoplayer_init creates the info and config arrays. The config array is
 # available through the Config button but the info array is private. 
@@ -835,6 +831,14 @@ proc Videoplayer_setup {args} {
 		switch $option {
 			"-file" {
 				set config(video_file) $value
+				if {![file exists $value]} {
+					if {![regexp {(V[0-9]{10}\.mp4)} $value]} {
+						Videoplayer_print "ERROR: Cannot find file \"$value\".\
+							Remove spaces from directory name."
+					} else {
+						Videoplayer_print "ERROR: Cannot find file \"$value\"."
+					}
+				}
 			}
 			"-stream" {
 				set config(video_stream) $value
