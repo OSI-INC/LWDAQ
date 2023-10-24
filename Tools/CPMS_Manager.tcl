@@ -23,7 +23,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.0"
+	LWDAQ_tool_init "CPMS_Manager" "1.1"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.283 38.549 4.568 -7.789 1.833 2.000 26.411 0.137" 
@@ -65,16 +65,7 @@ proc CPMS_Manager_init {} {
 	return ""   
 }
 
-proc CPMS_Manager_get_params {} {
-	upvar #0 CPMS_Manager_config config
-	upvar #0 CPMS_Manager_info info
-	
-	set params ""
-	foreach obj $config(objects) {append params "[lrange $obj 1 6] "}
-	return $params
-}
-
-proc CPMS_Manager_go {{params ""}} {
+proc CPMS_Manager_disagreement {params} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
@@ -82,8 +73,6 @@ proc CPMS_Manager_go {{params ""}} {
 		error "Cannot draw CPMS images: no CPMS window open."
 	}
 
-	if {$params == ""} {set params [CPMS_Manager_get_params]}
-	
 	set lc "LC $config(cam_left)"
 	set rc "RC $config(cam_right)"
 	
@@ -113,18 +102,63 @@ proc CPMS_Manager_go {{params ""}} {
 			
 		set params [lrange $params 6 end]
 	}
-	
+
 	return $disagreement
 }
 
-proc CPMS_Manager_altitude {{params ""}} {
+proc CPMS_Manager_get_params {} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+	
+	set params ""
+	foreach obj $config(objects) {append params "[lrange $obj 1 6] "}
+	return $params
+}
+
+proc CPMS_Manager_go {} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+
+	set info(control) "Go"
+	LWDAQ_update
+	
+	set params [CPMS_Manager_get_params]
+	set disagreement [CPMS_Manager_disagreement $params]
+	set result "$params $disagreement"
+	LWDAQ_print $info(text) $result
+	
+	set info(control) "Idle"
+	return 
+}
+
+proc CPMS_Manager_displace {} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+
+	set params [CPMS_Manager_get_params]
+	set obj_num 0
+	set param_num 0
+	foreach {x} $params {
+		set new_x [expr $x + (rand()-0.5)*10.0*[lindex $config(scaling) $param_num]]
+		set new_x [format %.3f $new_x]
+		set obj_index [expr ($param_num % 6) + 1] 
+		lset config(objects) $obj_num $obj_index $new_x
+		incr param_num
+		if {$param_num % 6 == 0} {incr obj_num}
+	}
+	CPMS_Manager_disagreement [CPMS_Manager_get_params]
+	return [CPMS_Manager_get_params]
+} 
+
+proc CPMS_Manager_altitude {params} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
 	if {$config(stop_fit)} {error "Fit aborted by user"}
 	if {![winfo exists $info(window)]} {error "Tool window destroyed"}
-	set count [CPMS_Manager_go "$params"]
-	LWDAQ_update
+	set count [CPMS_Manager_disagreement "$params"]
+	LWDAQ_support
+	
 	return $count
 }
 
@@ -134,6 +168,7 @@ proc CPMS_Manager_fit {} {
 
 	set config(stop_fit) 0
 	set info(state) "Fitting"
+	LWDAQ_update
 	
 	if {[catch {
 		set start_params [CPMS_Manager_get_params]
@@ -162,26 +197,36 @@ proc CPMS_Manager_fit {} {
 		return ""
 	}
 
-	CPMS_Manager_go
+	CPMS_Manager_disagreement [CPMS_Manager_get_params]
 	set info(state) "Idle"
+	return $result
 }
 
 proc CPMS_Manager_clear {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
+	set info(state) "Clear"
+	LWDAQ_update
+	
 	lwdaq_image_manipulate cpms_img_left none -clear 1
 	lwdaq_image_manipulate cpms_img_right none -clear 1	
 	lwdaq_draw cpms_img_left cpms_photo_left \
 		-intensify $config(intensify) -zoom $config(zoom)
 	lwdaq_draw cpms_img_right cpms_photo_right \
 		-intensify $config(intensify) -zoom $config(zoom)
+		
+	set info(state) "Idle"
+	return ""
 }
 
 proc CPMS_Manager_acquire {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 	upvar #0 LWDAQ_config_SCAM iconfig
+	
+	set info(state) "Acquire"
+	LWDAQ_update
 	
 	set iconfig(daq_driver_socket) $config(left_sensor_socket)
 	set iconfig(daq_source_driver_socket) $config(left_source_socket)
@@ -202,6 +247,9 @@ proc CPMS_Manager_acquire {} {
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name cpms_img_right
 	
 	CPMS_Manager_go
+
+	set info(state) "Idle"
+	LWDAQ_update
 }
 
 proc CPMS_Manager_open {} {
@@ -217,36 +265,26 @@ proc CPMS_Manager_open {} {
 	label $f.state -textvariable CPMS_Manager_info(state) -fg blue
 	pack $f.state -side left -expand yes
 
-	button $f.aqu -text "Acquire" -command {CPMS_Manager_acquire}
-	pack $f.aqu -side left -expand yes
-	
-	button $f.clear -text "Clear" -command {CPMS_Manager_clear}
-	pack $f.clear -side left -expand yes
-	
-	button $f.go -text "Go" -command {CPMS_Manager_go 
-		set count [CPMS_Manager_go]
-		LWDAQ_print $CPMS_Manager_info(text) \
-			"[lrange [lindex $CPMS_Manager_config(objects) 0] 1 3] [format %.0f $count]"
+	foreach a {Acquire Fit Go Clear Displace} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post CPMS_Manager_$b"
+		pack $f.$b -side left -expand yes
 	}
-	button $f.fit -text "Fit" -command {CPMS_Manager_fit}
-	button $f.stop -text "Stop" -command {set CPMS_Manager_config(stop_fit) 1}
+	
+	button $f.stop -text "Stop" -command {
+		set CPMS_Manager_config(stop_fit) 1
+	}
 	pack $f.go $f.fit $f.stop -side left -expand yes
 	
-	button $f.rdf -text "ReadFiles" -command {CPMS_Manager_read_files}
-	pack $f.rdf -side left -expand yes
-
 	foreach a {threshold} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 6
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	button $f.projector -text "Adjustor" -command {CPMS_Manager_adjustor}
-	pack $f.projector -side left -expand yes 
-
 	foreach a {Help Configure} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
+		button $f.$b -text $a -command [list LWDAQ_tool_$b $info(name)]
 		pack $f.$b -side left -expand 1
 	}
 
