@@ -76,11 +76,11 @@ proc CPMS_Manager_disagreement {params} {
 	set lc "LC $config(cam_left)"
 	set rc "RC $config(cam_right)"
 	
+	lwdaq_image_manipulate cpms_img_left none -clear 1
+	lwdaq_image_manipulate cpms_img_right none -clear 1
+		
 	set disagreement 0
 	foreach obj $config(objects) {
-		lwdaq_image_manipulate cpms_img_left none -clear 1
-		lwdaq_image_manipulate cpms_img_right none -clear 1
-		
 		set lp [lwdaq bcam_from_global_point [lrange $params 0 2] $config(mount_left)]
 		set ld [lwdaq bcam_from_global_vector [lrange $params 3 5] $config(mount_left)]
 		set lo "[lindex $obj 0] $lp $ld [lrange $obj 7 end]"
@@ -338,28 +338,20 @@ return ""
 
 ----------Begin Help----------
 
-The Contactless Position Measurement System (CPMS) Calibrator takes a series of
-silhouette images of the same object moving in a straight line to calibrate a
-pair of stereo Silhouette Cameras (SCAMs). The origin and direction of the locus
-of the calibration object is the "pose", given as x, y, z, rot_x, rot_y, rot_z
-in mm and mrad. The "scaling" is the size of the fitter simplex in each of the
-pose coordinates. The four positions of the object are given by four distances
-along the direction of the locus, in the "displacements" box. 
-
 The compound object being viewed we describe with a list of objects. Here are
 some example lists.
 
 Sphere:
-{sphere 0 0 0 0 0 0 34.72}
+{sphere 20 20 500 0 0 0 38.068}
 
 Cylinder:
-{cylinder 0 0 0 1 0 0 20 30}
+{cylinder 0 0 500 1 0 0 20 30}
 
 Sphere on Post:
-{sphere 0 0 0 0 0 0 34.72} {cylinder 0 -17.36 0 0 -1 0 19.05 50}
+{sphere 20 20 500 0 0 0 40} {cylinder 20 0 500 0 -1 0 20 50}
 
 Shaft:
-{shaft 0 0 0 1 0 0 0 -20 20 -20 30 10 36 10 40 12 40 30 60 30 60 39 58 40 0 40}
+{shaft 20 20 500 1 0 0 0 -20 20 -20 30 10 36 10 40 12 40 30 60 30 60 39 58 40 0 40}
 			
 Compound:
 {cylinder 0 0 0 1 0 0 33.78 7.24} {cylinder 0 0 0 1 0 0 19.00 -20.0} {cylinder 3.62 16.89 0 0 1 0 4 10}
