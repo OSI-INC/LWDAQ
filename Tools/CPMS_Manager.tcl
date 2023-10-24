@@ -23,7 +23,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.1"
+	LWDAQ_tool_init "CPMS_Manager" "1.2"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.283 38.549 4.568 -7.789 1.833 2.000 26.411 0.137" 
@@ -36,7 +36,6 @@ proc CPMS_Manager_init {} {
 		-115.549 -20.643 -68.317"
 		
 	set config(objects) [list "sphere 20 20 500 0 0 0 38.068"]
-	set config(scaling) "1 1 10 0 0 0"
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
 	set config(num_lines) "200"
@@ -50,6 +49,8 @@ proc CPMS_Manager_init {} {
 	set config(right_sensor_socket) "2"
 	set config(left_source_socket) "3"
 	set config(right_source_socket) "4"
+	
+	set config(image_dir) "~/Desktop"
 	
 	set info(projector_window) "$info(window).cpms_projector"
 
@@ -233,6 +234,7 @@ proc CPMS_Manager_acquire {} {
 	set result [LWDAQ_acquire SCAM]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
+		set info(state) "Idle"
 		return ""
 	}
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name cpms_img_left
@@ -242,6 +244,7 @@ proc CPMS_Manager_acquire {} {
 	set result [LWDAQ_acquire SCAM]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
+		set info(state) "Idle"
 		return ""
 	}
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name cpms_img_right
@@ -249,7 +252,48 @@ proc CPMS_Manager_acquire {} {
 	CPMS_Manager_go
 
 	set info(state) "Idle"
+	return ""
+}
+
+proc CPMS_Manager_pickdir {} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+
+	set info(state) "Pickdir"
 	LWDAQ_update
+
+	set dirname [LWDAQ_get_dir_name]
+	if {$dirname != ""} {
+		set config(image_dir) $dirname
+	}
+	
+	set info(state) "Idle"
+	return ""
+}
+
+proc CPMS_Manager_write {} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+
+	set info(state) "Write"
+	LWDAQ_update
+	
+	if {![file exists $config(image_dir)]} {
+		LWDAQ_print $info(text) "ERROR: Cannot find image directory\
+			\"$config(image_dir)\"."
+		set info(state) "Idle"
+		return ""
+	}
+	set cs [clock seconds]
+	set fn [file join $config(image_dir) L$cs\.gif]
+	LWDAQ_write_image_file cpms_img_left $fn		
+	LWDAQ_print $info(text) "Wrote left image to \"$fn\"."
+	set fn [file join $config(image_dir) R$cs\.gif]
+	LWDAQ_write_image_file cpms_img_right $fn
+	LWDAQ_print $info(text) "Wrote right image to \"$fn\"."
+	
+	set info(state) "Idle"
+	return ""
 }
 
 proc CPMS_Manager_open {} {
@@ -265,7 +309,7 @@ proc CPMS_Manager_open {} {
 	label $f.state -textvariable CPMS_Manager_info(state) -fg blue
 	pack $f.state -side left -expand yes
 
-	foreach a {Acquire Fit Go Clear Displace} {
+	foreach a {Acquire Fit Go Clear Displace Pickdir Write Read} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post CPMS_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -288,7 +332,7 @@ proc CPMS_Manager_open {} {
 		pack $f.$b -side left -expand 1
 	}
 
-	set f [frame $w.parameters]
+	set f [frame $w.cameras]
 	pack $f -side top -fill x
 
 	foreach a {cam_left cam_right} {
@@ -300,6 +344,15 @@ proc CPMS_Manager_open {} {
 	label $f.lnl -text "num_lines:"
 	entry $f.enl -textvariable CPMS_Manager_config(num_lines) -width 5
 	pack $f.lnl $f.enl -side left -expand yes
+	
+	set f [frame $w.mounts]
+	pack $f -side top -fill x
+
+	foreach a {mount_left mount_right} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 50
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
 	
 	foreach a {objects scaling} {
 		set f [frame $w.$a]
