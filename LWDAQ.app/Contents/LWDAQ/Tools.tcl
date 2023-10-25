@@ -206,8 +206,7 @@ proc LWDAQ_tool_init {name version} {
 		return "ABORT"
 	}		
 	
-	# When we generate a fresh tool window, the tool window will be named
-	# after the tool, and will be its own toplevel window.
+	# Delete any previous copies of the configuration and information arrays.
 	array unset info
 	array unset config
 

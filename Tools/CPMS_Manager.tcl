@@ -23,7 +23,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.2"
+	LWDAQ_tool_init "CPMS_Manager" "1.3"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.283 38.549 4.568 -7.789 1.833 2.000 26.411 0.137" 
@@ -51,6 +51,7 @@ proc CPMS_Manager_init {} {
 	set config(right_source_socket) "4"
 	
 	set config(image_dir) "~/Desktop"
+	set config(auto_fit) "0"
 	
 	set info(projector_window) "$info(window).cpms_projector"
 
@@ -66,6 +67,14 @@ proc CPMS_Manager_init {} {
 	return ""   
 }
 
+#
+# CPMS_Manager_disagreement takes the two cpms images and obtains the number of
+# pixels in which our modelled objects and their actual silhouettes disagree. In
+# doint so, the routine colors the overlay of the cpms images to show the modelled
+# objects and their silhouettes with the disagreement pixels colored blue for model
+# without silhouette and orange for silhouette without model and no overlay color
+# for agreement between the two.
+#
 proc CPMS_Manager_disagreement {params} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -107,6 +116,12 @@ proc CPMS_Manager_disagreement {params} {
 	return $disagreement
 }
 
+#
+# CPMS_Manager_get_params extracts from the objects their postion and
+# orientation When we fit the model to the silhouettes, we will be adjusting the
+# position and orientation of each modelled object, but not its object type
+# string or its diameter and length parameters. 
+#
 proc CPMS_Manager_get_params {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -116,7 +131,12 @@ proc CPMS_Manager_get_params {} {
 	return $params
 }
 
-proc CPMS_Manager_go {} {
+#
+# CPMS_Manager_show gets the parameters from the current modelled objects, calculates
+# the disagreement, and prints the current parameters and disagreement to the text
+# window. 
+#
+proc CPMS_Manager_show {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
@@ -132,25 +152,31 @@ proc CPMS_Manager_go {} {
 	return 
 }
 
+#
+# CPMS_Manager_displace displaces the object position and orientation a random
+# amount.
+#
 proc CPMS_Manager_displace {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
-	set params [CPMS_Manager_get_params]
-	set obj_num 0
-	set param_num 0
-	foreach {x} $params {
-		set new_x [expr $x + (rand()-0.5)*10.0*[lindex $config(scaling) $param_num]]
-		set new_x [format %.3f $new_x]
-		set obj_index [expr ($param_num % 6) + 1] 
-		lset config(objects) $obj_num $obj_index $new_x
-		incr param_num
-		if {$param_num % 6 == 0} {incr obj_num}
+	for {set i 0} {$i < [llength $config(objects)]} {incr i} {
+		set x [lindex $config(objects) $i 1]
+		lset config(objects) $i 1 [format %.3f [expr $x + (rand()-0.5)*10.0]]
+		set y [lindex $config(objects) $i 2]
+		lset config(objects) $i 2 [format %.3f [expr $y + (rand()-0.5)*10.0]]
+		set z [lindex $config(objects) $i 3]
+		lset config(objects) $i 3 [format %.3f [expr $z + (rand()-0.5)*100.0]]
 	}
 	CPMS_Manager_disagreement [CPMS_Manager_get_params]
 	return [CPMS_Manager_get_params]
 } 
 
+#
+# CPMS_Manager_altitude is the error function for the fitter. The fitter calls this
+# routine with a set of parameter values to get the disgreement, which it is 
+# attemptint to minimise.
+#
 proc CPMS_Manager_altitude {params} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -163,6 +189,18 @@ proc CPMS_Manager_altitude {params} {
 	return $count
 }
 
+#
+# CPMS_Manager_fit gets the object parameters as a starting point and calls the
+# simplex fitter to minimise the disagreement between the modelled and actual
+# objects. The size of the adjustments the fitter makes in each parameter during
+# the fit will be shrinking as the fit proceeds, but relative to one another thye
+# will be in proportion to the list of scaling factors we have provided. If the
+# scaling factors are all unity, all parameters are fitted with equal steps. If 
+# a scaling factor is zero, the parameter will not be adjusted. If a scaling factor
+# is 10, the parameter will be adjusted by ten times the amount as a parameter with
+# scaling factor one. At the end of the fit, we take the final fitted parameter
+# values and apply them to our object models.
+#
 proc CPMS_Manager_fit {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -173,13 +211,22 @@ proc CPMS_Manager_fit {} {
 	
 	if {[catch {
 		set start_params [CPMS_Manager_get_params]
+		set scaling ""
+		foreach obj $config(objects) {
+			append scaling "1 1 10 "
+			if {[lindex $obj 0] != "sphere"} {
+				append scaling "1 1 1 "
+			} else {
+				append scaling "0 0 0 "
+			}
+		}
 		set result [lwdaq_simplex $start_params CPMS_Manager_altitude \
 			-report 0 \
 			-steps $config(fit_steps) \
 			-restarts $config(fit_restarts) \
 			-start_size 1.0 \
 			-end_size 0.01 \
-			-scaling $config(scaling)]
+			-scaling $scaling]
 		if {[LWDAQ_is_error_result $result]} {error "$result"}
 		LWDAQ_print $info(text) $result black
 		set obj_num 0
@@ -203,6 +250,10 @@ proc CPMS_Manager_fit {} {
 	return $result
 }
 
+#
+# CPMS_Manager_clear clears the overlay pixels in the cpms images, so that we see
+# only the original silhouette images.
+#
 proc CPMS_Manager_clear {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -221,6 +272,10 @@ proc CPMS_Manager_clear {} {
 	return ""
 }
 
+#
+# CPMS_Manager_acquire uses the SCAM Instrument to acquire two SCAM images, thus
+# obtaining a stereo CPMS pair of images.
+#
 proc CPMS_Manager_acquire {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -249,12 +304,16 @@ proc CPMS_Manager_acquire {} {
 	}
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name cpms_img_right
 	
-	CPMS_Manager_go
-
+	CPMS_Manager_show
+	
 	set info(state) "Idle"
 	return ""
 }
 
+#
+# CPMS_Manager_pickdir picks a directory into which to write image files when
+# we press call CPMS_Manager_write.
+#
 proc CPMS_Manager_pickdir {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -271,6 +330,10 @@ proc CPMS_Manager_pickdir {} {
 	return ""
 }
 
+#
+# CPMS_Manager_write writes both cpms images into the image directory, giving
+# them both names S followed by UNIX timestamp and suffix L or R followed by .gif.
+#
 proc CPMS_Manager_write {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -285,17 +348,61 @@ proc CPMS_Manager_write {} {
 		return ""
 	}
 	set cs [clock seconds]
-	set fn [file join $config(image_dir) L$cs\.gif]
+	set fn [file join $config(image_dir) S$cs\_L.gif]
 	LWDAQ_write_image_file cpms_img_left $fn		
-	LWDAQ_print $info(text) "Wrote left image to \"$fn\"."
-	set fn [file join $config(image_dir) R$cs\.gif]
+	LWDAQ_print $info(text) "Wrote left-hand image to \"$fn\"."
+	set fn [file join $config(image_dir) S$cs\_R.gif]
 	LWDAQ_write_image_file cpms_img_right $fn
-	LWDAQ_print $info(text) "Wrote right image to \"$fn\"."
+	LWDAQ_print $info(text) "Wrote right-hand image to \"$fn\"."
 	
 	set info(state) "Idle"
 	return ""
 }
 
+#
+# CPMS_Manager_read reads pairs of image files from disk. It opens a browser in
+# the image directory and allows us to select images. We must selet an even
+# number of images for the read to complete. Each pair of stereo image files
+# must be named in the CPMS format, which is L and UNIX time with GIF extension
+# for left and same with R for right. If auto_fit is set, the routine fits the
+# modelled objects to each pair of images and prints results to text window.
+#
+proc CPMS_Manager_read {} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+	global LWDAQ_Info
+
+	set info(state) "Read"
+	LWDAQ_update
+	
+	if {[file exists $config(image_dir)]} {
+		set LWDAQ_Info(working_dir) $config(image_dir)
+	}
+	set fnl [LWDAQ_get_file_name 1]
+	foreach {lfn rfn} $fnl {
+		LWDAQ_read_image_file $lfn cpms_img_left
+		LWDAQ_read_image_file $rfn cpms_img_right
+		if {[regexp {S([0-9]{10})} [file tail $lfn] match ts]} {
+			set name $ts
+		} else {
+			set name [file tail $lfn]
+		}
+		if {$config(auto_fit)} {
+			LWDAQ_print -nonewline $info(text) "$name " green
+			CPMS_Manager_fit
+		} else {
+			LWDAQ_print -nonewline $info(text) "$name " green
+			CPMS_Manager_show
+		}
+	}
+	
+	set info(state) "Idle"
+	return ""
+}
+
+#
+# CPMS_Manager_open opens the CPMS Manger Tool window.
+#
 proc CPMS_Manager_open {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
@@ -309,16 +416,19 @@ proc CPMS_Manager_open {} {
 	label $f.state -textvariable CPMS_Manager_info(state) -fg blue
 	pack $f.state -side left -expand yes
 
-	foreach a {Acquire Fit Go Clear Displace Pickdir Write Read} {
+	foreach a {Acquire Show Clear Displace Fit Pickdir Write Read} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post CPMS_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
 	
+	checkbutton $f.af -variable CPMS_Manager_config(auto_fit) -text "auto_fit"
+	pack $f.af -side left -expand yes
+
 	button $f.stop -text "Stop" -command {
 		set CPMS_Manager_config(stop_fit) 1
 	}
-	pack $f.go $f.fit $f.stop -side left -expand yes
+	pack $f.stop -side left -expand yes
 	
 	foreach a {threshold} {
 		label $f.l$a -text "$a\:"
@@ -341,6 +451,9 @@ proc CPMS_Manager_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
+	button $f.scam -text "SCAM" -command {LWDAQ_post "LWDAQ_open SCAM"}
+	pack $f.scam -side left -expand yes
+	
 	label $f.lnl -text "num_lines:"
 	entry $f.enl -textvariable CPMS_Manager_config(num_lines) -width 5
 	pack $f.lnl $f.enl -side left -expand yes
@@ -350,15 +463,15 @@ proc CPMS_Manager_open {} {
 
 	foreach a {mount_left mount_right} {
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 50
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 70
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	foreach a {objects scaling} {
+	foreach a {objects} {
 		set f [frame $w.$a]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 120
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 150
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -373,8 +486,8 @@ proc CPMS_Manager_open {} {
 	pack $f.right_$a -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 100 15]
-	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
-	lwdaq_config -text_name $info(text) -fsd 3	
+	lwdaq_config -text_name $info(text) -fsd 3
+	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple
 	
 	lwdaq_draw cpms_img_left cpms_photo_left \
 		-intensify $config(intensify) -zoom $config(zoom)
@@ -391,8 +504,9 @@ return ""
 
 ----------Begin Help----------
 
-The compound object being viewed we describe with a list of objects. Here are
-some example lists.
+Before acquiring live images, configure SCAM instrument to acquire either the
+left or right imageThe compound object being viewed we describe with a list of
+objects. Here are some example lists.
 
 Sphere:
 {sphere 20 20 500 0 0 0 38.068}
@@ -409,8 +523,6 @@ Shaft:
 Compound:
 {cylinder 0 0 0 1 0 0 33.78 7.24} {cylinder 0 0 0 1 0 0 19.00 -20.0} {cylinder 3.62 16.89 0 0 1 0 4 10}
 
-
-Kevan Hashemi hashemi@brandeis.edu
 ----------End Help----------
 
 ----------Begin Data----------
