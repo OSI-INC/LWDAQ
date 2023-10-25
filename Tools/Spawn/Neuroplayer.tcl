@@ -51,7 +51,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "167"
+	LWDAQ_tool_init "Neuroplayer" "168"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -6496,8 +6496,8 @@ proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 	# Set up the range and plot the values.
 	if {$config(vt_mode) == "CP"} {
 		lwdaq_graph $signal $info(vt_image) \
-			-y_min [expr - $config(v_range) / 2 ] \
-			-y_max [expr + $config(v_range) / 2] \
+			-y_min [expr $config(v_offset) - $config(v_range) / 2 ] \
+			-y_max [expr $config(v_offset) + $config(v_range) / 2] \
 			-color $color \
 			-ac_couple 1
 	} elseif {$config(vt_mode) == "NP"} {
