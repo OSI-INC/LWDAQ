@@ -23,7 +23,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.3"
+	LWDAQ_tool_init "CPMS_Manager" "1.4"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.283 38.549 4.568 -7.789 1.833 2.000 26.411 0.137" 
@@ -52,6 +52,7 @@ proc CPMS_Manager_init {} {
 	
 	set config(image_dir) "~/Desktop"
 	set config(auto_fit) "0"
+	set config(file_index) "0000000000"
 	
 	set info(projector_window) "$info(window).cpms_projector"
 
@@ -61,8 +62,10 @@ proc CPMS_Manager_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	lwdaq_image_create -name cpms_img_left -width 700 -height 520
-	lwdaq_image_create -name cpms_img_right -width 700 -height 520
+	set info(img_left) "cpms_img_left"
+	lwdaq_image_create -name $info(img_left) -width 700 -height 520
+	set info(img_right) "cpms_img_right"
+	lwdaq_image_create -name $info(img_right) -width 700 -height 520
 
 	return ""   
 }
@@ -86,28 +89,28 @@ proc CPMS_Manager_disagreement {params} {
 	set lc "LC $config(cam_left)"
 	set rc "RC $config(cam_right)"
 	
-	lwdaq_image_manipulate cpms_img_left none -clear 1
-	lwdaq_image_manipulate cpms_img_right none -clear 1
+	lwdaq_image_manipulate $info(img_left) none -clear 1
+	lwdaq_image_manipulate $info(img_right) none -clear 1
 		
 	set disagreement 0
 	foreach obj $config(objects) {
 		set lp [lwdaq bcam_from_global_point [lrange $params 0 2] $config(mount_left)]
 		set ld [lwdaq bcam_from_global_vector [lrange $params 3 5] $config(mount_left)]
 		set lo "[lindex $obj 0] $lp $ld [lrange $obj 7 end]"
-		lwdaq_scam cpms_img_left project $lc $lo $config(num_lines)
+		lwdaq_scam $info(img_left) project $lc $lo $config(num_lines)
 
 		set rp [lwdaq bcam_from_global_point [lrange $params 0 2] $config(mount_right)]
 		set rd [lwdaq bcam_from_global_vector [lrange $params 3 5] $config(mount_right)]
 		set ro "[lindex $obj 0] $rp $rd [lrange $obj 7 end]"
-		lwdaq_scam cpms_img_right project $rc $ro $config(num_lines)
+		lwdaq_scam $info(img_right) project $rc $ro $config(num_lines)
 
-		set left_count [lwdaq_scam cpms_img_left disagreement $config(threshold)]
-		set right_count [lwdaq_scam cpms_img_right disagreement $config(threshold)]
+		set left_count [lwdaq_scam $info(img_left) disagreement $config(threshold)]
+		set right_count [lwdaq_scam $info(img_right) disagreement $config(threshold)]
 		set disagreement [expr $disagreement + $left_count + $right_count]
 
-		lwdaq_draw cpms_img_left cpms_photo_left \
+		lwdaq_draw $info(img_left) cpms_photo_left \
 			-intensify $config(intensify) -zoom $config(zoom)
-		lwdaq_draw cpms_img_right cpms_photo_right \
+		lwdaq_draw $info(img_right) cpms_photo_right \
 			-intensify $config(intensify) -zoom $config(zoom)
 			
 		set params [lrange $params 6 end]
@@ -145,6 +148,7 @@ proc CPMS_Manager_show {} {
 	
 	set params [CPMS_Manager_get_params]
 	set disagreement [CPMS_Manager_disagreement $params]
+	LWDAQ_print -nonewline $info(text) "$config(file_index) " green
 	set result "$params $disagreement"
 	LWDAQ_print $info(text) $result
 	
@@ -228,6 +232,7 @@ proc CPMS_Manager_fit {} {
 			-end_size 0.01 \
 			-scaling $scaling]
 		if {[LWDAQ_is_error_result $result]} {error "$result"}
+		LWDAQ_print -nonewline $info(text) "$config(file_index) " green	
 		LWDAQ_print $info(text) $result black
 		set obj_num 0
 		foreach {x y z rx ry rz} [lrange $result 0 end-2] {
@@ -261,11 +266,11 @@ proc CPMS_Manager_clear {} {
 	set info(state) "Clear"
 	LWDAQ_update
 	
-	lwdaq_image_manipulate cpms_img_left none -clear 1
-	lwdaq_image_manipulate cpms_img_right none -clear 1	
-	lwdaq_draw cpms_img_left cpms_photo_left \
+	lwdaq_image_manipulate $info(img_left) none -clear 1
+	lwdaq_image_manipulate $info(img_right) none -clear 1	
+	lwdaq_draw $info(img_left) cpms_photo_left \
 		-intensify $config(intensify) -zoom $config(zoom)
-	lwdaq_draw cpms_img_right cpms_photo_right \
+	lwdaq_draw $info(img_right) cpms_photo_right \
 		-intensify $config(intensify) -zoom $config(zoom)
 		
 	set info(state) "Idle"
@@ -292,7 +297,7 @@ proc CPMS_Manager_acquire {} {
 		set info(state) "Idle"
 		return ""
 	}
-	lwdaq_image_manipulate $iconfig(memory_name) copy -name cpms_img_left
+	lwdaq_image_manipulate $iconfig(memory_name) copy -name $info(img_left)
 	
 	set iconfig(daq_driver_socket) $config(right_sensor_socket)
 	set iconfig(daq_source_driver_socket) $config(right_source_socket)
@@ -302,8 +307,9 @@ proc CPMS_Manager_acquire {} {
 		set info(state) "Idle"
 		return ""
 	}
-	lwdaq_image_manipulate $iconfig(memory_name) copy -name cpms_img_right
+	lwdaq_image_manipulate $iconfig(memory_name) copy -name $info(img_right)
 	
+	set config(file_index) [clock seconds]
 	CPMS_Manager_show
 	
 	set info(state) "Idle"
@@ -347,12 +353,11 @@ proc CPMS_Manager_write {} {
 		set info(state) "Idle"
 		return ""
 	}
-	set cs [clock seconds]
-	set fn [file join $config(image_dir) S$cs\_L.gif]
-	LWDAQ_write_image_file cpms_img_left $fn		
+	set fn [file join $config(image_dir) S$config(file_index)_L.gif]
+	LWDAQ_write_image_file $info(img_left) $fn		
 	LWDAQ_print $info(text) "Wrote left-hand image to \"$fn\"."
-	set fn [file join $config(image_dir) S$cs\_R.gif]
-	LWDAQ_write_image_file cpms_img_right $fn
+	set fn [file join $config(image_dir) S$config(file_index)_R.gif]
+	LWDAQ_write_image_file $info(img_right) $fn
 	LWDAQ_print $info(text) "Wrote right-hand image to \"$fn\"."
 	
 	set info(state) "Idle"
@@ -378,20 +383,18 @@ proc CPMS_Manager_read {} {
 	if {[file exists $config(image_dir)]} {
 		set LWDAQ_Info(working_dir) $config(image_dir)
 	}
-	set fnl [LWDAQ_get_file_name 1]
+	set fnl [lsort -increasing [LWDAQ_get_file_name 1]]
 	foreach {lfn rfn} $fnl {
-		LWDAQ_read_image_file $lfn cpms_img_left
-		LWDAQ_read_image_file $rfn cpms_img_right
+		LWDAQ_read_image_file $lfn $info(img_left)
+		LWDAQ_read_image_file $rfn $info(img_right)
 		if {[regexp {S([0-9]{10})} [file tail $lfn] match ts]} {
-			set name $ts
+			set config(file_index) $ts
 		} else {
-			set name [file tail $lfn]
+			set config(file_index) [file root [file tail $lfn]]
 		}
 		if {$config(auto_fit)} {
-			LWDAQ_print -nonewline $info(text) "$name " green
 			CPMS_Manager_fit
 		} else {
-			LWDAQ_print -nonewline $info(text) "$name " green
 			CPMS_Manager_show
 		}
 	}
@@ -416,20 +419,22 @@ proc CPMS_Manager_open {} {
 	label $f.state -textvariable CPMS_Manager_info(state) -fg blue
 	pack $f.state -side left -expand yes
 
+	button $f.stop -text "Stop" -command {set CPMS_Manager_config(stop_fit) 1}
+	pack $f.stop -side left -expand yes
+	
 	foreach a {Acquire Show Clear Displace Fit Pickdir Write Read} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post CPMS_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
 	
+	label $f.lfi -text "index:"
+	entry $f.efi -textvariable CPMS_Manager_config(file_index) -width 12
+	pack $f.lfi $f.efi -side left -expand yes
+
 	checkbutton $f.af -variable CPMS_Manager_config(auto_fit) -text "auto_fit"
 	pack $f.af -side left -expand yes
 
-	button $f.stop -text "Stop" -command {
-		set CPMS_Manager_config(stop_fit) 1
-	}
-	pack $f.stop -side left -expand yes
-	
 	foreach a {threshold} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 6
@@ -471,7 +476,7 @@ proc CPMS_Manager_open {} {
 		set f [frame $w.$a]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 150
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 180
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -489,9 +494,9 @@ proc CPMS_Manager_open {} {
 	lwdaq_config -text_name $info(text) -fsd 3
 	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple
 	
-	lwdaq_draw cpms_img_left cpms_photo_left \
+	lwdaq_draw $info(img_left) cpms_photo_left \
 		-intensify $config(intensify) -zoom $config(zoom)
-	lwdaq_draw cpms_img_right cpms_photo_right \
+	lwdaq_draw $info(img_right) cpms_photo_right \
 		-intensify $config(intensify) -zoom $config(zoom)
 
 	return $w
