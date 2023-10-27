@@ -3594,7 +3594,7 @@ begin
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Invalid shape "'+option+'", must be one of '
-					+'"sphere cylinder" in '
+					+'"sphere cylinder shaft" in '
 					+'lwdaq_scam.');
 				exit;
 			end;

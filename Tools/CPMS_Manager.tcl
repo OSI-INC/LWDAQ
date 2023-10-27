@@ -82,47 +82,70 @@ proc CPMS_Manager_disagreement {params} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
+	# If user has closed the manager window, generate an error so that we stop any
+	# fitting that might be calling this routine. 
 	if {![winfo exists $info(window)]} {
 		error "Cannot draw CPMS images: no CPMS window open."
 	}
 
+	# Put the left and right camera calibration constants into a string with a name
+	# at the front, which is the format our projection routines require.
 	set lc "LC $config(cam_left)"
 	set rc "RC $config(cam_right)"
 	
+	# We clear the overlays in the two CPMS images. We will be using the overlays
+	# to keep track of silhouettes and objects.
 	lwdaq_image_manipulate $info(img_left) none -clear 1
 	lwdaq_image_manipulate $info(img_right) none -clear 1
-		
-	set disagreement 0
+	
+	# Go through each of the modelled objects and project it onto our modelled SCAM
+	# image sensors, marking the projection with lines.
 	foreach obj $config(objects) {
+	
+		# Transform the location and orientation of the object into the mount
+		# coordinate system of the left SCAM. Once we have the object in the
+		# mount coordinates, project into the image sensor with the help of our
+		# calibration constants.
 		set lp [lwdaq bcam_from_global_point [lrange $params 0 2] $config(mount_left)]
 		set ld [lwdaq bcam_from_global_vector [lrange $params 3 5] $config(mount_left)]
 		set lo "[lindex $obj 0] $lp $ld [lrange $obj 7 end]"
 		lwdaq_scam $info(img_left) project $lc $lo $config(num_lines)
 
+		# Do the same for the right-hand SCAM.
 		set rp [lwdaq bcam_from_global_point [lrange $params 0 2] $config(mount_right)]
 		set rd [lwdaq bcam_from_global_vector [lrange $params 3 5] $config(mount_right)]
 		set ro "[lindex $obj 0] $rp $rd [lrange $obj 7 end]"
 		lwdaq_scam $info(img_right) project $rc $ro $config(num_lines)
 
-		set left_count [lwdaq_scam $info(img_left) disagreement $config(threshold)]
-		set right_count [lwdaq_scam $info(img_right) disagreement $config(threshold)]
-		set disagreement [expr $disagreement + $left_count + $right_count]
-
-		lwdaq_draw $info(img_left) cpms_photo_left \
-			-intensify $config(intensify) -zoom $config(zoom)
-		lwdaq_draw $info(img_right) cpms_photo_right \
-			-intensify $config(intensify) -zoom $config(zoom)
-			
+		# We have made use of six parameters, which are what we need for one
+		# object. We remove these six from our parameter list so that the next
+		# six parameter will come to the front and be ready for the next object,
+		# if any.
 		set params [lrange $params 6 end]
 	}
 
+	# Go through both images and adjust the overlay to be orange for silhouette
+	# only, blue for object only, and clear for agreement. Count the disagreeing
+	# pixels.
+	set disagreement 0
+	set left_count [lwdaq_scam $info(img_left) disagreement $config(threshold)]
+	set right_count [lwdaq_scam $info(img_right) disagreement $config(threshold)]
+	set disagreement [expr $disagreement + $left_count + $right_count]
+
+	# Draw the images with their overlays in the manager window.
+	lwdaq_draw $info(img_left) cpms_photo_left \
+		-intensify $config(intensify) -zoom $config(zoom)
+	lwdaq_draw $info(img_right) cpms_photo_right \
+		-intensify $config(intensify) -zoom $config(zoom)
+			
+	# Return the disagremenet. The fitter uses the disagreement as its error function.
 	return $disagreement
 }
 
 #
 # CPMS_Manager_get_params extracts from the objects their postion and
-# orientation When we fit the model to the silhouettes, we will be adjusting the
-# position and orientation of each modelled object, but not its object type
+# orientation. When we fit the model to the silhouettes, we will be adjusting
+# the position and orientation of each modelled object, but not its object type
 # string or its diameter and length parameters. 
 #
 proc CPMS_Manager_get_params {} {
@@ -177,9 +200,9 @@ proc CPMS_Manager_displace {} {
 } 
 
 #
-# CPMS_Manager_altitude is the error function for the fitter. The fitter calls this
-# routine with a set of parameter values to get the disgreement, which it is 
-# attemptint to minimise.
+# CPMS_Manager_altitude is the error function for the fitter. The fitter calls
+# this routine with a set of parameter values to get the disgreement, which it
+# is attemptint to minimise.
 #
 proc CPMS_Manager_altitude {params} {
 	upvar #0 CPMS_Manager_config config
@@ -197,13 +220,13 @@ proc CPMS_Manager_altitude {params} {
 # CPMS_Manager_fit gets the object parameters as a starting point and calls the
 # simplex fitter to minimise the disagreement between the modelled and actual
 # objects. The size of the adjustments the fitter makes in each parameter during
-# the fit will be shrinking as the fit proceeds, but relative to one another thye
-# will be in proportion to the list of scaling factors we have provided. If the
-# scaling factors are all unity, all parameters are fitted with equal steps. If 
-# a scaling factor is zero, the parameter will not be adjusted. If a scaling factor
-# is 10, the parameter will be adjusted by ten times the amount as a parameter with
-# scaling factor one. At the end of the fit, we take the final fitted parameter
-# values and apply them to our object models.
+# the fit will be shrinking as the fit proceeds, but relative to one another
+# thye will be in proportion to the list of scaling factors we have provided. If
+# the scaling factors are all unity, all parameters are fitted with equal steps.
+# If a scaling factor is zero, the parameter will not be adjusted. If a scaling
+# factor is 10, the parameter will be adjusted by ten times the amount as a
+# parameter with scaling factor one. At the end of the fit, we take the final
+# fitted parameter values and apply them to our object models.
 #
 proc CPMS_Manager_fit {} {
 	upvar #0 CPMS_Manager_config config
@@ -219,7 +242,7 @@ proc CPMS_Manager_fit {} {
 		foreach obj $config(objects) {
 			append scaling "1 1 10 "
 			if {[lindex $obj 0] != "sphere"} {
-				append scaling "1 1 1 "
+				append scaling "0.1 0.1 0.1 "
 			} else {
 				append scaling "0 0 0 "
 			}
