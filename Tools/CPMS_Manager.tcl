@@ -35,7 +35,7 @@ proc CPMS_Manager_init {} {
 		-74.201 -20.179 -75.451 \
 		-115.549 -20.643 -68.317"
 		
-	set config(objects) [list "sphere 20 20 500 0 0 0 38.068"]
+	set config(objects) [list "20 20 0 0 0 0 sphere 38.068"]
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
 	set config(num_lines) "200"
@@ -102,12 +102,19 @@ proc CPMS_Manager_disagreement {params} {
 	# image sensors, marking the projection with lines.
 	foreach obj $config(objects) {
 	
+		# Get the location and orienation of the object in global coordinates, which
+		# will be in the first six values of the parameter string.
+		set gl [lrange $params 0 2]
+		set go [lrange $params 3 5]
+	
 		# Transform the location and orientation of the object into the mount
-		# coordinate system of the left SCAM. Once we have the object in the
+		# coordinate system of the left SCAM. 
+		set lp [lwdaq bcam_from_global_point $gl $config(mount_left)]
+		set ld [lwdaq bcam_from_global_rotation $go $config(mount_left)]
+		
+		# Once we have the object in the
 		# mount coordinates, project into the image sensor with the help of our
 		# calibration constants.
-		set lp [lwdaq bcam_from_global_point [lrange $params 0 2] $config(mount_left)]
-		set ld [lwdaq bcam_from_global_vector [lrange $params 3 5] $config(mount_left)]
 		set lo "[lindex $obj 0] $lp $ld [lrange $obj 7 end]"
 		lwdaq_scam $info(img_left) project $lc $lo $config(num_lines)
 

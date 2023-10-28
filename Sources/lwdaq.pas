@@ -3456,8 +3456,8 @@ end;
 <p>lwdaq_scam applies Silhouette Camera (SCAM) routines to SCAM images. The SCAM
 routines are defined in <a
 href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. We pass
-lwdaq_scam an instruction, and one or more arguments required by
-the instruction.</p>
+lwdaq_scam an instruction, and one or more arguments required by the
+instruction.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Instruction</th><th>Function</th></tr>
@@ -3465,16 +3465,12 @@ the instruction.</p>
 <tr><td>disagreement</td><td>Measure disagreement between actual and modelled silhouette.</td></tr>
 </table></center>
 
-<p>The <i>project</i> instruction takes four arguments: a <i>camera</i>
-calibration in mount coordinates, an <i>object</i> definition in camera mount
-coordinates, and a number of projection lines to use to fill the overlay in the
-silhouette image. The object must be one of the radially-symmetric objects
-supported by the <a
-href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a> library.
-When we want to project objects that are not radially symmetric, we compose them
-out of radially symmetric objects and project each in turn. Prior to projecting
-each object, we must translate and rotate its global position and orientation
-into the SCAM mount cooridnate system.</p>
+<p>The <i>project</i> instruction takes three arguments: a <i>camera</i>
+calibration in the SCAM's mount coordinates, an <i>object</i> definition in the
+SCAM's mount coordinates, and a number of projection lines to use to fill the
+overlay in the silhouette image. The object must be one of those in the library
+provided by scam.pas. When we want to project more complex bodies, we build them
+out of multiple objects.</p>
 
 <p>The <i>camera</i> string contains nine elements. The first is the name of the
 camera. The following eight are the camera calibration constants, as described
@@ -3485,27 +3481,49 @@ code to say if the axis is forward or backwards and to identify the image
 sensor, the distance from the pivot point to the center of the image sensor, and
 the rotation of the image sensor about the camera axis.</p>
 
-<p>The modelled object itself we specify with its own string. The first word in
-the string is the object type, such as "sphere", "cylinder", or "shaft". After
-that are mount coordinates of a reference point in the object, the coordinates
-of a vector giving giving the orientation of the object, and finally one or more
-numbers giving the dimensions of the object. For a sphere, the reference point
-is the sphere center, the orientation is three zeros, and the only dimension is
-its diameter. See <i>scam_sphere_from_string</i> in <a
-href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. For a
-cylinder, the reference point is one end of the axis, the orientation is a unit
-vector pointing along the axis into the cylinder from the reference point, and
-the dimensions are diameter followed by length,
-<i>scam_cylinder_from_string</i>.  For a shaft, we specify the point at one end
-of the shaft axis, the orienation is the direction of the axis, and the
-dimensions are a sequence of one or more faces. Each face is a diameter and a
-distance along the axis from the shaft, see <i>scam_shaft_from_string</i> </p>
+<p>Prior to projecting any object, we must transform its location into mount
+coordinates. If the object is anything other than a sphere, it will have an
+orientation as well, and this we must transform this orientation into mount
+coordinates as well. The orientation of an object is three rotations about the
+x, y, and z axes that bring the object from its zero orienation to its modelled
+orientation.The modelled object itself we specify with its own string. Each
+object begins with a name, such as "sphere" or "shaft". Every object has a
+location, which is the translation of its zero point to obtain its modelled
+position. All objects other than the sphere have an orientation, which is the
+xyz rotation we apply to the object in its zero orientation to obtain its
+modelled oriention. The location and orientation together define the "pose" of
+the modelled object.</p>
 
-<p>If we specify zero for the number of lines, the projection algorithm reverts
-to one where we check every pixel in the silhouette image to see if it should or
-should not be included in the modelled silhouette. For one or more lines, the
-projection picks points on the modelled object and joins them up with lines in
-the silhouette image overlay.</p>
+<center><table border cellspacing=2>
+<tr>
+	<th>Object</th>
+	<th>Zero Point</th>
+	<th>Zero Orientation</th>
+</tr>
+<tr>
+	<td>sphere</td>
+	<td>center of sphere</td>
+	<td>no orientation</td>
+</tr>
+<tr>
+	<td>shaft</td>
+	<td>a point on the shaft axis</td>
+	<td>shaft axis is parallel to x-axis</td></tr>
+<tr>
+	<td>cuboid</td>
+	<td>center of left face</td>
+	<td>x-axis perpendicular to left face, y-axis parallel to top edge</td>
+</tr>
+</table></center>
+
+<p>Following the location, and possibly the orientation, of the object are one
+or more values giving its dimensions. A sphere consists of a location and a
+diameter. A shaft consists of a location, an orientation, a number of faces, and
+a diameter and distance for each face, where the distance is measured along the
+shaft axis from the zero point, with negative values being in the direction
+opposite to the axis vector. A cuboid consists of a location, an orientation, a
+width, a height, and a depth. The width, height, and depth are parallel to the
+x, y, and z axes respectively when the cuboid is in its zero orientation.</p>
 
 <p>The <i>disagreement</i> instruction counts the number of pixels in the
 analysis boundaries for which the image and the overlay disagree about the
@@ -3533,10 +3551,8 @@ var
 	rule:string='10 %';
 	camera:bcam_camera_type;
 	sphere:scam_sphere_type;
-	cylinder:scam_cylinder_type;
 	shaft:scam_shaft_type;
 	disagreement:real=0;
-	spread:real=0;
 	threshold:real=0;
 	num_points:integer=2000;
 		
@@ -3570,7 +3586,6 @@ begin
 		if argc>5 then num_points:=Tcl_ObjInteger(argv[5]);
 	end else if (command='disagreement') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
-		if argc>4 then spread:=Tcl_ObjReal(argv[4]);
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Invalid command "'+command+'", must be one of '
@@ -3580,31 +3595,25 @@ begin
 	end;
 	
 	if command='project' then begin
-		while body<>'' do begin
-			option:=read_word(body);
-			if option='sphere' then begin
-				sphere:=read_scam_sphere(body);
-				scam_project_sphere(ip,sphere,camera,num_points);
-			end else if option='cylinder' then begin
-				cylinder:=read_scam_cylinder(body);
-				scam_project_cylinder(ip,cylinder,camera,num_points);
-			end else if option='shaft' then begin
-				shaft:=read_scam_shaft(body);
-				scam_project_shaft(ip,shaft,camera,num_points);
-			end else begin
-				Tcl_SetReturnString(interp,error_prefix
-					+'Invalid shape "'+option+'", must be one of '
-					+'"sphere cylinder shaft" in '
-					+'lwdaq_scam.');
-				exit;
-			end;
+		option:=read_word(body);
+		if option='sphere' then begin
+			sphere:=read_scam_sphere(body);
+			scam_project_sphere(ip,sphere,camera,num_points);
+		end else if option='shaft' then begin
+			shaft:=read_scam_shaft(body);
+			scam_project_shaft(ip,shaft,camera,num_points);
+		end else begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Invalid shape "'+option+'", must be one of '
+				+'"sphere shaft" in '
+				+'lwdaq_scam.');
+			exit;
 		end;
 	end;
 	
 	if command='disagreement' then begin
 		threshold:=scam_decode_rule(ip,rule);
-		if spread=0 then disagreement:=scam_disagreement(ip,threshold)
-		else disagreement:=scam_disagreement_spread(ip,threshold,spread);
+		disagreement:=scam_disagreement(ip,threshold);
 		writestr(result,disagreement:0:1);
 	end;
 	
@@ -5350,7 +5359,6 @@ var
 	x_div:real=0;
 	y_div:real=0;
 	width:integer=1;
-	saved_width:integer=1;
 	num_points:integer=0;
 	point_num:integer=0;
 	color:integer=0;
