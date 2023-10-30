@@ -75,7 +75,7 @@ function wps_ray(p:xy_point_type;camera:wps_camera_type):xyz_line_type;
 function wps_wire_plane(p:xy_point_type;r:real;camera:wps_camera_type):xyz_plane_type;
 function wps_wire(p_1,p_2:xy_point_type;r_1,r_2:real;c_1,c_2:wps_camera_type):xyz_line_type;
 function wps_calibrate(device_name:string;camera_num:integer;data:string):string;
-function wps_coordinates_from_mount(mount:kinematic_mount_type):coordinates_type;
+function wps_coord_from_mount(mount:kinematic_mount_type):bcam_coord_type;
 function wps_from_image_point(p:xy_point_type;camera:wps_camera_type):xyz_point_type;
 function image_from_wps_point(p:xyz_point_type;camera:wps_camera_type):xy_point_type;
 function wps_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
@@ -173,16 +173,16 @@ begin
 end;
 
 {
-	wps_coordinates_from_mount takes the global coordinates of the wps mounting
+	wps_coord_from_mount takes the global coordinates of the wps mounting
 	balls and calculates the origin and axis unit vectors of the wps coordinate
 	system expressed in global coordinates. We define wps coordinates in the
 	same way as bcam coordinates, so we just call the bcam routine that
 	generates these coordinates, and use its result.
 }
-function wps_coordinates_from_mount(mount:kinematic_mount_type):coordinates_type;
+function wps_coord_from_mount(mount:kinematic_mount_type):bcam_coord_type;
 	
 begin
-	wps_coordinates_from_mount:=bcam_coordinates_from_mount(mount);
+	wps_coord_from_mount:=bcam_coord_from_mount(mount);
 end;
 
 {
@@ -193,10 +193,10 @@ function wps_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz
 
 var
 	M:xyz_matrix_type;
-	wps:coordinates_type;
+	wps:bcam_coord_type;
 	
 begin
-	wps:=wps_coordinates_from_mount(mount);
+	wps:=wps_coord_from_mount(mount);
 	M:=xyz_matrix_from_points(wps.x_axis,wps.y_axis,wps.z_axis);
 	wps_from_global_vector:=xyz_transform(M,p);
 end;
@@ -217,9 +217,9 @@ end;
 	direction in global coordinates.
 }
 function global_from_wps_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-var bc:coordinates_type;	
+var bc:bcam_coord_type;	
 begin
-	bc:=wps_coordinates_from_mount(mount);
+	bc:=wps_coord_from_mount(mount);
 	global_from_wps_vector:=
 		xyz_transform(
 			xyz_matrix_inverse(

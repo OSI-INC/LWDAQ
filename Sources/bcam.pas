@@ -114,6 +114,12 @@ const {array sizes}
 	max_num_calibration_reals=100;
 	max_num_apparatus_reals=100;
 	max_num_parameter_reals=100;
+
+type {coordinate transformations}
+	bcam_coord_type=record
+		origin:xyz_point_type; {the origin}
+		x_axis,y_axis,z_axis:xyz_point_type;{axis unit vectors}
+	end;
 	
 type {database records}
 	device_calibration_type=record 
@@ -192,7 +198,7 @@ type
 	bcam_jk_type=bcam_sources_type;
 
 {geometry}
-function bcam_coordinates_from_mount(mount:kinematic_mount_type):coordinates_type;
+function bcam_coord_from_mount(mount:kinematic_mount_type):bcam_coord_type;
 function bcam_from_image_point(p:xy_point_type;camera:bcam_camera_type):xyz_point_type;
 function bcam_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
 function bcam_from_global_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
@@ -1136,14 +1142,14 @@ begin
 end;
 
 {
-	bcam_coordinates_from_mount takes the global coordintes of the camera
+	bcam_coord_from_mount takes the global coordintes of the camera
 	mounting balls and calculates the origin and axis unit vectors of the bcam
 	coordinate system expressed in global coordinates.
 }
-function bcam_coordinates_from_mount(mount:kinematic_mount_type):coordinates_type;
+function bcam_coord_from_mount(mount:kinematic_mount_type):bcam_coord_type;
 	
 var
-	bcam:coordinates_type;
+	bcam:bcam_coord_type;
 	cs,cp,cs_normal:xyz_point_type;
 	
 begin
@@ -1154,7 +1160,7 @@ begin
 	product of cp with cs.
 }
 		cs:=xyz_unit_vector(xyz_difference(slot,cone));
-		cp:=xyz_unit_vector(xyz_difference(plane,cone));
+		cp:=xyz_unit_vector(xyz_difference(flat,cone));
 		y_axis:=xyz_unit_vector(xyz_cross_product(cp,cs));
 {
 	The orientation of the bcam camera around its y-axis is set by the slot 
@@ -1178,11 +1184,11 @@ begin
 }
 		origin:=bcam_origin(mount);
 	end;
-	bcam_coordinates_from_mount:=bcam;
+	bcam_coord_from_mount:=bcam;
 end;
 
 {
-	bcam_jk_coordinates_from_mount takes the global coordintes of three pins and
+	bcam_jk_coord_from_mount takes the global coordintes of three pins and
 	returns the mount coordinates for a j_plate or k_plate, which are based upon
 	the top front corner of the plate that is nearest the sources. The y-axis
 	goes across the top-front edge of the plate. The x-axis goes forwards. In
@@ -1193,12 +1199,12 @@ end;
 	establish the directions of the coordinates. The J plate z-axis is
 	downwards, while the K plate's is upwards.
 }
-function bcam_jk_coordinates_from_mount(mount:bcam_jk_mount_type):coordinates_type;
+function bcam_jk_coord_from_mount(mount:bcam_jk_mount_type):bcam_coord_type;
 
 var	
 	top:xyz_line_type;
 	side:xyz_point_type;
-	c:coordinates_type;
+	c:bcam_coord_type;
 	
 begin
 	with mount do begin
@@ -1213,7 +1219,7 @@ begin
 		if plate_type='j_plate' then c.z_axis:=xyz_scale(c.z_axis,-1);
 		c.x_axis:=xyz_cross_product(c.y_axis,c.z_axis);
 	end;
-	bcam_jk_coordinates_from_mount:=c;
+	bcam_jk_coord_from_mount:=c;
 end;
 
 {
@@ -1224,10 +1230,10 @@ function bcam_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xy
 
 var
 	M:xyz_matrix_type;
-	bcam:coordinates_type;
+	bcam:bcam_coord_type;
 	
 begin
-	bcam:=bcam_coordinates_from_mount(mount);
+	bcam:=bcam_coord_from_mount(mount);
 	M:=xyz_matrix_from_points(bcam.x_axis,bcam.y_axis,bcam.z_axis);
 	bcam_from_global_vector:=xyz_transform(M,p);
 end;
@@ -1265,9 +1271,9 @@ end;
 	direction in global coordinates.
 }
 function global_from_bcam_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-var bc:coordinates_type;	
+var bc:bcam_coord_type;	
 begin
-	bc:=bcam_coordinates_from_mount(mount);
+	bc:=bcam_coord_from_mount(mount);
 	global_from_bcam_vector:=
 		xyz_transform(
 			xyz_matrix_inverse(
@@ -1705,7 +1711,7 @@ var
 	p,pivot_sum,axis_sum,xyz_datum:xyz_point_type;
 	far_range,close_range,sum,datum,cos_sum,sin_sum,ns,fs:real;
 	M_1,M_2,M,N:xyz_matrix_type;
-	bc_1,bc_2:coordinates_type;
+	bc_1,bc_2:bcam_coord_type;
 	
 begin
 	with calib_data do begin
@@ -1930,8 +1936,8 @@ begin
 	appears as M_1.v in the coordinates of the first mount, and M_2.v in the
 	coordinates of the second mount.
 }
-			bc_1:=bcam_coordinates_from_mount(mounts[first_mount_num]);
-			bc_2:=bcam_coordinates_from_mount(mounts[second_mount_num]);
+			bc_1:=bcam_coord_from_mount(mounts[first_mount_num]);
+			bc_2:=bcam_coord_from_mount(mounts[second_mount_num]);
 			with bc_1 do M_1:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 			with bc_2 do M_2:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 {
@@ -2129,7 +2135,7 @@ begin
 				with slot do begin
 					x:=next_app_real;y:=next_app_real;z:=next_app_real;
 				end;
-				with plane do begin
+				with flat do begin
 					x:=next_app_real;y:=next_app_real;z:=next_app_real;
 				end;
 			end;
@@ -2248,7 +2254,7 @@ var
 	source_z:real;
 	null_source:xyz_point_type;
 	M_1,M_2,M,N:xyz_matrix_type;
-	bc_1,bc_2:coordinates_type;
+	bc_1,bc_2:bcam_coord_type;
 	
 	function next_calib_real:real;
 	begin 
@@ -2282,7 +2288,7 @@ begin
 				with slot do begin
 					x:=next_app_real;y:=next_app_real;z:=next_app_real;
 				end;
-				with plane do begin
+				with flat do begin
 					x:=next_app_real;y:=next_app_real;z:=next_app_real;
 				end;
 			end;
@@ -2353,8 +2359,8 @@ begin
 	the coupling matrix for the two mount positions. Look at the comments in
 	bcam_pair_calib for a detailed explanation of the following manipulation.
 }
-					bc_1:=bcam_coordinates_from_mount(mounts[first_mount_num]);
-					bc_2:=bcam_coordinates_from_mount(mounts[second_mount_num]);
+					bc_1:=bcam_coord_from_mount(mounts[first_mount_num]);
+					bc_2:=bcam_coord_from_mount(mounts[second_mount_num]);
 					with bc_1 do M_1:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 					with bc_2 do M_2:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 					M:=xyz_matrix_difference(xyz_matrix_inverse(M_2),xyz_matrix_inverse(M_1));
@@ -2413,7 +2419,7 @@ var
 	global_link,p:xyz_point_type;
 	v:xy_point_type;
 	M_1,M_2,M,N:xyz_matrix_type;
-	pc_1,pc_2:coordinates_type;
+	pc_1,pc_2:bcam_coord_type;
 	
 	function next_calib_real:real;
 	begin 
@@ -2496,8 +2502,8 @@ begin
 	One difference here is that the degenerate element in the matrix is M[3,1] because
 	the jk_plate x-axis is parallel with the global z-axis.
 }
-				pc_1:=bcam_jk_coordinates_from_mount(mounts[first_mount_num]);
-				pc_2:=bcam_jk_coordinates_from_mount(mounts[second_mount_num]);
+				pc_1:=bcam_jk_coord_from_mount(mounts[first_mount_num]);
+				pc_2:=bcam_jk_coord_from_mount(mounts[second_mount_num]);
 				with pc_1 do M_1:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 				with pc_2 do M_2:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 				M:=xyz_matrix_difference(

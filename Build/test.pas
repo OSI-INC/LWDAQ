@@ -40,7 +40,7 @@ var
 	dp:x_graph_type;
 	ft:xy_graph_type;
 	ptr:pointer=nil;
-	coords:coordinates_type;
+	x_axis,y_axis,z_axis:xyz_point_type;
 	rot,rot2:xyz_point_type;
 	
 procedure console_write(s:string);
@@ -548,22 +548,20 @@ begin
 }
 	fsr:=5;
 	fsd:=6;
-	writeln('Testing xyz_rotation_from_axes, which uses the simplex fitter.');
+	writeln('Performing ',reps:1,' searches for xyz rotation that matches orthogonal axes.');
 	start_ms:=clock_milliseconds;
 	good:=true;
 	for i:=1 to reps do begin
 		rot.x:=random_0_to_1*pi/2;
 		rot.y:=random_0_to_1*pi/2;
 		rot.y:=random_0_to_1*pi/2;
-		with coords do begin
-			with x_axis do begin x:=1;y:=0;z:=0; end;
-			x_axis:=xyz_rotate(x_axis,rot);
-			with y_axis do begin x:=0;y:=1;z:=0; end;
-			y_axis:=xyz_rotate(y_axis,rot);
-			with z_axis do begin x:=0;y:=0;z:=1; end;
-			z_axis:=xyz_rotate(z_axis,rot);
-		end;
-		rot2:=xyz_rotation_from_axes(coords);
+		with x_axis do begin x:=1;y:=0;z:=0; end;
+		x_axis:=xyz_rotate(x_axis,rot);
+		with y_axis do begin x:=0;y:=1;z:=0; end;
+		y_axis:=xyz_rotate(y_axis,rot);
+		with z_axis do begin x:=0;y:=0;z:=1; end;
+		z_axis:=xyz_rotate(z_axis,rot);
+		rot2:=xyz_rotation_from_axes(x_axis,y_axis,z_axis);
 		if xyz_separation(rot,rot2) > small_error then good:=false;
 	end;
 	writeln('Each search takes ',1.0*(clock_milliseconds-start_ms)/reps:1:1,' ms.');

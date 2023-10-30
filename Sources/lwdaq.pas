@@ -1370,7 +1370,7 @@ end;
 
 {
 <p>lwdaq_image_exists returns a list of images in the lwdaq image list that
-match the image_name pattern you pass to the routine. If you pass "*", it will
+match the image_name pattern we pass to the routine. If we pass "*", it will
 return a list of all existing images. If there are no matching images,
 lwdaq_image_exists returns an empty string.</p>
 }
@@ -6016,7 +6016,7 @@ var
 	num_rows,num_elements,num_columns:integer;
 	num_glitches:integer=0;
 	i,extent,color,red,blue,green:integer;
-	coords:coordinates_type;
+	x_axis,y_axis,z_axis:xyz_point_type;
 	
 begin
 	error_string:='';
@@ -6034,7 +6034,7 @@ begin
 {
 <p>Transforms a point in global coordinates to a point in BCAM coordinates. The
 point in BCAM coordinates is returned as a string of three numbers, the BCAM
-<i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point. You specify the point
+<i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point. We specify the point
 in global coordinates with the <i>point</i> parameter, which also takes the form
 of a string of three numbers, these numbers being the global <i>x</i>, <i>y</i>,
 and <i>z</i> coordinates of the point whose BCAM coordinates we want to
@@ -6075,14 +6075,12 @@ mount strings.</p>
 {
 <p>Transforms a point in global coordinates to a point in BCAM coordinates. It
 is the inverse of <a href="#bcam_from_global_point">bcam_from_global_point</a>.
-You pass it the global coordinates of a point in the <i>point</i> string, and
+We pass it the BCAM coordinates of a point in the <i>point</i> string, and
 the coordinates of the BCAM's kinematic mounting balls with the <i>mount</i>
 string. The routine returns the global coordinates of the point.</p>
 
-<pre>
-lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
-0.000000 2.000000 0.000000
-</pre>
+<pre>lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
+0.000000 2.000000 0.000000</pre>
 
 <p>For a description of the BCAM coordinate system, and how it is defined with
 respect to a BCAM's kinematic mounting balls, consult the BCAM <a
@@ -6106,10 +6104,8 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 See <a href="#bcam_from_global_point">bcam_from_global_point</a> for more
 details.</p>
 
-<pre>
-lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
-0.000000 1.000000 0.000000
-</pre>
+<pre>lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
+0.000000 1.000000 0.000000</pre>
 
 <p>For a description of the BCAM coordinate system, and how it is defined with
 respect to a BCAM's kinematic mounting balls, consult the BCAM <a
@@ -6130,13 +6126,10 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 	else if option='global_from_bcam_vector' then begin
 {
 <p>Transforms a vector in global coordinates to a vector in BCAM coordinates. It
-is the inverse of <a
-href="#bcam_from_global_vector">bcam_from_global_vector</a>.</p>
+is the inverse of <a href="#bcam_from_global_vector">bcam_from_global_vector</a>.</p>
 
-<pre>
-lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
-0.000000 1.000000 0.000000
-</pre>
+<pre>lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
+0.000000 1.000000 0.000000</pre>
 
 <p>For a description of the BCAM coordinate system, and how it is defined with
 respect to a BCAM's kinematic mounting balls, consult the BCAM <a
@@ -6168,10 +6161,8 @@ described in the <a
 href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User
 Manual</a>.</p>
 
-<pre>
-lwdaq bcam_source_bearing "1.72 1.22" "P0001 1 0 0 0 0 1 75 0"
-1.000000 0.000000 0.000000 0.000000 0.000000 1.000000
-</pre>
+<pre>lwdaq bcam_source_bearing "1.72 1.22" "P0001 1 0 0 0 0 1 75 0"
+1.000000 0.000000 0.000000 0.000000 0.000000 1.000000</pre>
 
 <p>The first element in the <i>camera</i> string is the name of the camera, even
 though this calculation does not use the camera name. In the example above,
@@ -6210,10 +6201,8 @@ bearing with the <i>z</i>=<i>range</i> plane. The <i>camera</i> string contains
 the camera calibration constants, just as for <a
 href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
 
-<pre>
-lwdaq bcam_source_position "1.72 1.22" 1000 "P0001 1 0 0 0 0 1 75 0"
-1.000000 0.000000 1000.000000
-</pre>
+<pre>lwdaq bcam_source_position "1.72 1.22" 1000 "P0001 1 0 0 0 0 1 75 0"
+1.000000 0.000000 1000.000000</pre>
 
 <p>Here we see the source is at (1, 0, 1000) in BCAM coordinates, where all
 three coordinates are in millimeters. You specify the BCAM itself with its
@@ -6273,6 +6262,127 @@ causing a 100-um move on the image.</p>
 				bcam_image_position(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					bcam_camera_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='scam_from_global_point' then begin
+{
+<p>Transforms a point in global coordinates to a point in scam coordinates. It
+is the inverse of <a href="#global_from_scam_point">global_from_scam_point</a>.
+We pass the scam coordinates of a point in the <i>point</i> string. We pass a
+description of the scam coordinate system in the <i>scam</i> string. The
+coordinate description consists of six numbers. The first three are the location
+in global coordinates of the scam origin. The next three are the rotations about
+the global x, y, and z axes that transform the global axis unit vectors into the
+scam axis unit vectors. The units of angle are radians. The routine returns the
+scam coordinates of the point.</p>
+
+<pre>lwdaq scam_from_global_point "0 1 0" "10 0 0 1.570796327 0 0"
+-10.000000 -0.000000 1.000000</pre>
+
+<p>The SCAM coordinate system is defined in the same way as a BCAM coordinate
+system. See the BCAM <a
+href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a> for a
+description of we the cone, slot, and flat balls beneath the SCAM or BCAM define
+the mount coordinate system. See <i>bcam_coordinates_from_mount</i> in <a
+href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a> for the
+exact calculation. Note that our BCAM coordinate transformation routines take as
+input the coordinates of the three mounting balls, while our SCAM routines take
+the global description of the SCAM coordinate system that we can obtain from the
+coordinates of the mounting balls. The SCAM routines are faster because they
+need not re-calculate the SCAM coordinate axes. We obtain the SCAM coordinate
+description with the <i>coordinates</i> instruction passed into our <a
+href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' point scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				scam_from_global_point(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='global_from_scam_point' then begin
+{
+<p>Transforms a point in global coordinates to a point in SCAM coordinates. It
+is the inverse of <a href="#scam_from_global_point">scam_from_global_point</a>.
+We pass it the scam coordinates of a point in the <i>point</i> string. We pass
+it a description of the scam coordinate system in the <i>scam</i> string. The
+routine returns the global coordinates of the point.</p>
+
+<pre>lwdaq global_from_scam_point "-10 0 1" "10 0 0 1.570796327 0 0"
+0.000000 1.000000 -0.000000</pre>
+
+<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
+instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' point scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				global_from_scam_point(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='scam_from_global_vector' then begin
+{
+<p>Transforms a vector in global coordinates to a vector in SCAM coordinates. It
+is the inverse of <a href="#global_from_scam_vector">global_from_scam_vector</a>. See
+<a href="#scam_from_global_point">scam_from_global_point</a> for background.
+We pass the scam coordinates of a point in the <i>point</i> string. We pass
+a description of the scam coordinate system in the <i>scam</i> string. The
+routine returns the scam components of the vector.</p>
+
+<pre>lwdaq scam_from_global_vector "0 0 1" "10 0 0 1.570796327 0 0"
+0.000000 -1.000000 -0.000000</pre>
+
+<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
+instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				scam_from_global_vector(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='global_from_scam_vector' then begin
+{
+<p>Transforms a vector in SCAM coordinates to a vector in global coordinates. It
+is the inverse of <a href="#scam_from_global_vector">scam_from_global_vector</a>. See
+<a href="#scam_from_global_point">scam_from_global_point</a> for background.
+We pass the scam coordinates of a point in the <i>point</i> string. We pass
+a description of the scam coordinate system in the <i>scam</i> string. The
+routine returns the scam components of the vector.</p>
+
+<pre>lwdaq global_from_scam_vector "0 -1 0" "10 0 0 1.570796327 0 0"
+0.000000 0.000000 1.000000</pre>
+
+<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
+instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				global_from_scam_vector(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					scam_coord_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='wps_wire_plane' then begin
 {
@@ -6504,12 +6614,12 @@ coordinate system. The routine returns the three rotations.</p>
 				+'"lwdaq '+option+' x_axis y_axis z_axis".');
 			exit;
 		end;
-		with coords do begin
-			x_axis:=xyz_from_string(Tcl_ObjString(argv[2]));
-			y_axis:=xyz_from_string(Tcl_ObjString(argv[3]));
-			z_axis:=xyz_from_string(Tcl_ObjString(argv[4]));	
-		end;
-		Tcl_SetReturnString(interp,string_from_xyz(xyz_rotation_from_axes(coords)));
+		x_axis:=xyz_from_string(Tcl_ObjString(argv[2]));
+		y_axis:=xyz_from_string(Tcl_ObjString(argv[3]));
+		z_axis:=xyz_from_string(Tcl_ObjString(argv[4]));	
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_rotation_from_axes(x_axis,y_axis,z_axis)));
 	end 
 	else if option='xyz_dot_product' then begin
 {
@@ -7168,7 +7278,7 @@ entire input graph is the final y-value of the output sequence.</p>
 	end
 	else if option='matrix_inverse' then begin
 {
-<p>Calculates the inverse of a square matrix. You pass the original matrix as a
+<p>Calculates the inverse of a square matrix. We pass the original matrix as a
 string of real numbers in <i>matrix</i>. The first number should be the top-left
 element in the matrix, the second number should be the element immediately to
 the right of the top-left element, and so on, proceeding from left to right, and
