@@ -4669,8 +4669,8 @@ end;
 {
 <p>lwdaq_tcb extracts the top antenna and top power from data recorded by a
 Telemetry Control Box (TCB, <a
-href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</
-a>. The top antenna is a number specifying one of the antennas connected to the
+href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</a>.) 
+The top antenna is a number specifying one of the antennas connected to the
 TCB. Each of these antennas is capable of receiving telemetry messages from
 devices such as our Subcutaneous Transmitters (<a
 href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial
@@ -4946,12 +4946,11 @@ initial position and an error procedure name. The initial position must be a
 list of <i>n</i> real numbers. The error procedure must be defined in the Tcl
 interpreter, take a list of <i>n</i> real numbers as its input, and return a
 real-valued error measurement. We call the Tcl error routine with the help of
-the <a href="#lwdaq_simplex_error">lwdaq_simplex_error</a> interface function.
-The simplex fitter starts at the initial position and moves through the
-n-dimensional space until it reaches a maximum number of steps specified with
-the "-max_steps <i>m</i>" option. When it stops, it returns the point of
-convergeance as <i>n</i> real numbers, the final error value, and the number of
-steps it took.</p>
+the lwdaq_simplex_error interface function. The simplex fitter starts at the
+initial position and moves through the n-dimensional space until it reaches a
+maximum number of steps specified with the "-max_steps <i>m</i>" option. When it
+stops, it returns the point of convergeance as <i>n</i> real numbers, the final
+error value, and the number of steps it took.</p>
 
 <center><table border cellspacing=2>
 <tr>
@@ -4982,7 +4981,7 @@ steps it took.</p>
 	<td>-restarts <i>m</i></td>
 	<td>Number of restarts before starting to shrink, default <i>m</i> = 0.</td>
 </tr>
-</table><small><b>Table:</b> Options Accepted by the Simplex Library Routine.</center>
+</table><small><b>Table:</b> Options Accepted by the Simplex Library Routine.</small></center>
 
 <p>By default, the simplex routine assumes that the sensitivity of the error to
 each of the n coordinates is similar, so that it sets up its simplex triangle

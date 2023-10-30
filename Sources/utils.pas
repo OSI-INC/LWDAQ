@@ -5859,16 +5859,19 @@ begin
 	p.x:=point.x;
 	p.y:=point.y*cos(rotation.x)-point.z*sin(rotation.x);
 	p.z:=point.y*sin(rotation.x)+point.z*cos(rotation.x);
+	
 	{rotate about y-axis}
 	point:=p;
 	p.x:=point.x*cos(rotation.y)+point.z*sin(rotation.y);
 	p.y:=point.y;
 	p.z:=-point.x*sin(rotation.y)+point.z*cos(rotation.y);
+	
 	{rotate about z-axis}
 	point:=p;
 	p.x:=point.x*cos(rotation.z)-point.y*sin(rotation.z);
 	p.y:=point.x*sin(rotation.z)+point.y*cos(rotation.z);
 	p.z:=point.z;
+	
 	{return result}
 	xyz_rotate:=p;	
 end;
@@ -5901,9 +5904,10 @@ begin
 end;
 
 {
-	xyz_axis_rotate rotates a subject point about an axis line. We take the
-	vector from the axis to the subject point and rotate it about the axis.
-	Positive rotatin is right-handed about the axis direction.
+	xyz_axis_rotate rotates a subject point about an axis line. We take a vector
+	from a point on the axis to the subject point and rotate it about the axis.
+	We add the resulting vector to our axis point to obtain the new point.
+	Positive rotation is right-handed about the axis direction.
 }
 function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;
 	rotation:real):xyz_point_type;
