@@ -384,8 +384,7 @@ type
 		done:boolean;
 	end;
 	simplex_ptr=^simplex_type;
-	simplex_error_function_type = 
-		function(vertex:simplex_vertex_type;ep:pointer):real;
+	simplex_error_function_type = function(vertex:simplex_vertex_type;ep:pointer):real;
 
 function new_simplex(num_coords:integer):simplex_type;
 procedure simplex_step(var simplex:simplex_type;
@@ -542,10 +541,15 @@ function xy_rectangle_ellipse(rect:xy_rectangle_type):xy_ellipse_type;
 	debugging. We do note, however, that our definition of an xyz_line is not
 	consistent with our definition of an xy_line. In the xy_line, we use two
 	points, no vector. We define a three-dimensional coordinate system as an
-	origin point and three unit vectors for the three axes. The coordinate
-	system is over-constrained, but in our code we find that the
-	over-constrained definition serves as a self-consistency check, and is at
-	the same time easier to work with and easier to check.
+	origin point and three unit vectors for the three axes. Defined in this
+	manner, the coordinate system is over-constrained. As an alternative
+	definition, the coordinate type has an xyz_rotation field, in which we can
+	store the three rotations about the x, y, and z axis, in that order, and in
+	radians, that we apply to the original coordinate axes to obtain the new
+	coordinate axes of our new coordinate system. The xyz_rotation_from_axes
+	routine determines these rotations given the three axis vectors, but takes a
+	few hundred microseconds to run, so we consider the xyz_rotation field of
+	the coordinate type to be options.
 }
 type 
 	xyz_line_type=record point,direction:xyz_point_type; end;
@@ -553,7 +557,9 @@ type
 	xyz_plane_type=record point,normal:xyz_point_type; end;
 	xyz_plane_ptr_type=^xyz_plane_type;
 	coordinates_type=record
-		origin,x_axis,y_axis,z_axis:xyz_point_type;{a point and three unit vectors}
+		origin:xyz_point_type; {the origin, mandatory}
+		x_axis,y_axis,z_axis:xyz_point_type;{axis unit vectors, mandatory}
+		xyz_rotation:xyz_point_type;{rotation to obtain unit vectors, optional}
 	end;
 	kinematic_mount_type=record 
 		cone,slot,plane:xyz_point_type;{ball centers}
@@ -586,8 +592,8 @@ function xyz_matrix_inverse(A:xyz_matrix_type):xyz_matrix_type;
 function xyz_matrix_difference(A,B:xyz_matrix_type):xyz_matrix_type;
 function xyz_rotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_unrotate(point,rotation:xyz_point_type):xyz_point_type;
-function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;
-	rotation:real):xyz_point_type;
+function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;rotation:real):xyz_point_type;
+function xyz_rotation_from_axes(coords:coordinates_type):xyz_point_type;
 
 {
 	Memory Access. We use byte arrays as a data structure for copying blocks of
@@ -5951,6 +5957,102 @@ begin
 }
 	xyz_axis_rotate:=pp;
 end;
+
+{
+	xyz_rotation_from_axes_error is the error function used by the routine that
+	finds an xyz rotation to match a coordinate system. 
+}
+function xyz_rotation_from_axes_error(v:simplex_vertex_type;dp:pointer):real;
+
+type
+	data_type=record new,global:coordinates_type; end;
+	data_ptr=^data_type;
+
+var
+	c:coordinates_type;
+	rot:xyz_point_type;
+	sum:real;
+
+begin
+{
+	Make a rotation vector out of the three vertex coordinates and use it
+	to rotate the global coordinate axes.
+}
+	rot.x:=v[1];
+	rot.y:=v[2];
+	rot.z:=v[3];
+	c.x_axis:=xyz_rotate(data_ptr(dp)^.global.x_axis,rot);
+	c.y_axis:=xyz_rotate(data_ptr(dp)^.global.y_axis,rot);
+	c.z_axis:=xyz_rotate(data_ptr(dp)^.global.z_axis,rot);
+{
+	Our error is the square of the separations between the rotated axes
+	and our new coordinate axes.
+}
+	sum:=0;
+	sum:=sum+sqr(xyz_separation(c.x_axis,data_ptr(dp)^.new.x_axis));
+	sum:=sum+sqr(xyz_separation(c.y_axis,data_ptr(dp)^.new.y_axis));
+	sum:=sum+sqr(xyz_separation(c.z_axis,data_ptr(dp)^.new.z_axis));
+	xyz_rotation_from_axes_error:=sum;
+end;
+
+{
+	xyz_rotation_from_axes determines an xyz rotation that gives rise to three
+	coordinate axes. We pass the axes in with a coordinates_type. The routine
+	uses our simplex fitter to obtain the three rotations x, y, and z that rotate
+	the global coordinate axes so that they are parallel to the new coordinate
+	axes.
+}
+function xyz_rotation_from_axes(coords:coordinates_type):xyz_point_type;
+
+const
+	angle_scale=0.1;
+	small_error=0.000001;
+	
+type
+	data_type=record new,global:coordinates_type; end;
+
+var
+	data:data_type;
+	simplex:simplex_type;
+	rot:xyz_point_type;
+
+begin
+{
+	Set up the data record that we will pass to our error functions. We have
+	a copy of the global and new coordinate axes.
+}
+	xyz_rotation_from_axes:=xyz_origin;
+	data.new:=coords;
+	with data.global.x_axis do begin x:=1;y:=0;z:=0; end;
+	with data.global.y_axis do begin x:=0;y:=1;z:=0; end;
+	with data.global.z_axis do begin x:=0;y:=0;z:=1; end;
+{
+	Configure and run the simplex fitter.
+}
+	simplex:=new_simplex(num_xyz_dimensions);
+	simplex_construct(simplex,xyz_rotation_from_axes_error,@data);
+	simplex.scaling[1]:=angle_scale;
+	simplex.scaling[2]:=angle_scale;
+	simplex.scaling[3]:=angle_scale;
+	repeat 
+		simplex_step(simplex,xyz_rotation_from_axes_error,@data); 
+	until simplex.done;
+{
+	Check the final error value.
+}
+	if simplex.errors[1]>small_error then begin
+		report_error('Failed to find rotation in xyz_rotation_from_axes.');
+		exit;
+	end;
+{
+	Transfer the final fitted values into a rotation vector and return.
+}
+	rot.x:=simplex.vertices[1,1];
+	rot.y:=simplex.vertices[1,2];
+	rot.z:=simplex.vertices[1,3];
+	xyz_rotation_from_axes:=rot;
+end;
+
 
 {	
 	memory_byte	returns the value of the 8-bit unsigned byte at the specified address.

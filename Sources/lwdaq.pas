@@ -6016,6 +6016,7 @@ var
 	num_rows,num_elements,num_columns:integer;
 	num_glitches:integer=0;
 	i,extent,color,red,blue,green:integer;
+	coords:coordinates_type;
 	
 begin
 	error_string:='';
@@ -6488,6 +6489,27 @@ respective axes, hence the name "unrotate".</p>
 				xyz_unrotate(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					xyz_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='xyz_rotation_from_axes' then begin
+{
+<p>Search for a compount, three-dimensional rotation that produces the specified
+orthogonal, right-handed coordinate system vectors from the existing x, y, and z
+unit vectors. The rotation takes the form of three angles by which we rotate
+about x, y, and z. We pass the routine three vectors parallel to the new
+coordinate system. The routine returns the three rotations.</p>
+}
+		if (argc<>5) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' x_axis y_axis z_axis".');
+			exit;
+		end;
+		with coords do begin
+			x_axis:=xyz_from_string(Tcl_ObjString(argv[2]));
+			y_axis:=xyz_from_string(Tcl_ObjString(argv[3]));
+			z_axis:=xyz_from_string(Tcl_ObjString(argv[4]));	
+		end;
+		Tcl_SetReturnString(interp,string_from_xyz(xyz_rotation_from_axes(coords)));
 	end 
 	else if option='xyz_dot_product' then begin
 {
@@ -7215,7 +7237,8 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 		+' bcam_from_global_point global_from_bcam_point bcam_from_global_vector'
 		+' global_from_bcam_vector bcam_source_bearing bcam_source_position'
 		+' bcam_image_position wps_wire_plane wps_calibrate xyz_sum xyz_difference'
-		+' xyz_rotate xyz_unrotate xyz_unit_vector xyz_cross_product xyz_dot_product'
+		+' xyz_rotate xyz_unrotate xyz_rotation_from_axes xyz_unit_vector'
+		+' xyz_cross_product xyz_dot_product'
 		+' xyz_plane_plane_intersection xyz_line_plane_intersection'
 		+' xyz_line_line_bridge xyz_point_line_vector linear_interpolate'
 		+' nearest_neighbor sum_sinusoids frequency_components window_function'

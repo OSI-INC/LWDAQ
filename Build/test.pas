@@ -17,6 +17,7 @@ const
 	xsize=10;
 	xreps=100;
 	fftsize=1024;
+	small_error=0.00001;
 	
 var
 	p,q:smallint;
@@ -39,6 +40,8 @@ var
 	dp:x_graph_type;
 	ft:xy_graph_type;
 	ptr:pointer=nil;
+	coords:coordinates_type;
+	rot,rot2:xyz_point_type;
 	
 procedure console_write(s:string);
 begin writeln(s); end;
@@ -507,7 +510,6 @@ begin
 	fsr:=5;
 	fsd:=2;
 	writeln('Testing simplex fitter in ',xsize:1,' dimensions.');
-	good:=true;
 	start_ms:=clock_milliseconds;
 	simplex:=new_simplex(xsize);
 	with simplex do begin
@@ -521,12 +523,11 @@ begin
 		simplex_step(simplex,simplex_error,ptr);
 	until simplex.done;
 
-	if good then with simplex do begin
-		for i:=1 to n do 
-			if abs(vertices[1,i])>0.001 then 
-				good:=false;
+	good:=true;
+	with simplex do begin
+		for i:=1 to n do if abs(vertices[1,i])>0.001 then good:=false;
 		if not good then begin
-			writestr(s,'Convergeance failure on iteration ',j:1,'.');
+			writestr(s,'Convergeance failure.');
 			print_error(s);
 		end;
 		if (not good) or (j=xreps) then begin
@@ -542,6 +543,37 @@ begin
 	end;
 	writeln('Each fit takes ',1.0*(clock_milliseconds-start_ms)/xreps:1:1,' ms.');
 {
+	Test simplex fitter again with xyz_rotation_from_coordinates, which uses the
+	fitter to find an xyz rotation that produces a set of coordinate axes.
+}
+	fsr:=5;
+	fsd:=6;
+	writeln('Testing xyz_rotation_from_axes, which uses the simplex fitter.');
+	start_ms:=clock_milliseconds;
+	good:=true;
+	for i:=1 to reps do begin
+		rot.x:=random_0_to_1*pi/2;
+		rot.y:=random_0_to_1*pi/2;
+		rot.y:=random_0_to_1*pi/2;
+		with coords do begin
+			with x_axis do begin x:=1;y:=0;z:=0; end;
+			x_axis:=xyz_rotate(x_axis,rot);
+			with y_axis do begin x:=0;y:=1;z:=0; end;
+			y_axis:=xyz_rotate(y_axis,rot);
+			with z_axis do begin x:=0;y:=0;z:=1; end;
+			z_axis:=xyz_rotate(z_axis,rot);
+		end;
+		rot2:=xyz_rotation_from_axes(coords);
+		if xyz_separation(rot,rot2) > small_error then good:=false;
+	end;
+	writeln('Each search takes ',1.0*(clock_milliseconds-start_ms)/reps:1:1,' ms.');
+	if good then begin
+		writeln('All discovered rotations match original rotations.');
+	end else begin
+		writestr(s,'Simplex fitter failed to find accurate xyz rotation.');
+		print_error(s);
+	end;
+{
 	Report error string.
 }
 	writeln('After all these tests, the global error string is as follows:');
@@ -556,11 +588,9 @@ begin
 	gui_writeln:=console_write;
 	gui_readln:=console_read;
 	gui_writeln('Hello from gui_writeln.');
-	repeat
-		s:=gui_readln('Enter a number or press return. ');
-		writeln('You entered: "',s,'".');
-		x:=real_from_string(s,good);
-		if not good then writeln('Hey! That was not a number')
-		else writeln('That was a number.');
-	until good;
+	s:=gui_readln('Enter a number or press return. ');
+	writeln('You entered: "',s,'".');
+	x:=real_from_string(s,good);
+	if not good then writeln('Hey! That was not a number')
+	else writeln('That was a number.');
 end.
