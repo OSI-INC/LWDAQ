@@ -6234,10 +6234,8 @@ origin is the top-left corner of the image sensor as seen on the screen. The
 units of image coordinates are microns, with x going left-right and y going
 top-bottom.</p>
 
-<pre>
-lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 75 0"
-1.720000 1.220000
-</pre>
+<pre>lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 75 0"
+1.720000 1.220000</pre>
 
 <p>Here we see the image is at (1.72,1.22) in image coordinates, which is the
 center of a TC255P image sensor. You specify the BCAM itself with its
@@ -6263,6 +6261,48 @@ causing a 100-um move on the image.</p>
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					bcam_camera_from_string(Tcl_ObjString(argv[3])))));
 	end 
+	else if option='scam_coord_from_mount' then begin	
+{
+<p>Convert an SCAM mount into an SCAM coordinate system. The mount consists of
+the global coordinates of the cone, slot, and flat balls of the SCAM mount.
+These balls are named after the depressions on the underside of the SCAM. The
+routine returns the translation and rotation of the SCAM mount coordinate system
+with respect to the global coordinate system. The translation is the position of
+the SCAM coordinate origin. The rotation is three angles by which we rotate
+about the global x axis, then y-axis, then z-axis, in that order, in order to
+rotate the global axis unit vectors into the SCAM axis unit vectors.</p>
+
+<p>The SCAM coordinate system is defined in the same way as a BCAM coordinate
+system. See the Coordinate Systems section of the BCAM <a
+href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a> for
+an explanation of the procedure for taking the positions of the cone, slot, and
+flat balls and creating a mount coordinate system that will always be in the
+same location and orientation with respect to any device sitting on the mount.
+See <i>bcam_coordinates_from_mount</i> in <a
+href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a> for the
+exact calculation. Note that our BCAM coordinate transformation routines take as
+input the coordinates of the three mounting balls, while our SCAM routines take
+the global description of the SCAM coordinate system that we can obtain from the
+coordinates of the mounting balls. The SCAM routines are faster because they
+need not re-calculate the SCAM coordinate axes.</p>
+
+<pre>lwdaq scam_coord_from_mount "0 1 0 -21 1 -72 21 1 -72"
+0.000 1.000 0.000 -0.000 0.004 0.000</pre>
+
+<p>In the example above, the coordinates of the balls are such that the scam coordinates
+are almost parallel to those of the global coordinate system.</p>
+}
+		if (argc<>3) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' mount".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_scam_coord(
+				scam_coord_from_mount(
+					kinematic_mount_from_string(Tcl_ObjString(argv[2])))));
+	end
 	else if option='scam_from_global_point' then begin
 {
 <p>Transforms a point in global coordinates to a point in scam coordinates. It
@@ -6278,19 +6318,9 @@ scam coordinates of the point.</p>
 <pre>lwdaq scam_from_global_point "0 1 0" "10 0 0 1.570796327 0 0"
 -10.000000 -0.000000 1.000000</pre>
 
-<p>The SCAM coordinate system is defined in the same way as a BCAM coordinate
-system. See the BCAM <a
-href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a> for a
-description of we the cone, slot, and flat balls beneath the SCAM or BCAM define
-the mount coordinate system. See <i>bcam_coordinates_from_mount</i> in <a
-href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a> for the
-exact calculation. Note that our BCAM coordinate transformation routines take as
-input the coordinates of the three mounting balls, while our SCAM routines take
-the global description of the SCAM coordinate system that we can obtain from the
-coordinates of the mounting balls. The SCAM routines are faster because they
-need not re-calculate the SCAM coordinate axes. We obtain the SCAM coordinate
-description with the <i>coordinates</i> instruction passed into our <a
-href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+<p>See <a href="#scam_coord_from_mount">scam_coord_from_mount</a> for discussion of
+the coordinate system definition with respect to the coordinates of the balls upon 
+which the SCAM sits.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -7346,15 +7376,20 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 		Tcl_SetReturnString(interp,'Bad option "'+option+'", must be one of "'
 		+' bcam_from_global_point global_from_bcam_point bcam_from_global_vector'
 		+' global_from_bcam_vector bcam_source_bearing bcam_source_position'
-		+' bcam_image_position wps_wire_plane wps_calibrate xyz_sum xyz_difference'
-		+' xyz_rotate xyz_unrotate xyz_rotation_from_axes xyz_unit_vector'
-		+' xyz_cross_product xyz_dot_product'
+		+' bcam_image_position'
+		+' scam_from_global_point global_from_scam_point scam_from_global_vector'
+		+' global_from_scam_vector scam_coord_from_mount'
+		+' wps_wire_plane wps_calibrate'
+		+' xyz_sum xyz_difference xyz_rotate xyz_unrotate xyz_unit_vector'
+		+' xyz_cross_product xyz_dot_product xyz_rotation_from_axes'
 		+' xyz_plane_plane_intersection xyz_line_plane_intersection'
-		+' xyz_line_line_bridge xyz_point_line_vector linear_interpolate'
-		+' nearest_neighbor sum_sinusoids frequency_components window_function'
-		+' glitch_filter spikes_x glitch_filter_y glitch_filter_xy coastline_x'
-		+' coastline_x_progress coastline_xy coastline_xy_progress matrix_inverse'
-		+' tkcolor straight_line_fit ave_stdev'
+		+' xyz_line_line_bridge xyz_point_line_vector'
+		+' linear_interpolate nearest_neighbor straight_line_fit ave_stdev'
+		+' sum_sinusoids frequency_components window_function'
+		+' glitch_filter spikes_x glitch_filter_y glitch_filter_xy'
+		+' coastline_x coastline_x_progress coastline_xy coastline_xy_progress'
+		+' matrix_inverse'
+		+' tkcolor'
 		+'".');
 		exit;
 	end;

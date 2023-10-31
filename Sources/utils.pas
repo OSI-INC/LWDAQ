@@ -286,6 +286,7 @@ type
 	xy_graph_ptr=^xy_graph_type;
 
 	xyz_point_type=record x,y,z:real; end;
+	xyz_pose_type=record location,orientation:xyz_point_type; end;
 	xyz_point_ptr_type=^xyz_point_type;
 	xyz_graph_type=array of xyz_point_type;
 	xyz_graph_ptr=^xyz_graph_type;

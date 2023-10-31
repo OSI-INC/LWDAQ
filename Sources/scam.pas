@@ -58,7 +58,9 @@ type
 	global coordinates and a compound rotation about the global coordinate axes.
 	The compound rotation is three rotations in order x, y, z, which we call an
 	"xyz rotation". When we apply the rotation to the global axis vectors, we
-	obtain the SCAM axis vectors.
+	obtain the SCAM axis vectors. Note that this type is in practice identical
+	to xyz_pose_type, but we name the linear and angular parts "translation" and
+	"rotation" instead of "location" and "orientation".
 }
 	scam_coord_type=record
 		translation:xyz_point_type; {global vector from global origin to coord origin}
@@ -69,7 +71,7 @@ type
 	diameter. 
 }
 	scam_sphere_type=record 
-		location:xyz_point_type; {center of sphere}
+		pose:xyz_pose_type; {center of sphere}
 		diameter:real; {diameter of sphere}
 	end;
 {
@@ -79,8 +81,7 @@ type
 	"location" of the shaft. The axis vector is the "orientation" of the shaft.
 }
 	scam_shaft_type=record 
-		location:xyz_point_type; {origin of shaft}
-		orientation:xyz_point_type; {direction of shaft}
+		pose:xyz_pose_type; {origin of shaft}
 		num_faces:integer; {number of faces that define the shaft}
 		diameter:array of real; {diameter of face}
 		distance:array of real; {distance of face from origin}
@@ -105,8 +106,10 @@ function string_from_scam_shaft(shaft:scam_shaft_type):string;
 function scam_coord_from_mount(mount:kinematic_mount_type):scam_coord_type;
 function scam_from_global_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 function scam_from_global_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+function scam_from_global_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
 function global_from_scam_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 function global_from_scam_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+function global_from_scam_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
 
 {
 	Routines that project hypothetical objects onto the overlays of our SCAM
@@ -174,7 +177,8 @@ end;
 function read_scam_sphere(var s:string):scam_sphere_type;
 var sphere:scam_sphere_type;
 begin 
-	sphere.location:=read_xyz(s);
+	sphere.pose.location:=read_xyz(s);
+	sphere.pose.orientation:=xyz_origin;
 	sphere.diameter:=read_real(s);
 	read_scam_sphere:=sphere;
 end;
@@ -193,7 +197,7 @@ function string_from_scam_sphere(sphere:scam_sphere_type):string;
 var s:string='';
 begin
 	with sphere do begin
-		write_xyz(s,location);
+		write_xyz(s,pose.location);
 		s:=s+' ';
 		writestr(s,s,diameter:fsr:fsd);
 	end;
@@ -211,8 +215,8 @@ function read_scam_shaft(var s:string):scam_shaft_type;
 var shaft:scam_shaft_type;i:integer;
 begin 
 	with shaft do begin
-		location:=read_xyz(s);
-		orientation:=read_xyz(s);
+		pose.location:=read_xyz(s);
+		pose.orientation:=read_xyz(s);
 		num_faces:=word_count(s) div 2;
 		setlength(diameter,num_faces);
 		setlength(distance,num_faces);
@@ -238,9 +242,9 @@ function string_from_scam_shaft(shaft:scam_shaft_type):string;
 var s:string='';face_num:integer;
 begin
 	with shaft do begin
-		write_xyz(s,location);
+		write_xyz(s,pose.location);
 		s:=s+' ';
-		write_xyz(s,orientation);
+		write_xyz(s,pose.orientation);
 		s:=s+' ';
 		for face_num:=0 to num_faces-1 do
 			writestr(s,s,diameter[face_num]:fsr:fsd,' ',distance[face_num]:fsr:fsd,' ');
@@ -358,6 +362,30 @@ end;
 function global_from_scam_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 begin
 	global_from_scam_point:=xyz_sum(c.translation,global_from_scam_vector(p,c));
+end;
+
+{
+	global_from_scam_pose transforms a pose in scam coordinates to a pose
+	in global coordinates.
+}
+function global_from_scam_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
+var pose:xyz_pose_type;
+begin
+	pose.location:=global_from_scam_point(p.location,c);
+	pose.orientation:=global_from_scam_vector(p.orientation,c);
+	global_from_scam_pose:=pose;
+end;
+
+{
+	scam_from_global_pose transforms a pose in global coordinates to a pose
+	in scam coordinates.
+}
+function scam_from_global_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
+var pose:xyz_pose_type;
+begin
+	pose.location:=scam_from_global_point(p.location,c);
+	pose.orientation:=scam_from_global_vector(p.orientation,c);
+	scam_from_global_pose:=pose;
 end;
 
 {
