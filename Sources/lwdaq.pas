@@ -6266,17 +6266,17 @@ causing a 100-um move on the image.</p>
 <p>Convert an SCAM mount into an SCAM coordinate system. The mount consists of
 the global coordinates of the cone, slot, and flat balls of the SCAM mount.
 These balls are named after the depressions on the underside of the SCAM. The
-routine returns the translation and rotation of the SCAM mount coordinate system
-with respect to the global coordinate system. The translation is the position of
-the SCAM coordinate origin. The rotation is three angles by which we rotate
-about the global x axis, then y-axis, then z-axis, in that order, in order to
-rotate the global axis unit vectors into the SCAM axis unit vectors.</p>
+routine returns the location and orientation of the SCAM coordinates with
+respect to the global coordinate system. The location is the position of the
+SCAM coordinate origin. The orientation is three angles by which we rotate about
+the global x axis, then y-axis, then z-axis, in that order, in order to rotate
+the global axis unit vectors into the SCAM axis unit vectors.</p>
 
-<p>The SCAM coordinate system is defined in the same way as a BCAM coordinate
-system. See the Coordinate Systems section of the BCAM <a
-href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a> for
-an explanation of the procedure for taking the positions of the cone, slot, and
-flat balls and creating a mount coordinate system that will always be in the
+<p>The SCAM coordinate system is constrained by three mounting balls in the same
+way as a BCAM coordinate system. See the Coordinate Systems section of the BCAM
+<a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>
+for an explanation of the procedure for taking the positions of the cone, slot,
+and flat balls and creating a mount coordinate system that will always be in the
 same location and orientation with respect to any device sitting on the mount.
 See <i>bcam_coordinates_from_mount</i> in <a
 href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a> for the
@@ -6303,77 +6303,28 @@ are almost parallel to those of the global coordinate system.</p>
 				scam_coord_from_mount(
 					kinematic_mount_from_string(Tcl_ObjString(argv[2])))));
 	end
-	else if option='scam_from_global_point' then begin
-{
-<p>Transforms a point in global coordinates to a point in scam coordinates. It
-is the inverse of <a href="#global_from_scam_point">global_from_scam_point</a>.
-We pass the scam coordinates of a point in the <i>point</i> string. We pass a
-description of the scam coordinate system in the <i>scam</i> string. The
-coordinate description consists of six numbers. The first three are the location
-in global coordinates of the scam origin. The next three are the rotations about
-the global x, y, and z axes that transform the global axis unit vectors into the
-scam axis unit vectors. The units of angle are radians. The routine returns the
-scam coordinates of the point.</p>
-
-<pre>lwdaq scam_from_global_point "0 1 0" "10 0 0 1.570796327 0 0"
--10.000000 -0.000000 1.000000</pre>
-
-<p>See <a href="#scam_coord_from_mount">scam_coord_from_mount</a> for discussion of
-the coordinate system definition with respect to the coordinates of the balls upon 
-which the SCAM sits.</p>
-}
-		if (argc<>4) then begin
-			Tcl_SetReturnString(interp,error_prefix
-				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' point scam".');
-			exit;
-		end;
-		Tcl_SetReturnString(interp,
-			string_from_xyz(
-				scam_from_global_point(
-					xyz_from_string(Tcl_ObjString(argv[2])),
-					scam_coord_from_string(Tcl_ObjString(argv[3])))));
-	end 
-	else if option='global_from_scam_point' then begin
-{
-<p>Transforms a point in global coordinates to a point in SCAM coordinates. It
-is the inverse of <a href="#scam_from_global_point">scam_from_global_point</a>.
-We pass it the scam coordinates of a point in the <i>point</i> string. We pass
-it a description of the scam coordinate system in the <i>scam</i> string. The
-routine returns the global coordinates of the point.</p>
-
-<pre>lwdaq global_from_scam_point "-10 0 1" "10 0 0 1.570796327 0 0"
-0.000000 1.000000 -0.000000</pre>
-
-<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
-instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
-}
-		if (argc<>4) then begin
-			Tcl_SetReturnString(interp,error_prefix
-				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' point scam".');
-			exit;
-		end;
-		Tcl_SetReturnString(interp,
-			string_from_xyz(
-				global_from_scam_point(
-					xyz_from_string(Tcl_ObjString(argv[2])),
-					scam_coord_from_string(Tcl_ObjString(argv[3])))));
-	end 
 	else if option='scam_from_global_vector' then begin
 {
 <p>Transforms a vector in global coordinates to a vector in SCAM coordinates. It
 is the inverse of <a href="#global_from_scam_vector">global_from_scam_vector</a>. See
 <a href="#scam_from_global_point">scam_from_global_point</a> for background.
-We pass the scam coordinates of a point in the <i>point</i> string. We pass
+We pass the global coordinates of a point in the <i>point</i> string. We pass
 a description of the scam coordinate system in the <i>scam</i> string. The
 routine returns the scam components of the vector.</p>
 
 <pre>lwdaq scam_from_global_vector "0 0 1" "10 0 0 1.570796327 0 0"
-0.000000 -1.000000 -0.000000</pre>
+0.000000 1.000000 -0.000000</pre>
 
 <p>We obtain the SCAM coordinate description with the <i>coordinates</i>
 instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+
+<pre>lwdaq scam_from_global_vector "5 0 0" "10 0 0 0 0.1 0"
+4.975021 0.000000 0.499167</pre>
+
+<p>In the example above, we have the SCAM origin at x=10 in global coordinates,
+but this has no effect upon the resulting vector. The SCAM axes are rotated by
+100 mrad about the global y-axis. Our vector is distance 5 in the global
+x-direction.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6401,6 +6352,14 @@ routine returns the scam components of the vector.</p>
 
 <p>We obtain the SCAM coordinate description with the <i>coordinates</i>
 instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+
+<pre>lwdaq global_from_scam_vector "4.975021 0.000000 0.499167" "10 0 0 0 0.1 0"
+5.000000 0.000000 -0.000000</pre>
+
+<p>In the example above, we have the SCAM origin at x=10 in global coordinates,
+but this has no effect upon the resulting vector. The SCAM axes are rotated by
+100 mrad about the global y-axis. Our vector is distance 5 in the global
+x-direction.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6412,6 +6371,144 @@ instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
 			string_from_xyz(
 				global_from_scam_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
+					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='scam_from_global_point' then begin
+{
+<p>Transforms a point in global coordinates to a point in scam coordinates. It
+is the inverse of <a href="#global_from_scam_point">global_from_scam_point</a>.
+We pass the scam coordinates of a point in the <i>point</i> string. We pass a
+description of the scam coordinate system in the <i>scam</i> string. The
+coordinate description consists of six numbers. The first three are the location
+in global coordinates of the scam origin. The next three are the rotations about
+the global x, y, and z axes that transform the global axis unit vectors into the
+scam axis unit vectors. The units of angle are radians. The routine returns the
+scam coordinates of the point.</p>
+
+<pre>lwdaq scam_from_global_point "0 1 0" "10 0 0 1.570796327 0 0"
+-10.000000 -0.000000 -1.000000</pre>
+
+<p>See <a href="#scam_coord_from_mount">scam_coord_from_mount</a> for discussion of
+the coordinate system definition with respect to the coordinates of the balls upon 
+which the SCAM sits.</p>
+
+<pre>lwdaq scam_from_global_point "0 0 0" "10 0 0 0 0.1 0"
+-9.950042 0.000000 -0.998334</pre>
+
+<p>In the example above, we have the SCAM origin at x=10 in global coordinates. The
+SCAM axes are rotated by 100 mrad about the global y-axis.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' point scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				scam_from_global_point(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='global_from_scam_point' then begin
+{
+<p>Transforms a point in global coordinates to a point in SCAM coordinates. It
+is the inverse of <a href="#scam_from_global_point">scam_from_global_point</a>.
+We pass it the scam coordinates of a point in the <i>point</i> string. We pass
+it a description of the scam coordinate system in the <i>scam</i> string. The
+routine returns the global coordinates of the point.</p>
+
+<pre>lwdaq global_from_scam_point "-10 0 1" "10 0 0 1.570796327 0 0"
+0.000000 1.000000 -0.000000</pre>
+
+<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
+instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+
+<pre>lwdaq global_from_scam_point "-9.950042 0.000000 -0.998334" "10 0 0 0 0.1 0"
+-0.000000 0.000000 0.000000</pre>
+
+<p>In the example above, we have the SCAM origin at x=10 in global coordinates. The
+SCAM axes are rotated by 100 mrad about the global y-axis. Our SCAM point is the one
+that corresponds to the origin of global coordinates.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' point scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				global_from_scam_point(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='scam_from_global_pose' then begin
+{
+<p>Transforms a pose in global coordinates to a pose in SCAM coordinates. It is
+the inverse of <a href="#global_from_scam_pose">global_from_scam_pose</a>. See
+<a href="#scam_from_global_point">scam_from_global_point</a> for background. The
+<i>pose</i> is a location and compount rotation in global coordinates. The
+former is an xyz point in global coordinate. The latter is an xyz rotation about
+the global coordinate axes. We pass a description of the scam coordinate system
+in the <i>scam</i> string. The routine returns the pose in scam coordinates.</p>
+
+<pre>lwdaq scam_from_global_pose "0 0 0 0 0 0" "10 0 0 0 0.1 0"
+-9.950042 0.000000 -0.998334 0.000000 -0.100000 0.000000</pre>
+
+<p>In the example above, our SCAM coordinate system is shifted by +10 in the
+global x-direction and rotated by 100 mrad about the global y-axis. The pose
+is located at the global origin with orientation zero. In SCAM coordinates, the
+location is -10*cos(0.1) in x, 0 in y, and -sin(0.1) in z.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' pose scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz_pose(
+				scam_from_global_pose(
+					xyz_pose_from_string(Tcl_ObjString(argv[2])),
+					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='global_from_scam_pose' then begin
+{
+<p>Transforms a pose in SCAM coordinates to a pose in global coordinates. It is
+the inverse of <a href="#scam_from_global_pose">scam_from_global_pose</a>. See
+<a href="#scam_from_global_point">scam_from_global_point</a> for background. The
+<i>pose</i> is a location and compount rotation in SCAM coordinates. The former
+is an xyz point in SCAM coordinate. The latter is an xyz rotation about the SCAM
+coordinate axes. We pass a description of the scam coordinate system in the
+<i>scam</i> string. The routine returns the pose in scam coordinates.</p>
+
+<pre>lwdaq global_from_scam_pose "-9.950042 0 -0.998334 0 -0.1 0" "10 0 0 0 0.1 0"
+-0.000000 0.000000 0.000000 0.000000 0.000000 0.000000</pre>
+
+<p>In the example above, our SCAM coordinate system is shifted by +10 in the
+global x-direction and rotated by 100 mrad about the global y-axis. The pose
+is located at the global origin with orientation zero. In SCAM coordinates, the
+location is -10*cos(0.1) in x, 0 in y, and -sin(0.1) in z.</p>
+
+<pre>lwdaq global_from_scam_pose "0 0 0 0 0 0" "10 0 0 0 0.1 0"
+10.000000 0.000000 0.000000 0.000000 0.100000 0.000000</pre>
+
+<p>In the above example, we have pose at the SCAM origin with zero rotation in
+the SCAM coordinate system. When transformed into global coordinates, the
+location is the same as the coordinate system origin and the orientation is the
+same as the coordinate system rotation.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' pose scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz_pose(
+				global_from_scam_pose(
+					xyz_pose_from_string(Tcl_ObjString(argv[2])),
 					scam_coord_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='wps_wire_plane' then begin
@@ -7378,7 +7475,8 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 		+' global_from_bcam_vector bcam_source_bearing bcam_source_position'
 		+' bcam_image_position'
 		+' scam_from_global_point global_from_scam_point scam_from_global_vector'
-		+' global_from_scam_vector scam_coord_from_mount'
+		+' global_from_scam_vector scam_coord_from_mount scam_from_global_pose'
+		+' global_from_scam_pose'
 		+' wps_wire_plane wps_calibrate'
 		+' xyz_sum xyz_difference xyz_rotate xyz_unrotate xyz_unit_vector'
 		+' xyz_cross_product xyz_dot_product xyz_rotation_from_axes'

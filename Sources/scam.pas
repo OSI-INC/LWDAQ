@@ -36,6 +36,23 @@ unit scam;
 	the absolute value specifies the sensor itself. The SCAM projection routines
 	need to know the size of the pixels, and for this reason the SCAM unit keeps
 	a list of pixel sizes to go with the sensor codes.
+	
+	The CPMS measures position by modelling the bodies in its view, projecting
+	line drawings of the modelled bodies into the image sensor planes of both
+	SCAMs, and comparing the projected line drawings to the actual silhouette
+	images obtained by the SCAM image sensors. We compose a model of a "body"
+	with one or more "objects", where each object is a simple shape such as a
+	sphere, cylinder, shaft, or cuboid. The body itself has its own coordinate
+	system. The location and orientation of this coordinate system with respect
+	to the CPMS global coordinate system is the body's "pose". Each object
+	within the body has a pose in the coordinate system of the body. When we
+	project a drawing of an object, we obtain the object's global pose by adding
+	its pose within the body to the pose of the body within the global
+	coordinate system. We then transform the global pose of the object into the
+	coordinate system of each SCAM. Once we have the pose of the object in SCAM
+	coordinates, we can call one of the projection routines in this library. The
+	routines for adding and transforming poses are provided by the utils, bcam,
+	and scam units.
 }
 
 interface
@@ -58,14 +75,15 @@ type
 	global coordinates and a compound rotation about the global coordinate axes.
 	The compound rotation is three rotations in order x, y, z, which we call an
 	"xyz rotation". When we apply the rotation to the global axis vectors, we
-	obtain the SCAM axis vectors. Note that this type is in practice identical
-	to xyz_pose_type, but we name the linear and angular parts "translation" and
-	"rotation" instead of "location" and "orientation".
+	obtain the SCAM axis vectors. Together, the translation and the rotation
+	define the SCAM coordinate system with the minimal number of free variables.
+	We can think of the SCAM coordinate system as being one with a particular
+	location and orientation in global coordinates, which is to say: a
+	right-handed coordinate system with a particular pose. As a result, our SCAM
+	coordinate type is simply and xyz_pose_type, containing two fields: a
+	location and an orientation.
 }
-	scam_coord_type=record
-		translation:xyz_point_type; {global vector from global origin to coord origin}
-		rotation:xyz_point_type; {rotation of global axes to obtain coord axes}
-	end;
+	scam_coord_type=xyz_pose_type;
 {
 	A sphere object is entirely specified by the location of its center and its 
 	diameter. 
@@ -143,8 +161,8 @@ implementation
 function read_scam_coord(var s:string):scam_coord_type;
 var scam:scam_coord_type;
 begin
-	scam.translation:=read_xyz(s);
-	scam.rotation:=read_xyz(s);
+	scam.location:=read_xyz(s);
+	scam.orientation:=read_xyz(s);
 	read_scam_coord:=scam;
 end;	
 
@@ -162,9 +180,9 @@ function string_from_scam_coord(scam:scam_coord_type):string;
 var s:string='';
 begin
 	with scam do begin
-		write_xyz(s,translation);
+		write_xyz(s,location);
 		s:=s+' ';
-		write_xyz(s,rotation);
+		write_xyz(s,orientation);
 	end;
 	string_from_scam_coord:=s;
 end;
@@ -301,11 +319,11 @@ end;
 {
 	scam_coordinates_from_mount takes the global coordinates of the cone, slot,
 	and flat balls of an SCAM mount and returns the SCAM coordinate system
-	defined by the mount. The translation is the vector in global coordinates
+	defined by the mount. The location is the vector in global coordinates
 	from the global coordinate origin to the SCAM mount origin, which will be
 	the center of the cone ball. The rotation is an xyz rotation that rotates
 	the global axis unit vectors into the SCAM coordinate axis vectors. To
-	obtain the translation and SCAM coordinate axes vectors we call the BCAM
+	obtain the location and SCAM coordinate axes vectors we call the BCAM
 	coordinate routine. To obtain the compount rotation from the three
 	coordinate axes vectors we call another routine that uses a simplex fitter
 	to find the x, y, and z rotations that match the coordinate axes vectors.
@@ -321,8 +339,8 @@ var
 	
 begin
 	bcam:=bcam_coord_from_mount(mount);
-	scam.translation:=bcam.origin;
-	scam.rotation:=xyz_rotation_from_axes(bcam.x_axis,bcam.y_axis,bcam.z_axis);
+	scam.location:=bcam.origin;
+	scam.orientation:=xyz_rotation_from_axes(bcam.x_axis,bcam.y_axis,bcam.z_axis);
 	scam_coord_from_mount:=scam;
 end;
 
@@ -333,16 +351,7 @@ end;
 }
 function scam_from_global_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 begin
-	scam_from_global_vector:=xyz_rotate(p,c.rotation);
-end;
-
-{
-	scam_from_global_point transforms a point in global coordinates to a point
-	in scam coordinates.
-}
-function scam_from_global_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
-begin
-	scam_from_global_point:=scam_from_global_vector(xyz_difference(p,c.translation),c);
+	scam_from_global_vector:=xyz_unrotate(p,c.orientation);
 end;
 
 {
@@ -352,7 +361,16 @@ end;
 }
 function global_from_scam_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 begin
-	global_from_scam_vector:=xyz_unrotate(p,c.rotation);
+	global_from_scam_vector:=xyz_rotate(p,c.orientation);
+end;
+
+{
+	scam_from_global_point transforms a point in global coordinates to a point
+	in scam coordinates.
+}
+function scam_from_global_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+begin
+	scam_from_global_point:=scam_from_global_vector(xyz_difference(p,c.location),c);
 end;
 
 {
@@ -361,19 +379,7 @@ end;
 }
 function global_from_scam_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 begin
-	global_from_scam_point:=xyz_sum(c.translation,global_from_scam_vector(p,c));
-end;
-
-{
-	global_from_scam_pose transforms a pose in scam coordinates to a pose
-	in global coordinates.
-}
-function global_from_scam_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
-var pose:xyz_pose_type;
-begin
-	pose.location:=global_from_scam_point(p.location,c);
-	pose.orientation:=global_from_scam_vector(p.orientation,c);
-	global_from_scam_pose:=pose;
+	global_from_scam_point:=xyz_sum(c.location,global_from_scam_vector(p,c));
 end;
 
 {
@@ -384,18 +390,31 @@ function scam_from_global_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
 var pose:xyz_pose_type;
 begin
 	pose.location:=scam_from_global_point(p.location,c);
-	pose.orientation:=scam_from_global_vector(p.orientation,c);
+	pose.orientation:=scam_from_global_vector(
+		xyz_difference(p.orientation,c.orientation),c);
 	scam_from_global_pose:=pose;
 end;
 
 {
-	scam_project_sphere takes a sphere in SCAM coordinates and draws the outline
-	of its projection onto the image plane of a camera, then attempts to fill
-	the projection with lines drawn within the sphere. The num_points prameter
-	is the number of perimeter points the routine will project. The routine
-	represents the outline with a finite number of straight lines joining points
-	on the projection's perimeter. The routine draws in the
-	overlay, not the actual image. 
+	global_from_scam_pose transforms a pose in scam coordinates to a pose
+	in global coordinates.
+}
+function global_from_scam_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
+var pose:xyz_pose_type;
+begin
+	pose.location:=global_from_scam_point(p.location,c);
+	pose.orientation:=xyz_sum(c.orientation,global_from_scam_vector(p.orientation,c));
+	global_from_scam_pose:=pose;
+end;
+
+{
+	scam_project_sphere takes a sphere in SCAM coordinates and projects drawing
+	of the sphere onto the image plane of a camera. The routine finds the circle
+	on the surface of the sphere that is the outsline of the sphere as seen by
+	the camera. It projects num_points points around this circle into the image
+	and joins them to trace the sphere silhouette perimiter. It further joins
+	the points with one another to provide some fill of the silhouette. The
+	routine draws in the overlay, not the actual image. 
 }
 procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:scam_sphere_type;
@@ -439,11 +458,11 @@ begin
 	the tangent point. 
 }
 	center_line.point:=camera.pivot;
-	center_line.direction:=xyz_difference(sphere.location,camera.pivot);
+	center_line.direction:=xyz_difference(sphere.pose.location,camera.pivot);
 	theta:=arcsin(sphere.diameter*one_half/xyz_length(center_line.direction));
 	axis.point:=camera.pivot;
 	axis.direction:=xyz_perpendicular(center_line.direction);
-	tangent.point:=xyz_axis_rotate(sphere.location,axis,theta);
+	tangent.point:=xyz_axis_rotate(sphere.pose.location,axis,theta);
 	tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 {
 	When we project tangents onto our image sensor, we are going to mark them in the
@@ -473,7 +492,7 @@ begin
 	from each perimeter point to the center. If draw_chords, we draw parallel lines
 	between opposite perimeter points.
 }	
-	pc:=bcam_image_position(sphere.location,camera);
+	pc:=bcam_image_position(sphere.pose.location,camera);
 	ic.x:=pc.x/w-ccd_origin_x;
 	ic.y:=pc.y/w-ccd_origin_y;
 	for step:=0 to num_points-1 do begin
@@ -504,10 +523,15 @@ begin
 end;
 
 {
-	scam_project_shaft takes a shaft in SCAM coordinates and draws the outline
-	of its projection onto the image plane of a camera, then attempts to fill in
-	the outline with lines. The num_points parameter tells the routine how many
-	points around the perimiter of each shaft face it should project.
+	scam_project_shaft takes a shaft in SCAM coordinates and projects a drawing
+	of the shaft onto the image plane of a camera. We specify the number of
+	points around each shaft face that the routine should use to traced the
+	circumference at each face. The routine will further join these points from
+	one face to the next, and from the shaft center line it will draw radial
+	lines out to these points on the first and last faces. With enough points,
+	the projection will appear solid. But we do not need a solid projection for
+	SCAM fitting to work. The routine draws in the overlay, not the actual
+	image.
 }
 procedure scam_project_shaft(ip:image_ptr_type;
 	shaft:scam_shaft_type;
@@ -545,11 +569,12 @@ begin
 	if num_points=0 then exit;
 	if shaft.num_faces<=0 then exit;
 {
-	Make sure the shaft axis direction is a unit vector.
+	Apply the location and orientation of the shaft's pose to obtain the
+	axis.
 }
-	shaft.orientation:=xyz_unit_vector(shaft.orientation);
-	axis.point:=shaft.location;
-	axis.direction:=shaft.orientation;
+	axis.point:=shaft.pose.location;
+	with axis.direction do begin x:=1; y:=0; z:=0; end;
+	axis.direction:=xyz_rotate(axis.direction,shaft.pose.orientation);
 {
 	When we project tangents onto our image sensor, we are going to mark them in
 	the overlay, for which we need the size of the pixels.
@@ -571,10 +596,10 @@ begin
 	for face_num:=0 to shaft.num_faces-1 do begin
 		setlength(perimeter_a,num_points);
 		with shaft do begin
-			radial:=xyz_scale(xyz_perpendicular(shaft.orientation),
+			radial:=xyz_scale(xyz_perpendicular(axis.direction),
 				diameter[face_num]*one_half);
-			center:=xyz_sum(shaft.location,
-				xyz_scale(shaft.orientation,distance[face_num]));
+			center:=xyz_sum(shaft.pose.location,
+				xyz_scale(axis.direction,distance[face_num]));
 			point:=xyz_sum(center,radial);
 			
 			for step:=0 to num_points-1 do begin

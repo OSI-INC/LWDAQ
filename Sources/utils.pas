@@ -670,6 +670,7 @@ function decimal_from_string(s:string;base:integer):integer;
 function real_from_string(s:string;var okay:boolean):real;
 function xy_from_string(s:string):xy_point_type;
 function xyz_from_string(s:string):xyz_point_type;
+function xyz_pose_from_string(s:string):xyz_pose_type;
 function xyz_line_from_string(s:string):xyz_line_type;
 function xyz_plane_from_string(s:string):xyz_plane_type;
 function kinematic_mount_from_string(s:string):kinematic_mount_type;
@@ -684,6 +685,7 @@ function hex_string_from_byte(number:byte):string;
 function string_from_ij(p:ij_point_type):string;
 function string_from_xy(p:xy_point_type):string;
 function string_from_xyz(p:xyz_point_type):string;
+function string_from_xyz_pose(p:xyz_pose_type):string;
 function string_from_xyz_line(l:xyz_line_type):string;
 function string_from_xyz_plane(p:xyz_plane_type):string;
 function upper_case(s:string):string;
@@ -701,6 +703,7 @@ function read_real(var s:string):real;
 function read_integer(var s:string):integer;
 function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
+function read_xyz_pose(var s:string):xyz_pose_type;
 function read_x_graph(var s:string):x_graph_type;
 function read_xy_graph(var s:string):xy_graph_type;
 function read_xyz_graph(var s:string):xyz_graph_type;
@@ -709,6 +712,7 @@ function read_kinematic_mount(var s:string):kinematic_mount_type;
 procedure write_ij(var s:string;p:ij_point_type);
 procedure write_xy(var s:string;p:xy_point_type);
 procedure write_xyz(var s:string;p:xyz_point_type);
+procedure write_xyz_pose(var s:string;p:xyz_pose_type);
 procedure write_xyz_line(var s:string;l:xyz_line_type);
 procedure write_xyz_plane(var s:string;p:xyz_plane_type);
 procedure write_xyz_matrix(var s:string;M:xyz_matrix_type);
@@ -1705,6 +1709,18 @@ begin
 	read_xyz:=p;
 end;
 
+function read_xyz_pose(var s:string):xyz_pose_type;
+var p:xyz_pose_type;
+begin
+	p.location.x:=read_real(s);
+	p.location.y:=read_real(s);
+	p.location.z:=read_real(s);
+	p.orientation.x:=read_real(s);
+	p.orientation.y:=read_real(s);
+	p.orientation.z:=read_real(s);
+	read_xyz_pose:=p;
+end;
+
 function read_integer(var s:string):integer;
 var okay:boolean;
 begin
@@ -1906,6 +1922,9 @@ begin xy_from_string:=read_xy(s);end;
 function xyz_from_string(s:string):xyz_point_type;
 begin xyz_from_string:=read_xyz(s);end;
 
+function xyz_pose_from_string(s:string):xyz_pose_type;
+begin xyz_pose_from_string:=read_xyz_pose(s);end;
+
 function xyz_line_from_string(s:string):xyz_line_type;
 var l:xyz_line_type;
 begin 
@@ -1948,6 +1967,14 @@ procedure write_xyz(var s:string;p:xyz_point_type);
 var a:string;
 begin 
 	writestr(a,p.x:fsr:fsd,' ',p.y:fsr:fsd,' ',p.z:fsr:fsd);
+	s:=s+a;
+end;
+
+procedure write_xyz_pose(var s:string;p:xyz_pose_type);
+var a:string;
+begin 
+	with p.location do writestr(a,x:fsr:fsd,' ',y:fsr:fsd,' ',z:fsr:fsd);
+	with p.orientation do writestr(a,a,' ',x:fsr:fsd,' ',y:fsr:fsd,' ',z:fsr:fsd);
 	s:=s+a;
 end;
 
@@ -2033,6 +2060,13 @@ var s:string='';
 begin
 	write_xyz(s,p);
 	string_from_xyz:=s;
+end;
+
+function string_from_xyz_pose(p:xyz_pose_type):string;
+var s:string='';
+begin
+	write_xyz_pose(s,p);
+	string_from_xyz_pose:=s;
 end;
 
 function string_from_xyz_line(l:xyz_line_type):string;
@@ -6034,9 +6068,12 @@ end;
 	equation. We pass the x, y, and z axes as parameter. The routine uses our
 	simplex fitter to obtain the three rotations x, y, and z that rotate the
 	global coordinate axes so that they are parallel to the given axes. If the
-	fit does not converge to an accurate solution, it generates an error. Failure
-	will occur if the given axes are not orthogonal, are not right-handed, or are
-	at particular large angles that create a local minimum in our error function.
+	fit does not converge to an accurate solution, it generates an error.
+	Failure will occur if the given axes are not orthogonal, are not
+	right-handed, or are at particular large angles that create a local minimum
+	in our error function. The routine will not be confused by axes that are not
+	unit vectors: it converts all the axes into unit vectors before it starts
+	work.
 }
 function xyz_rotation_from_axes(x_axis,y_axis,z_axis:xyz_point_type):xyz_point_type;
 
@@ -6047,7 +6084,7 @@ const
 var
 	simplex:simplex_type;
 	rot:xyz_point_type;
-	dp:xyz_graph_type;
+	data:xyz_graph_type;
 
 begin
 {
@@ -6055,23 +6092,23 @@ begin
 	a copy of the global and new coordinate axes.
 }
 	xyz_rotation_from_axes:=xyz_origin;
-	setlength(dp,6);
-	dp.[0]:=x_axis;
-	dp.[1]:=y_axis;
-	dp.[2]:=z_axis;
-	with dp.[3] do begin x:=1;y:=0;z:=0; end;
-	with dp.[4] do begin x:=0;y:=1;z:=0; end;
-	with dp.[5] do begin x:=0;y:=0;z:=1; end;
+	setlength(data,6);
+	data[0]:=xyz_unit_vector(x_axis);
+	data[1]:=xyz_unit_vector(y_axis);
+	data[2]:=xyz_unit_vector(z_axis);
+	with data[3] do begin x:=1;y:=0;z:=0; end;
+	with data[4] do begin x:=0;y:=1;z:=0; end;
+	with data[5] do begin x:=0;y:=0;z:=1; end;
 {
 	Configure and run the simplex fitter.
 }
 	simplex:=new_simplex(num_xyz_dimensions);
-	simplex_construct(simplex,xyz_rotation_from_axes_error,@dp);
+	simplex_construct(simplex,xyz_rotation_from_axes_error,@data);
 	simplex.scaling[1]:=angle_scale;
 	simplex.scaling[2]:=angle_scale;
 	simplex.scaling[3]:=angle_scale;
 	repeat 
-		simplex_step(simplex,xyz_rotation_from_axes_error,@dp); 
+		simplex_step(simplex,xyz_rotation_from_axes_error,@data); 
 	until simplex.done;
 {
 	Check the final error value.
