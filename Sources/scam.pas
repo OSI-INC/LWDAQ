@@ -80,16 +80,16 @@ type
 	We can think of the SCAM coordinate system as being one with a particular
 	location and orientation in global coordinates, which is to say: a
 	right-handed coordinate system with a particular pose. As a result, our SCAM
-	coordinate type is simply and xyz_pose_type, containing two fields: a
-	location and an orientation.
+	coordinate type is simply and pose_type, containing two fields: a location
+	and an orientation.
 }
-	scam_coord_type=xyz_pose_type;
+	scam_coord_type=pose_type;
 {
 	A sphere object is entirely specified by the location of its center and its 
 	diameter. 
 }
 	scam_sphere_type=record 
-		pose:xyz_pose_type; {center of sphere}
+		pose:pose_type; {center of sphere}
 		diameter:real; {diameter of sphere}
 	end;
 {
@@ -99,7 +99,7 @@ type
 	"location" of the shaft. The axis vector is the "orientation" of the shaft.
 }
 	scam_shaft_type=record 
-		pose:xyz_pose_type; {origin of shaft}
+		pose:pose_type; {origin of shaft}
 		num_faces:integer; {number of faces that define the shaft}
 		diameter:array of real; {diameter of face}
 		distance:array of real; {distance of face from origin}
@@ -124,10 +124,10 @@ function string_from_scam_shaft(shaft:scam_shaft_type):string;
 function scam_coord_from_mount(mount:kinematic_mount_type):scam_coord_type;
 function scam_from_global_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 function scam_from_global_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
-function scam_from_global_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
+function scam_from_global_pose(p:pose_type;c:scam_coord_type):pose_type;
 function global_from_scam_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 function global_from_scam_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
-function global_from_scam_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
+function global_from_scam_pose(p:pose_type;c:scam_coord_type):pose_type;
 
 {
 	Routines that project hypothetical objects onto the overlays of our SCAM
@@ -370,7 +370,7 @@ end;
 }
 function scam_from_global_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 begin
-	scam_from_global_vector:=xyz_unrotate(p,c.orientation);
+	scam_from_global_vector:=xyz_rotate(p,c.orientation);
 end;
 
 {
@@ -380,7 +380,7 @@ end;
 }
 function global_from_scam_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
 begin
-	global_from_scam_vector:=xyz_rotate(p,c.orientation);
+	global_from_scam_vector:=xyz_unrotate(p,c.orientation);
 end;
 
 {
@@ -405,17 +405,16 @@ end;
 	scam_from_global_pose transforms a pose in global coordinates to a pose
 	in scam coordinates.
 }
-function scam_from_global_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
+function scam_from_global_pose(p:pose_type;c:scam_coord_type):pose_type;
 
 var 
-	pose:xyz_pose_type;
+	pose:pose_type;
 	
 begin
 	pose.location:=scam_from_global_point(p.location,c);
-	pose.orientation:=
-		xyz_rotate(
-			xyz_difference(
-				p.orientation,c.orientation),c.orientation);
+	pose.orientation:=xyz_rotate(
+		xyz_difference(p.orientation,c.orientation),
+		c.orientation);
 	scam_from_global_pose:=pose;
 end;
 
@@ -423,17 +422,16 @@ end;
 	global_from_scam_pose transforms a pose in scam coordinates to a pose
 	in global coordinates.
 }
-function global_from_scam_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
+function global_from_scam_pose(p:pose_type;c:scam_coord_type):pose_type;
 
 var 
-	pose:xyz_pose_type;
+	pose:pose_type;
 	
 begin
 	pose.location:=global_from_scam_point(p.location,c);
-	pose.orientation:=
-		xyz_unrotate(
-			xyz_sum(
-				p.orientation,c.orientation),c.orientation);
+	pose.orientation:=xyz_sum(
+		xyz_unrotate(p.orientation,c.orientation),
+		c.orientation);
 	global_from_scam_pose:=pose;
 end;
 
@@ -603,8 +601,10 @@ begin
 	axis.
 }
 	axis.point:=shaft.pose.location;
-	with axis.direction do begin x:=1; y:=0; z:=0; end;
-	axis.direction:=xyz_rotate(axis.direction,shaft.pose.orientation);
+	with axis.direction do begin x:=1; y:=0; z:=0; end;	
+ 	axis.direction:=xyz_rotate(axis.direction,shaft.pose.orientation);
+ 	axis.direction:=xyz_from_string('-0.974 -0.011 0.228');
+gui_writeln('shaft axis: '+string_from_xyz_line(axis));
 {
 	When we project tangents onto our image sensor, we are going to mark them in
 	the overlay, for which we need the size of the pixels.
@@ -625,10 +625,11 @@ begin
 }
 	for face_num:=0 to shaft.num_faces-1 do begin
 		setlength(perimeter_a,num_points);
+		if face_num=0 then perimeter_b:=perimeter_a;
 		with shaft do begin
 			radial:=xyz_scale(xyz_perpendicular(axis.direction),
 				diameter[face_num]*one_half);
-			center:=xyz_sum(shaft.pose.location,
+			center:=xyz_sum(axis.point,
 				xyz_scale(axis.direction,distance[face_num]));
 			point:=xyz_sum(center,radial);
 			

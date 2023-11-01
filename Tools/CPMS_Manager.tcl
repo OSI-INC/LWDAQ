@@ -91,6 +91,10 @@ proc CPMS_Manager_disagreement {params} {
 	if {![winfo exists $info(window)]} {
 		error "Cannot draw CPMS images: no CPMS window open."
 	}
+	
+	# Make sure messages from the SCAM routines get to the CPMS Manager's text
+	# window. Set the number of decimal places to three.
+	lwdaq_config -text_name $info(text)
 
 	# We clear the overlays in the two CPMS images. We will be using the overlays
 	# to keep track of silhouettes and bodies.
@@ -102,6 +106,15 @@ proc CPMS_Manager_disagreement {params} {
 	foreach body $config(bodies) {
 		
 		foreach side {left right} {
+set coord $config(coord_$side)
+LWDAQ_print $info(text) "\n$side\: $coord" black
+set global_pose [lrange $params 0 5]
+LWDAQ_print $info(text) "global_pose: $global_pose" green
+set scam_pose [lwdaq scam_from_global_pose $global_pose $coord]
+LWDAQ_print $info(text) "scam_pose: $scam_pose" green
+set global_pose [lwdaq global_from_scam_pose $scam_pose $coord]
+LWDAQ_print $info(text) "global_pose: $global_pose" brown
+
 			# The first six parameters in our parameter string are the pose of
 			# the body that we want to try out. We project our body onto the
 			# image sensor plane of the SCAM. We provide the mount coordinates,
@@ -113,10 +126,8 @@ proc CPMS_Manager_disagreement {params} {
 				"SCAM_$side $config(cam_$side)" \
 				"[lrange $params 0 5] [lrange $body 6 end]" \
 				$config(num_lines)
-LWDAQ_print $info(text) "$config(coord_$side)" black
-set pose "[lrange $params 0 5] [lrange $body 6 end]"
-LWDAQ_print $info(text) [lrange $params 0 5] green
-LWDAQ_print $info(text) [lwdaq scam_from_global_pose $pose $config(coord_$side)] orange
+				
+
 
 		}
 
@@ -517,8 +528,8 @@ proc CPMS_Manager_open {} {
 	pack $f.right_$a -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 100 15]
-	lwdaq_config -text_name $info(text) -fsd 3
 	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple
+	lwdaq_config -text_name $info(text) -fsd 3
 	
 	lwdaq_draw $info(img_left) cpms_photo_left \
 		-intensify $config(intensify) -zoom $config(zoom)

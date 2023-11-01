@@ -135,7 +135,6 @@ begin
 	lwdaq_tcl_eval('LWDAQ_print '+gui_text_name+' "'+s+'"');
 end;
 
-
 {
 	lwdaq_gui_draw draws the named image into the TK photo named gui_photo_name.
 	The routine calls lwdaq_draw, which, like all the lwdaq TclTk commands,
@@ -3549,21 +3548,21 @@ var
 	option:string='';
 	body:string='';
 	rule:string='10 %';
-	scam:bcam_camera_type;
+	camera:bcam_camera_type;
 	sphere:scam_sphere_type;
 	shaft:scam_shaft_type;
 	disagreement:real=0;
 	threshold:real=0;
 	num_points:integer=2000;
-	body_pose:xyz_pose_type;
-	scam_coords:scam_coord_type;
+	body_pose:pose_type;
+	coords:scam_coord_type;
 		
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_scam:=Tcl_Error;
-	scam_coords:=scam_coord_from_string('0 0 0 0 0 0');
-	scam:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
+	coords:=scam_coord_from_string('0 0 0 0 0 0');
+	camera:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
 	body:='sphere 0 0 1000 0 0 0 50';
 	
 	if (argc<3) then begin
@@ -3584,8 +3583,8 @@ begin
 	
 	command:=Tcl_ObjString(argv[2]);
 	if (command='project') then begin
-		if argc>3 then scam_coords:=scam_coord_from_string(Tcl_ObjString(argv[3]));
-		if argc>4 then scam:=bcam_camera_from_string(Tcl_ObjString(argv[4]));
+		if argc>3 then coords:=scam_coord_from_string(Tcl_ObjString(argv[3]));
+		if argc>4 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[4]));
 		if argc>5 then body:=Tcl_ObjString(argv[5]);
 		if argc>6 then num_points:=Tcl_ObjInteger(argv[6]);
 	end else if (command='disagreement') then begin
@@ -3599,25 +3598,35 @@ begin
 	end;
 	
 	if command='project' then begin
-		body_pose:=read_xyz_pose(body);
+		body_pose:=read_pose(body);
 		while body<>'' do begin
 			option:=read_word(body);
 			if option='sphere' then begin
 				sphere:=read_scam_sphere(body);
 				sphere.pose:=
 					scam_from_global_pose(
-						xyz_pose_sum(
-							body_pose,sphere.pose),
-							scam_coords);
-				scam_project_sphere(ip,sphere,scam,num_points);
+						pose_sum(body_pose,sphere.pose),
+						coords);
+				scam_project_sphere(ip,sphere,camera,num_points);
 			end else if option='shaft' then begin
 				shaft:=read_scam_shaft(body);
-				shaft.pose:=
-					scam_from_global_pose(
-						xyz_pose_sum(
-							body_pose,shaft.pose),
-							scam_coords);
-				scam_project_shaft(ip,shaft,scam,num_points);
+				shaft.pose:=pose_sum(body_pose,shaft.pose);
+				shaft.pose:=scam_from_global_pose(shaft.pose,coords);
+gui_writeln('x scam_from_global_vector: '
+	+string_from_xyz(scam_from_global_vector(xyz_from_string('1 0 0'),coords)));
+gui_writeln('x rotated by body_pose.orientation: '
+	+string_from_xyz(xyz_rotate(xyz_from_string('1 0 0'),body_pose.orientation)));
+gui_writeln('x rotated by shaft.pose.orientation: '
+	+string_from_xyz(xyz_rotate(xyz_from_string('1 0 0'),shaft.pose.orientation)));
+gui_writeln('x rotated by coords.orientation: '
+	+string_from_xyz(xyz_rotate(xyz_from_string('1 0 0'),coords.orientation)));
+gui_writeln('x unrotated by body_pose.orientation: '
+	+string_from_xyz(xyz_unrotate(xyz_from_string('1 0 0'),body_pose.orientation)));
+gui_writeln('x unrotated by shaft.pose.orientation: '
+	+string_from_xyz(xyz_unrotate(xyz_from_string('1 0 0'),shaft.pose.orientation)));
+gui_writeln('x unrotated by coords.orientation: '
+	+string_from_xyz(xyz_unrotate(xyz_from_string('1 0 0'),coords.orientation)));
+				scam_project_shaft(ip,shaft,camera,num_points);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Invalid shape "'+option+'", must be one of '
@@ -6485,9 +6494,9 @@ location is -10*cos(0.1) in x, 0 in y, and -sin(0.1) in z.</p>
 			exit;
 		end;
 		Tcl_SetReturnString(interp,
-			string_from_xyz_pose(
+			string_from_pose(
 				scam_from_global_pose(
-					xyz_pose_from_string(Tcl_ObjString(argv[2])),
+					pose_from_string(Tcl_ObjString(argv[2])),
 					scam_coord_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='global_from_scam_pose' then begin
@@ -6523,9 +6532,9 @@ same as the coordinate system rotation.</p>
 			exit;
 		end;
 		Tcl_SetReturnString(interp,
-			string_from_xyz_pose(
+			string_from_pose(
 				global_from_scam_pose(
-					xyz_pose_from_string(Tcl_ObjString(argv[2])),
+					pose_from_string(Tcl_ObjString(argv[2])),
 					scam_coord_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='wps_wire_plane' then begin

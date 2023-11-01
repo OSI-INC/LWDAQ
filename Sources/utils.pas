@@ -286,7 +286,7 @@ type
 	xy_graph_ptr=^xy_graph_type;
 
 	xyz_point_type=record x,y,z:real; end;
-	xyz_pose_type=record location,orientation:xyz_point_type; end;
+	pose_type=record location,orientation:xyz_point_type; end;
 	xyz_point_ptr_type=^xyz_point_type;
 	xyz_graph_type=array of xyz_point_type;
 	xyz_graph_ptr=^xyz_graph_type;
@@ -587,8 +587,8 @@ function xyz_rotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_unrotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;rotation:real):xyz_point_type;
 function xyz_rotation_from_axes(x_axis,y_axis,z_axis:xyz_point_type):xyz_point_type;
-function xyz_pose_sum(p,q:xyz_pose_type):xyz_pose_type;
-function xyz_pose_difference(p,q:xyz_pose_type):xyz_pose_type;
+function pose_sum(p,q:pose_type):pose_type;
+function pose_difference(p,q:pose_type):pose_type;
 
 {
 	Memory Access. We use byte arrays as a data structure for copying blocks of
@@ -672,7 +672,7 @@ function decimal_from_string(s:string;base:integer):integer;
 function real_from_string(s:string;var okay:boolean):real;
 function xy_from_string(s:string):xy_point_type;
 function xyz_from_string(s:string):xyz_point_type;
-function xyz_pose_from_string(s:string):xyz_pose_type;
+function pose_from_string(s:string):pose_type;
 function xyz_line_from_string(s:string):xyz_line_type;
 function xyz_plane_from_string(s:string):xyz_plane_type;
 function kinematic_mount_from_string(s:string):kinematic_mount_type;
@@ -687,7 +687,7 @@ function hex_string_from_byte(number:byte):string;
 function string_from_ij(p:ij_point_type):string;
 function string_from_xy(p:xy_point_type):string;
 function string_from_xyz(p:xyz_point_type):string;
-function string_from_xyz_pose(p:xyz_pose_type):string;
+function string_from_pose(p:pose_type):string;
 function string_from_xyz_line(l:xyz_line_type):string;
 function string_from_xyz_plane(p:xyz_plane_type):string;
 function upper_case(s:string):string;
@@ -705,7 +705,7 @@ function read_real(var s:string):real;
 function read_integer(var s:string):integer;
 function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
-function read_xyz_pose(var s:string):xyz_pose_type;
+function read_pose(var s:string):pose_type;
 function read_x_graph(var s:string):x_graph_type;
 function read_xy_graph(var s:string):xy_graph_type;
 function read_xyz_graph(var s:string):xyz_graph_type;
@@ -714,10 +714,11 @@ function read_kinematic_mount(var s:string):kinematic_mount_type;
 procedure write_ij(var s:string;p:ij_point_type);
 procedure write_xy(var s:string;p:xy_point_type);
 procedure write_xyz(var s:string;p:xyz_point_type);
-procedure write_xyz_pose(var s:string;p:xyz_pose_type);
+procedure write_pose(var s:string;p:pose_type);
 procedure write_xyz_line(var s:string;l:xyz_line_type);
 procedure write_xyz_plane(var s:string;p:xyz_plane_type);
 procedure write_xyz_matrix(var s:string;M:xyz_matrix_type);
+function string_from_xyz_matrix(M:xyz_matrix_type):string;
 procedure write_matrix(var s:string;var M:matrix_type);
 function string_from_matrix(var M:matrix_type):string;
 procedure write_kinematic_mount(var s:string;mount:kinematic_mount_type);
@@ -1711,8 +1712,8 @@ begin
 	read_xyz:=p;
 end;
 
-function read_xyz_pose(var s:string):xyz_pose_type;
-var p:xyz_pose_type;
+function read_pose(var s:string):pose_type;
+var p:pose_type;
 begin
 	p.location.x:=read_real(s);
 	p.location.y:=read_real(s);
@@ -1720,7 +1721,7 @@ begin
 	p.orientation.x:=read_real(s);
 	p.orientation.y:=read_real(s);
 	p.orientation.z:=read_real(s);
-	read_xyz_pose:=p;
+	read_pose:=p;
 end;
 
 function read_integer(var s:string):integer;
@@ -1924,8 +1925,8 @@ begin xy_from_string:=read_xy(s);end;
 function xyz_from_string(s:string):xyz_point_type;
 begin xyz_from_string:=read_xyz(s);end;
 
-function xyz_pose_from_string(s:string):xyz_pose_type;
-begin xyz_pose_from_string:=read_xyz_pose(s);end;
+function pose_from_string(s:string):pose_type;
+begin pose_from_string:=read_pose(s);end;
 
 function xyz_line_from_string(s:string):xyz_line_type;
 var l:xyz_line_type;
@@ -1972,7 +1973,7 @@ begin
 	s:=s+a;
 end;
 
-procedure write_xyz_pose(var s:string;p:xyz_pose_type);
+procedure write_pose(var s:string;p:pose_type);
 var a:string;
 begin 
 	with p.location do writestr(a,x:fsr:fsd,' ',y:fsr:fsd,' ',z:fsr:fsd);
@@ -2007,6 +2008,14 @@ begin
 		a:=a+eol;
 	end;
 	s:=s+a;
+end;
+
+function string_from_xyz_matrix(M:xyz_matrix_type):string;
+var s:string;
+begin
+	s:='';
+	write_xyz_matrix(s,M);
+	string_from_xyz_matrix:=s;
 end;
 
 procedure write_matrix(var s:string; var M:matrix_type);
@@ -2064,11 +2073,11 @@ begin
 	string_from_xyz:=s;
 end;
 
-function string_from_xyz_pose(p:xyz_pose_type):string;
+function string_from_pose(p:pose_type):string;
 var s:string='';
 begin
-	write_xyz_pose(s,p);
-	string_from_xyz_pose:=s;
+	write_pose(s,p);
+	string_from_pose:=s;
 end;
 
 function string_from_xyz_line(l:xyz_line_type):string;
@@ -4267,7 +4276,8 @@ end;
 
 {
 	xyz_matrix_from_points takes three xyz_point_types and makes them the rows 
-	of an xyz matrix. It returns a pointer to this new matrix.	
+	of an xyz matrix. It returns a pointer to this new matrix. If we want the 
+	points in the columns instead, apply xyz_matrix_transpose afterwards.
 }
 function xyz_matrix_from_points(p,q,r:xyz_point_type):xyz_matrix_type;
 var M:xyz_matrix_type;
@@ -5667,20 +5677,20 @@ begin
 	else xyz_separation:=0;
 end;
 
-function xyz_pose_sum(p,q:xyz_pose_type):xyz_pose_type;
-var s:xyz_pose_type;
+function pose_sum(p,q:pose_type):pose_type;
+var s:pose_type;
 begin
 	s.location:=xyz_sum(p.location,q.location);
 	s.orientation:=xyz_sum(p.orientation,q.orientation);
-	xyz_pose_sum:=s;
+	pose_sum:=s;
 end;
 
-function xyz_pose_difference(p,q:xyz_pose_type):xyz_pose_type;
-var d:xyz_pose_type;
+function pose_difference(p,q:pose_type):pose_type;
+var d:pose_type;
 begin
 	d.location:=xyz_difference(p.location,q.location);
 	d.orientation:=xyz_difference(p.orientation,q.orientation);
-	xyz_pose_difference:=d;
+	pose_difference:=d;
 end;
 
 function xyz_z_plane(z:real):xyz_plane_type;
@@ -5977,16 +5987,19 @@ begin
 	p.x:=point.x*cos(-rotation.z)-point.y*sin(-rotation.z);
 	p.y:=point.x*sin(-rotation.z)+point.y*cos(-rotation.z);
 	p.z:=point.z;
+	
 	{unrotate about y-axis}
 	point:=p;
 	p.x:=point.x*cos(-rotation.y)+point.z*sin(-rotation.y);
 	p.y:=point.y;
 	p.z:=-point.x*sin(-rotation.y)+point.z*cos(-rotation.y);
+	
 	{unrotate about x-axis}
 	point:=p;
 	p.x:=point.x;
 	p.y:=point.y*cos(-rotation.x)-point.z*sin(-rotation.x);
 	p.z:=point.y*sin(-rotation.x)+point.z*cos(-rotation.x);
+	
 	{return result}
 	xyz_unrotate:=p;	
 end;
