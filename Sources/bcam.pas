@@ -203,15 +203,15 @@ type
 {geometry}
 function bcam_coord_from_mount(mount:kinematic_mount_type):bcam_coord_type;
 function bcam_from_image_point(p:xy_point_type;camera:bcam_camera_type):xyz_point_type;
-function bcam_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-function bcam_from_global_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-function bcam_from_global_line(b:xyz_line_type;mount:kinematic_mount_type):xyz_line_type;
-function bcam_from_global_plane(p:xyz_plane_type;mount:kinematic_mount_type):xyz_plane_type;
+function bcam_from_global_vector(p:xyz_point_type;bcam:bcam_coord_type):xyz_point_type;
+function bcam_from_global_point(p:xyz_point_type;bcam:bcam_coord_type):xyz_point_type;
+function bcam_from_global_line(b:xyz_line_type;bcam:bcam_coord_type):xyz_line_type;
+function bcam_from_global_plane(p:xyz_plane_type;bcam:bcam_coord_type):xyz_plane_type;
 function image_from_bcam_point(p:xyz_point_type;camera:bcam_camera_type):xy_point_type;
-function global_from_bcam_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-function global_from_bcam_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-function global_from_bcam_line(b:xyz_line_type;mount:kinematic_mount_type):xyz_line_type;
-function global_from_bcam_plane(p:xyz_plane_type;mount:kinematic_mount_type):xyz_plane_type;
+function global_from_bcam_vector(p:xyz_point_type;bcam:bcam_coord_type):xyz_point_type;
+function global_from_bcam_point(p:xyz_point_type;bcam:bcam_coord_type):xyz_point_type;
+function global_from_bcam_line(b:xyz_line_type;bcam:bcam_coord_type):xyz_line_type;
+function global_from_bcam_plane(p:xyz_plane_type;bcam:bcam_coord_type):xyz_plane_type;
 function bcam_image_position(source_position:xyz_point_type;
 	camera:bcam_camera_type):xy_point_type;
 function bcam_source_bearing(spot_center:xy_point_type;
@@ -1188,6 +1188,11 @@ begin
 		origin:=bcam_origin(mount);
 	end;
 	bcam_coord_from_mount:=bcam;
+(*
+gui_writeln('bcam_coord_from_mount x: '+string_from_xyz(bcam.x_axis));
+gui_writeln('bcam_coord_from_mount y: '+string_from_xyz(bcam.y_axis));
+gui_writeln('bcam_coord_from_mount z: '+string_from_xyz(bcam.z_axis));
+*)
 end;
 
 {
@@ -1229,14 +1234,12 @@ end;
 	bcam_from_global_vector converts a direction in global coordinates into a 
 	direction in bcam coordinates.
 }
-function bcam_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
+function bcam_from_global_vector(p:xyz_point_type;bcam:bcam_coord_type):xyz_point_type;
 
 var
 	M:xyz_matrix_type;
-	bcam:bcam_coord_type;
 	
 begin
-	bcam:=bcam_coord_from_mount(mount);
 	M:=xyz_matrix_from_points(bcam.x_axis,bcam.y_axis,bcam.z_axis);
 	bcam_from_global_vector:=xyz_transform(M,p);
 end;
@@ -1245,10 +1248,10 @@ end;
 	bcam_from_global_point converts a point in global coordinates into a point
 	in bcam coordinates.
 }
-function bcam_from_global_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
+function bcam_from_global_point(p:xyz_point_type;bcam:bcam_coord_type):xyz_point_type;
 
 begin
-	bcam_from_global_point:=bcam_from_global_vector(xyz_difference(p,bcam_origin(mount)),mount);
+	bcam_from_global_point:=bcam_from_global_vector(xyz_difference(p,bcam.origin),bcam);
 end;
 
 {
@@ -1256,7 +1259,7 @@ end;
 	given its z-position in global coordinates. The routine assumes that the source is on 
 	the global z-axis. 
 }
-function bcam_from_global_z(z:real;mount:kinematic_mount_type):real;
+function bcam_from_global_z(z:real;bcam:bcam_coord_type):real;
 
 var
 	p,q:xyz_point_type;
@@ -1265,7 +1268,7 @@ begin
 	p.x:=0;
 	p.y:=0;
 	p.z:=z;
-	q:=bcam_from_global_point(p,mount);
+	q:=bcam_from_global_point(p,bcam);
 	bcam_from_global_z:=q.z;
 end;
 
@@ -1273,14 +1276,12 @@ end;
 	global_from_bcam_vector converts a direction in bcam coordinates into a 
 	direction in global coordinates.
 }
-function global_from_bcam_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-var bc:bcam_coord_type;	
+function global_from_bcam_vector(p:xyz_point_type;bcam:bcam_coord_type):xyz_point_type;
 begin
-	bc:=bcam_coord_from_mount(mount);
 	global_from_bcam_vector:=
 		xyz_transform(
 			xyz_matrix_inverse(
-				xyz_matrix_from_points(bc.x_axis,bc.y_axis,bc.z_axis)),
+				xyz_matrix_from_points(bcam.x_axis,bcam.y_axis,bcam.z_axis)),
 			p);
 end;
 
@@ -1288,38 +1289,38 @@ end;
 	global_from_bcam_point converts a point in bcam coordinates into a point
 	in global coordinates.
 }
-function global_from_bcam_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
+function global_from_bcam_point(p:xyz_point_type;bcam:bcam_coord_type):xyz_point_type;
 
 begin
-	global_from_bcam_point:=xyz_sum(bcam_origin(mount),global_from_bcam_vector(p,mount));
+	global_from_bcam_point:=xyz_sum(bcam.origin,global_from_bcam_vector(p,bcam));
 end;
 
 {
 	global_from_bcam_line converts a bearing (point and direction) in bcam coordinates into
 	a bearing in global coordinates.
 }
-function global_from_bcam_line(b:xyz_line_type;mount:kinematic_mount_type):xyz_line_type;
+function global_from_bcam_line(b:xyz_line_type;bcam:bcam_coord_type):xyz_line_type;
 
 var
 	gb:xyz_line_type;
 	
 begin
-	gb.point:=global_from_bcam_point(b.point,mount);
-	gb.direction:=global_from_bcam_vector(b.direction,mount);
+	gb.point:=global_from_bcam_point(b.point,bcam);
+	gb.direction:=global_from_bcam_vector(b.direction,bcam);
 	global_from_bcam_line:=gb;
 end;
 
 {
 	bcam_from_global_line does the opposite of global_from_bcam_line
 }
-function bcam_from_global_line(b:xyz_line_type;mount:kinematic_mount_type):xyz_line_type;
+function bcam_from_global_line(b:xyz_line_type;bcam:bcam_coord_type):xyz_line_type;
 
 var
 	bb:xyz_line_type;
 	
 begin
-	bb.point:=bcam_from_global_point(b.point,mount);
-	bb.direction:=bcam_from_global_vector(b.direction,mount);
+	bb.point:=bcam_from_global_point(b.point,bcam);
+	bb.direction:=bcam_from_global_vector(b.direction,bcam);
 	bcam_from_global_line:=bb;
 end;
 
@@ -1327,28 +1328,28 @@ end;
 	global_from_bcam_plane converts a bearing (point and direction) in bcam coordinates into
 	a bearing in global coordinates.
 }
-function global_from_bcam_plane(p:xyz_plane_type;mount:kinematic_mount_type):xyz_plane_type;
+function global_from_bcam_plane(p:xyz_plane_type;bcam:bcam_coord_type):xyz_plane_type;
 
 var
 	gp:xyz_plane_type;
 	
 begin
-	gp.point:=global_from_bcam_point(p.point,mount);
-	gp.normal:=global_from_bcam_vector(p.normal,mount);
+	gp.point:=global_from_bcam_point(p.point,bcam);
+	gp.normal:=global_from_bcam_vector(p.normal,bcam);
 	global_from_bcam_plane:=gp;
 end;
 
 {
 	bcam_from_global_plane does the opposite of global_from_bcam_plane
 }
-function bcam_from_global_plane(p:xyz_plane_type;mount:kinematic_mount_type):xyz_plane_type;
+function bcam_from_global_plane(p:xyz_plane_type;bcam:bcam_coord_type):xyz_plane_type;
 
 var
 	bp:xyz_plane_type;
 	
 begin
-	bp.point:=bcam_from_global_point(p.point,mount);
-	bp.normal:=bcam_from_global_vector(p.normal,mount);
+	bp.point:=bcam_from_global_point(p.point,bcam);
+	bp.normal:=bcam_from_global_vector(p.normal,bcam);
 	bcam_from_global_plane:=bp;
 end;
 
@@ -1513,12 +1514,12 @@ end;
 }
 function global_from_calib_datum(p:calib_datum_type;
 	camera:bcam_camera_type;
-	mount:kinematic_mount_type):xyz_point_type;
+	bcam:bcam_coord_type):xyz_point_type;
 
 begin
 	global_from_calib_datum:=
 		xyz_line_plane_intersection(
-			global_from_bcam_line(bcam_source_bearing(p.spot_center,camera),mount),
+			global_from_bcam_line(bcam_source_bearing(p.spot_center,camera),bcam),
 			xyz_z_plane(p.source_range));
 end;
 
@@ -1551,14 +1552,14 @@ end;
 }
 function global_offset_vector(p:calib_datum_type;
 	camera:bcam_camera_type;
-	mount:kinematic_mount_type):xyz_point_type;
+	bcam:bcam_coord_type):xyz_point_type;
 
 var
 	source_point,axis_point:xyz_point_type;
 	axis_data_point:calib_datum_type;
 
 begin
-	source_point:=global_from_calib_datum(p,camera,mount);
+	source_point:=global_from_calib_datum(p,camera,bcam);
 	with axis_data_point do begin
 		case round(camera.code) of 
 			bcam_icx424_code: begin
@@ -1580,7 +1581,7 @@ begin
 		end;
 		source_range:=p.source_range;
 	end;
-	axis_point:=global_from_calib_datum(axis_data_point,camera,mount);
+	axis_point:=global_from_calib_datum(axis_data_point,camera,bcam);
 	global_offset_vector:=xyz_difference(source_point,axis_point);
 end;
 
@@ -1745,7 +1746,7 @@ begin
 									(measurements[mount_num,far_range_num,source_num].source_range
 									-measurements[mount_num,close_range_num,source_num].source_range)
 										/(ns/fs-1),
-								mounts[mount_num]);
+								bcam_coord_from_mount(mounts[mount_num]));
 						sum:=sum+datum;
 						inc(count);
 						if show_details then begin 
@@ -1791,7 +1792,7 @@ begin
 							datum:=axis.z*
 								(bcam_from_global_z(
 									measurements[mount_num,range_num,source_num].source_range,
-									mounts[mount_num])
+									bcam_coord_from_mount(mounts[mount_num]))
 								-pivot.z)
 								*xy_separation(measurements[mount_num,range_num,source_num].spot_center,
 									measurements[mount_num,range_num,second_source_num].spot_center)
@@ -1831,10 +1832,10 @@ begin
 									xyz_difference(
 										global_from_calib_datum(
 											measurements[mount_num,range_num,second_source_num],
-											calibration,mounts[mount_num]),
+											calibration,bcam_coord_from_mount(mounts[mount_num])),
 										global_from_calib_datum(
 											measurements[mount_num,range_num,source_num],
-											calibration,mounts[mount_num])));
+											calibration,bcam_coord_from_mount(mounts[mount_num]))));
 							r:=xy_unit_vector(
 									xy_difference(
 										source_locations[second_source_num],
@@ -1880,7 +1881,7 @@ begin
 						global_offset_vector(
 							measurements[mount_num,range_num,source_num],
 							calibration,
-							mounts[mount_num]);
+							bcam_coord_from_mount(mounts[mount_num]));
 				end;
 			end;
 		end;
@@ -1901,12 +1902,12 @@ begin
 			close_range:=
 				bcam_from_global_z(
 					measurements[first_mount_num,close_range_num,source_num].source_range,
-					mounts[first_mount_num])
+					bcam_coord_from_mount(mounts[first_mount_num]))
 				-calibration.pivot.z;
 			far_range:=
 				bcam_from_global_z(
 					measurements[first_mount_num,far_range_num,source_num].source_range,
-					mounts[first_mount_num])
+					bcam_coord_from_mount(mounts[first_mount_num]))
 				-calibration.pivot.z;
 {
 	With the camera on two different mounts, the lens center is in two
@@ -2032,8 +2033,10 @@ begin
 			with zero_pivot do begin x:=0; y:=0; z:=calibration.pivot.z; end;
 			xyz_datum:=xyz_difference(xyz_datum,
 				xyz_difference(
-					global_from_bcam_point(zero_pivot,mounts[second_mount_num]),
-					global_from_bcam_point(zero_pivot,mounts[first_mount_num])));
+					global_from_bcam_point(zero_pivot,
+						bcam_coord_from_mount(mounts[second_mount_num])),
+					global_from_bcam_point(zero_pivot,
+						bcam_coord_from_mount(mounts[first_mount_num]))));
 {
 	We now have the change in pivot position that would occur due to rotation
 	only from the first mount to the second. The z-component of this change
@@ -2355,8 +2358,10 @@ begin
 					global_link:=xyz_difference(
 						global_link,
 						xyz_difference(
-							global_from_bcam_point(null_source,mounts[second_mount_num]),
-							global_from_bcam_point(null_source,mounts[first_mount_num])));
+							global_from_bcam_point(null_source,
+								bcam_coord_from_mount(mounts[second_mount_num])),
+							global_from_bcam_point(null_source,
+								bcam_coord_from_mount(mounts[first_mount_num]))));
 {
 	Now we convert the global link into the bcam coords of source position with the help of 
 	the coupling matrix for the two mount positions. Look at the comments in

@@ -361,6 +361,11 @@ begin
 	bcam.y_axis:=xyz_rotate(global_bcam_coord.y_axis,scam.orientation);
 	bcam.z_axis:=xyz_rotate(global_bcam_coord.z_axis,scam.orientation);
 	bcam_from_scam_coord:=bcam;
+(*
+gui_writeln('bcam_from_scam_coord x: '+string_from_xyz(bcam.x_axis));
+gui_writeln('bcam_from_scam_coord y: '+string_from_xyz(bcam.y_axis));
+gui_writeln('bcam_from_scam_coord z: '+string_from_xyz(bcam.z_axis));
+*)
 end;
 
 {
@@ -369,8 +374,15 @@ end;
 	type, which provides the xyz rotation we must apply to the vector.
 }
 function scam_from_global_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+var v:xyz_point_type;
 begin
-	scam_from_global_vector:=xyz_rotate(p,c.orientation);
+	v:=xyz_unrotate(p,c.orientation);
+(*
+gui_writeln('scam_from_global_vector: '+string_from_xyz(v));
+gui_writeln('bcam_from_global_vector: '+string_from_xyz(
+		bcam_from_global_vector(p,bcam_from_scam_coord(c))));
+*)
+	scam_from_global_vector:=v;
 end;
 
 {
@@ -379,8 +391,15 @@ end;
 	type, which provides the xyz rotation we must apply in reverse to the vector.
 }
 function global_from_scam_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+var v:xyz_point_type;
 begin
-	global_from_scam_vector:=xyz_unrotate(p,c.orientation);
+	v:=xyz_rotate(p,c.orientation);
+(*
+gui_writeln('global_from_scam_vector: '+string_from_xyz(v));
+gui_writeln('global_from_bcam_vector: '+string_from_xyz(
+		global_from_bcam_vector(p,bcam_from_scam_coord(c))));
+*)
+	global_from_scam_vector:=v;
 end;
 
 {
@@ -388,8 +407,15 @@ end;
 	in scam coordinates.
 }
 function scam_from_global_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+var v:xyz_point_type;
 begin
-	scam_from_global_point:=scam_from_global_vector(xyz_difference(p,c.location),c);
+	v:=scam_from_global_vector(xyz_difference(p,c.location),c);
+(*
+gui_writeln('scam_from_global_point: '+string_from_xyz(v));
+gui_writeln('bcam_from_global_point: '+string_from_xyz(
+	bcam_from_global_point(p,bcam_from_scam_coord(c))));
+*)
+	scam_from_global_point:=v;
 end;
 
 {
@@ -397,8 +423,15 @@ end;
 	in global coordinates.
 }
 function global_from_scam_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+var v:xyz_point_type;
 begin
-	global_from_scam_point:=xyz_sum(c.location,global_from_scam_vector(p,c));
+	v:=xyz_sum(c.location,global_from_scam_vector(p,c));
+(*
+gui_writeln('global_from_scam_point: '+string_from_xyz(v));
+gui_writeln('global_from_bcam_point: '+string_from_xyz(
+	global_from_bcam_point(p,bcam_from_scam_coord(c))));
+*)
+	global_from_scam_point:=v;
 end;
 
 {
@@ -412,7 +445,7 @@ var
 	
 begin
 	pose.location:=scam_from_global_point(p.location,c);
-	pose.orientation:=xyz_rotate(
+	pose.orientation:=xyz_unrotate(
 		xyz_difference(p.orientation,c.orientation),
 		c.orientation);
 	scam_from_global_pose:=pose;
@@ -430,7 +463,7 @@ var
 begin
 	pose.location:=global_from_scam_point(p.location,c);
 	pose.orientation:=xyz_sum(
-		xyz_unrotate(p.orientation,c.orientation),
+		xyz_rotate(p.orientation,c.orientation),
 		c.orientation);
 	global_from_scam_pose:=pose;
 end;

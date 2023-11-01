@@ -6095,7 +6095,8 @@ mount strings.</p>
 			string_from_xyz(
 				bcam_from_global_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					kinematic_mount_from_string(Tcl_ObjString(argv[3])))));
+					bcam_coord_from_mount(
+						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='global_from_bcam_point' then begin
 {
@@ -6122,7 +6123,8 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 			string_from_xyz(
 				global_from_bcam_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					kinematic_mount_from_string(Tcl_ObjString(argv[3])))));
+					bcam_coord_from_mount(
+						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='bcam_from_global_vector' then begin
 {
@@ -6147,7 +6149,8 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 			string_from_xyz(
 				bcam_from_global_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					kinematic_mount_from_string(Tcl_ObjString(argv[3])))));
+					bcam_coord_from_mount(
+						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='global_from_bcam_vector' then begin
 {
@@ -6171,7 +6174,8 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 			string_from_xyz(
 				global_from_bcam_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					kinematic_mount_from_string(Tcl_ObjString(argv[3])))));
+					bcam_coord_from_mount(
+						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='bcam_source_bearing' then begin
 {
