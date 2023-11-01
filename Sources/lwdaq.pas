@@ -3549,18 +3549,21 @@ var
 	option:string='';
 	body:string='';
 	rule:string='10 %';
-	camera:bcam_camera_type;
+	scam:bcam_camera_type;
 	sphere:scam_sphere_type;
 	shaft:scam_shaft_type;
 	disagreement:real=0;
 	threshold:real=0;
 	num_points:integer=2000;
+	body_pose:xyz_pose_type;
+	scam_coords:scam_coord_type;
 		
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_scam:=Tcl_Error;
-	camera:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
+	scam_coords:=scam_coord_from_string('0 0 0 0 0 0');
+	scam:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
 	body:='sphere 0 0 1000 0 0 0 50';
 	
 	if (argc<3) then begin
@@ -3581,9 +3584,10 @@ begin
 	
 	command:=Tcl_ObjString(argv[2]);
 	if (command='project') then begin
-		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
-		if argc>4 then body:=Tcl_ObjString(argv[4]);
-		if argc>5 then num_points:=Tcl_ObjInteger(argv[5]);
+		if argc>3 then scam_coords:=scam_coord_from_string(Tcl_ObjString(argv[3]));
+		if argc>4 then scam:=bcam_camera_from_string(Tcl_ObjString(argv[4]));
+		if argc>5 then body:=Tcl_ObjString(argv[5]);
+		if argc>6 then num_points:=Tcl_ObjInteger(argv[6]);
 	end else if (command='disagreement') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
 	end else begin
@@ -3595,19 +3599,32 @@ begin
 	end;
 	
 	if command='project' then begin
-		option:=read_word(body);
-		if option='sphere' then begin
-			sphere:=read_scam_sphere(body);
-			scam_project_sphere(ip,sphere,camera,num_points);
-		end else if option='shaft' then begin
-			shaft:=read_scam_shaft(body);
-			scam_project_shaft(ip,shaft,camera,num_points);
-		end else begin
-			Tcl_SetReturnString(interp,error_prefix
-				+'Invalid shape "'+option+'", must be one of '
-				+'"sphere shaft" in '
-				+'lwdaq_scam.');
-			exit;
+		body_pose:=read_xyz_pose(body);
+		while body<>'' do begin
+			option:=read_word(body);
+			if option='sphere' then begin
+				sphere:=read_scam_sphere(body);
+				sphere.pose:=
+					scam_from_global_pose(
+						xyz_pose_sum(
+							body_pose,sphere.pose),
+							scam_coords);
+				scam_project_sphere(ip,sphere,scam,num_points);
+			end else if option='shaft' then begin
+				shaft:=read_scam_shaft(body);
+				shaft.pose:=
+					scam_from_global_pose(
+						xyz_pose_sum(
+							body_pose,shaft.pose),
+							scam_coords);
+				scam_project_shaft(ip,shaft,scam,num_points);
+			end else begin
+				Tcl_SetReturnString(interp,error_prefix
+					+'Invalid shape "'+option+'", must be one of '
+					+'"sphere shaft" in '
+					+'lwdaq_scam.');
+				exit;
+			end;
 		end;
 	end;
 	

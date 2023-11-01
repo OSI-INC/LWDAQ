@@ -27,15 +27,19 @@ proc CPMS_Manager_init {} {
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.283 38.549 4.568 -7.789 1.833 2.000 26.411 0.137" 
-	set config(mount_left) "92.123 -18.364 -3.450 \
-		83.853 -18.211 -78.940 \
+	set config(mount_left) "92.123 -18.364 -3.450\
+		83.853 -18.211 -78.940\
 		125.201 -17.747 -71.806"
+	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
 	set config(cam_right) "12.588 -38.571 4.827 -3.708 7.509 2.000 26.252 3144.919" 
-	set config(mount_right) "-77.819 -20.395 -2.397 \
-		-74.201 -20.179 -75.451 \
+	set config(mount_right) "-77.819 -20.395 -2.397\
+		-74.201 -20.179 -75.451\
 		-115.549 -20.643 -68.317"
+	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+	
 		
-	set config(objects) [list "20 20 0 0 0 0 sphere 38.068"]
+	set config(bodies) [list \
+		{0 20 450 0 0 0 sphere 0 0 0 38.068 shaft 0 0 0 0 0 -1.57 1 0 1 40} ]
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
 	set config(num_lines) "200"
@@ -72,9 +76,9 @@ proc CPMS_Manager_init {} {
 
 #
 # CPMS_Manager_disagreement takes the two cpms images and obtains the number of
-# pixels in which our modelled objects and their actual silhouettes disagree. In
+# pixels in which our modelled bodies and their actual silhouettes disagree. In
 # doint so, the routine colors the overlay of the cpms images to show the modelled
-# objects and their silhouettes with the disagreement pixels colored blue for model
+# bodies and their silhouettes with the disagreement pixels colored blue for model
 # without silhouette and orange for silhouette without model and no overlay color
 # for agreement between the two.
 #
@@ -88,51 +92,43 @@ proc CPMS_Manager_disagreement {params} {
 		error "Cannot draw CPMS images: no CPMS window open."
 	}
 
-	# Put the left and right camera calibration constants into a string with a name
-	# at the front, which is the format our projection routines require.
-	set lc "LC $config(cam_left)"
-	set rc "RC $config(cam_right)"
-	
 	# We clear the overlays in the two CPMS images. We will be using the overlays
-	# to keep track of silhouettes and objects.
+	# to keep track of silhouettes and bodies.
 	lwdaq_image_manipulate $info(img_left) none -clear 1
 	lwdaq_image_manipulate $info(img_right) none -clear 1
 	
-	# Go through each of the modelled objects and project it onto our modelled SCAM
-	# image sensors, marking the projection with lines.
-	foreach obj $config(objects) {
-	
-		# Get the location and orienation of the object in global coordinates, which
-		# will be in the first six values of the parameter string.
-		set gl [lrange $params 0 2]
-		set go [lrange $params 3 5]
-	
-		# Transform the location and orientation of the object into the mount
-		# coordinate system of the left SCAM. 
-		set lp [lwdaq bcam_from_global_point $gl $config(mount_left)]
-		set ld [lwdaq bcam_from_global_rotation $go $config(mount_left)]
+	# Go through each modelled body and project a drawing of it onto the image
+	# plane of both of our SCAMs.
+	foreach body $config(bodies) {
 		
-		# Once we have the object in the
-		# mount coordinates, project into the image sensor with the help of our
-		# calibration constants.
-		set lo "[lindex $obj 0] $lp $ld [lrange $obj 7 end]"
-		lwdaq_scam $info(img_left) project $lc $lo $config(num_lines)
+		foreach side {left right} {
+			# The first six parameters in our parameter string are the pose of
+			# the body that we want to try out. We project our body onto the
+			# image sensor plane of the SCAM. We provide the mount coordinates,
+			# the camera calibration constants, and our global-coordinate 
+			# description of the body with its pose over-written by the pose
+			# provided by the parameter string.
+			lwdaq_scam $info(img_$side) project \
+				$config(coord_$side) \
+				"SCAM_$side $config(cam_$side)" \
+				"[lrange $params 0 5] [lrange $body 6 end]" \
+				$config(num_lines)
+LWDAQ_print $info(text) "$config(coord_$side)" black
+set pose "[lrange $params 0 5] [lrange $body 6 end]"
+LWDAQ_print $info(text) [lrange $params 0 5] green
+LWDAQ_print $info(text) [lwdaq scam_from_global_pose $pose $config(coord_$side)] orange
 
-		# Do the same for the right-hand SCAM.
-		set rp [lwdaq bcam_from_global_point [lrange $params 0 2] $config(mount_right)]
-		set rd [lwdaq bcam_from_global_vector [lrange $params 3 5] $config(mount_right)]
-		set ro "[lindex $obj 0] $rp $rd [lrange $obj 7 end]"
-		lwdaq_scam $info(img_right) project $rc $ro $config(num_lines)
+		}
 
 		# We have made use of six parameters, which are what we need for one
-		# object. We remove these six from our parameter list so that the next
-		# six parameter will come to the front and be ready for the next object,
+		# body. We remove these six from our parameter list so that the next
+		# six parameter will come to the front and be ready for the next body,
 		# if any.
 		set params [lrange $params 6 end]
 	}
 
 	# Go through both images and adjust the overlay to be orange for silhouette
-	# only, blue for object only, and clear for agreement. Count the disagreeing
+	# only, blue for body only, and clear for agreement. Count the disagreeing
 	# pixels.
 	set disagreement 0
 	set left_count [lwdaq_scam $info(img_left) disagreement $config(threshold)]
@@ -150,9 +146,9 @@ proc CPMS_Manager_disagreement {params} {
 }
 
 #
-# CPMS_Manager_get_params extracts from the objects their postion and
+# CPMS_Manager_get_params extracts from the bodies their postion and
 # orientation. When we fit the model to the silhouettes, we will be adjusting
-# the position and orientation of each modelled object, but not its object type
+# the position and orientation of each modelled body, but not its body type
 # string or its diameter and length parameters. 
 #
 proc CPMS_Manager_get_params {} {
@@ -160,12 +156,12 @@ proc CPMS_Manager_get_params {} {
 	upvar #0 CPMS_Manager_info info
 	
 	set params ""
-	foreach obj $config(objects) {append params "[lrange $obj 1 6] "}
+	foreach body $config(bodies) {append params "[lrange $body 0 5] "}
 	return $params
 }
 
 #
-# CPMS_Manager_show gets the parameters from the current modelled objects, calculates
+# CPMS_Manager_show gets the parameters from the current modelled bodies, calculates
 # the disagreement, and prints the current parameters and disagreement to the text
 # window. 
 #
@@ -176,6 +172,8 @@ proc CPMS_Manager_show {} {
 	set info(control) "Go"
 	LWDAQ_update
 	
+	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
 	set params [CPMS_Manager_get_params]
 	set disagreement [CPMS_Manager_disagreement $params]
 	LWDAQ_print -nonewline $info(text) "$config(file_index) " green
@@ -187,21 +185,26 @@ proc CPMS_Manager_show {} {
 }
 
 #
-# CPMS_Manager_displace displaces the object position and orientation a random
+# CPMS_Manager_displace displaces the body position and orientation a random
 # amount.
 #
 proc CPMS_Manager_displace {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
-	for {set i 0} {$i < [llength $config(objects)]} {incr i} {
-		set x [lindex $config(objects) $i 1]
-		lset config(objects) $i 1 [format %.3f [expr $x + (rand()-0.5)*10.0]]
-		set y [lindex $config(objects) $i 2]
-		lset config(objects) $i 2 [format %.3f [expr $y + (rand()-0.5)*10.0]]
-		set z [lindex $config(objects) $i 3]
-		lset config(objects) $i 3 [format %.3f [expr $z + (rand()-0.5)*100.0]]
+	set newbodies [list]
+	foreach body $config(bodies) {
+		set x [format %.3f [expr [lindex $body 0] + (rand()-0.5)*10.0]]
+		set y [format %.3f [expr [lindex $body 1] + (rand()-0.5)*10.0]]
+		set z [format %.3f [expr [lindex $body 2] + (rand()-0.5)*10.0]]
+		set rx [format %.3f [expr [lindex $body 3] + (rand()-0.5)*1.0]]
+		set ry [format %.3f [expr [lindex $body 4] + (rand()-0.5)*1.0]]
+		set rz [format %.3f [expr [lindex $body 5] + (rand()-0.5)*1.0]]
+		
+		lappend newbodies "$x $y $z $rx $ry $rz [lrange $body 6 end]"
 	}
+	LWDAQ_print $info(text) $newbodies
+	set config(bodies) $newbodies
 	CPMS_Manager_disagreement [CPMS_Manager_get_params]
 	return [CPMS_Manager_get_params]
 } 
@@ -224,16 +227,16 @@ proc CPMS_Manager_altitude {params} {
 }
 
 #
-# CPMS_Manager_fit gets the object parameters as a starting point and calls the
+# CPMS_Manager_fit gets the body parameters as a starting point and calls the
 # simplex fitter to minimise the disagreement between the modelled and actual
-# objects. The size of the adjustments the fitter makes in each parameter during
+# bodies. The size of the adjustments the fitter makes in each parameter during
 # the fit will be shrinking as the fit proceeds, but relative to one another
 # thye will be in proportion to the list of scaling factors we have provided. If
 # the scaling factors are all unity, all parameters are fitted with equal steps.
 # If a scaling factor is zero, the parameter will not be adjusted. If a scaling
 # factor is 10, the parameter will be adjusted by ten times the amount as a
 # parameter with scaling factor one. At the end of the fit, we take the final
-# fitted parameter values and apply them to our object models.
+# fitted parameter values and apply them to our body models.
 #
 proc CPMS_Manager_fit {} {
 	upvar #0 CPMS_Manager_config config
@@ -244,15 +247,12 @@ proc CPMS_Manager_fit {} {
 	LWDAQ_update
 	
 	if {[catch {
+		set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
+		set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
 		set start_params [CPMS_Manager_get_params]
 		set scaling ""
-		foreach obj $config(objects) {
-			append scaling "1 1 10 "
-			if {[lindex $obj 0] != "sphere"} {
-				append scaling "0.1 0.1 0.1 "
-			} else {
-				append scaling "0 0 0 "
-			}
+		foreach body $config(bodies) {
+			append scaling "1 1 10 0 0 0 "
 		}
 		set result [lwdaq_simplex $start_params CPMS_Manager_altitude \
 			-report 0 \
@@ -264,16 +264,12 @@ proc CPMS_Manager_fit {} {
 		if {[LWDAQ_is_error_result $result]} {error "$result"}
 		LWDAQ_print -nonewline $info(text) "$config(file_index) " green	
 		LWDAQ_print $info(text) $result black
-		set obj_num 0
-		foreach {x y z rx ry rz} [lrange $result 0 end-2] {
-			lset config(objects) $obj_num 1 $x
-			lset config(objects) $obj_num 2 $y
-			lset config(objects) $obj_num 3 $z
-			lset config(objects) $obj_num 4 $rx
-			lset config(objects) $obj_num 5 $ry
-			lset config(objects) $obj_num 6 $rz
-			incr obj_num
+		set newbodies [list]
+		foreach body $config(bodies) {
+			lappend newbodies "[lrange $result 0 5] [lrange $body 6 end]"
+			set result [lrange $result 6 end]
 		}
+		set config(bodies) $newbodies
 	} error_message]} {
 		LWDAQ_print $info(text) $error_message
 		set info(state) "Idle"
@@ -400,7 +396,7 @@ proc CPMS_Manager_write {} {
 # number of images for the read to complete. Each pair of stereo image files
 # must be named in the CPMS format, which is L and UNIX time with GIF extension
 # for left and same with R for right. If auto_fit is set, the routine fits the
-# modelled objects to each pair of images and prints results to text window.
+# modelled bodies to each pair of images and prints results to text window.
 #
 proc CPMS_Manager_read {} {
 	upvar #0 CPMS_Manager_config config
@@ -502,7 +498,7 @@ proc CPMS_Manager_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	foreach a {objects} {
+	foreach a {bodies} {
 		set f [frame $w.$a]
 		pack $f -side top -fill x
 		label $f.l$a -text "$a\:"
@@ -539,24 +535,8 @@ return ""
 
 ----------Begin Help----------
 
-Before acquiring live images, configure SCAM instrument to acquire either the
-left or right imageThe compound object being viewed we describe with a list of
-objects. Here are some example lists.
-
-Sphere:
-{sphere 20 20 500 0 0 0 38.068}
-
-Cylinder:
-{cylinder 0 0 500 1 0 0 20 30}
-
-Sphere on Post:
-{sphere 20 20 500 0 0 0 40} {cylinder 20 0 500 0 -1 0 20 50}
-
-Shaft:
-{shaft 20 20 500 1 0 0 0 -20 20 -20 30 10 36 10 40 12 40 30 60 30 60 39 58 40 0 40}
-			
 Compound:
-{cylinder 0 0 0 1 0 0 33.78 7.24} {cylinder 0 0 0 1 0 0 19.00 -20.0} {cylinder 3.62 16.89 0 0 1 0 4 10}
+{0 20450 0.000 0.000 0.000 sphere 0 0 0 38.068 shaft 0 0 0 0 0 -1.57 1 0 1 40}
 
 ----------End Help----------
 

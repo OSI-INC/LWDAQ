@@ -345,6 +345,25 @@ begin
 end;
 
 {
+	bcam_from_scam_coord takes an scam_coord_type and transforms it into 
+	a bcam_coord_type. We rotate the bcam global coordinate axes to obtain
+	the coordinate axes of the bcam coordinate system that is equivalent
+	to our rotation-based scam coordinate system.
+}
+function bcam_from_scam_coord(scam:scam_coord_type):bcam_coord_type;
+
+var
+	bcam:bcam_coord_type;
+
+begin
+	bcam.origin:=scam.location;
+	bcam.x_axis:=xyz_rotate(global_bcam_coord.x_axis,scam.orientation);
+	bcam.y_axis:=xyz_rotate(global_bcam_coord.y_axis,scam.orientation);
+	bcam.z_axis:=xyz_rotate(global_bcam_coord.z_axis,scam.orientation);
+	bcam_from_scam_coord:=bcam;
+end;
+
+{
 	scam_from_global_vector transforms a direction in global coordinates to a
 	direction in scam coordinates. We pass into the routine an scam coordinate
 	type, which provides the xyz rotation we must apply to the vector.
@@ -387,11 +406,16 @@ end;
 	in scam coordinates.
 }
 function scam_from_global_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
-var pose:xyz_pose_type;
+
+var 
+	pose:xyz_pose_type;
+	
 begin
 	pose.location:=scam_from_global_point(p.location,c);
-	pose.orientation:=scam_from_global_vector(
-		xyz_difference(p.orientation,c.orientation),c);
+	pose.orientation:=
+		xyz_rotate(
+			xyz_difference(
+				p.orientation,c.orientation),c.orientation);
 	scam_from_global_pose:=pose;
 end;
 
@@ -400,10 +424,16 @@ end;
 	in global coordinates.
 }
 function global_from_scam_pose(p:xyz_pose_type;c:scam_coord_type):xyz_pose_type;
-var pose:xyz_pose_type;
+
+var 
+	pose:xyz_pose_type;
+	
 begin
 	pose.location:=global_from_scam_point(p.location,c);
-	pose.orientation:=xyz_sum(c.orientation,global_from_scam_vector(p.orientation,c));
+	pose.orientation:=
+		xyz_unrotate(
+			xyz_sum(
+				p.orientation,c.orientation),c.orientation);
 	global_from_scam_pose:=pose;
 end;
 

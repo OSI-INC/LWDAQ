@@ -121,6 +121,9 @@ type {coordinate transformations}
 		x_axis,y_axis,z_axis:xyz_point_type;{axis unit vectors}
 	end;
 	
+var {global coordinates: origin=(0,0,0) x=(1,0,0) y=(0,1,0) z=(0,0,1)}
+	global_bcam_coord:bcam_coord_type;
+	
 type {database records}
 	device_calibration_type=record 
 		device_id:string;
@@ -2552,6 +2555,19 @@ begin
 }
 	bcam_jk_calib:=string_from_jk_calib(calib_output,verbose,check);
 end;
+
+{
+	Initialization sets up bcam variables.
+}
+initialization 
+
+with global_bcam_coord do begin
+	with origin do begin x:=0;y:=0;z:=0; end;
+	with x_axis do begin x:=1;y:=0;z:=0; end;
+	with y_axis do begin x:=0;y:=1;z:=0; end;
+	with z_axis do begin x:=0;y:=0;z:=1; end;
+end;
+
 
 end.
 

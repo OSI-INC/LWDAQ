@@ -587,6 +587,8 @@ function xyz_rotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_unrotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;rotation:real):xyz_point_type;
 function xyz_rotation_from_axes(x_axis,y_axis,z_axis:xyz_point_type):xyz_point_type;
+function xyz_pose_sum(p,q:xyz_pose_type):xyz_pose_type;
+function xyz_pose_difference(p,q:xyz_pose_type):xyz_pose_type;
 
 {
 	Memory Access. We use byte arrays as a data structure for copying blocks of
@@ -5665,6 +5667,22 @@ begin
 	else xyz_separation:=0;
 end;
 
+function xyz_pose_sum(p,q:xyz_pose_type):xyz_pose_type;
+var s:xyz_pose_type;
+begin
+	s.location:=xyz_sum(p.location,q.location);
+	s.orientation:=xyz_sum(p.orientation,q.orientation);
+	xyz_pose_sum:=s;
+end;
+
+function xyz_pose_difference(p,q:xyz_pose_type):xyz_pose_type;
+var d:xyz_pose_type;
+begin
+	d.location:=xyz_difference(p.location,q.location);
+	d.orientation:=xyz_difference(p.orientation,q.orientation);
+	xyz_pose_difference:=d;
+end;
+
 function xyz_z_plane(z:real):xyz_plane_type;
 var plane:xyz_plane_type;
 begin
@@ -6396,7 +6414,7 @@ begin
 end;
 
 {
-	initialization sets up the utils variables.
+	Initialization sets up the utils variables.
 }
 initialization 
 
