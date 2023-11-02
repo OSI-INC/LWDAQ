@@ -23,7 +23,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.4"
+	LWDAQ_tool_init "CPMS_Manager" "1.5"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.283 38.549 4.568 -7.789 1.833 2.000 26.411 0.137" 
@@ -38,18 +38,15 @@ proc CPMS_Manager_init {} {
 	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
 	
 	set config(bodies) [list \
-		{0.061 19.240 453.744 0.000 0.291 0.005 \
-		sphere 0 0 0 38.068 \
-		shaft 1 -27 0 0 -1 0 19 0 19 40} ]
+		{0 20 450 0 0 0 sphere 0 0 0 38.068 shaft 1 -27 0 0 -1 0 19 0 19 40} ]
 	set config(scaling) "1 1 1 0 0.1 0.1"
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
-	set config(num_lines) "50"
+	set config(num_lines) "100"
 	set config(stop_fit) 0
 	
 	set config(zoom) "1.0"
 	set config(intensify) "exact"
-	set config(threshold) "5 %"
 	
 	set config(left_sensor_socket) "1"
 	set config(right_sensor_socket) "2"
@@ -60,8 +57,7 @@ proc CPMS_Manager_init {} {
 	set config(auto_fit) "0"
 	set config(file_index) "0000000000"
 	
-	set info(projector_window) "$info(window).cpms_projector"
-
+	set info(calib_window) "$info(window).calib_window"
 	set info(state) "Idle"
 
 	if {[file exists $info(settings_file_name)]} {
@@ -87,6 +83,7 @@ proc CPMS_Manager_init {} {
 proc CPMS_Manager_disagreement {params} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
+	upvar #0 LWDAQ_config_SCAM iconfig
 
 	# If user has closed the manager window, generate an error so that we stop any
 	# fitting that might be calling this routine. 
@@ -132,8 +129,10 @@ proc CPMS_Manager_disagreement {params} {
 	# only, blue for body only, and clear for agreement. Count the disagreeing
 	# pixels.
 	set disagreement 0
-	set left_count [lwdaq_scam $info(img_left) disagreement $config(threshold)]
-	set right_count [lwdaq_scam $info(img_right) disagreement $config(threshold)]
+	set left_count [lwdaq_scam $info(img_left) disagreement \
+		$iconfig(analysis_threshold)]
+	set right_count [lwdaq_scam $info(img_right) disagreement \
+		$iconfig(analysis_threshold)]
 	set disagreement [expr $disagreement + $left_count + $right_count]
 
 	# Draw the images with their overlays in the manager window.
@@ -193,19 +192,13 @@ proc CPMS_Manager_displace {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
-	set newbodies [list]
-	foreach body $config(bodies) {
-		set x [format %.3f [expr [lindex $body 0] + (rand()-0.5)*10.0]]
-		set y [format %.3f [expr [lindex $body 1] + (rand()-0.5)*10.0]]
-		set z [format %.3f [expr [lindex $body 2] + (rand()-0.5)*10.0]]
-		set rx [format %.3f [expr [lindex $body 3] + (rand()-0.5)*1.0]]
-		set ry [format %.3f [expr [lindex $body 4] + (rand()-0.5)*1.0]]
-		set rz [format %.3f [expr [lindex $body 5] + (rand()-0.5)*1.0]]
-		
-		lappend newbodies "$x $y $z $rx $ry $rz [lrange $body 6 end]"
+	for {set i 0} {$i < [llength $config(bodies)]} {incr i} {
+		for {set j 0} {$j < 6} {incr j} {
+			lset config(bodies) $i $j [format %.3f \
+				[expr [lindex $config(bodies) $i $j] \
+					+ (rand()-0.5)*10.0*[lindex $config(scaling) $j]]]
+		}
 	}
-	LWDAQ_print $info(text) $newbodies
-	set config(bodies) $newbodies
 	CPMS_Manager_disagreement [CPMS_Manager_get_params]
 	return [CPMS_Manager_get_params]
 } 
@@ -429,6 +422,49 @@ proc CPMS_Manager_read {} {
 }
 
 #
+# CPMS_Manager_calibration opens a new window that displays the calibration constants
+# of the left and right cameras, as well as the mounting ball measurements in CPMS
+# coordinates.
+#
+proc CPMS_Manager_calibration {} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+
+	set w $info(calib_window)
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "Calibration Constants, CPMS Manager $info(version)"
+	} {
+		raise $w
+		return ""
+	}
+
+	set f [frame $w.buttons]
+	pack $f -side top -fill x
+	button $f.save -text "Save Configuration" -command "LWDAQ_tool_save $info(name)"
+	pack $f.save -side left -expand 1
+	button $f.unsave -text "Unsave Configuration" -command "LWDAQ_tool_unsave $info(name)"
+	pack $f.unsave -side left -expand 1
+	
+	foreach a {cam_left cam_right} {
+		set f [frame $w.$a]
+		pack $f -side top -fill x
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 70
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	foreach a {mount_left mount_right} {
+		set f [frame $w.$a]
+		pack $f -side top -fill x
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 70
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+}
+
+#
 # CPMS_Manager_open opens the CPMS Manger Tool window.
 #
 proc CPMS_Manager_open {} {
@@ -441,31 +477,25 @@ proc CPMS_Manager_open {} {
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.state -textvariable CPMS_Manager_info(state) -fg blue
+	label $f.state -textvariable CPMS_Manager_info(state) -fg blue -width 10
 	pack $f.state -side left -expand yes
 
 	button $f.stop -text "Stop" -command {set CPMS_Manager_config(stop_fit) 1}
 	pack $f.stop -side left -expand yes
 	
-	foreach a {Acquire Show Clear Displace Fit Pickdir Write Read} {
+	foreach a {Acquire Show Clear Displace Fit Calibration Pickdir Write Read} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post CPMS_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
 	
+	checkbutton $f.af -variable CPMS_Manager_config(auto_fit) -text "auto_fit"
+	pack $f.af -side left -expand yes
+
 	label $f.lfi -text "index:"
 	entry $f.efi -textvariable CPMS_Manager_config(file_index) -width 12
 	pack $f.lfi $f.efi -side left -expand yes
 
-	checkbutton $f.af -variable CPMS_Manager_config(auto_fit) -text "auto_fit"
-	pack $f.af -side left -expand yes
-
-	foreach a {threshold} {
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 6
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-	
 	foreach a {Help Configure} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command [list LWDAQ_tool_$b $info(name)]
@@ -475,45 +505,42 @@ proc CPMS_Manager_open {} {
 	set f [frame $w.cameras]
 	pack $f -side top -fill x
 
-	foreach a {cam_left cam_right} {
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 50
+	foreach a {daq_flash_seconds analysis_threshold} {
+		label $f.l$a -text "$a"
+		entry $f.e$a -textvariable LWDAQ_config_SCAM($a) -width 4
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
-	
+
+	foreach a {num_lines left_sensor_socket right_sensor_socket \
+		left_source_socket right_source_socket} {
+		label $f.l$a -text "$a"
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 3
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+
 	button $f.scam -text "SCAM" -command {LWDAQ_post "LWDAQ_open SCAM"}
 	pack $f.scam -side left -expand yes
 	
-	label $f.lnl -text "num_lines:"
-	entry $f.enl -textvariable CPMS_Manager_config(num_lines) -width 5
-	pack $f.lnl $f.enl -side left -expand yes
-	
-	set f [frame $w.mounts]
+	set f [frame $w.bodies]
 	pack $f -side top -fill x
-
-	foreach a {mount_left mount_right} {
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 70
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
 	
-	foreach a {bodies} {
-		set f [frame $w.$a]
-		pack $f -side top -fill x
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 180
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
+	label $f.lbodies -text "bodies:"
+	entry $f.ebodies -textvariable CPMS_Manager_config(bodies) -width 130
+	pack $f.lbodies $f.ebodies -side left -expand yes
+
+	label $f.lscaling -text "scaling:"
+	entry $f.escaling -textvariable CPMS_Manager_config(scaling) -width 20
+	pack $f.lscaling $f.escaling -side left -expand yes
 
 	set f [frame $w.images_a]
 	pack $f -side top -fill x
 
 	image create photo "cpms_photo_left"
-	label $f.left_$a -image "cpms_photo_left"
-	pack $f.left_$a -side left -expand yes
+	label $f.limg -image "cpms_photo_left"
+	pack $f.limg -side left -expand yes
 	image create photo "cpms_photo_right"
-	label $f.right_$a -image "cpms_photo_right"
-	pack $f.right_$a -side left -expand yes
+	label $f.rimg -image "cpms_photo_right"
+	pack $f.rimg -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 100 15]
 	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple

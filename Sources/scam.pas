@@ -203,17 +203,30 @@ end;
 	negative or positive.	
 }
 function read_scam_shaft(var s:string):scam_shaft_type;
-var shaft:scam_shaft_type;i:integer;
+var 
+	shaft:scam_shaft_type;
+	i:integer;
+	x:real;
+	word,ss:string;
+	okay:boolean;
 begin 
 	with shaft do begin
 		location:=read_xyz(s);
 		direction:=read_xyz(s);
-		num_faces:=word_count(s) div 2;
+		ss:='';
+		repeat
+			word:=read_word(s);
+			x:=real_from_string(word,okay);
+			if okay then ss:=ss+' '+word;
+		until (s='') or (not okay);
+		if not okay then s:=word+' '+s;
+		
+		num_faces:=word_count(ss) div 2;
 		setlength(diameter,num_faces);
 		setlength(distance,num_faces);
 		for i:=0 to num_faces-1 do begin
-			diameter[i]:=read_real(s);
-			distance[i]:=read_real(s);
+			diameter[i]:=read_real(ss);
+			distance[i]:=read_real(ss);
 		end;
 	end;
 	read_scam_shaft:=shaft;

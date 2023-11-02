@@ -1553,10 +1553,8 @@ begin
 			fail:begin 
 				okay:=false;
 				state:=quit;
-				if s<>'' then
-					report_error('Invalid string "'+s+'" in real_from_string.');
 			end;
-		end;{case state of}
+		end;
 	until state=quit;
 
 	if okay then real_from_string:=value
