@@ -22,37 +22,62 @@ unit scam;
 {$LONGSTRINGS ON}
 
 {
-	This unit contains routines for use with our Silhouette Cameras (SCAMs) and
-	the Contactless Position Measurement System (CPMS) that uses these cameras.
-	The SCAM uses the same kinematic mount as a BCAM. The SCAM coordinate system
-	is defined with respect to the SCAM's three mounting balls in the same way
-	as for BCAMs. In our SCAM calibration constants, we assume that the SCAM
-	axis is close to the SCAM z-axis. Our image coordinates are microns from the
-	top-left corner of the top-left pixel in the image. Our mount coordinates
-	are in millimeters, with the origin at the center of the cone ball. Our
-	global coordinates are in millimeters also. We use the same image sensor
-	encoding system as the BCAM: in place of axis.z we include a code that
-	indicates if the SCAM faces forward (+ve) or backwards (-ve), and for which
-	the absolute value specifies the sensor itself. The SCAM projection routines
-	need to know the size of the pixels, and for this reason the SCAM unit keeps
-	a list of pixel sizes to go with the sensor codes.
-	
-	The CPMS measures position by modelling the bodies in its view, projecting
-	line drawings of the modelled bodies into the image sensor planes of both
-	SCAMs, and comparing the projected line drawings to the actual silhouette
-	images obtained by the SCAM image sensors. We compose a model of a "body"
-	with one or more "objects", where each object is a simple shape such as a
-	sphere, cylinder, shaft, or cuboid. The body itself has its own coordinate
-	system. The location and orientation of this coordinate system with respect
-	to the CPMS global coordinate system is the body's "pose". Each object
-	within the body has a pose in the coordinate system of the body. When we
-	project a drawing of an object, we obtain the object's global pose by adding
-	its pose within the body to the pose of the body within the global
-	coordinate system. We then transform the global pose of the object into the
-	coordinate system of each SCAM. Once we have the pose of the object in SCAM
-	coordinates, we can call one of the projection routines in this library. The
-	routines for adding and transforming poses are provided by the utils, bcam,
-	and scam units.
+	This unit contains routines for use with the Silhouette Cameras (SCAMs) of
+	our Contactless Position Measurement System (CPMS). An SCAM sits on the same
+	design of kinematic mount as a BCAM. The SCAM coordinate system is defined
+	with respect to its three mounting balls in the same way as it is for BCAMs.
+	An SCAM camera's calibration constants are defined in the same way as those
+	of a BCAM. We assume the camera axis is almost parallel to the z-axis of the
+	mount coordinate system. We have the direction of the axis, the location of
+	the pivot point, the distance to the image sensor, and the rotation of the
+	image sensor about the z-axis as the eight parameters that describe an SCAM,
+	all in mount coordinates. Each image sensor has a different pixel size, so
+	we need the calibration constants to specify the image sensor as well. The
+	z-component of the axis direction is redundant: all our routines calculate
+	the z-component from the small x and y components. In place of z in the
+	calibration constants is an integer code that allows us to deduce the size
+	of the image sensor pixels.
+
+	The CPMS measures position taking stereo silhouette images of one or more
+	bodies, modelling each body with a line drawing, and adjusting the location
+	and orientation of each body until we minimize the disagreement between the
+	line drawing and the actual silhouette. For brevity, we refer to the
+	location and orientation of a body as its "pose". In our SCAM routines, we
+	express the pose with six numbers: six coordinates and six angles. The six
+	angles specify a compound rotation consisting of sequential rotations about
+	the x, y, and z axes.
+
+	Each CPMS body has its own internal coordinate system. The location of its
+	origin is the location of the body. The sequence compount rotation that
+	aligns the global coordinate axes with those of the body's coordinate system
+	are the orientation of the body. The pose of the body is the pose of its
+	coordinate system.
+
+	Each SCAM has its own mount coordinate system. In our SCAM routines, we
+	represent each mount coordinate system by its own pose, just as we do for
+	bodies. This representation contrasts with that of mounts in our BCAM
+	routines, where we pass around the mounting ball coordinates and convert
+	them into an origin and a set of orthogonal unit vectors. We use pose for
+	bodies and mounts in SCAM routines because we want to use our simplex fitter
+	to deduce body positions and to calibrate SCAMs. For the simplex fitter to
+	work well, we must represent the pose with the minimum number of parameters,
+	which is six. An origin with three unit vectors is twelve parameters. Half
+	of them are redundant.
+
+	We compose a model of a CPMS "body" with one or more "objects", where each
+	object is a simple shape such as a sphere, cylinder, shaft, or cuboid. Each
+	object has its own pose within the coordinate system of the body. The body
+	has its pose within the global coordinate system, and the SCAM viewing the
+	body has its own pose. To obtain the pose of a body in SCAM coordinates, we
+	transform one or more points in each object into the SCAM coordinates. We do
+	not attempt to obtain the pose of the objects in SCAM coordinates for
+	several reasons. One is that some objects are radially or axially symmetric,
+	so they are insensitive to one or more rotations. Another is that
+	calculating the pose that corresponds to a transformation is not as fast as
+	transforming points and vectors. During our fits, we want the
+	transformations to run fast. We take the time to obtain the pose of SCAM
+	coordinates, but we need to so only once per measurement fit, because the
+	SCAM coordinates are not changing.
 }
 
 interface
@@ -71,25 +96,11 @@ const
 
 type
 {
-	An SCAM coordinate system is defined by a translation of the origin in
-	global coordinates and a compound rotation about the global coordinate axes.
-	The compound rotation is three rotations in order x, y, z, which we call an
-	"xyz rotation". When we apply the rotation to the global axis vectors, we
-	obtain the SCAM axis vectors. Together, the translation and the rotation
-	define the SCAM coordinate system with the minimal number of free variables.
-	We can think of the SCAM coordinate system as being one with a particular
-	location and orientation in global coordinates, which is to say: a
-	right-handed coordinate system with a particular pose. As a result, our SCAM
-	coordinate type is simply and pose_type, containing two fields: a location
-	and an orientation.
-}
-	scam_coord_type=pose_type;
-{
 	A sphere object is entirely specified by the location of its center and its 
 	diameter. 
 }
 	scam_sphere_type=record 
-		pose:pose_type; {center of sphere}
+		location:xyz_point_type; {center of sphere}
 		diameter:real; {diameter of sphere}
 	end;
 {
@@ -99,7 +110,8 @@ type
 	"location" of the shaft. The axis vector is the "orientation" of the shaft.
 }
 	scam_shaft_type=record 
-		pose:pose_type; {origin of shaft}
+		location:xyz_point_type; {origin of shaft}
+		direction:xyz_point_type; {direction of shaft}
 		num_faces:integer; {number of faces that define the shaft}
 		diameter:array of real; {diameter of face}
 		distance:array of real; {distance of face from origin}
@@ -108,26 +120,21 @@ type
 {
 	String input and output routines.
 }
-function scam_coord_from_string(s:string):scam_coord_type;
 function scam_sphere_from_string(s:string):scam_sphere_type;
 function scam_shaft_from_string(s:string):scam_shaft_type;
-function read_scam_coord(var s:string):scam_coord_type;
 function read_scam_sphere(var s:string):scam_sphere_type;
 function read_scam_shaft(var s:string):scam_shaft_type;
-function string_from_scam_coord(scam:scam_coord_type):string;
 function string_from_scam_sphere(sphere:scam_sphere_type):string;
 function string_from_scam_shaft(shaft:scam_shaft_type):string;
 
 {
 	Coordinate handling routines.
 }
-function scam_coord_from_mount(mount:kinematic_mount_type):scam_coord_type;
-function scam_from_global_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
-function scam_from_global_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
-function scam_from_global_pose(p:pose_type;c:scam_coord_type):pose_type;
-function global_from_scam_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
-function global_from_scam_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
-function global_from_scam_pose(p:pose_type;c:scam_coord_type):pose_type;
+function scam_coord_from_mount(mount:kinematic_mount_type):pose_type;
+function scam_from_global_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
+function scam_from_global_point(p:xyz_point_type;c:pose_type):xyz_point_type;
+function global_from_scam_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
+function global_from_scam_point(p:xyz_point_type;c:pose_type):xyz_point_type;
 
 {
 	Routines that project hypothetical objects onto the overlays of our SCAM
@@ -154,49 +161,13 @@ function scam_disagreement(ip:image_ptr_type;threshold:real):real;
 implementation
 
 {
-	read_scam_coord reads the parameters of an scam coordinate system from a
-	string and deletes them from the string. It returns an scam coordinate
-	record.
-}
-function read_scam_coord(var s:string):scam_coord_type;
-var scam:scam_coord_type;
-begin
-	scam.location:=read_xyz(s);
-	scam.orientation:=read_xyz(s);
-	read_scam_coord:=scam;
-end;	
-
-{
-	scam_coord_from_string converts a string into an scam coordinate type and returns
-	the coordinate record.
-}
-function scam_coord_from_string(s:string):scam_coord_type;
-begin scam_coord_from_string:=read_scam_coord(s); end;	
-
-{
-	string_from_scam_coord converts a coordinate type into a string for printing.
-}
-function string_from_scam_coord(scam:scam_coord_type):string;
-var s:string='';
-begin
-	with scam do begin
-		write_xyz(s,location);
-		s:=s+' ';
-		write_xyz(s,orientation);
-	end;
-	string_from_scam_coord:=s;
-end;
-
-
-{
 	read_scam_sphere reads the parameters of a sphere from a string and deletes
 	them from the string. It returns a new sphere record.
 }
 function read_scam_sphere(var s:string):scam_sphere_type;
 var sphere:scam_sphere_type;
 begin 
-	sphere.pose.location:=read_xyz(s);
-	sphere.pose.orientation:=xyz_origin;
+	sphere.location:=read_xyz(s);
 	sphere.diameter:=read_real(s);
 	read_scam_sphere:=sphere;
 end;
@@ -215,7 +186,7 @@ function string_from_scam_sphere(sphere:scam_sphere_type):string;
 var s:string='';
 begin
 	with sphere do begin
-		write_xyz(s,pose.location);
+		write_xyz(s,location);
 		s:=s+' ';
 		writestr(s,s,diameter:fsr:fsd);
 	end;
@@ -225,16 +196,18 @@ end;
 {
 	read_scam_shaft reads the parameters of a shaft from a string and deletes
 	them from the string. It returns a new shaft record. The string must contain
-	with the xyz origin of the shaft axis, the xyz direction of the shaft axis,
-	and one or more faces. Each face is specified by a diameter and a distance
-	from the origin along the shaft.	
+	the location of the shaft, which is a point on its axis, and the direction
+	of the shaft, which points in the positive direction for locating faces on
+	the shaft. Each face is specified by a diameter and a distance from the
+	location along the shaft in the shaft direction. The distances can be
+	negative or positive.	
 }
 function read_scam_shaft(var s:string):scam_shaft_type;
 var shaft:scam_shaft_type;i:integer;
 begin 
 	with shaft do begin
-		pose.location:=read_xyz(s);
-		pose.orientation:=read_xyz(s);
+		location:=read_xyz(s);
+		direction:=read_xyz(s);
 		num_faces:=word_count(s) div 2;
 		setlength(diameter,num_faces);
 		setlength(distance,num_faces);
@@ -260,9 +233,9 @@ function string_from_scam_shaft(shaft:scam_shaft_type):string;
 var s:string='';face_num:integer;
 begin
 	with shaft do begin
-		write_xyz(s,pose.location);
+		write_xyz(s,location);
 		s:=s+' ';
-		write_xyz(s,pose.orientation);
+		write_xyz(s,direction);
 		s:=s+' ';
 		for face_num:=0 to num_faces-1 do
 			writestr(s,s,diameter[face_num]:fsr:fsd,' ',distance[face_num]:fsr:fsd,' ');
@@ -331,11 +304,11 @@ end;
 	the scam coordinates and pass them in to coordinate transformation routines
 	so that we don't have to find the angles more than once.
 }
-function scam_coord_from_mount(mount:kinematic_mount_type):scam_coord_type;
+function scam_coord_from_mount(mount:kinematic_mount_type):pose_type;
 
 var
 	bcam:bcam_coord_type;
-	scam:scam_coord_type;
+	scam:pose_type;
 	
 begin
 	bcam:=bcam_coord_from_mount(mount);
@@ -345,43 +318,14 @@ begin
 end;
 
 {
-	bcam_from_scam_coord takes an scam_coord_type and transforms it into 
-	a bcam_coord_type. We rotate the bcam global coordinate axes to obtain
-	the coordinate axes of the bcam coordinate system that is equivalent
-	to our rotation-based scam coordinate system.
-}
-function bcam_from_scam_coord(scam:scam_coord_type):bcam_coord_type;
-
-var
-	bcam:bcam_coord_type;
-
-begin
-	bcam.origin:=scam.location;
-	bcam.x_axis:=xyz_rotate(global_bcam_coord.x_axis,scam.orientation);
-	bcam.y_axis:=xyz_rotate(global_bcam_coord.y_axis,scam.orientation);
-	bcam.z_axis:=xyz_rotate(global_bcam_coord.z_axis,scam.orientation);
-	bcam_from_scam_coord:=bcam;
-(*
-gui_writeln('bcam_from_scam_coord x: '+string_from_xyz(bcam.x_axis));
-gui_writeln('bcam_from_scam_coord y: '+string_from_xyz(bcam.y_axis));
-gui_writeln('bcam_from_scam_coord z: '+string_from_xyz(bcam.z_axis));
-*)
-end;
-
-{
 	scam_from_global_vector transforms a direction in global coordinates to a
 	direction in scam coordinates. We pass into the routine an scam coordinate
 	type, which provides the xyz rotation we must apply to the vector.
 }
-function scam_from_global_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+function scam_from_global_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
 var v:xyz_point_type;
 begin
 	v:=xyz_unrotate(p,c.orientation);
-(*
-gui_writeln('scam_from_global_vector: '+string_from_xyz(v));
-gui_writeln('bcam_from_global_vector: '+string_from_xyz(
-		bcam_from_global_vector(p,bcam_from_scam_coord(c))));
-*)
 	scam_from_global_vector:=v;
 end;
 
@@ -390,15 +334,10 @@ end;
 	direction in global coordinates. We pass into the routine an scam coordinate
 	type, which provides the xyz rotation we must apply in reverse to the vector.
 }
-function global_from_scam_vector(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+function global_from_scam_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
 var v:xyz_point_type;
 begin
 	v:=xyz_rotate(p,c.orientation);
-(*
-gui_writeln('global_from_scam_vector: '+string_from_xyz(v));
-gui_writeln('global_from_bcam_vector: '+string_from_xyz(
-		global_from_bcam_vector(p,bcam_from_scam_coord(c))));
-*)
 	global_from_scam_vector:=v;
 end;
 
@@ -406,15 +345,10 @@ end;
 	scam_from_global_point transforms a point in global coordinates to a point
 	in scam coordinates.
 }
-function scam_from_global_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+function scam_from_global_point(p:xyz_point_type;c:pose_type):xyz_point_type;
 var v:xyz_point_type;
 begin
 	v:=scam_from_global_vector(xyz_difference(p,c.location),c);
-(*
-gui_writeln('scam_from_global_point: '+string_from_xyz(v));
-gui_writeln('bcam_from_global_point: '+string_from_xyz(
-	bcam_from_global_point(p,bcam_from_scam_coord(c))));
-*)
 	scam_from_global_point:=v;
 end;
 
@@ -422,50 +356,11 @@ end;
 	global_from_scam_point transforms a point in scam coordinates into a point
 	in global coordinates.
 }
-function global_from_scam_point(p:xyz_point_type;c:scam_coord_type):xyz_point_type;
+function global_from_scam_point(p:xyz_point_type;c:pose_type):xyz_point_type;
 var v:xyz_point_type;
 begin
 	v:=xyz_sum(c.location,global_from_scam_vector(p,c));
-(*
-gui_writeln('global_from_scam_point: '+string_from_xyz(v));
-gui_writeln('global_from_bcam_point: '+string_from_xyz(
-	global_from_bcam_point(p,bcam_from_scam_coord(c))));
-*)
 	global_from_scam_point:=v;
-end;
-
-{
-	scam_from_global_pose transforms a pose in global coordinates to a pose
-	in scam coordinates.
-}
-function scam_from_global_pose(p:pose_type;c:scam_coord_type):pose_type;
-
-var 
-	pose:pose_type;
-	
-begin
-	pose.location:=scam_from_global_point(p.location,c);
-	pose.orientation:=xyz_unrotate(
-		xyz_difference(p.orientation,c.orientation),
-		c.orientation);
-	scam_from_global_pose:=pose;
-end;
-
-{
-	global_from_scam_pose transforms a pose in scam coordinates to a pose
-	in global coordinates.
-}
-function global_from_scam_pose(p:pose_type;c:scam_coord_type):pose_type;
-
-var 
-	pose:pose_type;
-	
-begin
-	pose.location:=global_from_scam_point(p.location,c);
-	pose.orientation:=xyz_sum(
-		xyz_rotate(p.orientation,c.orientation),
-		c.orientation);
-	global_from_scam_pose:=pose;
 end;
 
 {
@@ -519,11 +414,11 @@ begin
 	the tangent point. 
 }
 	center_line.point:=camera.pivot;
-	center_line.direction:=xyz_difference(sphere.pose.location,camera.pivot);
+	center_line.direction:=xyz_difference(sphere.location,camera.pivot);
 	theta:=arcsin(sphere.diameter*one_half/xyz_length(center_line.direction));
 	axis.point:=camera.pivot;
 	axis.direction:=xyz_perpendicular(center_line.direction);
-	tangent.point:=xyz_axis_rotate(sphere.pose.location,axis,theta);
+	tangent.point:=xyz_axis_rotate(sphere.location,axis,theta);
 	tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 {
 	When we project tangents onto our image sensor, we are going to mark them in the
@@ -553,7 +448,7 @@ begin
 	from each perimeter point to the center. If draw_chords, we draw parallel lines
 	between opposite perimeter points.
 }	
-	pc:=bcam_image_position(sphere.pose.location,camera);
+	pc:=bcam_image_position(sphere.location,camera);
 	ic.x:=pc.x/w-ccd_origin_x;
 	ic.y:=pc.y/w-ccd_origin_y;
 	for step:=0 to num_points-1 do begin
@@ -633,11 +528,8 @@ begin
 	Apply the location and orientation of the shaft's pose to obtain the
 	axis.
 }
-	axis.point:=shaft.pose.location;
-	with axis.direction do begin x:=1; y:=0; z:=0; end;	
- 	axis.direction:=xyz_rotate(axis.direction,shaft.pose.orientation);
- 	axis.direction:=xyz_from_string('-0.974 -0.011 0.228');
-gui_writeln('shaft axis: '+string_from_xyz_line(axis));
+	axis.point:=shaft.location;
+	axis.direction:=shaft.direction;
 {
 	When we project tangents onto our image sensor, we are going to mark them in
 	the overlay, for which we need the size of the pixels.

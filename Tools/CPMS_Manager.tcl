@@ -37,12 +37,14 @@ proc CPMS_Manager_init {} {
 		-115.549 -20.643 -68.317"
 	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
 	
-		
 	set config(bodies) [list \
-		{0 20 450 0 0 0 sphere 0 0 0 38.068 shaft 0 0 0 0 0 -1.57 1 0 1 40} ]
+		{0.061 19.240 453.744 0.000 0.291 0.005 \
+		sphere 0 0 0 38.068 \
+		shaft 1 -27 0 0 -1 0 19 0 19 40} ]
+	set config(scaling) "1 1 1 0 0.1 0.1"
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
-	set config(num_lines) "200"
+	set config(num_lines) "50"
 	set config(stop_fit) 0
 	
 	set config(zoom) "1.0"
@@ -106,15 +108,6 @@ proc CPMS_Manager_disagreement {params} {
 	foreach body $config(bodies) {
 		
 		foreach side {left right} {
-set coord $config(coord_$side)
-LWDAQ_print $info(text) "\n$side\: $coord" black
-set global_pose [lrange $params 0 5]
-LWDAQ_print $info(text) "global_pose: $global_pose" green
-set scam_pose [lwdaq scam_from_global_pose $global_pose $coord]
-LWDAQ_print $info(text) "scam_pose: $scam_pose" green
-set global_pose [lwdaq global_from_scam_pose $scam_pose $coord]
-LWDAQ_print $info(text) "global_pose: $global_pose" brown
-
 			# The first six parameters in our parameter string are the pose of
 			# the body that we want to try out. We project our body onto the
 			# image sensor plane of the SCAM. We provide the mount coordinates,
@@ -126,9 +119,6 @@ LWDAQ_print $info(text) "global_pose: $global_pose" brown
 				"SCAM_$side $config(cam_$side)" \
 				"[lrange $params 0 5] [lrange $body 6 end]" \
 				$config(num_lines)
-				
-
-
 		}
 
 		# We have made use of six parameters, which are what we need for one
@@ -262,9 +252,7 @@ proc CPMS_Manager_fit {} {
 		set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
 		set start_params [CPMS_Manager_get_params]
 		set scaling ""
-		foreach body $config(bodies) {
-			append scaling "1 1 10 0 0 0 "
-		}
+		foreach body $config(bodies) {append scaling "$config(scaling) "}
 		set result [lwdaq_simplex $start_params CPMS_Manager_altitude \
 			-report 0 \
 			-steps $config(fit_steps) \

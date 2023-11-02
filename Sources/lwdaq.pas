@@ -3555,13 +3555,13 @@ var
 	threshold:real=0;
 	num_points:integer=2000;
 	body_pose:pose_type;
-	coords:scam_coord_type;
+	scam_pose:pose_type;
 		
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_scam:=Tcl_Error;
-	coords:=scam_coord_from_string('0 0 0 0 0 0');
+	scam_pose:=pose_from_string('0 0 0 0 0 0');
 	camera:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
 	body:='sphere 0 0 1000 0 0 0 50';
 	
@@ -3583,7 +3583,7 @@ begin
 	
 	command:=Tcl_ObjString(argv[2]);
 	if (command='project') then begin
-		if argc>3 then coords:=scam_coord_from_string(Tcl_ObjString(argv[3]));
+		if argc>3 then scam_pose:=pose_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[4]));
 		if argc>5 then body:=Tcl_ObjString(argv[5]);
 		if argc>6 then num_points:=Tcl_ObjInteger(argv[6]);
@@ -3603,29 +3603,15 @@ begin
 			option:=read_word(body);
 			if option='sphere' then begin
 				sphere:=read_scam_sphere(body);
-				sphere.pose:=
-					scam_from_global_pose(
-						pose_sum(body_pose,sphere.pose),
-						coords);
+				sphere.location:=global_from_scam_point(sphere.location,body_pose);
+				sphere.location:=scam_from_global_point(sphere.location,scam_pose);
 				scam_project_sphere(ip,sphere,camera,num_points);
 			end else if option='shaft' then begin
 				shaft:=read_scam_shaft(body);
-				shaft.pose:=pose_sum(body_pose,shaft.pose);
-				shaft.pose:=scam_from_global_pose(shaft.pose,coords);
-gui_writeln('x scam_from_global_vector: '
-	+string_from_xyz(scam_from_global_vector(xyz_from_string('1 0 0'),coords)));
-gui_writeln('x rotated by body_pose.orientation: '
-	+string_from_xyz(xyz_rotate(xyz_from_string('1 0 0'),body_pose.orientation)));
-gui_writeln('x rotated by shaft.pose.orientation: '
-	+string_from_xyz(xyz_rotate(xyz_from_string('1 0 0'),shaft.pose.orientation)));
-gui_writeln('x rotated by coords.orientation: '
-	+string_from_xyz(xyz_rotate(xyz_from_string('1 0 0'),coords.orientation)));
-gui_writeln('x unrotated by body_pose.orientation: '
-	+string_from_xyz(xyz_unrotate(xyz_from_string('1 0 0'),body_pose.orientation)));
-gui_writeln('x unrotated by shaft.pose.orientation: '
-	+string_from_xyz(xyz_unrotate(xyz_from_string('1 0 0'),shaft.pose.orientation)));
-gui_writeln('x unrotated by coords.orientation: '
-	+string_from_xyz(xyz_unrotate(xyz_from_string('1 0 0'),coords.orientation)));
+				shaft.location:=global_from_scam_point(shaft.location,body_pose);
+				shaft.location:=scam_from_global_point(shaft.location,scam_pose);
+				shaft.direction:=global_from_scam_vector(shaft.direction,body_pose);
+				shaft.direction:=scam_from_global_vector(shaft.direction,scam_pose);
 				scam_project_shaft(ip,shaft,camera,num_points);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
@@ -6329,7 +6315,7 @@ are almost parallel to those of the global coordinate system.</p>
 			exit;
 		end;
 		Tcl_SetReturnString(interp,
-			string_from_scam_coord(
+			string_from_pose(
 				scam_coord_from_mount(
 					kinematic_mount_from_string(Tcl_ObjString(argv[2])))));
 	end
@@ -6366,7 +6352,7 @@ x-direction.</p>
 			string_from_xyz(
 				scam_from_global_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+					pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='global_from_scam_vector' then begin
 {
@@ -6401,7 +6387,7 @@ x-direction.</p>
 			string_from_xyz(
 				global_from_scam_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+					pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='scam_from_global_point' then begin
 {
@@ -6438,7 +6424,7 @@ SCAM axes are rotated by 100 mrad about the global y-axis.</p>
 			string_from_xyz(
 				scam_from_global_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+					pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='global_from_scam_point' then begin
 {
@@ -6471,75 +6457,7 @@ that corresponds to the origin of global coordinates.</p>
 			string_from_xyz(
 				global_from_scam_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					scam_coord_from_string(Tcl_ObjString(argv[3])))));
-	end 
-	else if option='scam_from_global_pose' then begin
-{
-<p>Transforms a pose in global coordinates to a pose in SCAM coordinates. It is
-the inverse of <a href="#global_from_scam_pose">global_from_scam_pose</a>. See
-<a href="#scam_from_global_point">scam_from_global_point</a> for background. The
-<i>pose</i> is a location and compount rotation in global coordinates. The
-former is an xyz point in global coordinate. The latter is an xyz rotation about
-the global coordinate axes. We pass a description of the scam coordinate system
-in the <i>scam</i> string. The routine returns the pose in scam coordinates.</p>
-
-<pre>lwdaq scam_from_global_pose "0 0 0 0 0 0" "10 0 0 0 0.1 0"
--9.950042 0.000000 -0.998334 0.000000 -0.100000 0.000000</pre>
-
-<p>In the example above, our SCAM coordinate system is shifted by +10 in the
-global x-direction and rotated by 100 mrad about the global y-axis. The pose
-is located at the global origin with orientation zero. In SCAM coordinates, the
-location is -10*cos(0.1) in x, 0 in y, and -sin(0.1) in z.</p>
-}
-		if (argc<>4) then begin
-			Tcl_SetReturnString(interp,error_prefix
-				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' pose scam".');
-			exit;
-		end;
-		Tcl_SetReturnString(interp,
-			string_from_pose(
-				scam_from_global_pose(
-					pose_from_string(Tcl_ObjString(argv[2])),
-					scam_coord_from_string(Tcl_ObjString(argv[3])))));
-	end 
-	else if option='global_from_scam_pose' then begin
-{
-<p>Transforms a pose in SCAM coordinates to a pose in global coordinates. It is
-the inverse of <a href="#scam_from_global_pose">scam_from_global_pose</a>. See
-<a href="#scam_from_global_point">scam_from_global_point</a> for background. The
-<i>pose</i> is a location and compount rotation in SCAM coordinates. The former
-is an xyz point in SCAM coordinate. The latter is an xyz rotation about the SCAM
-coordinate axes. We pass a description of the scam coordinate system in the
-<i>scam</i> string. The routine returns the pose in scam coordinates.</p>
-
-<pre>lwdaq global_from_scam_pose "-9.950042 0 -0.998334 0 -0.1 0" "10 0 0 0 0.1 0"
--0.000000 0.000000 0.000000 0.000000 0.000000 0.000000</pre>
-
-<p>In the example above, our SCAM coordinate system is shifted by +10 in the
-global x-direction and rotated by 100 mrad about the global y-axis. The pose
-is located at the global origin with orientation zero. In SCAM coordinates, the
-location is -10*cos(0.1) in x, 0 in y, and -sin(0.1) in z.</p>
-
-<pre>lwdaq global_from_scam_pose "0 0 0 0 0 0" "10 0 0 0 0.1 0"
-10.000000 0.000000 0.000000 0.000000 0.100000 0.000000</pre>
-
-<p>In the above example, we have pose at the SCAM origin with zero rotation in
-the SCAM coordinate system. When transformed into global coordinates, the
-location is the same as the coordinate system origin and the orientation is the
-same as the coordinate system rotation.</p>
-}
-		if (argc<>4) then begin
-			Tcl_SetReturnString(interp,error_prefix
-				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' pose scam".');
-			exit;
-		end;
-		Tcl_SetReturnString(interp,
-			string_from_pose(
-				global_from_scam_pose(
-					pose_from_string(Tcl_ObjString(argv[2])),
-					scam_coord_from_string(Tcl_ObjString(argv[3])))));
+					pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='wps_wire_plane' then begin
 {
