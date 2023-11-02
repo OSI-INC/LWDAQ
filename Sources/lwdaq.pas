@@ -135,7 +135,6 @@ begin
 	lwdaq_tcl_eval('LWDAQ_print '+gui_text_name+' "'+s+'"');
 end;
 
-
 {
 	lwdaq_gui_draw draws the named image into the TK photo named gui_photo_name.
 	The routine calls lwdaq_draw, which, like all the lwdaq TclTk commands,
@@ -1370,7 +1369,7 @@ end;
 
 {
 <p>lwdaq_image_exists returns a list of images in the lwdaq image list that
-match the image_name pattern you pass to the routine. If you pass "*", it will
+match the image_name pattern we pass to the routine. If we pass "*", it will
 return a list of all existing images. If there are no matching images,
 lwdaq_image_exists returns an empty string.</p>
 }
@@ -3456,8 +3455,8 @@ end;
 <p>lwdaq_scam applies Silhouette Camera (SCAM) routines to SCAM images. The SCAM
 routines are defined in <a
 href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. We pass
-lwdaq_scam an instruction, and one or more arguments required by
-the instruction.</p>
+lwdaq_scam an instruction, and one or more arguments required by the
+instruction.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Instruction</th><th>Function</th></tr>
@@ -3465,16 +3464,12 @@ the instruction.</p>
 <tr><td>disagreement</td><td>Measure disagreement between actual and modelled silhouette.</td></tr>
 </table></center>
 
-<p>The <i>project</i> instruction takes four arguments: a <i>camera</i>
-calibration in mount coordinates, an <i>object</i> definition in camera mount
-coordinates, and a number of projection lines to use to fill the overlay in the
-silhouette image. The object must be one of the radially-symmetric objects
-supported by the <a
-href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a> library.
-When we want to project objects that are not radially symmetric, we compose them
-out of radially symmetric objects and project each in turn. Prior to projecting
-each object, we must translate and rotate its global position and orientation
-into the SCAM mount cooridnate system.</p>
+<p>The <i>project</i> instruction takes three arguments: a <i>camera</i>
+calibration in the SCAM's mount coordinates, an <i>object</i> definition in the
+SCAM's mount coordinates, and a number of projection lines to use to fill the
+overlay in the silhouette image. The object must be one of those in the library
+provided by scam.pas. When we want to project more complex bodies, we build them
+out of multiple objects.</p>
 
 <p>The <i>camera</i> string contains nine elements. The first is the name of the
 camera. The following eight are the camera calibration constants, as described
@@ -3485,27 +3480,49 @@ code to say if the axis is forward or backwards and to identify the image
 sensor, the distance from the pivot point to the center of the image sensor, and
 the rotation of the image sensor about the camera axis.</p>
 
-<p>The modelled object itself we specify with its own string. The first word in
-the string is the object type, such as "sphere", "cylinder", or "shaft". After
-that are mount coordinates of a reference point in the object, the coordinates
-of a vector giving giving the orientation of the object, and finally one or more
-numbers giving the dimensions of the object. For a sphere, the reference point
-is the sphere center, the orientation is three zeros, and the only dimension is
-its diameter. See <i>scam_sphere_from_string</i> in <a
-href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. For a
-cylinder, the reference point is one end of the axis, the orientation is a unit
-vector pointing along the axis into the cylinder from the reference point, and
-the dimensions are diameter followed by length,
-<i>scam_cylinder_from_string</i>.  For a shaft, we specify the point at one end
-of the shaft axis, the orienation is the direction of the axis, and the
-dimensions are a sequence of one or more faces. Each face is a diameter and a
-distance along the axis from the shaft, see <i>scam_shaft_from_string</i> </p>
+<p>Prior to projecting any object, we must transform its location into mount
+coordinates. If the object is anything other than a sphere, it will have an
+orientation as well, and this we must transform this orientation into mount
+coordinates as well. The orientation of an object is three rotations about the
+x, y, and z axes that bring the object from its zero orienation to its modelled
+orientation.The modelled object itself we specify with its own string. Each
+object begins with a name, such as "sphere" or "shaft". Every object has a
+location, which is the translation of its zero point to obtain its modelled
+position. All objects other than the sphere have an orientation, which is the
+xyz rotation we apply to the object in its zero orientation to obtain its
+modelled oriention. The location and orientation together define the "pose" of
+the modelled object.</p>
 
-<p>If we specify zero for the number of lines, the projection algorithm reverts
-to one where we check every pixel in the silhouette image to see if it should or
-should not be included in the modelled silhouette. For one or more lines, the
-projection picks points on the modelled object and joins them up with lines in
-the silhouette image overlay.</p>
+<center><table border cellspacing=2>
+<tr>
+	<th>Object</th>
+	<th>Zero Point</th>
+	<th>Zero Orientation</th>
+</tr>
+<tr>
+	<td>sphere</td>
+	<td>center of sphere</td>
+	<td>no orientation</td>
+</tr>
+<tr>
+	<td>shaft</td>
+	<td>a point on the shaft axis</td>
+	<td>shaft axis is parallel to x-axis</td></tr>
+<tr>
+	<td>cuboid</td>
+	<td>center of left face</td>
+	<td>x-axis perpendicular to left face, y-axis parallel to top edge</td>
+</tr>
+</table></center>
+
+<p>Following the location, and possibly the orientation, of the object are one
+or more values giving its dimensions. A sphere consists of a location and a
+diameter. A shaft consists of a location, an orientation, a number of faces, and
+a diameter and distance for each face, where the distance is measured along the
+shaft axis from the zero point, with negative values being in the direction
+opposite to the axis vector. A cuboid consists of a location, an orientation, a
+width, a height, and a depth. The width, height, and depth are parallel to the
+x, y, and z axes respectively when the cuboid is in its zero orientation.</p>
 
 <p>The <i>disagreement</i> instruction counts the number of pixels in the
 analysis boundaries for which the image and the overlay disagree about the
@@ -3533,17 +3550,18 @@ var
 	rule:string='10 %';
 	camera:bcam_camera_type;
 	sphere:scam_sphere_type;
-	cylinder:scam_cylinder_type;
 	shaft:scam_shaft_type;
 	disagreement:real=0;
-	spread:real=0;
 	threshold:real=0;
 	num_points:integer=2000;
+	body_pose:pose_type;
+	scam_pose:pose_type;
 		
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_scam:=Tcl_Error;
+	scam_pose:=pose_from_string('0 0 0 0 0 0');
 	camera:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
 	body:='sphere 0 0 1000 0 0 0 50';
 	
@@ -3565,12 +3583,12 @@ begin
 	
 	command:=Tcl_ObjString(argv[2]);
 	if (command='project') then begin
-		if argc>3 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[3]));
-		if argc>4 then body:=Tcl_ObjString(argv[4]);
-		if argc>5 then num_points:=Tcl_ObjInteger(argv[5]);
+		if argc>3 then scam_pose:=pose_from_string(Tcl_ObjString(argv[3]));
+		if argc>4 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[4]));
+		if argc>5 then body:=Tcl_ObjString(argv[5]);
+		if argc>6 then num_points:=Tcl_ObjInteger(argv[6]);
 	end else if (command='disagreement') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
-		if argc>4 then spread:=Tcl_ObjReal(argv[4]);
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Invalid command "'+command+'", must be one of '
@@ -3580,21 +3598,25 @@ begin
 	end;
 	
 	if command='project' then begin
+		body_pose:=read_pose(body);
 		while body<>'' do begin
 			option:=read_word(body);
 			if option='sphere' then begin
 				sphere:=read_scam_sphere(body);
+				sphere.location:=global_from_scam_point(sphere.location,body_pose);
+				sphere.location:=scam_from_global_point(sphere.location,scam_pose);
 				scam_project_sphere(ip,sphere,camera,num_points);
-			end else if option='cylinder' then begin
-				cylinder:=read_scam_cylinder(body);
-				scam_project_cylinder(ip,cylinder,camera,num_points);
 			end else if option='shaft' then begin
 				shaft:=read_scam_shaft(body);
+				shaft.location:=global_from_scam_point(shaft.location,body_pose);
+				shaft.location:=scam_from_global_point(shaft.location,scam_pose);
+				shaft.direction:=global_from_scam_vector(shaft.direction,body_pose);
+				shaft.direction:=scam_from_global_vector(shaft.direction,scam_pose);
 				scam_project_shaft(ip,shaft,camera,num_points);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Invalid shape "'+option+'", must be one of '
-					+'"sphere cylinder" in '
+					+'"sphere shaft" in '
 					+'lwdaq_scam.');
 				exit;
 			end;
@@ -3603,8 +3625,7 @@ begin
 	
 	if command='disagreement' then begin
 		threshold:=scam_decode_rule(ip,rule);
-		if spread=0 then disagreement:=scam_disagreement(ip,threshold)
-		else disagreement:=scam_disagreement_spread(ip,threshold,spread);
+		disagreement:=scam_disagreement(ip,threshold);
 		writestr(result,disagreement:0:1);
 	end;
 	
@@ -4660,8 +4681,8 @@ end;
 {
 <p>lwdaq_tcb extracts the top antenna and top power from data recorded by a
 Telemetry Control Box (TCB, <a
-href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</
-a>. The top antenna is a number specifying one of the antennas connected to the
+href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</a>.) 
+The top antenna is a number specifying one of the antennas connected to the
 TCB. Each of these antennas is capable of receiving telemetry messages from
 devices such as our Subcutaneous Transmitters (<a
 href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial
@@ -4937,12 +4958,11 @@ initial position and an error procedure name. The initial position must be a
 list of <i>n</i> real numbers. The error procedure must be defined in the Tcl
 interpreter, take a list of <i>n</i> real numbers as its input, and return a
 real-valued error measurement. We call the Tcl error routine with the help of
-the <a href="#lwdaq_simplex_error">lwdaq_simplex_error</a> interface function.
-The simplex fitter starts at the initial position and moves through the
-n-dimensional space until it reaches a maximum number of steps specified with
-the "-max_steps <i>m</i>" option. When it stops, it returns the point of
-convergeance as <i>n</i> real numbers, the final error value, and the number of
-steps it took.</p>
+the lwdaq_simplex_error interface function. The simplex fitter starts at the
+initial position and moves through the n-dimensional space until it reaches a
+maximum number of steps specified with the "-max_steps <i>m</i>" option. When it
+stops, it returns the point of convergeance as <i>n</i> real numbers, the final
+error value, and the number of steps it took.</p>
 
 <center><table border cellspacing=2>
 <tr>
@@ -4973,7 +4993,7 @@ steps it took.</p>
 	<td>-restarts <i>m</i></td>
 	<td>Number of restarts before starting to shrink, default <i>m</i> = 0.</td>
 </tr>
-</table><small><b>Table:</b> Options Accepted by the Simplex Library Routine.</center>
+</table><small><b>Table:</b> Options Accepted by the Simplex Library Routine.</small></center>
 
 <p>By default, the simplex routine assumes that the sensitivity of the error to
 each of the n coordinates is similar, so that it sets up its simplex triangle
@@ -5350,7 +5370,6 @@ var
 	x_div:real=0;
 	y_div:real=0;
 	width:integer=1;
-	saved_width:integer=1;
 	num_points:integer=0;
 	point_num:integer=0;
 	color:integer=0;
@@ -6009,6 +6028,7 @@ var
 	num_rows,num_elements,num_columns:integer;
 	num_glitches:integer=0;
 	i,extent,color,red,blue,green:integer;
+	x_axis,y_axis,z_axis:xyz_point_type;
 	
 begin
 	error_string:='';
@@ -6026,7 +6046,7 @@ begin
 {
 <p>Transforms a point in global coordinates to a point in BCAM coordinates. The
 point in BCAM coordinates is returned as a string of three numbers, the BCAM
-<i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point. You specify the point
+<i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point. We specify the point
 in global coordinates with the <i>point</i> parameter, which also takes the form
 of a string of three numbers, these numbers being the global <i>x</i>, <i>y</i>,
 and <i>z</i> coordinates of the point whose BCAM coordinates we want to
@@ -6061,20 +6081,19 @@ mount strings.</p>
 			string_from_xyz(
 				bcam_from_global_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					kinematic_mount_from_string(Tcl_ObjString(argv[3])))));
+					bcam_coord_from_mount(
+						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='global_from_bcam_point' then begin
 {
 <p>Transforms a point in global coordinates to a point in BCAM coordinates. It
 is the inverse of <a href="#bcam_from_global_point">bcam_from_global_point</a>.
-You pass it the global coordinates of a point in the <i>point</i> string, and
+We pass it the BCAM coordinates of a point in the <i>point</i> string, and
 the coordinates of the BCAM's kinematic mounting balls with the <i>mount</i>
 string. The routine returns the global coordinates of the point.</p>
 
-<pre>
-lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
-0.000000 2.000000 0.000000
-</pre>
+<pre>lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
+0.000000 2.000000 0.000000</pre>
 
 <p>For a description of the BCAM coordinate system, and how it is defined with
 respect to a BCAM's kinematic mounting balls, consult the BCAM <a
@@ -6090,7 +6109,8 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 			string_from_xyz(
 				global_from_bcam_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					kinematic_mount_from_string(Tcl_ObjString(argv[3])))));
+					bcam_coord_from_mount(
+						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='bcam_from_global_vector' then begin
 {
@@ -6098,10 +6118,8 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 See <a href="#bcam_from_global_point">bcam_from_global_point</a> for more
 details.</p>
 
-<pre>
-lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
-0.000000 1.000000 0.000000
-</pre>
+<pre>lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
+0.000000 1.000000 0.000000</pre>
 
 <p>For a description of the BCAM coordinate system, and how it is defined with
 respect to a BCAM's kinematic mounting balls, consult the BCAM <a
@@ -6117,18 +6135,16 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 			string_from_xyz(
 				bcam_from_global_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					kinematic_mount_from_string(Tcl_ObjString(argv[3])))));
+					bcam_coord_from_mount(
+						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='global_from_bcam_vector' then begin
 {
 <p>Transforms a vector in global coordinates to a vector in BCAM coordinates. It
-is the inverse of <a
-href="#bcam_from_global_vector">bcam_from_global_vector</a>.</p>
+is the inverse of <a href="#bcam_from_global_vector">bcam_from_global_vector</a>.</p>
 
-<pre>
-lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
-0.000000 1.000000 0.000000
-</pre>
+<pre>lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
+0.000000 1.000000 0.000000</pre>
 
 <p>For a description of the BCAM coordinate system, and how it is defined with
 respect to a BCAM's kinematic mounting balls, consult the BCAM <a
@@ -6144,7 +6160,8 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 			string_from_xyz(
 				global_from_bcam_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					kinematic_mount_from_string(Tcl_ObjString(argv[3])))));
+					bcam_coord_from_mount(
+						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='bcam_source_bearing' then begin
 {
@@ -6160,10 +6177,8 @@ described in the <a
 href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User
 Manual</a>.</p>
 
-<pre>
-lwdaq bcam_source_bearing "1.72 1.22" "P0001 1 0 0 0 0 1 75 0"
-1.000000 0.000000 0.000000 0.000000 0.000000 1.000000
-</pre>
+<pre>lwdaq bcam_source_bearing "1.72 1.22" "P0001 1 0 0 0 0 1 75 0"
+1.000000 0.000000 0.000000 0.000000 0.000000 1.000000</pre>
 
 <p>The first element in the <i>camera</i> string is the name of the camera, even
 though this calculation does not use the camera name. In the example above,
@@ -6202,10 +6217,8 @@ bearing with the <i>z</i>=<i>range</i> plane. The <i>camera</i> string contains
 the camera calibration constants, just as for <a
 href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
 
-<pre>
-lwdaq bcam_source_position "1.72 1.22" 1000 "P0001 1 0 0 0 0 1 75 0"
-1.000000 0.000000 1000.000000
-</pre>
+<pre>lwdaq bcam_source_position "1.72 1.22" 1000 "P0001 1 0 0 0 0 1 75 0"
+1.000000 0.000000 1000.000000</pre>
 
 <p>Here we see the source is at (1, 0, 1000) in BCAM coordinates, where all
 three coordinates are in millimeters. You specify the BCAM itself with its
@@ -6237,10 +6250,8 @@ origin is the top-left corner of the image sensor as seen on the screen. The
 units of image coordinates are microns, with x going left-right and y going
 top-bottom.</p>
 
-<pre>
-lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 75 0"
-1.720000 1.220000
-</pre>
+<pre>lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 75 0"
+1.720000 1.220000</pre>
 
 <p>Here we see the image is at (1.72,1.22) in image coordinates, which is the
 center of a TC255P image sensor. You specify the BCAM itself with its
@@ -6265,6 +6276,188 @@ causing a 100-um move on the image.</p>
 				bcam_image_position(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					bcam_camera_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='scam_coord_from_mount' then begin	
+{
+<p>Convert an SCAM mount into an SCAM coordinate system. The mount consists of
+the global coordinates of the cone, slot, and flat balls of the SCAM mount.
+These balls are named after the depressions on the underside of the SCAM. The
+routine returns the location and orientation of the SCAM coordinates with
+respect to the global coordinate system. The location is the position of the
+SCAM coordinate origin. The orientation is three angles by which we rotate about
+the global x axis, then y-axis, then z-axis, in that order, in order to rotate
+the global axis unit vectors into the SCAM axis unit vectors.</p>
+
+<p>The SCAM coordinate system is constrained by three mounting balls in the same
+way as a BCAM coordinate system. See the Coordinate Systems section of the BCAM
+<a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>
+for an explanation of the procedure for taking the positions of the cone, slot,
+and flat balls and creating a mount coordinate system that will always be in the
+same location and orientation with respect to any device sitting on the mount.
+See <i>bcam_coordinates_from_mount</i> in <a
+href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a> for the
+exact calculation. Note that our BCAM coordinate transformation routines take as
+input the coordinates of the three mounting balls, while our SCAM routines take
+the global description of the SCAM coordinate system that we can obtain from the
+coordinates of the mounting balls. The SCAM routines are faster because they
+need not re-calculate the SCAM coordinate axes.</p>
+
+<pre>lwdaq scam_coord_from_mount "0 1 0 -21 1 -72 21 1 -72"
+0.000 1.000 0.000 -0.000 0.004 0.000</pre>
+
+<p>In the example above, the coordinates of the balls are such that the scam coordinates
+are almost parallel to those of the global coordinate system.</p>
+}
+		if (argc<>3) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' mount".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_pose(
+				scam_coord_from_mount(
+					kinematic_mount_from_string(Tcl_ObjString(argv[2])))));
+	end
+	else if option='scam_from_global_vector' then begin
+{
+<p>Transforms a vector in global coordinates to a vector in SCAM coordinates. It
+is the inverse of <a href="#global_from_scam_vector">global_from_scam_vector</a>. See
+<a href="#scam_from_global_point">scam_from_global_point</a> for background.
+We pass the global coordinates of a point in the <i>point</i> string. We pass
+a description of the scam coordinate system in the <i>scam</i> string. The
+routine returns the scam components of the vector.</p>
+
+<pre>lwdaq scam_from_global_vector "0 0 1" "10 0 0 1.570796327 0 0"
+0.000000 1.000000 -0.000000</pre>
+
+<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
+instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+
+<pre>lwdaq scam_from_global_vector "5 0 0" "10 0 0 0 0.1 0"
+4.975021 0.000000 0.499167</pre>
+
+<p>In the example above, we have the SCAM origin at x=10 in global coordinates,
+but this has no effect upon the resulting vector. The SCAM axes are rotated by
+100 mrad about the global y-axis. Our vector is distance 5 in the global
+x-direction.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				scam_from_global_vector(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					pose_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='global_from_scam_vector' then begin
+{
+<p>Transforms a vector in SCAM coordinates to a vector in global coordinates. It
+is the inverse of <a href="#scam_from_global_vector">scam_from_global_vector</a>. See
+<a href="#scam_from_global_point">scam_from_global_point</a> for background.
+We pass the scam coordinates of a point in the <i>point</i> string. We pass
+a description of the scam coordinate system in the <i>scam</i> string. The
+routine returns the scam components of the vector.</p>
+
+<pre>lwdaq global_from_scam_vector "0 -1 0" "10 0 0 1.570796327 0 0"
+0.000000 0.000000 1.000000</pre>
+
+<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
+instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+
+<pre>lwdaq global_from_scam_vector "4.975021 0.000000 0.499167" "10 0 0 0 0.1 0"
+5.000000 0.000000 -0.000000</pre>
+
+<p>In the example above, we have the SCAM origin at x=10 in global coordinates,
+but this has no effect upon the resulting vector. The SCAM axes are rotated by
+100 mrad about the global y-axis. Our vector is distance 5 in the global
+x-direction.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				global_from_scam_vector(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					pose_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='scam_from_global_point' then begin
+{
+<p>Transforms a point in global coordinates to a point in scam coordinates. It
+is the inverse of <a href="#global_from_scam_point">global_from_scam_point</a>.
+We pass the scam coordinates of a point in the <i>point</i> string. We pass a
+description of the scam coordinate system in the <i>scam</i> string. The
+coordinate description consists of six numbers. The first three are the location
+in global coordinates of the scam origin. The next three are the rotations about
+the global x, y, and z axes that transform the global axis unit vectors into the
+scam axis unit vectors. The units of angle are radians. The routine returns the
+scam coordinates of the point.</p>
+
+<pre>lwdaq scam_from_global_point "0 1 0" "10 0 0 1.570796327 0 0"
+-10.000000 -0.000000 -1.000000</pre>
+
+<p>See <a href="#scam_coord_from_mount">scam_coord_from_mount</a> for discussion of
+the coordinate system definition with respect to the coordinates of the balls upon 
+which the SCAM sits.</p>
+
+<pre>lwdaq scam_from_global_point "0 0 0" "10 0 0 0 0.1 0"
+-9.950042 0.000000 -0.998334</pre>
+
+<p>In the example above, we have the SCAM origin at x=10 in global coordinates. The
+SCAM axes are rotated by 100 mrad about the global y-axis.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' point scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				scam_from_global_point(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					pose_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='global_from_scam_point' then begin
+{
+<p>Transforms a point in global coordinates to a point in SCAM coordinates. It
+is the inverse of <a href="#scam_from_global_point">scam_from_global_point</a>.
+We pass it the scam coordinates of a point in the <i>point</i> string. We pass
+it a description of the scam coordinate system in the <i>scam</i> string. The
+routine returns the global coordinates of the point.</p>
+
+<pre>lwdaq global_from_scam_point "-10 0 1" "10 0 0 1.570796327 0 0"
+0.000000 1.000000 -0.000000</pre>
+
+<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
+instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+
+<pre>lwdaq global_from_scam_point "-9.950042 0.000000 -0.998334" "10 0 0 0 0.1 0"
+-0.000000 0.000000 0.000000</pre>
+
+<p>In the example above, we have the SCAM origin at x=10 in global coordinates. The
+SCAM axes are rotated by 100 mrad about the global y-axis. Our SCAM point is the one
+that corresponds to the origin of global coordinates.</p>
+}
+		if (argc<>4) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' point scam".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				global_from_scam_point(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='wps_wire_plane' then begin
 {
@@ -6481,6 +6674,27 @@ respective axes, hence the name "unrotate".</p>
 				xyz_unrotate(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					xyz_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='xyz_rotation_from_axes' then begin
+{
+<p>Search for a compount, three-dimensional rotation that produces the specified
+orthogonal, right-handed coordinate system vectors from the existing x, y, and z
+unit vectors. The rotation takes the form of three angles by which we rotate
+about x, y, and z. We pass the routine three vectors parallel to the new
+coordinate system. The routine returns the three rotations.</p>
+}
+		if (argc<>5) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' x_axis y_axis z_axis".');
+			exit;
+		end;
+		x_axis:=xyz_from_string(Tcl_ObjString(argv[2]));
+		y_axis:=xyz_from_string(Tcl_ObjString(argv[3]));
+		z_axis:=xyz_from_string(Tcl_ObjString(argv[4]));	
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_rotation_from_axes(x_axis,y_axis,z_axis)));
 	end 
 	else if option='xyz_dot_product' then begin
 {
@@ -7139,7 +7353,7 @@ entire input graph is the final y-value of the output sequence.</p>
 	end
 	else if option='matrix_inverse' then begin
 {
-<p>Calculates the inverse of a square matrix. You pass the original matrix as a
+<p>Calculates the inverse of a square matrix. We pass the original matrix as a
 string of real numbers in <i>matrix</i>. The first number should be the top-left
 element in the matrix, the second number should be the element immediately to
 the right of the top-left element, and so on, proceeding from left to right, and
@@ -7207,14 +7421,21 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 		Tcl_SetReturnString(interp,'Bad option "'+option+'", must be one of "'
 		+' bcam_from_global_point global_from_bcam_point bcam_from_global_vector'
 		+' global_from_bcam_vector bcam_source_bearing bcam_source_position'
-		+' bcam_image_position wps_wire_plane wps_calibrate xyz_sum xyz_difference'
-		+' xyz_rotate xyz_unrotate xyz_unit_vector xyz_cross_product xyz_dot_product'
+		+' bcam_image_position'
+		+' scam_from_global_point global_from_scam_point scam_from_global_vector'
+		+' global_from_scam_vector scam_coord_from_mount scam_from_global_pose'
+		+' global_from_scam_pose'
+		+' wps_wire_plane wps_calibrate'
+		+' xyz_sum xyz_difference xyz_rotate xyz_unrotate xyz_unit_vector'
+		+' xyz_cross_product xyz_dot_product xyz_rotation_from_axes'
 		+' xyz_plane_plane_intersection xyz_line_plane_intersection'
-		+' xyz_line_line_bridge xyz_point_line_vector linear_interpolate'
-		+' nearest_neighbor sum_sinusoids frequency_components window_function'
-		+' glitch_filter spikes_x glitch_filter_y glitch_filter_xy coastline_x'
-		+' coastline_x_progress coastline_xy coastline_xy_progress matrix_inverse'
-		+' tkcolor straight_line_fit ave_stdev'
+		+' xyz_line_line_bridge xyz_point_line_vector'
+		+' linear_interpolate nearest_neighbor straight_line_fit ave_stdev'
+		+' sum_sinusoids frequency_components window_function'
+		+' glitch_filter spikes_x glitch_filter_y glitch_filter_xy'
+		+' coastline_x coastline_x_progress coastline_xy coastline_xy_progress'
+		+' matrix_inverse'
+		+' tkcolor'
 		+'".');
 		exit;
 	end;

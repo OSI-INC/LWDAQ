@@ -1922,8 +1922,6 @@ proc LWDAQ_script_description {{file_name ""} {keep_breaks 0} } {
 	}
 	close $f
 	set description [string map {"# " ""} $description]
-	set description [regsub -all "$script_name" $description \
-		"<a href=\"../../Software/Sources/$script_name\">$script_name</a>"]
 	return $description
 }
 
@@ -2308,11 +2306,13 @@ proc LWDAQ_command_reference { {file_name ""} } {
 	
 		if {$line == "Script_Descriptions"} {
 			foreach f $LWDAQ_Info(scripts) {
+				set description [LWDAQ_script_description $f]
+				if {$description == ""} {continue}
 				set s [file tail $f]
 				puts $ref_file ""
 				puts $ref_file "<h3>$s</h3>"
 				puts $ref_file ""
-				puts $ref_file "<p>[LWDAQ_script_description $f]</p>"
+				puts $ref_file "<p>$description</p>"
 			}
 			continue
 		}
@@ -2365,7 +2365,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 				} {
 					puts $ref_file "<small><pre>$n ?option value?</pre></small>"
 				}
-				set r "\{(\[^\\\}\]+)\}\[\\r\\t\\n \]*function $n"
+				set r "\{(\[^\\\}\]+)\}\[\\r\\t\\n \]*function $n\[ \\\(\]+"
 				regexp $r $code match comment
 				puts $ref_file "$comment"
 			}

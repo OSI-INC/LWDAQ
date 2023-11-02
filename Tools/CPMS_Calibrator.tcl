@@ -426,8 +426,6 @@ The Contactless Position Measurement System (CPMS) Calibrator takes a series of
 silhouette images of the same sphere in various positions as measured by a Coordinate
 Measuring Machine (CMM) and deduces the calibration constants of a pair of Silhouette Cameras (SCAMs). 
 
-
-Kevan Hashemi hashemi@brandeis.edu
 ----------End Help----------
 
 ----------Begin Data----------

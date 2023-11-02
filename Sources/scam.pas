@@ -22,20 +22,62 @@ unit scam;
 {$LONGSTRINGS ON}
 
 {
-	This unit contains routines for use with our Silhouette Cameras (SCAMs) and
-	the Contactless Position Measurement System (CPMS) that uses these cameras.
-	The SCAM uses the same kinematic mount as a BCAM, so SCAM coordinates are
-	defined with respect to the SCAM's three mounting balls as for the BCAM. We
-	assume the SCAM's axis is close to parallel to the mount coordinate z-axis.
-	Our image coordinates are microns from the top-left corner of the top-left
-	pixel in the image. Our mount coordinates are in millimeters, with the
-	origin at the center of the cone ball. Our global coordinates are in
-	millimeters also. We use the same image sensor encoding system as the BCAM:
-	in place of axis.z we include a code that indicates if the SCAM faces
-	forward (+ve) or backwards (-ve), and for which the absolute value specifies
-	the sensor itself. The SCAM projection routines need to know the size of the
-	pixels, and for this reason the SCAM unit keeps a list of pixel sizes to go
-	with the sensor codes.
+	This unit contains routines for use with the Silhouette Cameras (SCAMs) of
+	our Contactless Position Measurement System (CPMS). An SCAM sits on the same
+	design of kinematic mount as a BCAM. The SCAM coordinate system is defined
+	with respect to its three mounting balls in the same way as it is for BCAMs.
+	An SCAM camera's calibration constants are defined in the same way as those
+	of a BCAM. We assume the camera axis is almost parallel to the z-axis of the
+	mount coordinate system. We have the direction of the axis, the location of
+	the pivot point, the distance to the image sensor, and the rotation of the
+	image sensor about the z-axis as the eight parameters that describe an SCAM,
+	all in mount coordinates. Each image sensor has a different pixel size, so
+	we need the calibration constants to specify the image sensor as well. The
+	z-component of the axis direction is redundant: all our routines calculate
+	the z-component from the small x and y components. In place of z in the
+	calibration constants is an integer code that allows us to deduce the size
+	of the image sensor pixels.
+
+	The CPMS measures position taking stereo silhouette images of one or more
+	bodies, modelling each body with a line drawing, and adjusting the location
+	and orientation of each body until we minimize the disagreement between the
+	line drawing and the actual silhouette. For brevity, we refer to the
+	location and orientation of a body as its "pose". In our SCAM routines, we
+	express the pose with six numbers: six coordinates and six angles. The six
+	angles specify a compound rotation consisting of sequential rotations about
+	the x, y, and z axes.
+
+	Each CPMS body has its own internal coordinate system. The location of its
+	origin is the location of the body. The sequence compount rotation that
+	aligns the global coordinate axes with those of the body's coordinate system
+	are the orientation of the body. The pose of the body is the pose of its
+	coordinate system.
+
+	Each SCAM has its own mount coordinate system. In our SCAM routines, we
+	represent each mount coordinate system by its own pose, just as we do for
+	bodies. This representation contrasts with that of mounts in our BCAM
+	routines, where we pass around the mounting ball coordinates and convert
+	them into an origin and a set of orthogonal unit vectors. We use pose for
+	bodies and mounts in SCAM routines because we want to use our simplex fitter
+	to deduce body positions and to calibrate SCAMs. For the simplex fitter to
+	work well, we must represent the pose with the minimum number of parameters,
+	which is six. An origin with three unit vectors is twelve parameters. Half
+	of them are redundant.
+
+	We compose a model of a CPMS "body" with one or more "objects", where each
+	object is a simple shape such as a sphere, cylinder, shaft, or cuboid. Each
+	object has its own pose within the coordinate system of the body. The body
+	has its pose within the global coordinate system, and the SCAM viewing the
+	body has its own pose. To obtain the pose of a body in SCAM coordinates, we
+	transform one or more points in each object into the SCAM coordinates. We do
+	not attempt to obtain the pose of the objects in SCAM coordinates for
+	several reasons. One is that some objects are radially or axially symmetric,
+	so they are insensitive to one or more rotations. Another is that
+	calculating the pose that corresponds to a transformation is not as fast as
+	transforming points and vectors. During our fits, we want the
+	transformations to run fast. We take the time to obtain the pose of SCAM
+	coordinates, but we need to so only once per measurement fit, because the
+	SCAM coordinates are not changing.
 }
 
 interface
@@ -54,58 +96,45 @@ const
 
 type
 {
-	Object types for projection. Each object begins with an xyz location point
-	and an xyz orientation vector. The orientation vector is present even if the
-	object is symmetric with respect to one or more axes of rotation. The
-	generic object type is one we use for type-casting other object types when
-	we apply rotation and translation. An scam_sphere we define with a point and
-	a diameter. An scam_cylinder is a point, a direction, a diameter, and a
-	length. We have no xyz_circle, because we can get a circle by setting the
-	length of a cylinder to zero. A shaft is an point, a direction, and a list
-	of faces. Each face is defined by a distance along the axis from the axis
-	point and a diameter. 
+	A sphere object is entirely specified by the location of its center and its 
+	diameter. 
 }
-	scam_object_type=record 
-		location:xyz_point_type; {center of sphere}
-		orientation:xyz_point_type; {redundant orientation of sphere}
-	end;
 	scam_sphere_type=record 
 		location:xyz_point_type; {center of sphere}
-		orientation:xyz_point_type; {redundant orientation of sphere}
 		diameter:real; {diameter of sphere}
 	end;
-	scam_cylinder_type=record 
-		location:xyz_point_type; {center of one face}
-		orientation:xyz_point_type; {direction of axis}
-		diameter:real; {diameter of both faces}
-		length:real; {distance along axis to second face}
-	end;
+{
+	We specify a shaft with a point on the shaft axis, the direction of the
+	shaft, the number of faces, and for each face a diameter and a distance
+	along the axis from the specified point on the shaft. We call this point the
+	"location" of the shaft. The axis vector is the "orientation" of the shaft.
+}
 	scam_shaft_type=record 
 		location:xyz_point_type; {origin of shaft}
-		orientation:xyz_point_type; {direction of shaft}
+		direction:xyz_point_type; {direction of shaft}
 		num_faces:integer; {number of faces that define the shaft}
 		diameter:array of real; {diameter of face}
 		distance:array of real; {distance of face from origin}
 	end;
 
 {
-	Geometry routines.
-}
-function xyz_line_crosses_sphere(line:xyz_line_type;
-	sphere:scam_sphere_type):boolean;
-function xyz_line_crosses_cylinder(line:xyz_line_type;
-	cylinder:scam_cylinder_type):boolean;
-
-{
 	String input and output routines.
 }
 function scam_sphere_from_string(s:string):scam_sphere_type;
-function scam_cylinder_from_string(s:string):scam_cylinder_type;
 function scam_shaft_from_string(s:string):scam_shaft_type;
 function read_scam_sphere(var s:string):scam_sphere_type;
-function read_scam_cylinder(var s:string):scam_cylinder_type;
 function read_scam_shaft(var s:string):scam_shaft_type;
+function string_from_scam_sphere(sphere:scam_sphere_type):string;
 function string_from_scam_shaft(shaft:scam_shaft_type):string;
+
+{
+	Coordinate handling routines.
+}
+function scam_coord_from_mount(mount:kinematic_mount_type):pose_type;
+function scam_from_global_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
+function scam_from_global_point(p:xyz_point_type;c:pose_type):xyz_point_type;
+function global_from_scam_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
+function global_from_scam_point(p:xyz_point_type;c:pose_type):xyz_point_type;
 
 {
 	Routines that project hypothetical objects onto the overlays of our SCAM
@@ -118,49 +147,27 @@ procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:scam_sphere_type;
 	camera:bcam_camera_type;
 	num_points:integer);
-procedure scam_project_cylinder(ip:image_ptr_type;
-	cylinder:scam_cylinder_type;
-	camera:bcam_camera_type;
-	num_points:integer);
 procedure scam_project_shaft(ip:image_ptr_type;
 	shaft:scam_shaft_type;
 	camera:bcam_camera_type;
 	num_points:integer);
 
 {
-	These projection routines go through every pixel in the image to see if it
-	should be included in a projected silhouette. They are slow, but they are
-	useful as a check of the line-drawing projection routines.
-}
-procedure scam_project_sphere_complete(ip:image_ptr_type;
-	sphere:scam_sphere_type;
-	camera:bcam_camera_type);
-procedure scam_project_cylinder_complete(ip:image_ptr_type;
-	cylinder:scam_cylinder_type;
-	camera:bcam_camera_type);
-	
-{
 	Routines that analyze the image.
 }
 function scam_decode_rule(ip:image_ptr_type;rule:string):real;
 function scam_disagreement(ip:image_ptr_type;threshold:real):real;
-function scam_disagreement_spread(ip:image_ptr_type;threshold,spread:real):real;
 
 implementation
 
 {
 	read_scam_sphere reads the parameters of a sphere from a string and deletes
-	them from the string. It returns a new sphere record. Note that the string
-	must contain values for the orientation of the sphere, even though a sphere
-	is symmetric for all rotation. Our sphere strings have the same format as
-	the strings for other objects: they begin with xyz location and xyz
-	orientation.
+	them from the string. It returns a new sphere record.
 }
 function read_scam_sphere(var s:string):scam_sphere_type;
 var sphere:scam_sphere_type;
 begin 
 	sphere.location:=read_xyz(s);
-	sphere.orientation:=read_xyz(s);
 	sphere.diameter:=read_real(s);
 	read_scam_sphere:=sphere;
 end;
@@ -173,45 +180,53 @@ function scam_sphere_from_string(s:string):scam_sphere_type;
 begin scam_sphere_from_string:=read_scam_sphere(s); end;
 
 {
-	read_scam_cylinder reads the parameters of a cylinder from a string and deletes
-	them from the string. It returns a new cylinder record.
+	string_from_scam_sphere converts a shaft into a string for printing.
 }
-function read_scam_cylinder(var s:string):scam_cylinder_type;
-var cylinder:scam_cylinder_type;
-begin 
-	cylinder.location:=read_xyz(s);
-	cylinder.orientation:=read_xyz(s);
-	cylinder.diameter:=read_real(s);
-	cylinder.length:=read_real(s);
-	read_scam_cylinder:=cylinder;
+function string_from_scam_sphere(sphere:scam_sphere_type):string;
+var s:string='';
+begin
+	with sphere do begin
+		write_xyz(s,location);
+		s:=s+' ';
+		writestr(s,s,diameter:fsr:fsd);
+	end;
+	string_from_scam_sphere:=s;
 end;
-
-{
-	scam_cylinder_from_string takes a string and returns a new cylinder record. Does
-	not alter the original string.
-}
-function scam_cylinder_from_string(s:string):scam_cylinder_type;
-begin scam_cylinder_from_string:=read_scam_cylinder(s); end;
 
 {
 	read_scam_shaft reads the parameters of a shaft from a string and deletes
 	them from the string. It returns a new shaft record. The string must contain
-	with the xyz origin of the shaft axis, the xyz direction of the shaft axis,
-	and one or more faces. Each face is specified by a diameter and a distance
-	from the origin along the shaft.	
+	the location of the shaft, which is a point on its axis, and the direction
+	of the shaft, which points in the positive direction for locating faces on
+	the shaft. Each face is specified by a diameter and a distance from the
+	location along the shaft in the shaft direction. The distances can be
+	negative or positive.	
 }
 function read_scam_shaft(var s:string):scam_shaft_type;
-var shaft:scam_shaft_type;i:integer;
+var 
+	shaft:scam_shaft_type;
+	i:integer;
+	x:real;
+	word,ss:string;
+	okay:boolean;
 begin 
 	with shaft do begin
 		location:=read_xyz(s);
-		orientation:=read_xyz(s);
-		num_faces:=word_count(s) div 2;
+		direction:=read_xyz(s);
+		ss:='';
+		repeat
+			word:=read_word(s);
+			x:=real_from_string(word,okay);
+			if okay then ss:=ss+' '+word;
+		until (s='') or (not okay);
+		if not okay then s:=word+' '+s;
+		
+		num_faces:=word_count(ss) div 2;
 		setlength(diameter,num_faces);
 		setlength(distance,num_faces);
 		for i:=0 to num_faces-1 do begin
-			diameter[i]:=read_real(s);
-			distance[i]:=read_real(s);
+			diameter[i]:=read_real(ss);
+			distance[i]:=read_real(ss);
 		end;
 	end;
 	read_scam_shaft:=shaft;
@@ -233,71 +248,12 @@ begin
 	with shaft do begin
 		write_xyz(s,location);
 		s:=s+' ';
-		write_xyz(s,orientation);
+		write_xyz(s,direction);
 		s:=s+' ';
 		for face_num:=0 to num_faces-1 do
 			writestr(s,s,diameter[face_num]:fsr:fsd,' ',distance[face_num]:fsr:fsd,' ');
 	end;
 	string_from_scam_shaft:=s;
-end;
-
-{
-	xyz_line_crosses_sphere returns true iff the line intersects or touches
-	the sphere.
-}
-function xyz_line_crosses_sphere(line:xyz_line_type;sphere:scam_sphere_type):boolean;
-var
-	range:real;
-begin
-	xyz_line_crosses_sphere:=false;
-	range:=xyz_length(xyz_point_line_vector(sphere.location,line));
-	xyz_line_crosses_sphere:=(range<=sphere.diameter*one_half);
-end;
-
-{
-	xyz_line_crosses_cylinder returns true iff the line intersects or touches
-	the cylinder. We check to see if the line crosses either flat face of the 
-	cylinder, then to see if it crosses the curved surface. A line crosses a
-	flat face if it intersects with the plane defining the flat surface within
-	cylinder radius of the face center. If a line crosses neither face, its
-	only means of crossing the cylinder is to enter the curved surface of the
-	cylinder some place and leave the curved surface at another place. The closest
-	approach of the line to the cylinder axis will have length less than the 
-	cylinder radius, and the closest point on the axis will lie between the 
-	two cylinder faces.
-}
-function xyz_line_crosses_cylinder(line:xyz_line_type;cylinder:scam_cylinder_type):boolean;
-var
-	face:xyz_plane_type;
-	axis,bridge:xyz_line_type;
-	p:xyz_point_type;
-	a:real;
-begin
-	xyz_line_crosses_cylinder:=false;
-	face.point:=cylinder.location;
-	face.normal:=xyz_unit_vector(cylinder.orientation);
-	if xyz_separation(
-			xyz_line_plane_intersection(line,face),
-			cylinder.location) 
-			<= cylinder.diameter*one_half then 
-		xyz_line_crosses_cylinder:=true
-	else begin
-		face.point:=xyz_sum(face.point,xyz_scale(face.normal,cylinder.length));
-		if xyz_separation(
-				xyz_line_plane_intersection(line,face),
-				face.point) <= cylinder.diameter*one_half then 
-			xyz_line_crosses_cylinder:=true
-		else begin
-			axis.point:=cylinder.location;
-			axis.direction:=face.normal;
-			bridge:=xyz_line_line_bridge(axis,line);
-			p:=xyz_difference(bridge.point,cylinder.location);
-			a:=xyz_dot_product(p,face.normal);
-			if (a>=0) and (a<=cylinder.length) and (xyz_length(bridge.direction)
-					<=cylinder.diameter*one_half) then
-				xyz_line_crosses_cylinder:=true
-		end;
-	end;
 end;
 
 {
@@ -347,92 +303,87 @@ begin
 end;
 	
 {
-	scam_project_sphere_complete takes a sphere in SCAM coordinates and projects
-	it onto the image plane of a camera. The image plane's center and pixel size
-	are specified by the sensor code in the camera record. The routine draws in
-	the overlay, not the actual image. It represents the projection as a solid
-	fill in the sphere color. The routine goes through all the pixels within the
-	analysis bounds of the image and seeing if each will be in the silhouette of
-	the object. Its execution time is slow, but it is "complete". We call this
-	routine when we pass zero for the number of projection points to the usual
-	projection routine.
+	scam_coordinates_from_mount takes the global coordinates of the cone, slot,
+	and flat balls of an SCAM mount and returns the SCAM coordinate system
+	defined by the mount. The location is the vector in global coordinates
+	from the global coordinate origin to the SCAM mount origin, which will be
+	the center of the cone ball. The rotation is an xyz rotation that rotates
+	the global axis unit vectors into the SCAM coordinate axis vectors. To
+	obtain the location and SCAM coordinate axes vectors we call the BCAM
+	coordinate routine. To obtain the compount rotation from the three
+	coordinate axes vectors we call another routine that uses a simplex fitter
+	to find the x, y, and z rotations that match the coordinate axes vectors.
+	This routine takes roughly one millisecond to run, so the idea is we save
+	the scam coordinates and pass them in to coordinate transformation routines
+	so that we don't have to find the angles more than once.
 }
-procedure scam_project_sphere_complete(ip:image_ptr_type;
-	sphere:scam_sphere_type;
-	camera:bcam_camera_type);
+function scam_coord_from_mount(mount:kinematic_mount_type):pose_type;
 
 var
-	i,j:integer;
-	q:xy_point_type;
-	w:real;
+	bcam:bcam_coord_type;
+	scam:pose_type;
 	
 begin
-	case round(camera.code) of 
-		bcam_icx424_code: w:=bcam_icx424_pixel_um/um_per_mm;
-		bcam_tc255_code: w:=bcam_tc255_pixel_um/um_per_mm;
-		bcam_generic_code: w:=bcam_generic_pixel_um/um_per_mm;
-		otherwise w:=bcam_tc255_pixel_um/um_per_mm;
-	end;
-	with ip^.analysis_bounds do begin
-		for j:=top to bottom do begin
-			for i:=left to right do begin
-				q.x:=(i+ccd_origin_x)*w;
-				q.y:=(j+ccd_origin_y)*w;
-				if xyz_line_crosses_sphere(bcam_source_bearing(q,camera),sphere) then
-					set_ov(ip,j,i,scam_sphere_color);
-			end;
-		end;
-	end;
+	bcam:=bcam_coord_from_mount(mount);
+	scam.location:=bcam.origin;
+	scam.orientation:=xyz_rotation_from_axes(bcam.x_axis,bcam.y_axis,bcam.z_axis);
+	scam_coord_from_mount:=scam;
 end;
 
 {
-	scam_project_cylinder_complete does for cylinders what scam_project_sphere
-	does for spheres. We get a solid fill in the cylinder color in the overlay.
-	The routine goes through all the pixels within the analysis bounds of the
-	image and seeing if each will be in the silhouette of the object. Its
-	execution time is slow, but it is "complete". We call this routine when we
-	pass zero for the number of projection points to the usual projection
-	routine.
+	scam_from_global_vector transforms a direction in global coordinates to a
+	direction in scam coordinates. We pass into the routine an scam coordinate
+	type, which provides the xyz rotation we must apply to the vector.
 }
-procedure scam_project_cylinder_complete(ip:image_ptr_type;
-	cylinder:scam_cylinder_type;
-	camera:bcam_camera_type);
-	
-var
-	i,j:integer;
-	q:xy_point_type;
-	w:real;
-	
+function scam_from_global_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
+var v:xyz_point_type;
 begin
-	case round(camera.code) of 
-		bcam_icx424_code: w:=bcam_icx424_pixel_um/um_per_mm;
-		bcam_tc255_code: w:=bcam_tc255_pixel_um/um_per_mm;
-		bcam_generic_code: w:=bcam_generic_pixel_um/um_per_mm;
-		otherwise w:=bcam_tc255_pixel_um/um_per_mm;
-	end;
-	with ip^.analysis_bounds do begin
-		for j:=top to bottom do begin
-			for i:=left to right do begin
-				q.x:=(i+ccd_origin_x)*w;
-				q.y:=(j+ccd_origin_y)*w;
-				if xyz_line_crosses_cylinder(bcam_source_bearing(q,camera),cylinder) then
-					set_ov(ip,j,i,scam_cylinder_color);
-			end;
-		end;
-	end;
+	v:=xyz_unrotate(p,c.orientation);
+	scam_from_global_vector:=v;
 end;
 
 {
-	scam_project_sphere takes a sphere in SCAM coordinates and draws the outline
-	of its projection onto the image plane of a camera, then attempts to fill
-	the projection with lines drawn within the sphere. The num_points prameter
-	is the number of perimeter points the routine will project. The routine
-	represents the outline with a finite number of straight lines joining points
-	on the projection's perimeter. If we pass zero for the number of lines, the
-	routine calls scam_project_sphere_complete. The routine draws in the
-	overlay, not the actual image. If we pass zero for the number of lines, the
-	routine calls scam_project_sphere_complete. The routine draws in the
-	overlay, not the actual image. 
+	global_from_scam_vector transforms a direction in scam coordinates into a 
+	direction in global coordinates. We pass into the routine an scam coordinate
+	type, which provides the xyz rotation we must apply in reverse to the vector.
+}
+function global_from_scam_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
+var v:xyz_point_type;
+begin
+	v:=xyz_rotate(p,c.orientation);
+	global_from_scam_vector:=v;
+end;
+
+{
+	scam_from_global_point transforms a point in global coordinates to a point
+	in scam coordinates.
+}
+function scam_from_global_point(p:xyz_point_type;c:pose_type):xyz_point_type;
+var v:xyz_point_type;
+begin
+	v:=scam_from_global_vector(xyz_difference(p,c.location),c);
+	scam_from_global_point:=v;
+end;
+
+{
+	global_from_scam_point transforms a point in scam coordinates into a point
+	in global coordinates.
+}
+function global_from_scam_point(p:xyz_point_type;c:pose_type):xyz_point_type;
+var v:xyz_point_type;
+begin
+	v:=xyz_sum(c.location,global_from_scam_vector(p,c));
+	global_from_scam_point:=v;
+end;
+
+{
+	scam_project_sphere takes a sphere in SCAM coordinates and projects drawing
+	of the sphere onto the image plane of a camera. The routine finds the circle
+	on the surface of the sphere that is the outsline of the sphere as seen by
+	the camera. It projects num_points points around this circle into the image
+	and joins them to trace the sphere silhouette perimiter. It further joins
+	the points with one another to provide some fill of the silhouette. The
+	routine draws in the overlay, not the actual image. 
 }
 procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:scam_sphere_type;
@@ -444,6 +395,7 @@ const
 	draw_radials=false;
 	draw_chords=true;
 	draw_cross_chords=true;
+	min_points=2;
 	
 var
 	axis,tangent,center_line:xyz_line_type;
@@ -457,9 +409,12 @@ var
 	
 begin
 {
-	If the number of points is zero, we call the complete projection routine.
+	If the number of points is fewer than two, we abort.
 }
-	if num_points=0 then scam_project_sphere_complete(ip,sphere,camera);
+	if num_points<min_points then begin
+		report_error('num_points<min_points in scam_project_sphere');
+		exit;
+	end;
 {
 	Find a tangent to the sphere that intersects the pivot point of the camera.
 	We start by constructing a line from the pivot point to the sphere center,
@@ -537,151 +492,15 @@ begin
 end;
 
 {
-	scam_project_cylinder takes a cylinder in SCAM coordinates and draws the
-	outline of its projection onto the image plane of a camera, then attempts to
-	fill in the outline with lines. The num_points parameter tells the routine
-	how many points around the perimiter of the cylinder faces it should project
-	into the image plane. The routine operates in such a way that if the length
-	of the cylinder is zero, the routine draws a single ellipse. If we pass zero
-	for num_points, the routine calls scam_project_cylinder_complete.
-}
-procedure scam_project_cylinder(ip:image_ptr_type;
-	cylinder:scam_cylinder_type;
-	camera:bcam_camera_type;
-	num_points:integer);
-	
-const
-	draw_perimeter=true;
-	draw_axials=true;
-	draw_chords=true;
-	draw_cross_chords=true;
-	draw_radials=false;
-	
-var
-	step:integer;
-	point_a,point_b,center_a,center_b,radial:xyz_point_type;
-	w:real;
-	projection:xy_point_type;
-	perimeter_a,perimeter_b:array of xy_point_type;
-	ica,icb:xy_point_type;
-	line:xy_line_type;
-	axis:xyz_line_type;
-	pc:xy_point_type;
-
-begin
-{
-	If the number of points is zero, we call the complete projection routine.
-}
-	if num_points=0 then scam_project_cylinder_complete(ip,cylinder,camera);
-{
-	Find a point on the circumference of the first end of the cylinder.
-}
-	cylinder.orientation:=xyz_unit_vector(cylinder.orientation);
-	radial:=xyz_scale(
-		xyz_perpendicular(cylinder.orientation),
-		cylinder.diameter*one_half);
-	point_a:=xyz_sum(cylinder.location,radial);
-	center_a:=cylinder.location;
-	axis.point:=cylinder.location;
-	axis.direction:=xyz_scale(cylinder.orientation,cylinder.length);
-{
-	Find the matching point and center on the opposite end of the cylinder.
-	These two points are joined by a line parallel to the cylinder axis, of
-	length equal to the cylinder length, which could be zero or negative.
-}
-	point_b:=xyz_sum(point_a,axis.direction);
-	center_b:=xyz_sum(center_a,axis.direction);
-{
-	When we project tangents onto our image sensor, we are going to mark them in
-	the overlay, for which we need the size of the pixels.
-}
-	case round(camera.code) of 
-		bcam_icx424_code: w:=bcam_icx424_pixel_um/um_per_mm;
-		bcam_tc255_code: w:=bcam_tc255_pixel_um/um_per_mm;
-		bcam_generic_code: w:=bcam_generic_pixel_um/um_per_mm;
-		otherwise w:=bcam_tc255_pixel_um/um_per_mm;
-	end;
-{
-	Rotate our cicumference points about the cylinder axis. Project them both
-	into the image plane and store in two arrays, one for the a-face, one for
-	the b-face. Our objective is to produce num_points pairs of points along the
-	perimeter of the two faces of the cylinder.
-}
-	setlength(perimeter_a,num_points);
-	setlength(perimeter_b,num_points);
-	for step:=0 to num_points-1 do begin
-		projection:=bcam_image_position(point_a,camera);
-		perimeter_a[step].x:=projection.x/w-ccd_origin_x;
-		perimeter_a[step].y:=projection.y/w-ccd_origin_y;
-		
-		projection:=bcam_image_position(point_b,camera);
-		perimeter_b[step].x:=projection.x/w-ccd_origin_x;
-		perimeter_b[step].y:=projection.y/w-ccd_origin_y;
-		
-		point_a:=xyz_axis_rotate(point_a,axis,2*pi/num_points);
-		point_b:=xyz_axis_rotate(point_b,axis,2*pi/num_points);
-	end;
-{
-	Draw lines between the circumference points on the image plane, and also
-	radials and chords in the faces themselves, as directed by flags.
-}
-	pc:=bcam_image_position(center_a,camera);
-	ica.x:=pc.x/w-ccd_origin_x;
-	ica.y:=pc.y/w-ccd_origin_y;
-	pc:=bcam_image_position(center_b,camera);
-	icb.x:=pc.x/w-ccd_origin_x;
-	icb.y:=pc.y/w-ccd_origin_y;
-	for step:=0 to num_points-1 do begin
-	
-		if draw_perimeter then begin
-			line.a:=perimeter_a[step];		
-			line.b:=perimeter_a[(step+1) mod num_points];
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-			line.a:=perimeter_b[step];		
-			line.b:=perimeter_b[(step+1) mod num_points];
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-		end;
-				
-		if draw_axials then begin
-			line.a:=perimeter_a[step];
-			line.b:=perimeter_b[step];
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-		end;
-	
-		if draw_chords and (step<=num_points/2) then begin
-			line.a:=perimeter_a[step];		
-			line.b:=perimeter_a[num_points-step-1];
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-			line.a:=perimeter_b[step];		
-			line.b:=perimeter_b[num_points-step-1];
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-		end;
-		
-		if draw_radials then begin
-			line.a:=perimeter_a[step];		
-			line.b:=ica;
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-			line.a:=perimeter_b[step];		
-			line.b:=icb;
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-		end;
-
-		if draw_cross_chords and (step<=num_points/2) then begin
-			line.a:=perimeter_a[step+round(num_points/4)];		
-			line.b:=perimeter_a[(num_points+round(num_points/4)-step-1) mod num_points];
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-			line.a:=perimeter_b[step+round(num_points/4)];		
-			line.b:=perimeter_b[(num_points+round(num_points/4)-step-1) mod num_points];
-			draw_overlay_xy_line(ip,line,scam_cylinder_color);
-		end;
-	end;
-end;
-
-{
-	scam_project_shaft takes a shaft in SCAM coordinates and draws the outline
-	of its projection onto the image plane of a camera, then attempts to fill in
-	the outline with lines. The num_points parameter tells the routine how many
-	points around the perimiter of each shaft face it should project.
+	scam_project_shaft takes a shaft in SCAM coordinates and projects a drawing
+	of the shaft onto the image plane of a camera. We specify the number of
+	points around each shaft face that the routine should use to traced the
+	circumference at each face. The routine will further join these points from
+	one face to the next, and from the shaft center line it will draw radial
+	lines out to these points on the first and last faces. With enough points,
+	the projection will appear solid. But we do not need a solid projection for
+	SCAM fitting to work. The routine draws in the overlay, not the actual
+	image.
 }
 procedure scam_project_shaft(ip:image_ptr_type;
 	shaft:scam_shaft_type;
@@ -692,6 +511,7 @@ const
 	draw_perimeter=true;
 	draw_axials=true;
 	draw_radials=false;
+	min_points=2;
 	
 var
 	step,face_num:integer;
@@ -699,23 +519,30 @@ var
 	w:real;
 	projection:xy_point_type;
 	perimeter_a,perimeter_b:array of xy_point_type;
-	ica,icb:xy_point_type;
+	ica:xy_point_type;
 	line:xy_line_type;
 	axis:xyz_line_type;
 	pc:xy_point_type;
 
 begin
 {
+	If the number of points is fewer than two, we abort.
+}
+	if num_points<min_points then begin
+		report_error('num_points<min_points in scam_project_shaft');
+		exit;
+	end;
+{
 	If the number of points is zero, or the number of faces is zero, exit.
 }
 	if num_points=0 then exit;
 	if shaft.num_faces<=0 then exit;
 {
-	Make sure the shaft axis direction is a unit vector.
+	Apply the location and orientation of the shaft's pose to obtain the
+	axis.
 }
-	shaft.orientation:=xyz_unit_vector(shaft.orientation);
 	axis.point:=shaft.location;
-	axis.direction:=shaft.orientation;
+	axis.direction:=shaft.direction;
 {
 	When we project tangents onto our image sensor, we are going to mark them in
 	the overlay, for which we need the size of the pixels.
@@ -736,11 +563,12 @@ begin
 }
 	for face_num:=0 to shaft.num_faces-1 do begin
 		setlength(perimeter_a,num_points);
+		if face_num=0 then perimeter_b:=perimeter_a;
 		with shaft do begin
-			radial:=xyz_scale(xyz_perpendicular(shaft.orientation),
+			radial:=xyz_scale(xyz_perpendicular(axis.direction),
 				diameter[face_num]*one_half);
-			center:=xyz_sum(shaft.location,
-				xyz_scale(shaft.orientation,distance[face_num]));
+			center:=xyz_sum(axis.point,
+				xyz_scale(axis.direction,distance[face_num]));
 			point:=xyz_sum(center,radial);
 			
 			for step:=0 to num_points-1 do begin
@@ -825,67 +653,6 @@ begin
 	end;
 	scam_disagreement:=d;
 end;
-
-{
-	scam_disagreement_spread measures the disagreement between a silhouette and a
-	collection of projected objets. So far as the routine is concerned, a pixel
-	is part of a projection if and only if its overlay is not clear. A pixel is
-	part of a silhouette if and only if its intensity is less than the specified
-	threshold. When a pixel is occupied by silhouette and projection, we clear
-	its overlay, to show there is no disagreement. If it is occupied by neither
-	silhouette nor projection, we leave its overlay clear, to show there is no
-	disagreement. If it is silhouette but not projection, we mark its overlay
-	with the silhouette color to show disagreement. If it is projection but not
-	silhouette, we leave its overlay marked with the projection color to show
-	disagreement. The overlay will be clear except where the silhouette and
-	projection disagree.
-	
-	The routine returns a measures of the disagreement between the image and
-	projections. To obtain the disagreement we use the intensity threshold, "t",
-	the pixel intensity "b", the minimum intensity in the image, "m", and the
-	specified spread. We let e = (t-m)*spread. If the projected object occupies
-	the pixel, we use the following three rules. If b < t-e, we add 0.0 to the
-	disagreement. If b > t+e we add 1.0. In between we add (b-t+e)/2e. When the
-	projected object does not occupy the pixel, we use the following three
-	rules. If b > t+e we add 0.0. If b < t-e we add one. In between we add
-	(t+e-b)/2e. We add the disagreement of all pixels together to obtain the
-	total disagreement. With spread=0, the disagreement is the number of pixels
-	that are silhouette or projection but not both, using a binary threshold. 
-}
-function scam_disagreement_spread(ip:image_ptr_type;threshold,spread:real):real;
-
-var
-	i,j:integer;
-	t,b,e,d,m:real;
-	p:boolean;
-	
-begin
-	d:=0;
-	m:=image_minimum(ip);
-	t:=threshold;
-	e:=(t-m)*spread;
-	with ip^.analysis_bounds do begin
-		for j:=top to bottom do begin
-			for i:=left to right do begin
-				p:=(get_ov(ip,j,i)<>clear_color);
-				b:=get_px(ip,j,i);
-				if p then begin
-					if b>t+e then d:=d+1.0
-					else if (b>t-e) then d:=d+(b-t+e)/(2.0*e);
-				end else begin
-					if b<t-e then d:=d+1.0
-					else if (b<t+e) then d:=d+(t-b+e)/(2.0*e);
-				end;
-				if (b<=t) then begin
-					if not p then set_ov(ip,j,i,scam_silhouette_color)
-					else set_ov(ip,j,i,clear_color);
-				end;
-			end;
-		end;
-	end;
-	scam_disagreement_spread:=d;
-end;
-
 
 end.
 

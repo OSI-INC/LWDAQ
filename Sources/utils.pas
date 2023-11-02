@@ -286,6 +286,7 @@ type
 	xy_graph_ptr=^xy_graph_type;
 
 	xyz_point_type=record x,y,z:real; end;
+	pose_type=record location,orientation:xyz_point_type; end;
 	xyz_point_ptr_type=^xyz_point_type;
 	xyz_graph_type=array of xyz_point_type;
 	xyz_graph_ptr=^xyz_graph_type;
@@ -351,6 +352,7 @@ function unit_matrix(num_rows:integer):matrix_type;
 function matrix_product(var A,B:matrix_type):matrix_type;
 function matrix_determinant(var A:matrix_type):real;
 function matrix_difference(var A,B:matrix_type):matrix_type;
+function matrix_transpose(var A:matrix_type):matrix_type;
 function matrix_inverse(var A:matrix_type):matrix_type;
 procedure swap_matrix_rows(var M:matrix_type;row_1,row_2:integer);
 
@@ -384,8 +386,7 @@ type
 		done:boolean;
 	end;
 	simplex_ptr=^simplex_type;
-	simplex_error_function_type = 
-		function(vertex:simplex_vertex_type;ep:pointer):real;
+	simplex_error_function_type = function(vertex:simplex_vertex_type;ep:pointer):real;
 
 function new_simplex(num_coords:integer):simplex_type;
 procedure simplex_step(var simplex:simplex_type;
@@ -542,21 +543,18 @@ function xy_rectangle_ellipse(rect:xy_rectangle_type):xy_ellipse_type;
 	debugging. We do note, however, that our definition of an xyz_line is not
 	consistent with our definition of an xy_line. In the xy_line, we use two
 	points, no vector. We define a three-dimensional coordinate system as an
-	origin point and three unit vectors for the three axes. The coordinate
-	system is over-constrained, but in our code we find that the
-	over-constrained definition serves as a self-consistency check, and is at
-	the same time easier to work with and easier to check.
+	origin point and three unit vectors for the three axes. Defined in this
+	manner, the coordinate system is over-constrained. Another way to define a
+	coordinate system is with an origin and a compound rotation, see comments
+	in our xyz_rotation_from_axes routine.
 }
 type 
 	xyz_line_type=record point,direction:xyz_point_type; end;
 	xyz_line_ptr_type=^xyz_line_type;
 	xyz_plane_type=record point,normal:xyz_point_type; end;
 	xyz_plane_ptr_type=^xyz_plane_type;
-	coordinates_type=record
-		origin,x_axis,y_axis,z_axis:xyz_point_type;{a point and three unit vectors}
-	end;
 	kinematic_mount_type=record 
-		cone,slot,plane:xyz_point_type;{ball centers}
+		cone,slot,flat:xyz_point_type;{ball centers}
 	end;
 
 function xyz_random:xyz_point_type;
@@ -582,12 +580,15 @@ function xyz_point_line_vector(point:xyz_point_type;line:xyz_line_type):xyz_poin
 function xyz_line_line_bridge(p,q:xyz_line_type):xyz_line_type;
 function xyz_point_plane_vector(point:xyz_point_type;plane:xyz_plane_type):xyz_point_type;
 function xyz_matrix_determinant(A:xyz_matrix_type):real;
+function xyz_matrix_transpose(A:xyz_matrix_type):xyz_matrix_type;
 function xyz_matrix_inverse(A:xyz_matrix_type):xyz_matrix_type;
 function xyz_matrix_difference(A,B:xyz_matrix_type):xyz_matrix_type;
 function xyz_rotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_unrotate(point,rotation:xyz_point_type):xyz_point_type;
-function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;
-	rotation:real):xyz_point_type;
+function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;rotation:real):xyz_point_type;
+function xyz_rotation_from_axes(x_axis,y_axis,z_axis:xyz_point_type):xyz_point_type;
+function pose_sum(p,q:pose_type):pose_type;
+function pose_difference(p,q:pose_type):pose_type;
 
 {
 	Memory Access. We use byte arrays as a data structure for copying blocks of
@@ -671,6 +672,7 @@ function decimal_from_string(s:string;base:integer):integer;
 function real_from_string(s:string;var okay:boolean):real;
 function xy_from_string(s:string):xy_point_type;
 function xyz_from_string(s:string):xyz_point_type;
+function pose_from_string(s:string):pose_type;
 function xyz_line_from_string(s:string):xyz_line_type;
 function xyz_plane_from_string(s:string):xyz_plane_type;
 function kinematic_mount_from_string(s:string):kinematic_mount_type;
@@ -685,6 +687,7 @@ function hex_string_from_byte(number:byte):string;
 function string_from_ij(p:ij_point_type):string;
 function string_from_xy(p:xy_point_type):string;
 function string_from_xyz(p:xyz_point_type):string;
+function string_from_pose(p:pose_type):string;
 function string_from_xyz_line(l:xyz_line_type):string;
 function string_from_xyz_plane(p:xyz_plane_type):string;
 function upper_case(s:string):string;
@@ -702,6 +705,7 @@ function read_real(var s:string):real;
 function read_integer(var s:string):integer;
 function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
+function read_pose(var s:string):pose_type;
 function read_x_graph(var s:string):x_graph_type;
 function read_xy_graph(var s:string):xy_graph_type;
 function read_xyz_graph(var s:string):xyz_graph_type;
@@ -710,9 +714,11 @@ function read_kinematic_mount(var s:string):kinematic_mount_type;
 procedure write_ij(var s:string;p:ij_point_type);
 procedure write_xy(var s:string;p:xy_point_type);
 procedure write_xyz(var s:string;p:xyz_point_type);
+procedure write_pose(var s:string;p:pose_type);
 procedure write_xyz_line(var s:string;l:xyz_line_type);
 procedure write_xyz_plane(var s:string;p:xyz_plane_type);
 procedure write_xyz_matrix(var s:string;M:xyz_matrix_type);
+function string_from_xyz_matrix(M:xyz_matrix_type):string;
 procedure write_matrix(var s:string;var M:matrix_type);
 function string_from_matrix(var M:matrix_type):string;
 procedure write_kinematic_mount(var s:string;mount:kinematic_mount_type);
@@ -1547,10 +1553,8 @@ begin
 			fail:begin 
 				okay:=false;
 				state:=quit;
-				if s<>'' then
-					report_error('Invalid string "'+s+'" in real_from_string.');
 			end;
-		end;{case state of}
+		end;
 	until state=quit;
 
 	if okay then real_from_string:=value
@@ -1706,6 +1710,18 @@ begin
 	read_xyz:=p;
 end;
 
+function read_pose(var s:string):pose_type;
+var p:pose_type;
+begin
+	p.location.x:=read_real(s);
+	p.location.y:=read_real(s);
+	p.location.z:=read_real(s);
+	p.orientation.x:=read_real(s);
+	p.orientation.y:=read_real(s);
+	p.orientation.z:=read_real(s);
+	read_pose:=p;
+end;
+
 function read_integer(var s:string):integer;
 var okay:boolean;
 begin
@@ -1731,7 +1747,7 @@ begin
 	with mount do begin
 		cone:=read_xyz(s);
 		slot:=read_xyz(s);
-		plane:=read_xyz(s);
+		flat:=read_xyz(s);
 	end;
 	read_kinematic_mount:=mount;
 end;
@@ -1907,6 +1923,9 @@ begin xy_from_string:=read_xy(s);end;
 function xyz_from_string(s:string):xyz_point_type;
 begin xyz_from_string:=read_xyz(s);end;
 
+function pose_from_string(s:string):pose_type;
+begin pose_from_string:=read_pose(s);end;
+
 function xyz_line_from_string(s:string):xyz_line_type;
 var l:xyz_line_type;
 begin 
@@ -1952,6 +1971,14 @@ begin
 	s:=s+a;
 end;
 
+procedure write_pose(var s:string;p:pose_type);
+var a:string;
+begin 
+	with p.location do writestr(a,x:fsr:fsd,' ',y:fsr:fsd,' ',z:fsr:fsd);
+	with p.orientation do writestr(a,a,' ',x:fsr:fsd,' ',y:fsr:fsd,' ',z:fsr:fsd);
+	s:=s+a;
+end;
+
 procedure write_xyz_line(var s:string;l:xyz_line_type);
 var a:string;
 begin 
@@ -1981,6 +2008,14 @@ begin
 	s:=s+a;
 end;
 
+function string_from_xyz_matrix(M:xyz_matrix_type):string;
+var s:string;
+begin
+	s:='';
+	write_xyz_matrix(s,M);
+	string_from_xyz_matrix:=s;
+end;
+
 procedure write_matrix(var s:string; var M:matrix_type);
 var i,j:integer;
 begin
@@ -2007,7 +2042,7 @@ begin
 		s:=s+' ';
 		write_xyz(s,slot);
 		s:=s+' ';
-		write_xyz(s,plane);
+		write_xyz(s,flat);
 	end;
 end;
 
@@ -2034,6 +2069,13 @@ var s:string='';
 begin
 	write_xyz(s,p);
 	string_from_xyz:=s;
+end;
+
+function string_from_pose(p:pose_type):string;
+var s:string='';
+begin
+	write_pose(s,p);
+	string_from_pose:=s;
 end;
 
 function string_from_xyz_line(l:xyz_line_type):string;
@@ -3853,13 +3895,33 @@ begin
 		exit;
 	end;
 	
-	for j:=1 to matrix_rows(A) do begin
-		for i:=1 to matrix_columns(A) do begin
+	for j:=1 to matrix_rows(M) do begin
+		for i:=1 to matrix_columns(M) do begin
 			M[j,i]:=A[j,i]-B[j,i];
 		end;
 	end;
 	
 	matrix_difference:=M;
+end;
+
+{
+	matrix_transpose returns the matrix for which the rows are the original
+	columns.
+}
+function matrix_transpose(var A:matrix_type):matrix_type;
+
+var
+	M:matrix_type;
+	i,j:integer;
+	
+begin
+	M:=new_matrix(matrix_columns(A),matrix_rows(A));
+	for j:=1 to matrix_rows(M) do begin
+		for i:=1 to matrix_columns(M) do begin
+			M[j,i]:=A[i,j];
+		end;
+	end;
+	matrix_transpose:=M;
 end;
 
 {
@@ -4123,6 +4185,23 @@ begin
 end;
 
 {
+	xyz_matrix_transpose returns the transpose of the original matrix, where
+	the rows become the previous columns.
+}
+function xyz_matrix_transpose(A:xyz_matrix_type):xyz_matrix_type;
+
+var
+	M:xyz_matrix_type;
+	i,j:integer;
+	
+begin
+	for j:=1 to num_xyz_dimensions do
+		for i:=1 to num_xyz_dimensions do
+			M[i,j]:=A[j,i];
+	xyz_matrix_transpose:=M;
+end;
+
+{
 	xyz_matrix_inverse inverts a 3x3 matrix for geometry calculations.
 	We could use matrix_inverse, and dynamically-allocated 3x3 matrices,
 	but the time taken by the dynamic allocation of space for the
@@ -4195,7 +4274,8 @@ end;
 
 {
 	xyz_matrix_from_points takes three xyz_point_types and makes them the rows 
-	of an xyz matrix. It returns a pointer to this new matrix.	
+	of an xyz matrix. It returns a pointer to this new matrix. If we want the 
+	points in the columns instead, apply xyz_matrix_transpose afterwards.
 }
 function xyz_matrix_from_points(p,q,r:xyz_point_type):xyz_matrix_type;
 var M:xyz_matrix_type;
@@ -5595,6 +5675,22 @@ begin
 	else xyz_separation:=0;
 end;
 
+function pose_sum(p,q:pose_type):pose_type;
+var s:pose_type;
+begin
+	s.location:=xyz_sum(p.location,q.location);
+	s.orientation:=xyz_sum(p.orientation,q.orientation);
+	pose_sum:=s;
+end;
+
+function pose_difference(p,q:pose_type):pose_type;
+var d:pose_type;
+begin
+	d.location:=xyz_difference(p.location,q.location);
+	d.orientation:=xyz_difference(p.orientation,q.orientation);
+	pose_difference:=d;
+end;
+
 function xyz_z_plane(z:real):xyz_plane_type;
 var plane:xyz_plane_type;
 begin
@@ -5859,16 +5955,19 @@ begin
 	p.x:=point.x;
 	p.y:=point.y*cos(rotation.x)-point.z*sin(rotation.x);
 	p.z:=point.y*sin(rotation.x)+point.z*cos(rotation.x);
+	
 	{rotate about y-axis}
 	point:=p;
 	p.x:=point.x*cos(rotation.y)+point.z*sin(rotation.y);
 	p.y:=point.y;
 	p.z:=-point.x*sin(rotation.y)+point.z*cos(rotation.y);
+	
 	{rotate about z-axis}
 	point:=p;
 	p.x:=point.x*cos(rotation.z)-point.y*sin(rotation.z);
 	p.y:=point.x*sin(rotation.z)+point.y*cos(rotation.z);
 	p.z:=point.z;
+	
 	{return result}
 	xyz_rotate:=p;	
 end;
@@ -5886,24 +5985,28 @@ begin
 	p.x:=point.x*cos(-rotation.z)-point.y*sin(-rotation.z);
 	p.y:=point.x*sin(-rotation.z)+point.y*cos(-rotation.z);
 	p.z:=point.z;
+	
 	{unrotate about y-axis}
 	point:=p;
 	p.x:=point.x*cos(-rotation.y)+point.z*sin(-rotation.y);
 	p.y:=point.y;
 	p.z:=-point.x*sin(-rotation.y)+point.z*cos(-rotation.y);
+	
 	{unrotate about x-axis}
 	point:=p;
 	p.x:=point.x;
 	p.y:=point.y*cos(-rotation.x)-point.z*sin(-rotation.x);
 	p.z:=point.y*sin(-rotation.x)+point.z*cos(-rotation.x);
+	
 	{return result}
 	xyz_unrotate:=p;	
 end;
 
 {
-	xyz_axis_rotate rotates a subject point about an axis line. We take the
-	vector from the axis to the subject point and rotate it about the axis.
-	Positive rotatin is right-handed about the axis direction.
+	xyz_axis_rotate rotates a subject point about an axis line. We take a vector
+	from a point on the axis to the subject point and rotate it about the axis.
+	We add the resulting vector to our axis point to obtain the new point.
+	Positive rotation is right-handed about the axis direction.
 }
 function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;
 	rotation:real):xyz_point_type;
@@ -5947,6 +6050,111 @@ begin
 }
 	xyz_axis_rotate:=pp;
 end;
+
+{
+	xyz_rotation_from_axes_error is the error function used by the routine that
+	finds an xyz rotation to match a coordinate system. 
+}
+function xyz_rotation_from_axes_error(v:simplex_vertex_type;dp:pointer):real;
+
+var
+	rot:xyz_point_type;
+	sum:real;
+	
+
+begin
+{
+	Make a rotation vector out of the three vertex coordinates and use it
+	to rotate the global coordinate axes.
+}
+	rot.x:=v[1];
+	rot.y:=v[2];
+	rot.z:=v[3];
+{
+	Our error is the square of the separations between the rotated global axes
+	and our specified coordinate axes.
+}
+	sum:=0;
+	sum:=sum+sqr(xyz_separation(
+		xyz_rotate(xyz_graph_ptr(dp)^[3],rot),
+		xyz_graph_ptr(dp)^[0]));
+	sum:=sum+sqr(xyz_separation(
+		xyz_rotate(xyz_graph_ptr(dp)^[4],rot),
+		xyz_graph_ptr(dp)^[1]));
+	sum:=sum+sqr(xyz_separation(
+		xyz_rotate(xyz_graph_ptr(dp)^[5],rot),
+		xyz_graph_ptr(dp)^[2]));
+	xyz_rotation_from_axes_error:=sum;
+end;
+
+{
+	xyz_rotation_from_axes determines the compount rotation that produces the
+	specified right-handed coordinate axes from the global coordinate axes. The
+	compound rotation consists of a rotation about x, y, and z, and we refer to
+	it as an "xyz" rotation for brevity. Deducing the xyz rotation that
+	transforms the global axes into another set of axes is a non-trivial
+	calculation. This routine uses a simplex fitter rather than an analytical
+	equation. We pass the x, y, and z axes as parameter. The routine uses our
+	simplex fitter to obtain the three rotations x, y, and z that rotate the
+	global coordinate axes so that they are parallel to the given axes. If the
+	fit does not converge to an accurate solution, it generates an error.
+	Failure will occur if the given axes are not orthogonal, are not
+	right-handed, or are at particular large angles that create a local minimum
+	in our error function. The routine will not be confused by axes that are not
+	unit vectors: it converts all the axes into unit vectors before it starts
+	work.
+}
+function xyz_rotation_from_axes(x_axis,y_axis,z_axis:xyz_point_type):xyz_point_type;
+
+const
+	angle_scale=0.1;
+	small_error=0.000001;
+	
+var
+	simplex:simplex_type;
+	rot:xyz_point_type;
+	data:xyz_graph_type;
+
+begin
+{
+	Set up the data record that we will pass to our error functions. We have
+	a copy of the global and new coordinate axes.
+}
+	xyz_rotation_from_axes:=xyz_origin;
+	setlength(data,6);
+	data[0]:=xyz_unit_vector(x_axis);
+	data[1]:=xyz_unit_vector(y_axis);
+	data[2]:=xyz_unit_vector(z_axis);
+	with data[3] do begin x:=1;y:=0;z:=0; end;
+	with data[4] do begin x:=0;y:=1;z:=0; end;
+	with data[5] do begin x:=0;y:=0;z:=1; end;
+{
+	Configure and run the simplex fitter.
+}
+	simplex:=new_simplex(num_xyz_dimensions);
+	simplex_construct(simplex,xyz_rotation_from_axes_error,@data);
+	simplex.scaling[1]:=angle_scale;
+	simplex.scaling[2]:=angle_scale;
+	simplex.scaling[3]:=angle_scale;
+	repeat 
+		simplex_step(simplex,xyz_rotation_from_axes_error,@data); 
+	until simplex.done;
+{
+	Check the final error value.
+}
+	if simplex.errors[1]>small_error then begin
+		report_error('Failed to find rotation in xyz_rotation_from_axes.');
+		exit;
+	end;
+{
+	Transfer the final fitted values into a rotation vector and return.
+}
+	rot.x:=simplex.vertices[1,1];
+	rot.y:=simplex.vertices[1,2];
+	rot.z:=simplex.vertices[1,3];
+	xyz_rotation_from_axes:=rot;
+end;
+
 
 {	
 	memory_byte	returns the value of the 8-bit unsigned byte at the specified address.
@@ -6217,7 +6425,7 @@ begin
 end;
 
 {
-	initialization sets up the utils variables.
+	Initialization sets up the utils variables.
 }
 initialization 
 
