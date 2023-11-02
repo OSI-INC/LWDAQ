@@ -16,8 +16,7 @@
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
-# Receiver.tcl defines the Receiver Instrument for LWDAQ, which until 13-SEP-21
-# was called the Recorder Instrument, as defined in Recorder.tcl.
+# Receiver.tcl defines the Receiver Instrument for LWDAQ.
 
 
 #

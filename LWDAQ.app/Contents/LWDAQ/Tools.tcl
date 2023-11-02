@@ -536,7 +536,7 @@ proc LWDAQ_Toolmaker_execute {{save 1}} {
 	catch {destroy $w}
 	set w [LWDAQ_toplevel_window "Toolmaker Execution"]
 	set f [frame $w.f]
-	pack $f -side top
+	pack $f -side top -fill x
 	set t [LWDAQ_text_widget $w 60 15 1 1]	
 
 	# Execute the script at the global scope. If the script generates
