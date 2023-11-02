@@ -328,7 +328,11 @@ proc CPMS_Manager_acquire {} {
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name $info(img_right)
 	
 	set config(file_index) [clock seconds]
-	CPMS_Manager_show
+	if {$config(auto_fit)} {
+		CPMS_Manager_fit
+	} else {
+		CPMS_Manager_show
+	}
 	
 	set info(state) "Idle"
 	return ""
