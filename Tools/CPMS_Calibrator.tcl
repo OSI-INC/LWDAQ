@@ -23,36 +23,37 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_info info
 	upvar #0 CPMS_Calibrator_config config
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "2.1"
+	LWDAQ_tool_init "CPMS_Calibrator" "2.2"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.675 39.312 1.1 0.0 0.0 2 26.0 0.0" 
 	set config(mount_left) "92.123 -18.364 -3.450 \
 		83.853 -18.211 -78.940 \
 		125.201 -17.747 -71.806"
+	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
 	set config(cam_right) "12.675 -39.312 1.1 0.0 0.0 2 26.0 3141.6" 
 	set config(mount_right) "-77.819 -20.395 -2.397 \
 		-74.201 -20.179 -75.451 \
 		-115.549 -20.643 -68.317"
-	set config(objects) [list \
-		"sphere 20.231 19.192 506.194 0 0 0 38.068" \
-		"sphere 20.017 19.275 466.169 0 0 0 38.068" \
-		"sphere 19.861 19.319 436.169 0 0 0 38.073" \
-		"sphere 19.693 19.371 406.173 0 0 0 38.072"]
+	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+
+	set config(bodies) [list \
+		"20.231 19.192 506.194 0 0 0 sphere 0 0 0 38.068" \
+		"20.017 19.275 466.169 0 0 0 sphere 0 0 0 38.068" \
+		"19.861 19.319 436.169 0 0 0 sphere 0 0 0 38.073" \
+		"19.693 19.371 406.173 0 0 0 sphere 0 0 0 38.072"]
 
 	set config(scaling) "1 1 10 10 10 0 1 10"
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
-	set config(num_lines) "2000"
-	set config(stop_fit) 0
-	set config(zoom) 0.5
+	set config(num_lines) "200"
+	set config(stop_fit) "0"
+	set config(zoom) "0.5"
 	set config(intensify) "exact"
 	set config(threshold) "10 %"
 	set config(img_dir) "~/Desktop/CPMS"
 	
-	set info(projector_window) "$info(window).cpms_projector"
-
 	set info(state) "Idle"
 
 	if {[file exists $info(settings_file_name)]} {
@@ -95,9 +96,9 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 		set spheres [list]
 		foreach {d x y z} $numbers {lappend spheres "$d $x $y $z"}
 		set spheres [lrange $spheres 9 end]
-		set config(objects) [list]
+		set config(bodies) [list]
 		foreach s $spheres {
-			lappend config(objects) "sphere [lrange $s 1 3] 0 0 0 [lindex $s 0]"
+			lappend config(bodies) "[lrange $s 1 3] 0 0 0 sphere 0 0 0 [lindex $s 0]"
 		}
 	} else {
 		LWDAQ_print $info(text) "Cannot find \"$fn\"."
@@ -107,7 +108,7 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 
 	set a 1
 	set count 0
-	foreach obj $config(objects) {
+	foreach body $config(bodies) {
 		foreach {letter word} {L left R right} {
 			set imgf [file join $config(img_dir) $letter$a\.gif]
 			if {[file exists $imgf]} {
@@ -118,7 +119,7 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 		incr a
 	}
 	LWDAQ_print $info(text) "Read left and right mounts,\
-		[llength $config(objects)] objects,\
+		[llength $config(bodies)] bodies,\
 		$count images."
 	
 	set info(state) "Idle"
@@ -143,25 +144,19 @@ proc CPMS_Calibrator_go {{params ""}} {
 	}
 
 	if {$params == ""} {set params [CPMS_Calibrator_get_params]}
-	set lc "LC [lrange $params 0 7]"
-	set rc "RC [lrange $params 8 15]"
+	set scam_left "SCAM_left [lrange $params 0 7]"
+	set scam_right "SCAM_left [lrange $params 8 15]"
 	
 	set disagreement 0
 	set a 1
-	foreach obj $config(objects) {
-		lwdaq_image_manipulate img_left_$a none -clear 1
-		lwdaq_image_manipulate img_right_$a none -clear 1
+	foreach body $config(bodies) {
+
+		foreach side {left right} {
+			lwdaq_image_manipulate img_$side\_$a none -clear 1			
+			lwdaq_scam img_$side\_$a project \
+				$config(coord_$side) scam_$side $body $config(num_lines)
+		}
 		
-		set lp [lwdaq bcam_from_global_point [lrange $obj 1 3] $config(mount_left)]
-		set ld [lwdaq bcam_from_global_vector [lrange $obj 4 6] $config(mount_left)]
-		set lo "[lindex $obj 0] $lp $ld [lrange $obj 7 end]"
-		lwdaq_scam img_left_$a project $lc $lo $config(num_lines)
-
-		set rp [lwdaq bcam_from_global_point [lrange $obj 1 3] $config(mount_right)]
-		set rd [lwdaq bcam_from_global_vector [lrange $obj 4 6] $config(mount_right)]
-		set ro "[lindex $obj 0] $rp $rd [lrange $obj 7 end]"
-		lwdaq_scam img_right_$a project $rc $ro $config(num_lines)
-
 		set left_count [lwdaq_scam img_left_$a disagreement $config(threshold)]
 		set right_count [lwdaq_scam img_right_$a disagreement $config(threshold)]
 		set disagreement [expr $disagreement + $left_count + $right_count]
@@ -196,6 +191,8 @@ proc CPMS_Calibrator_fit {} {
 	set info(state) "Fitting"
 	
 	if {[catch {
+		set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
+		set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
 		set scaling "$config(scaling) $config(scaling)"
 		set start_params [CPMS_Calibrator_get_params] 
 		set end_params [lwdaq_simplex $start_params \
@@ -215,91 +212,6 @@ proc CPMS_Calibrator_fit {} {
 
 	CPMS_Calibrator_go
 	set info(state) "Idle"
-}
-
-proc CPMS_Calibrator_adjust {a v} {
-	upvar #0 CPMS_Calibrator_config config
-	upvar #0 CPMS_Calibrator_info info
-	
-	if {$info(state) != "Idle"} {
-		LWDAQ_print $info(text) "WARNING: Cannot adjust manually while $info(state)."
-		return ""
-	}
-	set info(state) "Project"
-	
-	switch $a {
-		lpx {lset config(cam_left) 0 $v}
-		lpy {lset config(cam_left) 1 $v}
-		lpz {lset config(cam_left) 2 $v}
-		laz {lset config(cam_left) 3 $v}
-		lay {lset config(cam_left) 4 $v}
-		lpc {lset config(cam_left) 6 $v}
-		lrot {lset config(cam_left) 7 $v}
-		rpx {lset config(cam_right) 0 $v}
-		rpy {lset config(cam_right) 1 $v}
-		rpz {lset config(cam_right) 2 $v}
-		raz {lset config(cam_right) 3 $v}
-		ray {lset config(cam_right) 4 $v}
-		rpc {lset config(cam_right) 6 $v}
-		rrot {lset config(cam_right) 7 $v}
-	}
-	CPMS_Calibrator_go "$config(cam_left) $config(cam_right)"
-	set info(state) "Idle"
-	return ""
-}
-
-proc CPMS_Calibrator_adjustor {} {
-	upvar #0 CPMS_Calibrator_config config
-	upvar #0 CPMS_Calibrator_info info
-
-	if {[winfo exists $info(projector_window)]} {
-		raise $info(projector_window)
-		CPMS_Calibrator_adjust none 0
-		return ""
-	}	
-	
-	set w $info(projector_window)
-	toplevel $w
-	wm title $w "Object Projector for CPMS Calibrator Version $info(version)"
-
-	set f [frame $w.controls]
-	pack $f -side top -fill x
-	
-	foreach a {num_lines threshold} {
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 6
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-	
-	set info(projector_lpx) [lindex $config(cam_left) 0]
-	set info(projector_lpy) [lindex $config(cam_left) 1]
-	set info(projector_lpz) [lindex $config(cam_left) 2]
-	set info(projector_lax) [lindex $config(cam_left) 3]
-	set info(projector_lay) [lindex $config(cam_left) 4]
-	set info(projector_lpc) [lindex $config(cam_left) 6]
-	set info(projector_lrot) [lindex $config(cam_left) 7]
-	set info(projector_rpx) [lindex $config(cam_right) 0]
-	set info(projector_rpy) [lindex $config(cam_right) 1]
-	set info(projector_rpz) [lindex $config(cam_right) 2]
-	set info(projector_rax) [lindex $config(cam_right) 3]
-	set info(projector_ray) [lindex $config(cam_right) 4]
-	set info(projector_rpc) [lindex $config(cam_right) 6]
-	set info(projector_rrot) [lindex $config(cam_right) 7]
-	
-	foreach a {lpx lpy lpz lax lay lpc lrot rpx rpy rpz rax ray rpc rrot} {
-		set f [frame $w.$a -border 2 -relief sunken]
-		pack $f -side top -fill x
-		label $f.l$a -text "$a\:"
-		set lo [expr round($info(projector_$a)-10.0)]
-		set hi [expr round($info(projector_$a)+10.0)]
-		scale $f.$a -from $lo -to $hi -length 1000 -resolution 0.1 \
-			-variable CPMS_Calibrator_info(projector_$a) \
-			-orient horizontal -showvalue false -tickinterval 5 \
-			-command "CPMS_Calibrator_adjust $a"
-		pack $f.l$a $f.$a -side left -expand yes
-	}
-
-	CPMS_Calibrator_adjust none 0
 }
 
 proc CPMS_Calibrator_clear {} {
@@ -376,12 +288,12 @@ proc CPMS_Calibrator_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	set f [frame $w.object]
+	set f [frame $w.bodies]
 	pack $f -side top -fill x
 
-	label $f.lobj -text "objects:"
-	entry $f.eobj -textvariable CPMS_Calibrator_config(objects) -width 160
-	pack $f.lobj $f.eobj -side left -expand yes
+	label $f.lbody -text "bodies:"
+	entry $f.ebody -textvariable CPMS_Calibrator_config(bodies) -width 160
+	pack $f.lbody $f.ebody -side left -expand yes
 		
 	set f [frame $w.images_a]
 	pack $f -side top -fill x
