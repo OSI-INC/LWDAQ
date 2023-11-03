@@ -2521,10 +2521,10 @@ begin
 {
 	Adjust the coordinates of the spot to account for different ways of reading
 	out the same image sensor. For example, if we read out the ICX424 by binning
-	blocks of four pixels into one, which is the ICX424Q readout, we have to 
-	displace the coordinate to make them consistent with the coordinates we would
-	obtain with the single-pixel readout. This displacement is a result of pipelines
-	in the LWDAQ Driver, not due to any geometry on the image sensor.
+	blocks of four pixels into one, which is the ICX424Q readout, we have to
+	displace the coordinate to make them consistent with the coordinates we
+	would obtain with the single-pixel readout. This displacement is a result of
+	pipelines in the LWDAQ Driver, not due to any geometry on the image sensor.
 }	
 	mark_time('adjusting coordinates','lwdaq_bcam');
 	if (add_x_um<>0) or (add_y_um<>0) then begin
@@ -3553,10 +3553,13 @@ var
 	shaft:scam_shaft_type;
 	disagreement:real=0;
 	threshold:real=0;
-	num_points:integer=2000;
+	num_lines:integer=0;
+	line_width:integer=0;
 	body_pose:pose_type;
 	scam_pose:pose_type;
-		
+	arg_index:integer;
+	vp:pointer;	
+	
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
@@ -3564,6 +3567,8 @@ begin
 	scam_pose:=pose_from_string('0 0 0 0 0 0');
 	camera:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
 	body:='sphere 0 0 1000 0 0 0 50';
+	num_lines:=1000;
+	line_width:=1;
 	
 	if (argc<3) then begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -3586,15 +3591,31 @@ begin
 		if argc>3 then scam_pose:=pose_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[4]));
 		if argc>5 then body:=Tcl_ObjString(argv[5]);
-		if argc>6 then num_points:=Tcl_ObjInteger(argv[6]);
+		arg_index:=6;
 	end else if (command='disagreement') then begin
 		if argc>3 then rule:=Tcl_ObjString(argv[3]);
+		arg_index:=4;
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Invalid command "'+command+'", must be one of '
 			+'"project disagreement" in '
 			+'lwdaq_scam.');
 		exit;
+	end;
+	
+	while (arg_index<argc-1) do begin
+		option:=Tcl_ObjString(argv[arg_index]);
+		inc(arg_index);
+		vp:=argv[arg_index];
+		inc(arg_index);
+		if (option='-num_lines') then num_lines:=Tcl_ObjInteger(vp)
+		else if (option='-line_width') then line_width:=Tcl_ObjInteger(vp)
+		else begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Bad option "'+option+'", must be one of '
+				+'"-num_lines -line_width" in lwdaq_scam.');
+			exit;
+		end;
 	end;
 	
 	if command='project' then begin
@@ -3605,14 +3626,14 @@ begin
 				sphere:=read_scam_sphere(body);
 				sphere.location:=global_from_scam_point(sphere.location,body_pose);
 				sphere.location:=scam_from_global_point(sphere.location,scam_pose);
-				scam_project_sphere(ip,sphere,camera,num_points);
+				scam_project_sphere(ip,sphere,camera,num_lines,line_width);
 			end else if option='shaft' then begin
 				shaft:=read_scam_shaft(body);
 				shaft.location:=global_from_scam_point(shaft.location,body_pose);
 				shaft.location:=scam_from_global_point(shaft.location,scam_pose);
 				shaft.direction:=global_from_scam_vector(shaft.direction,body_pose);
 				shaft.direction:=scam_from_global_vector(shaft.direction,scam_pose);
-				scam_project_shaft(ip,shaft,camera,num_points);
+				scam_project_shaft(ip,shaft,camera,num_lines,line_width);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
 					+'Invalid shape "'+option+'", must be one of '

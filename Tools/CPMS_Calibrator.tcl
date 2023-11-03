@@ -43,15 +43,16 @@ proc CPMS_Calibrator_init {} {
 		"19.861 19.319 436.169 0 0 0 sphere 0 0 0 38.073" \
 		"19.693 19.371 406.173 0 0 0 sphere 0 0 0 38.072"]
 
-	set config(scaling) "1 1 10 10 10 0 1 10"
+	set config(scaling) "1 1 1 1 1 0 1 1"
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
-	set config(num_lines) "200"
 	set config(stop_fit) "0"
 	set config(zoom) "0.5"
 	set config(intensify) "exact"
+	set config(num_lines) "200"
 	set config(threshold) "10 %"
+	set config(line_width) "1"
 	set config(img_dir) "~/Desktop/CPMS"
 	
 	set info(state) "Idle"
@@ -69,7 +70,9 @@ proc CPMS_Calibrator_init {} {
 }
 
 #
-#  CPMS_Calibrator_read_files attempts to read eight image 
+#  CPMS_Calibrator_read_files attempts to read eight images with names L1..L4 and
+# R1..R4. It tries to open a file CMM.txt that contains CMM measurements of a sphere
+# in four positions, as well as measurements of a left and right SCAM mount.
 #
 proc CPMS_Calibrator_read_files {{img_dir ""}} {
 	upvar #0 CPMS_Calibrator_config config
@@ -125,6 +128,65 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 	set info(state) "Idle"
 }
 
+#
+# CPMS_Calibrator_disagreement takes the eight SCAM images and obtains the
+# number of pixels in which our modelled bodies and their actual silhouettes
+# disagree. In doing so, the routine colors the overlay of the SCAM images to
+# show the modelled bodies and their silhouettes with the disagreement pixels
+# colored blue for model without silhouette and orange for silhouette without
+# model and no overlay color for agreement between the two.
+#
+proc CPMS_Calibrator_disagreement {params} {
+	upvar #0 CPMS_Calibrator_config config
+	upvar #0 CPMS_Calibrator_info info
+
+	# If user has closed the manager window, generate an error so that we stop any
+	# fitting that might be calling this routine. 
+	if {![winfo exists $info(window)]} {
+		error "Cannot draw CPMS images: no CPMS window open."
+	}
+	
+	# Make sure messages from the SCAM routines get to the CPMS Manager's text
+	# window. Set the number of decimal places to three.
+	lwdaq_config -text_name $info(text)
+
+	# Extract the two sets of camera calibration constants from the parameters passed
+	# to us by the fitter.
+	set scam_left "SCAM_left [lrange $params 0 7]"
+	set scam_right "SCAM_left [lrange $params 8 15]"
+	
+	# Go through the four pairs of images, each of which views its own body. We 
+	# project the body into the image plane of each camera, measure disagreement
+	# and draw the images with coloring.
+	set disagreement 0
+	set a 1
+	foreach body $config(bodies) {
+		foreach side {left right} {
+			lwdaq_image_manipulate img_$side\_$a none -clear 1	
+			lwdaq_scam img_$side\_$a project \
+				$config(coord_$side) [set scam_$side] $body \
+				-num_lines $config(num_lines) -line_width $config(line_width)
+			set count [lwdaq_scam img_$side\_$a disagreement $config(threshold)]
+			set disagreement [expr $disagreement + $count]
+			lwdaq_draw img_$side\_$a photo_$side\_$a \
+				-intensify $config(intensify) -zoom $config(zoom)
+		}
+		incr a
+	}
+	
+	# Return the total disagreement, which is our error value.
+	return $disagreement
+}
+
+#
+# CPMS_Calibrator_get_params puts together a string containing the parameters
+# the fitter can adjust to minimise the calibration disagreement. The fitter
+# will adjust any parameter for which we assign a scaling value greater than 
+# zero. The scaling string gives the scaling factors the fitter uses for each
+# camera calibration constant. The scaling factors are used twice: once for 
+# the left camera and once for the right. See the fitting routine for their
+# implementation.
+#
 proc CPMS_Calibrator_get_params {} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
@@ -133,56 +195,81 @@ proc CPMS_Calibrator_get_params {} {
 	return $params
 }
 
-proc CPMS_Calibrator_go {{params ""}} {
+#
+# CPMS_Calibrator_show gets the current camera calibration constants and shows
+# the locations of the modelled bodies in their left images. It calculates the
+# disagreement, and prints the current parameters and disagreement to the text
+# window. In case we have adjusted the mounts before showing, we calculate
+# again the pose of the mount from both sets of balls.
+#
+proc CPMS_Calibrator_show {} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
-	upvar #0 LWDAQ_config_BCAM iconfig
-	upvar #0 LWDAQ_info_BCAM iinfo
 
-	if {![winfo exists $info(window)]} {
-		error "Cannot draw CPMS images: no CPMS window open."
-	}
-
-	if {$params == ""} {set params [CPMS_Calibrator_get_params]}
-	set scam_left "SCAM_left [lrange $params 0 7]"
-	set scam_right "SCAM_left [lrange $params 8 15]"
+	set info(control) "Show"
+	LWDAQ_update
 	
-	set disagreement 0
-	set a 1
-	foreach body $config(bodies) {
-
-		foreach side {left right} {
-			lwdaq_image_manipulate img_$side\_$a none -clear 1			
-			lwdaq_scam img_$side\_$a project \
-				$config(coord_$side) scam_$side $body $config(num_lines)
-		}
-		
-		set left_count [lwdaq_scam img_left_$a disagreement $config(threshold)]
-		set right_count [lwdaq_scam img_right_$a disagreement $config(threshold)]
-		set disagreement [expr $disagreement + $left_count + $right_count]
-
-		lwdaq_draw img_left_$a photo_left_$a \
-			-intensify $config(intensify) -zoom $config(zoom)
-		lwdaq_draw img_right_$a photo_right_$a \
-			-intensify $config(intensify) -zoom $config(zoom)
-			
-		incr a
-	}
+	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+	set params [CPMS_Calibrator_get_params]
+	set disagreement [CPMS_Calibrator_disagreement $params]
+	set result "$params $disagreement"
+	LWDAQ_print $info(text) $result
 	
-	return $disagreement
+	set info(control) "Idle"
+	return 
 }
 
+#
+# CPMS_Calibrator_displace displaces the camera calibration constants by a random
+# amount in proportion to their scaling factors.
+#
+proc CPMS_Calibrator_displace {} {
+	upvar #0 CPMS_Calibrator_config config
+	upvar #0 CPMS_Calibrator_info info
+
+	foreach side {left right} {
+		for {set i 0} {$i < [llength $config(cam_$side)]} {incr i} {
+			lset config(cam_$side) $i [format %.3f \
+				[expr [lindex $config(cam_$side) $i] \
+					+ (rand()-0.5)*10.0*[lindex $config(scaling) $i]]]
+		}
+	}
+	set params [CPMS_Calibrator_get_params]
+	CPMS_Calibrator_disagreement $params
+	return $params
+} 
+
+#
+# CPMS_Calibrator_altitude is the error function for the fitter. The fitter calls
+# this routine with a set of parameter values to get the disgreement, which it
+# is attemptint to minimise.
+#
 proc CPMS_Calibrator_altitude {params} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
 
 	if {$config(stop_fit)} {error "Fit aborted by user"}
 	if {![winfo exists $info(window)]} {error "Tool window destroyed"}
-	set count [CPMS_Calibrator_go "$params"]
+	set count [CPMS_Calibrator_disagreement "$params"]
 	LWDAQ_update
 	return $count
 }
 
+#
+# CPMS_Calibrator_fit gets the camera calibration constants as a starting point
+# and calls the simplex fitter to minimise the disagreement between the modelled
+# and actual bodies by adjusting the calibration constants of both parameter.
+# The size of the adjustments the fitter makes in each parameter during the fit
+# will be shrinking as the fit proceeds, but relative to one another thye will
+# be in proportion to the list of scaling factors we have provided. These
+# factors are applied twice: once to each camera. If the scaling factors are all
+# unity, all parameters are fitted with equal steps. If a scaling factor is
+# zero, the parameter will not be adjusted. If a scaling factor is 10, the
+# parameter will be adjusted by ten times the amount as a parameter with scaling
+# factor one. At the end of the fit, we take the final fitted parameter values
+# and apply them to our body models.
+#
 proc CPMS_Calibrator_fit {} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
@@ -210,10 +297,14 @@ proc CPMS_Calibrator_fit {} {
 		return ""
 	}
 
-	CPMS_Calibrator_go
+	CPMS_Calibrator_disagreement [CPMS_Calibrator_get_params]
 	set info(state) "Idle"
 }
 
+#
+# CPMS_Calibrator_clear clears the overlay pixels in the cpms images, so that we see
+# only the original silhouette images.
+#
 proc CPMS_Calibrator_clear {} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
@@ -228,6 +319,9 @@ proc CPMS_Calibrator_clear {} {
 	}
 }
 
+#
+# CPMS_Calibrator_open opens the CPMS Manger Tool window.
+#
 proc CPMS_Calibrator_open {} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
@@ -238,42 +332,31 @@ proc CPMS_Calibrator_open {} {
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.state -textvariable CPMS_Calibrator_info(state) -fg blue
+	label $f.state -textvariable CPMS_Calibrator_info(state) -fg blue -width 10
 	pack $f.state -side left -expand yes
 
-	button $f.clear -text "Clear" -command {CPMS_Calibrator_clear}
-	pack $f.clear -side left -expand yes
-	
-	button $f.go -text "Go" -command {CPMS_Calibrator_go 
-		set count [CPMS_Calibrator_go]
-		LWDAQ_print $CPMS_Calibrator_info(text) \
-			"$CPMS_Calibrator_config(cam_left)\
-			$CPMS_Calibrator_config(cam_right)\
-			[format %.0f $count]"
-	}
-	button $f.fit -text "Fit" -command {CPMS_Calibrator_fit}
 	button $f.stop -text "Stop" -command {set CPMS_Calibrator_config(stop_fit) 1}
-	pack $f.go $f.fit $f.stop -side left -expand yes
-	
-	button $f.rdf -text "ReadFiles" -command {CPMS_Calibrator_read_files}
-	pack $f.rdf -side left -expand yes
+	pack $f.stop -side left -expand yes
 
-	foreach a {threshold} {
+	foreach a {Show Clear Displace Fit Read_Files} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post CPMS_Calibrator_$b"
+		pack $f.$b -side left -expand yes
+	}
+
+	foreach a {threshold num_lines line_width} {
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 6
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 4
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	button $f.projector -text "Adjustor" -command {CPMS_Calibrator_adjustor}
-	pack $f.projector -side left -expand yes 
-
 	foreach a {Help Configure} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
 	}
 
-	set f [frame $w.parameters]
+	set f [frame $w.cameras]
 	pack $f -side top -fill x
 
 	foreach a {cam_left cam_right} {
@@ -285,6 +368,15 @@ proc CPMS_Calibrator_open {} {
 	foreach a {scaling} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 20
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+
+	set f [frame $w.mounts]
+	pack $f -side top -fill x
+
+	foreach a {mount_left mount_right} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 60
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -335,8 +427,9 @@ return ""
 ----------Begin Help----------
 
 The Contactless Position Measurement System (CPMS) Calibrator takes a series of
-silhouette images of the same sphere in various positions as measured by a Coordinate
-Measuring Machine (CMM) and deduces the calibration constants of a pair of Silhouette Cameras (SCAMs). 
+silhouette images of the same sphere in various positions as measured by a
+Coordinate Measuring Machine (CMM) and deduces the calibration constants of a
+pair of Silhouette Cameras (SCAMs). 
 
 ----------End Help----------
 

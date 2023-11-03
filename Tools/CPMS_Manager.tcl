@@ -43,7 +43,8 @@ proc CPMS_Manager_init {} {
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
 	set config(num_lines) "100"
-	set config(stop_fit) 0
+	set config(line_width) "1"
+	set config(stop_fit) "0"
 	
 	set config(zoom) "1.0"
 	set config(intensify) "exact"
@@ -73,12 +74,12 @@ proc CPMS_Manager_init {} {
 }
 
 #
-# CPMS_Manager_disagreement takes the two cpms images and obtains the number of
+# CPMS_Manager_disagreement takes the two SCAM images and obtains the number of
 # pixels in which our modelled bodies and their actual silhouettes disagree. In
-# doint so, the routine colors the overlay of the cpms images to show the modelled
-# bodies and their silhouettes with the disagreement pixels colored blue for model
-# without silhouette and orange for silhouette without model and no overlay color
-# for agreement between the two.
+# doing so, the routine colors the overlay of the SCAM images to show the
+# modelled bodies and their silhouettes with the disagreement pixels colored
+# blue for model without silhouette and orange for silhouette without model and
+# no overlay color for agreement between the two.
 #
 proc CPMS_Manager_disagreement {params} {
 	upvar #0 CPMS_Manager_config config
@@ -115,7 +116,7 @@ proc CPMS_Manager_disagreement {params} {
 				$config(coord_$side) \
 				"SCAM_$side $config(cam_$side)" \
 				"[lrange $params 0 5] [lrange $body 6 end]" \
-				$config(num_lines)
+				-num_lines $config(num_lines) -line_width $config(line_width)
 		}
 
 		# We have made use of six parameters, which are what we need for one
@@ -149,7 +150,11 @@ proc CPMS_Manager_disagreement {params} {
 # CPMS_Manager_get_params extracts from the bodies their postion and
 # orientation. When we fit the model to the silhouettes, we will be adjusting
 # the position and orientation of each modelled body, but not its body type
-# string or its diameter and length parameters. 
+# string or its diameter and length parameters. The fitter will adjust any
+# parameter for which we assign a scaling value greater than zero. The scaling
+# string gives the scaling factors the fitter uses for each camera calibration
+# constant. The scaling factors are used twice: once for the left camera and
+# once for the right. See the fitting routine for their implementation.
 #
 proc CPMS_Manager_get_params {} {
 	upvar #0 CPMS_Manager_config config
@@ -169,7 +174,7 @@ proc CPMS_Manager_show {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
-	set info(control) "Go"
+	set info(control) "Show"
 	LWDAQ_update
 	
 	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
@@ -339,8 +344,8 @@ proc CPMS_Manager_acquire {} {
 }
 
 #
-# CPMS_Manager_pickdir picks a directory into which to write image files when
-# we press call CPMS_Manager_write.
+# CPMS_Manager_pickdir picks a directory into which to write image files when we
+# press call CPMS_Manager_write.
 #
 proc CPMS_Manager_pickdir {} {
 	upvar #0 CPMS_Manager_config config
@@ -465,7 +470,6 @@ proc CPMS_Manager_calibration {} {
 		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 70
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
-	
 }
 
 #
@@ -515,7 +519,7 @@ proc CPMS_Manager_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	foreach a {num_lines left_sensor_socket right_sensor_socket \
+	foreach a {num_lines line_width left_sensor_socket right_sensor_socket \
 		left_source_socket right_source_socket} {
 		label $f.l$a -text "$a"
 		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 3

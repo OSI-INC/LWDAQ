@@ -146,11 +146,11 @@ function global_from_scam_point(p:xyz_point_type;c:pose_type):xyz_point_type;
 procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:scam_sphere_type;
 	camera:bcam_camera_type;
-	num_points:integer);
+	num_lines,line_width:integer);
 procedure scam_project_shaft(ip:image_ptr_type;
 	shaft:scam_shaft_type;
 	camera:bcam_camera_type;
-	num_points:integer);
+	num_lines,line_width:integer);
 
 {
 	Routines that analyze the image.
@@ -380,7 +380,7 @@ end;
 	scam_project_sphere takes a sphere in SCAM coordinates and projects drawing
 	of the sphere onto the image plane of a camera. The routine finds the circle
 	on the surface of the sphere that is the outsline of the sphere as seen by
-	the camera. It projects num_points points around this circle into the image
+	the camera. It projects num_lines points around this circle into the image
 	and joins them to trace the sphere silhouette perimiter. It further joins
 	the points with one another to provide some fill of the silhouette. The
 	routine draws in the overlay, not the actual image. 
@@ -388,14 +388,14 @@ end;
 procedure scam_project_sphere(ip:image_ptr_type;
 	sphere:scam_sphere_type;
 	camera:bcam_camera_type;
-	num_points:integer);
+	num_lines,line_width:integer);
 	
 const
 	draw_perimeter=true;
 	draw_radials=false;
 	draw_chords=true;
 	draw_cross_chords=true;
-	min_points=2;
+	min_num_lines=2;
 	
 var
 	axis,tangent,center_line:xyz_line_type;
@@ -406,15 +406,20 @@ var
 	line:xy_line_type;
 	ic:xy_point_type;
 	perimeter:array of xy_point_type;
+	color:integer;
 	
 begin
 {
 	If the number of points is fewer than two, we abort.
 }
-	if num_points<min_points then begin
-		report_error('num_points<min_points in scam_project_sphere');
+	if num_lines<min_num_lines then begin
+		report_error('num_lines<min_num_lines in scam_project_sphere');
 		exit;
 	end;
+{
+	Set the color to include the line width and the overlay pixel color.
+}
+	color:=scam_sphere_color+(line_width-1)*byte_shift;
 {
 	Find a tangent to the sphere that intersects the pivot point of the camera.
 	We start by constructing a line from the pivot point to the sphere center,
@@ -448,12 +453,12 @@ begin
 	the projection cone. At each step, we project the tangent point onto our
 	image plane and store this image point in a perimieter array.
 }
-	setlength(perimeter,num_points);
-	for step:=0 to num_points-1 do begin
+	setlength(perimeter,num_lines);
+	for step:=0 to num_lines-1 do begin
 		pt:=bcam_image_position(tangent.point,camera);
 		perimeter[step].x:=pt.x/w-ccd_origin_x;
 		perimeter[step].y:=pt.y/w-ccd_origin_y;
-		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/num_points);
+		tangent.point:=xyz_axis_rotate(tangent.point,center_line,2*pi/num_lines);
 		tangent.direction:=xyz_difference(tangent.point,camera.pivot);
 	end;
 {
@@ -464,29 +469,29 @@ begin
 	pc:=bcam_image_position(sphere.location,camera);
 	ic.x:=pc.x/w-ccd_origin_x;
 	ic.y:=pc.y/w-ccd_origin_y;
-	for step:=0 to num_points-1 do begin
+	for step:=0 to num_lines-1 do begin
 		if draw_perimeter then begin
 			line.a:=perimeter[step];		
-			line.b:=perimeter[(step+1) mod num_points];
-			draw_overlay_xy_line(ip,line,scam_sphere_color);
+			line.b:=perimeter[(step+1) mod num_lines];
+			draw_overlay_xy_line(ip,line,color);
 		end;
 		
-		if draw_chords and (step<=num_points/2) then begin
+		if draw_chords and (step<=num_lines/2) then begin
 			line.a:=perimeter[step];		
-			line.b:=perimeter[num_points-step-1];
-			draw_overlay_xy_line(ip,line,scam_sphere_color);
+			line.b:=perimeter[num_lines-step-1];
+			draw_overlay_xy_line(ip,line,color);
 		end;	
 			
-		if draw_cross_chords and (step<=num_points/2) then begin
-			line.a:=perimeter[step+round(num_points/4)];		
-			line.b:=perimeter[(num_points+round(num_points/4)-step-1) mod num_points];
-			draw_overlay_xy_line(ip,line,scam_sphere_color);
+		if draw_cross_chords and (step<=num_lines/2) then begin
+			line.a:=perimeter[step+round(num_lines/4)];		
+			line.b:=perimeter[(num_lines+round(num_lines/4)-step-1) mod num_lines];
+			draw_overlay_xy_line(ip,line,color);
 		end;
 
 		if draw_radials then begin
 			line.a:=perimeter[step];		
 			line.b:=ic;
-			draw_overlay_xy_line(ip,line,scam_sphere_color);
+			draw_overlay_xy_line(ip,line,color);
 		end;
 	end;
 end;
@@ -505,13 +510,13 @@ end;
 procedure scam_project_shaft(ip:image_ptr_type;
 	shaft:scam_shaft_type;
 	camera:bcam_camera_type;
-	num_points:integer);
+	num_lines,line_width:integer);
 	
 const
 	draw_perimeter=true;
 	draw_axials=true;
 	draw_radials=false;
-	min_points=2;
+	min_num_lines=2;
 	
 var
 	step,face_num:integer;
@@ -523,26 +528,31 @@ var
 	line:xy_line_type;
 	axis:xyz_line_type;
 	pc:xy_point_type;
+	color:integer;
 
 begin
 {
 	If the number of points is fewer than two, we abort.
 }
-	if num_points<min_points then begin
-		report_error('num_points<min_points in scam_project_shaft');
+	if num_lines<min_num_lines then begin
+		report_error('num_lines<min_num_lines in scam_project_shaft');
 		exit;
 	end;
 {
+	Set the color to include the line width and the overlay pixel color.
+}
+	color:=scam_sphere_color+(line_width-1)*byte_shift;
+{
 	If the number of points is zero, or the number of faces is zero, exit.
 }
-	if num_points=0 then exit;
+	if num_lines=0 then exit;
 	if shaft.num_faces<=0 then exit;
 {
-	Apply the location and orientation of the shaft's pose to obtain the
-	axis.
+	Set the axis line point at the shaft location, and set its direction to
+	be a unit vector parallel to the shaft direction.
 }
 	axis.point:=shaft.location;
-	axis.direction:=shaft.direction;
+	axis.direction:=xyz_unit_vector(shaft.direction);
 {
 	When we project tangents onto our image sensor, we are going to mark them in
 	the overlay, for which we need the size of the pixels.
@@ -562,7 +572,7 @@ begin
 	radials only if the draw_radials flag is set.
 }
 	for face_num:=0 to shaft.num_faces-1 do begin
-		setlength(perimeter_a,num_points);
+		setlength(perimeter_a,num_lines);
 		if face_num=0 then perimeter_b:=perimeter_a;
 		with shaft do begin
 			radial:=xyz_scale(xyz_perpendicular(axis.direction),
@@ -571,22 +581,22 @@ begin
 				xyz_scale(axis.direction,distance[face_num]));
 			point:=xyz_sum(center,radial);
 			
-			for step:=0 to num_points-1 do begin
+			for step:=0 to num_lines-1 do begin
 				projection:=bcam_image_position(point,camera);
 				perimeter_a[step].x:=projection.x/w-ccd_origin_x;
 				perimeter_a[step].y:=projection.y/w-ccd_origin_y;
-				point:=xyz_axis_rotate(point,axis,2*pi/num_points);
+				point:=xyz_axis_rotate(point,axis,2*pi/num_lines);
 			end;
 			
 			pc:=bcam_image_position(center,camera);
 			ica.x:=pc.x/w-ccd_origin_x;
 			ica.y:=pc.y/w-ccd_origin_y;
 			
-			for step:=0 to num_points-1 do begin
+			for step:=0 to num_lines-1 do begin
 				if draw_perimeter then begin
 					line.a:=perimeter_a[step];		
-					line.b:=perimeter_a[(step+1) mod num_points];
-					draw_overlay_xy_line(ip,line,scam_shaft_color);
+					line.b:=perimeter_a[(step+1) mod num_lines];
+					draw_overlay_xy_line(ip,line,color);
 				end;
 				
 				if ((face_num=0) and (diameter[face_num]>0))
@@ -594,13 +604,13 @@ begin
 					or draw_radials then begin
 					line.a:=perimeter_a[step];		
 					line.b:=ica;
-					draw_overlay_xy_line(ip,line,scam_shaft_color);
+					draw_overlay_xy_line(ip,line,color);
 				end;
 				
 				if (face_num>0) and draw_axials then begin
 					line.a:=perimeter_a[step];
 					line.b:=perimeter_b[step];
-					draw_overlay_xy_line(ip,line,scam_shaft_color);
+					draw_overlay_xy_line(ip,line,color);
 				end;
 			end;
 		end;

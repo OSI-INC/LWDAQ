@@ -1049,7 +1049,8 @@ begin
 							if (num_pixels<min_pixels) or (num_pixels>max_pixels) then 
 								valid:=false;
 							if (max_eccentricity<>0) then
-								if (spot_eccentricity(spots[num_valid_spots])>max_eccentricity) then 
+								if (spot_eccentricity(spots[num_valid_spots])
+										>max_eccentricity) then 
 									valid:=false;
 							if (not valid) and (num_pixels>0) then begin
 								for jj:=bounds.top to bounds.bottom do
@@ -1059,8 +1060,10 @@ begin
 							end;
 						end;
 						if spots[num_valid_spots].valid then begin
-							grand_sum_intensity:=grand_sum_intensity+spots[num_valid_spots].sum_intensity;
-							grand_num_pixels:=grand_num_pixels+spots[num_valid_spots].num_pixels;
+							grand_sum_intensity:=
+								grand_sum_intensity+spots[num_valid_spots].sum_intensity;
+							grand_num_pixels:=
+								grand_num_pixels+spots[num_valid_spots].num_pixels;
 						end else 
 							dec(num_valid_spots);
 					end;
@@ -1075,27 +1078,27 @@ begin
 	slp^.num_selected_spots:=slp^.num_valid_spots;
 	spot_list_sort(slp,spot_decreasing_brightness);
 {
-	Record the number of spots requested in the spot list. If num_spots is negative, this 
-	means the user has requested all valid spots. Otherwise, num_spots gives the number 
-	of spots requested directly.
+	Record the number of spots requested in the spot list. If num_spots is
+	negative, this means the user has requested all valid spots. Otherwise,
+	num_spots gives the number of spots requested directly.
 }
 	if num_spots<0 then 
 		slp^.num_requested_spots:=slp^.num_valid_spots
 	else
 		slp^.num_requested_spots:=num_spots;
 {
-	Record the number of spots selected for display, which will be
-	the number requested if there are enough valid spots, or the
-	number of valid spots if there are fewer than requested.
+	Record the number of spots selected for display, which will be the number
+	requested if there are enough valid spots, or the number of valid spots if
+	there are fewer than requested.
 }
 	if slp^.num_requested_spots<slp^.num_valid_spots then
 		slp^.num_selected_spots:=slp^.num_requested_spots
 	else
 		slp^.num_selected_spots:=slp^.num_valid_spots;
 {
-	Return the list. The list may have fewer than num_spots valid entries.
-	The routine that uses the spot list must check the valid flag on each 
-	spot before using it.
+	Return the list. The list may have fewer than num_spots valid entries. The
+	routine that uses the spot list must check the valid flag on each spot
+	before using it.
 }
 	spot_list_find:=slp;
 end;
@@ -1208,10 +1211,14 @@ begin
 	if slp=nil then exit;
 	for spot_num:=1 to slp^.num_selected_spots do begin
 		r:=slp^.spots[spot_num].bounds;
-		if r.right>=ip^.analysis_bounds.right then r.right:=ip^.analysis_bounds.right-1;
-		if r.left<=ip^.analysis_bounds.left then r.left:=ip^.analysis_bounds.left+1;
-		if r.top<=ip^.analysis_bounds.top then r.top:=ip^.analysis_bounds.top+1;
-		if r.bottom>=ip^.analysis_bounds.bottom then r.bottom:=ip^.analysis_bounds.bottom-1;
+		if r.right>=ip^.analysis_bounds.right then 
+			r.right:=ip^.analysis_bounds.right-1;
+		if r.left<=ip^.analysis_bounds.left then 
+			r.left:=ip^.analysis_bounds.left+1;
+		if r.top<=ip^.analysis_bounds.top then 
+			r.top:=ip^.analysis_bounds.top+1;
+		if r.bottom>=ip^.analysis_bounds.bottom then 
+			r.bottom:=ip^.analysis_bounds.bottom-1;
 		if abs(r.right-r.left)<min_width then begin
 			i:=round(one_half*(r.right+r.left));
 			r.right:=i+extent;
