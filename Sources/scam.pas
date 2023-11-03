@@ -128,15 +128,6 @@ function string_from_scam_sphere(sphere:scam_sphere_type):string;
 function string_from_scam_shaft(shaft:scam_shaft_type):string;
 
 {
-	Coordinate handling routines.
-}
-function scam_coord_from_mount(mount:kinematic_mount_type):pose_type;
-function scam_from_global_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
-function scam_from_global_point(p:xyz_point_type;c:pose_type):xyz_point_type;
-function global_from_scam_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
-function global_from_scam_point(p:xyz_point_type;c:pose_type):xyz_point_type;
-
-{
 	Routines that project hypothetical objects onto the overlays of our SCAM
 	images. We pass an image pointer to the routines, and the routine works on
 	this image. We specify an object in SCAM coordinates and we give the
@@ -302,80 +293,6 @@ begin
 	scam_decode_rule:=threshold;
 end;
 	
-{
-	scam_coordinates_from_mount takes the global coordinates of the cone, slot,
-	and flat balls of an SCAM mount and returns the SCAM coordinate system
-	defined by the mount. The location is the vector in global coordinates
-	from the global coordinate origin to the SCAM mount origin, which will be
-	the center of the cone ball. The rotation is an xyz rotation that rotates
-	the global axis unit vectors into the SCAM coordinate axis vectors. To
-	obtain the location and SCAM coordinate axes vectors we call the BCAM
-	coordinate routine. To obtain the compount rotation from the three
-	coordinate axes vectors we call another routine that uses a simplex fitter
-	to find the x, y, and z rotations that match the coordinate axes vectors.
-	This routine takes roughly one millisecond to run, so the idea is we save
-	the scam coordinates and pass them in to coordinate transformation routines
-	so that we don't have to find the angles more than once.
-}
-function scam_coord_from_mount(mount:kinematic_mount_type):pose_type;
-
-var
-	bcam:bcam_coord_type;
-	scam:pose_type;
-	
-begin
-	bcam:=bcam_coord_from_mount(mount);
-	scam.location:=bcam.origin;
-	scam.orientation:=xyz_rotation_from_axes(bcam.x_axis,bcam.y_axis,bcam.z_axis);
-	scam_coord_from_mount:=scam;
-end;
-
-{
-	scam_from_global_vector transforms a direction in global coordinates to a
-	direction in scam coordinates. We pass into the routine an scam coordinate
-	type, which provides the xyz rotation we must apply to the vector.
-}
-function scam_from_global_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
-var v:xyz_point_type;
-begin
-	v:=xyz_unrotate(p,c.orientation);
-	scam_from_global_vector:=v;
-end;
-
-{
-	global_from_scam_vector transforms a direction in scam coordinates into a 
-	direction in global coordinates. We pass into the routine an scam coordinate
-	type, which provides the xyz rotation we must apply in reverse to the vector.
-}
-function global_from_scam_vector(p:xyz_point_type;c:pose_type):xyz_point_type;
-var v:xyz_point_type;
-begin
-	v:=xyz_rotate(p,c.orientation);
-	global_from_scam_vector:=v;
-end;
-
-{
-	scam_from_global_point transforms a point in global coordinates to a point
-	in scam coordinates.
-}
-function scam_from_global_point(p:xyz_point_type;c:pose_type):xyz_point_type;
-var v:xyz_point_type;
-begin
-	v:=scam_from_global_vector(xyz_difference(p,c.location),c);
-	scam_from_global_point:=v;
-end;
-
-{
-	global_from_scam_point transforms a point in scam coordinates into a point
-	in global coordinates.
-}
-function global_from_scam_point(p:xyz_point_type;c:pose_type):xyz_point_type;
-var v:xyz_point_type;
-begin
-	v:=xyz_sum(c.location,global_from_scam_vector(p,c));
-	global_from_scam_point:=v;
-end;
-
 {
 	scam_project_sphere takes a sphere in SCAM coordinates and projects drawing
 	of the sphere onto the image plane of a camera. The routine finds the circle

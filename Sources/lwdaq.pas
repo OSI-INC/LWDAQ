@@ -3555,8 +3555,8 @@ var
 	threshold:real=0;
 	num_lines:integer=0;
 	line_width:integer=0;
-	body_pose:pose_type;
-	scam_pose:pose_type;
+	body_pose:xyz_pose_type;
+	scam_pose:xyz_pose_type;
 	arg_index:integer;
 	vp:pointer;	
 	
@@ -3564,7 +3564,7 @@ begin
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_scam:=Tcl_Error;
-	scam_pose:=pose_from_string('0 0 0 0 0 0');
+	scam_pose:=xyz_pose_from_string('0 0 0 0 0 0');
 	camera:=bcam_camera_from_string('scam 0 0 0 0 0 2 25 0');
 	body:='sphere 0 0 1000 0 0 0 50';
 	num_lines:=1000;
@@ -3588,7 +3588,7 @@ begin
 	
 	command:=Tcl_ObjString(argv[2]);
 	if (command='project') then begin
-		if argc>3 then scam_pose:=pose_from_string(Tcl_ObjString(argv[3]));
+		if argc>3 then scam_pose:=xyz_pose_from_string(Tcl_ObjString(argv[3]));
 		if argc>4 then camera:=bcam_camera_from_string(Tcl_ObjString(argv[4]));
 		if argc>5 then body:=Tcl_ObjString(argv[5]);
 		arg_index:=6;
@@ -3619,20 +3619,20 @@ begin
 	end;
 	
 	if command='project' then begin
-		body_pose:=read_pose(body);
+		body_pose:=read_xyz_pose(body);
 		while body<>'' do begin
 			option:=read_word(body);
 			if option='sphere' then begin
 				sphere:=read_scam_sphere(body);
-				sphere.location:=global_from_scam_point(sphere.location,body_pose);
-				sphere.location:=scam_from_global_point(sphere.location,scam_pose);
+				sphere.location:=global_from_bcam_point(sphere.location,body_pose);
+				sphere.location:=bcam_from_global_point(sphere.location,scam_pose);
 				scam_project_sphere(ip,sphere,camera,num_lines,line_width);
 			end else if option='shaft' then begin
 				shaft:=read_scam_shaft(body);
-				shaft.location:=global_from_scam_point(shaft.location,body_pose);
-				shaft.location:=scam_from_global_point(shaft.location,scam_pose);
-				shaft.direction:=global_from_scam_vector(shaft.direction,body_pose);
-				shaft.direction:=scam_from_global_vector(shaft.direction,scam_pose);
+				shaft.location:=global_from_bcam_point(shaft.location,body_pose);
+				shaft.location:=bcam_from_global_point(shaft.location,scam_pose);
+				shaft.direction:=global_from_bcam_vector(shaft.direction,body_pose);
+				shaft.direction:=bcam_from_global_vector(shaft.direction,scam_pose);
 				scam_project_shaft(ip,shaft,camera,num_lines,line_width);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
@@ -6336,15 +6336,13 @@ are almost parallel to those of the global coordinate system.</p>
 			exit;
 		end;
 		Tcl_SetReturnString(interp,
-			string_from_pose(
-				scam_coord_from_mount(
+			string_from_xyz_pose(
+				bcam_coord_from_mount(
 					kinematic_mount_from_string(Tcl_ObjString(argv[2])))));
 	end
 	else if option='scam_from_global_vector' then begin
 {
-<p>Transforms a vector in global coordinates to a vector in SCAM coordinates. It
-is the inverse of <a href="#global_from_scam_vector">global_from_scam_vector</a>. See
-<a href="#scam_from_global_point">scam_from_global_point</a> for background.
+<p>Transforms a vector in global coordinates to a vector in SCAM coordinates. 
 We pass the global coordinates of a point in the <i>point</i> string. We pass
 a description of the scam coordinate system in the <i>scam</i> string. The
 routine returns the scam components of the vector.</p>
@@ -6371,9 +6369,9 @@ x-direction.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				scam_from_global_vector(
+				bcam_from_global_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					pose_from_string(Tcl_ObjString(argv[3])))));
+					xyz_pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='global_from_scam_vector' then begin
 {
@@ -6406,9 +6404,9 @@ x-direction.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				global_from_scam_vector(
+				global_from_bcam_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					pose_from_string(Tcl_ObjString(argv[3])))));
+					xyz_pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='scam_from_global_point' then begin
 {
@@ -6443,9 +6441,9 @@ SCAM axes are rotated by 100 mrad about the global y-axis.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				scam_from_global_point(
+				bcam_from_global_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					pose_from_string(Tcl_ObjString(argv[3])))));
+					xyz_pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='global_from_scam_point' then begin
 {
@@ -6476,9 +6474,9 @@ that corresponds to the origin of global coordinates.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				global_from_scam_point(
+				global_from_bcam_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
-					pose_from_string(Tcl_ObjString(argv[3])))));
+					xyz_pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
 	else if option='wps_wire_plane' then begin
 {

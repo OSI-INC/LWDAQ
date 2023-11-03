@@ -286,7 +286,7 @@ type
 	xy_graph_ptr=^xy_graph_type;
 
 	xyz_point_type=record x,y,z:real; end;
-	pose_type=record location,orientation:xyz_point_type; end;
+	xyz_pose_type=record location,orientation:xyz_point_type; end;
 	xyz_point_ptr_type=^xyz_point_type;
 	xyz_graph_type=array of xyz_point_type;
 	xyz_graph_ptr=^xyz_graph_type;
@@ -587,8 +587,6 @@ function xyz_rotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_unrotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;rotation:real):xyz_point_type;
 function xyz_rotation_from_axes(x_axis,y_axis,z_axis:xyz_point_type):xyz_point_type;
-function pose_sum(p,q:pose_type):pose_type;
-function pose_difference(p,q:pose_type):pose_type;
 
 {
 	Memory Access. We use byte arrays as a data structure for copying blocks of
@@ -672,7 +670,7 @@ function decimal_from_string(s:string;base:integer):integer;
 function real_from_string(s:string;var okay:boolean):real;
 function xy_from_string(s:string):xy_point_type;
 function xyz_from_string(s:string):xyz_point_type;
-function pose_from_string(s:string):pose_type;
+function xyz_pose_from_string(s:string):xyz_pose_type;
 function xyz_line_from_string(s:string):xyz_line_type;
 function xyz_plane_from_string(s:string):xyz_plane_type;
 function kinematic_mount_from_string(s:string):kinematic_mount_type;
@@ -687,7 +685,7 @@ function hex_string_from_byte(number:byte):string;
 function string_from_ij(p:ij_point_type):string;
 function string_from_xy(p:xy_point_type):string;
 function string_from_xyz(p:xyz_point_type):string;
-function string_from_pose(p:pose_type):string;
+function string_from_xyz_pose(p:xyz_pose_type):string;
 function string_from_xyz_line(l:xyz_line_type):string;
 function string_from_xyz_plane(p:xyz_plane_type):string;
 function upper_case(s:string):string;
@@ -705,7 +703,7 @@ function read_real(var s:string):real;
 function read_integer(var s:string):integer;
 function read_xy(var s:string):xy_point_type;
 function read_xyz(var s:string):xyz_point_type;
-function read_pose(var s:string):pose_type;
+function read_xyz_pose(var s:string):xyz_pose_type;
 function read_x_graph(var s:string):x_graph_type;
 function read_xy_graph(var s:string):xy_graph_type;
 function read_xyz_graph(var s:string):xyz_graph_type;
@@ -714,7 +712,7 @@ function read_kinematic_mount(var s:string):kinematic_mount_type;
 procedure write_ij(var s:string;p:ij_point_type);
 procedure write_xy(var s:string;p:xy_point_type);
 procedure write_xyz(var s:string;p:xyz_point_type);
-procedure write_pose(var s:string;p:pose_type);
+procedure write_xyz_pose(var s:string;p:xyz_pose_type);
 procedure write_xyz_line(var s:string;l:xyz_line_type);
 procedure write_xyz_plane(var s:string;p:xyz_plane_type);
 procedure write_xyz_matrix(var s:string;M:xyz_matrix_type);
@@ -1710,8 +1708,8 @@ begin
 	read_xyz:=p;
 end;
 
-function read_pose(var s:string):pose_type;
-var p:pose_type;
+function read_xyz_pose(var s:string):xyz_pose_type;
+var p:xyz_pose_type;
 begin
 	p.location.x:=read_real(s);
 	p.location.y:=read_real(s);
@@ -1719,7 +1717,7 @@ begin
 	p.orientation.x:=read_real(s);
 	p.orientation.y:=read_real(s);
 	p.orientation.z:=read_real(s);
-	read_pose:=p;
+	read_xyz_pose:=p;
 end;
 
 function read_integer(var s:string):integer;
@@ -1923,8 +1921,8 @@ begin xy_from_string:=read_xy(s);end;
 function xyz_from_string(s:string):xyz_point_type;
 begin xyz_from_string:=read_xyz(s);end;
 
-function pose_from_string(s:string):pose_type;
-begin pose_from_string:=read_pose(s);end;
+function xyz_pose_from_string(s:string):xyz_pose_type;
+begin xyz_pose_from_string:=read_xyz_pose(s);end;
 
 function xyz_line_from_string(s:string):xyz_line_type;
 var l:xyz_line_type;
@@ -1971,7 +1969,7 @@ begin
 	s:=s+a;
 end;
 
-procedure write_pose(var s:string;p:pose_type);
+procedure write_xyz_pose(var s:string;p:xyz_pose_type);
 var a:string;
 begin 
 	with p.location do writestr(a,x:fsr:fsd,' ',y:fsr:fsd,' ',z:fsr:fsd);
@@ -2071,11 +2069,11 @@ begin
 	string_from_xyz:=s;
 end;
 
-function string_from_pose(p:pose_type):string;
+function string_from_xyz_pose(p:xyz_pose_type):string;
 var s:string='';
 begin
-	write_pose(s,p);
-	string_from_pose:=s;
+	write_xyz_pose(s,p);
+	string_from_xyz_pose:=s;
 end;
 
 function string_from_xyz_line(l:xyz_line_type):string;
@@ -5673,22 +5671,6 @@ begin
 	x:=sqr(p.x-q.x)+sqr(p.y-q.y)+sqr(p.z-q.z);
 	if x>0 then xyz_separation:=sqrt(x)
 	else xyz_separation:=0;
-end;
-
-function pose_sum(p,q:pose_type):pose_type;
-var s:pose_type;
-begin
-	s.location:=xyz_sum(p.location,q.location);
-	s.orientation:=xyz_sum(p.orientation,q.orientation);
-	pose_sum:=s;
-end;
-
-function pose_difference(p,q:pose_type):pose_type;
-var d:pose_type;
-begin
-	d.location:=xyz_difference(p.location,q.location);
-	d.orientation:=xyz_difference(p.orientation,q.orientation);
-	pose_difference:=d;
 end;
 
 function xyz_z_plane(z:real):xyz_plane_type;

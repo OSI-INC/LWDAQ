@@ -75,7 +75,7 @@ function wps_ray(p:xy_point_type;camera:wps_camera_type):xyz_line_type;
 function wps_wire_plane(p:xy_point_type;r:real;camera:wps_camera_type):xyz_plane_type;
 function wps_wire(p_1,p_2:xy_point_type;r_1,r_2:real;c_1,c_2:wps_camera_type):xyz_line_type;
 function wps_calibrate(device_name:string;camera_num:integer;data:string):string;
-function wps_coord_from_mount(mount:kinematic_mount_type):bcam_coord_type;
+function wps_coord_from_mount(mount:kinematic_mount_type):xyz_pose_type;
 function wps_from_image_point(p:xy_point_type;camera:wps_camera_type):xyz_point_type;
 function image_from_wps_point(p:xyz_point_type;camera:wps_camera_type):xy_point_type;
 function wps_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
@@ -179,7 +179,7 @@ end;
 	same way as bcam coordinates, so we just call the bcam routine that
 	generates these coordinates, and use its result.
 }
-function wps_coord_from_mount(mount:kinematic_mount_type):bcam_coord_type;
+function wps_coord_from_mount(mount:kinematic_mount_type):xyz_pose_type;
 	
 begin
 	wps_coord_from_mount:=bcam_coord_from_mount(mount);
@@ -192,13 +192,11 @@ end;
 function wps_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
 
 var
-	M:xyz_matrix_type;
-	wps:bcam_coord_type;
+	wps:xyz_pose_type;
 	
 begin
 	wps:=wps_coord_from_mount(mount);
-	M:=xyz_matrix_from_points(wps.x_axis,wps.y_axis,wps.z_axis);
-	wps_from_global_vector:=xyz_transform(M,p);
+	wps_from_global_vector:=bcam_from_global_vector(p,wps);
 end;
 
 
@@ -217,14 +215,10 @@ end;
 	direction in global coordinates.
 }
 function global_from_wps_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-var bc:bcam_coord_type;	
+var wps:xyz_pose_type;	
 begin
-	bc:=wps_coord_from_mount(mount);
-	global_from_wps_vector:=
-		xyz_transform(
-			xyz_matrix_inverse(
-				xyz_matrix_from_points(bc.x_axis,bc.y_axis,bc.z_axis)),
-			p);
+	wps:=wps_coord_from_mount(mount);
+	global_from_wps_vector:=global_from_bcam_vector(p,wps);
 end;
 
 {
@@ -232,7 +226,6 @@ end;
 	global coordinates.
 }
 function global_from_wps_point(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-
 begin
 	global_from_wps_point:=xyz_sum(wps_origin(mount),global_from_wps_vector(p,mount));
 end;
