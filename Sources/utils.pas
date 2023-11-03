@@ -6422,6 +6422,7 @@ end;
 initialization 
 
 randomize;
+
 gui_draw:=default_gui_draw;
 gui_support:=default_gui_support;
 gui_wait:=default_gui_wait;
@@ -6431,6 +6432,7 @@ gui_readln:=default_gui_readln;
 debug_log:=default_debug_log;
 big_endian:=check_big_endian;
 log_file_name:=default_log_file_name;
+
 with xyz_origin do begin x:=0;y:=0;z:=0; end;
 with xyz_x_axis do begin x:=1;y:=0;z:=0; end;
 with xyz_y_axis do begin x:=0;y:=1;z:=0; end;

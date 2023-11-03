@@ -55,14 +55,13 @@ unit scam;
 
 	Each SCAM has its own mount coordinate system. In our SCAM routines, we
 	represent each mount coordinate system by its own pose, just as we do for
-	bodies. This representation contrasts with that of mounts in our BCAM
-	routines, where we pass around the mounting ball coordinates and convert
-	them into an origin and a set of orthogonal unit vectors. We use pose for
-	bodies and mounts in SCAM routines because we want to use our simplex fitter
-	to deduce body positions and to calibrate SCAMs. For the simplex fitter to
-	work well, we must represent the pose with the minimum number of parameters,
-	which is six. An origin with three unit vectors is twelve parameters. Half
-	of them are redundant.
+	bodies. We use the same representation in our BCAM routines. Thus we use
+	the same routines to transform coordinates as we use for BCAMs. We use
+	pose for bodies and mounts because we want to use our simplex fitter to
+	deduce body positions and to calibrate SCAMs. For the simplex fitter to work
+	well, we must represent the pose with the minimum number of parameters,
+	which is six. If we were to use an origin with three unit vectors we would
+	have twelve parameters, making half of them redundant.
 
 	We compose a model of a CPMS "body" with one or more "objects", where each
 	object is a simple shape such as a sphere, cylinder, shaft, or cuboid. Each
