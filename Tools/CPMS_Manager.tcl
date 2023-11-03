@@ -569,8 +569,142 @@ return ""
 
 ----------Begin Help----------
 
-Compound:
-{0 20450 0.000 0.000 0.000 sphere 0 0 0 38.068 shaft 0 0 0 0 0 -1.57 1 0 1 40}
+The Contactless Position Measurement System (CPMS) Manager uses stereo
+Silhouette Cameras (SCAMs) to measures the position of one or more bodies. The
+manager must be provided with Coordinate Measuring Machine (CMM) measurements of
+the three balls on the left and right SCAM mounts. We must configure the SCAM
+Instrument to capture images from one of the two SCAMs, and we must direct the
+manager in selecting the left and right SCAMs by entering the LWDAQ driver
+socket of the left and right cameras and backlights. When we have the manager
+set up correctly, we can acquire and analyze images in a few seconds to obtain
+the position of bodies such as spheres, cylinders, and flanges.
+
+We describe the bodies we want the manager to find with the help of a list that
+we enter in the "bodies" entry box in the manager window. We enclose each body
+in braces. The description of each body begins with its "pose", which is its
+location and orientation in global coordinates. The location is x, y, and z. The
+orientation is three angles that specify three rotations made about the x, y,
+and z axes in the order x, y, and z. The pose is what will be adjusted by the
+manger to produce its measurement of body position and orientation.
+
+Each body consists of one or more "objects". An object begins with a name, such
+as "sphere" or "shaft". Each object has its own position in the body coordinate
+system. The "body coordinate system" is the one we obtain by translating the
+global coordinate system by the body position and rotating the global coordinate
+system by the body orientation. A sphere has only a position and a diameter. A
+shaft consists of one or more circular "faces" along an axis. We specify the
+direction of the axis with a vector in the body coordinate system. Here are some
+example bodies.
+
+One body, a sphere (1.5-inch diameter):
+{0 10 450 0 0 0 sphere 0 0 0 38.10}
+
+Single body, a sphere (1.5-inch diameter) sitting on a post (0.75-inch diameter):
+{0 10 450 0 0 0 sphere 0 0 0 38.10 shaft 1 -19.05 0 0 -1 0 19.05 0 19.05 40}
+
+Two bodies, one a sphere (1.5-inch diameter), another a sphere (0.75-inch diameter):
+{0 10 450 0 0 0 sphere 0 0 0 38.10} {40 10 450 0 0 0 sphere 0 0 0 19.05}
+
+Single body, a shaft with a bolt-alignment rod:
+{-5 10 550 0 0 0 shaft 1 0 0 1 0 0 50 0 50 20 20 20 20 50 30 50 30 55 shaft 10 25 0 0 1 0 4 0 4 20}
+
+The "scaling" string dictates which elements of the body pose will be adjusted,
+and rapidly they will be adjusted. For bodies with no axis of symmetry, we set
+the scaling parameter to "1 1 1 0.1 0.1 0.1". The position of the body will be
+adjusted by one millimeter at first, and each rotation angle by 0.1 radians. As
+the fit progresses and the adjustments shrink, the size of the position
+adjustments in millimeters will remain ten times the angle adjustments in
+radians. If a body is radially symmetric, align its axis of symmetry with the
+global x-coordinate axis and instruct the fitter not to adjust the rotation of
+the body about the x-axis, which is the first of the three rotations that the
+fitter applies when applying the body orientation. We don't want the fitter to
+adjust more parameters than are absolutely necessary, so that it will converge
+faster and more accurately. To disable the x-axis rotation, we set the fourth
+value in the scaling string to zero. For a single sphere object, we disable the
+orientation fit all together, by setting the fourth, fifth, and sixth elements
+of scaling to zero.
+
+The manager works by minimizing disagreement between actual silhouettes and a
+line drawing of modelled bodies. The line drawing can be sparse, as when
+num_lines = 20, or filled completely, as when num_lines = 2000. We can increase
+the thickness of the lines with line_width. The silhouettes will be drawn using
+the intensity threshold dictated by the threshold string. When we press Fit, the
+simplex fitter starts minimizing the disagreement by adjusting the pose of each
+body. This process should take no more than a few seconds. If the fit fails to
+converge, we can stop it with the Stop button. The manager buttons have the
+following functions.
+
+Stop: Abort fitting.
+
+Acquire: Obtain new images.
+
+Show: Show the silhouettes and line drawings.
+
+Clear: Clear the silhouettes and line drawings, show the raw images.
+
+Displace: Displace the camera calibration constants from their current values.
+
+Fit: Start the simplex fitter adjusting calibration constants to minimize
+disagreement.
+
+Calibration: Open the calibration panel, in which we see the calibration
+constants of the left and right SCAMs, and the mount measurements of the left
+and right mounts.
+
+Pickdir: Select a directory into which to write images and from which to read images.
+
+Write: Write both images to disk with the current index in their name, preceeded by
+the letter L or R for left and right cameras.
+
+Read: Read one or more pairs of images with L and R as prefix in their file names to
+indicate left and right. 
+
+Help: Get this help page.
+
+Configure: Open configuration panel with Save and Unsave buttons.
+
+SCAM: Open the SCAM Instrument.
+
+To use the calibrator, press SCAM to open the SCAM Instrument. Set up the
+instrument to take images from one of the SCAMs. Confirm that it can take images
+from the other SCAM too. In the manager window, enter the CPMS sensor and source
+socket numbers that select the left and right SCAMs. Press Acquire. You should
+get images, silhouettes shaded in orange and modelled objects projected with
+blue lines. If the objects are overlapping the silhouettes and of the same
+shape, press Fit. The modelled bodies will start moving around. The status
+indicator on the top left will say "Fitting". After a few seconds, the status
+label should return to "Idle". The body pose measurement is now available.
+
+The parameters available in the manager window entry boxes are the ones you are
+most likely to adjust during operation.
+
+auto_fit: Check to apply the fitter whenever we acquire or read a pair of
+images.
+
+daq_flash_seconds: The SCAM Instrument's backlight flash time.
+
+analysis_threshold: the SCAM Instrument's threshold control string.
+
+num_lines: The number of perimiter points used to obtain drawing lines during
+projection.
+
+line_width: The width of the drawing lines, in units of pixels.
+
+left_sensor_socket: The driver socket used by the left SCAM.
+
+right_sensor_socket: The driver socket used by the right SCAM.
+
+left_source_socket: The driver socket used by the left SCAM's backlight.
+
+right_source_socket: The driver socket used by the right SCAM's backlight.
+
+bodies: The list of bodies, ecample "{0 10 450 0 0 0 sphere 0 0 0 38.10}" for
+1.5-inch diameter sphere.
+
+scaling: the scaling string, example "1 1 1 0 0.1 0.1" for a shaft.
+
+(C) Kevan Hashemi, 2023, Open Source Instruments Inc.
+https://www.opensourceinstruments.com
 
 ----------End Help----------
 

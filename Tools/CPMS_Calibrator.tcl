@@ -23,7 +23,7 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_info info
 	upvar #0 CPMS_Calibrator_config config
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "2.2"
+	LWDAQ_tool_init "CPMS_Calibrator" "3.1"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.675 39.312 1.1 0.0 0.0 2 26.0 0.0" 
@@ -50,9 +50,9 @@ proc CPMS_Calibrator_init {} {
 	set config(stop_fit) "0"
 	set config(zoom) "0.5"
 	set config(intensify) "exact"
-	set config(num_lines) "200"
+	set config(num_lines) "20"
 	set config(threshold) "10 %"
-	set config(line_width) "1"
+	set config(line_width) "3"
 	set config(img_dir) "~/Desktop/CPMS"
 	
 	set info(state) "Idle"
@@ -70,7 +70,7 @@ proc CPMS_Calibrator_init {} {
 }
 
 #
-#  CPMS_Calibrator_read_files attempts to read eight images with names L1..L4 and
+# CPMS_Calibrator_read_files attempts to read eight images with names L1..L4 and
 # R1..R4. It tries to open a file CMM.txt that contains CMM measurements of a sphere
 # in four positions, as well as measurements of a left and right SCAM mount.
 #
@@ -124,6 +124,7 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 	LWDAQ_print $info(text) "Read left and right mounts,\
 		[llength $config(bodies)] bodies,\
 		$count images."
+	CPMS_Calibrator_show
 	
 	set info(state) "Idle"
 }
@@ -410,7 +411,7 @@ proc CPMS_Calibrator_open {} {
 		label $f.right_$a -image "photo_right_$a"
 		pack $f.right_$a -side left -expand yes
 	}
-		
+
 	set info(text) [LWDAQ_text_widget $w 100 15]
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
 	lwdaq_config -text_name $info(text) -fsd 3	
@@ -420,19 +421,137 @@ proc CPMS_Calibrator_open {} {
 
 CPMS_Calibrator_init
 CPMS_Calibrator_open
-CPMS_Calibrator_read_files $CPMS_Calibrator_config(img_dir)
+CPMS_Calibrator_clear
 	
 return ""
 
 ----------Begin Help----------
 
-The Contactless Position Measurement System (CPMS) Calibrator takes a series of
-silhouette images of the same sphere in various positions as measured by a
-Coordinate Measuring Machine (CMM) and deduces the calibration constants of a
-pair of Silhouette Cameras (SCAMs). 
+The Contactless Position Measurement System (CPMS) Calibrator calculates the
+calibration constants of the two Silhouette Cameras (SCAMs) mounted on a CPMS
+base plate. The routine assumes we have Coordinate Measuring Machine (CMM)
+measurements of the global coordinates and diameter of a sphere in each of four
+positions in the field of view of both SCAMs, CMM measurements of the left and
+right SCAM mounting balls in the same coordinate system, and left and right SCAM
+images the sphere in each of the four positions. The sphere need not be the same
+sphere. That is: we could use different diameter spheres in each of the four
+locations. 
+
+The CMM output file must contain the diameter, and x, y, and z coordinates of
+the three balls used to define the global coordinate system, followed by the
+same for the cone, slot, and flat balls of the left mount, followed by the same
+for the right mount, and finally the same for each of the four calibration
+spheres in sequence. The file containing these measurements must be named
+CMM.txt. The file can contain any number of words that are not well-formed real
+number strings, and it can contain any number of white space charcters. All
+words that are not real numbers will be ignored. An example CMM.txt file is to
+be found in the data section of the CPMS_Calibrator.tcl script. The images must
+be named L1, R1, L2, R2,.. for the four spheres. They can be in GIF, PNG, or DAQ
+format.
+
+The calibrator works by minimizing disagreement between actual silhouettes and a
+line drawing of modelled spheres. The line drawing can be sparse, as when
+num_lines = 20, or filled completely, as when num_lines = 2000. We can increase
+the thickness of the lines with the line_width parameter. The silhouettes will
+be drawn using the intensity threshold dictated by the threshold string. When we
+press Fit, the simplex fitter starts minimizing the disagreement by adjusting
+the calibrations of the left and right SCAMs. This process can take one or two
+minutes. The buttons in the calibrator have the following functions.
+
+Stop: Abort fitting.
+
+Show: Show the silhouettes and line drawings.
+
+Clear: Clear the silhouettes and line drawings, show the raw images.
+
+Displace: Displace the camera calibration constants from their current values.
+
+Fit: Start the simplex fitter adjusting calibration constants to minimize
+disagreement.
+
+Read_Files: Select a directory, read image files and CMM measurements
+
+Help: Get this help page.
+
+Configure: Open configuration panel with Save and Unsave buttons.
+
+To use the calibrator, press Read_Files and select your measurements. The
+calibrator will display the images, silhouettes, and the modelled spheres. If
+the spheres are nowhere near the silhouettes, or they are not visible, you most
+likely have a mix-up in the mount coordinates. You may be saing that a slot ball
+is a flat ball, for example, as is likely when you swap a blue for a black SCAM.
+When you have the modelled spheres overlapping the silhouettes, press Fit. The
+modelled spheres will start moving around. The status indicator on the top left
+will say "Fitting". After a minute or two, the fit will converge. The status
+label will return to "Idle". The camera calibration constants are now ready.
+
+(C) Kevan Hashemi, 2023, Open Source Instruments Inc.
+https://www.opensourceinstruments.com
 
 ----------End Help----------
 
 ----------Begin Data----------
+
++---------------------+--------------+------+-----------+---------+------+-------+----------+
+| Feature Table       |              |      |           |         |      |       |          |
++---------------------+--------------+------+-----------+---------+------+-------+----------+
+| Length Units        | Millimeters  |      |           |         |      |       |          |
+| Coordinate Systems  | Main         |      |           |         |      |       |          |
+| Data Alignments     | original     |      |           |         |      |       |          |
+|                     |              |      |           |         |      |       |          |
+| Name                | Control      | Nom  | Meas      | Tol     | Dev  | Test  | Out Tol  |
+| Cone                | Diameter     |      | 6.345     | ±1.000  |      |       |          |
+| Cone                | X            |      | 0.000     | ±1.000  |      |       |          |
+| Cone                | Y            |      | 0.000     | ±1.000  |      |       |          |
+| Cone                | Z            |      | 0.000     | ±1.000  |      |       |          |
+| Slot                | Diameter     |      | 6.347     | ±1.000  |      |       |          |
+| Slot                | X            |      | -20.975   | ±1.000  |      |       |          |
+| Slot                | Y            |      | 0.000     | ±1.000  |      |       |          |
+| Slot                | Z            |      | -73.000   | ±1.000  |      |       |          |
+| Flat                | Diameter     |      | 6.346     | ±1.000  |      |       |          |
+| Flat                | X            |      | 21.010    | ±1.000  |      |       |          |
+| Flat                | Y            |      | 0.517     | ±1.000  |      |       |          |
+| Flat                | Z            |      | -73.060   | ±1.000  |      |       |          |
+| ConeL               | Diameter     |      | 6.339     | ±1.000  |      |       |          |
+| ConeL               | X            |      | 92.134    | ±1.000  |      |       |          |
+| ConeL               | Y            |      | -18.283   | ±1.000  |      |       |          |
+| ConeL               | Z            |      | -3.435    | ±1.000  |      |       |          |
+| SlotL               | Diameter     |      | 6.338     | ±1.000  |      |       |          |
+| SlotL               | X            |      | 83.868    | ±1.000  |      |       |          |
+| SlotL               | Y            |      | -18.132   | ±1.000  |      |       |          |
+| SlotL               | Z            |      | -78.935   | ±1.000  |      |       |          |
+| FlatL               | Diameter     |      | 6.336     | ±1.000  |      |       |          |
+| FlatL               | X            |      | 125.222   | ±1.000  |      |       |          |
+| FlatL               | Y            |      | -17.636   | ±1.000  |      |       |          |
+| FlatL               | Z            |      | -71.795   | ±1.000  |      |       |          |
+| ConeR               | Diameter     |      | 6.343     | ±1.000  |      |       |          |
+| ConeR               | X            |      | -77.784   | ±1.000  |      |       |          |
+| ConeR               | Y            |      | -20.454   | ±1.000  |      |       |          |
+| ConeR               | Z            |      | -2.384    | ±1.000  |      |       |          |
+| SlotR               | Diameter     |      | 6.339     | ±1.000  |      |       |          |
+| SlotR               | X            |      | -74.756   | ±1.000  |      |       |          |
+| SlotR               | Y            |      | -20.146   | ±1.000  |      |       |          |
+| SlotR               | Z            |      | -78.278   | ±1.000  |      |       |          |
+| FlatR               | Diameter     |      | 6.338     | ±1.000  |      |       |          |
+| FlatR               | X            |      | -115.524  | ±1.000  |      |       |          |
+| FlatR               | Y            |      | -20.735   | ±1.000  |      |       |          |
+| FlatR               | Z            |      | -68.300   | ±1.000  |      |       |          |
+| 0cm                 | Diameter     |      | 38.068    | ±1.000  |      |       |          |
+| 0cm                 | X            |      | 20.231    | ±1.000  |      |       |          |
+| 0cm                 | Y            |      | 19.192    | ±1.000  |      |       |          |
+| 0cm                 | Z            |      | 506.194   | ±1.000  |      |       |          |
+| 4cm                 | Diameter     |      | 38.066    | ±1.000  |      |       |          |
+| 4cm                 | X            |      | 20.017    | ±1.000  |      |       |          |
+| 4cm                 | Y            |      | 19.275    | ±1.000  |      |       |          |
+| 4cm                 | Z            |      | 466.169   | ±1.000  |      |       |          |
+| 7cm                 | Diameter     |      | 38.073    | ±1.000  |      |       |          |
+| 7cm                 | X            |      | 19.861    | ±1.000  |      |       |          |
+| 7cm                 | Y            |      | 19.319    | ±1.000  |      |       |          |
+| 7cm                 | Z            |      | 436.169   | ±1.000  |      |       |          |
+| 10cm                | Diameter     |      | 38.072    | ±1.000  |      |       |          |
+| 10cm                | X            |      | 19.693    | ±1.000  |      |       |          |
+| 10cm                | Y            |      | 19.371    | ±1.000  |      |       |          |
+| 10cm                | Z            |      | 406.173   | ±1.000  |      |       |          |
++---------------------+--------------+------+-----------+---------+------+-------+----------+
 
 ----------End Data----------
