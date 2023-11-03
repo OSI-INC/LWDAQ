@@ -1677,7 +1677,7 @@ end;
 type
 	source_locations_type=array [1..num_sources_per_range] of xy_point_type;
 	bcam_camera_pair_calib_input_type=record
-		mounts:array [1..num_mounts_per_pair] of kinematic_mount_type;
+		mounts:array [1..num_mounts_per_pair] of bcam_coord_type;
 		measurements:
 			array [1..num_mounts_per_pair,1..num_ranges_per_mount,1..num_sources_per_range] 
 			of calib_datum_type;
@@ -1743,7 +1743,7 @@ begin
 						(measurements[mount_num,far_range_num,source_num].source_range
 						-measurements[mount_num,close_range_num,source_num].source_range)
 							/(ns/fs-1),
-					bcam_coord_from_mount(mounts[mount_num]));
+					mounts[mount_num]);
 			sum:=sum+datum;
 			inc(count);
 			if show_details then begin 
@@ -1789,7 +1789,7 @@ begin
 			datum:=axis.z*
 				(bcam_from_global_z(
 					measurements[mount_num,range_num,source_num].source_range,
-					bcam_coord_from_mount(mounts[mount_num]))
+					mounts[mount_num])
 				-pivot.z)
 				*xy_separation(measurements[mount_num,range_num,source_num].spot_center,
 					measurements[mount_num,range_num,second_source_num].spot_center)
@@ -1829,10 +1829,10 @@ begin
 					xyz_difference(
 						global_from_calib_datum(
 							measurements[mount_num,range_num,second_source_num],
-							calibration,bcam_coord_from_mount(mounts[mount_num])),
+							calibration,mounts[mount_num]),
 						global_from_calib_datum(
 							measurements[mount_num,range_num,source_num],
-							calibration,bcam_coord_from_mount(mounts[mount_num]))));
+							calibration,mounts[mount_num])));
 			r:=xy_unit_vector(
 					xy_difference(
 						source_locations[second_source_num],
@@ -1878,7 +1878,7 @@ begin
 						global_offset_vector(
 							measurements[mount_num,range_num,source_num],
 							calibration,
-							bcam_coord_from_mount(mounts[mount_num]));
+							mounts[mount_num]);
 				end;
 			end;
 		end;
@@ -1899,12 +1899,12 @@ begin
 			close_range:=
 				bcam_from_global_z(
 					measurements[first_mount_num,close_range_num,source_num].source_range,
-					bcam_coord_from_mount(mounts[first_mount_num]))
+					mounts[first_mount_num])
 				-calibration.pivot.z;
 			far_range:=
 				bcam_from_global_z(
 					measurements[first_mount_num,far_range_num,source_num].source_range,
-					bcam_coord_from_mount(mounts[first_mount_num]))
+					mounts[first_mount_num])
 				-calibration.pivot.z;
 {
 	With the camera on two different mounts, the lens center is in two
@@ -1937,8 +1937,8 @@ begin
 	appears as M_1.v in the coordinates of the first mount, and M_2.v in the
 	coordinates of the second mount.
 }
-			bc_1:=bcam_coord_from_mount(mounts[first_mount_num]);
-			bc_2:=bcam_coord_from_mount(mounts[second_mount_num]);
+			bc_1:=mounts[first_mount_num];
+			bc_2:=mounts[second_mount_num];
 			with bc_1 do M_1:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 			with bc_2 do M_2:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 {
@@ -2031,9 +2031,9 @@ begin
 			xyz_datum:=xyz_difference(xyz_datum,
 				xyz_difference(
 					global_from_bcam_point(zero_pivot,
-						bcam_coord_from_mount(mounts[second_mount_num])),
+						mounts[second_mount_num]),
 					global_from_bcam_point(zero_pivot,
-						bcam_coord_from_mount(mounts[first_mount_num]))));
+						mounts[first_mount_num])));
 {
 	We now have the change in pivot position that would occur due to rotation
 	only from the first mount to the second. The z-component of this change
@@ -2090,7 +2090,7 @@ function bcam_camera_calib(calib:device_calibration_type;
 	
 type
 	input_type=record
-		mounts:array [1..num_mounts_per_quad] of kinematic_mount_type;
+		mounts:array [1..num_mounts_per_quad] of bcam_coord_type;
 		measurements:array [1..num_mounts_per_quad,
 				1..num_ranges_per_mount,
 				1..num_sources_per_range] 
@@ -2108,6 +2108,7 @@ var
 	mount_num,second_mount_num,source_num,range_num:integer;
 	pair_num,app_data_num,calib_data_num:integer;
 	r:real;
+	balls:kinematic_mount_type;
 	
 	function next_calib_real:real;
 	begin 
@@ -2134,7 +2135,7 @@ begin
 		time:=calib.calibration_time;
 		device_type:=calib.calibration_type;
 		for mount_num:=1 to num_mounts_per_quad do begin
-			with mounts[mount_num] do begin
+			with balls do begin
 				with cone do begin
 					x:=next_app_real;y:=next_app_real;z:=next_app_real;
 				end;
@@ -2145,6 +2146,7 @@ begin
 					x:=next_app_real;y:=next_app_real;z:=next_app_real;
 				end;
 			end;
+			mounts[mount_num]:=bcam_coord_from_mount(balls);
 		end;
 		for range_num:=1 to num_ranges_per_mount do begin
 			r:=next_app_real;
@@ -2242,7 +2244,7 @@ function bcam_sources_calib(calib:device_calibration_type;
 
 type
 	input_type=record
-		mounts:array [1..num_mounts_per_quad] of kinematic_mount_type;
+		mounts:array [1..num_mounts_per_quad] of bcam_coord_type;
 		viewing_x_direction:real;
 		viewing_scale:real;
 		measurements:array [1..num_mounts_per_quad,1..num_sources_per_pair] 
@@ -2261,6 +2263,7 @@ var
 	null_source:xyz_point_type;
 	M_1,M_2,M,N:xyz_matrix_type;
 	bc_1,bc_2:bcam_coord_type;
+	balls:kinematic_mount_type;
 	
 	function next_calib_real:real;
 	begin 
@@ -2287,7 +2290,7 @@ begin
 		time:=calib.calibration_time;
 		device_type:=calib.calibration_type;
 		for mount_num:=1 to num_mounts_per_quad do begin
-			with mounts[mount_num] do begin
+			with balls do begin
 				with cone do begin
 					x:=next_app_real;y:=next_app_real;z:=next_app_real;
 				end;
@@ -2298,6 +2301,7 @@ begin
 					x:=next_app_real;y:=next_app_real;z:=next_app_real;
 				end;
 			end;
+			mounts[mount_num]:=bcam_coord_from_mount(balls);
 		end;
 		viewing_x_direction:=next_app_real;
 		viewing_scale:=next_app_real;
@@ -2362,17 +2366,17 @@ begin
 						global_link,
 						xyz_difference(
 							global_from_bcam_point(null_source,
-								bcam_coord_from_mount(mounts[second_mount_num])),
+								mounts[second_mount_num]),
 							global_from_bcam_point(null_source,
-								bcam_coord_from_mount(mounts[first_mount_num]))));
+								mounts[first_mount_num])));
 {
 	Now we convert the global link into the bcam coords of source position with
 	the help of the coupling matrix for the two mount positions. Look at the
 	comments in bcam_pair_calib for a detailed explanation of the following
 	manipulation.
 }
-					bc_1:=bcam_coord_from_mount(mounts[first_mount_num]);
-					bc_2:=bcam_coord_from_mount(mounts[second_mount_num]);
+					bc_1:=mounts[first_mount_num];
+					bc_2:=mounts[second_mount_num];
 					with bc_1 do M_1:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 					with bc_2 do M_2:=xyz_matrix_from_points(x_axis,y_axis,z_axis);
 					M:=xyz_matrix_difference(
