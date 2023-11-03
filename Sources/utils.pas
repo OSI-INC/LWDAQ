@@ -5918,29 +5918,37 @@ end;
 	point by an angle rotation.x about the x-axis. Next, we rotate the point by
 	rotation.y about the y-axis. Last, we rotate by rotation.z about the z-axis.
 	Positive rotation about an axis is clockwise when looking in the positive
-	direction along the axis.
+	direction along the axis. The routine reduces its execution time by calculating
+	the sine and cosine of each rotation angle only once.
 }
 function xyz_rotate(point,rotation:xyz_point_type):xyz_point_type;
 
 var
 	p:xyz_point_type;
+	c,s:real;
 	
 begin
 	{rotate about x-axis}
 	p.x:=point.x;
-	p.y:=point.y*cos(rotation.x)-point.z*sin(rotation.x);
-	p.z:=point.y*sin(rotation.x)+point.z*cos(rotation.x);
+	c:=cos(rotation.x);
+	s:=sin(rotation.x);
+	p.y:=point.y*c-point.z*s;
+	p.z:=point.y*s+point.z*c;
 	
 	{rotate about y-axis}
 	point:=p;
-	p.x:=point.x*cos(rotation.y)+point.z*sin(rotation.y);
+	c:=cos(rotation.y);
+	s:=sin(rotation.y);
+	p.x:=point.x*c+point.z*s;
 	p.y:=point.y;
-	p.z:=-point.x*sin(rotation.y)+point.z*cos(rotation.y);
+	p.z:=-point.x*s+point.z*c;
 	
 	{rotate about z-axis}
 	point:=p;
-	p.x:=point.x*cos(rotation.z)-point.y*sin(rotation.z);
-	p.y:=point.x*sin(rotation.z)+point.y*cos(rotation.z);
+	c:=cos(rotation.z);
+	s:=sin(rotation.z);
+	p.x:=point.x*c-point.y*s;
+	p.y:=point.x*s+point.y*c;
 	p.z:=point.z;
 	
 	{return result}
