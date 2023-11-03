@@ -6713,7 +6713,8 @@ coordinate system. The routine returns the three rotations.</p>
 		z_axis:=xyz_from_string(Tcl_ObjString(argv[4]));	
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				xyz_rotation_from_axes(x_axis,y_axis,z_axis)));
+				xyz_rotation_from_matrix(
+					xyz_matrix_from_points(x_axis,y_axis,z_axis))));
 	end 
 	else if option='xyz_dot_product' then begin
 {

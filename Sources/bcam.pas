@@ -115,10 +115,6 @@ const {array sizes}
 	max_num_apparatus_reals=100;
 	max_num_parameter_reals=100;
 
-var {coordinate systems}
-	global_origin,global_x_axis,global_y_axis,global_z_axis:xyz_point_type;
-	
-		
 type {database records}
 	device_calibration_type=record 
 		device_id:string;
@@ -1178,7 +1174,9 @@ begin
 	Compose the pose of the coordinate system.
 }
 	c.location:=origin;
-	c.orientation:=xyz_rotation_from_axes(x_axis,y_axis,z_axis);
+	c.orientation:=
+		xyz_rotation_from_matrix(
+			xyz_matrix_from_points(x_axis,y_axis,z_axis));
 	bcam_coord_from_mount:=c;
 end;
 
@@ -1216,7 +1214,8 @@ begin
 		x_axis:=xyz_cross_product(y_axis,z_axis);
 	end;
 	c.location:=origin;
-	c.orientation:=xyz_rotation_from_axes(x_axis,y_axis,z_axis);
+	c.orientation:=xyz_rotation_from_matrix(
+		xyz_matrix_from_points(x_axis,y_axis,z_axis));
 	bcam_jk_coord_from_mount:=c;
 end;
 
@@ -1930,14 +1929,8 @@ begin
 }
 			bc_1:=mounts[first_mount_num];
 			bc_2:=mounts[second_mount_num];
-			with bc_1 do M_1:=xyz_matrix_from_points(
-				xyz_rotate(global_x_axis,orientation),
-				xyz_rotate(global_y_axis,orientation),
-				xyz_rotate(global_z_axis,orientation));
-			with bc_2 do M_2:=xyz_matrix_from_points(
-				xyz_rotate(global_x_axis,orientation),
-				xyz_rotate(global_y_axis,orientation),
-				xyz_rotate(global_z_axis,orientation));
+			with bc_1 do M_1:=xyz_matrix_from_rotation(orientation);
+			with bc_2 do M_2:=xyz_matrix_from_rotation(orientation);
 {
 	The axis bearing, v, is the same in both mount coordinates. If we denote its
 	appearance in global coordinates as v_1 when in the first mount and v_2 when
@@ -2374,14 +2367,8 @@ begin
 }
 					bc_1:=mounts[first_mount_num];
 					bc_2:=mounts[second_mount_num];
-					with bc_1 do M_1:=xyz_matrix_from_points(
-						xyz_rotate(global_x_axis,orientation),
-						xyz_rotate(global_y_axis,orientation),
-						xyz_rotate(global_z_axis,orientation));
-					with bc_2 do M_2:=xyz_matrix_from_points(
-						xyz_rotate(global_x_axis,orientation),
-						xyz_rotate(global_y_axis,orientation),
-						xyz_rotate(global_z_axis,orientation));
+					with bc_1 do M_1:=xyz_matrix_from_rotation(orientation);
+					with bc_2 do M_2:=xyz_matrix_from_rotation(orientation);
 					M:=xyz_matrix_difference(
 						xyz_matrix_inverse(M_2),xyz_matrix_inverse(M_1));
 					M[3,3]:=1;
@@ -2524,14 +2511,8 @@ begin
 }
 				pc_1:=bcam_jk_coord_from_mount(mounts[first_mount_num]);
 				pc_2:=bcam_jk_coord_from_mount(mounts[second_mount_num]);
-				with pc_1 do M_1:=xyz_matrix_from_points(
-					xyz_rotate(global_x_axis,orientation),
-					xyz_rotate(global_y_axis,orientation),
-					xyz_rotate(global_z_axis,orientation));
-				with pc_2 do M_2:=xyz_matrix_from_points(
-					xyz_rotate(global_x_axis,orientation),
-					xyz_rotate(global_y_axis,orientation),
-					xyz_rotate(global_z_axis,orientation));
+				with pc_1 do M_1:=xyz_matrix_from_rotation(orientation);
+				with pc_2 do M_2:=xyz_matrix_from_rotation(orientation);
 				M:=xyz_matrix_difference(
 					xyz_matrix_inverse(M_2),
 					xyz_matrix_inverse(M_1));
@@ -2585,11 +2566,6 @@ end;
 	Initialization sets up bcam variables.
 }
 initialization 
-
-with global_origin do begin x:=0;y:=0;z:=0; end;
-with global_x_axis do begin x:=1;y:=0;z:=0; end;
-with global_y_axis do begin x:=0;y:=1;z:=0; end;
-with global_z_axis do begin x:=0;y:=0;z:=1; end;
 
 
 end.
