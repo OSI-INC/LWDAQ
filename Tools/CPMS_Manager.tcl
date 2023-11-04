@@ -30,12 +30,12 @@ proc CPMS_Manager_init {} {
 	set config(mount_left) "92.123 -18.364 -3.450\
 		83.853 -18.211 -78.940\
 		125.201 -17.747 -71.806"
-	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	set config(cam_right) "12.588 -38.571 4.827 -3.708 7.509 2.000 26.252 3144.919" 
 	set config(mount_right) "-77.819 -20.395 -2.397\
 		-74.201 -20.179 -75.451\
 		-115.549 -20.643 -68.317"
-	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	
 	set config(bodies) [list \
 		{0 20 450 0 0 0 sphere 0 0 0 38.068 shaft 1 -27 0 0 -1 0 19 0 19 40} ]
@@ -177,8 +177,8 @@ proc CPMS_Manager_show {} {
 	set info(control) "Show"
 	LWDAQ_update
 	
-	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
-	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	set params [CPMS_Manager_get_params]
 	set disagreement [CPMS_Manager_disagreement $params]
 	LWDAQ_print -nonewline $info(text) "$config(file_index) " green
@@ -246,8 +246,8 @@ proc CPMS_Manager_fit {} {
 	LWDAQ_update
 	
 	if {[catch {
-		set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
-		set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+		set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+		set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 		set start_params [CPMS_Manager_get_params]
 		set scaling ""
 		foreach body $config(bodies) {append scaling "$config(scaling) "}

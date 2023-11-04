@@ -194,15 +194,7 @@ type
 {geometry}
 function bcam_coord_from_mount(mount:kinematic_mount_type):xyz_pose_type;
 function bcam_from_image_point(p:xy_point_type;camera:bcam_camera_type):xyz_point_type;
-function bcam_from_global_vector(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
-function bcam_from_global_point(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
-function bcam_from_global_line(b:xyz_line_type;c:xyz_pose_type):xyz_line_type;
-function bcam_from_global_plane(p:xyz_plane_type;c:xyz_pose_type):xyz_plane_type;
 function image_from_bcam_point(p:xyz_point_type;camera:bcam_camera_type):xy_point_type;
-function global_from_bcam_vector(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
-function global_from_bcam_point(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
-function global_from_bcam_line(b:xyz_line_type;c:xyz_pose_type):xyz_line_type;
-function global_from_bcam_plane(p:xyz_plane_type;c:xyz_pose_type):xyz_plane_type;
 function bcam_image_position(source_position:xyz_point_type;
 	camera:bcam_camera_type):xy_point_type;
 function bcam_source_bearing(spot_center:xy_point_type;
@@ -1220,28 +1212,6 @@ begin
 end;
 
 {
-	bcam_from_global_vector converts a direction in global coordinates into a 
-	direction in bcam coordinates.
-}
-function bcam_from_global_vector(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
-var v:xyz_point_type;
-begin
-	v:=xyz_unrotate(p,c.orientation);
-	bcam_from_global_vector:=v;
-end;
-
-{
-	bcam_from_global_point converts a point in global coordinates into a point
-	in bcam coordinates.
-}
-function bcam_from_global_point(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
-var v:xyz_point_type;
-begin
-	v:=bcam_from_global_vector(xyz_difference(p,c.location),c);
-	bcam_from_global_point:=v;
-end;
-
-{
 	bcam_from_global_z calculates the z-position of a source in bcam coordinates
 	given its z-position in global coordinates. The routine assumes that the
 	source is on the global z-axis. 
@@ -1255,88 +1225,8 @@ begin
 	p.x:=0;
 	p.y:=0;
 	p.z:=z;
-	q:=bcam_from_global_point(p,c);
+	q:=xyz_local_from_global_point(p,c);
 	bcam_from_global_z:=q.z;
-end;
-
-{
-	global_from_bcam_vector converts a direction in bcam coordinates into a
-	direction in global coordinates.
-}
-function global_from_bcam_vector(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
-var v:xyz_point_type;
-begin
-	v:=xyz_rotate(p,c.orientation);
-	global_from_bcam_vector:=v;
-end;
-
-{
-	global_from_bcam_point converts a point in bcam coordinates into a point
-	in global coordinates.
-}
-function global_from_bcam_point(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
-var v:xyz_point_type;
-begin
-	v:=xyz_sum(c.location,global_from_bcam_vector(p,c));
-	global_from_bcam_point:=v;
-end;
-
-{
-	global_from_bcam_line converts a bearing (point and direction) in bcam
-	coordinates into a bearing in global coordinates.
-}
-function global_from_bcam_line(b:xyz_line_type;c:xyz_pose_type):xyz_line_type;
-
-var
-	gb:xyz_line_type;
-	
-begin
-	gb.point:=global_from_bcam_point(b.point,c);
-	gb.direction:=global_from_bcam_vector(b.direction,c);
-	global_from_bcam_line:=gb;
-end;
-
-{
-	bcam_from_global_line does the opposite of global_from_bcam_line
-}
-function bcam_from_global_line(b:xyz_line_type;c:xyz_pose_type):xyz_line_type;
-
-var
-	bb:xyz_line_type;
-	
-begin
-	bb.point:=bcam_from_global_point(b.point,c);
-	bb.direction:=bcam_from_global_vector(b.direction,c);
-	bcam_from_global_line:=bb;
-end;
-
-{
-	global_from_bcam_plane converts a bearing (point and direction) in bcam
-	coordinates into a bearing in global coordinates.
-}
-function global_from_bcam_plane(p:xyz_plane_type;c:xyz_pose_type):xyz_plane_type;
-
-var
-	gp:xyz_plane_type;
-	
-begin
-	gp.point:=global_from_bcam_point(p.point,c);
-	gp.normal:=global_from_bcam_vector(p.normal,c);
-	global_from_bcam_plane:=gp;
-end;
-
-{
-	bcam_from_global_plane does the opposite of global_from_bcam_plane
-}
-function bcam_from_global_plane(p:xyz_plane_type;c:xyz_pose_type):xyz_plane_type;
-
-var
-	bp:xyz_plane_type;
-	
-begin
-	bp.point:=bcam_from_global_point(p.point,c);
-	bp.normal:=bcam_from_global_vector(p.normal,c);
-	bcam_from_global_plane:=bp;
 end;
 
 {
@@ -1506,7 +1396,7 @@ function global_from_calib_datum(p:calib_datum_type;
 begin
 	global_from_calib_datum:=
 		xyz_line_plane_intersection(
-			global_from_bcam_line(bcam_source_bearing(p.spot_center,camera),c),
+			xyz_global_from_local_line(bcam_source_bearing(p.spot_center,camera),c),
 			xyz_z_plane(p.source_range));
 end;
 
@@ -2020,9 +1910,9 @@ begin
 			with zero_pivot do begin x:=0; y:=0; z:=calibration.pivot.z; end;
 			xyz_datum:=xyz_difference(xyz_datum,
 				xyz_difference(
-					global_from_bcam_point(zero_pivot,
+					xyz_global_from_local_point(zero_pivot,
 						mounts[second_mount_num]),
-					global_from_bcam_point(zero_pivot,
+					xyz_global_from_local_point(zero_pivot,
 						mounts[first_mount_num])));
 {
 	We now have the change in pivot position that would occur due to rotation
@@ -2355,9 +2245,9 @@ begin
 					global_link:=xyz_difference(
 						global_link,
 						xyz_difference(
-							global_from_bcam_point(null_source,
+							xyz_global_from_local_point(null_source,
 								mounts[second_mount_num]),
-							global_from_bcam_point(null_source,
+							xyz_global_from_local_point(null_source,
 								mounts[first_mount_num])));
 {
 	Now we convert the global link into the bcam coords of source position with

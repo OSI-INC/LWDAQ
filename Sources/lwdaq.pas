@@ -3624,15 +3624,15 @@ begin
 			option:=read_word(body);
 			if option='sphere' then begin
 				sphere:=read_scam_sphere(body);
-				sphere.location:=global_from_bcam_point(sphere.location,body_pose);
-				sphere.location:=bcam_from_global_point(sphere.location,scam_pose);
+				sphere.location:=xyz_global_from_local_point(sphere.location,body_pose);
+				sphere.location:=xyz_local_from_global_point(sphere.location,scam_pose);
 				scam_project_sphere(ip,sphere,camera,num_lines,line_width);
 			end else if option='shaft' then begin
 				shaft:=read_scam_shaft(body);
-				shaft.location:=global_from_bcam_point(shaft.location,body_pose);
-				shaft.location:=bcam_from_global_point(shaft.location,scam_pose);
-				shaft.direction:=global_from_bcam_vector(shaft.direction,body_pose);
-				shaft.direction:=bcam_from_global_vector(shaft.direction,scam_pose);
+				shaft.location:=xyz_global_from_local_point(shaft.location,body_pose);
+				shaft.location:=xyz_local_from_global_point(shaft.location,scam_pose);
+				shaft.direction:=xyz_global_from_local_vector(shaft.direction,body_pose);
+				shaft.direction:=xyz_local_from_global_vector(shaft.direction,scam_pose);
 				scam_project_shaft(ip,shaft,camera,num_lines,line_width);
 			end else begin
 				Tcl_SetReturnString(interp,error_prefix
@@ -6065,24 +6065,23 @@ begin
 	option:=Tcl_ObjString(argv[1]);
 	if option='bcam_from_global_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in BCAM coordinates. The
-point in BCAM coordinates is returned as a string of three numbers, the BCAM
-<i>x</i>, <i>y</i>, and <i>z</i> coordinates of the point. We specify the point
-in global coordinates with the <i>point</i> parameter, which also takes the form
-of a string of three numbers, these numbers being the global <i>x</i>, <i>y</i>,
-and <i>z</i> coordinates of the point whose BCAM coordinates we want to
-determine. You specify how the BCAM and global coordinate systems relate to one
-another with the <i>mount</i> string. The <i>mount</i> string contains the
-global coordinates of the BCAM's kinematic mounting balls. You specify the
-coordinates of the cone, slot, and flat balls, and for each ball we give its
-<i>x</i>, <i>y</i>, and <i>z</i> coordinates. In the following example, we
-transform the global point (0,1,0) into BCAM coordinates when our cone, slot and
-flat balls have coordinates (0,1,0), (-1,1,-1), and (1,1,-1).</p>
+<p>Transforms a point in global coordinates to a point in the coordinates
+defined by the three balls of a BCAM mount. The routine takes as input a
+<i>point</i> string containing the global xyz-position of point and a
+<i>mount</i> string containing the global xyz-position of the centers of the
+cone, slot, and flat balls of the mount. Note that the routine does not accept
+the pose of the mount coordinate system. Rather, it accepts the ball positions
+and will deduce the pose of the mount coordinate system itself. To transform a
+point from global to local coordinate using the pose of the local coordinate
+system, use <a
+href=#xyz_local_from_global_point">xyz_local_from_global_point</i>.</p>
 
-<pre>
-lwdaq bcam_from_global_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
-0.000000 0.000000 0.000000
-</pre>
+<p>In the following example, we transform the global
+point (0,1,0) into BCAM coordinates when our cone, slot and flat balls have
+coordinates (0,1,0), (-1,1,-1), and (1,1,-1).</p>
+
+<pre>lwdaq bcam_from_global_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
+0.000000 0.000000 0.000000</pre>
 
 <p>For a description of the BCAM coordinate system, and how it is defined with
 respect to a BCAM's kinematic mounting balls, consult the BCAM <a
@@ -6100,7 +6099,7 @@ mount strings.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				bcam_from_global_point(
+				xyz_local_from_global_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					bcam_coord_from_mount(
 						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
@@ -6109,16 +6108,16 @@ mount strings.</p>
 {
 <p>Transforms a point in global coordinates to a point in BCAM coordinates. It
 is the inverse of <a href="#bcam_from_global_point">bcam_from_global_point</a>.
-We pass it the BCAM coordinates of a point in the <i>point</i> string, and
-the coordinates of the BCAM's kinematic mounting balls with the <i>mount</i>
+We pass it the BCAM coordinates of a point in the <i>point</i> string and the
+global coordinates of the BCAM's kinematic mounting balls in the <i>mount</i>
 string. The routine returns the global coordinates of the point.</p>
 
 <pre>lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 2.000000 0.000000</pre>
 
-<p>For a description of the BCAM coordinate system, and how it is defined with
-respect to a BCAM's kinematic mounting balls, consult the BCAM <a
-href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
+<p>To transform a point from local to global coordinate using the pose of the
+local coordinate system, use <a
+href=#xyz_global_from_local_point">xyz_global_from_local_point</i>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6128,7 +6127,7 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				global_from_bcam_point(
+				xyz_global_from_local_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					bcam_coord_from_mount(
 						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
@@ -6142,9 +6141,9 @@ details.</p>
 <pre>lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 1.000000 0.000000</pre>
 
-<p>For a description of the BCAM coordinate system, and how it is defined with
-respect to a BCAM's kinematic mounting balls, consult the BCAM <a
-href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
+<p>To transform a vector from global to local coordinate using the pose of the
+local coordinate system, use <a
+href=#xyz_local_from_global_vector">xyz_local_from_global_vector</i>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6154,22 +6153,26 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				bcam_from_global_vector(
+				xyz_local_from_global_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					bcam_coord_from_mount(
 						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
 	end 
 	else if option='global_from_bcam_vector' then begin
 {
-<p>Transforms a vector in global coordinates to a vector in BCAM coordinates. It
-is the inverse of <a href="#bcam_from_global_vector">bcam_from_global_vector</a>.</p>
+<p>Transforms a vector in BCAM coordinates to a vector in global coordinates. It
+is the inverse of <a
+href="#bcam_from_global_vector">bcam_from_global_vector</a>. It takes as input
+two string. One gives the xyz-components of the vector in BCAM coordinates, the
+other gives the global coordinates of the BCAM mounting balls in order cone,
+slot, flat.</p>
 
 <pre>lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 1.000000 0.000000</pre>
 
-<p>For a description of the BCAM coordinate system, and how it is defined with
-respect to a BCAM's kinematic mounting balls, consult the BCAM <a
-href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
+<p>To transform a vector from local to global coordinate using the pose of the
+local coordinate system, use <a
+href=#xyz_global_from_local_point">xyz_global_from_local_point</i>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6179,7 +6182,7 @@ href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				global_from_bcam_vector(
+				xyz_global_from_local_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					bcam_coord_from_mount(
 						kinematic_mount_from_string(Tcl_ObjString(argv[3]))))));
@@ -6280,8 +6283,7 @@ calibration constants using the <i>camera</i> string, just as for <a
 href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
 
 <pre>lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 100 0"
-1.720000 1.220000
-lwdaq bcam_image_position "1.1 0 1000" "P0001 1 0 0 0 0 1 100 0"</pre>
+1.720000 1.220000</pre>
 
 <p>Here we see movement of 1 mm at a range ten times the pivot-ccd distance
 causing a 100-um move on the image.</p>
@@ -6298,36 +6300,43 @@ causing a 100-um move on the image.</p>
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					bcam_camera_from_string(Tcl_ObjString(argv[3])))));
 	end 
-	else if option='scam_coord_from_mount' then begin	
+	else if option='bcam_coord_from_mount' then begin	
 {
-<p>Convert an SCAM mount into an SCAM coordinate system. The mount consists of
-the global coordinates of the cone, slot, and flat balls of the SCAM mount.
-These balls are named after the depressions on the underside of the SCAM. The
-routine returns the location and orientation of the SCAM coordinates with
-respect to the global coordinate system. The location is the position of the
-SCAM coordinate origin. The orientation is three angles by which we rotate about
-the global x axis, then y-axis, then z-axis, in that order, in order to rotate
-the global axis unit vectors into the SCAM axis unit vectors.</p>
-
-<p>The SCAM coordinate system is constrained by three mounting balls in the same
-way as a BCAM coordinate system. See the Coordinate Systems section of the BCAM
-<a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>
-for an explanation of the procedure for taking the positions of the cone, slot,
-and flat balls and creating a mount coordinate system that will always be in the
-same location and orientation with respect to any device sitting on the mount.
+<p>Convert the ball positions of a BCAM-style kinematic mount into the pose of
+the mount's coordinate system. These three balls mate with a cone, slot, and
+flat depression under the BCAM. We pass the routine the global xyz-position of
+the three balls in the order cone, slot, flat. The routine returns the location
+and orientation of the mount coordinate system. Because SCAMs and WPSs use the
+same kinematic mount, we can use this routine to obtain the pose of SCAM and WPS
+coordinate systems as well. We describe how the three balls define the mount
+coordinate system in the <a
+href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User Manual</a>.
 See <i>bcam_coordinates_from_mount</i> in <a
 href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a> for the
-exact calculation. Note that our BCAM coordinate transformation routines take as
-input the coordinates of the three mounting balls, while our SCAM routines take
-the global description of the SCAM coordinate system that we can obtain from the
-coordinates of the mounting balls. The SCAM routines are faster because they
-need not re-calculate the SCAM coordinate axes.</p>
+exact calculation. The mount coordinate system is defined in such a way that it
+is always in the same location and orientation with respect to the sensor
+chassis, regardless of small variations in the ball arrangements between one
+kinematic mount and the next.</p>
 
-<pre>lwdaq scam_coord_from_mount "0 1 0 -21 1 -72 21 1 -72"
+<pre>lwdaq bcam_coord_from_mount "0 1 0 -21 1 -72 21 1 -72"
 0.000 1.000 0.000 -0.000 0.004 0.000</pre>
 
-<p>In the example above, the coordinates of the balls are such that the scam coordinates
-are almost parallel to those of the global coordinate system.</p>
+<p>The "pose" of the mount coordinate system consists of its location and
+orientation. The location is the xyz-position of the mount coordinate origin in
+global coordinates. The rotation is three angles by which we rotate a global
+vector about the global x, y, and then z axis to obtain the components of the
+vector in mount coordinates. If we apply this rotation to the global coordinate
+axes, we obtain the axes of the mount coordinate system. The units of angle are
+radians.</p>
+
+<p>Note that our <i>bcam_from_global</i> and <i>global_from_bcam</i> routines
+perform this conversion from ball positions to mount coordinate system
+themselves. We pass these routine the ball positions, not the pose of the mount
+coordinate system. The more generic <i>xyz_local_from_global</i> and
+<i>xyz_local_from_global</i> routines do, however, expect the pose of the local
+coordinate system. We may use these generic routines for any style of kinematic
+mount or body positioning, provided that we know the pose of the local
+coordinate system in the global coordinate system.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6340,130 +6349,139 @@ are almost parallel to those of the global coordinate system.</p>
 				bcam_coord_from_mount(
 					kinematic_mount_from_string(Tcl_ObjString(argv[2])))));
 	end
-	else if option='scam_from_global_vector' then begin
+	else if option='xyz_local_from_global_vector' then begin
 {
-<p>Transforms a vector in global coordinates to a vector in SCAM coordinates. 
-We pass the global coordinates of a point in the <i>point</i> string. We pass
-a description of the scam coordinate system in the <i>scam</i> string. The
-routine returns the scam components of the vector.</p>
+<p>Transforms a vector in global coordinates to a vector in local coordinates.
+The routine takes two strings as parameters. The first is the xyz components of
+the vector in global coordinates. The second is the pose of the local coordinate
+system in the global coordinate system. By "pose" we mean the location and
+orientation of the local coordinates, where the locaion is the xyz-position of
+its origin in global coordinates and the orientation is the xyz-rotation we
+apply to the global coordinate axes to obtain the local coordinate axes. An
+"xyz-rotation" consists of three rotations by three angles about the x, y, and z
+axes in that order. The units of angle are radians. In the example below, the
+local coordinate system is at (10,0,0) and we obtain its axes by rotating the
+global axes by 90&deg; about the x-axis.</p>
 
-<pre>lwdaq scam_from_global_vector "0 0 1" "10 0 0 1.570796327 0 0"
+<pre>lwdaq xyz_local_from_global_vector "0 0 1" "10 0 0 1.570796327 0 0"
 0.000000 1.000000 -0.000000</pre>
 
-<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
-instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+<p>When working with BCAMs, SCAMs, and WPSs, we can obtain the pose of the
+sensor mount coordinate system by passing the global coordinates of their three
+mounting balls to <a
+href="#bcam_coord_from_mount">bcam_coord_from_mount</a>.</p>
 
-<pre>lwdaq scam_from_global_vector "5 0 0" "10 0 0 0 0.1 0"
+<pre>lwdaq xyz_local_from_global_vector "5 0 0" "10 0 0 0 0.1 0"
 4.975021 0.000000 0.499167</pre>
 
-<p>In the example above, we have the SCAM origin at x=10 in global coordinates,
-but this has no effect upon the resulting vector. The SCAM axes are rotated by
+<p>In the example above, we have the local origin at x=10 in global coordinates,
+but this has no effect upon the resulting vector. The local axes are rotated by
 100 mrad about the global y-axis. Our vector is distance 5 in the global
 x-direction.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' vector scam".');
+				+'"lwdaq '+option+' vector local".');
 			exit;
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				bcam_from_global_vector(
+				xyz_local_from_global_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					xyz_pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
-	else if option='global_from_scam_vector' then begin
+	else if option='xyz_global_from_local_vector' then begin
 {
-<p>Transforms a vector in SCAM coordinates to a vector in global coordinates. It
-is the inverse of <a href="#scam_from_global_vector">scam_from_global_vector</a>. See
-<a href="#scam_from_global_point">scam_from_global_point</a> for background.
-We pass the scam coordinates of a point in the <i>point</i> string. We pass
-a description of the scam coordinate system in the <i>scam</i> string. The
-routine returns the scam components of the vector.</p>
+<p>Transforms a vector in local coordinates to a vector in global coordinates.
+It is the inverse of <a
+href="#xyz_local_from_global_vector">xyz_local_from_global_vector</a>. We pass
+the local coordinates of a point in the <i>point</i> string. In the <i>local</i>
+string we pass the pose the local coordinate system as seen in the global
+coordinate system.</p>
 
-<pre>lwdaq global_from_scam_vector "0 -1 0" "10 0 0 1.570796327 0 0"
+<pre>lwdaq xyz_global_from_local_vector "0 -1 0" "10 0 0 1.570796327 0 0"
 0.000000 0.000000 1.000000</pre>
 
-<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
-instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+<p>The "pose" consists of the xyz-position and xyz-rotation of the local
+coordinates in global coordinates. The units of angle are radians. The routine
+returns the local components of the vector.</p>
 
-<pre>lwdaq global_from_scam_vector "4.975021 0.000000 0.499167" "10 0 0 0 0.1 0"
+<pre>lwdaq xyz_global_from_local_vector "4.975021 0.000000 0.499167" "10 0 0 0 0.1 0"
 5.000000 0.000000 -0.000000</pre>
 
-<p>In the example above, we have the SCAM origin at x=10 in global coordinates,
-but this has no effect upon the resulting vector. The SCAM axes are rotated by
+<p>In the example above, we have the local origin at x=10 in global coordinates,
+but this has no effect upon the resulting vector. The local axes are rotated by
 100 mrad about the global y-axis. Our vector is distance 5 in the global
 x-direction.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' vector scam".');
+				+'"lwdaq '+option+' vector local".');
 			exit;
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				global_from_bcam_vector(
+				xyz_global_from_local_vector(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					xyz_pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
-	else if option='scam_from_global_point' then begin
+	else if option='xyz_local_from_global_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in scam coordinates. It
-is the inverse of <a href="#global_from_scam_point">global_from_scam_point</a>.
-We pass the scam coordinates of a point in the <i>point</i> string. We pass a
-description of the scam coordinate system in the <i>scam</i> string. The
+<p>Transforms a point in global coordinates to a point in local coordinates. It
+is the inverse of <a href="#xyz_global_from_local_point">xyz_global_from_local_point</a>.
+We pass the local coordinates of a point in the <i>point</i> string. We pass a
+description of the local coordinate system in the <i>local</i> string. The
 coordinate description consists of six numbers. The first three are the location
-in global coordinates of the scam origin. The next three are the rotations about
+in global coordinates of the local origin. The next three are the rotations about
 the global x, y, and z axes that transform the global axis unit vectors into the
-scam axis unit vectors. The units of angle are radians. The routine returns the
+local axis unit vectors. The units of angle are radians. The routine returns the
 scam coordinates of the point.</p>
 
-<pre>lwdaq scam_from_global_point "0 1 0" "10 0 0 1.570796327 0 0"
+<pre>lwdaq xyz_local_from_global_point "0 1 0" "10 0 0 1.570796327 0 0"
 -10.000000 -0.000000 -1.000000</pre>
 
-<p>See <a href="#scam_coord_from_mount">scam_coord_from_mount</a> for discussion of
-the coordinate system definition with respect to the coordinates of the balls upon 
-which the SCAM sits.</p>
+<p>We use <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> to obtain the pose
+of the mount coordinate systems for BCAMs, SCAMs, and WPSs.</p>
 
-<pre>lwdaq scam_from_global_point "0 0 0" "10 0 0 0 0.1 0"
+<pre>lwdaq xyz_local_from_global_point "0 0 0" "10 0 0 0 0.1 0"
 -9.950042 0.000000 -0.998334</pre>
 
-<p>In the example above, we have the SCAM origin at x=10 in global coordinates. The
-SCAM axes are rotated by 100 mrad about the global y-axis.</p>
+<p>In the example above, we have the local origin at x=10 in global coordinates. The
+local axes are rotated by 100 mrad about the global y-axis.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' point scam".');
+				+'"lwdaq '+option+' point local".');
 			exit;
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				bcam_from_global_point(
+				xyz_local_from_global_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					xyz_pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
-	else if option='global_from_scam_point' then begin
+	else if option='xyz_global_from_local_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in SCAM coordinates. It
-is the inverse of <a href="#scam_from_global_point">scam_from_global_point</a>.
-We pass it the scam coordinates of a point in the <i>point</i> string. We pass
-it a description of the scam coordinate system in the <i>scam</i> string. The
+<p>Transforms a point in global coordinates to a point in local coordinates. It
+is the inverse of <a href="#xyz_local_from_global_point">xyz_local_from_global_point</a>.
+We pass it the local coordinates of a point in the <i>point</i> string. We pass
+it the pose of the local coordinate system in the <i>local</i> string. The
 routine returns the global coordinates of the point.</p>
 
-<pre>lwdaq global_from_scam_point "-10 0 1" "10 0 0 1.570796327 0 0"
+<pre>lwdaq xyz_global_from_local_point "-10 0 1" "10 0 0 1.570796327 0 0"
 0.000000 1.000000 -0.000000</pre>
 
-<p>We obtain the SCAM coordinate description with the <i>coordinates</i>
-instruction passed into our <a href="#lwdaq_scam">lwdaq_scam</a> routine.</p>
+<p>We use <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> to obtain the pose
+of the mount coordinate systems for BCAMs, SCAMs, and WPSs.</p>
 
-<pre>lwdaq global_from_scam_point "-9.950042 0.000000 -0.998334" "10 0 0 0 0.1 0"
+<pre>lwdaq xyz_global_from_local_point "-9.950042 0.000000 -0.998334" "10 0 0 0 0.1 0"
 -0.000000 0.000000 0.000000</pre>
 
-<p>In the example above, we have the SCAM origin at x=10 in global coordinates. The
-SCAM axes are rotated by 100 mrad about the global y-axis. Our SCAM point is the one
+<p>In the example above, we have the local origin at x=10 in global coordinates. The
+local axes are rotated by 100 mrad about the global y-axis. Our local point is the one
 that corresponds to the origin of global coordinates.</p>
 }
 		if (argc<>4) then begin
@@ -6474,7 +6492,7 @@ that corresponds to the origin of global coordinates.</p>
 		end;
 		Tcl_SetReturnString(interp,
 			string_from_xyz(
-				global_from_bcam_point(
+				xyz_global_from_local_point(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					xyz_pose_from_string(Tcl_ObjString(argv[3])))));
 	end 
@@ -7441,10 +7459,9 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 		Tcl_SetReturnString(interp,'Bad option "'+option+'", must be one of "'
 		+' bcam_from_global_point global_from_bcam_point bcam_from_global_vector'
 		+' global_from_bcam_vector bcam_source_bearing bcam_source_position'
-		+' bcam_image_position'
-		+' scam_from_global_point global_from_scam_point scam_from_global_vector'
-		+' global_from_scam_vector scam_coord_from_mount scam_from_global_pose'
-		+' global_from_scam_pose'
+		+' bcam_image_position bcam_coord_from_mount'
+		+' xyz_local_from_global_point xyz_global_from_local_point'
+		+' xyz_local_from_global_vector xyz_global_from_local_vector '
 		+' wps_wire_plane wps_calibrate'
 		+' xyz_sum xyz_difference xyz_rotate xyz_unrotate xyz_unit_vector'
 		+' xyz_cross_product xyz_dot_product xyz_rotation_from_axes'

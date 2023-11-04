@@ -590,6 +590,14 @@ function xyz_unrotate(point,rotation:xyz_point_type):xyz_point_type;
 function xyz_axis_rotate(point:xyz_point_type;axis:xyz_line_type;rotation:real):xyz_point_type;
 function xyz_rotation_from_matrix(M:xyz_matrix_type):xyz_point_type;
 function xyz_matrix_from_rotation(rotation:xyz_point_type):xyz_matrix_type;
+function xyz_local_from_global_vector(v:xyz_point_type;c:xyz_pose_type):xyz_point_type;
+function xyz_local_from_global_point(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
+function xyz_global_from_local_vector(v:xyz_point_type;c:xyz_pose_type):xyz_point_type;
+function xyz_global_from_local_point(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
+function xyz_global_from_local_line(b:xyz_line_type;c:xyz_pose_type):xyz_line_type;
+function xyz_local_from_global_line(b:xyz_line_type;c:xyz_pose_type):xyz_line_type;
+function xyz_global_from_local_plane(p:xyz_plane_type;c:xyz_pose_type):xyz_plane_type;
+function xyz_local_from_global_plane(p:xyz_plane_type;c:xyz_pose_type):xyz_plane_type;
 
 {
 	Memory Access. We use byte arrays as a data structure for copying blocks of
@@ -6155,6 +6163,114 @@ begin
 		xyz_rotate(xyz_z_axis,rotation));
 	xyz_matrix_from_rotation:=M;
 end;
+
+{
+	xyz_local_from_global_vector transforms a vector in global coordinates into a 
+	vector in a local coordinate system. The local coordinate system is defined by
+	a translation and rotation within the global coordinate system. This translation
+	and rotation are passed to our transformation routine in the form of a "pose"
+	record, with the pose location being the translation that moves a point from the
+	global origin to the local coordinate origin, and the pose orientation
+	being the compound rotation that rotates the global coordinate axes into the
+	local coordinate axes. In principle, these two coordinate systems are equivalent
+	and equal, but the one we call "global" is the one in which we provide a translation
+	and rotation to get to the other. 
+}
+function xyz_local_from_global_vector(v:xyz_point_type;c:xyz_pose_type):xyz_point_type;
+begin
+	xyz_local_from_global_vector:=xyz_unrotate(v,c.orientation);
+end;
+
+{
+	xyz_local_from_global_point converts a point in global coordinates into a point
+	in bcam coordinates.
+}
+function xyz_local_from_global_point(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
+begin
+	xyz_local_from_global_point:=
+		xyz_local_from_global_vector(xyz_difference(p,c.location),c);
+end;
+
+{
+	xyz_global_from_local_vector takes a vector in local coordinates and transforms
+	it into global coordiantes. The local coordinates are defined with respect to the
+	global coordinates using an xyz_pose_type that gives the translation in global
+	coordinates from the global origin to the local origin and the rotation in global
+	coordinates from the global axes to the local axes.
+}
+function xyz_global_from_local_vector(v:xyz_point_type;c:xyz_pose_type):xyz_point_type;
+begin
+	xyz_global_from_local_vector:=xyz_rotate(v,c.orientation);
+end;
+
+{
+	xyz_global_from_local_point takes a point in local coordinates and transforms it
+	into global coordinates.
+}
+function xyz_global_from_local_point(p:xyz_point_type;c:xyz_pose_type):xyz_point_type;
+begin
+	xyz_global_from_local_point:=
+		xyz_sum(c.location,xyz_global_from_local_vector(p,c));
+end;
+
+{
+	xyz_global_from_local_line converts a bearing (point and direction) in bcam
+	coordinates into a bearing in global coordinates.
+}
+function xyz_global_from_local_line(b:xyz_line_type;c:xyz_pose_type):xyz_line_type;
+
+var
+	gb:xyz_line_type;
+	
+begin
+	gb.point:=xyz_global_from_local_point(b.point,c);
+	gb.direction:=xyz_global_from_local_vector(b.direction,c);
+	xyz_global_from_local_line:=gb;
+end;
+
+{
+	xyz_local_from_global_line does the opposite of xyz_global_from_local_line
+}
+function xyz_local_from_global_line(b:xyz_line_type;c:xyz_pose_type):xyz_line_type;
+
+var
+	bb:xyz_line_type;
+	
+begin
+	bb.point:=xyz_local_from_global_point(b.point,c);
+	bb.direction:=xyz_local_from_global_vector(b.direction,c);
+	xyz_local_from_global_line:=bb;
+end;
+
+{
+	xyz_global_from_local_plane converts a bearing (point and direction) in bcam
+	coordinates into a bearing in global coordinates.
+}
+function xyz_global_from_local_plane(p:xyz_plane_type;c:xyz_pose_type):xyz_plane_type;
+
+var
+	gp:xyz_plane_type;
+	
+begin
+	gp.point:=xyz_global_from_local_point(p.point,c);
+	gp.normal:=xyz_global_from_local_vector(p.normal,c);
+	xyz_global_from_local_plane:=gp;
+end;
+
+{
+	xyz_local_from_global_plane does the opposite of xyz_global_from_local_plane
+}
+function xyz_local_from_global_plane(p:xyz_plane_type;c:xyz_pose_type):xyz_plane_type;
+
+var
+	bp:xyz_plane_type;
+	
+begin
+	bp.point:=xyz_local_from_global_point(p.point,c);
+	bp.normal:=xyz_local_from_global_vector(p.normal,c);
+	xyz_local_from_global_plane:=bp;
+end;
+
 
 {	
 	memory_byte	returns the value of the 8-bit unsigned byte at the specified address.

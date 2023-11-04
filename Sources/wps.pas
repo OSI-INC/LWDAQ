@@ -190,13 +190,8 @@ end;
 	direction in wps coordinates.
 }
 function wps_from_global_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-
-var
-	wps:xyz_pose_type;
-	
 begin
-	wps:=wps_coord_from_mount(mount);
-	wps_from_global_vector:=bcam_from_global_vector(p,wps);
+	wps_from_global_vector:=xyz_local_from_global_vector(p,wps_coord_from_mount(mount));
 end;
 
 
@@ -215,10 +210,8 @@ end;
 	direction in global coordinates.
 }
 function global_from_wps_vector(p:xyz_point_type;mount:kinematic_mount_type):xyz_point_type;
-var wps:xyz_pose_type;	
 begin
-	wps:=wps_coord_from_mount(mount);
-	global_from_wps_vector:=global_from_bcam_vector(p,wps);
+	global_from_wps_vector:=xyz_global_from_local_vector(p,wps_coord_from_mount(mount));
 end;
 
 {

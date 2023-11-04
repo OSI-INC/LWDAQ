@@ -30,12 +30,12 @@ proc CPMS_Calibrator_init {} {
 	set config(mount_left) "92.123 -18.364 -3.450 \
 		83.853 -18.211 -78.940 \
 		125.201 -17.747 -71.806"
-	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	set config(cam_right) "12.675 -39.312 1.1 0.0 0.0 2 26.0 3141.6" 
 	set config(mount_right) "-77.819 -20.395 -2.397 \
 		-74.201 -20.179 -75.451 \
 		-115.549 -20.643 -68.317"
-	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
 	set config(bodies) [list \
 		"20.231 19.192 506.194 0 0 0 sphere 0 0 0 38.068" \
@@ -83,7 +83,12 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 	LWDAQ_update
 	
 	if {$img_dir == ""} {set img_dir [LWDAQ_get_dir_name]}
-	if {$img_dir == ""} {return ""} {set config(img_dir) $img_dir}
+	if {$img_dir == ""} {
+		set info(state) "Idle"
+		return ""
+	} {
+		set config(img_dir) $img_dir
+	}
 	
 	set fn [file join $img_dir CMM.txt]
 	if {[file exists $fn]} {
@@ -210,8 +215,8 @@ proc CPMS_Calibrator_show {} {
 	set info(control) "Show"
 	LWDAQ_update
 	
-	set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
-	set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	set params [CPMS_Calibrator_get_params]
 	set disagreement [CPMS_Calibrator_disagreement $params]
 	set result "$params $disagreement"
@@ -279,8 +284,8 @@ proc CPMS_Calibrator_fit {} {
 	set info(state) "Fitting"
 	
 	if {[catch {
-		set config(coord_left) [lwdaq scam_coord_from_mount $config(mount_left)]
-		set config(coord_right) [lwdaq scam_coord_from_mount $config(mount_right)]
+		set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+		set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 		set scaling "$config(scaling) $config(scaling)"
 		set start_params [CPMS_Calibrator_get_params] 
 		set end_params [lwdaq_simplex $start_params \
