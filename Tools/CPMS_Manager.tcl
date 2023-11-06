@@ -37,8 +37,7 @@ proc CPMS_Manager_init {} {
 		-115.549 -20.643 -68.317"
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	
-	set config(bodies) [list \
-		{0 20 450 0 0 0 sphere 0 0 0 38.068 shaft 1 -27 0 0 -1 0 19 0 19 40} ]
+	set config(bodies) [list {0 20 450 0 0 0 sphere 0 0 0 38.068} ]
 	set config(scaling) "1 1 1 0 0.1 0.1"
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
