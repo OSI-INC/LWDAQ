@@ -390,7 +390,7 @@ proc CPMS_Calibrator_open {} {
 	pack $f -side top -fill x
 
 	label $f.lbody -text "bodies:"
-	entry $f.ebody -textvariable CPMS_Calibrator_config(bodies) -width 160
+	entry $f.ebody -textvariable CPMS_Calibrator_config(bodies) -width 180
 	pack $f.lbody $f.ebody -side left -expand yes
 		
 	set f [frame $w.images_a]

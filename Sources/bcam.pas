@@ -1128,18 +1128,18 @@ function bcam_coord_from_mount(mount:kinematic_mount_type):xyz_pose_type;
 var
 	origin,x_axis,y_axis,z_axis:xyz_point_type;
 	c:xyz_pose_type;
-	cs,cp,cs_normal:xyz_point_type;
+	cs,cf,cs_normal:xyz_point_type;
 	
 begin
 	with mount do begin
 {
-	The unit vectors cs and cp define a plane. The normal to this plane is the
-	y-axis of the bcam coordinate system, as defined by the cross product of cp
+	The unit vectors cs and cf define a plane. The normal to this plane is the
+	y-axis of the bcam coordinate system, as defined by the cross product of cf
 	with cs.
 }
 		cs:=xyz_unit_vector(xyz_difference(slot,cone));
-		cp:=xyz_unit_vector(xyz_difference(flat,cone));
-		y_axis:=xyz_unit_vector(xyz_cross_product(cp,cs));
+		cf:=xyz_unit_vector(xyz_difference(flat,cone));
+		y_axis:=xyz_unit_vector(xyz_cross_product(cf,cs));
 {
 	The orientation of the bcam camera around its y-axis is set by the slot and
 	cone. We create the z-axis of the bcam system by rotating sc by z_angle
