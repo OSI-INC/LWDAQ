@@ -232,23 +232,23 @@ proc LWDAQ_stop_instruments {} {
 # element is set even if the instrument window is not open, and LWDAQ_print
 # checks to see if the text window exists before it prints.
 #
-proc LWDAQ_instrument_print {instrument s {color black}} {
+proc LWDAQ_instrument_print {instrument print_str {color black}} {
 	upvar #0 LWDAQ_info_$instrument info
 	upvar #0 LWDAQ_config_$instrument config
 	if {![winfo exists $info(window)]} {return ""}
-	if {(![LWDAQ_is_error_result $s]) && ($config(verbose_result) != 0)} {
-		set verbose "\n[lindex $s 0]\n"
-		set s [lreplace $s 0 0]
-		for {set i 0} {$i < [llength $s]} {incr i} {
+	if {(![LWDAQ_is_error_result $print_str]) && ($config(verbose_result) != 0)} {
+		set verbose "\n[lindex $print_str 0]\n"
+		set print_str [lreplace $print_str 0 0]
+		for {set i 0} {$i < [llength $print_str]} {incr i} {
 			set k [expr $i % [llength $info(verbose_description)]]
-			set value [lindex $s $i]
+			set value [lindex $print_str $i]
 			if {$value == ""} {set value "\"\""}
 			set name [lindex $info(verbose_description) $k]
 			append verbose "$name: $value\n"
 		}
-		set s $verbose
+		set print_str $verbose
 	}
-	LWDAQ_print $info(text) $s $color
+	LWDAQ_print $info(text) $print_str $color
 	return ""
 }
 
@@ -274,6 +274,12 @@ proc LWDAQ_instrument_analyze {instrument {id ""}} {
 		set analyze $config(analysis_enable)
 	}
 
+	# If the instrument's analyze flag is set, analyze the image using the
+	# instrument's own analysis routine. Append a prefix to the result tring:
+	# either the ID we were passed, or the image name. If the analysis result is
+	# an error, and we have specified an ID, we want to add to the end of the
+	# error report that the error occurred on "ID", for which we must remove the
+	# period at the end of the error string.
 	if {$analyze} {
 		if {[catch {
 			lwdaq_config -text_name $info(text) -photo_name $info(photo)
@@ -295,10 +301,14 @@ proc LWDAQ_instrument_analyze {instrument {id ""}} {
 		}
 		LWDAQ_instrument_print $info(name) $result
 	} {
+	# If the analyze flag is not set, we clear the image overlay, so as to
+	# remove any previous analysis graphics.
 		lwdaq_image_manipulate $config(memory_name) none -clear 1
 	}
 
-	if {[winfo exists $info(window)]} {
+	# If we have a window to draw the image, and the image exists, then draw it.
+	if {[winfo exists $info(window)] \
+			&& ([lwdaq_image_exists $config(memory_name)] != "")} {
 		lwdaq_draw $config(memory_name) $info(photo) \
 			-intensify $config(intensify) -zoom $info(zoom)
 	}

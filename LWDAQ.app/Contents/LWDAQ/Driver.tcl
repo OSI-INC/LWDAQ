@@ -337,9 +337,9 @@ proc LWDAQ_stream_delete {sock addr stream_length value} {
 #
 # LWDAQ_stream_write writes a block of bytes to the same controller address so
 # as to transfer them into a memory block through a memory portal. It is like
-# the stream read in reverse. The addr parameter is a strings of characters that
-# represents decimal number. The data parameter is a block of binary bytes that
-# will be transmitted without modification. The routine translates the addr
+# the stream read in reverse. The addr parameter is a string of characters that
+# represents a decimal number. The data parameter is a block of binary bytes
+# that will be transmitted without modification. The routine translates the addr
 # string into a four-byte integer before transmitting to the driver.
 #
 proc LWDAQ_stream_write {sock addr data} {

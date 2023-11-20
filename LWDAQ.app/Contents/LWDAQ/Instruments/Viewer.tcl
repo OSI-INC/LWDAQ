@@ -50,12 +50,9 @@ proc LWDAQ_init_Viewer {} {
 	set info(daq_image_bottom) -1
 	set info(daq_min_width) 4
 	set info(image_results) ""
-	set info(verbose_description) \
-		"{Image Height} {Image Width} \
-		{Bounds Left} {Bounds Top} {Bounds Right} {Bounds Bottom} \
-		{Results String}"
+	set info(verbose_description) ""
 	
-	set config(image_source) "Rasnik"
+	set config(image_source) "SCAM"
 	set config(analysis_source) "Camera"
 	set config(file_name) ./Images/\*
 	set config(memory_name) lwdaq_image_1
@@ -81,7 +78,7 @@ proc LWDAQ_daq_Viewer {} {
 # image in the Viewer panel. If report is set, the routine draws the image in
 # the Viewer panel and writes the results of analysis to the text window.
 #
-proc LWDAQ_analysis_Viewer {{img ""} {report 0}} {
+proc LWDAQ_analysis_Viewer {{image_name ""}} {
 	global LWDAQ_Info
 	upvar #0 LWDAQ_config_Viewer config
 	upvar #0 LWDAQ_info_Viewer info
@@ -98,14 +95,14 @@ proc LWDAQ_analysis_Viewer {{img ""} {report 0}} {
 	upvar #0 LWDAQ_info_$instrument iinfo
 
 	# Check that the image exists. We use the local image by default.
-	if {$img == ""} {set img $config(memory_name)}
-	if {[lwdaq_image_exists $img] == ""} {
-		return "ERROR: Image \"$img\" does not exist."	
+	if {$image_name == ""} {set image_name $config(memory_name)}
+	if {[lwdaq_image_exists $image_name] == ""} {
+		return "ERROR: Image \"$image_name\" does not exist."	
 	}
 	
-	# Apply the analysis bounds if the use daq bounds flag is set.
+	# Apply the analysis bounds if file_use_daq_bounds is set.
 	if {$info(file_use_daq_bounds)} {
-		lwdaq_image_manipulate $img none \
+		lwdaq_image_manipulate $image_name none \
 			-left $info(daq_image_left) \
 			-top $info(daq_image_top) \
 			-right $info(daq_image_right) \
@@ -113,21 +110,18 @@ proc LWDAQ_analysis_Viewer {{img ""} {report 0}} {
 			-clear 1
 	}
 
-	# Set the instrument's image name to the Viewer's image name and analyze.
-	# set our result string to the result of analysis.
+	# Use the chosen instrument's analysis routine on the selected image.
 	set saved $iconfig(memory_name)
-	set iconfig(memory_name) $img
+	set iconfig(memory_name) $image_name
 	set result [LWDAQ_analysis_$instrument]
-	if {![LWDAQ_is_error_result $result]} {set result [lrange $result 1 end]}
 	set iconfig(memory_name) $saved
 	
-	# If the report flag is set, draw the analyzed image in the Viewer panel.
- 	if {$report} {
-		lwdaq_draw $img $info(photo) -intensify $config(intensify) -zoom $info(zoom)
-		LWDAQ_print -nonewline $info(text) "$instrument: " darkgreen
-		LWDAQ_print $info(text) $result	
-	}	
-	set info(image_results) [lwdaq_image_results $img]
+	# Copy the result string in the first line of the image into the resulds
+	# entry box in the Viewer panel.
+	set info(image_results) [lwdaq_image_results $image_name]
+	
+	# Copy the chosen instrument's verbose description into the Viewer's verbose
+	# description.
 	set info(verbose_description) $iinfo(verbose_description)
 
 	return $result
@@ -455,15 +449,17 @@ proc LWDAQ_controls_Viewer {} {
 
 	# These bindings allow us to change the analysis boundaries with the mouse.	
 	bind $info(image_display) <Motion> {LWDAQ_xy_Viewer %x %y Motion}
-	bind $info(image_display) <ButtonPress> {LWDAQ_xy_Viewer %x %y Press}
-	bind $info(image_display) <ButtonRelease> {LWDAQ_xy_Viewer %x %y Release}
-	
+	bind $info(image_display) <ButtonPress-2> {LWDAQ_xy_Viewer %x %y Press}
+	bind $info(image_display) <ButtonRelease-2> {LWDAQ_xy_Viewer %x %y Release}
+	bind $info(image_display) <Control-ButtonPress> {LWDAQ_xy_Viewer %x %y Press}
+	bind $info(image_display) <Control-ButtonRelease> {LWDAQ_xy_Viewer %x %y Release}
+
 	# Delete the default double-press binding that give us pixel detail.
 	bind $info(image_display) <Double-ButtonPress> ""
 
 	# Analyze and zoom buttons that re-analyze and re-draw the image. Provide
 	# buttons to convert between DAQ and GIF.
-	button $f.analyze -text "Analyze" -command {LWDAQ_analysis_Viewer "" 1}
+	button $f.analyze -text "Analyze" -command {LWDAQ_instrument_analyze Viewer}
 	pack $f.analyze -side left
 	button $f.bzoom -text "Zoom" -command LWDAQ_zoom_Viewer 
 	entry $f.ezoom -textvariable LWDAQ_info_Viewer(zoom) -width 3
