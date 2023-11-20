@@ -48,6 +48,8 @@ proc LWDAQ_init_Viewer {} {
 	set info(daq_image_right) -1
 	set info(daq_image_top) -1
 	set info(daq_image_bottom) -1
+	set info(daq_image_col) "0"
+	set info(daq_image_row) "0"
 	set info(daq_min_width) 4
 	set info(image_results) ""
 	set info(verbose_description) ""
@@ -124,6 +126,7 @@ proc LWDAQ_analysis_Viewer {{image_name ""}} {
 	# description.
 	set info(verbose_description) $iinfo(verbose_description)
 
+	# Return the result.
 	return $result
 }
 
@@ -390,14 +393,20 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 	
 	# Complete and apply a rectangle.
 	if {$cmd == "Release"} {
-		set info(select) 0
-		if {($info(daq_image_right)-$info(daq_image_left) < $info(daq_min_width)) \
-			&& ($info(daq_image_bottom)-$info(daq_image_top) < $info(daq_min_width))} {
-			set info(daq_image_right) [expr $info(daq_image_left) + $info(daq_min_width)]
-			set info(daq_image_bottom) [expr $info(daq_image_top) + $info(daq_min_width)]
+		if {$info(select)} {
+			if {($info(daq_image_right)-$info(daq_image_left) < $info(daq_min_width)) \
+				&& ($info(daq_image_bottom)-$info(daq_image_top) < $info(daq_min_width))} {
+				set info(daq_image_right) [expr $info(daq_image_left) + $info(daq_min_width)]
+				set info(daq_image_bottom) [expr $info(daq_image_top) + $info(daq_min_width)]
+			}
+			LWDAQ_set_bounds_Viewer
 		}
-		LWDAQ_set_bounds_Viewer
+		set info(select) 0
 	}
+	
+	# Assign the current x and y values to our global elements.
+	set info(daq_image_col) $xi
+	set info(daq_image_row) $yi
 	
 	return ""
 }
@@ -424,16 +433,19 @@ proc LWDAQ_controls_Viewer {} {
 	pack $f.crop -side left
 	button $f.setb -text "Set Bounds" -command LWDAQ_set_bounds_Viewer
 	pack $f.setb -side left
+
 	foreach l {left top right bottom} {
 		label $f.l$l -text $l\: -width [string length $l]
-		entry $f.e$l -textvariable LWDAQ_info_Viewer(daq_image_$l) \
-			-width 4
+		entry $f.e$l -textvariable LWDAQ_info_Viewer(daq_image_$l) -width 4
 		pack $f.l$l $f.e$l -side left -expand 1
 	}
-	checkbutton $f.ofb -text "file_use_daq_bounds" \
-		-variable LWDAQ_info_Viewer(file_use_daq_bounds)
-	pack $f.ofb -side left -expand 1
-	
+
+	foreach l {col row} {
+		label $f.l$l -text $l\: -width [string length $l]
+		label $f.e$l -textvariable LWDAQ_info_Viewer(daq_image_$l) -width 4
+		pack $f.l$l $f.e$l -side left -expand 1
+	}
+
 	set f $w.row2
 	frame $f
 	pack $f -side top -fill x
@@ -449,10 +461,9 @@ proc LWDAQ_controls_Viewer {} {
 
 	# These bindings allow us to change the analysis boundaries with the mouse.	
 	bind $info(image_display) <Motion> {LWDAQ_xy_Viewer %x %y Motion}
-	bind $info(image_display) <ButtonPress-2> {LWDAQ_xy_Viewer %x %y Press}
-	bind $info(image_display) <ButtonRelease-2> {LWDAQ_xy_Viewer %x %y Release}
 	bind $info(image_display) <Control-ButtonPress> {LWDAQ_xy_Viewer %x %y Press}
 	bind $info(image_display) <Control-ButtonRelease> {LWDAQ_xy_Viewer %x %y Release}
+	bind $info(image_display) <ButtonRelease> {LWDAQ_xy_Viewer %x %y Release}
 
 	# Delete the default double-press binding that give us pixel detail.
 	bind $info(image_display) <Double-ButtonPress> ""
@@ -480,6 +491,10 @@ proc LWDAQ_controls_Viewer {} {
 	pack $f.setr -side left
 	entry $f.results -textvariable LWDAQ_info_Viewer(image_results) -width 80
 	pack $f.results -side left
+	checkbutton $f.ofb -text "file_use_daq_bounds" \
+		-variable LWDAQ_info_Viewer(file_use_daq_bounds)
+	pack $f.ofb -side left -expand 1
+	
 	
 	# Return an empty string to show all is well.
 	return ""
