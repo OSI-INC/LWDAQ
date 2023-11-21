@@ -145,8 +145,8 @@ procedure scam_project_shaft(ip:image_ptr_type;
 {
 	Routines that analyze the image.
 }
-function scam_decode_rule(ip:image_ptr_type;rule:string):real;
-function scam_disagreement(ip:image_ptr_type;threshold:real):real;
+function scam_decode_threshold_string(ip:image_ptr_type;rule:string):real;
+function scam_disagreement(ip:image_ptr_type;threshold:real):integer;
 
 implementation
 
@@ -247,15 +247,15 @@ begin
 end;
 
 {
-	scam_decode_rule takes a string like "10 &" and returns, for the specified
-	image, an intensity threshold for backlight pixels in the image. The first
-	parameter in the command string must be an integer specifying the threshold
-	intensity. The integer may be followed by of the symbols *, %, #, $, or &.
-	Each of these symbols gives a different meaning to the threshold value, in
-	the same way they do for spot analysis, see the spot_decode_command_string
-	for details.
+	scam_decode_threshold_string takes a string like "10 &" and returns, for the
+	specified image, an intensity threshold for backlight pixels in the image.
+	The first parameter in the command string must be an integer specifying the
+	threshold intensity. The integer may be followed by of the symbols *, %, #,
+	$, or &. Each of these symbols gives a different meaning to the threshold
+	value, in the same way they do for spot analysis, see the
+	spot_decode_command_string for details.
 }
-function scam_decode_rule(ip:image_ptr_type;rule:string):real;
+function scam_decode_threshold_string(ip:image_ptr_type;rule:string):real;
 
 const
 	percent_unit=100;
@@ -289,7 +289,7 @@ begin
 		background:=image_median(ip);
 		threshold:=background+threshold;
 	end;
-	scam_decode_rule:=threshold;
+	scam_decode_threshold_string:=threshold;
 end;
 	
 {
@@ -549,11 +549,11 @@ end;
 	projection disagree. The routine returns the number of disagreeing pixels
 	as its measure of disagreement.
 }
-function scam_disagreement(ip:image_ptr_type;threshold:real):real;
+function scam_disagreement(ip:image_ptr_type;threshold:real):integer;
 
 var
-	i,j:integer;
-	t,b,d:real;
+	i,j,d:integer;
+	t,b:real;
 	p:boolean;
 	
 begin
@@ -566,13 +566,13 @@ begin
 				b:=get_px(ip,j,i);
 				if b<=t then begin
 					if not p then begin
-						d:=d+1.0;
+						d:=d+1;
 						set_ov(ip,j,i,scam_silhouette_color);
 					end else begin
 						set_ov(ip,j,i,clear_color);
 					end;
 				end else begin
-					if p then d:=d+1.0;
+					if p then d:=d+1;
 				end;
 			end;
 		end;

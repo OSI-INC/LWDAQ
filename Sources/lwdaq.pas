@@ -2115,8 +2115,28 @@ begin
 end;
 
 {
-<p>lwdaq_bcam finds spots in images. The routine clears the image overlay for
-its own use.</p>
+<p>lwdaq_bcam finds spots in images. It is used by the <a
+href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM
+Instrument</a> to analyze BCAM images. The routine clears the image overlay for
+its own use. By default, lwdaq_bcam returns six numbers for each of the spots it
+finds. In the example below, we read a sample image and apply BCAM analysis,
+asking for the location of two spots.</p>
+
+<pre>% set img [LWDAQ_read_image_file Images/BCAM_tape.gif]
+% lwdaq_bcam $img -num_spots 2 -threshold "10 #"
+2681.66 964.12 2313 72 0.556 62 959.30 883.76 2306 72 0.499 62</pre>
+
+<p>The first two numbers for each spot are the x and y position in microns of
+the spot, or the x position in microns and the anticlockwise rotation in
+milliradians. Position (0,0) is the top-left corner of the top-left pixel in the
+image. Rotation zero is vertical. The third value is an integer giving the
+number of pixels in the spot. The fourth value is an integer giving the
+intensity of the brightest pixel in the spot. The fifth number is the derivative
+of spot position with analysis threshold. The sixth number is an integer giving
+the threshold intensity used to distinguish between pixels that are bright
+enough to be in a spot and those that are not. This threshold intensity may have
+been specified directly by an absolute threshold string, or it may have been
+deduced from the image itself with the use of a threshold symbol.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -2136,34 +2156,34 @@ its own use.</p>
 <tr><td>-reference_um</td><td>Reference line y-position for line fits, default 0</td></tr>
 </table></center>
 
-<p>The lwdaq_bcam routine makes a list of spots in the image. The -threshold
-string tells lwdaq_bcam how to distinguish background pixels from spot pixels.
-At the very least, the -threshold string must specify a threshold intensity, or
-a means of calculating a threshold intensity. All the spot-locating routines
-called by lwdaq_bcam use the <i>net intensity</i> of pixels, which is the image
-intensity minus the threshold intensity, with negative values clipped to
-zero.</p>
+<p>The routine makes a list of spots in the image. The threshold string,
+included with the -threshold option, tells lwdaq_bcam how to distinguish
+background pixels from spot pixels. The threshold string must specify a
+threshold intensity, or a means of calculating a threshold intensity. All the
+spot-locating routines called by lwdaq_bcam use the <i>net intensity</i> of
+pixels, which is the image intensity minus the threshold intensity, with
+negative values clipped to zero.</p>
 
-<p>The -threshold string must begin with an integer, <i>t</i>. After <i>t</i>
-comes an optional symbol, the <i>threshold symbol</i>. If there is no threshold
-symbol, the routine assumes the "*" symbol. The "*" symbol tells the routine to
-use <i>t</i> as the threshold. The string "20 *" means any pixel with intensity
-20 or greater is a spot or part of some larger spot. The "%" symbol means that
-the threshold is some fraction of the way from the minimum image intensity to
-the maximum intensity, where the minimum and maximum are obtained from within
-the image analysis boundaries. The value of <i>t</i> is treated as a percentage.
-The string "10 %" in an image with minimum intensity 40 and maximum intensity
-140 results in a threshold of 50. The "#" symbol is similar to the "%" symbol,
-except the average intensity takes the place of the minimum. The string "10 #"
-in an image with average intensity 50 and maximum intensity 140 results in a
-threshold of 59. The "$" symbol means the threshold is <i>t</i> counts above the
-average intensity. The string "5 $" in an image with average intensity 50
-results in a threshold of 55. The "&" symbol uses the median intensity to obtain
-the threshold. The string "5 &" in an image with median intensity 62 results in
-a threshold of 67. In each of these calculations, the BCAM analysis also defines
-a "background" intensity, which it uses only when we want it to calculate and
-report to us the total brightness of a spot. The background is the average (#
-and $), minimum (%), median (&), or simply zero (*).</p>
+<p> The threshold string must begin with an integer, <i>t</i>. After <i>t</i>
+comes an optional <i>threshold symbol</i>. If there is no threshold symbol, the
+routine assumes the "*" symbol. The "*" symbol tells the routine to use
+intensity <i>t</i> as the threshold. The string "20 *" means any pixel with
+intensity 20 or greater is a spot or part of some larger spot. The "%" symbol
+means that the threshold is some fraction of the way from the minimum image
+intensity to the maximum intensity, where the minimum and maximum are obtained
+from within the image analysis boundaries. The value of <i>t</i> is treated as a
+percentage. The string "10 %" in an image with minimum intensity 40 and maximum
+intensity 140 results in a threshold of 50. The "#" symbol is similar to the "%"
+symbol, except the average intensity takes the place of the minimum. The string
+"10 #" in an image with average intensity 50 and maximum intensity 140 results
+in a threshold of 59. The "$" symbol means the threshold is <i>t</i> counts
+above the average intensity. The string "5 $" in an image with average intensity
+50 results in a threshold of 55. The "&" symbol uses the median intensity to
+obtain the threshold. The string "5 &" in an image with median intensity 62
+results in a threshold of 67. In each of these calculations, the BCAM analysis
+also defines a "background" intensity, which it uses only when we want it to
+calculate and report to us the total brightness of a spot. The background is the
+average (# and $), minimum (%), median (&), or simply zero (*).</p>
 
 <p>Following the threshold value and threshold symbol there are two further,
 optional criteria we can use to restrict the routine's choice of spots. The
@@ -2173,7 +2193,7 @@ spots must contain at least <i>n</i> pixels or else they are rejected. The
 symbol "<" means spots must contain at most <i>n</i> pixels. If the symbol is
 omitted, we assume <i>n</i> is a minimum.</p>
 
-<p>The next parameter must be a real number, <i>e</i>, which specifies the
+<p>The next parameter in the threshold  must be a real number, <i>e</i>, which specifies the
 maximum eccentricity of the spot, which is the maximum ratio of width to height,
 or height to width. Spots that have greater eccentricity will be rejected by the
 routine. The second parameter cannot be included without the first, but if you
@@ -2277,11 +2297,8 @@ contiguous.</p>
 the <i>-color</i> option. You specify the color with an integer. Color codes 0
 to 15 specity a set of distinct colors, shown <a
 href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
-
-<p>See the <a
-href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM
-Instrument</a> Manual for more information about the option values.</p>
 }
+
 function lwdaq_bcam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 const
@@ -3526,17 +3543,39 @@ x, y, and z axes respectively when the cuboid is in its zero orientation.</p>
 
 <p>The <i>disagreement</i> instruction counts the number of pixels in the
 analysis boundaries for which the image and the overlay disagree about the
-location and extent of the silhouette. After projecting objects onto the
-overlay, the overlay will be blue to represent the presence of the projections.
-We now check each pixel to see if its intensity is below the silhouette
-threshold or not. If the overlay pixel is clear and the image pixel is above
-threshold, the two agree and we leave the overlay clear. If the overlay pixel is
-blue and the image pixel is below threshold, we have agreement and we clear the
-overlay to show agreement. If the overlay is blue and the image is above
-threshold, we leave the overlay blue and add one to our disagreement. If the
-overlay is clear and the image is below threshold, we add one to our
-disagreement and we set the overlay to the orange.</p>
+location and extent of the silhouette. To determine which pixels are silhouette
+and which are background, the routine uses an intensity threshold. Pixels with
+intensity equal to or below the threshold are considered part of the silhouette.
+All others are background. To specify the threshold, we pass lwdaq_scam a
+"threshold string" immediately after the image name. The threshold string takes
+the same form as it does in the <a href="#lwdaq_bcam">lwdaq_bcam</a> routine, as
+illustrated in the <a
+href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM
+Instrument</a> manual. A background pixel that is marked blue from a previous
+SCAM body projection will remain blue. A background pixel that is not marked
+will remain unmarked. A silhouette pixel that is marked blue will be unmarked. A
+silhouette pixel that is unmarked will be marked orange. In this way, a prefect
+match between a solid projection and a silhouette will be entirely unmarked,
+while imprefections are marked either orange for silhouette without projection
+or blue for projection without silhouette. The marked pixels are the
+disagreement pixels.</p>
 
+<p>The <i>disagreement</i> instruction's result string begins with an integer
+giving the number of disagreement pixels in the image. If the analysis
+encountered an error, this value will be "-1". Following the count are the
+minimum and maximum intensities in the image, also integers, and the threshold
+intensity used to detect the silhouette. The threshold we return as a real
+number so that we can support thresholds half-way between two integer
+values.</p>
+
+<pre>% set img [LWDAQ_read_image_file Images/SCAM_sphere.gif]
+% lwdaq_scam $img disagreement "10 %"
+72832 49 123 56.4</pre>
+
+<p>In the above example, we read the sample SCAM_sphere.gif image and apply the
+scam disagreement routine with a threshold string "10 %". This threshold string
+specifies an intensity that is 10% of the way from the minimum intensity to the
+maximum intensity.</p>
 }
 function lwdaq_scam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3547,11 +3586,11 @@ var
 	command:string='';
 	option:string='';
 	body:string='';
-	rule:string='10 %';
+	threshold_string:string='10 %';
 	camera:bcam_camera_type;
 	sphere:scam_sphere_type;
 	shaft:scam_shaft_type;
-	disagreement:real=0;
+	disagreement:integer=0;
 	threshold:real=0;
 	num_lines:integer=0;
 	line_width:integer=0;
@@ -3593,7 +3632,7 @@ begin
 		if argc>5 then body:=Tcl_ObjString(argv[5]);
 		arg_index:=6;
 	end else if (command='disagreement') then begin
-		if argc>3 then rule:=Tcl_ObjString(argv[3]);
+		if argc>3 then threshold_string:=Tcl_ObjString(argv[3]);
 		arg_index:=4;
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -3645,9 +3684,10 @@ begin
 	end;
 	
 	if command='disagreement' then begin
-		threshold:=scam_decode_rule(ip,rule);
+		threshold:=scam_decode_threshold_string(ip,threshold_string);
 		disagreement:=scam_disagreement(ip,threshold);
-		writestr(result,disagreement:0:1);
+		writestr(result,disagreement:1,' ',image_minimum(ip):1:0,' ',
+			image_maximum(ip):1:0,' ',threshold:1:1);
 	end;
 	
 	if error_string='' then Tcl_SetReturnString(interp,result)
@@ -3656,14 +3696,14 @@ begin
 end;
 
 {
-<p>lwdaq_calibration takes as input an apparatus measurement and a device
+<p>lwdaq_bcam_calib takes as input an apparatus measurement and a device
 calibration, and returns a parameter calculation. The routine calls
 parameter_calculation in the <a
 href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a>. This
 routine supports bcam cameras and bcam sources for all types of bcam and both
 j_plates and k_plates.</p>
 }
-function lwdaq_calibration(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
+function lwdaq_bcam_calib(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 var 
 	option:string;
@@ -3681,12 +3721,12 @@ var
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
-	lwdaq_calibration:=Tcl_Error;
+	lwdaq_bcam_calib:=Tcl_Error;
 	
 	if (argc<3) or (not odd(argc)) then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Wrong number of arguments, must be ' 
-			+'"lwdaq_calibration device_calibration apparatus_measurement'
+			+'"lwdaq_bcam_calib device_calibration apparatus_measurement'
 			+' ?option value?".');
 		exit;
 	end;
@@ -3703,7 +3743,7 @@ begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
 				+'"-verbose -check" in '
-				+'lwdaq_calibration.');
+				+'lwdaq_bcam_calib.');
 			exit;
 		end;
 	end;
@@ -3718,7 +3758,7 @@ begin
 			+app.calibration_type
 			+'" does not match device calibration type "'
 			+calib.calibration_type+'" in '
-			+'lwdaq_calibration');
+			+'lwdaq_bcam_calib');
 	end;
 
 	ct:=calib.calibration_type;
@@ -3770,7 +3810,7 @@ begin
 	
 	if error_string='' then Tcl_SetReturnString(interp,param_str)
 	else Tcl_SetReturnString(interp,error_string);
-	lwdaq_calibration:=Tcl_OK;
+	lwdaq_bcam_calib:=Tcl_OK;
 end;
 
 {
@@ -7496,7 +7536,6 @@ begin
 	debug_log:=lwdaq_debug_log;
 	
 	tcl_createobjcommand(interp,'lwdaq_config',lwdaq_config,0,nil);
-	tcl_createobjcommand(interp,'lwdaq_error_string',lwdaq_error_string,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_image_create',lwdaq_image_create,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_draw',lwdaq_draw,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_draw_raw',lwdaq_draw_raw,0,nil);
@@ -7533,7 +7572,7 @@ begin
 	tcl_createobjcommand(interp,'lwdaq_alt',lwdaq_alt,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_tcb',lwdaq_tcb,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_metrics',lwdaq_metrics,0,nil);
-	tcl_createobjcommand(interp,'lwdaq_calibration',lwdaq_calibration,0,nil);
+	tcl_createobjcommand(interp,'lwdaq_bcam_calib',lwdaq_bcam_calib,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_simplex',lwdaq_simplex,0,nil);
 	
 	lwdaq_init:=tcl_pkgprovide(interp,package_name,version_num);

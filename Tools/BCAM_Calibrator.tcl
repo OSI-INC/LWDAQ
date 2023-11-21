@@ -1053,7 +1053,7 @@ proc BCAM_Calibrator_do {step} {
 			}	
 
 			$info(calculation_status_label) configure -text "CALCULATE" -fg blue
-			set result [lwdaq_calibration $dc $am \
+			set result [lwdaq_bcam_calib $dc $am \
 				-verbose $config(verbose_calculation) \
 				-check 1]
 			if {[regexp "WARNING:" $result] || [regexp "NaN" $result]} {

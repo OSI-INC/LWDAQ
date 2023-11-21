@@ -427,10 +427,10 @@ proc BCAM_Calculator_calculate {} {
 			continue
 		}
 		if {$config(output_style) == "Short"} {
-			set result [lwdaq_calibration $dc $am -verbose 0 \
+			set result [lwdaq_bcam_calib $dc $am -verbose 0 \
 				-check $config(check)]
 		} {
-			set result [lwdaq_calibration $dc $am -verbose 1 \
+			set result [lwdaq_bcam_calib $dc $am -verbose 1 \
 				-check $config(check)]
 		}
 		if {[LWDAQ_is_error_result $result]} {
