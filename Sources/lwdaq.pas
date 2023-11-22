@@ -1208,6 +1208,12 @@ The last row gives the last number.</p>
 <p>The lwdaq_image_characteristics routine does not use the global fsr and fsd
 parameters to format its output. Instead, it always provides one and only one
 decimal place for its real-valued characteristics.</p>
+
+<pre>set img [LWDAQ_read_image_file Images/Rasnik_skewed.gif]
+lwdaq_image_characteristics $img
+24 15 680 504 148.5 56.4 255.0 63.0 520 700</pre>
+
+<p>In the example above, we read in a sample image and obtain its characteristics. The analysis boundaries are set at column 24 on the left, row 15 on the top, column 680 on the right, and row 504 on the bottom. The average intensity in the image is 148.5. The standard deviation of intensity is 56.4. The maximum intensity is 255.0, which is the maximum value possible with eight-bit gray-scale images. The minimum intensity is 63.0. The number of rows in the image is 520 and the number of columns is 700.</p>
 }
 function lwdaq_image_characteristics(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1566,7 +1572,7 @@ frequency-based rasnik analysis. We can add noise to our simulated image with
 the noise amplitude parameter. If we set this to 1.0, we add a random number
 between 0.0 and 1.0 to each pixel.</p>
 
-<p><pre>lwdaq_image_manipulate image_name rasnik "0 0 20 30 2 10" -replace 1</pre></p>
+<pre>lwdaq_image_manipulate image_name rasnik "0 0 20 30 2 10" -replace 1</pre>
 
 <p>In the above example, the the existing image would be replaced by a new image
 containing a rasnik pattern with origin at the top-left corner of the top-left
@@ -2122,8 +2128,8 @@ its own use. By default, lwdaq_bcam returns six numbers for each of the spots it
 finds. In the example below, we read a sample image and apply BCAM analysis,
 asking for the location of two spots.</p>
 
-<pre>% set img [LWDAQ_read_image_file Images/BCAM_tape.gif]
-% lwdaq_bcam $img -num_spots 2 -threshold "10 #"
+<pre>set img [LWDAQ_read_image_file Images/BCAM_tape.gif]
+lwdaq_bcam $img -num_spots 2 -threshold "10 #"
 2681.66 964.12 2313 72 0.556 62 959.30 883.76 2306 72 0.499 62</pre>
 
 <p>The first two numbers for each spot are the x and y position in microns of
@@ -3568,8 +3574,8 @@ intensity used to detect the silhouette. The threshold we return as a real
 number so that we can support thresholds half-way between two integer
 values.</p>
 
-<pre>% set img [LWDAQ_read_image_file Images/SCAM_sphere.gif]
-% lwdaq_scam $img disagreement "10 %"
+<pre>set img [LWDAQ_read_image_file Images/SCAM_sphere.gif]
+lwdaq_scam $img disagreement "10 %"
 72832 49 123 56.4</pre>
 
 <p>In the above example, we read the sample SCAM_sphere.gif image and apply the
@@ -5353,10 +5359,10 @@ consistent with the negative-going vertical image coordinates, so that
 as vertical intensity profile. Thus the following code plots the vertical and
 horizontal intensity profiles in an image overlay</p>
 
-<pre><small>set profile [lwdaq_image_profile imagname -row 1]
+<pre>set profile [lwdaq_image_profile imagname -row 1]
 lwdaq_graph $profile imagname -y_only 1 -color 3
 set profile [lwdaq_image_profile imagname -row 0]
-lwdaq_graph $profile imagname -x_only 1 -color 4</small></pre>
+lwdaq_graph $profile imagname -x_only 1 -color 4</pre>
 
 <p>The graph will fill the analysis boundaries of the image unless you set
 <i>entire</i> = 1, in which case the graph will fill the entire image. The
@@ -5770,11 +5776,9 @@ transform algorithm itself, see the <i>fft</i> routine in <a
 href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. For its
 real-valued wrapper see <i>fft_real</i>.</p>
 
-<pre>
-lwdaq_config -fsr 1 -fsd 2
+<pre>lwdaq_config -fsr 1 -fsd 2
 lwdaq_fft "1 1 1 1 1 1 1 0"
-0.88 0.13 0.25 -2.36 0.25 -1.57 0.25 -0.79 
-</pre>
+0.88 0.13 0.25 -2.36 0.25 -1.57 0.25 -0.79</pre>
 
 <p>In the example, we supply the routine with eight real-valued samples and
 obtain a transform of eight numbers. The first number tells us the magnitude and
@@ -5793,10 +5797,8 @@ value of component <i>k</i> at time <i>t</i> with
 instead of time, the component is
 <i>a</i>cos(2&pi;<i>kn</i>/<i>N</i>+&Phi;).</p>
 
-<pre>
-lwdaq_fft "1 0 1 0 1 0 1 0 1 0 1 0 1 0 0 0" -complex 1
-0.88 0.00 -0.09 -0.09 -0.00 -0.13 0.09 -0.09 0.13 0.00 0.09 0.09 0.00 0.13 -0.09 0.09 
-</pre>
+<pre>lwdaq_fft "1 0 1 0 1 0 1 0 1 0 1 0 1 0 0 0" -complex 1
+0.88 0.00 -0.09 -0.09 -0.00 -0.13 0.09 -0.09 0.13 0.00 0.09 0.09 0.00 0.13 -0.09 0.09</pre>
 
 <p>We submit the same data to the complex version of the transform by
 accompanying each sample with a zero phase, so as to indicate a real value with
@@ -5813,12 +5815,10 @@ above.</p>
 <p>Here is another example. In this case, the <i>N</i>/4 component is zero, as
 is the 0 component.</p>
 
-<pre>
-lwdaq_fft "1 1 1 1 -1 -1 -1 -1"
+<pre>lwdaq_fft "1 1 1 1 -1 -1 -1 -1"
 0.00 0.00 1.31 -1.18 0.00 0.00 0.54 -0.39 
 lwdaq_fft "1 0 1 0 1 0 1 0 -1 0 -1 0 -1 0 -1 0" -complex 1
-0.00 0.00 0.25 -0.60 0.00 0.00 0.25 -0.10 0.00 0.00 0.25 0.10 0.00 0.00 0.25 0.60 
-</pre>
+0.00 0.00 0.25 -0.60 0.00 0.00 0.25 -0.10 0.00 0.00 0.25 0.10 0.00 0.00 0.25 0.60 </pre>
 
 <p>If the samples were taken over 1 s, the eight components represent
 frequencies 0, 1, 2, and 3 Hz. So we see the square wave of frequency 1 Hz has
@@ -5837,25 +5837,21 @@ harmonic is offset by &minus;1.18 radians, which means it is a cosine delayed by
 input data. In the example below, we change the phase of the input by &pi; and
 we see the phase of the fundamental harmonic changes by &pi;.</p>
 
-<pre>
-lwdaq_fft "1 1 1 1 0 0 0 0"
+<pre>lwdaq_fft "1 1 1 1 0 0 0 0"
 0.50 0.00 0.65 -1.18 0.00 0.00 0.27 -0.39 
 lwdaq_fft "0 0 0 0 1 1 1 1"
-0.50 0.00 0.65 1.96 0.00 0.00 0.27 2.75 
-</pre>
+0.50 0.00 0.65 1.96 0.00 0.00 0.27 2.75 </pre>
 
 <p>We can use <i>lwdaq_fft</i> to perform the inverse transform, but we must
 invoke the "-inverse 1" option or else the inverse does not come out quite
 right.</p>
 
-<pre>
-set dft [lwdaq_fft "1 0 1 0 1 0 1 0 -1 0 -1 0 -1 0 -1 0" -complex 1]
+<pre>set dft [lwdaq_fft "1 0 1 0 1 0 1 0 -1 0 -1 0 -1 0 -1 0" -complex 1]
 0.00 0.00 0.25 -0.60 0.00 0.00 0.25 -0.10 0.00 0.00 0.25 0.10 0.00 0.00 0.25 0.60 
 lwdaq_fft $dft -complex 1
 0.12 0.00 -0.12 0.00 -0.12 0.00 -0.12 0.00 -0.12 0.00 0.12 -0.00 0.12 -0.00 0.12 -0.00 
 lwdaq_fft $dft -complex 1 -inverse 1
-1.00 0.00 0.99 -0.00 1.00 -0.00 0.99 -0.00 -1.00 0.00 -0.99 0.00 -1.00 0.00 -0.99 0.00 
-</pre>
+1.00 0.00 0.99 -0.00 1.00 -0.00 0.99 -0.00 -1.00 0.00 -0.99 0.00 -1.00 0.00 -0.99 0.00 </pre>
 
 <p>The "-inverse 1" option reverses the order of the input components, which is
 a trick for getting the forward transform to act like an inverse transform, and
@@ -5868,12 +5864,10 @@ href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
 <p>We can also invert our compact magnitude-phase transforms, which we derive
 from real-valued inputs with the "-complex 0" option (the default).</p>
 
-<pre>
-set dft [lwdaq_fft "1 1 1 1 -1 -1 -1 -1"]
+<pre>set dft [lwdaq_fft "1 1 1 1 -1 -1 -1 -1"]
 0.00 0.00 1.31 -1.18 0.00 0.00 0.54 -0.39 
 lwdaq_fft $dft -inverse 1
-1.00 1.00 1.01 1.00 -1.00 -1.00 -1.01 -1.00 
-</pre>
+1.00 1.00 1.01 1.00 -1.00 -1.00 -1.01 -1.00 </pre>
 
 <p>Note the rounding errors we see because we are using only two decimal places
 in our examples. For the real-valued inverse transform code, see
@@ -6547,10 +6541,8 @@ positions of the WPS (or BCAM) mounting balls. For a description of the BCAM
 coordinate system, consult the BCAM <a
 href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 
-<pre>
-lwdaq wps_wire_plane "1.720 1.220" "0.000" "Q0131_1 0 0 0 -10 0 0 0 0 0"
-0.000000 0.000000 0.000000 0.000000 0.000000 1.000000
-</pre>
+<pre>lwdaq wps_wire_plane "1.720 1.220" "0.000" "Q0131_1 0 0 0 -10 0 0 0 0 0"
+0.000000 0.000000 0.000000 0.000000 0.000000 1.000000</pre>
 
 <p>The image position in our example is 1.720 mm from the right and 1.220 mm
 from the top. This is at the nominal center point of a TC255 image sensor. The
@@ -6566,10 +6558,8 @@ point and the center of the sensor. The rotation of the sensor is (0,0,0), which
 means the x-axis is perpendicular to the sensor surface. Here is another
 example.</p>
 
-<pre>
-lwdaq wps_wire_plane "1 1.220" "10.000" "Q0131_1 0 0 0 -10 0 0 0 0 0"
-0.000000 0.000000 0.000000 0.071811 0.009974 0.997368
-</pre>
+<pre>lwdaq wps_wire_plane "1 1.220" "10.000" "Q0131_1 0 0 0 -10 0 0 0 0 0"
+0.000000 0.000000 0.000000 0.071811 0.009974 0.997368</pre>
 
 <p>The routine calculates the plane that contains the center of the image and
 the pivot point. It specifies the plane as the pivot point, which is a point in
@@ -7049,11 +7039,9 @@ components, we can use our <a href="#lwdaq_fft">lwdaq_fft</a> routine instead.
 The <i>frequency_components</i> routine is designed to provide a small number of
 components for real-valued input data.</p>
 
-<pre>
-lwdaq_config -fsr 1 -fsd 2
+<pre>lwdaq_config -fsr 1 -fsd 2
 lwdaq frequency_components "0 1 2 3 4 5" "0 0 0 0 1 1 1 1"
-0.50 0.00 0.65 3.50 0.00 -1.91 0.27 0.83 0.00 0.00 0.27 0.30 
-</pre>
+0.50 0.00 0.65 3.50 0.00 -1.91 0.27 0.83 0.00 0.00 0.27 0.30 </pre>
 
 <p>Here we ask for components with frequencies "0 1 2 3 4 5" and we specify data
 "0 0 0 0 1 1 1 1". The routine returns a string containg the amplitude,
@@ -7140,13 +7128,9 @@ the affected sample range. The function returns a new data string with the same
 number of samples, but the first and last samples are guaranteed to be the same.
 The window function is useful for preparing data for fourier transforms.</p>
 
-<p>As an example, we would have:</p>
-
-<pre>
-lwdaq_config -fsd 2 -fsr 1
+<pre>lwdaq_config -fsd 2 -fsr 1
 lwdaq window_function 5 "0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
-0.50 0.40 0.30 0.20 0.10 0.00 0.00 0.00 0.00 0.00 1.00 1.00 1.00 1.00 1.00 0.90 0.80 0.70 0.60 0.50 
-</pre>
+0.50 0.40 0.30 0.20 0.10 0.00 0.00 0.00 0.00 0.00 1.00 1.00 1.00 1.00 1.00 0.90 0.80 0.70 0.60 0.50 </pre>
 
 <p>Here we see a step function being windowed so that the ends are at the
 average value. Note that we set the <i>fsd</i> (field size decimal) and
@@ -7186,7 +7170,7 @@ could have:</p>
 
 <pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
-0 1 1 1 0 3 1 2 3 2 2 0 8 6 7 7 7 </pre>
+0 1 1 1 0 3 1 2 3 2 2 0 8 6 7 7 7</pre>
 
 <p>Here we see a glitch in the third sample being removed, and later we have
 another glitch: a jump downwards of 7 when our threshold is 3, followed by two
@@ -7323,8 +7307,8 @@ steps. The extent is the maximum width for spikes. The result of the routine is
 a list of spikes, each of which is the index of a spike location and the size of
 the spike in units of mean absolute steps.</p>
 
-<pre>% lwdaq_config -fsd 2
-% lwdaq spikes_x "0 0 0 0 2 9 1 0 0 7 0 7 0 9 0 0 0 0" 2 4
+<pre>lwdaq_config -fsd 2
+lwdaq spikes_x "0 0 0 0 2 9 1 0 0 7 0 7 0 9 0 0 0 0" 2 4
 5.00 2.46 9.00 2.21 11.00 2.21 13.00 2.72</pre>
 
 <p>Above we specify a threshold of two mean absolute steps and an extent of four
