@@ -1,20 +1,21 @@
 # BCAM_Calculator, a Standard and Polite LWDAQ Tool
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+# Copyright (C) 2021-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <https://www.gnu.org/licenses/>.
 #
+
 # Version 20: Add support for JK plates.
 #
 # Version 23: Allow multiple files to be selected when adding calibrations
@@ -40,14 +41,15 @@
 # Compiler code. Improve printout from combining calibration files, so 
 # we can consolidate large files.
 #
-# Version 31: Routines with no useful return value return empty string.
+# Version 31: Routines with no useful return value return empty string. Remove
+# pre-defined name choices from operator dropdown menu.
 
 proc BCAM_Calculator_init {} {
 	upvar #0 BCAM_Calculator_info info
 	upvar #0 BCAM_Calculator_config config
 	global LWDAQ_Info
 	
-	LWDAQ_tool_init "BCAM_Calculator" "29"
+	LWDAQ_tool_init "BCAM_Calculator" "31"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set info(apparatus_database) ""
@@ -631,7 +633,7 @@ proc BCAM_Calculator_open {} {
 	set info(calibration_type_menu) $f.sct.menu
 	tk_optionMenu $f.sav BCAM_Calculator_config(apparatus_version) *
 	set info(apparatus_version_menu) $f.sav.menu
-	tk_optionMenu $f.son BCAM_Calculator_config(operator_name) * Kevan Alex Mike Sarah Netta Jim
+	tk_optionMenu $f.son BCAM_Calculator_config(operator_name) *
 	tk_optionMenu $f.sdi BCAM_Calculator_config(device_id) * HBCAM* 20MABND* 20MNABND*
 	tk_optionMenu $f.sts BCAM_Calculator_config(calibration_time) * last
 	

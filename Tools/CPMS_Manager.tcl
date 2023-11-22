@@ -1,20 +1,19 @@
 # CPMS Calibrator a LWDAQ Tool
-#
 # Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 
 #
 # CPMS_Manager_init initializes the tool's configuration and information arrays.
@@ -23,7 +22,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.5"
+	LWDAQ_tool_init "CPMS_Manager" "1.6"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.283 38.549 4.568 -7.789 1.833 2.000 26.411 0.137" 
@@ -129,10 +128,10 @@ proc CPMS_Manager_disagreement {params} {
 	# only, blue for body only, and clear for agreement. Count the disagreeing
 	# pixels.
 	set disagreement 0
-	set left_count [lwdaq_scam $info(img_left) disagreement \
-		$iconfig(analysis_threshold)]
-	set right_count [lwdaq_scam $info(img_right) disagreement \
-		$iconfig(analysis_threshold)]
+	set left_count [lindex [lwdaq_scam $info(img_left) disagreement \
+		$iconfig(analysis_threshold)] 0]
+	set right_count [lindex [lwdaq_scam $info(img_right) disagreement \
+		$iconfig(analysis_threshold)] 0]
 	set disagreement [expr $disagreement + $left_count + $right_count]
 
 	# Draw the images with their overlays in the manager window.
@@ -161,7 +160,7 @@ proc CPMS_Manager_get_params {} {
 	
 	set params ""
 	foreach body $config(bodies) {append params "[lrange $body 0 5] "}
-	return $params
+	return [string trim $params]
 }
 
 #
@@ -549,7 +548,7 @@ proc CPMS_Manager_open {} {
 	label $f.rimg -image "cpms_photo_right"
 	pack $f.rimg -side left -expand yes
 
-	set info(text) [LWDAQ_text_widget $w 100 15]
+	set info(text) [LWDAQ_text_widget $w 150 15]
 	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple
 	lwdaq_config -text_name $info(text) -fsd 3
 	

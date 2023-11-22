@@ -39,54 +39,54 @@ proc LWDAQ_init_SCAM {} {
 	set info(window) [string tolower .$info(name)]
 	set info(text) $info(window).text
 	set info(photo) [string tolower $info(name)\_photo]
-	set info(counter) 0 
-	set info(zoom) 1
-	set info(daq_extended) 0
+	set info(counter) "0" 
+	set info(zoom) "1.0"
+	set info(daq_extended) "0"
 	set info(extended_parameters) "0.6 0.9 0 1"
-	set info(file_use_daq_bounds) 0
+	set info(file_use_daq_bounds) "0"
 	LWDAQ_set_image_sensor ICX424 SCAM
-	set info(daq_wake_ms) 0
-	set info(flash_seconds_max) 1.0
-	set info(flash_seconds_step) 0.000001
-	set info(flash_seconds_reduce) 0.2
-	set info(flash_seconds_transition) 0.000030
-	set info(flash_max_tries) 30
-	set info(flash_num_tries) 0
-	set info(ambient_exposure_seconds) 0
-	set info(peak_max) 180
-	set info(peak_min) 100
-	set info(file_try_header) 1
-	set info(analysis_add_x_um) 0
-	set info(analysis_add_y_um) 0
-	set info(analysis_reference_um) 0
-	set info(daq_source_device_type) 1
+	set info(daq_wake_ms) "0"
+	set info(flash_seconds_max) "0.5"
+	set info(flash_seconds_step) "0.001"
+	set info(flash_seconds_reduce) "0.2"
+	set info(flash_seconds_transition) "0.01"
+	set info(flash_max_tries) "30"
+	set info(flash_num_tries) "0"
+	set info(ambient_exposure_seconds) "0"
+	set info(peak_max) "200"
+	set info(peak_min) "160"
+	set info(file_try_header) "1"
+	set info(analysis_add_x_um) "0"
+	set info(analysis_add_y_um) "0"
+	set info(analysis_reference_um) "0"
+	set info(daq_source_device_type) "1"
 	set info(daq_password) "no_password"
 	set info(daq_source_ip_addr) "*"
-	set info(delete_old_images) 1
-	set info(dummy_flash_element) 255
-	set info(dummy_flash_seconds) 0.0
+	set info(delete_old_images) "1"
+	set info(dummy_flash_element) "255"
+	set info(dummy_flash_seconds) "0.0"
 	set info(verbose_description) "{Disagreement (pixels)}"
 	
 	# All elements of the config array will be displayed in the
 	# instrument window. No config array variables can be set in the
 	# LWDAQ_open_Instrument procedure
 	set config(image_source) "daq"
-	set config(file_name) ./Images/$info(name)\*
-	set config(memory_name) $info(name)\_0
-	set config(daq_ip_addr) 10.0.0.37
-	set config(daq_source_driver_socket) 8
-	set config(daq_source_mux_socket) 1
-	set config(daq_source_device_element) 1
-	set config(daq_driver_socket) 5
-	set config(daq_mux_socket) 1
-	set config(daq_device_element) 2
-	set config(daq_subtract_background) 0
-	set config(daq_adjust_flash) 0
-	set config(daq_flash_seconds) 0.000010
-	set config(intensify) exact
-	set config(analysis_threshold) "10 %"
-	set config(analysis_enable) 1
-	set config(verbose_result) 0
+	set config(file_name) "./Images/$info(name)\*"
+	set config(memory_name) "$info(name)\_0"
+	set config(daq_ip_addr) "71.174.73.187"
+	set config(daq_source_driver_socket) "3"
+	set config(daq_source_mux_socket) "1"
+	set config(daq_source_device_element) "1"
+	set config(daq_driver_socket) "1"
+	set config(daq_mux_socket) "1"
+	set config(daq_device_element) "2"
+	set config(daq_subtract_background) "0"
+	set config(daq_adjust_flash) "0"
+	set config(daq_flash_seconds) "0.05"
+	set config(intensify) "exact"
+	set config(analysis_threshold) "5 %"
+	set config(analysis_enable) "1"
+	set config(verbose_result) "0"
 
 	return ""
 }		

@@ -2,19 +2,20 @@
 # Copyright (C) 2004-2021, Kevan Hashemi, Brandeis University
 # Copyright (C) 2021-2023, Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or modify it under
+# This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
-# Foundation; either version 2 of the License, or (at your option) any later
+# Foundation, either version 3 of the License, or (at your option) any later
 # version.
-
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 # details.
-
+#
 # You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-# Place - Suite 330, Boston, MA  02111-1307, USA.
+# this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+
 #
 # Version 8: Brought up to date with LWDAQ 7.2. 
 #
@@ -34,7 +35,7 @@ proc Camera_Saturator_init {} {
 	upvar #0 Camera_Saturator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Camera_Saturator" "9"
+	LWDAQ_tool_init "Camera_Saturator" "1"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(flash_min) "0"
@@ -65,7 +66,6 @@ proc Camera_Saturator_saturate {} {
 
 	# Check the state of the saturator.
 	if {$info(control) != "Idle"} {
-		LWDAQ_print $info(text) "ERROR: The saturator is busy."
 		return ""
 	}
 	set info(control) "Saturate"
@@ -73,13 +73,13 @@ proc Camera_Saturator_saturate {} {
 	
 	if {[info exists iconfig(daq_adjust_flash)] \
 			&& $iconfig(daq_adjust_flash)} {
-		LWDAQ_print $info(text) "WARNING: Turning off \"$config(instrument)\"\
+		LWDAQ_print $info(text) "WARNING: Turning off $config(instrument)\
 			instrument's automatic flash adjustmenet."
 		set iconfig(daq_adjust_flash) 0
 	}
 	if {[info exists iconfig(daq_subtract_background)] \
 			&& $iconfig(daq_subtract_background)} {
-		LWDAQ_print $info(text) "WARNING: Turning off \"$config(instrument)\"\
+		LWDAQ_print $info(text) "WARNING: Turning off $config(instrument)\
 			instrument's automatic background subtraction."
 		set iconfig(daq_subtract_background) 0
 	}
@@ -112,7 +112,10 @@ proc Camera_Saturator_saturate {} {
 			set info(control) "Abort"
 		}		
 		LWDAQ_update	
-		if {$info(control) == "Abort"} {break}
+		if {$info(control) == "Abort"} {
+			LWDAQ_print $info(text) "Saturation aborted by user."
+			break
+		}
 		set iconfig(daq_flash_seconds) [format %.6f \
 			[expr $iconfig(daq_flash_seconds) + $step]]
 	}
@@ -185,7 +188,11 @@ proc Camera_Saturator_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
-	foreach a {instrument flash_min flash_max flash_steps intensify zoom} {
+	tk_optionMenu $f.instrument Camera_Saturator_config(instrument) \
+		BCAM Rasnik SCAM WPS
+	pack $f.instrument -side left -expand 1
+	
+	foreach a {flash_min flash_max flash_steps intensify zoom} {
 		label $f.l$a -text $a -fg green
 		entry $f.e$a -textvariable Camera_Saturator_config($a) -width 8
 		pack $f.l$a $f.e$a -side left -expand 1

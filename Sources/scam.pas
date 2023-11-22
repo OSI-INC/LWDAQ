@@ -1,19 +1,19 @@
 {
-Silhouette Camera (SCAM) Projection and Fitting Routines
-Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
+	Silhouette Camera (SCAM) Projection and Fitting Routines
+	Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; either version 2 of the License, or (at your option) any later
-version.
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or (at
+	your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+	This program is distributed in the hope that it will be useful, but
+	WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+	General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with
-this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-Place - Suite 330, Boston, MA  02111-1307, USA.
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
 }
 
 unit scam;
@@ -82,7 +82,7 @@ unit scam;
 interface
 
 uses
-	math,utils,images,transforms,bcam;
+	math,utils,images,transforms,spot,bcam;
 	
 const
 {
@@ -145,7 +145,7 @@ procedure scam_project_shaft(ip:image_ptr_type;
 {
 	Routines that analyze the image.
 }
-function scam_decode_threshold_string(ip:image_ptr_type;rule:string):real;
+function scam_decode_threshold_string(ip:image_ptr_type;threshold_string:string):real;
 function scam_disagreement(ip:image_ptr_type;threshold:real):integer;
 
 implementation
@@ -198,7 +198,7 @@ var
 	i:integer;
 	x:real;
 	word,ss:string;
-	okay:boolean;
+	okay:boolean=true;
 begin 
 	with shaft do begin
 		location:=read_xyz(s);
@@ -247,48 +247,19 @@ begin
 end;
 
 {
-	scam_decode_threshold_string takes a string like "10 &" and returns, for the
-	specified image, an intensity threshold for backlight pixels in the image.
-	The first parameter in the command string must be an integer specifying the
-	threshold intensity. The integer may be followed by of the symbols *, %, #,
-	$, or &. Each of these symbols gives a different meaning to the threshold
-	value, in the same way they do for spot analysis, see the
-	spot_decode_command_string for details.
+	scam_decode_threshold_string takes a string like "10 @" and returns, for the
+	specified image, an intensity threshold for silhouette pixels in the image.
+	It calls spot_decode_threshold_string and returns the threshold.
 }
-function scam_decode_threshold_string(ip:image_ptr_type;rule:string):real;
-
-const
-	percent_unit=100;
+function scam_decode_threshold_string(ip:image_ptr_type;threshold_string:string):real;
 
 var
-	word:string;
-	background,threshold:real;
-	
+	threshold,background,min_pixels,max_pixels:integer;
+	max_eccentricity:real;
+
 begin
-{
-	Decode the threshold string. First we read the threshold, then we look for a
-	valid threshold qualifier.
-}
-	threshold:=read_integer(rule);
-	word:=read_word(rule);
-	if word='%' then begin
-		background:=round(image_minimum(ip));
-		threshold:=(1-threshold/percent_unit)*background
-			+threshold/percent_unit*image_maximum(ip);
-	end else if word='#' then begin
-		background:=image_average(ip);
-		threshold:=(1-threshold/percent_unit)*background
-			+threshold/percent_unit*image_maximum(ip);
-	end else if word='*' then begin
-		background:=0;
-		threshold:=threshold-background;
-	end else if word='$' then begin
-		background:=image_average(ip);
-		threshold:=background+threshold;
-	end else if word='&' then begin
-		background:=image_median(ip);
-		threshold:=background+threshold;
-	end;
+	spot_decode_threshold_string(ip,threshold_string,
+		threshold,background,min_pixels,max_pixels,max_eccentricity);
 	scam_decode_threshold_string:=threshold;
 end;
 	

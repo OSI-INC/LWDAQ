@@ -1,20 +1,20 @@
 {
-Routines to Locate Bright Spots in Images
-Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+	Routines to Locate Bright Spots in Images
+	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+	Copyright (C) 2021-2023 Kevan Hashemi, Open Source Instruments Inc.
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or (at
+	your option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+	This program is distributed in the hope that it will be useful, but
+	WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+	General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
 }
 
 unit spot;
@@ -94,8 +94,8 @@ procedure spot_list_display_crosses(ip:image_ptr_type;slp:spot_list_ptr_type;
 	color:integer);
 procedure spot_list_display_ellipses(ip:image_ptr_type;slp:spot_list_ptr_type;
 	color:integer);
-function spot_list_find(ip:image_ptr_type;
-	num_spots:integer;command:string;pixel_size_um:real):spot_list_ptr_type;
+function spot_list_find(ip:image_ptr_type;num_spots:integer;
+	threshold_string:string;pixel_size_um:real):spot_list_ptr_type;
 procedure spot_list_merge(ip:image_ptr_type;slp:spot_list_ptr_type;command:string);
 procedure spot_list_sort(slp:spot_list_ptr_type;sort_code:integer);
 procedure spot_list_tidy(slp:spot_list_ptr_type);
@@ -107,7 +107,7 @@ function string_from_spot_list(slp:spot_list_ptr_type):string;
 function bounds_string_from_spot_list(slp:spot_list_ptr_type):string;
 function intensity_string_from_spot_list(slp:spot_list_ptr_type):string;
 procedure spot_decode_threshold_string(ip:image_ptr_type;
-	command:string;
+	threshold_string:string;
 	var threshold,background,min_pixels,max_pixels:integer;
 	var max_eccentricity:real);
 
@@ -843,11 +843,11 @@ end;
 	bright pixels in the image, minimum and maximum values for the number of
 	pixels in a spot, and a maximu, value for eccentricity.
 
-	The first parameter in the command string must be an integer specifying the
-	threshold intensity. The integer may be followed by of the symbols *, %, #,
-	$, or &. Each of these symbols give a different meaning to the threshold
-	value. If there is no symbol, we default to the function of the * symbol, in
-	which the threshold integer is the threshoild intensity with no
+	The first parameter in the threshold string must be an integer specifying
+	the threshold intensity. The integer may be followed by of the symbols *, %,
+	#, $, @, or &. Each of these symbols give a different meaning to the
+	threshold value. If there is no symbol, we default to the function of the *
+	symbol, in which the threshold integer is the threshoild intensity with no
 	modification. But the % symbol means that the threshold is a percentage of
 	the way from the minimum to maximum intensities within the analysis
 	boundaries of the image. Thus, if the minimum intensity is 40, the maximum
@@ -856,7 +856,9 @@ end;
 	takes the place of the miniumum. The $ symbol says that the threshold is the
 	average intensity plus the threshold integer. If the average is 50 and the
 	command starts with "10 $", the threshold will be 60. The "&" symbol says
-	the threshold is the median intensity plus the threshold integer.
+	the threshold is the median intensity plus the threshold integer. The "@"
+	symbols says the threshold is the minimum intensity plus the threshold
+	integer.
 
 	Following the threshold definition is a minimum or maximum number of pixels
 	the spot must contain to be added to the spot list. If the integer is
@@ -865,7 +867,7 @@ end;
 	third integer gives the maximum eccentricity of the spot.
 }
 procedure spot_decode_threshold_string(ip:image_ptr_type;
-	command:string;
+	threshold_string:string;
 	var threshold,background,min_pixels,max_pixels:integer;
 	var max_eccentricity:real);
 
@@ -879,11 +881,11 @@ var
 
 begin
 {
-	Decode the command string. First we read the threshold, then we look for a
+	Decode the threshold string. First we read the threshold, then we look for a
 	valid threshold qualifier.
 }
-	threshold:=read_integer(command);
-	word:=read_word(command);
+	threshold:=read_integer(threshold_string);
+	word:=read_word(threshold_string);
 	if word='%' then begin
 		background:=round(image_minimum(ip));
 		threshold:=
@@ -903,13 +905,16 @@ begin
 	end else if word='&' then begin
 		background:=round(image_median(ip));
 		threshold:=background+threshold;
-	end else command:=word+' '+command;
+	end else if word='@' then begin
+		background:=round(image_minimum(ip));
+		threshold:=background+threshold;
+	end else threshold_string:=word+' '+threshold_string;
 {
 	Determine minimum and maximum number of pixels in valid spot.
 }
-	min_pixels:=read_integer(command);
+	min_pixels:=read_integer(threshold_string);
 	if min_pixels<1 then min_pixels:=1;
-	word:=read_word(command);
+	word:=read_word(threshold_string);
 	if word='<' then begin
 		max_pixels:=min_pixels;
 		min_pixels:=1;
@@ -917,12 +922,12 @@ begin
 		max_pixels:=large_number
 	else begin
 		max_pixels:=large_number;
-		command:=word+' '+command;
+		threshold_string:=word+' '+threshold_string;
 	end;
 {
 	Determine maximum eccentricity of a valid spot.
 }
-	max_eccentricity:=read_real(command);
+	max_eccentricity:=read_real(threshold_string);
 	if max_eccentricity<1 then max_eccentricity:=0;
 end;
 
@@ -932,10 +937,10 @@ end;
 	spot_list_type, which the calling process must dispose of itself. The
 	routine uses the image overlay to mark the spots its finds. It clears the
 	overlay at the start of execution. A spot is any connected set of pixels
-	with intensity above the threshold specified in the command string.
+	with intensity above the threshold specified in the threshold string.
 
-	We decode the command string with the spot_decode_threshold_string procedure,
-	see comments above. The purpose of the command string is to define a
+	We decode the threshold string with the spot_decode_threshold_string procedure,
+	see comments above. The purpose of the threshold string is to define a
 	background intensity, a threshold intensity, limits for the number of pixels
 	in the spot, and a limit for the eccentricity of the spot. In the image
 	overlay, the color black (0) is reserved for pixels below threshold. The
@@ -962,7 +967,7 @@ end;
 }
 function spot_list_find(ip:image_ptr_type;
 	num_spots:integer;
-	command:string;
+	threshold_string:string;
 	pixel_size_um:real):spot_list_ptr_type;
 	
 var 
@@ -983,11 +988,11 @@ begin
 		exit;
 	end;
 {
-	Decode the command string to obtain the threshold for spot detection, the background
+	Decode the threshold string to obtain the threshold for spot detection, the background
 	for spot intensity, the minimum and maximum number of pixels a spot can contain and
 	be counted, and the maximum eccentricity.
 }
-	spot_decode_threshold_string(ip,command,
+	spot_decode_threshold_string(ip,threshold_string,
 		threshold,background,
 		min_pixels,max_pixels,
 		max_eccentricity);

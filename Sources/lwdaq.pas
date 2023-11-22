@@ -3,19 +3,18 @@
 	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 	Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
 	
-	This program is free software; you can redistribute it and/or modify it
-	under the terms of the GNU General Public License as published by the Free
-	Software Foundation; either version 2 of the License, or (at your option)
-	any later version.
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or (at
+	your option) any later version.
 
-	This program is distributed in the hope that it will be useful, but WITHOUT
-	ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-	FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-	more details.
+	This program is distributed in the hope that it will be useful, but
+	WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+	General Public License for more details.
 
-	You should have received a copy of the GNU General Public License along with
-	this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-	Place - Suite 330, Boston, MA	02111-1307, USA.
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
 }
 
 library lwdaq;
@@ -2170,7 +2169,7 @@ spot-locating routines called by lwdaq_bcam use the <i>net intensity</i> of
 pixels, which is the image intensity minus the threshold intensity, with
 negative values clipped to zero.</p>
 
-<p> The threshold string must begin with an integer, <i>t</i>. After <i>t</i>
+<p>The threshold string must begin with an integer, <i>t</i>. After <i>t</i>
 comes an optional <i>threshold symbol</i>. If there is no threshold symbol, the
 routine assumes the "*" symbol. The "*" symbol tells the routine to use
 intensity <i>t</i> as the threshold. The string "20 *" means any pixel with
@@ -2186,10 +2185,12 @@ in a threshold of 59. The "$" symbol means the threshold is <i>t</i> counts
 above the average intensity. The string "5 $" in an image with average intensity
 50 results in a threshold of 55. The "&" symbol uses the median intensity to
 obtain the threshold. The string "5 &" in an image with median intensity 62
-results in a threshold of 67. In each of these calculations, the BCAM analysis
+results in a threshold of 67. The "@" symbol uses the minimum intensity to
+obtain the threshold. String "20 @" in an image with minimum intensity 42
+produces a threshold of 62. In each of these calculations, the BCAM analysis
 also defines a "background" intensity, which it uses only when we want it to
 calculate and report to us the total brightness of a spot. The background is the
-average (# and $), minimum (%), median (&), or simply zero (*).</p>
+average (# and $), minimum (% and @), median (&), or simply zero (*).</p>
 
 <p>Following the threshold value and threshold symbol there are two further,
 optional criteria we can use to restrict the routine's choice of spots. The
@@ -2199,12 +2200,12 @@ spots must contain at least <i>n</i> pixels or else they are rejected. The
 symbol "<" means spots must contain at most <i>n</i> pixels. If the symbol is
 omitted, we assume <i>n</i> is a minimum.</p>
 
-<p>The next parameter in the threshold  must be a real number, <i>e</i>, which specifies the
-maximum eccentricity of the spot, which is the maximum ratio of width to height,
-or height to width. Spots that have greater eccentricity will be rejected by the
-routine. The second parameter cannot be included without the first, but if you
-use 0 for the first, the routine ignores the first parameter and moves on to the
-second.</p>
+<p>The next parameter in the threshold  must be a real number, <i>e</i>, which
+specifies the maximum eccentricity of the spot, which is the maximum ratio of
+width to height, or height to width. Spots that have greater eccentricity will
+be rejected by the routine. The second parameter cannot be included without the
+first, but if you use 0 for the first, the routine ignores the first parameter
+and moves on to the second.</p>
 
 <p>The lwdaq_bcam routine identifies all distinct sets of contiguous pixels
 above threshold, eliminates those that do not meet the test criteria, determines
