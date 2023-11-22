@@ -561,7 +561,8 @@ begin
 		y_axis:=xyz_rotate(y_axis,rot);
 		with z_axis do begin x:=0;y:=0;z:=1; end;
 		z_axis:=xyz_rotate(z_axis,rot);
-		rot2:=xyz_rotation_from_axes(x_axis,y_axis,z_axis);
+		rot2:=xyz_rotation_from_matrix(
+			xyz_matrix_from_points(x_axis,y_axis,z_axis));
 		if xyz_separation(rot,rot2) > small_error then good:=false;
 	end;
 	writeln('Each search takes ',1.0*(clock_milliseconds-start_ms)/reps:1:1,' ms.');

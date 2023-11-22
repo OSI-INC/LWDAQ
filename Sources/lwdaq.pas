@@ -47,10 +47,10 @@ library lwdaq;
 {$LONGSTRINGS ON}
 
 uses
-	sysutils,
+	sysutils,process,
 	utils,images,transforms,image_manip,rasnik,
 	spot,bcam,scam,shadow,wps,electronics,metrics,
-	tcltk,process;
+	tcltk;
 
 const
 	package_name = 'lwdaq';
