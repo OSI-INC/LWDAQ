@@ -657,6 +657,17 @@ proc LWDAQ_daq_Receiver {} {
 		"-payload $config(payload_length) clocks 0 $daq_num_clocks"] %d%d%d%d%d \
 		num_errors num_clocks num_messages start_index end_index
 		
+	# Create a new data image. We want to be sure this data image exists even if
+	# we encounter an error during data acquisition.
+	set config(memory_name) [lwdaq_image_create \
+		-width $info(daq_image_width) \
+		-height $info(daq_image_height) \
+		-left $info(daq_image_left) \
+		-right $info(daq_image_right) \
+		-top $info(daq_image_top) \
+		-bottom $info(daq_image_bottom) \
+		-name "$info(name)\_$info(counter)"]
+	
 	if {[catch {
 		# Set the block counter, which counts how many times we download a 
 		# block of messages from the receiver.
@@ -911,16 +922,6 @@ proc LWDAQ_daq_Receiver {} {
 		}
 		return "ERROR: $error_result"
 	}
-	
-	# Create the new data image.
-	set config(memory_name) [lwdaq_image_create \
-		-width $info(daq_image_width) \
-		-height $info(daq_image_height) \
-		-left $info(daq_image_left) \
-		-right $info(daq_image_right) \
-		-top $info(daq_image_top) \
-		-bottom $info(daq_image_bottom) \
-		-name "$info(name)\_$info(counter)"]
 	
 	# Extract data from the buffer.
 	if {($start_index <= $end_index) && ($start_index >= 0) && ($end_index > 0)} {
