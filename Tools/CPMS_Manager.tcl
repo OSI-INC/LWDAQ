@@ -130,7 +130,7 @@ proc CPMS_Manager_disagreement {params} {
 	set disagreement 0
 	set left_count [lindex [lwdaq_scam $info(img_left) disagreement \
 		$iconfig(analysis_threshold)] 0]
-	set right_count [lindex [lwdaq_scam $info(img_right) disagreement \
+	set right_count [lindex [lwdaq_scam $info(img_right) "disagreement" \
 		$iconfig(analysis_threshold)] 0]
 	set disagreement [expr $disagreement + $left_count + $right_count]
 

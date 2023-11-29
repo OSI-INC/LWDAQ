@@ -22,7 +22,7 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_info info
 	upvar #0 CPMS_Calibrator_config config
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "3.1"
+	LWDAQ_tool_init "CPMS_Calibrator" "3.2"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.675 39.312 1.1 0.0 0.0 2 26.0 0.0" 
@@ -128,6 +128,7 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 	LWDAQ_print $info(text) "Read left and right mounts,\
 		[llength $config(bodies)] bodies,\
 		$count images."
+		
 	CPMS_Calibrator_show
 	
 	set info(state) "Idle"
@@ -171,7 +172,8 @@ proc CPMS_Calibrator_disagreement {params} {
 			lwdaq_scam img_$side\_$a project \
 				$config(coord_$side) [set scam_$side] $body \
 				-num_lines $config(num_lines) -line_width $config(line_width)
-			set count [lwdaq_scam img_$side\_$a disagreement $config(threshold)]
+			set count [lindex [lwdaq_scam img_$side\_$a \
+				"disagreement" $config(threshold)] 0]
 			set disagreement [expr $disagreement + $count]
 			lwdaq_draw img_$side\_$a photo_$side\_$a \
 				-intensify $config(intensify) -zoom $config(zoom)
