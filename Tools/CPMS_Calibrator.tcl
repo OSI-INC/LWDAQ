@@ -22,7 +22,7 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_info info
 	upvar #0 CPMS_Calibrator_config config
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "3.2"
+	LWDAQ_tool_init "CPMS_Calibrator" "3.3"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.675 39.312 1.1 0.0 0.0 2 26.0 0.0" 
@@ -128,8 +128,12 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 	LWDAQ_print $info(text) "Read left and right mounts,\
 		[llength $config(bodies)] bodies,\
 		$count images."
-		
-	CPMS_Calibrator_show
+	
+	if {[catch {CPMS_Calibrator_show} error_message]} {
+		LWDAQ_print $info(text) "ERROR: $error_message\."
+		LWDAQ_print $info(text) \
+			"SUGGESTION: Check your CMM.txt file format and image names."	
+	}
 	
 	set info(state) "Idle"
 }
