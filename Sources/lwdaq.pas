@@ -6675,6 +6675,22 @@ gui_writeln.</p>
 				Tcl_ObjInteger(argv[3]),
 				data_string));
 	end 
+	else if option='xyz_length' then begin
+{
+<p>Return the length of an xyz vectors.</p>
+}
+		if (argc<>3) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' vector".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_real(
+				xyz_length(
+					xyz_from_string(Tcl_ObjString(argv[2]))),
+				fsr,fsd));
+	end 
 	else if option='xyz_sum' then begin
 {
 <p>Add two xyz vectors together as in a + b.</p>
@@ -6706,6 +6722,23 @@ gui_writeln.</p>
 				xyz_difference(
 					xyz_from_string(Tcl_ObjString(argv[2])),
 					xyz_from_string(Tcl_ObjString(argv[3])))));
+	end 
+	else if option='xyz_axis_rotate' then begin
+{
+<p>Rotate an xyz point about an axis line by an angle in radians.</p>
+}
+		if (argc<>5) then begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Wrong number of arguments, should be '
+				+'"lwdaq '+option+' point axis rotation".');
+			exit;
+		end;
+		Tcl_SetReturnString(interp,
+			string_from_xyz(
+				xyz_axis_rotate(
+					xyz_from_string(Tcl_ObjString(argv[2])),
+					xyz_line_from_string(Tcl_ObjString(argv[3])),
+					Tcl_ObjReal(argv[4]))));
 	end 
 	else if option='xyz_rotate' then begin
 {
@@ -6745,7 +6778,7 @@ respective axes, hence the name "unrotate".</p>
 	end 
 	else if option='xyz_rotation_from_axes' then begin
 {
-<p>Search for a compount, three-dimensional rotation that produces the specified
+<p>Search for a compound, three-dimensional rotation that produces the specified
 orthogonal, right-handed coordinate system vectors from the existing x, y, and z
 unit vectors. The rotation takes the form of three angles by which we rotate
 about x, y, and z. We pass the routine three vectors parallel to the new
@@ -6872,7 +6905,7 @@ three components of the shortest vector.</p>
 {
 <p>Determines the shortest vector from a one line to another. We specify each
 line with a point and a direction vector. The direction vector does not have to
-be a unit vector. We express the link as a poit and a vector. We give the point
+be a unit vector. We express the link as a point and a vector. We give the point
 in the first line that is closest to the second, and the vector that connects
 this point to the point in the second line that is closest to the first. The
 original two lines must be skewed. Parallel lines will return the origin for a
@@ -7491,7 +7524,8 @@ hexadecimal digits specifying the intensity of red, blue, and green.</p>
 		+' xyz_sum xyz_difference xyz_rotate xyz_unrotate xyz_unit_vector'
 		+' xyz_cross_product xyz_dot_product xyz_rotation_from_axes'
 		+' xyz_plane_plane_intersection xyz_line_plane_intersection'
-		+' xyz_line_line_bridge xyz_point_line_vector'
+		+' xyz_line_line_bridge xyz_point_line_vector xyz_axis_rotate'
+		+' xyz_length'
 		+' linear_interpolate nearest_neighbor straight_line_fit ave_stdev'
 		+' sum_sinusoids frequency_components window_function'
 		+' glitch_filter spikes_x glitch_filter_y glitch_filter_xy'
