@@ -22,27 +22,26 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_info info
 	upvar #0 CPMS_Calibrator_config config
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "3.3"
+	LWDAQ_tool_init "CPMS_Calibrator" "3.4"
 	if {[winfo exists $info(window)]} {return ""}
 
-	set config(cam_left) "12.675 39.312 1.1 0.0 0.0 2 26.0 0.0" 
-	set config(mount_left) "92.123 -18.364 -3.450 \
-		83.853 -18.211 -78.940 \
-		125.201 -17.747 -71.806"
+	set config(cam_left) "12.675 39.312 4.0 0.0 0.0 2 26.0 0.0" 
+	set config(cam_right) "12.675 -39.312 4.0 0.0 0.0 2 26.0 3141.6" 
+	set config(mount_left) "91.877 -19.475 -3.330\
+		83.628 -19.455 -78.877\
+		124.975 -19.476 -71.682"
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set config(cam_right) "12.675 -39.312 1.1 0.0 0.0 2 26.0 3141.6" 
-	set config(mount_right) "-77.819 -20.395 -2.397 \
-		-74.201 -20.179 -75.451 \
-		-115.549 -20.643 -68.317"
+	set config(mount_right) "-78.059 -19.492 -2.332\
+		-75.026 -19.497 -78.231\
+		-115.797 -19.534 -68.268"
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	set config(bodies) [list \
-		"20.231 19.192 506.194 0 0 0 sphere 0 0 0 38.068" \
-		"20.017 19.275 466.169 0 0 0 sphere 0 0 0 38.068" \
-		"19.861 19.319 436.169 0 0 0 sphere 0 0 0 38.073" \
-		"19.693 19.371 406.173 0 0 0 sphere 0 0 0 38.072"]
+	set config(bodies) "{21.098 24.145 386.482 0 0 0 sphere 0 0 0 38.060}\
+		{21.274 12.845 386.406 0 0 0 sphere 0 0 0 38.054}\
+		{26.487 -2.695 640.772 0 0 0 sphere 0 0 0 38.056}\
+		{26.679 39.634 641.064 0 0 0 sphere 0 0 0 38.062}"
 
-	set config(scaling) "1 1 1 1 1 0 1 1"
+	set config(scaling) "1 1 0 1 1 0 1 1"
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
@@ -479,7 +478,75 @@ Displace: Displace the camera calibration constants from their current values.
 Fit: Start the simplex fitter adjusting calibration constants to minimize
 disagreement.
 
-Read_Files: Select a directory, read image files and CMM measurements
+Read_Files: Select a directory, read image files and CMM measurements. The
+images must be L1.gif, R1.gif, ... R4.gif. The CMM measurements must be in a
+file called CMM.txt. The only real-valued words in the file must be diameter, x,
+y, z coordinates in millimeters of the three global coordinate system definition
+balls, the cone, slot, flat balls of the left and right SCAM mounts, and the
+four calibration spheres. The text table below is an example of one produced by
+our CMM that satisfies the calibrator's requirements.
+
++---------------------+--------------+------+-----------+---------+
+| Feature Table       |              |      |           |         |
++---------------------+--------------+------+-----------+---------+
+| Length Units        | Millimeters  |      |           |         |
+| Coordinate Systems  | Global       |      |           |         | 
+| Data Alignments     | original     |      |           |         |
+|                     |              |      |           |         |
+| Name                | Control      | Nom  | Meas      | Tol     |
+| Cone                | Diameter     |      | 6.338     | ±1.000  |
+| Cone                | X            |      | 0.000     | ±1.000  |
+| Cone                | Y            |      | 0.000     | ±1.000  |
+| Cone                | Z            |      | 0.000     | ±1.000  |
+| Slot                | Diameter     |      | 6.339     | ±1.000  |
+| Slot                | X            |      | -20.975   | ±1.000  |
+| Slot                | Y            |      | 0.000     | ±1.000  |
+| Slot                | Z            |      | -72.999   | ±1.000  |
+| Flat                | Diameter     |      | 6.335     | ±1.000  |
+| Flat                | X            |      | 21.008    | ±1.000  |
+| Flat                | Y            |      | 0.000     | ±1.000  |
+| Flat                | Z            |      | -73.065   | ±1.000  |
+| ConeL               | Diameter     |      | 6.340     | ±1.000  |
+| ConeL               | X            |      | 91.877    | ±1.000  |
+| ConeL               | Y            |      | -19.475   | ±1.000  |
+| ConeL               | Z            |      | -3.330    | ±1.000  |
+| SlotL               | Diameter     |      | 6.338     | ±1.000  |
+| SlotL               | X            |      | 83.628    | ±1.000  |
+| SlotL               | Y            |      | -19.455   | ±1.000  |
+| SlotL               | Z            |      | -78.877   | ±1.000  |
+| FlatL               | Diameter     |      | 6.341     | ±1.000  |
+| FlatL               | X            |      | 124.975   | ±1.000  |
+| FlatL               | Y            |      | -19.476   | ±1.000  |
+| FlatL               | Z            |      | -71.682   | ±1.000  |
+| ConeR               | Diameter     |      | 6.336     | ±1.000  |
+| ConeR               | X            |      | -78.059   | ±1.000  |
+| ConeR               | Y            |      | -19.492   | ±1.000  |
+| ConeR               | Z            |      | -2.332    | ±1.000  |
+| SlotR               | Diameter     |      | 6.337     | ±1.000  |
+| SlotR               | X            |      | -75.026   | ±1.000  |
+| SlotR               | Y            |      | -19.497   | ±1.000  |
+| SlotR               | Z            |      | -78.231   | ±1.000  |
+| FlatR               | Diameter     |      | 6.339     | ±1.000  |
+| FlatR               | X            |      | -115.797  | ±1.000  |
+| FlatR               | Y            |      | -19.534   | ±1.000  |
+| FlatR               | Z            |      | -68.268   | ±1.000  |
+| S1                  | Diameter     |      | 38.060    | ±1.000  |
+| S1                  | X            |      | 21.098    | ±1.000  |
+| S1                  | Y            |      | 24.145    | ±1.000  |
+| S1                  | Z            |      | 386.482   | ±1.000  |
+| S2                  | Diameter     |      | 38.054    | ±1.000  |
+| S2                  | X            |      | 21.274    | ±1.000  |
+| S2                  | Y            |      | 12.845    | ±1.000  |
+| S2                  | Z            |      | 386.406   | ±1.000  |
+| S3                  | Diameter     |      | 38.056    | ±1.000  |
+| S3                  | X            |      | 26.487    | ±1.000  |
+| S3                  | Y            |      | -2.695    | ±1.000  |
+| S3                  | Z            |      | 640.772   | ±1.000  |
+| S4                  | Diameter     |      | 38.062    | ±1.000  |
+| S4                  | X            |      | 26.679    | ±1.000  |
+| S4                  | Y            |      | 39.634    | ±1.000  |
+| S4                  | Z            |      | 641.064   | ±1.000  |
++---------------------+--------------+------+-----------+---------+
 
 Help: Get this help page.
 
@@ -502,66 +569,67 @@ https://www.opensourceinstruments.com
 
 ----------Begin Data----------
 
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
-| Feature Table       |              |      |           |         |      |       |          |
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
-| Length Units        | Millimeters  |      |           |         |      |       |          |
-| Coordinate Systems  | Main         |      |           |         |      |       |          |
-| Data Alignments     | original     |      |           |         |      |       |          |
-|                     |              |      |           |         |      |       |          |
-| Name                | Control      | Nom  | Meas      | Tol     | Dev  | Test  | Out Tol  |
-| Cone                | Diameter     |      | 6.345     | ±1.000  |      |       |          |
-| Cone                | X            |      | 0.000     | ±1.000  |      |       |          |
-| Cone                | Y            |      | 0.000     | ±1.000  |      |       |          |
-| Cone                | Z            |      | 0.000     | ±1.000  |      |       |          |
-| Slot                | Diameter     |      | 6.347     | ±1.000  |      |       |          |
-| Slot                | X            |      | -20.975   | ±1.000  |      |       |          |
-| Slot                | Y            |      | 0.000     | ±1.000  |      |       |          |
-| Slot                | Z            |      | -73.000   | ±1.000  |      |       |          |
-| Flat                | Diameter     |      | 6.346     | ±1.000  |      |       |          |
-| Flat                | X            |      | 21.010    | ±1.000  |      |       |          |
-| Flat                | Y            |      | 0.517     | ±1.000  |      |       |          |
-| Flat                | Z            |      | -73.060   | ±1.000  |      |       |          |
-| ConeL               | Diameter     |      | 6.339     | ±1.000  |      |       |          |
-| ConeL               | X            |      | 92.134    | ±1.000  |      |       |          |
-| ConeL               | Y            |      | -18.283   | ±1.000  |      |       |          |
-| ConeL               | Z            |      | -3.435    | ±1.000  |      |       |          |
-| SlotL               | Diameter     |      | 6.338     | ±1.000  |      |       |          |
-| SlotL               | X            |      | 83.868    | ±1.000  |      |       |          |
-| SlotL               | Y            |      | -18.132   | ±1.000  |      |       |          |
-| SlotL               | Z            |      | -78.935   | ±1.000  |      |       |          |
-| FlatL               | Diameter     |      | 6.336     | ±1.000  |      |       |          |
-| FlatL               | X            |      | 125.222   | ±1.000  |      |       |          |
-| FlatL               | Y            |      | -17.636   | ±1.000  |      |       |          |
-| FlatL               | Z            |      | -71.795   | ±1.000  |      |       |          |
-| ConeR               | Diameter     |      | 6.343     | ±1.000  |      |       |          |
-| ConeR               | X            |      | -77.784   | ±1.000  |      |       |          |
-| ConeR               | Y            |      | -20.454   | ±1.000  |      |       |          |
-| ConeR               | Z            |      | -2.384    | ±1.000  |      |       |          |
-| SlotR               | Diameter     |      | 6.339     | ±1.000  |      |       |          |
-| SlotR               | X            |      | -74.756   | ±1.000  |      |       |          |
-| SlotR               | Y            |      | -20.146   | ±1.000  |      |       |          |
-| SlotR               | Z            |      | -78.278   | ±1.000  |      |       |          |
-| FlatR               | Diameter     |      | 6.338     | ±1.000  |      |       |          |
-| FlatR               | X            |      | -115.524  | ±1.000  |      |       |          |
-| FlatR               | Y            |      | -20.735   | ±1.000  |      |       |          |
-| FlatR               | Z            |      | -68.300   | ±1.000  |      |       |          |
-| 0cm                 | Diameter     |      | 38.068    | ±1.000  |      |       |          |
-| 0cm                 | X            |      | 20.231    | ±1.000  |      |       |          |
-| 0cm                 | Y            |      | 19.192    | ±1.000  |      |       |          |
-| 0cm                 | Z            |      | 506.194   | ±1.000  |      |       |          |
-| 4cm                 | Diameter     |      | 38.066    | ±1.000  |      |       |          |
-| 4cm                 | X            |      | 20.017    | ±1.000  |      |       |          |
-| 4cm                 | Y            |      | 19.275    | ±1.000  |      |       |          |
-| 4cm                 | Z            |      | 466.169   | ±1.000  |      |       |          |
-| 7cm                 | Diameter     |      | 38.073    | ±1.000  |      |       |          |
-| 7cm                 | X            |      | 19.861    | ±1.000  |      |       |          |
-| 7cm                 | Y            |      | 19.319    | ±1.000  |      |       |          |
-| 7cm                 | Z            |      | 436.169   | ±1.000  |      |       |          |
-| 10cm                | Diameter     |      | 38.072    | ±1.000  |      |       |          |
-| 10cm                | X            |      | 19.693    | ±1.000  |      |       |          |
-| 10cm                | Y            |      | 19.371    | ±1.000  |      |       |          |
-| 10cm                | Z            |      | 406.173   | ±1.000  |      |       |          |
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
++---------------------+--------------+------+-----------+---------+
+| Feature Table       |              |      |           |         |
++---------------------+--------------+------+-----------+---------+
+| Length Units        | Millimeters  |      |           |         |
+| Coordinate Systems  | Global       |      |           |         | 
+| Data Alignments     | original     |      |           |         |
+|                     |              |      |           |         |
+| Name                | Control      | Nom  | Meas      | Tol     |
+| Cone                | Diameter     |      | 6.338     | ±1.000  |
+| Cone                | X            |      | 0.000     | ±1.000  |
+| Cone                | Y            |      | 0.000     | ±1.000  |
+| Cone                | Z            |      | 0.000     | ±1.000  |
+| Slot                | Diameter     |      | 6.339     | ±1.000  |
+| Slot                | X            |      | -20.975   | ±1.000  |
+| Slot                | Y            |      | 0.000     | ±1.000  |
+| Slot                | Z            |      | -72.999   | ±1.000  |
+| Flat                | Diameter     |      | 6.335     | ±1.000  |
+| Flat                | X            |      | 21.008    | ±1.000  |
+| Flat                | Y            |      | 0.000     | ±1.000  |
+| Flat                | Z            |      | -73.065   | ±1.000  |
+| ConeL               | Diameter     |      | 6.340     | ±1.000  |
+| ConeL               | X            |      | 91.877    | ±1.000  |
+| ConeL               | Y            |      | -19.475   | ±1.000  |
+| ConeL               | Z            |      | -3.330    | ±1.000  |
+| SlotL               | Diameter     |      | 6.338     | ±1.000  |
+| SlotL               | X            |      | 83.628    | ±1.000  |
+| SlotL               | Y            |      | -19.455   | ±1.000  |
+| SlotL               | Z            |      | -78.877   | ±1.000  |
+| FlatL               | Diameter     |      | 6.341     | ±1.000  |
+| FlatL               | X            |      | 124.975   | ±1.000  |
+| FlatL               | Y            |      | -19.476   | ±1.000  |
+| FlatL               | Z            |      | -71.682   | ±1.000  |
+| ConeR               | Diameter     |      | 6.336     | ±1.000  |
+| ConeR               | X            |      | -78.059   | ±1.000  |
+| ConeR               | Y            |      | -19.492   | ±1.000  |
+| ConeR               | Z            |      | -2.332    | ±1.000  |
+| SlotR               | Diameter     |      | 6.337     | ±1.000  |
+| SlotR               | X            |      | -75.026   | ±1.000  |
+| SlotR               | Y            |      | -19.497   | ±1.000  |
+| SlotR               | Z            |      | -78.231   | ±1.000  |
+| FlatR               | Diameter     |      | 6.339     | ±1.000  |
+| FlatR               | X            |      | -115.797  | ±1.000  |
+| FlatR               | Y            |      | -19.534   | ±1.000  |
+| FlatR               | Z            |      | -68.268   | ±1.000  |
+| S1                  | Diameter     |      | 38.060    | ±1.000  |
+| S1                  | X            |      | 21.098    | ±1.000  |
+| S1                  | Y            |      | 24.145    | ±1.000  |
+| S1                  | Z            |      | 386.482   | ±1.000  |
+| S2                  | Diameter     |      | 38.054    | ±1.000  |
+| S2                  | X            |      | 21.274    | ±1.000  |
+| S2                  | Y            |      | 12.845    | ±1.000  |
+| S2                  | Z            |      | 386.406   | ±1.000  |
+| S3                  | Diameter     |      | 38.056    | ±1.000  |
+| S3                  | X            |      | 26.487    | ±1.000  |
+| S3                  | Y            |      | -2.695    | ±1.000  |
+| S3                  | Z            |      | 640.772   | ±1.000  |
+| S4                  | Diameter     |      | 38.062    | ±1.000  |
+| S4                  | X            |      | 26.679    | ±1.000  |
+| S4                  | Y            |      | 39.634    | ±1.000  |
+| S4                  | Z            |      | 641.064   | ±1.000  |
++---------------------+--------------+------+-----------+---------+
+
 
 ----------End Data----------

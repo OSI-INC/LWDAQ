@@ -22,18 +22,19 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.6"
+	LWDAQ_tool_init "CPMS_Manager" "1.7"
 	if {[winfo exists $info(window)]} {return ""}
 
-	set config(cam_left) "12.283 38.549 4.568 -7.789 1.833 2.000 26.411 0.137" 
-	set config(mount_left) "92.123 -18.364 -3.450\
-		83.853 -18.211 -78.940\
-		125.201 -17.747 -71.806"
+	set config(cam_left) "12.215 38.919 4.000 -6.857 1.989 2.000 26.532 6.647"
+	set config(cam_right) "13.403 -38.659 4.000 -3.163 5.862 2.000 26.356 3144.368"
+
+	set config(mount_left) "91.877 -19.475 -3.330\
+		83.628 -19.455 -78.877\
+		124.975 -19.476 -71.682"
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set config(cam_right) "12.588 -38.571 4.827 -3.708 7.509 2.000 26.252 3144.919" 
-	set config(mount_right) "-77.819 -20.395 -2.397\
-		-74.201 -20.179 -75.451\
-		-115.549 -20.643 -68.317"
+	set config(mount_right) "-78.059 -19.492 -2.332\
+		-75.026 -19.497 -78.231\
+		-115.797 -19.534 -68.268"
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	
 	set config(bodies) [list {0 20 450 0 0 0 sphere 0 0 0 38.068} ]
