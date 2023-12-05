@@ -22,7 +22,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.7"
+	LWDAQ_tool_init "CPMS_Manager" "1.8"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.215 38.919 4.000 -6.857 1.989 2.000 26.532 6.647"
@@ -234,7 +234,8 @@ proc CPMS_Manager_altitude {params} {
 # If a scaling factor is zero, the parameter will not be adjusted. If a scaling
 # factor is 10, the parameter will be adjusted by ten times the amount as a
 # parameter with scaling factor one. At the end of the fit, we take the final
-# fitted parameter values and apply them to our body models.
+# fitted parameter values and apply them to our body models. We return the
+# fitted body positions.
 #
 proc CPMS_Manager_fit {} {
 	upvar #0 CPMS_Manager_config config
@@ -274,7 +275,8 @@ proc CPMS_Manager_fit {} {
 
 	CPMS_Manager_disagreement [CPMS_Manager_get_params]
 	set info(state) "Idle"
-	return $result
+	
+	return $config(bodies)
 }
 
 #
@@ -496,6 +498,9 @@ proc CPMS_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 	
+	button $f.scam -text "SCAM" -command {LWDAQ_post "LWDAQ_open SCAM"}
+	pack $f.scam -side left -expand yes
+	
 	checkbutton $f.af -variable CPMS_Manager_config(auto_fit) -text "auto_fit"
 	pack $f.af -side left -expand yes
 
@@ -521,13 +526,10 @@ proc CPMS_Manager_open {} {
 	foreach a {num_lines line_width left_sensor_socket right_sensor_socket \
 		left_source_socket right_source_socket} {
 		label $f.l$a -text "$a"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 3
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 4
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	button $f.scam -text "SCAM" -command {LWDAQ_post "LWDAQ_open SCAM"}
-	pack $f.scam -side left -expand yes
-	
 	set f [frame $w.bodies]
 	pack $f -side top -fill x
 	
@@ -639,7 +641,7 @@ Acquire: Obtain new images.
 
 Show: Show the silhouettes and line drawings.
 
-Clear: Clear the silhouettes and line drawings, show the raw images.
+Clear: Clear the silhouette shading and body drawings, show the raw images.
 
 Displace: Displace the camera calibration constants from their current values.
 
