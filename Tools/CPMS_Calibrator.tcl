@@ -22,7 +22,7 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_info info
 	upvar #0 CPMS_Calibrator_config config
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "4.1"
+	LWDAQ_tool_init "CPMS_Calibrator" "4.2"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.675 39.312 7.0 0.0 0.0 2 26.0 0.0" 
@@ -38,7 +38,6 @@ proc CPMS_Calibrator_init {} {
 	set config(mount_right) "0 0 0 21 0 -73 -21 0 -73"
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	set config(num_bodies) 4
 	set config(body_1) "0 40 400 0 0 0 sphere 0 0 0 20"
 	set config(body_2) "-20 40 600 0 0 0 shaft 0 0 0 1 0 0\
 		40 0 40 10 20 10 20 40 80 40 80 60"
@@ -46,12 +45,7 @@ proc CPMS_Calibrator_init {} {
 	set config(body_4) "0 40 550 0 0 0 sphere 0 0 0 40"
 	set config(display_body) "1"
 	set config(fit_bodies) "1 2 3 4"
-
-	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
-		foreach side {left right} {
-			lwdaq_image_create -name img_$side\_$a -width 700 -height 520
-		}
-	}
+	set config(num_bodies) 4
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
@@ -71,6 +65,12 @@ proc CPMS_Calibrator_init {} {
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
+
+	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+		foreach side {left right} {
+			lwdaq_image_create -name img_$side\_$a -width 700 -height 520
+		}
+	}
 
 	return ""   
 }
@@ -431,6 +431,9 @@ proc CPMS_Calibrator_check {} {
 	upvar #0 CPMS_Manager_config mconfig
 	upvar #0 CPMS_Manager_info minfo
 	upvar #0 LWDAQ_config_SCAM iconfig
+	
+	set config(stop_fit) 0
+	set info(state) "Check"
 
 	set iconfig(analysis_threshold) $config(threshold)
 
@@ -440,6 +443,11 @@ proc CPMS_Calibrator_check {} {
 	}
 	
 	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+		if {$config(stop_fit)} {
+			LWDAQ_print $info(text) "Check aborted by user."
+			set info(state) "Idle"
+			return ""
+		}
 		if {[lsearch $config(fit_bodies) $a] >= 0} {
 			set mconfig(bodies) [list $config(body_$a)]
 			lwdaq_image_manipulate img_left\_$a copy -name $minfo(img_left)
@@ -453,6 +461,9 @@ proc CPMS_Calibrator_check {} {
 				[format %.3f [expr [lindex $result 2]-[lindex $config(body_$a) 2]]]"
 		}
 	}
+	
+	set info(state) "Idle"
+	return ""
 
 }
 
