@@ -22,58 +22,143 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_info info
 	upvar #0 CPMS_Calibrator_config config
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "3.2"
+	LWDAQ_tool_init "CPMS_Calibrator" "4.2"
 	if {[winfo exists $info(window)]} {return ""}
 
-	set config(cam_left) "12.675 39.312 1.1 0.0 0.0 2 26.0 0.0" 
-	set config(mount_left) "92.123 -18.364 -3.450 \
-		83.853 -18.211 -78.940 \
-		125.201 -17.747 -71.806"
+	set config(cam_left) "12.675 39.312 7.0 0.0 0.0 2 26.0 0.0" 
+	set config(cam_right) "12.675 -39.312 7.0 0.0 0.0 2 26.0 3141.6" 
+	set config(scaling) "0 0 0 1 1 0 1 1"
+
+	set config(mount_reference) "0 0 0 -21 0 -73 21 0 -73"
+	set config(coord_reference) [lwdaq bcam_coord_from_mount $config(mount_reference)]
+	
+	set config(mount_left) "0 0 0 -21 0 -73 21 0 -73"
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set config(cam_right) "12.675 -39.312 1.1 0.0 0.0 2 26.0 3141.6" 
-	set config(mount_right) "-77.819 -20.395 -2.397 \
-		-74.201 -20.179 -75.451 \
-		-115.549 -20.643 -68.317"
+	
+	set config(mount_right) "0 0 0 21 0 -73 -21 0 -73"
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	set config(bodies) [list \
-		"20.231 19.192 506.194 0 0 0 sphere 0 0 0 38.068" \
-		"20.017 19.275 466.169 0 0 0 sphere 0 0 0 38.068" \
-		"19.861 19.319 436.169 0 0 0 sphere 0 0 0 38.073" \
-		"19.693 19.371 406.173 0 0 0 sphere 0 0 0 38.072"]
-
-	set config(scaling) "1 1 1 1 1 0 1 1"
+	set config(body_1) "0 40 400 0 0 0 sphere 0 0 0 20"
+	set config(body_2) "-20 40 600 0 0 0 shaft 0 0 0 1 0 0\
+		40 0 40 10 20 10 20 40 80 40 80 60"
+	set config(body_3) "0 40 500 0 0 0 sphere 0 0 0 50"
+	set config(body_4) "0 40 550 0 0 0 sphere 0 0 0 40"
+	set config(display_body) "1"
+	set config(fit_bodies) "1 2 3 4"
+	set config(num_bodies) 4
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
 	set config(stop_fit) "0"
 	set config(zoom) "0.5"
 	set config(intensify) "exact"
-	set config(num_lines) "20"
+	set config(num_lines) "2000"
 	set config(threshold) "10 %"
-	set config(line_width) "3"
+	set config(line_width) "1"
 	set config(img_dir) "~/Desktop/CPMS"
 	
+	set info(state) "Idle"
+	
+	set info(examine_window) "$info(window).examine_window"
 	set info(state) "Idle"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	foreach a {1 2 3 4} {
-		lwdaq_image_create -name img_left_$a -width 700 -height 520
-		lwdaq_image_create -name img_right_$a -width 700 -height 520
+	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+		foreach side {left right} {
+			lwdaq_image_create -name img_$side\_$a -width 700 -height 520
+		}
 	}
 
 	return ""   
 }
 
 #
-# CPMS_Calibrator_read_files attempts to read eight images with names L1..L4 and
-# R1..R4. It tries to open a file CMM.txt that contains CMM measurements of a sphere
-# in four positions, as well as measurements of a left and right SCAM mount.
+# CPMS_Calibrator_clear clears the overlay pixels in the cpms images, so that we see
+# only the original silhouette images.
 #
-proc CPMS_Calibrator_read_files {{img_dir ""}} {
+proc CPMS_Calibrator_clear {} {
+	upvar #0 CPMS_Calibrator_config config
+	upvar #0 CPMS_Calibrator_info info
+
+	LWDAQ_print $info(text) "Coordinate Systems:"
+	foreach mount {reference left right} {
+		set config(coord_$mount) [lwdaq bcam_coord_from_mount $config(mount_$mount)]
+		LWDAQ_print $info(text) "$mount $config(coord_$mount)" brown
+	}
+
+	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+		if {[lsearch $config(fit_bodies) $a] >= 0} {set fit 1} else {set fit 0}
+		if {$a == $config(display_body)} {set display 1} else {set display 0}
+		lwdaq_image_manipulate img_left_$a none -clear 1
+		lwdaq_image_manipulate img_right_$a none -clear 1	
+		if {$display} {
+			lwdaq_draw img_left_$a photo_left \
+				-intensify $config(intensify) -zoom $config(zoom)
+			lwdaq_draw img_right_$a photo_right \
+				-intensify $config(intensify) -zoom $config(zoom)
+		}
+	}
+}
+
+#
+# CPMS_Calibrator_examine opens a new window that displays the CMM
+# measurements of the left and right mounts, as well calibration constants of
+# the left and right cameras, as well as the calibration bodies. The window
+# allows us to modify the mount measurements and body definitions directly.
+#
+proc CPMS_Calibrator_examine {} {
+	upvar #0 CPMS_Calibrator_config config
+	upvar #0 CPMS_Calibrator_info info
+
+	set w $info(examine_window)
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "Coordinate Measurements, CPMS Calibrator $info(version)"
+	} {
+		raise $w
+		return ""
+	}
+
+	set f [frame $w.buttons]
+	pack $f -side top -fill x
+	button $f.save -text "Save Configuration" -command "LWDAQ_tool_save $info(name)"
+	pack $f.save -side left -expand 1
+	button $f.unsave -text "Unsave Configuration" -command "LWDAQ_tool_unsave $info(name)"
+	pack $f.unsave -side left -expand 1
+	
+	foreach mount {reference left right} {
+		set f [frame $w.$mount]
+		pack $f -side top -fill x
+		label $f.l$mount -text "$mount\:"
+		entry $f.e$mount -textvariable CPMS_Calibrator_config(mount_$mount) -width 70
+		pack $f.l$mount $f.e$mount -side left -expand yes
+	}
+
+	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+		set f [frame $w.$a]
+		pack $f -side top -fill x
+		label $f.l$a -text "Body $a\:"
+		entry $f.e$a -textvariable CPMS_Calibrator_config(body_$a) -width 70
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	return ""
+}
+
+#
+# CPMS_Calibrator_read looks for a file called CMM.txt in a directory. We either
+# pass it the directory name or the routine will open a browser for us to choose
+# the directory. From the CMM.txt file the calibrator reads the global
+# coordinats of the balls in the reference mount, left SCAM mount, and right
+# SCAM mount. It reads the diameter and position of all object sphere
+# measurements, each of which represents a location of the sphere for which we
+# have accompanying CPMS images Lx.gif and Rx.gif, where x is 1 for the first
+# position, and so on. 
+#
+proc CPMS_Calibrator_read {{img_dir ""}} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
 
@@ -98,38 +183,51 @@ proc CPMS_Calibrator_read_files {{img_dir ""}} {
 		foreach a $cmm {if {[string is double -strict $a]} {lappend numbers $a}}
 		set spheres [list]
 		foreach {d x y z} $numbers {lappend spheres "$x $y $z"}
+		set config(mount_reference) [join [lrange $spheres 0 2]]
 		set config(mount_left) [join [lrange $spheres 3 5]]
 		set config(mount_right) [join [lrange $spheres 6 8]]
 		set spheres [list]
 		foreach {d x y z} $numbers {lappend spheres "$d $x $y $z"}
 		set spheres [lrange $spheres 9 end]
-		set config(bodies) [list]
+		set a 0
 		foreach s $spheres {
-			lappend config(bodies) "[lrange $s 1 3] 0 0 0 sphere 0 0 0 [lindex $s 0]"
+			incr a
+			set config(body_$a) "[lrange $s 1 3] 0 0 0 sphere 0 0 0 [lindex $s 0]"
 		}
+		set config(num_bodies) $a
 	} else {
 		LWDAQ_print $info(text) "Cannot find \"$fn\"."
 		set info(state) "Idle"
 		return ""
 	}
 
-	set a 1
 	set count 0
-	foreach body $config(bodies) {
-		foreach {letter word} {L left R right} {
-			set imgf [file join $config(img_dir) $letter$a\.gif]
-			if {[file exists $imgf]} {
-				LWDAQ_read_image_file $imgf img_$word\_$a
+	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+		foreach {s side} {L left R right} {
+			set ifn [file join $config(img_dir) $s$a\.gif]
+			if {[file exists $ifn]} {
+				LWDAQ_read_image_file $ifn img_$side\_$a
 				incr count
 			}
 		}
-		incr a
 	}
-	LWDAQ_print $info(text) "Read left and right mounts,\
-		[llength $config(bodies)] bodies,\
-		$count images."
+	LWDAQ_print $info(text) "Read reference, left and right mounts.\
+		Read $config(num_bodies) bodies. Read $count images."
+	
+	CPMS_Calibrator_clear
 		
-	CPMS_Calibrator_show
+	set w $info(examine_window)
+	if {[winfo exists $w]} {
+		LWDAQ_print $info(text) "Updating calibration measurement window for new bodies."
+		destroy $w
+		CPMS_Calibrator_examine
+	}
+	
+	if {[catch {CPMS_Calibrator_show} error_message]} {
+		LWDAQ_print $info(text) "ERROR: $error_message\."
+		LWDAQ_print $info(text) \
+			"SUGGESTION: Check your CMM.txt file format and image names."	
+	}
 	
 	set info(state) "Idle"
 }
@@ -146,13 +244,13 @@ proc CPMS_Calibrator_disagreement {params} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
 
-	# If user has closed the manager window, generate an error so that we stop any
+	# If user has closed the calibrator window, generate an error so that we stop any
 	# fitting that might be calling this routine. 
 	if {![winfo exists $info(window)]} {
 		error "Cannot draw CPMS images: no CPMS window open."
 	}
 	
-	# Make sure messages from the SCAM routines get to the CPMS Manager's text
+	# Make sure messages from the SCAM routines get to the CPMS Calibrator's text
 	# window. Set the number of decimal places to three.
 	lwdaq_config -text_name $info(text)
 
@@ -161,24 +259,33 @@ proc CPMS_Calibrator_disagreement {params} {
 	set scam_left "SCAM_left [lrange $params 0 7]"
 	set scam_right "SCAM_left [lrange $params 8 15]"
 	
-	# Go through the four pairs of images, each of which views its own body. We 
-	# project the body into the image plane of each camera, measure disagreement
-	# and draw the images with coloring.
+	# Go through the list of bodies. For each body, we check to see if it is one
+	# chosen for the calibration fit. If so, we calculate disagreement for the
+	# left and right cameras and add to our disagreement total. If the body is
+	# the one we want to display, we display it with the silhouette and model
+	# colors in the overlay.
 	set disagreement 0
-	set a 1
-	foreach body $config(bodies) {
-		foreach side {left right} {
-			lwdaq_image_manipulate img_$side\_$a none -clear 1	
-			lwdaq_scam img_$side\_$a project \
-				$config(coord_$side) [set scam_$side] $body \
-				-num_lines $config(num_lines) -line_width $config(line_width)
-			set count [lindex [lwdaq_scam img_$side\_$a \
-				"disagreement" $config(threshold)] 0]
-			set disagreement [expr $disagreement + $count]
-			lwdaq_draw img_$side\_$a photo_$side\_$a \
-				-intensify $config(intensify) -zoom $config(zoom)
+	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+		if {[lsearch $config(fit_bodies) $a] >= 0} {set fit 1} else {set fit 0}
+		if {$a == $config(display_body)} {set display 1} else {set display 0}
+		if {$fit || $display} {
+			foreach side {left right} {
+				lwdaq_image_manipulate img_$side\_$a none -clear 1	
+				lwdaq_scam img_$side\_$a project \
+					$config(coord_$side) [set scam_$side] \
+					$config(body_$a) \
+					-num_lines $config(num_lines) -line_width $config(line_width)
+				set count [lindex [lwdaq_scam img_$side\_$a \
+					"disagreement" $config(threshold)] 0]
+				if {$fit} {
+					set disagreement [expr $disagreement + $count]
+				}
+				if {$display} {
+					lwdaq_draw img_$side\_$a photo_$side \
+						-intensify $config(intensify) -zoom $config(zoom)
+				}
+			}
 		}
-		incr a
 	}
 	
 	# Return the total disagreement, which is our error value.
@@ -259,7 +366,7 @@ proc CPMS_Calibrator_altitude {params} {
 	if {$config(stop_fit)} {error "Fit aborted by user"}
 	if {![winfo exists $info(window)]} {error "Tool window destroyed"}
 	set count [CPMS_Calibrator_disagreement "$params"]
-	LWDAQ_update
+	LWDAQ_support
 	return $count
 }
 
@@ -309,25 +416,60 @@ proc CPMS_Calibrator_fit {} {
 }
 
 #
-# CPMS_Calibrator_clear clears the overlay pixels in the cpms images, so that we see
-# only the original silhouette images.
+# CPMS_Calibrator_check opens the CPMS Manager and uses its fitting routine to
+# measure the position of all calibration bodies using the current camera
+# calibration constants and mount measurements. It compares the CPMS measurement
+# to the CMM measurement and reports on the difference. Before the CPMS Manager
+# performs its fit, we displace its model of the calibration model so as to
+# blind it to the correct body pose. The results of the check we print in the
+# calibrator text window, giving the position of the body as measured by the
+# CMM, and the difference between the CPMS measurement and the CMM measurement.
 #
-proc CPMS_Calibrator_clear {} {
+proc CPMS_Calibrator_check {} {
 	upvar #0 CPMS_Calibrator_config config
 	upvar #0 CPMS_Calibrator_info info
+	upvar #0 CPMS_Manager_config mconfig
+	upvar #0 CPMS_Manager_info minfo
+	upvar #0 LWDAQ_config_SCAM iconfig
+	
+	set config(stop_fit) 0
+	set info(state) "Check"
 
-	foreach a {1 2 3 4} {
-		lwdaq_image_manipulate img_left_$a none -clear 1
-		lwdaq_image_manipulate img_right_$a none -clear 1	
-		lwdaq_draw img_left_$a photo_left_$a \
-			-intensify $config(intensify) -zoom $config(zoom)
-		lwdaq_draw img_right_$a photo_right_$a \
-			-intensify $config(intensify) -zoom $config(zoom)
+	set iconfig(analysis_threshold) $config(threshold)
+
+	LWDAQ_run_tool "CPMS_Manager"
+	foreach b {num_lines line_width cam_left cam_right mount_left mount_right} {
+		set mconfig($b) $config($b)
 	}
+	
+	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+		if {$config(stop_fit)} {
+			LWDAQ_print $info(text) "Check aborted by user."
+			set info(state) "Idle"
+			return ""
+		}
+		if {[lsearch $config(fit_bodies) $a] >= 0} {
+			set mconfig(bodies) [list $config(body_$a)]
+			lwdaq_image_manipulate img_left\_$a copy -name $minfo(img_left)
+			lwdaq_image_manipulate img_right\_$a copy -name $minfo(img_right)
+			CPMS_Manager_displace
+			set result [lindex [CPMS_Manager_fit] 0]
+			
+			LWDAQ_print $info(text) "$a [lrange $config(body_$a) 0 2]\
+				[format %.3f [expr [lindex $result 0]-[lindex $config(body_$a) 0]]]\
+				[format %.3f [expr [lindex $result 1]-[lindex $config(body_$a) 1]]]\
+				[format %.3f [expr [lindex $result 2]-[lindex $config(body_$a) 2]]]"
+		}
+	}
+	
+	set info(state) "Idle"
+	return ""
+
 }
 
+
 #
-# CPMS_Calibrator_open opens the CPMS Manger Tool window.
+# CPMS_Calibrator_open opens the CPMS Calibrator window.
 #
 proc CPMS_Calibrator_open {} {
 	upvar #0 CPMS_Calibrator_config config
@@ -345,7 +487,7 @@ proc CPMS_Calibrator_open {} {
 	button $f.stop -text "Stop" -command {set CPMS_Calibrator_config(stop_fit) 1}
 	pack $f.stop -side left -expand yes
 
-	foreach a {Show Clear Displace Fit Read_Files} {
+	foreach a {Show Clear Displace Fit} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post CPMS_Calibrator_$b"
 		pack $f.$b -side left -expand yes
@@ -357,7 +499,7 @@ proc CPMS_Calibrator_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	foreach a {Help Configure} {
+	foreach a {Configure Help} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
@@ -378,46 +520,36 @@ proc CPMS_Calibrator_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	set f [frame $w.mounts]
+	set f [frame $w.measurements]
 	pack $f -side top -fill x
 
-	foreach a {mount_left mount_right} {
+	foreach a {Read Examine Check} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post CPMS_Calibrator_$b"
+		pack $f.$b -side left -expand yes
+	}
+
+	foreach a {num_bodies display_body} {
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 60
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 3
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
-
-	set f [frame $w.bodies]
-	pack $f -side top -fill x
-
-	label $f.lbody -text "bodies:"
-	entry $f.ebody -textvariable CPMS_Calibrator_config(bodies) -width 180
-	pack $f.lbody $f.ebody -side left -expand yes
 		
-	set f [frame $w.images_a]
-	pack $f -side top -fill x
-
-	foreach a {1 2} {
-		image create photo "photo_left_$a"
-		label $f.left_$a -image "photo_left_$a"
-		pack $f.left_$a -side left -expand yes
-		image create photo "photo_right_$a"
-		label $f.right_$a -image "photo_right_$a"
-		pack $f.right_$a -side left -expand yes
+	foreach a {fit_bodies} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 30
+		pack $f.l$a $f.e$a -side left -expand yes
 	}
 		
-	set f [frame $w.images_b]
+	set f [frame $w.images]
 	pack $f -side top -fill x
 
-	foreach a {3 4} {
-		image create photo "photo_left_$a"
-		label $f.left_$a -image "photo_left_$a"
-		pack $f.left_$a -side left -expand yes
-		image create photo "photo_right_$a"
-		label $f.right_$a -image "photo_right_$a"
-		pack $f.right_$a -side left -expand yes
+	foreach a {left right} {
+		image create photo "photo_$a"
+		label $f.$a -image "photo_$a"
+		pack $f.$a -side left -expand yes
 	}
-
+	
 	set info(text) [LWDAQ_text_widget $w 100 15]
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n"
 	lwdaq_config -text_name $info(text) -fsd 3	
@@ -436,60 +568,140 @@ return ""
 The Contactless Position Measurement System (CPMS) Calibrator calculates the
 calibration constants of the two Silhouette Cameras (SCAMs) mounted on a CPMS
 base plate. The routine assumes we have Coordinate Measuring Machine (CMM)
-measurements of the global coordinates and diameter of a sphere in each of four
-positions in the field of view of both SCAMs, CMM measurements of the left and
-right SCAM mounting balls in the same coordinate system, and left and right SCAM
-images the sphere in each of the four positions. The sphere need not be the same
-sphere. That is: we could use different diameter spheres in each of the four
-locations. 
+measurements of a reference mount, a left SCAM mount, a right SCAM mount, and
+two or more bodies in the field of view of both SCAMs. These "bodies" can be the
+same or different bodies. This version of the Calibrator supports only
+single-sphere bodies, but future versions might permit calibration with shafts
+and pairs of spheres. The Calibrator assumes we have both left and right SCAM
+images to accompany all calibration bodies. 
 
 The CMM output file must contain the diameter, and x, y, and z coordinates of
-the three balls used to define the global coordinate system, followed by the
-same for the cone, slot, and flat balls of the left mount, followed by the same
-for the right mount, and finally the same for each of the four calibration
-spheres in sequence. The file containing these measurements must be named
-CMM.txt. The file can contain any number of words that are not well-formed real
-number strings, and it can contain any number of white space charcters. All
-words that are not real numbers will be ignored. An example CMM.txt file is to
-be found in the data section of the CPMS_Calibrator.tcl script. The images must
-be named L1, R1, L2, R2,.. for the four spheres. They can be in GIF, PNG, or DAQ
-format.
+the cone, slot, and flat balls in the mount we use to define the global
+coordinate system, followed by the same for the left and right mounts. Next come
+the diameter, x, y, and z coordinates of each calibration sphere. The file
+containing these measurements must be named CMM.txt. In addition to the measured
+diameters and coordinates, CMM.txt may contain any number of words that are not
+real number strings and any number of white space charcters. All words that are
+not real numbers will be ignored. An example CMM.txt file is to be found below.
+The images must be named L1, R1, L2, ... RN for the N spheres. The spheres can
+be GIF, PNG, or DAQ.
 
-The calibrator works by minimizing disagreement between actual silhouettes and a
-line drawing of modelled spheres. The line drawing can be sparse, as when
-num_lines = 20, or filled completely, as when num_lines = 2000. We can increase
-the thickness of the lines with the line_width parameter. The silhouettes will
-be drawn using the intensity threshold dictated by the threshold string. When we
-press Fit, the simplex fitter starts minimizing the disagreement by adjusting
-the calibrations of the left and right SCAMs. This process can take one or two
-minutes. The buttons in the calibrator have the following functions.
++---------------------+--------------+------+-----------+---------+
+| Feature Table       |              |      |           |         |
++---------------------+--------------+------+-----------+---------+
+| Length Units        | Millimeters  |      |           |         |
+| Coordinate Systems  | Global       |      |           |         | 
+| Data Alignments     | original     |      |           |         |
+|                     |              |      |           |         |
+| Name                | Control      | Nom  | Meas      | Tol     |
+| Cone                | Diameter     |      | 6.338     | ±1.000  |
+| Cone                | X            |      | 0.000     | ±1.000  |
+| Cone                | Y            |      | 0.000     | ±1.000  |
+| Cone                | Z            |      | 0.000     | ±1.000  |
+| Slot                | Diameter     |      | 6.339     | ±1.000  |
+| Slot                | X            |      | -20.975   | ±1.000  |
+| Slot                | Y            |      | 0.000     | ±1.000  |
+| Slot                | Z            |      | -72.999   | ±1.000  |
+| Flat                | Diameter     |      | 6.335     | ±1.000  |
+| Flat                | X            |      | 21.008    | ±1.000  |
+| Flat                | Y            |      | 0.000     | ±1.000  |
+| Flat                | Z            |      | -73.065   | ±1.000  |
+| ConeL               | Diameter     |      | 6.340     | ±1.000  |
+| ConeL               | X            |      | 91.877    | ±1.000  |
+| ConeL               | Y            |      | -19.475   | ±1.000  |
+| ConeL               | Z            |      | -3.330    | ±1.000  |
+| SlotL               | Diameter     |      | 6.338     | ±1.000  |
+| SlotL               | X            |      | 83.628    | ±1.000  |
+| SlotL               | Y            |      | -19.455   | ±1.000  |
+| SlotL               | Z            |      | -78.877   | ±1.000  |
+| FlatL               | Diameter     |      | 6.341     | ±1.000  |
+| FlatL               | X            |      | 124.975   | ±1.000  |
+| FlatL               | Y            |      | -19.476   | ±1.000  |
+| FlatL               | Z            |      | -71.682   | ±1.000  |
+| ConeR               | Diameter     |      | 6.336     | ±1.000  |
+| ConeR               | X            |      | -78.059   | ±1.000  |
+| ConeR               | Y            |      | -19.492   | ±1.000  |
+| ConeR               | Z            |      | -2.332    | ±1.000  |
+| SlotR               | Diameter     |      | 6.337     | ±1.000  |
+| SlotR               | X            |      | -75.026   | ±1.000  |
+| SlotR               | Y            |      | -19.497   | ±1.000  |
+| SlotR               | Z            |      | -78.231   | ±1.000  |
+| FlatR               | Diameter     |      | 6.339     | ±1.000  |
+| FlatR               | X            |      | -115.797  | ±1.000  |
+| FlatR               | Y            |      | -19.534   | ±1.000  |
+| FlatR               | Z            |      | -68.268   | ±1.000  |
+| S1                  | Diameter     |      | 38.060    | ±1.000  |
+| S1                  | X            |      | 21.098    | ±1.000  |
+| S1                  | Y            |      | 24.145    | ±1.000  |
+| S1                  | Z            |      | 386.482   | ±1.000  |
+| S2                  | Diameter     |      | 38.054    | ±1.000  |
+| S2                  | X            |      | 21.274    | ±1.000  |
+| S2                  | Y            |      | 12.845    | ±1.000  |
+| S2                  | Z            |      | 386.406   | ±1.000  |
++---------------------+--------------+------+-----------+---------+
+
+The calibrator works by minimizing disagreement between actual silhouettes and
+drawings of modelled spheres. The drawing should be filled, as when num_lines is
+2000, or else the fit may not converge correctly. The line width should be only
+one pixel, as with line_width is 1, or else the fill will make the modelled
+object appear too large. The silhouettes will be drawn using the intensity
+threshold dictated by the threshold string. When we press Fit, the simplex
+fitter starts minimizing the disagreement by adjusting the calibrations of the
+left and right SCAMs. The fit applies the "scaling" values to the eight
+calibration constants of the cameras. We can fix any one of the eight parameters
+by setting its scaling value to zero. We always fix the pivot.z of SCAMs because
+this parameter has no geometric implementation. The fit uses only those
+calibration bodies specified in the fit_bodies string. If we want all bodies to
+be used, we list all the body numbers from 1 to N for N bodies. If we want to
+use only two of them, we list their indeces. During the fit, we select one of
+the bodies to view by giving its index in the display_body entry. We can change
+both fit_bodies and display_bodies during the fit, and the fit will adapt as it
+proceeds.
 
 Stop: Abort fitting.
 
-Show: Show the silhouettes and line drawings.
+Show: Show the silhouettes and modelled bodies.
 
-Clear: Clear the silhouettes and line drawings, show the raw images.
+Clear: Clear the silhouettes and modelled bodies, show the raw images.
 
 Displace: Displace the camera calibration constants from their current values.
 
 Fit: Start the simplex fitter adjusting calibration constants to minimize
 disagreement.
 
-Read_Files: Select a directory, read image files and CMM measurements
+Configure: Open configuration panel with Save and Unsave buttons.
 
 Help: Get this help page.
 
-Configure: Open configuration panel with Save and Unsave buttons.
+Read: Select a directory, read image files and CMM measurements. The images must
+be L1.gif, R1.gif, ... RN.gif, where N is the number of calibration spheres. The
+CMM measurements must be in a file called CMM.txt. The only real-valued words in
+the file must be diameter, x, y, z coordinates in millimeters of the three
+global coordinate system definition balls, the cone, slot, flat balls of the
+left and right SCAM mounts, and the calibration spheres. The text table below is
+an example of one produced by our CMM that satisfies the calibrator's
+requirements.
 
-To use the calibrator, press Read_Files and select your measurements. The
-calibrator will display the images, silhouettes, and the modelled spheres. If
-the spheres are nowhere near the silhouettes, or they are not visible, you most
-likely have a mix-up in the mount coordinates. You may be saing that a slot ball
-is a flat ball, for example, as is likely when you swap a blue for a black SCAM.
-When you have the modelled spheres overlapping the silhouettes, press Fit. The
-modelled spheres will start moving around. The status indicator on the top left
-will say "Fitting". After a minute or two, the fit will converge. The status
-label will return to "Idle". The camera calibration constants are now ready.
+Examine: Open a window that displays the mount and body measurements produce by
+the CMM. We can modify any measurement in this window and see how our
+modification affects the fit by following with the Show button.
+
+Check: Opens the CPMS Manager Tool and uses its fitting routine to check the
+performance of the current camera calibration constants when applied to all
+bodies listed in fit_bodies. Leaves the CPMS Manager open at the end, with
+mounts and cameras updated.
+
+To use the calibrator, press Read and select your measurements. The calibrator
+will display the images, silhouettes, and the modelled bodies. If the bodies are
+nowhere near the silhouettes, or they are not visible, you most likely have a
+mix-up in the mount coordinates. Check that you have the slot and cone balls
+named correctly for your black and blue SCAMs. If some bodies are in view of
+both cameras, but others are not, use fit_bodies to select two or more bodies
+that are in view of both cameras. Press Fit. Choose a body to display with
+display_body. The modelled body will start moving around. The status indicator
+on the top left will say "Fitting". After a minute or two, the fit will
+converge. The status label will return to "Idle". The camera calibration
+constants are now ready.
 
 (C) Kevan Hashemi, 2023, Open Source Instruments Inc.
 https://www.opensourceinstruments.com
@@ -498,66 +710,67 @@ https://www.opensourceinstruments.com
 
 ----------Begin Data----------
 
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
-| Feature Table       |              |      |           |         |      |       |          |
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
-| Length Units        | Millimeters  |      |           |         |      |       |          |
-| Coordinate Systems  | Main         |      |           |         |      |       |          |
-| Data Alignments     | original     |      |           |         |      |       |          |
-|                     |              |      |           |         |      |       |          |
-| Name                | Control      | Nom  | Meas      | Tol     | Dev  | Test  | Out Tol  |
-| Cone                | Diameter     |      | 6.345     | ±1.000  |      |       |          |
-| Cone                | X            |      | 0.000     | ±1.000  |      |       |          |
-| Cone                | Y            |      | 0.000     | ±1.000  |      |       |          |
-| Cone                | Z            |      | 0.000     | ±1.000  |      |       |          |
-| Slot                | Diameter     |      | 6.347     | ±1.000  |      |       |          |
-| Slot                | X            |      | -20.975   | ±1.000  |      |       |          |
-| Slot                | Y            |      | 0.000     | ±1.000  |      |       |          |
-| Slot                | Z            |      | -73.000   | ±1.000  |      |       |          |
-| Flat                | Diameter     |      | 6.346     | ±1.000  |      |       |          |
-| Flat                | X            |      | 21.010    | ±1.000  |      |       |          |
-| Flat                | Y            |      | 0.517     | ±1.000  |      |       |          |
-| Flat                | Z            |      | -73.060   | ±1.000  |      |       |          |
-| ConeL               | Diameter     |      | 6.339     | ±1.000  |      |       |          |
-| ConeL               | X            |      | 92.134    | ±1.000  |      |       |          |
-| ConeL               | Y            |      | -18.283   | ±1.000  |      |       |          |
-| ConeL               | Z            |      | -3.435    | ±1.000  |      |       |          |
-| SlotL               | Diameter     |      | 6.338     | ±1.000  |      |       |          |
-| SlotL               | X            |      | 83.868    | ±1.000  |      |       |          |
-| SlotL               | Y            |      | -18.132   | ±1.000  |      |       |          |
-| SlotL               | Z            |      | -78.935   | ±1.000  |      |       |          |
-| FlatL               | Diameter     |      | 6.336     | ±1.000  |      |       |          |
-| FlatL               | X            |      | 125.222   | ±1.000  |      |       |          |
-| FlatL               | Y            |      | -17.636   | ±1.000  |      |       |          |
-| FlatL               | Z            |      | -71.795   | ±1.000  |      |       |          |
-| ConeR               | Diameter     |      | 6.343     | ±1.000  |      |       |          |
-| ConeR               | X            |      | -77.784   | ±1.000  |      |       |          |
-| ConeR               | Y            |      | -20.454   | ±1.000  |      |       |          |
-| ConeR               | Z            |      | -2.384    | ±1.000  |      |       |          |
-| SlotR               | Diameter     |      | 6.339     | ±1.000  |      |       |          |
-| SlotR               | X            |      | -74.756   | ±1.000  |      |       |          |
-| SlotR               | Y            |      | -20.146   | ±1.000  |      |       |          |
-| SlotR               | Z            |      | -78.278   | ±1.000  |      |       |          |
-| FlatR               | Diameter     |      | 6.338     | ±1.000  |      |       |          |
-| FlatR               | X            |      | -115.524  | ±1.000  |      |       |          |
-| FlatR               | Y            |      | -20.735   | ±1.000  |      |       |          |
-| FlatR               | Z            |      | -68.300   | ±1.000  |      |       |          |
-| 0cm                 | Diameter     |      | 38.068    | ±1.000  |      |       |          |
-| 0cm                 | X            |      | 20.231    | ±1.000  |      |       |          |
-| 0cm                 | Y            |      | 19.192    | ±1.000  |      |       |          |
-| 0cm                 | Z            |      | 506.194   | ±1.000  |      |       |          |
-| 4cm                 | Diameter     |      | 38.066    | ±1.000  |      |       |          |
-| 4cm                 | X            |      | 20.017    | ±1.000  |      |       |          |
-| 4cm                 | Y            |      | 19.275    | ±1.000  |      |       |          |
-| 4cm                 | Z            |      | 466.169   | ±1.000  |      |       |          |
-| 7cm                 | Diameter     |      | 38.073    | ±1.000  |      |       |          |
-| 7cm                 | X            |      | 19.861    | ±1.000  |      |       |          |
-| 7cm                 | Y            |      | 19.319    | ±1.000  |      |       |          |
-| 7cm                 | Z            |      | 436.169   | ±1.000  |      |       |          |
-| 10cm                | Diameter     |      | 38.072    | ±1.000  |      |       |          |
-| 10cm                | X            |      | 19.693    | ±1.000  |      |       |          |
-| 10cm                | Y            |      | 19.371    | ±1.000  |      |       |          |
-| 10cm                | Z            |      | 406.173   | ±1.000  |      |       |          |
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
++---------------------+--------------+------+-----------+---------+
+| Feature Table       |              |      |           |         |
++---------------------+--------------+------+-----------+---------+
+| Length Units        | Millimeters  |      |           |         |
+| Coordinate Systems  | Global       |      |           |         | 
+| Data Alignments     | original     |      |           |         |
+|                     |              |      |           |         |
+| Name                | Control      | Nom  | Meas      | Tol     |
+| Cone                | Diameter     |      | 6.338     | ±1.000  |
+| Cone                | X            |      | 0.000     | ±1.000  |
+| Cone                | Y            |      | 0.000     | ±1.000  |
+| Cone                | Z            |      | 0.000     | ±1.000  |
+| Slot                | Diameter     |      | 6.339     | ±1.000  |
+| Slot                | X            |      | -20.975   | ±1.000  |
+| Slot                | Y            |      | 0.000     | ±1.000  |
+| Slot                | Z            |      | -72.999   | ±1.000  |
+| Flat                | Diameter     |      | 6.335     | ±1.000  |
+| Flat                | X            |      | 21.008    | ±1.000  |
+| Flat                | Y            |      | 0.000     | ±1.000  |
+| Flat                | Z            |      | -73.065   | ±1.000  |
+| ConeL               | Diameter     |      | 6.340     | ±1.000  |
+| ConeL               | X            |      | 91.877    | ±1.000  |
+| ConeL               | Y            |      | -19.475   | ±1.000  |
+| ConeL               | Z            |      | -3.330    | ±1.000  |
+| SlotL               | Diameter     |      | 6.338     | ±1.000  |
+| SlotL               | X            |      | 83.628    | ±1.000  |
+| SlotL               | Y            |      | -19.455   | ±1.000  |
+| SlotL               | Z            |      | -78.877   | ±1.000  |
+| FlatL               | Diameter     |      | 6.341     | ±1.000  |
+| FlatL               | X            |      | 124.975   | ±1.000  |
+| FlatL               | Y            |      | -19.476   | ±1.000  |
+| FlatL               | Z            |      | -71.682   | ±1.000  |
+| ConeR               | Diameter     |      | 6.336     | ±1.000  |
+| ConeR               | X            |      | -78.059   | ±1.000  |
+| ConeR               | Y            |      | -19.492   | ±1.000  |
+| ConeR               | Z            |      | -2.332    | ±1.000  |
+| SlotR               | Diameter     |      | 6.337     | ±1.000  |
+| SlotR               | X            |      | -75.026   | ±1.000  |
+| SlotR               | Y            |      | -19.497   | ±1.000  |
+| SlotR               | Z            |      | -78.231   | ±1.000  |
+| FlatR               | Diameter     |      | 6.339     | ±1.000  |
+| FlatR               | X            |      | -115.797  | ±1.000  |
+| FlatR               | Y            |      | -19.534   | ±1.000  |
+| FlatR               | Z            |      | -68.268   | ±1.000  |
+| S1                  | Diameter     |      | 38.060    | ±1.000  |
+| S1                  | X            |      | 21.098    | ±1.000  |
+| S1                  | Y            |      | 24.145    | ±1.000  |
+| S1                  | Z            |      | 386.482   | ±1.000  |
+| S2                  | Diameter     |      | 38.054    | ±1.000  |
+| S2                  | X            |      | 21.274    | ±1.000  |
+| S2                  | Y            |      | 12.845    | ±1.000  |
+| S2                  | Z            |      | 386.406   | ±1.000  |
+| S3                  | Diameter     |      | 38.056    | ±1.000  |
+| S3                  | X            |      | 26.487    | ±1.000  |
+| S3                  | Y            |      | -2.695    | ±1.000  |
+| S3                  | Z            |      | 640.772   | ±1.000  |
+| S4                  | Diameter     |      | 38.062    | ±1.000  |
+| S4                  | X            |      | 26.679    | ±1.000  |
+| S4                  | Y            |      | 39.634    | ±1.000  |
+| S4                  | Z            |      | 641.064   | ±1.000  |
++---------------------+--------------+------+-----------+---------+
+
 
 ----------End Data----------
