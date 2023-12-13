@@ -22,11 +22,11 @@ proc CPMS_Calibrator_init {} {
 	upvar #0 CPMS_Calibrator_info info
 	upvar #0 CPMS_Calibrator_config config
 	
-	LWDAQ_tool_init "CPMS_Calibrator" "4.2"
+	LWDAQ_tool_init "CPMS_Calibrator" "4.3"
 	if {[winfo exists $info(window)]} {return ""}
 
-	set config(cam_left) "12.675 39.312 7.0 0.0 0.0 2 26.0 0.0" 
-	set config(cam_right) "12.675 -39.312 7.0 0.0 0.0 2 26.0 3141.6" 
+	set config(cam_left) "12.675 39.312 5.2 0.0 0.0 2 25.0 0.0" 
+	set config(cam_right) "12.675 -39.312 5.2 0.0 0.0 2 25.0 3141.6" 
 	set config(scaling) "0 0 0 1 1 0 1 1"
 
 	set config(mount_reference) "0 0 0 -21 0 -73 21 0 -73"
@@ -49,6 +49,8 @@ proc CPMS_Calibrator_init {} {
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
+	set config(fit_startsize) "1"
+	set config(fit_endsize) "0.005"
 	set config(stop_fit) "0"
 	set config(zoom) "0.5"
 	set config(intensify) "exact"
@@ -346,7 +348,7 @@ proc CPMS_Calibrator_displace {} {
 		for {set i 0} {$i < [llength $config(cam_$side)]} {incr i} {
 			lset config(cam_$side) $i [format %.3f \
 				[expr [lindex $config(cam_$side) $i] \
-					+ (rand()-0.5)*10.0*[lindex $config(scaling) $i]]]
+					+ (rand()-0.5)*[lindex $config(scaling) $i]]]
 		}
 	}
 	set params [CPMS_Calibrator_get_params]
@@ -398,8 +400,11 @@ proc CPMS_Calibrator_fit {} {
 		set start_params [CPMS_Calibrator_get_params] 
 		set end_params [lwdaq_simplex $start_params \
 			CPMS_Calibrator_altitude \
-			-report 0 -steps $config(fit_steps) -restarts $config(fit_restarts) \
-			-start_size 1.0 -end_size 0.01 \
+			-report 0 \
+			-steps $config(fit_steps) \
+			-restarts $config(fit_restarts) \
+			-start_size $config(fit_startsize) \
+			-end_size $config(fit_endsize) \
 			-scaling $scaling]
 		if {[LWDAQ_is_error_result $end_params]} {error "$end_params"}
 		LWDAQ_print $info(text) $end_params black
@@ -467,7 +472,6 @@ proc CPMS_Calibrator_check {} {
 
 }
 
-
 #
 # CPMS_Calibrator_open opens the CPMS Calibrator window.
 #
@@ -493,33 +497,30 @@ proc CPMS_Calibrator_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {threshold num_lines line_width} {
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 4
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-	
 	foreach a {Configure Help} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
 	}
-
-	set f [frame $w.cameras]
+	
+	set f [frame $w.scam]
 	pack $f -side top -fill x
-
-	foreach a {cam_left cam_right} {
+	
+	foreach {a wd} {threshold 6 num_lines 4 line_width 2 scaling 20} {
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 50
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	foreach a {scaling} {
+	set f [frame $w.cameras]
+	pack $f -side top -fill x
+
+	foreach {a wd} {cam_left 50 cam_right 50} {
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 20
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
-
+	
 	set f [frame $w.measurements]
 	pack $f -side top -fill x
 
@@ -529,15 +530,9 @@ proc CPMS_Calibrator_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {num_bodies display_body} {
+	foreach {a wd} {num_bodies 3 display_body 3 fit_bodies 30} {
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 3
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-		
-	foreach a {fit_bodies} {
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width 30
+		entry $f.e$a -textvariable CPMS_Calibrator_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 		
@@ -709,68 +704,6 @@ https://www.opensourceinstruments.com
 ----------End Help----------
 
 ----------Begin Data----------
-
-+---------------------+--------------+------+-----------+---------+
-| Feature Table       |              |      |           |         |
-+---------------------+--------------+------+-----------+---------+
-| Length Units        | Millimeters  |      |           |         |
-| Coordinate Systems  | Global       |      |           |         | 
-| Data Alignments     | original     |      |           |         |
-|                     |              |      |           |         |
-| Name                | Control      | Nom  | Meas      | Tol     |
-| Cone                | Diameter     |      | 6.338     | ±1.000  |
-| Cone                | X            |      | 0.000     | ±1.000  |
-| Cone                | Y            |      | 0.000     | ±1.000  |
-| Cone                | Z            |      | 0.000     | ±1.000  |
-| Slot                | Diameter     |      | 6.339     | ±1.000  |
-| Slot                | X            |      | -20.975   | ±1.000  |
-| Slot                | Y            |      | 0.000     | ±1.000  |
-| Slot                | Z            |      | -72.999   | ±1.000  |
-| Flat                | Diameter     |      | 6.335     | ±1.000  |
-| Flat                | X            |      | 21.008    | ±1.000  |
-| Flat                | Y            |      | 0.000     | ±1.000  |
-| Flat                | Z            |      | -73.065   | ±1.000  |
-| ConeL               | Diameter     |      | 6.340     | ±1.000  |
-| ConeL               | X            |      | 91.877    | ±1.000  |
-| ConeL               | Y            |      | -19.475   | ±1.000  |
-| ConeL               | Z            |      | -3.330    | ±1.000  |
-| SlotL               | Diameter     |      | 6.338     | ±1.000  |
-| SlotL               | X            |      | 83.628    | ±1.000  |
-| SlotL               | Y            |      | -19.455   | ±1.000  |
-| SlotL               | Z            |      | -78.877   | ±1.000  |
-| FlatL               | Diameter     |      | 6.341     | ±1.000  |
-| FlatL               | X            |      | 124.975   | ±1.000  |
-| FlatL               | Y            |      | -19.476   | ±1.000  |
-| FlatL               | Z            |      | -71.682   | ±1.000  |
-| ConeR               | Diameter     |      | 6.336     | ±1.000  |
-| ConeR               | X            |      | -78.059   | ±1.000  |
-| ConeR               | Y            |      | -19.492   | ±1.000  |
-| ConeR               | Z            |      | -2.332    | ±1.000  |
-| SlotR               | Diameter     |      | 6.337     | ±1.000  |
-| SlotR               | X            |      | -75.026   | ±1.000  |
-| SlotR               | Y            |      | -19.497   | ±1.000  |
-| SlotR               | Z            |      | -78.231   | ±1.000  |
-| FlatR               | Diameter     |      | 6.339     | ±1.000  |
-| FlatR               | X            |      | -115.797  | ±1.000  |
-| FlatR               | Y            |      | -19.534   | ±1.000  |
-| FlatR               | Z            |      | -68.268   | ±1.000  |
-| S1                  | Diameter     |      | 38.060    | ±1.000  |
-| S1                  | X            |      | 21.098    | ±1.000  |
-| S1                  | Y            |      | 24.145    | ±1.000  |
-| S1                  | Z            |      | 386.482   | ±1.000  |
-| S2                  | Diameter     |      | 38.054    | ±1.000  |
-| S2                  | X            |      | 21.274    | ±1.000  |
-| S2                  | Y            |      | 12.845    | ±1.000  |
-| S2                  | Z            |      | 386.406   | ±1.000  |
-| S3                  | Diameter     |      | 38.056    | ±1.000  |
-| S3                  | X            |      | 26.487    | ±1.000  |
-| S3                  | Y            |      | -2.695    | ±1.000  |
-| S3                  | Z            |      | 640.772   | ±1.000  |
-| S4                  | Diameter     |      | 38.062    | ±1.000  |
-| S4                  | X            |      | 26.679    | ±1.000  |
-| S4                  | Y            |      | 39.634    | ±1.000  |
-| S4                  | Z            |      | 641.064   | ±1.000  |
-+---------------------+--------------+------+-----------+---------+
 
 
 ----------End Data----------

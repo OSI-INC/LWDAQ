@@ -41,6 +41,8 @@ proc CPMS_Manager_init {} {
 	set config(scaling) "1 1 1 0 0.1 0.1"
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
+	set config(fit_startsize) "1"
+	set config(fit_endsize) "0.01"
 	set config(num_lines) "100"
 	set config(line_width) "1"
 	set config(stop_fit) "0"
@@ -55,6 +57,7 @@ proc CPMS_Manager_init {} {
 	
 	set config(image_dir) "~/Desktop"
 	set config(auto_fit) "0"
+	set config(auto_disp) "0"
 	set config(file_index) "0000000000"
 	
 	set info(calib_window) "$info(window).calib_window"
@@ -200,7 +203,7 @@ proc CPMS_Manager_displace {} {
 		for {set j 0} {$j < 6} {incr j} {
 			lset config(bodies) $i $j [format %.3f \
 				[expr [lindex $config(bodies) $i $j] \
-					+ (rand()-0.5)*10.0*[lindex $config(scaling) $j]]]
+					+ (rand()-0.5)*[lindex $config(scaling) $j]]]
 		}
 	}
 	CPMS_Manager_disagreement [CPMS_Manager_get_params]
@@ -235,7 +238,7 @@ proc CPMS_Manager_altitude {params} {
 # factor is 10, the parameter will be adjusted by ten times the amount as a
 # parameter with scaling factor one. At the end of the fit, we take the final
 # fitted parameter values and apply them to our body models. We return the
-# fitted body positions.
+# fitted body positions. The routine returns the final poses of the bodies.
 #
 proc CPMS_Manager_fit {} {
 	upvar #0 CPMS_Manager_config config
@@ -255,8 +258,8 @@ proc CPMS_Manager_fit {} {
 			-report 0 \
 			-steps $config(fit_steps) \
 			-restarts $config(fit_restarts) \
-			-start_size 1.0 \
-			-end_size 0.01 \
+			-start_size $config(fit_startsize) \
+			-end_size $config(fit_endsize) \
 			-scaling $scaling]
 		if {[LWDAQ_is_error_result $result]} {error "$result"}
 		LWDAQ_print -nonewline $info(text) "$config(file_index) " green	
@@ -303,7 +306,9 @@ proc CPMS_Manager_clear {} {
 
 #
 # CPMS_Manager_acquire uses the SCAM Instrument to acquire two SCAM images, thus
-# obtaining a stereo CPMS pair of images.
+# obtaining a stereo CPMS pair of images. If auto_fit is set, we measure the
+# pose of our listed bodies. If auto_disp is set, we displace out existing
+# bodies before fitting.
 #
 proc CPMS_Manager_acquire {} {
 	upvar #0 CPMS_Manager_config config
@@ -335,6 +340,9 @@ proc CPMS_Manager_acquire {} {
 	
 	set config(file_index) [clock seconds]
 	if {$config(auto_fit)} {
+		if {$config(auto_disp)} {
+			CPMS_Manager_displace
+		}
 		CPMS_Manager_fit
 	} else {
 		CPMS_Manager_show
@@ -395,39 +403,72 @@ proc CPMS_Manager_write {} {
 #
 # CPMS_Manager_read reads pairs of image files from disk. It opens a browser in
 # the image directory and allows us to select images. We must selet an even
-# number of images for the read to complete. Each pair of stereo image files
-# must be named in the CPMS format, which is L and UNIX time with GIF extension
-# for left and same with R for right. If auto_fit is set, the routine fits the
-# modelled bodies to each pair of images and prints results to text window.
+# number of images. The images may be arranged in pairs in one of two ways. One
+# way is to have them named as they were written by the CPMS Manager, in the
+# format Sx_L.gif and Sx_L.gif, where x is a ten-digit unit time stamp. Another
+# way to arrange them is to name them Ln.gif and Rn.gif, where n is an index.
+# The read routine detects which file-naming convention has been used. It
+# selects the image pairs according to time stamp or index and displays them. If
+# auto_fit is set, the routine fits the modelled bodies to each pair of images
+# and prints results to text window. If auto_disp is set, we displace the 
+# body models randomly before the fit.
 #
 proc CPMS_Manager_read {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 	global LWDAQ_Info
 
-	set info(state) "Read"
-	LWDAQ_update
-	
+	# Get the list of files and sort in increasing order.
 	if {[file exists $config(image_dir)]} {
 		set LWDAQ_Info(working_dir) $config(image_dir)
 	}
-	set fnl [lsort -increasing [LWDAQ_get_file_name 1]]
+	set fnl [lsort -increasing -dictionary [LWDAQ_get_file_name 1]]
+	
+	# Read and display Sx_L/Sx_R pairs.
 	foreach {lfn rfn} $fnl {
-		LWDAQ_read_image_file $lfn $info(img_left)
-		LWDAQ_read_image_file $rfn $info(img_right)
-		if {[regexp {S([0-9]{10})} [file tail $lfn] match ts]} {
-			set config(file_index) $ts
-		} else {
-			set config(file_index) [file root [file tail $lfn]]
-		}
-		if {$config(auto_fit)} {
-			CPMS_Manager_fit
-		} else {
-			CPMS_Manager_show
-		}
+		if {[regexp {S([0-9]{10})_L\.gif} [file tail $lfn] match ts]} {
+			if {[regexp {S([0-9]{10})_R\.gif} $rfn]} {
+				LWDAQ_read_image_file $lfn $info(img_left)
+				LWDAQ_read_image_file $rfn $info(img_right)
+				set config(file_index) $ts
+				if {$config(auto_fit)} {
+					if {$config(auto_disp)} {
+						CPMS_Manager_displace
+					}
+					CPMS_Manager_fit
+				} else {
+					CPMS_Manager_show
+				}
+			} else {
+				LWDAQ_print $info(text) "ERROR: Images [file tail $lfn]\
+					and [file tail $rfn] do not match."
+			}
+		} 
+	}
+
+	# Read and display Lx/Rx pairs.
+	foreach {lfn} $fnl {
+		if {[regexp {L([0-9]+)\.gif} [file tail $lfn] match index]} {
+			set rfn [file join [file dirname $lfn] R$index\.gif]
+			if {[file exists $rfn]} {
+				LWDAQ_read_image_file $lfn $info(img_left)
+				LWDAQ_read_image_file $rfn $info(img_right)
+				set config(file_index) $index
+				if {$config(auto_fit)} {
+					if {$config(auto_disp)} {
+						CPMS_Manager_displace
+					}
+					CPMS_Manager_fit
+				} else {
+					CPMS_Manager_show
+				}
+			} else {
+				LWDAQ_print $info(text) "ERROR: Image [file tail $lfn]\
+					has no partner [file tail $rfn]."
+			}
+		} 
 	}
 	
-	set info(state) "Idle"
 	return ""
 }
 
@@ -503,6 +544,9 @@ proc CPMS_Manager_open {} {
 	
 	checkbutton $f.af -variable CPMS_Manager_config(auto_fit) -text "auto_fit"
 	pack $f.af -side left -expand yes
+
+	checkbutton $f.ad -variable CPMS_Manager_config(auto_disp) -text "auto_disp"
+	pack $f.ad -side left -expand yes
 
 	label $f.lfi -text "index:"
 	entry $f.efi -textvariable CPMS_Manager_config(file_index) -width 12
