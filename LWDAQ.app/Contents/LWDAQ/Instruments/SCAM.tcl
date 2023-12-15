@@ -84,7 +84,7 @@ proc LWDAQ_init_SCAM {} {
 	set config(daq_adjust_flash) "0"
 	set config(daq_flash_seconds) "0.05"
 	set config(intensify) "exact"
-	set config(analysis_threshold) "5 %"
+	set config(analysis_threshold) "13 %"
 	set config(analysis_enable) "1"
 	set config(verbose_result) "0"
 

@@ -21,6 +21,7 @@
 proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
+	upvar #0 LWDAQ_info_SCAM iinfo
 	
 	LWDAQ_tool_init "CPMS_Manager" "1.9"
 	if {[winfo exists $info(window)]} {return ""}
@@ -38,12 +39,12 @@ proc CPMS_Manager_init {} {
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	
 	set config(bodies) [list {0 20 450 0 0 0 sphere 0 0 0 38.068} ]
-	set config(scaling) "1 1 1 0 0.1 0.1"
+	set config(scaling) "1 1 5 0 0.02 0.02"
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
 	set config(fit_startsize) "1"
 	set config(fit_endsize) "0.01"
-	set config(num_lines) "100"
+	set config(num_lines) "1000"
 	set config(line_width) "1"
 	set config(stop_fit) "0"
 	
@@ -55,6 +56,16 @@ proc CPMS_Manager_init {} {
 	set config(left_source_socket) "3"
 	set config(right_source_socket) "4"
 	
+	foreach side {left right} {
+		foreach edge {left top right bottom} {
+			set info(bounds_$side\_$edge) $iinfo(daq_image_$edge)
+		}
+	}
+	set info(corner_x) $iinfo(daq_image_left)
+	set info(corner_y) $iinfo(daq_image_top)
+	set info(select) 0
+	set info(daq_min_width) 10
+	
 	set config(image_dir) ""
 	set config(auto_fit) "0"
 	set config(auto_disp) "0"
@@ -62,16 +73,15 @@ proc CPMS_Manager_init {} {
 	
 	set info(calib_window) "$info(window).calib_window"
 	set info(state) "Idle"
-
+	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	set info(img_left) "cpms_img_left"
-	lwdaq_image_create -name $info(img_left) -width 700 -height 520
-	set info(img_right) "cpms_img_right"
-	lwdaq_image_create -name $info(img_right) -width 700 -height 520
-
+	foreach side {left right} {
+		lwdaq_image_create -name cpms_image_$side -width 700 -height 520
+	}
+	
 	return ""   
 }
 
@@ -100,8 +110,8 @@ proc CPMS_Manager_disagreement {params} {
 
 	# We clear the overlays in the two CPMS images. We will be using the overlays
 	# to keep track of silhouettes and bodies.
-	lwdaq_image_manipulate $info(img_left) none -clear 1
-	lwdaq_image_manipulate $info(img_right) none -clear 1
+	lwdaq_image_manipulate cpms_image_left none -clear 1
+	lwdaq_image_manipulate cpms_image_right none -clear 1
 	
 	# Go through each modelled body and project a drawing of it onto the image
 	# plane of both of our SCAMs.
@@ -114,7 +124,7 @@ proc CPMS_Manager_disagreement {params} {
 			# the camera calibration constants, and our global-coordinate 
 			# description of the body with its pose over-written by the pose
 			# provided by the parameter string.
-			lwdaq_scam $info(img_$side) project \
+			lwdaq_scam cpms_image_$side project \
 				$config(coord_$side) \
 				"SCAM_$side $config(cam_$side)" \
 				"[lrange $params 0 5] [lrange $body 6 end]" \
@@ -132,18 +142,18 @@ proc CPMS_Manager_disagreement {params} {
 	# only, blue for body only, and clear for agreement. Count the disagreeing
 	# pixels.
 	set disagreement 0
-	set left_count [lindex [lwdaq_scam $info(img_left) disagreement \
+	set left_count [lindex [lwdaq_scam cpms_image_left disagreement \
 		$iconfig(analysis_threshold)] 0]
-	set right_count [lindex [lwdaq_scam $info(img_right) "disagreement" \
+	set right_count [lindex [lwdaq_scam cpms_image_right "disagreement" \
 		$iconfig(analysis_threshold)] 0]
 	set disagreement [expr $disagreement + $left_count + $right_count]
 
 	# Draw the images with their overlays in the manager window.
-	lwdaq_draw $info(img_left) cpms_photo_left \
-		-intensify $config(intensify) -zoom $config(zoom)
-	lwdaq_draw $info(img_right) cpms_photo_right \
-		-intensify $config(intensify) -zoom $config(zoom)
-			
+	foreach side {left right} {
+		lwdaq_draw cpms_image_$side cpms_photo_$side \
+			-intensify $config(intensify) -zoom $config(zoom)
+	}
+				
 	# Return the disagremenet. The fitter uses the disagreement as its error function.
 	return $disagreement
 }
@@ -293,11 +303,11 @@ proc CPMS_Manager_clear {} {
 	set info(state) "Clear"
 	LWDAQ_update
 	
-	lwdaq_image_manipulate $info(img_left) none -clear 1
-	lwdaq_image_manipulate $info(img_right) none -clear 1	
-	lwdaq_draw $info(img_left) cpms_photo_left \
+	lwdaq_image_manipulate cpms_image_left none -clear 1
+	lwdaq_image_manipulate cpms_image_right none -clear 1	
+	lwdaq_draw cpms_image_left cpms_photo_left \
 		-intensify $config(intensify) -zoom $config(zoom)
-	lwdaq_draw $info(img_right) cpms_photo_right \
+	lwdaq_draw cpms_image_right cpms_photo_right \
 		-intensify $config(intensify) -zoom $config(zoom)
 		
 	set info(state) "Idle"
@@ -318,26 +328,20 @@ proc CPMS_Manager_acquire {} {
 	set info(state) "Acquire"
 	LWDAQ_update
 	
-	set iconfig(daq_driver_socket) $config(left_sensor_socket)
-	set iconfig(daq_source_driver_socket) $config(left_source_socket)
-	set result [LWDAQ_acquire SCAM]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(text) $result
-		set info(state) "Idle"
-		return ""
+	foreach side {left right} {
+		set iconfig(daq_driver_socket) $config($side\_sensor_socket)
+		set iconfig(daq_source_driver_socket) $config($side\_source_socket)
+		set result [LWDAQ_acquire SCAM]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $info(text) $result
+			set info(state) "Idle"
+			return ""
+		}
+		lwdaq_image_manipulate $iconfig(memory_name) copy -name cpms_image_$side \
+			-left $info(bounds_$side\_left) -top $info(bounds_$side\_top) \
+			-right $info(bounds_$side\_right) -bottom $info(bounds_$side\_bottom)
 	}
-	lwdaq_image_manipulate $iconfig(memory_name) copy -name $info(img_left)
-	
-	set iconfig(daq_driver_socket) $config(right_sensor_socket)
-	set iconfig(daq_source_driver_socket) $config(right_source_socket)
-	set result [LWDAQ_acquire SCAM]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(text) $result
-		set info(state) "Idle"
-		return ""
-	}
-	lwdaq_image_manipulate $iconfig(memory_name) copy -name $info(img_right)
-	
+		
 	set config(file_index) [clock seconds]
 	if {$config(auto_fit)} {
 		if {$config(auto_disp)} {
@@ -389,10 +393,10 @@ proc CPMS_Manager_write {} {
 	
 	# Write left and right images to the image directory.
 	set fn [file join $config(image_dir) S$config(file_index)_L.gif]
-	LWDAQ_write_image_file $info(img_left) $fn		
+	LWDAQ_write_image_file cpms_image_left $fn		
 	LWDAQ_print $info(text) "Wrote left-hand image to \"$fn\"."
 	set fn [file join $config(image_dir) S$config(file_index)_R.gif]
-	LWDAQ_write_image_file $info(img_right) $fn
+	LWDAQ_write_image_file cpms_image_right $fn
 	LWDAQ_print $info(text) "Wrote right-hand image to \"$fn\"."
 	
 	return ""
@@ -432,8 +436,15 @@ proc CPMS_Manager_read {} {
 	foreach {lfn rfn} $fnl {
 		if {[regexp {S([0-9]{10})_L\.gif} [file tail $lfn] match ts]} {
 			if {[regexp {S([0-9]{10})_R\.gif} $rfn]} {
-				LWDAQ_read_image_file $lfn $info(img_left)
-				LWDAQ_read_image_file $rfn $info(img_right)
+				LWDAQ_read_image_file $lfn cpms_image_left
+				LWDAQ_read_image_file $rfn cpms_image_right
+				foreach side {left right} {
+					lwdaq_image_manipulate cpms_image_$side none -clear 1 \
+						-left $info(bounds_$side\_left) \
+						-top $info(bounds_$side\_top) \
+						-right $info(bounds_$side\_right) \
+						-bottom $info(bounds_$side\_bottom)
+				}
 				set config(file_index) $ts
 				if {$config(auto_fit)} {
 					if {$config(auto_disp)} {
@@ -455,8 +466,15 @@ proc CPMS_Manager_read {} {
 		if {[regexp {L([0-9]+)\.gif} [file tail $lfn] match index]} {
 			set rfn [file join [file dirname $lfn] R$index\.gif]
 			if {[file exists $rfn]} {
-				LWDAQ_read_image_file $lfn $info(img_left)
-				LWDAQ_read_image_file $rfn $info(img_right)
+				LWDAQ_read_image_file $lfn cpms_image_left
+				LWDAQ_read_image_file $rfn cpms_image_right
+				foreach side {left right} {
+					lwdaq_image_manipulate cpms_image_$side none -clear 1 \
+						-left $info(bounds_$side\_left) \
+						-top $info(bounds_$side\_top) \
+						-right $info(bounds_$side\_right) \
+						-bottom $info(bounds_$side\_bottom)
+				}
 				set config(file_index) $index
 				if {$config(auto_fit)} {
 					if {$config(auto_disp)} {
@@ -471,6 +489,105 @@ proc CPMS_Manager_read {} {
 					has no partner [file tail $rfn]."
 			}
 		} 
+	}
+	
+	return ""
+}
+
+#
+# CPMS_Manager_set_bounds applies the info(bounds_*) parameters to the left
+# or right image, as selected by its only argument: "side".
+#
+proc CPMS_Manager_set_bounds {side} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+
+	# Check the image exists.
+	if {[lwdaq_image_exists cpms_image_$side] == ""} {
+		LWDAQ_print $info(text) "ERROR: Image \"cpms_image_$side\" does not exist."
+		return ""
+	}
+
+	# Change the image boundaries and draw in the Viewer.
+	lwdaq_image_manipulate cpms_image_$side none -clear 1 \
+		-left $info(bounds_$side\_left) -top $info(bounds_$side\_top) \
+		-right $info(bounds_$side\_right) -bottom $info(bounds_$side\_bottom)
+	lwdaq_draw cpms_image_$side cpms_photo_$side \
+		-intensify $config(intensify) -zoom $config(zoom)
+	
+	# Return empty string.
+	return ""
+}
+
+#
+# CPMS_Manager_xy takes as input an image name, an x-y position relative to the
+# top-left corner of the image's display widget, and a command. Depending upon
+# the command, the routine sets corners of the analysis boundaries of the
+# specified image. The "press" command sets the top-left corner of a proposed,
+# new analysis boundary. The "motion" command adjusts the bottom-right corner.
+# The release command sets the image analysis bounds equal to the rectangle
+# defined by earlier press and motion commands. We bind this routine to each
+# image widget.
+#
+proc CPMS_Manager_xy {side x y cmd} {
+	upvar #0 CPMS_Manager_config config
+	upvar #0 CPMS_Manager_info info
+	
+	# Get the image column and row.
+	set zoom [expr 1.0 * $config(zoom) * [LWDAQ_get_lwdaq_config display_zoom]]
+	set xi [expr round(1.0*($x - 4)/$zoom)] 
+	set yi [expr round(1.0*($y - 4)/$zoom)]
+	
+	# Start a rectangle by dropping one corner on the image.
+	if {$cmd == "Press"} {
+		set info(select) 1
+		set info(corner_x) $xi
+		set info(corner_y) $yi
+		set info(bounds_$side\_left) $info(corner_x)
+		set info(bounds_$side\_top) $info(corner_y)
+		set info(bounds_$side\_right) [expr $info(bounds_$side\_left) + 1]
+		set info(bounds_$side\_bottom) [expr $info(bounds_$side\_top) + 1]
+		CPMS_Manager_set_bounds $side
+	}
+	
+	# Update corners of analysis bounds if we are moving.
+	if {$cmd == "Motion"} {
+		if {$info(select)} {
+			if {$xi > $info(corner_x)} {
+				set info(bounds_$side\_right) $xi
+				set info(bounds_$side\_left) $info(corner_x)
+			} 
+			if {$xi < $info(corner_x)} {
+				set info(bounds_$side\_left) $xi
+				set info(bounds_$side\_right) $info(corner_x)
+			} 
+			if {$yi > $info(corner_y)} {
+				set info(bounds_$side\_bottom) $yi
+				set info(bounds_$side\_top) $info(corner_y)
+			} 
+			if {$yi < $info(corner_y)} {
+				set info(bounds_$side\_top) $yi
+				set info(bounds_$side\_bottom) $info(corner_y)
+			} 
+			CPMS_Manager_set_bounds $side
+		}
+	}
+	
+	# Complete and apply a rectangle.
+	if {$cmd == "Release"} {
+		if {$info(select)} {
+			if {($info(bounds_$side\_right)-$info(bounds_$side\_left) \
+					< $info(daq_min_width)) \
+				&& ($info(bounds_$side\_bottom)-$info(bounds_$side\_top) 
+					< $info(daq_min_width))} {
+				set info(bounds_$side\_right) [expr $info(bounds_$side\_left) \
+					+ $info(daq_min_width)]
+				set info(bounds_$side\_bottom) [expr $info(bounds_$side\_top) \
+					+ $info(daq_min_width)]
+			}
+			CPMS_Manager_set_bounds $side
+		}
+		set info(select) 0
 	}
 	
 	return ""
@@ -589,25 +706,29 @@ proc CPMS_Manager_open {} {
 	entry $f.escaling -textvariable CPMS_Manager_config(scaling) -width 20
 	pack $f.lscaling $f.escaling -side left -expand yes
 
-	set f [frame $w.images_a]
+	set f [frame $w.images]
 	pack $f -side top -fill x
 
-	image create photo "cpms_photo_left"
-	label $f.limg -image "cpms_photo_left"
-	pack $f.limg -side left -expand yes
-	image create photo "cpms_photo_right"
-	label $f.rimg -image "cpms_photo_right"
-	pack $f.rimg -side left -expand yes
-
+	foreach side {left right} {
+		image create photo "cpms_photo_$side"
+		set img $f.$side
+		label $img -image "cpms_photo_$side"
+		pack $img -side left -expand yes
+		bind $img <Motion> "CPMS_Manager_xy $side %x %y Motion"
+		bind $img <Control-ButtonPress> "CPMS_Manager_xy $side %x %y Press"
+		bind $img <Control-ButtonRelease> "CPMS_Manager_xy $side %x %y Release"
+		bind $img <ButtonRelease> "CPMS_Manager_xy $side %x %y Release"
+	}
+	
 	set info(text) [LWDAQ_text_widget $w 150 15]
 	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple
 	lwdaq_config -text_name $info(text) -fsd 3
 	
-	lwdaq_draw $info(img_left) cpms_photo_left \
-		-intensify $config(intensify) -zoom $config(zoom)
-	lwdaq_draw $info(img_right) cpms_photo_right \
-		-intensify $config(intensify) -zoom $config(zoom)
-
+	foreach side {left right} {
+		lwdaq_draw cpms_image_$side cpms_photo_$side \
+			-intensify $config(intensify) -zoom $config(zoom)
+	}
+	
 	return $w
 }
 
@@ -655,7 +776,9 @@ Two bodies, one a sphere (1.5-inch diameter), another a sphere (0.75-inch diamet
 {0 10 450 0 0 0 sphere 0 0 0 38.10} {40 10 450 0 0 0 sphere 0 0 0 19.05}
 
 Single body, a shaft with a bolt-alignment rod:
-{-5 10 550 0 0 0 shaft 1 0 0 1 0 0 50 0 50 20 20 20 20 50 30 50 30 55 shaft 10 25 0 0 1 0 4 0 4 20}
+{-5 10 550 0 0 0 \
+shaft 1 0 0 1 0 0 50 0 50 20 20 20 20 50 30 50 30 55 \
+shaft 10 25 0 0 1 0 4 0 4 20}
 
 The "scaling" string dictates which elements of the body pose will be adjusted,
 and rapidly they will be adjusted. For bodies with no axis of symmetry, we set
