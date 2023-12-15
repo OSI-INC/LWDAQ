@@ -1,4 +1,4 @@
-# CPMS Calibrator a LWDAQ Tool
+# CPMS Manager a LWDAQ Tool
 # Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software: you can redistribute it and/or modify it under
@@ -22,7 +22,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.8"
+	LWDAQ_tool_init "CPMS_Manager" "1.9"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.215 38.919 4.000 -6.857 1.989 2.000 26.532 6.647"
@@ -55,7 +55,7 @@ proc CPMS_Manager_init {} {
 	set config(left_source_socket) "3"
 	set config(right_source_socket) "4"
 	
-	set config(image_dir) "~/Desktop"
+	set config(image_dir) ""
 	set config(auto_fit) "0"
 	set config(auto_disp) "0"
 	set config(file_index) "0000000000"
@@ -360,15 +360,11 @@ proc CPMS_Manager_pickdir {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
 
-	set info(state) "Pickdir"
-	LWDAQ_update
-
 	set dirname [LWDAQ_get_dir_name]
 	if {$dirname != ""} {
 		set config(image_dir) $dirname
 	}
-	
-	set info(state) "Idle"
+
 	return ""
 }
 
@@ -379,16 +375,19 @@ proc CPMS_Manager_pickdir {} {
 proc CPMS_Manager_write {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 CPMS_Manager_info info
-
-	set info(state) "Write"
-	LWDAQ_update
 	
+	# Make sure we have a directory to write to.
 	if {![file exists $config(image_dir)]} {
-		LWDAQ_print $info(text) "ERROR: Cannot find image directory\
-			\"$config(image_dir)\"."
-		set info(state) "Idle"
-		return ""
+		set dirname [LWDAQ_get_dir_name]
+		if {$dirname != ""} {
+			set config(image_dir) $dirname
+		} else {
+			LWDAQ_print $info(text) "ERROR: No directory selected for Write."
+			return ""
+		}
 	}
+	
+	# Write left and right images to the image directory.
 	set fn [file join $config(image_dir) S$config(file_index)_L.gif]
 	LWDAQ_write_image_file $info(img_left) $fn		
 	LWDAQ_print $info(text) "Wrote left-hand image to \"$fn\"."
@@ -396,22 +395,23 @@ proc CPMS_Manager_write {} {
 	LWDAQ_write_image_file $info(img_right) $fn
 	LWDAQ_print $info(text) "Wrote right-hand image to \"$fn\"."
 	
-	set info(state) "Idle"
 	return ""
 }
 
 #
 # CPMS_Manager_read reads pairs of image files from disk. It opens a browser in
-# the image directory and allows us to select images. We must selet an even
-# number of images. The images may be arranged in pairs in one of two ways. One
-# way is to have them named as they were written by the CPMS Manager, in the
-# format Sx_L.gif and Sx_L.gif, where x is a ten-digit unit time stamp. Another
-# way to arrange them is to name them Ln.gif and Rn.gif, where n is an index.
-# The read routine detects which file-naming convention has been used. It
-# selects the image pairs according to time stamp or index and displays them. If
-# auto_fit is set, the routine fits the modelled bodies to each pair of images
-# and prints results to text window. If auto_disp is set, we displace the 
-# body models randomly before the fit.
+# the image directory and allows us to select images in a single directory. We
+# must selet an even number of images. The images may be arranged in pairs in
+# one of two ways. One way is to have them named as they were written by the
+# CPMS Manager, in the format Sx_L.gif and Sx_L.gif, where x is a ten-digit UNIX
+# time stamp. Another way to arrange them is to name them Ln.gif and Rn.gif,
+# where n is an index. The read routine detects which file-naming convention has
+# been used. It selects the image pairs according to time stamp or index and
+# displays them. If auto_fit is set, the routine fits the modelled bodies to
+# each pair of images and prints results to text window. If auto_disp is set, we
+# displace the body models randomly before the fit. The routine also sets the
+# image directory, where the manager will write image files, equal to the
+# directory from which it reads files.
 #
 proc CPMS_Manager_read {} {
 	upvar #0 CPMS_Manager_config config
@@ -419,10 +419,14 @@ proc CPMS_Manager_read {} {
 	global LWDAQ_Info
 
 	# Get the list of files and sort in increasing order.
-	if {[file exists $config(image_dir)]} {
-		set LWDAQ_Info(working_dir) $config(image_dir)
-	}
 	set fnl [lsort -increasing -dictionary [LWDAQ_get_file_name 1]]
+	if {[llength $fnl] <= 0} {
+		LWDAQ_print $info(text) "ERROR: No files selected, aborting Read."
+	}
+	set config(image_dir) [file dirname [lindex $fnl 0]]
+	if {[llength $fnl] % 2 != 0} {
+		LWDAQ_print $info(text) "ERROR: Select even number of files for Read."
+	}
 	
 	# Read and display Sx_L/Sx_R pairs.
 	foreach {lfn rfn} $fnl {
@@ -533,7 +537,7 @@ proc CPMS_Manager_open {} {
 	button $f.stop -text "Stop" -command {set CPMS_Manager_config(stop_fit) 1}
 	pack $f.stop -side left -expand yes
 	
-	foreach a {Acquire Show Clear Displace Fit Calibration Pickdir Write Read} {
+	foreach a {Acquire Show Clear Displace Fit Calibration PickDir Write Read} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post CPMS_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -696,13 +700,15 @@ Calibration: Open the calibration panel, in which we see the calibration
 constants of the left and right SCAMs, and the mount measurements of the left
 and right mounts.
 
-Pickdir: Select a directory into which to write images and from which to read images.
+PickDir: Pick a directory for writing files.
 
 Write: Write both images to disk with the current index in their name, preceeded by
 the letter L or R for left and right cameras.
 
-Read: Read one or more pairs of images with L and R as prefix in their file names to
-indicate left and right. 
+Read: Read one or more pairs of CPMS left and right images. The images may be
+arranged in pairs in one of two ways. They may be named as they were written by
+the Manager, in the format Sx_L.gif and Sx_L.gif, where x is a ten-digit UNIX
+time stamp. They may be named Ln.gif and Rn.gif where n is an index.
 
 Help: Get this help page.
 
