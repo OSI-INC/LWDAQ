@@ -377,6 +377,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
+					set info(max_block_reads) "50"
 				}
 				1 {
 					set info(receiver_type) "A3027"
@@ -385,6 +386,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 0
 					set send_all_sets_cmd 1
 					set info(purge_duplicates) 1
+					set info(max_block_reads) "50"
 				}
 				2 {
 					set info(receiver_type) "A3032"
@@ -393,6 +395,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
+					set info(max_block_reads) "50"
 				}
 				3 {
 					set info(receiver_type) "A3038"
@@ -401,6 +404,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 1
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
+					set info(max_block_reads) "20"
 				}
 				4  {
 					set info(receiver_type) "A3042"
@@ -409,6 +413,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 1
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 1
+					set info(max_block_reads) "20"
 				}
 				default {
 					set info(receiver_type) "?"
@@ -417,6 +422,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
+					set info(max_block_reads) "20"
 				}					
 			}
 		}
@@ -673,11 +679,19 @@ proc LWDAQ_daq_Receiver {} {
 		# block of messages from the receiver.
 		set block_counter 0
 		
-		# We download data until we have more than daq_num_clocks clock messages.
-		# If the buffer already contains enough messages, we are already done without
-		# any further download.
+		# We download data until we have more than daq_num_clocks clock
+		# messages. If the buffer already contains enough messages, we are
+		# already done without any further download.
 		while {$num_clocks <= $daq_num_clocks} {
 
+			# Check the block counter to see if we have made too many attempts
+			# to get our data. If so, abandon acquisition.
+			incr block_counter
+			if {$block_counter > $info(max_block_reads)} {
+				error "Downloaded $block_counter blocks,\
+					but failed to accumulate clock messages."
+			}
+			
 			# Open a socket to driver and log in.
 			set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 			LWDAQ_login $sock $info(daq_password)
@@ -889,13 +903,6 @@ proc LWDAQ_daq_Receiver {} {
 				error "Data corrupted, cannot parse messages, check payload length."
 			}
 
-			# Check the block counter to see if we have made too many attempts
-			# to get our data. If so, abandon acquisition.
-			incr block_counter
-			if {$block_counter > $info(max_block_reads)} {
-				error "Data corrupted, failed to accumulate clock messages."
-			}
-			
 			# Disable data upload from data receiver and close socket.
 			LWDAQ_wait_for_driver $sock
 			LWDAQ_socket_close $sock
