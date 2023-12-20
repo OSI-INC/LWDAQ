@@ -2419,8 +2419,8 @@ proc Neuroplayer_overview_plot {} {
 
 	# Create the plot viewing ranges from the user parameters.
 	if {$config(vt_mode) == "CP"} {
-		set v_min [expr - $config(v_range) / 2 ]
-		set v_max [expr + $config(v_range) / 2]
+		set v_min [expr $config(v_offset) - ($config(v_range) / 2) ]
+		set v_max [expr $config(v_offset) + ($config(v_range) / 2) ]
 		set ac 1
 	} elseif {$config(vt_mode) == "NP"} {
 		set v_min 0
@@ -6496,8 +6496,8 @@ proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 	# Set up the range and plot the values.
 	if {$config(vt_mode) == "CP"} {
 		lwdaq_graph $signal $info(vt_image) \
-			-y_min [expr $config(v_offset) - $config(v_range) / 2 ] \
-			-y_max [expr $config(v_offset) + $config(v_range) / 2] \
+			-y_min [expr $config(v_offset) - ($config(v_range) / 2) ] \
+			-y_max [expr $config(v_offset) + ($config(v_range) / 2) ] \
 			-color $color \
 			-ac_couple 1
 	} elseif {$config(vt_mode) == "NP"} {
