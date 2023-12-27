@@ -17,13 +17,15 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-## Initialization procedure, runs when tool is started
+#
+# Initialization procedure, runs when tool is started.
+#
 proc Tapermaker_init {} {
 	upvar #0 Tapermaker_info info
 	upvar #0 Tapermaker_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tapermaker" "2.7"
+	LWDAQ_tool_init "Tapermaker" "2.8"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Conversion constants.
@@ -62,16 +64,18 @@ proc Tapermaker_init {} {
 	# The Terminal Instrument settings that allow communication with the
 	# motor controller. We have a transmit string header consisting of 
 	# an XOFF command, character 19. 
-	set config(daq_ip_addr) "10.0.0.38"
+	set config(daq_ip_addr) "192.168.1.12"
 	set config(daq_driver_socket) "1"
 	set config(daq_mux_socket) "1"
 	set config(tx_header) "19" 
 	set config(tx_ascii) ""
 	set config(tx_footer) "13 10"
 	set config(rx_last) "0"
-	set config(rx_timeout_ms) "0"
-	set config(rx_size) "0"
-	set config(xmit_cmd) "<00 *"
+	set config(rx_timeout_ms) "1000"
+	set config(rx_size) "1000"
+	set config(xmit_cmd) "<01 H16"
+	set config(analysis_enable) "5"
+	set config(xmit_rx) "0"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -83,24 +87,44 @@ proc Tapermaker_init {} {
 # Tapermaker_xmit transmits a string of commands followed by a carriage return
 # and line feed to the motor controller via the Terminal Instrument and an
 # RS-232 Interface (A2060C). If the command string we pass is blank, we use the
-# xmitc_cmd string in the configuration array.
+# xmit_cmd string in the configuration array. We pass the string of commands in
+# through the "cmd" argument. The "rxen" argument is a flag. By default, rxen is
+# cleared, but if set, the xmit routine will wait for an answer from the motor
+# controller in response to the command, using rx_last, rx_timeout_ms, and rx_size.
+# The result string will then be analyzed and displayed using the Terminal analysis
+# type given by analysis_enable.
 #
-proc Tapermaker_xmit {{cmd ""}} {
+proc Tapermaker_xmit {cmd {rxen "0"}} {
 	upvar #0 Tapermaker_info info
 	upvar #0 Tapermaker_config config
 	upvar #0 LWDAQ_config_Terminal tconfig
 	upvar #0 LWDAQ_info_Terminal tinfo
 
-	if {$cmd == ""} {set cmd $config(xmit_cmd)}
-	
-	foreach a {daq_ip_addr daq_driver_socket daq_mux_socket \
-		rx_size rx_last tx_footer tx_ascii rx_timeout_ms} {
+	set tconfig(tx_ascii) "$cmd"
+
+	foreach a {daq_ip_addr daq_driver_socket daq_mux_socket tx_footer} {
 		set tconfig($a) $config($a)
 	}
-	set tconfig(tx_ascii) "$cmd"
-	
+	if {$rxen} {
+		foreach a {rx_size rx_last rx_timeout_ms analysis_enable} {
+			set tconfig($a) $config($a)
+		}
+	} else {
+		foreach a {rx_size rx_last rx_timeout_ms analysis_enable} {
+			set tconfig($a) 0
+		}
+	}
+
 	LWDAQ_print $info(text) $cmd brown
-	LWDAQ_acquire Terminal
+	set result [LWDAQ_acquire Terminal]
+	if {$rxen} {
+		if {![LWDAQ_is_error_result $result]} {
+			LWDAQ_print $info(text) $result
+		} else {
+			LWDAQ_print $info(text)
+		}
+	}
+	
 	return ""
 }
 
@@ -132,18 +156,18 @@ proc Tapermaker_off {} {
 }
 
 #
-# Tapermaker_reset sends the two stages to their home positions, in which they are
-# ready to commence a tapering operation. If one of the limit switches is active
-# when the home procedure begins, the accuracy of the home position cannot be
-# guaranteed. In this case, the procedure should be run twice. Before we drive the
-# stages to their home positions, we configure the motor controllers for our
-# purposes. Prior to this configuration, however, each motor must be configured on
-# its own to give it a motor identifier, which we call its ID. The No1 motor is
-# driven by the No1 controller, and the No2 motor is driven by the No2 controller.
-# We use "L21 1" to set a controller's ID to 1, and "L21 2" for 2. If we turn off
-# the power on the controllers, they will eventually forget their ID number, so
-# unplug No2 and program No1, then unplug No1 and program No2 with the "L21"
-# command, then plug both in at the same time.
+# Tapermaker_reset sends the two stages to their home positions, in which they
+# are ready to commence a tapering operation. If one of the limit switches is
+# active when the home procedure begins, the accuracy of the home position
+# cannot be guaranteed. In this case, the procedure should be run twice. Before
+# we drive the stages to their home positions, we configure the motor
+# controllers for our purposes. Prior to this configuration, however, each motor
+# must be configured on its own to give it a motor identifier, which we call its
+# ID. The No1 motor is driven by the No1 controller, and the No2 motor is driven
+# by the No2 controller. We use "L21 1" to set a controller's ID to 1, and "L21
+# 2" for 2. If we turn off the power on the controllers, they will eventually
+# forget their ID number, so unplug No2 and program No1, then unplug No1 and
+# program No2 with the "L21" command, then plug both in at the same time.
 # 
 proc Tapermaker_reset {} {
 	upvar #0 Tapermaker_info info
@@ -453,9 +477,12 @@ proc Tapermaker_open {} {
 	# Create a general-purpose G-code command interface.
 	set f [frame $w.xmit]
 	pack $f -side top -fill x
-	button $f.xmit -text "Transmit" -command "Tapermaker_xmit"
-	entry $f.cmd -textvariable Tapermaker_config(xmit_cmd) -width 80 -justify right
-	pack $f.xmit $f.cmd -side left
+	button $f.xmit -text "Transmit" -command {
+		Tapermaker_xmit $Tapermaker_config(xmit_cmd) $Tapermaker_config(xmit_rx)
+	}
+	entry $f.cmd -textvariable Tapermaker_config(xmit_cmd) -width 70 -justify right
+	checkbutton $f.rx -text "Rx" -variable Tapermaker_config(xmit_rx) 
+	pack $f.xmit $f.cmd $f.rx -side left
 	
 	# Creates text widget and prints tool name
 	set info(text) [LWDAQ_text_widget $w 85 10]

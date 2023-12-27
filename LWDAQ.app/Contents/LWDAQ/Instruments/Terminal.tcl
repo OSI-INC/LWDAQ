@@ -122,8 +122,10 @@ proc LWDAQ_analysis_Terminal {{image_name ""}} {
 			for {set i 0} {$i < $rxl} {incr i} {	
 				set a [string index $bytes $i]
 				binary scan $a cu ascii
-				if {($ascii < 128) && ($ascii > 0)} {
+				if {($ascii <= 127) && ($ascii >= 32)} {
 					append result $a
+				} elseif {$ascii == 10} {
+					append result "\n"
 				}
 			}
 		}
