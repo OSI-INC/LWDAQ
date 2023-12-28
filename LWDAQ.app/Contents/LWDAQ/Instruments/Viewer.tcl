@@ -1,19 +1,19 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+# Copyright (C) 2021-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or modify it under
+# This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
-# Foundation; either version 2 of the License, or (at your option) any later
+# Foundation, either version 3 of the License, or (at your option) any later
 # version.
-
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 # details.
-
+#
 # You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-# Place - Suite 330, Boston, MA  02111-1307, USA.
+# this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #
 # Viewer.tcl defines the Viewer instrument.
@@ -48,8 +48,8 @@ proc LWDAQ_init_Viewer {} {
 	set info(daq_image_right) -1
 	set info(daq_image_top) -1
 	set info(daq_image_bottom) -1
-	set info(daq_image_col) "0"
-	set info(daq_image_row) "0"
+	set info(corner_x) "0"
+	set info(corner_y) "0"
 	set info(daq_min_width) 4
 	set info(image_results) ""
 	set info(verbose_description) ""
@@ -343,8 +343,8 @@ proc LWDAQ_zoom_Viewer {} {
 # of the image display widget. By passing one of three commands, it sets the
 # corners of the analysis boundaries. The motion command adjusts the
 # bottom-right corner. The press command sets the top-left corner. The release
-# command sets the image analysis bounds with the rectangle drawn. We bind 
-# this routine to the image widget and remove the binding that exists in all other
+# command sets the image analysis bounds with the rectangle drawn. We bind this
+# routine to the image widget and remove the binding that exists in all other
 # instruments to the image closeup routine. 
 #
 proc LWDAQ_xy_Viewer {x y cmd} {
@@ -355,7 +355,19 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 	set zoom [expr 1.0 * $info(zoom) * [LWDAQ_get_lwdaq_config display_zoom]]
 	set xi [expr round(1.0*($x - 4)/$zoom)] 
 	set yi [expr round(1.0*($y - 4)/$zoom)]
-
+	
+	# Start a rectangle by dropping one corner on the image.
+	if {$cmd == "Press"} {
+		set info(select) 1
+		set info(corner_x) $xi
+		set info(corner_y) $yi
+		set info(daq_image_left) $info(corner_x)
+		set info(daq_image_top) $info(corner_y)
+		set info(daq_image_right) [expr $info(daq_image_left) + 1]
+		set info(daq_image_bottom) [expr $info(daq_image_top) + 1]
+		LWDAQ_set_bounds_Viewer
+	}
+	
 	# Update corners of analysis bounds if we are moving.
 	if {$cmd == "Motion"} {
 		if {$info(select)} {
@@ -379,18 +391,6 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 		}
 	}
 	
-	# Start a rectangle by dropping one corner on the image.
-	if {$cmd == "Press"} {
-		set info(select) 1
-		set info(corner_x) $xi
-		set info(corner_y) $yi
-		set info(daq_image_left) $info(corner_x)
-		set info(daq_image_top) $info(corner_y)
-		set info(daq_image_right) [expr $info(daq_image_left) + 1]
-		set info(daq_image_bottom) [expr $info(daq_image_top) + 1]
-		LWDAQ_set_bounds_Viewer
-	}
-	
 	# Complete and apply a rectangle.
 	if {$cmd == "Release"} {
 		if {$info(select)} {
@@ -403,10 +403,6 @@ proc LWDAQ_xy_Viewer {x y cmd} {
 		}
 		set info(select) 0
 	}
-	
-	# Assign the current x and y values to our global elements.
-	set info(daq_image_col) $xi
-	set info(daq_image_row) $yi
 	
 	return ""
 }
