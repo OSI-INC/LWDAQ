@@ -29,9 +29,12 @@
 # ADC counts, which is never inaccurate for telemetry devices. The EDF_create
 # routine returns the header. If we pass it an empty file name, it does not
 # create a file.
+#
+# Version 1.4 Fix fatal bug in EDF_create.
+#
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide EDF 1.3
+package provide EDF 1.4
 
 # Clear the global EDF array if it already exists.
 if {[info exists EDF]} {unset EDF}
@@ -183,7 +186,7 @@ proc EDF_create {file_name interval signals \
 	# If the file name is not an empty string, open the file for writing, and
 	# print the header to the file, making sure we don't leave a newline
 	# character at the end.
-	if {$f != ""} {
+	if {$file_name != ""} {
 		set f [open $file_name w]
 		puts -nonewline $f $header
 		close $f
