@@ -9,5 +9,5 @@
 # full path name of this file's directory.
 
 package ifneeded DB 1.2 [list source [file join $dir DB.tcl]]
-package ifneeded EDF 1.3 [list source [file join $dir EDF.tcl]]
+package ifneeded EDF 1.4 [list source [file join $dir EDF.tcl]]
 package ifneeded NIKHEF 1.0 [list source [file join $dir NIKHEF.tcl]]
