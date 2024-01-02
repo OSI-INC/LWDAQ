@@ -864,7 +864,7 @@ proc Function_Generator_upload_ram {} {
 			LWDAQ_transmit_command_binary $sock $latch_command
 			LWDAQ_transmit_command_binary $sock $latch_command
 	
-			#Send the data through the ram portal.	
+			#Send the data through the data portal.	
 			for {set i 0} {$i < $config(samples)} {incr i 1} {
 				set control_data $wfgen(data,$i)
 				set wake "1"
