@@ -3,18 +3,18 @@
 #
 # Copyright (C) 2007-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or modify it under
-# the terms of the GNU General Public License as published by the Free Software
-# Foundation; either version 2 of the License, or (at your option) any later
-# version.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-# Place - Suite 330, Boston, MA 02111-1307, USA.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or (at
+# your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 # The Neurorecorder records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "164"
+	LWDAQ_tool_init "Neurorecorder" "165"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -94,6 +94,13 @@ proc Neurorecorder_init {} {
 # is locked. 
 #
 	set info(recorder_buffer) ""
+#
+# The file lock delay is how long we idle before proceeding with further efforts
+# to write to a locked file. Units are milliseconds. The lock delay stops us
+# from locking the file ourselves by attempting to write to the file too
+# frequently.
+#
+	set config(lock_delay_ms) "1000"
 #
 # Properties of data messages.
 #
@@ -788,8 +795,17 @@ proc Neurorecorder_record {{command ""}} {
 			set info(record_control) "Idle"
 			return ""
 		}
-		LWDAQ_ndf_create $config(record_file) $config(ndf_metadata_size)	
-		LWDAQ_ndf_string_write $config(record_file) [Neurorecorder_metadata_header] 
+		if {[catch {
+			LWDAQ_ndf_create $config(record_file) $config(ndf_metadata_size)	
+			LWDAQ_ndf_string_write $config(record_file) [Neurorecorder_metadata_header] 
+		} error_message]} {
+			Neurorecorder_print "ERROR: $error_message\."
+			Neurorecorder_print "SUGGESTION: Your disk drive may be full,\
+				make space on the drive and try again."
+			set info(record_control) "Idle"
+			LWDAQ_set_bg $info(record_control_label) white
+			return ""		
+		}
 		if {($info(record_control) == "Start") || $config(synchronize)} {
 			Neurorecorder_print "Synchronization:\
 				Waiting period [expr $ms_stop-$ms_start] ms,\
@@ -831,8 +847,9 @@ proc Neurorecorder_record {{command ""}} {
 					[file tail $config(record_file)]\
 					after previous write failure."		
 			} error_message]} {
-				if {[regexp "file locked" $error_message]} {				
+				if {[regexp "file locked" $error_message]} {		
 					LWDAQ_post Neurorecorder_record end
+					LWDAQ_wait_ms $config(lock_delay_ms)
 				} {
 					Neurorecorder_print "ERROR: $error_message\."
 					set info(recorder_buffer) ""
