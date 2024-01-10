@@ -25,7 +25,7 @@ proc Tapermaker_init {} {
 	upvar #0 Tapermaker_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tapermaker" "2.8"
+	LWDAQ_tool_init "Tapermaker" "2.9"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Conversion constants.
@@ -76,6 +76,7 @@ proc Tapermaker_init {} {
 	set config(xmit_cmd) "<01 H16"
 	set config(analysis_enable) "5"
 	set config(xmit_rx) "0"
+	set config(xmit_wait_ms) "10"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -123,6 +124,8 @@ proc Tapermaker_xmit {cmd {rxen "0"}} {
 		} else {
 			LWDAQ_print $info(text)
 		}
+	} else {
+		LWDAQ_wait_ms $config(xmit_wait_ms)
 	}
 	
 	return ""
