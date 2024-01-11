@@ -32,16 +32,16 @@ proc Tapermaker_init {} {
 	set info(steps_per_mm) "4000"
 	
 	# Variables.
-	set config(bottom_distance) "-1"
-	set config(top_distance) "-1"
+	set config(right_distance) "-1"
+	set config(left_distance) "-1"
 	
 	# The reset and go-home speeds.
 	set config(reset_speed_mmps) "2.0"
 	set config(acceleration_mmpss) "10.0"
 	
 	# Set the home positions of the two motors.
-	set config(bottom_home_position_mm) "20.0"
-	set config(top_home_position_mm) "42.0"
+	set config(right_home_position_mm) "20.0"
+	set config(left_home_position_mm) "42.0"
 	
 	# The distance moved on approach from home to the heating coil. The bottom
 	# of the coil will be just above the lower fiber mounting plate. The differential
@@ -54,12 +54,12 @@ proc Tapermaker_init {} {
 	# of the fiber that we are separating into two tapered portions. Also
 	# A bottom portion delay between the start of the top stretch movement
 	# and the bottom stretch movement.
-	set config(top_stretch_delay_s) "0.0"
-	set config(top_stretch_distance_mm) "10.0"
-	set config(top_stretch_speed_mmps) "2.0"
-	set config(bottom_stretch_delay_s) "2.0"
-	set config(bottom_stretch_distance_mm) "10.0"
-	set config(bottom_stretch_speed_mmps) "2.0"
+	set config(left_stretch_delay_s) "0.0"
+	set config(left_stretch_distance_mm) "10.0"
+	set config(left_stretch_speed_mmps) "2.0"
+	set config(right_stretch_delay_s) "2.0"
+	set config(right_stretch_distance_mm) "10.0"
+	set config(right_stretch_speed_mmps) "2.0"
 	
 	# The Terminal Instrument settings that allow communication with the
 	# motor controller. We have a transmit string header consisting of 
@@ -76,7 +76,6 @@ proc Tapermaker_init {} {
 	set config(xmit_cmd) "<01 H16"
 	set config(analysis_enable) "5"
 	set config(xmit_rx) "0"
-	set config(xmit_wait_ms) "10"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -124,8 +123,6 @@ proc Tapermaker_xmit {cmd {rxen "0"}} {
 		} else {
 			LWDAQ_print $info(text)
 		}
-	} else {
-		LWDAQ_wait_ms $config(xmit_wait_ms)
 	}
 	
 	return ""
@@ -257,7 +254,7 @@ proc Tapermaker_reset {} {
 	# controller into step mode, in which it moves a specific number of pulses.
 	# "L13 122000" specifies a movement of 122k pulses, or 30.5 mm, and "H6" orders 
 	# the movement in the CW direction.
-	set num_pulses [expr round($config(bottom_home_position_mm) * $info(steps_per_mm))]
+	set num_pulses [expr round($config(right_home_position_mm) * $info(steps_per_mm))]
 	Tapermaker_xmit "H2 L13 $num_pulses H6"
 
 	# Select No2 and set it to turning clockwise (CW). The motor will
@@ -265,7 +262,7 @@ proc Tapermaker_reset {} {
 	Tapermaker_xmit "<02 H4 H3 H6"
 
 	# Move No2 off CW limit switch by 190k steps, or 47.5 mm.
-	set num_pulses [expr round($config(top_home_position_mm) * $info(steps_per_mm))]
+	set num_pulses [expr round($config(left_home_position_mm) * $info(steps_per_mm))]
 	Tapermaker_xmit "H2 L13 $num_pulses H7"
 
 	LWDAQ_print $info(text) "Establishing home position.\n"
@@ -291,8 +288,8 @@ proc Tapermaker_taper {} {
 	# We have two variables to store the total upward movement of the two
 	# stages during the tapering process. This allows us to return to the
 	# home position from which we started using the home routine.
-	set config(bottom_distance) 0
-	set config(top_distance) 0
+	set config(right_distance) 0
+	set config(left_distance) 0
 	
 	# Select both controllers and clear all program lines. "L48 0" specifies
 	# that the "H12" clear instruction should clear all ones. 
@@ -301,18 +298,18 @@ proc Tapermaker_taper {} {
 	# Program both motors to move together to bring the target region of the fiber
 	# into the heating coil. We make the top motor move slightly faster than the 
 	# bottom motor to make sure we maintain tension on the fiber.
-	set bottom_approach_distance [expr round($config(approach_distance_mm) * $info(steps_per_mm))]
-	set bottom_approach_speed [expr round($config(approach_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "<01 N1 X+$bottom_approach_distance F$bottom_approach_speed"
-	set config(bottom_distance) $bottom_approach_distance
+	set right_approach_distance [expr round($config(approach_distance_mm) * $info(steps_per_mm))]
+	set right_approach_speed [expr round($config(approach_speed_mmps) * $info(steps_per_mm))]
+	Tapermaker_xmit "<01 N1 X+$right_approach_distance F$right_approach_speed"
+	set config(right_distance) $right_approach_distance
 
 	# The top stage is the one that moves slightly faster and farther.
-	set top_approach_distance [expr round($bottom_approach_distance \
+	set left_approach_distance [expr round($right_approach_distance \
 		* $config(approach_differential_mmpmm))]
-	set top_approach_speed [expr round($bottom_approach_speed \
+	set left_approach_speed [expr round($right_approach_speed \
 		* $config(approach_differential_mmpmm))]
-	Tapermaker_xmit "<02 N1 X+$top_approach_distance F$top_approach_speed"
-	set config(top_distance) $top_approach_distance
+	Tapermaker_xmit "<02 N1 X+$left_approach_distance F$left_approach_speed"
+	set config(left_distance) $left_approach_distance
 
 	# The rest of the program is different for the two motors. The top motor
 	# moves the top portion of the fiber up and away, while the bottom motor
@@ -321,25 +318,25 @@ proc Tapermaker_taper {} {
 	# ends pull apart. The taper we want to keep is the one on the bottom portion.
 
 	# The bottom motor pauses before it moves down.
-	set delay [expr round($config(bottom_stretch_delay_s)*1000)]
+	set delay [expr round($config(right_stretch_delay_s)*1000)]
 	Tapermaker_xmit "<01 N2 G04 X$delay"
 	
 	# The bottom motor moves down by the bottom stretch distance at the bottom
 	# stretch speed.
-	set stretch_distance [expr round($config(bottom_stretch_distance_mm) * $info(steps_per_mm))]
-	set stretch_speed [expr round($config(bottom_stretch_speed_mmps) * $info(steps_per_mm))]
+	set stretch_distance [expr round($config(right_stretch_distance_mm) * $info(steps_per_mm))]
+	set stretch_speed [expr round($config(right_stretch_speed_mmps) * $info(steps_per_mm))]
 	Tapermaker_xmit "<01 N3 X-$stretch_distance F$stretch_speed"
-	set config(bottom_distance) [expr $config(bottom_distance) - $stretch_distance]
+	set config(right_distance) [expr $config(right_distance) - $stretch_distance]
 	
 	# The top motor pauses before it moves up.
-	set delay [expr round($config(top_stretch_delay_s)*1000)]
+	set delay [expr round($config(left_stretch_delay_s)*1000)]
 	Tapermaker_xmit "<02 N2 G04 X$delay"
 		
 	# The top motor moves up by the top stretch distance at the top stretch speed.
-	set stretch_distance [expr round($config(top_stretch_distance_mm) * $info(steps_per_mm))]
-	set stretch_speed [expr round($config(top_stretch_speed_mmps) * $info(steps_per_mm))]
+	set stretch_distance [expr round($config(left_stretch_distance_mm) * $info(steps_per_mm))]
+	set stretch_speed [expr round($config(left_stretch_speed_mmps) * $info(steps_per_mm))]
 	Tapermaker_xmit "<02 N3 X+$stretch_distance F$stretch_speed"
-	set config(top_distance) [expr $config(top_distance) + $stretch_distance]
+	set config(left_distance) [expr $config(left_distance) + $stretch_distance]
 
 	LWDAQ_print $info(text) "Program loaded.\n"
 
@@ -362,15 +359,15 @@ proc Tapermaker_home {} {
 	# Put the bottom motor into step mode and move it back to the home position. We
 	# have to check that the distance moved is greater than zero, or else the command
 	# will be misinterpreted by the motor controller.
-	if {$config(bottom_distance) > 0} {
-		Tapermaker_xmit "<01 H2 L13 $config(bottom_distance) H7"
+	if {$config(right_distance) > 0} {
+		Tapermaker_xmit "<01 H2 L13 $config(right_distance) H7"
 	} {
 		LWDAQ_print $info(text) "Bottom stage (No1) already in home position." brown
 	}
 	
 	# Put the top motor into step mode and move it back to the home position.
-	if {$config(top_distance) > 0} {
-		Tapermaker_xmit "<02 H2 L13 $config(top_distance) H7"
+	if {$config(left_distance) > 0} {
+		Tapermaker_xmit "<02 H2 L13 $config(left_distance) H7"
 	} {
 		LWDAQ_print $info(text) "Top stage (No2) already in home position." brown	
 	}
@@ -416,14 +413,14 @@ proc Tapermaker_open {} {
 	set f [frame $ff.left]
 	pack $f -side left -fill y
 
-	foreach a {bottom_home_position_mm \
-		top_home_position_mm \
+	foreach a {right_home_position_mm \
+		left_home_position_mm \
 		approach_distance_mm \
 		approach_speed_mmps \
 		approach_differential_mmpmm \
-		bottom_stretch_delay_s \
-		bottom_stretch_distance_mm \
-		bottom_stretch_speed_mmps} {
+		right_stretch_delay_s \
+		right_stretch_distance_mm \
+		right_stretch_speed_mmps} {
 		
 		set word_list [split $a _] 
 		set name ""
@@ -446,9 +443,9 @@ proc Tapermaker_open {} {
 	set f [frame $ff.right]
 	pack $f -side right -fill y
 
-	foreach a {top_stretch_delay_s \
-		top_stretch_distance_mm \
-		top_stretch_speed_mmps \
+	foreach a {left_stretch_delay_s \
+		left_stretch_distance_mm \
+		left_stretch_speed_mmps \
 		reset_speed_mmps \
 		acceleration_mmpss} {
 		
