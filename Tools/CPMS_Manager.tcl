@@ -23,7 +23,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 LWDAQ_info_SCAM iinfo
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.9"
+	LWDAQ_tool_init "CPMS_Manager" "1.10"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.215 38.919 4.000 -6.857 1.989 2.000 26.532 6.647"
@@ -39,7 +39,7 @@ proc CPMS_Manager_init {} {
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	
 	set config(bodies) [list {0 20 450 0 0 0 sphere 0 0 0 38.068} ]
-	set config(scaling) "1 1 5 0 0.02 0.02"
+	set config(scaling) "1 1 5 0 0.1 0.1"
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
 	set config(fit_startsize) "1"
@@ -47,6 +47,7 @@ proc CPMS_Manager_init {} {
 	set config(num_lines) "1000"
 	set config(line_width) "1"
 	set config(stop_fit) "0"
+	set config(displacements) "0.5 0.5 1 0 0 0"
 	
 	set config(zoom) "1.0"
 	set config(intensify) "exact"
@@ -213,7 +214,7 @@ proc CPMS_Manager_displace {} {
 		for {set j 0} {$j < 6} {incr j} {
 			lset config(bodies) $i $j [format %.3f \
 				[expr [lindex $config(bodies) $i $j] \
-					+ (rand()-0.5)*[lindex $config(scaling) $j]]]
+					+ (rand()-0.5)*[lindex $config(displacements) $j]]]
 		}
 	}
 	CPMS_Manager_disagreement [CPMS_Manager_get_params]
