@@ -23,7 +23,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 LWDAQ_info_SCAM iinfo
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.10"
+	LWDAQ_tool_init "CPMS_Manager" "1.11"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.215 38.919 4.000 -6.857 1.989 2.000 26.532 6.647"
@@ -634,6 +634,46 @@ proc CPMS_Manager_calibration {} {
 		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 70
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
+}
+
+#
+# CPMS_Manager_bodies opens an editing window in which we can edit the models of 
+# our silhouette bodies. It provides an save button that applies the edited
+# string to the body parameter.
+#
+proc CPMS_Manager_bodies {} {
+	upvar #0 CPMS_Manager_info info
+	upvar #0 CPMS_Manager_config config
+	
+	# If the metadata viewing panel exists, destroy it. We are going to make a
+	# new one.
+	set w $info(window)\.bodies
+	if {[winfo exists $w]} {destroy $w}
+	
+	# Create a new top-level text window that is a child of the main tool
+	# window. Bind the Command-S key to save the metadata.
+	toplevel $w
+	wm title $w "Body Models, CPMS Manager $info(version)"
+	LWDAQ_text_widget $w 60 20
+	LWDAQ_enable_text_undo $w.text
+	LWDAQ_bind_command_key $w s {
+		set CPMS_Manager_config(bodies) \
+			[string trim [$CPMS_Manager_info(window)\.bodies\.text get 1.0 end]]
+	}
+	
+	# Create the Save button.
+	frame $w.f
+	pack $w.f -side top
+	button $w.f.save -text "Save" -command {
+		set CPMS_Manager_config(bodies) \
+			[string trim [$CPMS_Manager_info(window)\.bodies\.text get 1.0 end]]
+	}
+	pack $w.f.save -side left
+	
+	# Print the metadata to the text window.
+	LWDAQ_print $w.text $config(bodies)
+
+	return ""
 }
 
 #

@@ -3531,7 +3531,8 @@ the modelled object.</p>
 <tr>
 	<td>shaft</td>
 	<td>a point on the shaft axis</td>
-	<td>shaft axis is parallel to x-axis</td></tr>
+	<td>shaft axis is parallel to x-axis</td>
+</tr>
 <tr>
 	<td>cuboid</td>
 	<td>center of left face</td>
@@ -3540,11 +3541,12 @@ the modelled object.</p>
 </table></center>
 
 <p>Following the location, and possibly the orientation, of the object are one
-or more values giving its dimensions. A sphere consists of a location and a
-diameter. A shaft consists of a location, an orientation, a number of faces, and
-a diameter and distance for each face, where the distance is measured along the
-shaft axis from the zero point, with negative values being in the direction
-opposite to the axis vector. A cuboid consists of a location, an orientation, a
+or more values giving its dimensions. A <i>sphere</i> consists of a location and
+a diameter. A <i>shaft</i> consists of a location and orientation in the
+coordinate system of the body, followed by a pair of numbers for each face of
+the shaft. Each pair is a diameter and distance. The distance is measured along
+the shaft axis from the zero point, with negative values being in the direction
+opposite to the axis vector. A <i>cuboid</i> consists of a location, an orientation, a
 width, a height, and a depth. The width, height, and depth are parallel to the
 x, y, and z axes respectively when the cuboid is in its zero orientation.</p>
 
