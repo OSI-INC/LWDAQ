@@ -637,28 +637,28 @@ proc CPMS_Manager_calibration {} {
 }
 
 #
-# CPMS_Manager_bodies opens an editing window in which we can edit the models of 
-# our silhouette bodies. It provides an save button that applies the edited
-# string to the body parameter.
+# CPMS_Manager_edit_bodies opens an editing window in which we can edit the
+# models of our silhouette bodies. It provides an save button that applies the
+# edited string to the body parameter.
 #
-proc CPMS_Manager_bodies {} {
+proc CPMS_Manager_edit_bodies {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
 	# If the metadata viewing panel exists, destroy it. We are going to make a
 	# new one.
-	set w $info(window)\.bodies
+	set w $info(window)\.edit_bodies
 	if {[winfo exists $w]} {destroy $w}
 	
 	# Create a new top-level text window that is a child of the main tool
 	# window. Bind the Command-S key to save the metadata.
 	toplevel $w
 	wm title $w "Body Models, CPMS Manager $info(version)"
-	LWDAQ_text_widget $w 60 20
+	LWDAQ_text_widget $w 100 20
 	LWDAQ_enable_text_undo $w.text
 	LWDAQ_bind_command_key $w s {
 		set CPMS_Manager_config(bodies) \
-			[string trim [$CPMS_Manager_info(window)\.bodies\.text get 1.0 end]]
+			[string trim [$CPMS_Manager_info(window)\.edit_bodies\.text get 1.0 end]]
 	}
 	
 	# Create the Save button.
@@ -666,13 +666,27 @@ proc CPMS_Manager_bodies {} {
 	pack $w.f -side top
 	button $w.f.save -text "Save" -command {
 		set CPMS_Manager_config(bodies) \
-			[string trim [$CPMS_Manager_info(window)\.bodies\.text get 1.0 end]]
+			[string trim [$CPMS_Manager_info(window)\.edit_bodies\.text get 1.0 end]]
 	}
 	pack $w.f.save -side left
 	
-	# Print the metadata to the text window.
-	LWDAQ_print $w.text $config(bodies)
-
+	# Print the bodies to the text window in a format we can read easily.
+	foreach body $config(bodies) {
+		LWDAQ_print $w.text "\{"
+		LWDAQ_print -nonewline $w.text [lrange $body 0 5]
+		set index 6
+		while {$index < [llength $body]} {
+			if {![string is double [lindex $body $index]]} {
+				LWDAQ_print $w.text "\n[lrange $body $index [expr $index + 6]]"
+				set index [expr $index + 7]
+			} else {
+				LWDAQ_print -nonewline $w.text "[lindex $body $index] "
+				incr index
+			}
+		}
+		LWDAQ_print $w.text "\n\}"
+	}
+	
 	return ""
 }
 
@@ -695,7 +709,7 @@ proc CPMS_Manager_open {} {
 	button $f.stop -text "Stop" -command {set CPMS_Manager_config(stop_fit) 1}
 	pack $f.stop -side left -expand yes
 	
-	foreach a {Acquire Show Clear Displace Fit Calibration PickDir Write Read} {
+	foreach a {Acquire Show Clear Displace Fit PickDir Write Read} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post CPMS_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -714,38 +728,45 @@ proc CPMS_Manager_open {} {
 	entry $f.efi -textvariable CPMS_Manager_config(file_index) -width 12
 	pack $f.lfi $f.efi -side left -expand yes
 
-	foreach a {Help Configure} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command [list LWDAQ_tool_$b $info(name)]
-		pack $f.$b -side left -expand 1
-	}
-
 	set f [frame $w.cameras]
 	pack $f -side top -fill x
 
 	foreach a {daq_flash_seconds analysis_threshold} {
 		label $f.l$a -text "$a"
-		entry $f.e$a -textvariable LWDAQ_config_SCAM($a) -width 4
+		entry $f.e$a -textvariable LWDAQ_config_SCAM($a) -width 6
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	foreach a {num_lines line_width left_sensor_socket right_sensor_socket \
-		left_source_socket right_source_socket} {
+	foreach {a b} {num_lines 4 line_width 2 left_sensor_socket 2 \
+		right_sensor_socket 2 left_source_socket 2 right_source_socket 2} {
 		label $f.l$a -text "$a"
-		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 4
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width $b
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
 	set f [frame $w.bodies]
 	pack $f -side top -fill x
 	
-	label $f.lbodies -text "bodies:"
-	entry $f.ebodies -textvariable CPMS_Manager_config(bodies) -width 130
-	pack $f.lbodies $f.ebodies -side left -expand yes
+	button $f.bodies -text "Edit Bodies" -command "CPMS_Manager_edit_bodies"
+	pack $f.bodies -side left -expand yes
 
-	label $f.lscaling -text "scaling:"
-	entry $f.escaling -textvariable CPMS_Manager_config(scaling) -width 20
-	pack $f.lscaling $f.escaling -side left -expand yes
+	foreach a {Calibration} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post CPMS_Manager_$b"
+		pack $f.$b -side left -expand yes
+	}
+	
+	foreach a {scaling displacements} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable CPMS_Manager_config($a) -width 20
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	foreach a {Help Configure} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command [list LWDAQ_tool_$b $info(name)]
+		pack $f.$b -side left -expand 1
+	}
 
 	set f [frame $w.images]
 	pack $f -side top -fill x
