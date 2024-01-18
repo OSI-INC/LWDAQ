@@ -1,23 +1,23 @@
-# The Analyzer measures the current consumption signature of 
-# a LWDAQ device and compares the signature to a database of
-# signatures contained in the data section of the Analyzer
-# script.
+# Analyzer, a LWDAQ Tool
 #
-# Copyright (C) 2008-2021, Kevan Hashemi, Brandeis University
+# The Analyzer measures the current consumption signature of a LWDAQ device and
+# compares the signature to a database of signatures contained in the data
+# section of the Analyzer script.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# Copyright (C) 2008-2024, Kevan Hashemi, Brandeis University
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. 
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+# 
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+# 
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # Version 10: Edited the BCAM circuit signature laser consumptions.
 #

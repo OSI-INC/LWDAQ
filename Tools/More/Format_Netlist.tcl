@@ -1,4 +1,23 @@
-# Format Traxmaker or Kicad Netlist and Create Updated Drill File. [14-APR-22]
+# Format Netlist, a LWDAQ Tool
+#
+# Copyright (C) 2005-2021 Kevan Hashemi, Brandeis University
+# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
+#
+# Formats netlists produced by Traxmaker or Kicad, producing a human-readable list
+# that we Netlist and Create Updated Drill File.
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
 
 # Get the file name of the netlist created by Traxmaker. Read its contents.
 set fn [LWDAQ_get_file_name]

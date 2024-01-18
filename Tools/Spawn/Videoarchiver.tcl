@@ -1,19 +1,24 @@
-# Videoarchiver, a Standard and Polite LWDAQ Tool
+# Videoarchiver, a LWDAQ Tool
 #
 # Copyright (C) 2018-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or (at
-# your option) any later version.
+# The Videoarchiver downloads and records video from Animal Cage Cameras. For detailed
+# help see:
 # 
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
+# http://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
 # 
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+# 
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #
 # Videoarchiver_init initializes the info and config arrays, and reads

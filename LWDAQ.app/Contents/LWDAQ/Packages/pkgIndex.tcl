@@ -10,4 +10,5 @@
 
 package ifneeded DB 1.2 [list source [file join $dir DB.tcl]]
 package ifneeded EDF 1.4 [list source [file join $dir EDF.tcl]]
+package ifneeded LWFG 1.0 [list source [file join $dir LWFG.tcl]]
 package ifneeded NIKHEF 1.0 [list source [file join $dir NIKHEF.tcl]]

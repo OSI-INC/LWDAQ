@@ -1,5 +1,6 @@
-# CPMS Manager a LWDAQ Tool
-# Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
+# CPMS Manager, a LWDAQ Tool
+#
+# Copyright (C) 2023-2024 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software

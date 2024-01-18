@@ -1,5 +1,6 @@
-# CPMS Calibrator a LWDAQ Tool
-# Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
+# CPMS Calibrator, a LWDAQ Tool
+#
+# Copyright (C) 2024 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -8,12 +9,11 @@
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
 # details.
 #
 # You should have received a copy of the GNU General Public License along with
-# this program.  If not, see <https://www.gnu.org/licenses/>.
-#
+# this program. If not, see <https://www.gnu.org/licenses/>.
 
 #
 # CPMS_Calibrator_init initializes the tool's configuration and information arrays.

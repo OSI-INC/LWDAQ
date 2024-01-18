@@ -1,4 +1,5 @@
-# BCAM_Calculator, a Standard and Polite LWDAQ Tool
+# BCAM_Calculator, a LWDAQ Tool
+#
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 # Copyright (C) 2021-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
@@ -13,7 +14,7 @@
 # details.
 #
 # You should have received a copy of the GNU General Public License along with
-# this program.  If not, see <https://www.gnu.org/licenses/>.
+# this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
 # Version 20: Add support for JK plates.

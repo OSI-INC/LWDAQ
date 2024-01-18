@@ -1,20 +1,26 @@
-# Image_Browser is a LWDAQ Tool. It allows you to browse LWDAQ images on your
-# hard drive. Copyright (C) 2007-2020 Kevan Hashemi, Brandeis University.
+# Image_Browser, a LWDAQ Tool. 
 #
-# This program is free software; you can redistribute it and/or modify it under
+# Copyright (C) 2007-2024 Kevan Hashemi, Brandeis University.
+#
+# The Image Browser allows you to browse LWDAQ images on your hard drive. 
+#
+# This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
-# Foundation; either version 2 of the License, or (at your option) any later
+# Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
 # details.
 #
 # You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-# Place - Suite 330, Boston, MA  02111-1307, USA.
+# this program. If not, see <https://www.gnu.org/licenses/>.
 
+# 
+# Image_Browser_init initializes the Image Browser information and configuration
+# arrays, as well as loading any existing settings file.
+#
 proc Image_Browser_init {} {
 	upvar #0 Image_Browser_info info
 	upvar #0 Image_Browser_config config
@@ -49,6 +55,10 @@ proc Image_Browser_init {} {
 	return ""   
 }
 
+#
+# Image_Browser_stop sets the browser's control variable to Stop, which will stop
+# any on-going browser process waiting in the LWDAQ queue.
+#
 proc Image_Browser_stop {} {
 	upvar #0 Image_Browser_info info
    	if {$info(control) != "Idle"} {
@@ -57,6 +67,9 @@ proc Image_Browser_stop {} {
 	return ""
 }
 
+#
+# Image_Browsser_choose selects the image directory.
+#
 proc Image_Browser_choose {} {
 	upvar #0 Image_Browser_config config
 	set d [LWDAQ_get_dir_name]
@@ -67,6 +80,9 @@ proc Image_Browser_choose {} {
 	return ""
 }
 
+#
+# Image_Browser_display shows an image in the selected instrument panel.
+#
 proc Image_Browser_display {file_name} {
 	global LWDAQ_Info
 	upvar #0 Image_Browser_config config
@@ -84,7 +100,11 @@ proc Image_Browser_display {file_name} {
 	return ""
 }
 
-proc Image_Browser_sort {a b} {
+#
+# Image_Browser_compare returns the ordering of two file names as instructed by
+# the sort specifier string.
+#
+proc Image_Browser_compare {a b} {
 	upvar #0 Image_Browser_config config
    	if {![file exists $a]} {return -1}
    	if {![file exists $b]} {return 1}
@@ -104,6 +124,9 @@ proc Image_Browser_sort {a b} {
 	return 0
 }
 
+#
+# Image_Browser_refresh refreshes the display.
+#
 proc Image_Browser_refresh {} {
 	global LWDAQ_Info
 	upvar #0 Image_Browser_config config
@@ -135,7 +158,7 @@ proc Image_Browser_refresh {} {
 	$info(text) configure -tabs $tabs
 	
 	set files [glob -nocomplain [file join $config(directory) $config(file_filter)]]
-	set files [lsort -command Image_Browser_sort $files]
+	set files [lsort -command Image_Browser_compare $files]
 	set index 0
 	set saved_names ""
 	foreach f $files {
@@ -175,6 +198,9 @@ proc Image_Browser_refresh {} {
 	return ""
 }
 
+#
+# Image_Browser_open opens the browser's window.
+#
 proc Image_Browser_open {} {
 	upvar #0 Image_Browser_config config
 	upvar #0 Image_Browser_info info
@@ -231,6 +257,10 @@ proc Image_Browser_open {} {
 	return $w
 }
 
+#
+# Image_Browser_cleanup deletes the tool and its images from memory after we close
+# the image browser window.
+#
 proc Image_Browser_cleanup {} {
 	upvar #0 Image_Browser_info info
 	
@@ -255,14 +285,13 @@ return ""
 
 ----------Begin Help----------
 
-The Image_Browser displays all files in the LWDAQ working directory
-that match the browser's file_filter variable. You choose the working
-directory with the Choose button, and you set the filter with the file
-filter text entry box. You can use * and ? characters for file name
-matching. The "*" is a string wildcard, and the "?" is a character
-wildcard. When you change the file filter, press Refresh to update the
-display. The display refreshes automatically after you select a new
-directory.
+The Image_Browser displays all files in the LWDAQ working directory that match
+the browser's file_filter variable. You choose the working directory with the
+Choose button, and you set the filter with the file filter text entry box. You
+can use * and ? characters for file name matching. The "*" is a string wildcard,
+and the "?" is a character wildcard. When you change the file filter, press
+Refresh to update the display. The display refreshes automatically after you
+select a new directory.
 
 The Image_Browser displays images in any format supported by the
 LWDAQ_read_image_file routine. When you ask it to display a file that does not
@@ -270,39 +299,35 @@ match one of these formats, the browser creates a small blank image and displays
 that instead. You will see a red error message in the TCLTK console for each
 such file the browser tries to open.
 
-The browser displays images in a text widget. Each image is an
-embedded label in the text, like a bullet or a smiley-face, only
-bigger. After each image is a tab character. We set the tab spacing
-for the text widget so that the images are spaced in a pleasing and
-regular manner, and so that the image names, which occupy the text
-line beneath each line of images, do not overlap.
+The browser displays images in a text widget. Each image is an embedded label in
+the text, like a bullet or a smiley-face, only bigger. After each image is a tab
+character. We set the tab spacing for the text widget so that the images are
+spaced in a pleasing and regular manner, and so that the image names, which
+occupy the text line beneath each line of images, do not overlap.
 
-You can set the tab spacing with the config(tab_spacing) variable.
-According to the TK manual, the units of tab_spacing are centimeters.
-But we find that this is not the case in practice. We set the default
-tab values according to platform (Windows, Linux, etc), but we expect
-you will have to modify them afterwards.
+You can set the tab spacing with the config(tab_spacing) variable. According to
+the TK manual, the units of tab_spacing are centimeters. But we find that this
+is not the case in practice. We set the default tab values according to platform
+(Windows, Linux, etc), but we expect you will have to modify them afterwards.
 
-By default, each image the browser displays is a fraction of its
-natural size on the screen. The config(zoom) variable tells the
-browser what this fraction should be. With zoom=0.3, the browser will
-fit the image into a rectangle with only 30% the number of columns and
-rows as the original image, and therefore only 10% of the pixels in
-total. For more details about zoom, see the LWDAQ Command Reference
-(Google lwdaq_draw). Note that you increase zoom, you may need to
-increase the tab_spacing also, to accommodate the larger images.
+By default, each image the browser displays is a fraction of its natural size on
+the screen. The config(zoom) variable tells the browser what this fraction
+should be. With zoom=0.3, the browser will fit the image into a rectangle with
+only 30% the number of columns and rows as the original image, and therefore
+only 10% of the pixels in total. For more details about zoom, see the LWDAQ
+Command Reference (Google lwdaq_draw). Note that you increase zoom, you may need
+to increase the tab_spacing also, to accommodate the larger images.
 
-If you click on an image, the browser will open an instrument window,
-display the image in the instrument window, and analyze the image
-(provided that you have analysis_enable not equal to zero in the
-instrument configuration array). Which instrument the browser uses to
-display and analyze the image is determined by the option menu on the
-top left of the browser tool bar.
+If you click on an image, the browser will open an instrument window, display
+the image in the instrument window, and analyze the image (provided that you
+have analysis_enable not equal to zero in the instrument configuration array).
+Which instrument the browser uses to display and analyze the image is determined
+by the option menu on the top left of the browser tool bar.
 
-When the browser displays images, it sorts them in one of four orders:
-a_to_z, z_to_a, new_to_old, or old_to_new, depending upon the option
-menu on the bottom left of the browser tool bar.
+When the browser displays images, it sorts them in one of four orders: a_to_z,
+z_to_a, new_to_old, or old_to_new, depending upon the option menu on the bottom
+left of the browser tool bar.
 
 
-Kevan Hashemi hashemi@brandeis.edu
+Kevan Hashemi hashemi@opensourceinstruments.com
 ----------End Help----------

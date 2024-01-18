@@ -1,23 +1,24 @@
-# Startup_Manager is a LWDAQ Tool that opens, configures, and launches
-# multiple LWDAQ tools so as to simplify re-starting an experiment.
-# The program is similar to the Acquisifier in the way it reads in 
-# a script in a custom format to perform its functions.
+# Startup_Manager, a LWDAQ Tool
 #
 # Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# The Startup Manager opens, configures, and launches multiple LWDAQ tools so as
+# to simplify re-starting an experiment. The program is similar to the
+# Acquisifier in the way it reads in a script in a custom format to perform its
+# functions.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+# 
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+# 
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 proc Startup_Manager_init {} {

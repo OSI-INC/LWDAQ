@@ -1,25 +1,20 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 #
-# Init.tcl is the initialization script that calls all other 
-# LWDAQ program scripts. Here we set the LWDAQ environment variables
-# in the LWDAQ_Info array.
-#
-# Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2005-2023 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2005-2021 Kevan Hashemi, Brandeis University
+# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
 # 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or (at
-# your option) any later version.
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
 # 
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
 # 
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Clear our initialization error flag.
 set num_errors 0

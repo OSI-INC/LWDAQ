@@ -1,21 +1,22 @@
-# Template, a Standard and Polite LWDAQ Tool
+# Template, a LWDAQ Tool
 #
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# A template LWDAQ Tool, a starting point for new tools.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 proc Template_init {} {
@@ -70,7 +71,7 @@ return ""
 
 The Template tool is a starting point form new, polite LWDAQ tools. 
 
-Kevan Hashemi hashemi@brandeis.edu
+Kevan Hashemi hashemi@opensourceinstruments.com
 ----------End Help----------
 
 ----------Begin Data----------
