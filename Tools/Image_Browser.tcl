@@ -1,6 +1,7 @@
 # Image_Browser, a LWDAQ Tool. 
 #
 # Copyright (C) 2007-2024 Kevan Hashemi, Brandeis University.
+# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
 #
 # The Image Browser allows you to browse LWDAQ images on your hard drive. 
 #
