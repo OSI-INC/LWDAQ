@@ -24,7 +24,7 @@ proc CPMS_Manager_init {} {
 	upvar #0 CPMS_Manager_config config
 	upvar #0 LWDAQ_info_SCAM iinfo
 	
-	LWDAQ_tool_init "CPMS_Manager" "1.11"
+	LWDAQ_tool_init "CPMS_Manager" "1.12"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_left) "12.215 38.919 4.000 -6.857 1.989 2.000 26.532 6.647"
@@ -219,6 +219,7 @@ proc CPMS_Manager_displace {} {
 		}
 	}
 	CPMS_Manager_disagreement [CPMS_Manager_get_params]
+	CPMS_Manager_body_print
 	return [CPMS_Manager_get_params]
 } 
 
@@ -289,8 +290,9 @@ proc CPMS_Manager_fit {} {
 	}
 
 	CPMS_Manager_disagreement [CPMS_Manager_get_params]
+	CPMS_Manager_body_print
 	set info(state) "Idle"
-	
+
 	return $config(bodies)
 }
 
@@ -638,17 +640,48 @@ proc CPMS_Manager_calibration {} {
 }
 
 #
-# CPMS_Manager_edit_bodies opens an editing window in which we can edit the
+# CPMS_Manager_body_print clears a text widget and prints the body string in 
+# the widget.
+#
+proc CPMS_Manager_body_print {{t ""}} {
+	upvar #0 CPMS_Manager_info info
+	upvar #0 CPMS_Manager_config config
+
+	if {$t == ""} {set t $info(window)\.body_edit\.text}
+	if {![winfo exists $t]} {return ""}
+	
+	$t delete 1.0 end
+	foreach body $config(bodies) {
+		LWDAQ_print $t "\{"
+		LWDAQ_print -nonewline $t [lrange $body 0 5]
+		set index 6
+		while {$index < [llength $body]} {
+			if {![string is double [lindex $body $index]]} {
+				LWDAQ_print $t "\n[lrange $body $index [expr $index + 6]]"
+				set index [expr $index + 7]
+			} else {
+				LWDAQ_print -nonewline $t "[lindex $body $index] "
+				incr index
+			}
+		}
+		LWDAQ_print $t "\n\}"
+	}
+
+	return ""
+}
+
+#
+# CPMS_Manager_body_edit opens an editing window in which we can edit the
 # models of our silhouette bodies. It provides an save button that applies the
 # edited string to the body parameter.
 #
-proc CPMS_Manager_edit_bodies {} {
+proc CPMS_Manager_body_edit {} {
 	upvar #0 CPMS_Manager_info info
 	upvar #0 CPMS_Manager_config config
 	
 	# If the metadata viewing panel exists, destroy it. We are going to make a
 	# new one.
-	set w $info(window)\.edit_bodies
+	set w $info(window)\.body_edit
 	if {[winfo exists $w]} {destroy $w}
 	
 	# Create a new top-level text window that is a child of the main tool
@@ -659,7 +692,7 @@ proc CPMS_Manager_edit_bodies {} {
 	LWDAQ_enable_text_undo $w.text
 	LWDAQ_bind_command_key $w s {
 		set CPMS_Manager_config(bodies) \
-			[string trim [$CPMS_Manager_info(window)\.edit_bodies\.text get 1.0 end]]
+			[string trim [$CPMS_Manager_info(window)\.body_edit\.text get 1.0 end]]
 	}
 	
 	# Create the Save button.
@@ -667,26 +700,12 @@ proc CPMS_Manager_edit_bodies {} {
 	pack $w.f -side top
 	button $w.f.save -text "Save" -command {
 		set CPMS_Manager_config(bodies) \
-			[string trim [$CPMS_Manager_info(window)\.edit_bodies\.text get 1.0 end]]
+			[string trim [$CPMS_Manager_info(window)\.body_edit\.text get 1.0 end]]
 	}
 	pack $w.f.save -side left
 	
 	# Print the bodies to the text window in a format we can read easily.
-	foreach body $config(bodies) {
-		LWDAQ_print $w.text "\{"
-		LWDAQ_print -nonewline $w.text [lrange $body 0 5]
-		set index 6
-		while {$index < [llength $body]} {
-			if {![string is double [lindex $body $index]]} {
-				LWDAQ_print $w.text "\n[lrange $body $index [expr $index + 6]]"
-				set index [expr $index + 7]
-			} else {
-				LWDAQ_print -nonewline $w.text "[lindex $body $index] "
-				incr index
-			}
-		}
-		LWDAQ_print $w.text "\n\}"
-	}
+	CPMS_Manager_body_print $w.text
 	
 	return ""
 }
@@ -748,7 +767,7 @@ proc CPMS_Manager_open {} {
 	set f [frame $w.bodies]
 	pack $f -side top -fill x
 	
-	button $f.bodies -text "Edit Bodies" -command "CPMS_Manager_edit_bodies"
+	button $f.bodies -text "Edit Bodies" -command "CPMS_Manager_body_edit"
 	pack $f.bodies -side left -expand yes
 
 	foreach a {Calibration} {
