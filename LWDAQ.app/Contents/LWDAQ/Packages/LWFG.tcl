@@ -56,10 +56,10 @@ set LWFG(ch_cnt_hi) "255"
 set LWFG(ch_v_lo) "-10.0"
 set LWFG(ch_v_hi) "+10.0"
 
-set LWFG(filter) "0x01"
+set LWFG(rc_options) "5.1e1 0x11 4.0e2 0x21 3.0e3 0x41 \
+	2.3e4 0x81 1.7e5 0x82 1.3e6 0x48 9.8e6 0x88"
 
-
-proc LWFG_configure {ip ch_num waveform frequency filter v_lo v_hi} {
+proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	global LWFG
 
 	# Determine the lower and upper DAC values for our lower and upper waveform
@@ -130,7 +130,20 @@ proc LWFG_configure {ip ch_num waveform frequency filter v_lo v_hi} {
 	}
 	
 	# Choose the filter.
-	set filter [expr $LWFG(filter)]
+	set rc [lindex $LWFG(rc_options) 0]
+	set filter [lindex $LWFG(rc_options) 1]
+	switch $waveform {
+		"sine"     - 
+		"triangle" {
+			set ideal_rc [expr 1.0/$frequency/10*1e9]
+			foreach {p code} $LWFG(rc_options) {
+				if {$p < $ideal_rc} {
+					set filter $code
+					set rc $p
+				}
+			}
+		}
+	}
 	
 	# Open a socket to the function generator and configure it through
 	# the data portal by means of stream write instructions.
@@ -142,13 +155,13 @@ proc LWFG_configure {ip ch_num waveform frequency filter v_lo v_hi} {
 
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_rc)
 		LWDAQ_stream_write $sock $LWFG(data_portal) \
-			[binary format c $filter]
+			[binary format c [expr $filter]]
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_div)
 		LWDAQ_stream_write $sock $LWFG(data_portal) \
-			[binary format I "[expr $divisor - 1]"]
+			[binary format I [expr $divisor - 1]]
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_len)
 		LWDAQ_stream_write $sock $LWFG(data_portal) \
-			[binary format S "[expr $num_pts - 1]"]
+			[binary format S [expr $num_pts - 1]]
 		
 		set id [LWDAQ_hardware_id $sock]
 		LWDAQ_socket_close $sock
@@ -158,5 +171,5 @@ proc LWFG_configure {ip ch_num waveform frequency filter v_lo v_hi} {
 	}
 	
 	# Return enough information about the waveform for us to assess accuracy.
-	return "$dac_lo $dac_hi $divisor $num_pts $num_cycles $actual"
+	return "$dac_lo $dac_hi $divisor $num_pts $num_cycles [format %.0f $rc]"
 }
