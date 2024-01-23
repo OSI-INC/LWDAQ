@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "1.1"
+	LWDAQ_tool_init "SCT_Check" "1.3"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -47,7 +47,8 @@ proc SCT_Check_init {} {
 	set config(max_num_clocks) "512"
 	set config(min_id) "1"
 	set config(max_id) "254"
-	set config(glitch_threshold) "0"
+	set config(glitch) "0"
+	set config(settle) "0.5"
 	
 	set config(off_frequency) "1e6"
 	set config(vbat_ref) "1.80"
@@ -70,12 +71,13 @@ proc SCT_Check_init {} {
 	set config(en_128) 0
 	set config(min_num_clocks_64) 128
 	set config(en_64) 0
-	set config(frequencies) "$config(frequencies_shared)"
+	set config(frequencies) $config(frequencies_shared)
 	set config(min_num_clocks) $config(min_num_clocks_512)
 	
 	set config(label_color) "green"
 
 	set info(data) [list]
+	set info(start_time) "0"
 	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -164,7 +166,7 @@ proc SCT_Check_battery {} {
 	LWDAQ_print $info(text) "Measuring battery voltages for selected signals." purple
 	LWDAQ_reset_Receiver
 	set iconfig(analysis_channels) $config(signals)
-	set iinfo(glitch_threshold) $config(glitch_threshold)
+	set iinfo(glitch_threshold) $config(glitch)
 	set result [LWDAQ_acquire Receiver]
 	set iconfig(analysis_channels) "*"
 	if {[LWDAQ_is_error_result $result]} {
@@ -197,6 +199,7 @@ proc SCT_Check_detect {} {
 	LWDAQ_print $info(text) "Detecting available telemetry signals." purple
 	set detect ""
 	LWDAQ_reset_Receiver
+	set iconfig(daq_num_clocks) 128
 	set iconfig(analysis_channels) "*"
 	set result [LWDAQ_acquire Receiver]
 	if {[LWDAQ_is_error_result $result]} {
@@ -227,6 +230,7 @@ proc SCT_Check_sweep {{index "-1"}} {
 	if {$index < 0} {
 		if {$info(control) == "Sweep"} {return "0"}
 		set info(control) "Sweep"
+		set info(start_time) [clock seconds]
 		SCT_Check_frequencies	
 		set info(data) [list]
 		LWDAQ_post [list SCT_Check_sweep "0"]
@@ -252,11 +256,11 @@ proc SCT_Check_sweep {{index "-1"}} {
 		set iconfig(daq_num_clocks) $num_clocks
 		set config(waveform_frequency) $frequency
 		SCT_Check_on
-		LWDAQ_wait_ms [expr 10+round(1000.0/$frequency)]
+		LWDAQ_wait_ms [expr round(1000.0*$config(settle)/$frequency)]
 
 		LWDAQ_reset_Receiver
 		set iconfig(analysis_channels) $config(signals)
-		set iinfo(glitch_threshold) $config(glitch_threshold)
+		set iinfo(glitch_threshold) $config(glitch)
 		set result [LWDAQ_acquire Receiver]
 		set iconfig(analysis_channels) "*"
 		if {[LWDAQ_is_error_result $result]} {
@@ -281,7 +285,9 @@ proc SCT_Check_sweep {{index "-1"}} {
 			return ""
 		} else {
 			LWDAQ_print $info(text) "Sweep Complete,\
-				[llength $config(frequencies)] frequencies." purple
+				[llength $config(frequencies)] frequencies\
+				in [expr [clock seconds] - $info(start_time)] s." purple
+			set iconfig(daq_num_clocks) 128
 			set info(control) "Idle"
 			return ""
 		}
@@ -395,6 +401,13 @@ proc SCT_Check_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
+	foreach a {Glitch} {
+		set b [string tolower $a]
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width 4
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+		
 	set f [frame $w.frequencies]
 	pack $f -side top -fill x
 
@@ -430,46 +443,67 @@ return ""
 
 ----------Begin Help----------
 
-Waveform Types:  Enter either sin, tri, square, or an integer value. Version 1.1
-only allows the amplitude of the sin function to be altered when setting the
-output voltage. The tri and square currently output maximum voltage.
+The Subcutaneous Transmitter (SCT) Check tool uses a data receiver and a
+function generator to measure the frequency response and battery voltages of
+SCTs during and after assembly and encapsulation. In particular, we use the tool
+to produce plots of gain versus frequency after encapsulation. The function
+generator must be one of our LWDAQ instruments, such as the Function Generator
+(A3050). The receiver must be one of our LWDAQ telemetry receivers, such as the
+Octal Data Receiver (A3027E) or Telemetry Control Box (TCB-A16). The tool uses
+the LWFG package, included with LWDAQ, to configure the function generator. It
+uses the Receiver Instrument, included with LWDAQ, to download telemetry signals
+from the receiver.
 
-Output Frequency:  Frequency Range= 0.1Hz - 40kHz(maximum voltage is limited by
-bug in v1.1 code.
+Type: The waveform type, by default a sinusoid, can be "sine", "square", or
+"triangle".
 
-Output Voltage Range:  0.10V - 9.8V peak to peak, unloaded.
+Frequency: The waveform frequency, anything from 1 mHz to 1 MHz.
 
-Sweep Points:  Enter a list of discrete frequency values from lowest frequency
-to highest.  These values will dictate the frequency sweep range.
+Amplitude: The amplitude of the symmetric waveform, which is half the peak to
+peak amplitude. Can be anything from 0 to 10 V.
 
-Enter transmitter ID:  Type in any alphanumeric value to identify the
-transmitter under test.
+Offset: The offset of the waveform average from zero. Subject to a signal range
+of -10 V to +10 V, the offset can be anything from -10 V to + 10 V.
 
-Sweep and Record:  Press this button to initiate a frequency sweep. If the ip
-addresses/mux sockets/driver sockets are set incorrectly, the tool will hang.
+FGIP: The function generator IP address.
 
-Record to file?:  Click this button to have the frequency sweep data recorded to
-a text file as defined under the button 'Set File Name'. Default file name is:
-Transmitter Frequency Response.txt.  File is located under the LWDAQ folder.
+RXIP: The data receiver IP address. If we are using an ODR, we must also specify
+the driver socket into which we have plugged the ODR. By default we use socket
+one (1). We can specify another socket by opening the Receiver Instrument with
+the Receiver button and setting daq_driver_socket to our chosen value.
 
-Set File Name:  Use this button to define a unique file name to save the
-frequency sweep data.
+Version: The SCT assembly version, a letter. The A3048S2 would be "S", the
+A3049Q4 would be "Q".
 
-Set Output:  Pressing this will turn on/adjust the function generator output as
-defined by the values in 'Waveform Type, Output Frequency, and Output Voltage.'
+Batch: The SCT assembly batch number, which is the first part of its serial
+number. Transmitter Q216.109 has batch number 216, and will share this batch
+number with its partners in a production batch.
 
-Output Off:  Disables function generator output.
+Signals: The SCT telemetry channels for which we want to measure sweep response
+or battery voltage.
 
-Number of Samples:  Currently, this entry box only displays the number of
-samples used for a given frequency output.
+Detect Button: Press this button to auto-detect available SCT telemetry signals.
+The tool will use the Receiver Instrument to populate the signals entry with all
+available channels.
 
-Auto Filter Select:  Pressing this button will automatically select an RC filter
-based on number of samples/frequency/sample period and based on the actual
-resistors and capacitors installed on the pcb.
+Glitch: Value for glitch filter to apply to telemetry signals before measuring
+the amplitude of its fundamental frequency. We enter zero for no filter, which
+is the defauilt. We enter 1000 if we want to apply the glitch filter to spikes
+of height 1000 or greater, where the 1000 is in units of sixteen-bit ADC counts.
 
-Choose a Filter:  Pressing this button will bring up a list of all possible RC
-Filter -3dB Corner Frequency choices based on the resistors and capacitors
-installed on the pcb.
+Frequencies: The frequencies at which we will measure SCT gain during a sweep.
+
+Frequencies Button: Set the frequencies so that they include the standard
+frequencies as well as those required for a detailed measurement of the gain
+near all the cut-off frequencies selected by the Sample Rates checkboxes.
+
+Sample Rates: A series of checkboxes that turn on detailed measurement around
+the cut-off frequency of SCT filters with various sample rates. When we check
+the 256 box, we add to our sweep the frequencies that will give us a good plot
+of the SCT's low-pass filter near its cut-off frequency of 80 Hz. Check multiple
+boxes to measure in detail around multiple cut-off frequencies.
+
+Copyright (C) 2024, Kevan Hashemi, Open Source Instruments Inc.
 
 ----------End Help----------
 
