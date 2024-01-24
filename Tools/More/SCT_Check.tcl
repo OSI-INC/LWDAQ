@@ -50,7 +50,7 @@ proc SCT_Check_init {} {
 	set config(glitch) "0"
 	set config(settle) "0.5"
 	
-	set config(off_frequency) "1e6"
+	set config(off_frequency) "40e6"
 	set config(vbat_ref) "1.80"
 	
 	set config(sample_rates) "64 128 256 512 1024 2048"
@@ -66,7 +66,7 @@ proc SCT_Check_init {} {
 	set config(min_num_clocks_512) 32
 	set config(en_512) 0
 	set config(min_num_clocks_256) 64
-	set config(en_256) 1
+	set config(en_256) 0
 	set config(min_num_clocks_128) 64
 	set config(en_128) 0
 	set config(min_num_clocks_64) 128
@@ -86,7 +86,7 @@ proc SCT_Check_init {} {
 	return ""	
 }
 
-proc SCT_Check_frequencies {{print 0}} {
+proc SCT_Check_set_frequencies {{print 0}} {
 	upvar #0 SCT_Check_config config
 	upvar #0 SCT_Check_info info
 	
@@ -147,9 +147,8 @@ proc SCT_Check_off {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 
-	LWDAQ_print $info(text) "Channel $config(gen_ch) off." purple
-	set result [LWFG_configure $config(gen_ip) $config(gen_ch) sine \
-		$config(off_frequency) 0 0]
+	LWDAQ_print $info(text) "Channel $config(gen_ch), 0 V amplitude, 0 V offset." purple
+	set result [LWFG_off $config(gen_ip) $config(gen_ch)]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
 	}
@@ -231,7 +230,6 @@ proc SCT_Check_sweep {{index "-1"}} {
 		if {$info(control) == "Sweep"} {return "0"}
 		set info(control) "Sweep"
 		set info(start_time) [clock seconds]
-		SCT_Check_frequencies	
 		set info(data) [list]
 		LWDAQ_post [list SCT_Check_sweep "0"]
 		return ""
@@ -288,6 +286,7 @@ proc SCT_Check_sweep {{index "-1"}} {
 				[llength $config(frequencies)] frequencies\
 				in [expr [clock seconds] - $info(start_time)] s." purple
 			set iconfig(daq_num_clocks) 128
+			SCT_Check_off
 			set info(control) "Idle"
 			return ""
 		}
@@ -344,18 +343,18 @@ proc SCT_Check_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {Help Configure} {
-		set b [string tolower $a]
-		button $f.$b -text "$a" -command "LWDAQ_tool_$b SCT_Check"
-		pack $f.$b -side left -expand yes
-	}
-
 	foreach a {Receiver} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_open $a"
 		pack $f.$b -side left -expand yes
 	}
 	
+	foreach a {Help Configure} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command "LWDAQ_tool_$b SCT_Check"
+		pack $f.$b -side left -expand yes
+	}
+
 	set f [frame $w.configure]
 	pack $f -side top -fill x
 	
@@ -418,7 +417,7 @@ proc SCT_Check_open {} {
 	set f [frame $w.sps]
 	pack $f -side top -fill x
 
-	button $f.lfset -text "Frequencies" -command {SCT_Check_frequencies 1}
+	button $f.lfset -text "Set Frequencies" -command {SCT_Check_set_frequencies 1}
 	pack $f.lfset -side left -expand yes
 	
 	label $f.spsl -text "Sample Rates:" -fg $config(label_color)
@@ -430,8 +429,6 @@ proc SCT_Check_open {} {
 		
 	set info(text) [LWDAQ_text_widget $w 90 20]
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n" purple
-	
-	SCT_Check_frequencies
 	
 	return $w	
 }
@@ -493,15 +490,16 @@ of height 1000 or greater, where the 1000 is in units of sixteen-bit ADC counts.
 
 Frequencies: The frequencies at which we will measure SCT gain during a sweep.
 
-Frequencies Button: Set the frequencies so that they include the standard
-frequencies as well as those required for a detailed measurement of the gain
-near all the cut-off frequencies selected by the Sample Rates checkboxes.
+Set Frequencies: Generate a list of frequencies for a sweep. We begin with the
+shared frequencies in frequencies_shared. We add a series of frequencies for
+each sample rate enabled by the sample rate checkboxes. We print the frequencies
+to the screen so that we can cut and paste them into a spreadsheet.
 
 Sample Rates: A series of checkboxes that turn on detailed measurement around
-the cut-off frequency of SCT filters with various sample rates. When we check
+the corner frequency of SCT filters with various sample rates. When we check
 the 256 box, we add to our sweep the frequencies that will give us a good plot
-of the SCT's low-pass filter near its cut-off frequency of 80 Hz. Check multiple
-boxes to measure in detail around multiple cut-off frequencies.
+of the SCT's low-pass filter near its corner frequency of 80 Hz. Check multiple
+boxes to measure in detail around multiple corner frequencies.
 
 Copyright (C) 2024, Kevan Hashemi, Open Source Instruments Inc.
 

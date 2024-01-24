@@ -30,7 +30,7 @@
 #
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide LWFG 1.0
+package provide LWFG 1.1
 
 # Clear the global EDF array if it already exists.
 if {[info exists LWFG]} {unset LWFG}
@@ -58,6 +58,29 @@ set LWFG(ch_v_hi) "+10.0"
 
 set LWFG(rc_options) "5.1e1 0x11 4.0e2 0x21 3.0e3 0x41 \
 	2.3e4 0x81 1.7e5 0x82 1.3e6 0x48 9.8e6 0x88"
+	
+proc LWFG_off {ip ch_num} {
+	global LWFG
+
+	# Open a socket to the function generator, set the divisor to one and the
+	# waveform length to zero.
+	if {[catch {
+		set sock [LWDAQ_socket_open $ip]
+		
+		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_div)
+		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format I 0]
+		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_len)
+		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format S 0]
+
+		set id [LWDAQ_hardware_id $sock]
+		LWDAQ_socket_close $sock
+	} error_message]} {
+		catch {LWDAQ_socket_close $sock}
+		return "ERROR: $error_message\."
+	}
+
+	return ""
+}
 
 proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	global LWFG
