@@ -30,6 +30,7 @@ proc SCT_Check_init {} {
 	package require LWFG
 
 	set info(control) "Idle"
+	set config(verbose) "0"
 	
 	set config(version) "A"
 	set config(signals) "1"
@@ -138,6 +139,16 @@ proc SCT_Check_on {} {
 		$v_lo $v_hi]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
+	} elseif {$config(verbose)} {
+		foreach a {dac_lo dac_hi divisor num_pts num_cycles} {
+			set $a [lindex $result 0]
+			LWDAQ_print $info(text) "$a = [lindex $result 0]"
+			set result [lrange $result 1 end] 
+		}
+		LWDAQ_print $info(text) "rc = [format %3.f [expr 0.001*[lindex $result 0]]] us"
+		set actual [expr $LWFG(clock_hz)*$num_cycles/$num_pts/$divisor]
+		LWDAQ_print $info(text) "actual = [format %.3f $actual] Hz"
+		LWDAQ_print $info(text) "requested = [format %.3f $config(waveform_frequency)] Hz"
 	}
 	
 	return ""
@@ -354,6 +365,9 @@ proc SCT_Check_open {} {
 		button $f.$b -text "$a" -command "LWDAQ_tool_$b SCT_Check"
 		pack $f.$b -side left -expand yes
 	}
+	
+	checkbutton $f.verbose -text "Verbose" -variable SCT_Check_config(verbose)
+	pack $f.verbose -side left -expand yes
 
 	set f [frame $w.configure]
 	pack $f -side top -fill x

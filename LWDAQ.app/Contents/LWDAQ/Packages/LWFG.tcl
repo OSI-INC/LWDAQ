@@ -58,6 +58,7 @@ set LWFG(ch_v_hi) "+10.0"
 
 set LWFG(rc_options) "5.1e1 0x11 4.0e2 0x21 3.0e3 0x41 \
 	2.3e4 0x81 1.7e5 0x82 1.3e6 0x48 9.8e6 0x88"
+set LWFG(rc_fraction) "0.03"
 	
 proc LWFG_off {ip ch_num} {
 	global LWFG
@@ -158,11 +159,14 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	switch $waveform {
 		"sine"     - 
 		"triangle" {
-			set ideal_rc [expr 1.0/$frequency/10*1e9]
+			set ideal_rc [expr 1.0E9/$frequency*$LWFG(rc_fraction)]
+			puts $ideal_rc
 			foreach {p code} $LWFG(rc_options) {
+				puts "$p $code"
 				if {$p < $ideal_rc} {
 					set filter $code
 					set rc $p
+					puts "set filter and rc"
 				}
 			}
 		}
