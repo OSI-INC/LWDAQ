@@ -74,7 +74,7 @@ proc Tapermaker_init {} {
 	set config(rx_last) "0"
 	set config(rx_timeout_ms) "1000"
 	set config(rx_size) "1000"
-	set config(xmit_cmd) "<01 H16"
+	set config(xmit_cmd) "<01 H01"
 	set config(analysis_enable) "5"
 	set config(xmit_rx) "0"
 
