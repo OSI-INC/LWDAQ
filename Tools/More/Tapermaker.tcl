@@ -41,7 +41,7 @@ proc Tapermaker_init {} {
 	set config(acceleration_mmpss) "10.0"
 	
 	# Set the home positions of the two motors.
-	set config(right_home_position_mm) "20.0"
+	set config(right_home_position_mm) "24.0"
 	set config(left_home_position_mm) "42.0"
 	
 	# The distance moved on approach from home to the heating coil. The bottom
@@ -340,9 +340,10 @@ proc Tapermaker_taper {} {
 	set config(left_distance) [expr $config(left_distance) + $stretch_distance]
 
 	LWDAQ_print $info(text) "Program loaded.\n"
-
+	LWDAQ_wait_ms 100
 	LWDAQ_print $info(text) "Initiating tapering process."
-	Tapermaker_xmit "<00 N1 H01"
+	Tapermaker_xmit "<02 N1 H01"
+	Tapermaker_xmit "<01 N1 H01"
 	LWDAQ_print $info(text) "Tapering in progress.\n"
 	return ""
 }
