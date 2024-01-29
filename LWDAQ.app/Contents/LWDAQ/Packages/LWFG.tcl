@@ -58,7 +58,7 @@ set LWFG(ch_v_hi) "+10.0"
 
 set LWFG(rc_options) "5.1e1 0x11 4.0e2 0x21 3.0e3 0x41 \
 	2.3e4 0x81 1.7e5 0x82 1.3e6 0x48 9.8e6 0x88"
-set LWFG(rc_fraction) "0.03"
+set LWFG(rc_fraction) "0.01"
 	
 proc LWFG_off {ip ch_num} {
 	global LWFG
