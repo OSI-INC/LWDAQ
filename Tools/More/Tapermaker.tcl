@@ -26,7 +26,7 @@ proc Tapermaker_init {} {
 	upvar #0 Tapermaker_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tapermaker" "2.9"
+	LWDAQ_tool_init "Tapermaker" "2.10"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Conversion constants.
@@ -44,17 +44,18 @@ proc Tapermaker_init {} {
 	set config(right_home_position_mm) "24.0"
 	set config(left_home_position_mm) "42.0"
 	
-	# The distance moved on approach from home to the heating coil. The bottom
-	# of the coil will be just above the lower fiber mounting plate. The differential
-	# is a factor by which the top motor moves faster than the lower.
+	# The distance moved on approach from home to the heating coil. The right
+	# side of the coil will be just to the left of the righ-side mounting plate.
+	# The differential is a factor by which the left motor moves faster than the
+	# right motor.
 	set config(approach_distance_mm) "10.0"
 	set config(approach_speed_mmps) "1.0"
 	set config(approach_differential_mmpmm) "1.02"
 
-	# Stretch speed (mm/s) and distance (mm) for the top and bottom portions
+	# Stretch speed (mm/s) and distance (mm) for the left and right portions
 	# of the fiber that we are separating into two tapered portions. Also
-	# A bottom portion delay between the start of the top stretch movement
-	# and the bottom stretch movement.
+	# A right portion delay between the start of the left stretch movement
+	# and the right stretch movement.
 	set config(left_stretch_delay_s) "0.0"
 	set config(left_stretch_distance_mm) "10.0"
 	set config(left_stretch_speed_mmps) "2.0"
@@ -271,40 +272,54 @@ proc Tapermaker_reset {} {
 }
 
 #
-# Tapermaker_taper writes the stretching program to the program memories
+# Tapermaker_program writes the stretching program to the program memories
 # of the two motor controllers. The distances and speeds used in the program
-# are derived from the parameters displayed in the Tapermaker window. Once
-# the program is loaded, the routine initiates the tapering process.
+# are derived from the parameters displayed in the Tapermaker window.
 # 
-proc Tapermaker_taper {} {
+proc Tapermaker_program {} {
 	upvar #0 Tapermaker_info info
 	upvar #0 Tapermaker_config config
 	
-	LWDAQ_print $info(text) "Loading tapering program."
+	LWDAQ_print $info(text) "Loading tapering programs into controllers."
 	
-	# Turn on the motor windings with "H35". The windings will be powered at all times
-	# until we use the OFF command.
-	Tapermaker_xmit "<00 H35"
-
-	# We have two variables to store the total upward movement of the two
-	# stages during the tapering process. This allows us to return to the
-	# home position from which we started using the home routine.
+	# We have two variables to store the total upward movement of the two stages
+	# during the tapering process. This allows us to return to the home position
+	# from which we started using the home routine. The left motor moves the
+	# left portion of the fiber up and away, while the right motor first pauses
+	# and then moves the right portion of the fiber down and away. Tapers are
+	# created at the break made by the heating coil as the two fiber ends pull
+	# apart. The taper we want to keep is the one on the right portion.
 	set config(right_distance) 0
 	set config(left_distance) 0
 	
-	# Select both controllers and clear all program lines. "L48 0" specifies
-	# that the "H12" clear instruction should clear all ones. 
-	Tapermaker_xmit "<00 L48 0 H12"
+	# Select the right-hand controller and clear all program lines. "L48 0"
+	# specifies that the "H12" clear instruction should clear all ones. 
+	Tapermaker_xmit "<01 L48 0 H12"
 
-	# Program both motors to move together to bring the target region of the fiber
-	# into the heating coil. We make the top motor move slightly faster than the 
-	# bottom motor to make sure we maintain tension on the fiber.
-	set right_approach_distance [expr round($config(approach_distance_mm) * $info(steps_per_mm))]
-	set right_approach_speed [expr round($config(approach_speed_mmps) * $info(steps_per_mm))]
+	# Program the right motor to bring the target region of the fiber into the
+	# heating coil. 
+	set right_approach_distance \
+		[expr round($config(approach_distance_mm) * $info(steps_per_mm))]
+	set right_approach_speed \
+		[expr round($config(approach_speed_mmps) * $info(steps_per_mm))]
 	Tapermaker_xmit "<01 N1 X+$right_approach_distance F$right_approach_speed"
 	set config(right_distance) $right_approach_distance
 
-	# The top stage is the one that moves slightly faster and farther.
+	# The right motor pauses before it moves down.
+	set delay [expr round($config(right_stretch_delay_s)*1000)]
+	Tapermaker_xmit "<01 N2 G04 X$delay"
+	
+	# The right motor moves right by the right stretch distance at the right
+	# stretch speed.
+	set stretch_distance [expr round($config(right_stretch_distance_mm) * $info(steps_per_mm))]
+	set stretch_speed [expr round($config(right_stretch_speed_mmps) * $info(steps_per_mm))]
+	Tapermaker_xmit "<01 N3 X-$stretch_distance F$stretch_speed"
+	set config(right_distance) [expr $config(right_distance) - $stretch_distance]
+	
+	# Select the left-hand controller and clear all program lines.
+	Tapermaker_xmit "<02 L48 0 H12"
+
+	# The left stage is the one that moves slightly faster and farther.
 	set left_approach_distance [expr round($right_approach_distance \
 		* $config(approach_differential_mmpmm))]
 	set left_approach_speed [expr round($right_approach_speed \
@@ -312,38 +327,37 @@ proc Tapermaker_taper {} {
 	Tapermaker_xmit "<02 N1 X+$left_approach_distance F$left_approach_speed"
 	set config(left_distance) $left_approach_distance
 
-	# The rest of the program is different for the two motors. The top motor
-	# moves the top portion of the fiber up and away, while the bottom motor
-	# first pauses and then moves the bottom portion of the fiber down and away. 
-	# Tapers are created at the break made by the heating coil as the two fiber 
-	# ends pull apart. The taper we want to keep is the one on the bottom portion.
-
-	# The bottom motor pauses before it moves down.
-	set delay [expr round($config(right_stretch_delay_s)*1000)]
-	Tapermaker_xmit "<01 N2 G04 X$delay"
-	
-	# The bottom motor moves down by the bottom stretch distance at the bottom
-	# stretch speed.
-	set stretch_distance [expr round($config(right_stretch_distance_mm) * $info(steps_per_mm))]
-	set stretch_speed [expr round($config(right_stretch_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "<01 N3 X-$stretch_distance F$stretch_speed"
-	set config(right_distance) [expr $config(right_distance) - $stretch_distance]
-	
-	# The top motor pauses before it moves up.
+	# The left motor pauses before it moves up.
 	set delay [expr round($config(left_stretch_delay_s)*1000)]
 	Tapermaker_xmit "<02 N2 G04 X$delay"
 		
-	# The top motor moves up by the top stretch distance at the top stretch speed.
+	# The left motor moves up by the left stretch distance at the left stretch speed.
 	set stretch_distance [expr round($config(left_stretch_distance_mm) * $info(steps_per_mm))]
 	set stretch_speed [expr round($config(left_stretch_speed_mmps) * $info(steps_per_mm))]
 	Tapermaker_xmit "<02 N3 X+$stretch_distance F$stretch_speed"
 	set config(left_distance) [expr $config(left_distance) + $stretch_distance]
+	
+	# The controllers are now programmed.
+	LWDAQ_print $info(text) "Motor controllers programmed.\n"
 
-	LWDAQ_print $info(text) "Program loaded.\n"
-	LWDAQ_wait_ms 100
-	LWDAQ_print $info(text) "Initiating tapering process."
-	Tapermaker_xmit "<02 N1 H01"
-	Tapermaker_xmit "<01 N1 H01"
+	return ""
+}
+
+
+#
+# Tapermaker_taper initiates the tapering process. The routine presupposes that a 
+# tapering program has been loaded into both controllers.
+# 
+proc Tapermaker_taper {} {
+	upvar #0 Tapermaker_info info
+	upvar #0 Tapermaker_config config
+	
+	# Turn on the motor windings with "H35". The windings will be powered until
+	# we use the "H36" command to turn them off. Transmit simultaneous program
+	# start to all controllers.
+	LWDAQ_print $info(text) "Turning on windings and starting program."
+	Tapermaker_xmit "<00 H35"
+	Tapermaker_xmit "<00 N1 H01"
 	LWDAQ_print $info(text) "Tapering in progress.\n"
 	return ""
 }
@@ -358,20 +372,20 @@ proc Tapermaker_home {} {
 	
 	LWDAQ_print $info(text) "Sending home commands."
 	
-	# Put the bottom motor into step mode and move it back to the home position. We
+	# Put the right motor into step mode and move it back to the home position. We
 	# have to check that the distance moved is greater than zero, or else the command
 	# will be misinterpreted by the motor controller.
 	if {$config(right_distance) > 0} {
 		Tapermaker_xmit "<01 H2 L13 $config(right_distance) H7"
 	} {
-		LWDAQ_print $info(text) "Bottom stage (No1) already in home position." brown
+		LWDAQ_print $info(text) "Right stage (No1) already in home position." brown
 	}
 	
-	# Put the top motor into step mode and move it back to the home position.
+	# Put the left motor into step mode and move it back to the home position.
 	if {$config(left_distance) > 0} {
 		Tapermaker_xmit "<02 H2 L13 $config(left_distance) H7"
 	} {
-		LWDAQ_print $info(text) "Top stage (No2) already in home position." brown	
+		LWDAQ_print $info(text) "Left stage (No2) already in home position." brown	
 	}
 	
 	LWDAQ_print $info(text) "Moving to home position.\n"
@@ -388,11 +402,13 @@ proc Tapermaker_open {} {
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}	
 
-	set f [frame $w.top]
+	set f [frame $w.left]
 	pack $f -side top -fill x
 
 	button $f.reset -text "Reset" -fg brown \
 		-command [list LWDAQ_post Tapermaker_reset]
+	button $f.program -text "Program" -fg orange \
+		-command [list LWDAQ_post Tapermaker_program]
 	button $f.taper -text "Taper" -fg green \
 		-command [list LWDAQ_post Tapermaker_taper]
 	button $f.home -text "Home" -fg orange \
@@ -406,7 +422,7 @@ proc Tapermaker_open {} {
     button $f.help -text "Help" \
     	-command "LWDAQ_tool_help $info(name)"
     	
-    pack $f.reset $f.home $f.taper $f.stop $f.off \
+    pack $f.reset $f.program $f.home $f.taper $f.stop $f.off \
     	$f.configure $f.help -side left -expand 1
 	
 	set ff [frame $w.middle]

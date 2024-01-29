@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "1.3"
+	LWDAQ_tool_init "SCT_Check" "1.4"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -55,11 +55,10 @@ proc SCT_Check_init {} {
 	set config(vbat_ref) "1.80"
 	
 	set config(sample_rates) "64 128 256 512 1024 2048"
-	set config(ratio_fc_sps) [format %.3f [expr 160.0/512]]
 	set config(frequencies_shared) "0.25 0.5 1.0 2.0 4 10\
 		20 40 100 200 400 1000"
-	set config(frequencies_wrt_fc) "0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0\
-		1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0"
+	set config(frequencies_wrt_sps) "0.13 0.15 0.17 0.19 0.21 0.23 0.25\
+		0.27 0.29 0.31 0.33 0.35 0.37 0.39 0.41 0.43 0.45 0.49 0.55 0.57"
 	set config(min_num_clocks_2048) 32
 	set config(en_2048) 0
 	set config(min_num_clocks_1024) 32
@@ -95,9 +94,8 @@ proc SCT_Check_set_frequencies {{print 0}} {
 	set config(min_num_clocks) 32
 	foreach sps $config(sample_rates) {
 		if {$config(en_$sps)} {
-			foreach ratio $config(frequencies_wrt_fc) {
-				lappend frequencies [format %.0f \
-					[expr $ratio * $sps * $config(ratio_fc_sps)]]
+			foreach ratio $config(frequencies_wrt_sps) {
+				lappend frequencies [format %.0f [expr $ratio * $sps]]
 			}
 			if {$config(min_num_clocks_$sps) > $config(min_num_clocks)} {
 				set config(min_num_clocks) $config(min_num_clocks_$sps)
