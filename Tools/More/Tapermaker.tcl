@@ -207,14 +207,14 @@ proc Tapermaker_reset {} {
 	# "L13 10" In step mode, one step is ten pulses. 
 	Tapermaker_xmit "L11 $acceleration L12 4000 L13 10"
 
-	# "L14 5000" Set the home speed to nnn. 
+	# "L14 nnn" Set the home speed to nnn. 
 	# 
 	# "L16 0" Disable maximum index limit.
 	#
 	# "L18 -0" Disable CW softare travel limit.
 	# 
 	# "L19 +0" Disable CCW software travel limit. 
-	Tapermaker_xmit "L14 5000 L16 0 L18 -0 L19 +0"
+	Tapermaker_xmit "L14 $reset_speed L16 0 L18 -0 L19 +0"
 
 	# "L26 3" Transmit EOT at end of each transmission, and "=" when ready for
 	# new commands.
@@ -237,9 +237,12 @@ proc Tapermaker_reset {} {
 	# 
 	# "L98 50" Delay between H-codes is 50 ms.
 	Tapermaker_xmit "L71 115000 L72 0 L98 50"
+	
+	# Set mechanical home directions.
+	Tapermaker_xmit "<01 L08 -"
+	Tapermaker_xmit "<02 L08 +"
 
 	LWDAQ_print $info(text) "Done.\n"
-
 	LWDAQ_print $info(text) "Sending reset commmands."
 
 	# Select right indexer and set it to high-speed and jog-mode. In "jog" mode
@@ -333,7 +336,6 @@ proc Tapermaker_program {} {
 
 	return ""
 }
-
 
 #
 # Tapermaker_taper programs the indexer for tapering, then initiates the
