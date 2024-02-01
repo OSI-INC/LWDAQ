@@ -26,25 +26,29 @@ proc Tapermaker_init {} {
 	upvar #0 Tapermaker_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tapermaker" "2.11"
+	LWDAQ_tool_init "Tapermaker" "2.12"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Conversion constants.
 	set info(steps_per_mm) "4000"
 	
-	# The reset and go-home speeds.
+	# The reset speeds, which we use for going home as well.
 	set config(reset_speed_mmps) "2.0"
 	set config(acceleration_mmpss) "10.0"
 	
+	# The motor numbers.
+	set config(sel_left) "<02"
+	set config(sel_right) "<01"
+	
 	# Set the home positions of the two motors.
-	set config(right_home_position_mm) "24.0"
+	set config(right_home_position_mm) "16.0"
 	set config(left_home_position_mm) "42.0"
 	
 	# The distance moved on approach from home to the heating coil. The right
 	# side of the coil will be just to the left of the righ-side mounting plate.
 	# The differential is a factor by which the left motor moves faster than the
 	# right motor.
-	set config(approach_distance_mm) "10.0"
+	set config(approach_distance_mm) "12.0"
 	set config(approach_speed_mmps) "1.0"
 	set config(approach_differential_mmpmm) "1.02"
 
@@ -56,7 +60,7 @@ proc Tapermaker_init {} {
 	set config(left_stretch_distance_mm) "10.0"
 	set config(left_stretch_speed_mmps) "2.0"
 	set config(right_stretch_delay_s) "2.0"
-	set config(right_stretch_distance_mm) "10.0"
+	set config(right_stretch_distance_mm) "12.0"
 	set config(right_stretch_speed_mmps) "2.0"
 	
 	# The Terminal Instrument settings that allow communication with the
@@ -71,7 +75,7 @@ proc Tapermaker_init {} {
 	set config(rx_last) "0"
 	set config(rx_timeout_ms) "1000"
 	set config(rx_size) "1000"
-	set config(xmit_cmd) "<01 H01"
+	set config(xmit_cmd) "$config(sel_right) H01"
 	set config(analysis_enable) "5"
 	set config(xmit_rx) "0"
 
@@ -177,7 +181,7 @@ proc Tapermaker_reset {} {
 	LWDAQ_print $info(text) "Configuring indexers."	
 	
 	# Translate millimeters per second and millimeters per second per second 
-	# into pulses per second and pulses per second per second.
+	# into pulses per second (pps) and pulses per second per second (ppss).
 	set reset_speed [expr round($config(reset_speed_mmps) * $info(steps_per_mm))]
 	set acceleration [expr round($config(acceleration_mmpss) * $info(steps_per_mm))]
 
@@ -188,6 +192,7 @@ proc Tapermaker_reset {} {
 	#
 	# "H35" Turn on the motor windings. The windings will be powered until the
 	# user sends an H36 command, which is windings off.
+	#
 	Tapermaker_xmit "L45 0 H35"
 
 	# "L06 2" Upon H01 command, program will be executed entirely. 
@@ -197,14 +202,16 @@ proc Tapermaker_reset {} {
 	# 
 	# "L07 0" turns off the strobe outputs.
 	# 
-	# "L09 8000" Set jog speed to 8000 p/s or 2 mm/s. 
+	# "L09 8000" Set jog speed to nnn pps. 
+	#
 	Tapermaker_xmit "L06 2 L70 10 L07 0 L09 $reset_speed"
 
 	# "L11 nnn" Set acceleration and deceleration to nnn p/s/s. 
 	# 
-	# "L12 nnn" Set low speed to nnn p/s.
+	# "L12 nnn" Set low speed to nnn pps.
 	# 
 	# "L13 10" In step mode, one step is ten pulses. 
+	#
 	Tapermaker_xmit "L11 $acceleration L12 4000 L13 10"
 
 	# "L14 nnn" Set the home speed to nnn. 
@@ -214,55 +221,57 @@ proc Tapermaker_reset {} {
 	# "L18 -0" Disable CW softare travel limit.
 	# 
 	# "L19 +0" Disable CCW software travel limit. 
+	#
 	Tapermaker_xmit "L14 $reset_speed L16 0 L18 -0 L19 +0"
 
-	# "L26 3" Transmit EOT at end of each transmission, and "=" when ready for
-	# new commands.
+	# "L26 4" Respect XON/XOFF, no "=" or "EOT".
 	# 
 	# "L41 1" Program reset line number.
 	# 
 	# "L44 50" Insert 50-ms delay between each line execution.
 	# 
 	# "L47 0" Program repeat counter zero.
-	Tapermaker_xmit "L26 3 L41 1 L44 50 L45 10 L47 0"
+	#
+	Tapermaker_xmit "L26 4 L41 1 L44 50 L45 10 L47 0"
 
 	# "L66 +0" Disable backlash compensation. 
 	# 
 	# "L67 0" Disable autoreverse.
+	#
 	Tapermaker_xmit "L66 +0 L67 0"
 
 	# "L71 nnn" Max speed in pps.
 	# 
 	# "L72 0" trapezoidal ramp
 	# 
-	# "L98 50" Delay between H-codes is 50 ms.
-	Tapermaker_xmit "L71 115000 L72 0 L98 50"
+	# "L98 100" Delay between H-codes is 100 ms.
+	#
+	Tapermaker_xmit "L71 115000 L72 0 L98 100"
 	
 	# Set mechanical home directions.
-	Tapermaker_xmit "<01 L08 -"
-	Tapermaker_xmit "<02 L08 +"
+	Tapermaker_xmit "$config(sel_right) L08 -"
+	Tapermaker_xmit "$config(sel_left) L08 +"
 
 	LWDAQ_print $info(text) "Done.\n"
 	LWDAQ_print $info(text) "Sending reset commmands."
 
 	# Select right indexer and set it to high-speed and jog-mode. In "jog" mode
-	# the motor keeps turning until you stop
-	# it. We set the motor turning counter-clockwise (CCW). It will 
-	# will keep turning until it hits its CCW limit switch. 
-	Tapermaker_xmit "<01 H04 H03 H07"
+	# the motor keeps turning until you stop it. We set the motor turning
+	# counter-clockwise (CCW). It will will keep turning until it hits its CCW
+	# limit switch. 
+	Tapermaker_xmit "$config(sel_right) H04 H03 H07"
 
-	# Now move No1 off CCW limit switch to its home position. "H02" puts the
-	# indexer into step mode, in which it moves a specific number of pulses.
-	# "L13 122000" specifies a movement of 122k pulses, or 30.5 mm, and "H6"
-	# orders the movement in the CW direction. Once we are done with these
-	# movements, we will be in the home position, so we establish electrical
-	# home with H09.
+	# Move No1 off CCW limit switch to its home position. "H02" puts the indexer
+	# into step mode, in which it moves a specific number of pulses. "L13 nnn"
+	# specifies a movement of nnn pulses. "H06" orders the movement in the CW
+	# direction. Once we are done with these movements, we will be in the home
+	# position, so we establish electrical home with "H09".
 	set num_pulses [expr round($config(right_home_position_mm) * $info(steps_per_mm))]
 	Tapermaker_xmit "H2 L13 $num_pulses H6 H09"
 
 	# Select No2 and set it to turning clockwise (CW). The motor will
 	# keep turning until it hits its CW limit switch.
-	Tapermaker_xmit "<02 H04 H03 H06"
+	Tapermaker_xmit "$config(sel_left) H04 H03 H06"
 
 	# Move No2 off CW limit switch by 190k steps, or 47.5 mm and establish electrical
 	# home with H09.
@@ -291,8 +300,8 @@ proc Tapermaker_program {} {
 	# right portion.
 	
 	# Select the right-hand indexer and clear all program lines. "L48 0"
-	# specifies that the "H12" clear instruction should clear all ones. 
-	Tapermaker_xmit "<01 L48 0 H12"
+	# specifies that the "H12" clear instruction should clear all lines. 
+	Tapermaker_xmit "$config(sel_right) L48 0 H12"
 
 	# Program the right motor to bring the target region of the fiber into the
 	# heating coil. 
@@ -300,36 +309,36 @@ proc Tapermaker_program {} {
 		[expr round($config(approach_distance_mm) * $info(steps_per_mm))]
 	set right_approach_speed \
 		[expr round($config(approach_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "<01 N1 X+$right_approach_distance F$right_approach_speed"
+	Tapermaker_xmit "$config(sel_right) N1 X+$right_approach_distance F$right_approach_speed"
 
 	# The right motor pauses before it moves down.
 	set delay [expr round($config(right_stretch_delay_s)*1000)]
-	Tapermaker_xmit "<01 N2 G04 X$delay"
+	Tapermaker_xmit "$config(sel_right) N2 G04 X$delay"
 	
 	# The right motor moves right by the right stretch distance at the right
 	# stretch speed.
 	set stretch_distance [expr round($config(right_stretch_distance_mm) * $info(steps_per_mm))]
 	set stretch_speed [expr round($config(right_stretch_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "<01 N3 X-$stretch_distance F$stretch_speed"
+	Tapermaker_xmit "$config(sel_right) N3 X-$stretch_distance F$stretch_speed"
 	
 	# Select the left-hand indexer and clear all program lines.
-	Tapermaker_xmit "<02 L48 0 H12"
+	Tapermaker_xmit "$config(sel_left) L48 0 H12"
 
 	# The left stage is the one that moves slightly faster and farther.
 	set left_approach_distance [expr round($right_approach_distance \
 		* $config(approach_differential_mmpmm))]
 	set left_approach_speed [expr round($right_approach_speed \
 		* $config(approach_differential_mmpmm))]
-	Tapermaker_xmit "<02 N1 X+$left_approach_distance F$left_approach_speed"
+	Tapermaker_xmit "$config(sel_left) N1 X+$left_approach_distance F$left_approach_speed"
 
 	# The left motor pauses before it moves up.
 	set delay [expr round($config(left_stretch_delay_s)*1000)]
-	Tapermaker_xmit "<02 N2 G04 X$delay"
+	Tapermaker_xmit "$config(sel_left) N2 G04 X$delay"
 		
 	# The left motor moves up by the left stretch distance at the left stretch speed.
 	set stretch_distance [expr round($config(left_stretch_distance_mm) * $info(steps_per_mm))]
 	set stretch_speed [expr round($config(left_stretch_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "<02 N3 X+$stretch_distance F$stretch_speed"
+	Tapermaker_xmit "$config(sel_left) N3 X+$stretch_distance F$stretch_speed"
 	
 	# The indexers are now programmed.
 	LWDAQ_print $info(text) "Motor indexers programmed.\n"
