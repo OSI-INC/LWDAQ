@@ -160,13 +160,10 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 		"sine"     - 
 		"triangle" {
 			set ideal_rc [expr 1.0E9/$frequency*$LWFG(rc_fraction)]
-			puts $ideal_rc
 			foreach {p code} $LWFG(rc_options) {
-				puts "$p $code"
 				if {$p < $ideal_rc} {
 					set filter $code
 					set rc $p
-					puts "set filter and rc"
 				}
 			}
 		}
