@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "168"
+	LWDAQ_tool_init "Neuroplayer" "169"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -2496,7 +2496,7 @@ proc Neuroplayer_overview_excerpt {} {
 	set addr_end [expr $data_start + $message_length * $index_max]
 
 	set excerpt_atime [expr round($ov_config(atime) + $ov_config(t_min))]
-	set excerpt_fn [file join [file dirname $ov_config(fn)] "X"$excerpt_atime\.ndf]
+	set excerpt_fn [file join [file dirname $ov_config(fn)] "X$excerpt_atime\.ndf"]
 	set metadata [LWDAQ_ndf_string_read $ov_config(fn)]
 	LWDAQ_ndf_create $excerpt_fn $config(ndf_metadata_size)
 	LWDAQ_ndf_string_write $excerpt_fn $metadata
