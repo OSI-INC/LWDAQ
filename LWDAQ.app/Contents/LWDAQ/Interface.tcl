@@ -101,8 +101,7 @@ proc LWDAQ_init_main_window {} {
 	if {!$info(gui_enabled)} {return ""}
 
 	# Give a title to the main window
-	wm title . $info(program_name)
-
+	wm title . "$info(program_name) $info(program_patchlevel)"
 	# Create a new menubar for the main window
 	set info(menubar) ".menubar"
 	set m $info(menubar)

@@ -190,7 +190,7 @@ if {$LWDAQ_Info(terminal_connected)} {
 if {[catch {
 	# Set the console title, if there is a console.
 	if {$LWDAQ_Info(tk_console)} {
-		console title "TCL/TK Console for LWDAQ \
+		console title "Console for $LWDAQ_Info(program_name) \
 			$LWDAQ_Info(program_patchlevel) on $LWDAQ_Info(os)"
 	}
 	
