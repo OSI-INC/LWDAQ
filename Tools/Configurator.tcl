@@ -21,7 +21,7 @@ proc Configurator_init {} {
 	upvar #0 Configurator_config config
 	global LWDAQ_Info
 	
-	LWDAQ_tool_init "Configurator" "21"
+	LWDAQ_tool_init "Configurator" "22"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(contact_ip_addr) 10.0.0.37
@@ -132,7 +132,7 @@ proc Configurator_write {} {
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_print $info(text) "succeeded." green
 		LWDAQ_socket_close $sock
-		LWDAQ_print $info(text)  "New configuration will be loaded after reboot.\n"
+		LWDAQ_print $info(text)  "Reboot driver to load new configuration.\n"
 	} error_result]} {
 		LWDAQ_print $info(text)
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
@@ -172,7 +172,7 @@ proc Configurator_reboot {} {
 	catch {LWDAQ_socket_close $sock}
 
 	LWDAQ_print $info(text) "succeeded." green
-	LWDAQ_print $info(text)  "New configuration will be loaded after reboot.\n"
+	LWDAQ_print $info(text)  "Configuration has been reloaded from memory.\n"
 
 	return ""
 }
