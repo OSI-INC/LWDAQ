@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.10"
+	LWDAQ_tool_init "Stimulator" "3.11"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -342,7 +342,7 @@ proc Stimulator_start {n} {
 
 #
 # Stimulator_stop transmits a stop command and sets the stimulus end time
-# for selected channel to the current time.
+# for selected device to the current time.
 #
 proc Stimulator_stop {n} {
 	upvar #0 Stimulator_config config
@@ -382,15 +382,25 @@ proc Stimulator_xon {n} {
 
 	# Send the Xon command with transmit period. 	
 	if {$config(sps) > $config(max_tx_sps)} {
-		Stimulator_print "ERROR: Requested frequency $config(sps) SPS\
-			is greater than maximum $config(max_tx_sps) SPS."
+		Stimulator_print "ERROR: Frequency $config(sps) SPS greater than maximum\
+			$config(max_tx_sps) SPS."
 		set info(state) "Idle"
 		return ""
 	}
 	set tx_p [expr round($config(rck_khz)*1000/$config(sps))-1]
 	
 	# Add the XON instruction.
-	lappend commands $info(op_xon) $info(dev$n\_channel) $tx_p
+	set ch $info(dev$n\_channel)
+	if {[string is integer -strict $ch] \
+		&& ($ch > 0) && ($ch < 255) \
+		&& ($ch % 16 > 0) && ($ch % 16 < 15)} {
+		lappend commands $info(op_xon) $ch $tx_p
+	} else {
+		Stimulator_print "ERROR: Invalid channel number \"$ch\",\
+			Try 0 < c < 254, c mod 16 <> 0, c mod 16 <> 15."
+		set info(state) "Idle"
+		return ""
+	}
 		
 	# Transmit the command.
 	Stimulator_transmit [Stimulator_id $n] $commands
