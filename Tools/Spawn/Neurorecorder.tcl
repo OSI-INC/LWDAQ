@@ -48,7 +48,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "165"
+	LWDAQ_tool_init "Neurorecorder" "166"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -92,14 +92,8 @@ proc Neurorecorder_init {} {
 # receiver but are unable to write to disk because the recording file
 # is locked. 
 #
-	set info(recorder_buffer) ""
-#
-# The file lock delay is how long we idle before proceeding with further efforts
-# to write to a locked file. Units are milliseconds. The lock delay stops us
-# from locking the file ourselves by attempting to write to the file too
-# frequently.
-#
-	set config(lock_delay_ms) "1000"
+	set info(rbuff) ""
+	set config(max_rbuff) "20000000"
 #
 # Properties of data messages.
 #
@@ -206,10 +200,15 @@ proc Neurorecorder_init {} {
 	set info(recorder_message_interval) $info(initial_message_interval)
 	set info(message_interval_multiplier) 3
 #
-# Colors for windows.
+# Colors for windows and widgets.
 #
 	set info(label_color) "darkgreen"
 	set info(variable_bg) "lightgray"
+	set info(active_color) "yellow"
+	set info(error_color) "red"
+	set info(start_color) "green"
+	set info(inactive_color) "white"
+	set info(pick_color) "orange"
 #
 # The Save button in the Configuration Panel allows you to save your own
 # configuration parameters to disk a file called settings_file_name. This
@@ -667,7 +666,7 @@ proc Neurorecorder_record {{command ""}} {
 	# If a global reset is going on, go to idle state.
 	if {$LWDAQ_Info(reset)} {
 		set info(record_control) "Idle"
-		set info(recorder_buffer) ""
+		set info(rbuff) ""
 		return ""
 	}
 	
@@ -692,11 +691,11 @@ proc Neurorecorder_record {{command ""}} {
 	
 	# If PickDir we choose a directory in which to create new archives.
 	if {$info(record_control) == "PickDir"} {
-		LWDAQ_set_bg $info(record_control_label) orange
+		LWDAQ_set_bg $info(record_control_label) $info(pick_color)
 		LWDAQ_update
 		Neurorecorder_pick record_dir
 		Neurorecorder_print "Files will be written to $config(record_dir)."
-		LWDAQ_set_bg $info(record_control_label) white
+		LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
 		LWDAQ_update
 	}
 	
@@ -726,11 +725,11 @@ proc Neurorecorder_record {{command ""}} {
 		(($config(record_end_time) >= $config(autocreate)) \
 			&& ($config(autocreate) > 0))} {
 
-		# Turn the recording label red,
-		LWDAQ_set_bg $info(record_control_label) red
+		# Turn the recording label to the start color.
+		LWDAQ_set_bg $info(record_control_label) $info(start_color)
 		
 		# Clear the buffer.
-		set info(recorder_buffer) ""
+		set info(rbuff) ""
 
 		# If the synchronization flag is set, or if we are starting a new recording,
 		# we wait until a new second begins so as to make the file time match the 
@@ -742,7 +741,7 @@ proc Neurorecorder_record {{command ""}} {
 				if {$info(record_control) == "Stop"} {
 					set info(record_control) "Idle"
 					if {[winfo exists $info(window)]} {
-						LWDAQ_set_bg $info(record_control_label) white
+						LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
 					}
 					return ""
 				}
@@ -763,14 +762,14 @@ proc Neurorecorder_record {{command ""}} {
 			if {[LWDAQ_is_error_result $result]} {
 				Neurorecorder_print "$result"
 				set info(record_control) "Idle"
-				LWDAQ_set_bg $info(record_control_label) white
+				LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
 				return ""
 			}
 			Neurorecorder_set_receiver $iinfo(receiver_type)
 		}
 
-		# Restore the recording label to white.
-		LWDAQ_set_bg $info(record_control_label) white
+		# Restore the recording label to the inactive color.
+		LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
 
 		# Check that the destination directory exists.
 		if {![file exists $config(record_dir)]} {
@@ -802,7 +801,7 @@ proc Neurorecorder_record {{command ""}} {
 			Neurorecorder_print "SUGGESTION: Your disk drive may be full,\
 				make space on the drive and try again."
 			set info(record_control) "Idle"
-			LWDAQ_set_bg $info(record_control_label) white
+			LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
 			return ""		
 		}
 		if {($info(record_control) == "Start") || $config(synchronize)} {
@@ -822,8 +821,10 @@ proc Neurorecorder_record {{command ""}} {
 		set info(record_control) "Record"
 	}
 
-	# If Record, we download data from the data receiver and write it to the
-	# archive.
+	# If Record, we attempt to download data from the data receiver and record
+	# it to disk. If the download attempt fails, we will still try to write any
+	# buffered data to disk. If the download succeeds, but the write failes, we
+	# buffer the downloaded data.
 	if {$info(record_control) == "Record"} {
 		# If we have already caught up with our recording, we don't bother
 		# trying to acquire more data because we'll be occupying the LWDAQ
@@ -834,34 +835,11 @@ proc Neurorecorder_record {{command ""}} {
 			return ""
 		}
 
-		# If our recording buffer is not empty, try to write the data to disk
-		# now. If we get a file locked error, we will try again later to write
-		# the data to disk, but avoid trying to download any more data. If we
-		# get any other error we abandon recording.
-		if {$info(recorder_buffer) != ""} {
-			if {[catch {
-				LWDAQ_ndf_data_append $config(record_file) $info(recorder_buffer)
-				set info(recorder_buffer) ""	
-				Neurorecorder_print "WARNING: Wrote buffered data to\
-					[file tail $config(record_file)]\
-					after previous write failure."		
-			} error_message]} {
-				if {[regexp "file locked" $error_message]} {		
-					LWDAQ_post Neurorecorder_record end
-					LWDAQ_wait_ms $config(lock_delay_ms)
-				} {
-					Neurorecorder_print "ERROR: $error_message\."
-					set info(recorder_buffer) ""
-					set info(record_control) "Idle"
-				}
-				LWDAQ_set_bg $info(record_control_label) white
-				return ""
-			}
-		}
-		
-		# Set the record label to the download color.
-		if {($info(recorder_error_time) == 0)} {
-			LWDAQ_set_bg $info(record_control_label) yellow
+		# If we are not dealing with no errors, set the record label to the
+		# active color.
+		if {($info(recorder_error_time) == 0) \
+				&& ([string length $info(rbuff)] == 0)} {
+			LWDAQ_set_bg $info(record_control_label) $info(active_color)
 		}
 		
 		# If the Receiver Instrument happens to be looping, stop it.
@@ -893,19 +871,13 @@ proc Neurorecorder_record {{command ""}} {
 		# an error.
 		set daq_result [LWDAQ_acquire Receiver]
 		
-		# We restore the global max_daq_attempts variable.
+		# Restore the global max_daq_attempts variable.
 		set LWDAQ_Info(max_daq_attempts) $saved_max_daq_attempts
 		
-		# If the attempt to download encountered an error, report it to the
-		# Neurorecorder text window with the current date and time. The Receiver
-		# Instrument will have tried to reset the data receiver. If successful,
-		# the reset will clear the data receiver's memory. The Receiver
-		# Instrument will set its acquire_end_ms parameter accordingly. We post
-		# Neurorecorder_record again, so we can make another attempt. The
-		# Neurorecorder will never give up trying to download data until the
-		# user presses the Stop button. In this case, we post the recording
-		# process to the end of the event queue because our recovery is not
-		# urgent.
+		# If the attempt to download encountered an error, we keep track of when
+		# we last dealt with an error, so that we do not attempt to correct the
+		# error too often. If the error is corrupted data, we are going to be
+		# resetting the data receiver.
 		if {[LWDAQ_is_error_result $daq_result]} {
 			set print_error_and_reset 0
 			if {($info(recorder_error_time) == 0)} {
@@ -920,66 +892,97 @@ proc Neurorecorder_record {{command ""}} {
 					* $info(message_interval_multiplier)]
 			}
 			if {$print_error_and_reset} {
-				LWDAQ_set_bg $info(record_control_label) red
+				LWDAQ_set_bg $info(record_control_label) $info(error_color)
 				Neurorecorder_print "$daq_result"
 				if {[regexp "corrupted" $daq_result]} {
-					Neurorecorder_print "WARNING: Attempting to reset data receiver\
-						and stop corruption."
+					Neurorecorder_print "WARNING: Corrupted data, resetting receiver."
 					set reset_result [LWDAQ_reset_Receiver]
 					if {[LWDAQ_is_error_result $reset_result]} {
 						LWDAQ_print "ERROR: $reset_result"
 					}
 				}
 			}
-			LWDAQ_post Neurorecorder_record end
-			return ""
 		} 
 		
-		# If we encountered an error earlier during disk access, we notify the user
-		# that recording has been resumed.
-		if {$info(recorder_error_time) != 0} {
-			LWDAQ_set_bg $info(record_control_label) yellow
-			Neurorecorder_print "WARNING: Recording resumed after interruption of\
+		# If we did not encounter an error, but the previous attempt failed, we now
+		# announce that we are resuming recording.
+		if {![LWDAQ_is_error_result $daq_result] \
+				&& ($info(recorder_error_time) != 0)} {
+			Neurorecorder_print "WARNING: Download resumed after interruption of\
 				[expr [clock seconds] - $info(recorder_error_time)] s."
 			set info(recorder_error_time) 0
 			set info(recorder_message_interval) $info(initial_message_interval)
 		}
 		
-		# Check the block of data for errors. If there are errors, we print a warning.
-		scan [lwdaq_receiver $iconfig(memory_name) \
-			"-payload $iconfig(payload_length) clocks 0"] %d%d%d%d \
-			num_errors num_clocks num_messages first_index
-		if {$num_errors > 0} {
-			Neurorecorder_print "WARNING: Encountered $num_errors errors\
-				in received interval."
+		# If our recorder buffer is not empty, we must be dealing with a problem
+		# writing data to disk, so set a flag.
+		if {$info(rbuff) != ""} {
+			set prev_disk_error 1
+		} {
+			set prev_disk_error 0
 		}
-
-		# Append the new data to our NDF file. If the data write fails, we print
-		# an error message warning of the loss of data. An error writing to the
-		# file will occur on Windows if another process is reading the file. If
-		# we encounter such an error, we drop this interval of data, post the
-		# recording process to the end of the event queue, and hope that the
-		# file system conflict will soon be resolved.
-		set message_length [expr $info(core_message_length) + $iconfig(payload_length)]
-		if {[catch {
-			set info(recorder_buffer) \
-				[lwdaq_image_contents $iconfig(memory_name) -truncate 1 \
-					-data_only 1 -record_size $message_length]
-			LWDAQ_ndf_data_append $config(record_file) $info(recorder_buffer)
-			set info(recorder_buffer) ""				
-		} error_message]} {
-			if {[regexp "file locked" $error_message]} {				
-				Neurorecorder_print "WARNING: Could not write to\
-					[file tail $config(record_file)],\
-					permission denied, buffering data."
-				LWDAQ_post Neurorecorder_record end
-			} {
-				Neurorecorder_print "ERROR: $error_message\."
-				set info(record_control) "Idle"
-				set info(recorder_buffer) ""				
+		
+		# If we did not encounter an error during data aquisition from the
+		# receiver, append the new data to our buffer. If our recording buffer
+		# has overflowed, we discard the new data and print a warning. If the
+		# new data contains errors, print a warning.
+		if {![LWDAQ_is_error_result $daq_result]} {
+			set message_length \
+				[expr $info(core_message_length) + $iconfig(payload_length)]
+			set new [lwdaq_image_contents $iconfig(memory_name) \
+					-truncate 1 -data_only 1 -record_size $message_length]
+			if {[string length $info(rbuff)] < $config(max_rbuff)} {
+				append info(rbuff) $new
+				if {[string length $info(rbuff)] >= $config(max_rbuff)} {
+					Neurorecorder_print "WARNING: Recording buffer overflow,\
+						[format %.1f [expr [string length $info(rbuff)]/1000000]] MB\
+						waiting to be written to disk."	
+				} 
 			}
-			LWDAQ_set_bg $info(record_control_label) white
-			return ""
+			Neurorecorder_print "Received [string length $new] bytes,\
+				buffer contains [string length $info(rbuff)] bytes." verbose
+			scan [lwdaq_receiver $iconfig(memory_name) \
+				"-payload $iconfig(payload_length) clocks 0"] %d%d%d%d \
+				num_errors num_clocks num_messages first_index
+			if {$num_errors > 0} {
+				Neurorecorder_print "WARNING: Encountered $num_errors errors\
+					in received interval."
+			}
+		}
+		
+		# If our recording buffer is not empty, try to write the data to disk. If our
+		# write succeeds, we empty the buffer. If our write fails with a locked file
+		# error, we set the recording label to the error color. If our write fails with
+		# some other error, abort recording.
+		if {$info(rbuff) != ""} {
+			if {[catch {
+				LWDAQ_ndf_data_append $config(record_file) $info(rbuff)
+				if {$prev_disk_error} {
+					Neurorecorder_print "WARNING: Wrote\
+						[string length $info(rbuff)]\
+						bytes to [file tail $config(record_file)]\
+						after previous write failure."
+				} {
+					Neurorecorder_print "Wrote [string length $info(rbuff)]\
+						bytes to disk." verbose
+				}
+				set info(rbuff) ""
+			} error_message]} {
+				if {[regexp "file locked" $error_message]} {
+					if {!$prev_disk_error} {		
+						LWDAQ_set_bg $info(record_control_label) $info(error_color)
+						Neurorecorder_print "WARNING: Could not write to\
+							[file tail $config(record_file)],\
+							file locked, buffering data."
+					}
+				} {
+					Neurorecorder_print "ERROR: $error_message\."
+					set info(rbuff) ""
+					set info(record_control) "Idle"
+					LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
+					return ""
+				}
+			}
 		}
 		
 		# Trim the text window to a maximum number of lines.
@@ -989,15 +992,17 @@ proc Neurorecorder_record {{command ""}} {
 			}
 		}
 
-		# Increment the record time. If there has been interruption in the
-		# data acquisition, in which we lost data, this end time will be too
-		# low. If the data acquisition has been fragmented, so that we obtain
-		# fewer clock messages than we asked for, this end time will be too high.
+		# Increment the record time, on the assumption that we obtained the 
+		# data we wanted.
 		set config(record_end_time) \
 			[expr $config(record_end_time) + $config(record_interval)]
-		
-		# We restore the record lable color.
-		LWDAQ_set_bg $info(record_control_label) white
+			
+		# If we are not dealing with no errors, set the record label to the
+		# inactive color.
+		if {($info(recorder_error_time) == 0) \
+				&& ([string length $info(rbuff)] == 0)} {
+			LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
+		}			
 		
 		# We continue recording by posting the record process to the LWDAQ event queue.
 		LWDAQ_post Neurorecorder_record end
