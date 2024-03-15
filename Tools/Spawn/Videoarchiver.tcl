@@ -30,7 +30,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "33"
+	LWDAQ_tool_init "Videoarchiver" "34"
 	
 	# Set minimum camera compressor version.
 	set info(min_compressor_version) "31"
