@@ -434,7 +434,6 @@ proc LWDAQ_daq_BCAM {} {
 				-sort_code 6]
 			if {![LWDAQ_is_error_result $result]} {
 				set brightness [lindex $result 3]
-				LWDAQ_print $info(text) $result green
 			} {
 				return $result
 			}
