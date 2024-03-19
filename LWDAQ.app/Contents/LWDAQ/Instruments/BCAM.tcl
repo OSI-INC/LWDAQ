@@ -31,10 +31,9 @@ proc LWDAQ_init_BCAM {} {
 	array unset config
 	array unset info
 
-	# The info array elements will not be displayed in the 
-	# instrument window. The only info variables set in the 
-	# LWDAQ_open_Instrument procedure are those which are checked
-	# only when the instrument window is open.
+	# The info array elements will not be displayed in the instrument window.
+	# The only info variables set in the LWDAQ_open_Instrument procedure are
+	# those which are checked only when the instrument window is open.
 	set info(name) "BCAM"
 	set info(control) "Idle"
 	set info(window) [string tolower .$info(name)]
@@ -59,7 +58,7 @@ proc LWDAQ_init_BCAM {} {
 	set info(flash_seconds_max) 1.0
 	set info(flash_seconds_step) 0.000001
 	set info(flash_seconds_reduce) 0.2
-	set info(flash_seconds_transition) 0.000030
+	set info(flash_seconds_transition) 0.000020
 	set info(flash_max_tries) 30
 	set info(flash_num_tries) 0
 	set info(ambient_exposure_seconds) 0
@@ -86,9 +85,9 @@ proc LWDAQ_init_BCAM {} {
 			{Accuracy (um)} \
 			{Threshold (counts)}"
 	
-	# All elements of the config array will be displayed in the
-	# instrument window. No config array variables can be set in the
-	# LWDAQ_open_Instrument procedure
+	# All elements of the config array will be displayed in the instrument
+	# window. No config array variables can be set in the LWDAQ_open_Instrument
+	# procedure
 	set config(image_source) "daq"
 	set config(file_name) ./Images/$info(name)\*
 	set config(memory_name) $info(name)\_0
@@ -112,9 +111,8 @@ proc LWDAQ_init_BCAM {} {
 }		
 
 #
-# LWDAQ_analysis_BCAM applies BCAM analysis to an image 
-# in the lwdaq image list. By default, the routine uses the
-# image $config(memory_name).
+# LWDAQ_analysis_BCAM applies BCAM analysis to an image in the lwdaq image list.
+# By default, the routine uses the image $config(memory_name).
 proc LWDAQ_analysis_BCAM {{image_name ""}} {
 	upvar #0 LWDAQ_config_BCAM config
 	upvar #0 LWDAQ_info_BCAM info
@@ -142,10 +140,9 @@ proc LWDAQ_analysis_BCAM {{image_name ""}} {
 }
 
 #
-# LWDAQ_infobuttons_BCAM creates buttons that allow us to configure
-# the BCAM for any of the available image sensors. The general-purpose
-# instrument routines will call this procedure when they create the
-# info panel.
+# LWDAQ_infobuttons_BCAM creates buttons that allow us to configure the BCAM for
+# any of the available image sensors. The general-purpose instrument routines
+# will call this procedure when they create the info panel.
 #
 proc LWDAQ_infobuttons_BCAM {f} {
 	global LWDAQ_Driver
@@ -180,12 +177,12 @@ proc LWDAQ_infobuttons_BCAM {f} {
 }
 
 #
-# LWDAQ_daq_BCAM captures an image from the LWDAQ electronics and places
-# the image in the lwdaq image list. It provides background subtraction by
-# taking a second image while flashing non-existent lasers. It provides
-# automatic exposure adjustment by calling itself until the maximum image
-# intensity lies within peak_min and peak_max. For detailed comments upon
-# the readout of the image sensors, see the LWDAQ_daq_Camera routine.
+# LWDAQ_daq_BCAM captures an image from the LWDAQ electronics and places the
+# image in the lwdaq image list. It provides background subtraction by taking a
+# second image while flashing non-existent lasers. It provides automatic
+# exposure adjustment by calling itself until the maximum image intensity lies
+# within peak_min and peak_max. For detailed comments upon the readout of the
+# image sensors, see the LWDAQ_daq_Camera routine.
 #
 proc LWDAQ_daq_BCAM {} {
 	global LWDAQ_Info LWDAQ_Driver
@@ -422,6 +419,24 @@ proc LWDAQ_daq_BCAM {} {
 				set num_above [expr $num_above - $n]
 				if {$num_above < $argument} {break}
 				set brightness $b
+			}
+		}
+		"5" {
+			# Apply BCAM analysis to the image, using the current value of 
+			# analysis_threshold, including its restrictions on the size and
+			# shape of the spots. Sort the spots in decreasing maximum intensity
+			# and use the brightness of the first spot as our measurement of the
+			# image intensity. We call this brightness the "spot maximum".
+			set result [lwdaq_bcam $config(memory_name) \
+				-num_spots 2 \
+				-threshold $config(analysis_threshold) \
+				-analysis_type 1 \
+				-sort_code 6]
+			if {![LWDAQ_is_error_result $result]} {
+				set brightness [lindex $result 3]
+				LWDAQ_print $info(text) $result green
+			} {
+				return $result
 			}
 		}
 		default {

@@ -30,7 +30,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "34"
+	LWDAQ_tool_init "Videoarchiver" "35"
 	
 	# Set minimum camera compressor version.
 	set info(min_compressor_version) "31"
@@ -2416,7 +2416,7 @@ proc Videoarchiver_check_libraries {} {
 		}
 		LWDAQ_print -nonewline $info(text) "Checking ffmpeg utility... " 
 		catch {exec $info(ffmpeg) -h} message
-		if {[regexp "Hyper" $message]} {
+		if {[regexp "usage:" $message]} {
 			LWDAQ_print $info(text) "success."
 		} else {
 			LWDAQ_print $info(text) "FAIL."
