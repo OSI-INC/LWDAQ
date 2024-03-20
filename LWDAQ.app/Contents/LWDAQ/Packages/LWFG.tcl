@@ -29,8 +29,11 @@
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 
+# Version 1.1 [01-FEB-24] First version, in use in the SCT Checkt tool.
+# Version 1.2 [20-MAR-24] Clip waveform DAC values to 0..255.
+
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide LWFG 1.1
+package provide LWFG 1.2
 
 # Clear the global EDF array if it already exists.
 if {[info exists LWFG]} {unset LWFG}
@@ -152,6 +155,15 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 			return "ERROR: Unkown waveform \"$waveform\"."
 		}
 	}
+	
+	# Limit the values to the range 0 to 255.
+	set clipped_values [list]
+	foreach value $values {
+		if {$value < 0} {set value 0}
+		if {$value > 255} {set value 255}
+		lappend clipped_values $value
+	}
+	set values $clipped_values
 	
 	# Choose the filter.
 	set rc [lindex $LWFG(rc_options) 0]
