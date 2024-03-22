@@ -26,8 +26,14 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
+# Version 3.1: Formats KiCad schematic netlists, KiCad PCB netlists, and 
+# Traxmaker netlists automatically. For Traxmaker, generates modern drill
+# file from obsolete format drill and tool files.
+
+# Version 3.2: When formatting KiCad PCB netlist, omit the "N/C" net.
+
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide NFU 3.1
+package provide NFU 3.2
 
 #
 # NFU_format reads a netlist file, identifies its type, re-formats it, and
@@ -105,8 +111,10 @@ proc NFU_format {{fn ""}} {
 		set netlist ""
 		set netname ""
 		foreach node $nodes {
-			if {[lindex $node 0] != $netname} {
-				set netname [lindex $node 0]
+			set first [lindex $node 0]
+			if {$first == "N/C"} {continue}
+			if {$first != $netname} {
+				set netname $first
 				append netlist "\n$netname\: [lindex $node 1][lindex $node 2] "
 			} else {
 				append netlist "[lindex $node 1][lindex $node 2] "
