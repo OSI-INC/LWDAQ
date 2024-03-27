@@ -14,6 +14,7 @@ proc Function_Generator_init {} {
 
 	set info(control) "Idle"
 	set config(verbose) "0"
+	set config(logarithmic) "0"
 
 	set config(gen_ip) "10.0.0.37"
 	set config(gen_ch) "1"
@@ -23,7 +24,7 @@ proc Function_Generator_init {} {
 	set config(waveform_offset) "0"
 	set config(waveform_frequency) "10"
 
-	set config(sweep_start_frequency) "0.1"
+	set config(sweep_start_frequency) "1"
 	set config(sweep_stop_frequency) "500"
 	set config(sweep_time) "1"
 
@@ -193,8 +194,8 @@ proc Function_Generator_sweep {} {
 	# with the fastest sample rate, and if num_pts is too large, we increase
 	# the divisor until num_pts is small enough.
 	set num_pts $LWFG(max_pts)
-	set num_cycles "1"
-	set divisor [expr round(($sweep_period * $LWFG(clock_hz)) / $num_pts) - "1"]
+	set num_cycles 1
+	set divisor [expr round(($LWFG(clock_hz) * $sweep_period) / $num_pts) - "1"]
 	
 	# Generate the waveform.
 	set values [list]
@@ -204,9 +205,18 @@ proc Function_Generator_sweep {} {
 			set pi 3.141592654
 			for {set i 0} {$i < $num_pts} {incr i} {
 				set phase [expr fmod($i,$period)/$period]
-				lappend values [expr $dac_lo + \
-					round(($dac_hi-$dac_lo)*0.5 * \
-						(1.0+sin(2*$pi*($start_frequency+($stop_frequency-$start_frequency)*$phase)*$phase)))]
+				if {$config(logarithmic) == "0"} {
+					lappend values [expr $dac_lo + \
+						round(($dac_hi - $dac_lo) * 0.5 * \
+							(1.0+sin(2*$pi*$sweep_period*(($start_frequency+ \
+								(($stop_frequency-$start_frequency)/2)*$phase)*$phase))))]
+				} else {
+					lappend values [expr $dac_lo + \
+						round(($dac_hi - $dac_lo) * 0.5 * \
+							(1.0+sin(2*$pi*($start_frequency*$sweep_period* \
+								((pow(($stop_frequency/$start_frequency), ($phase)) - 1) \
+									/(log($stop_frequency/$start_frequency)))))))]
+				}
 			}
 		}
 		"square" {
@@ -242,7 +252,7 @@ proc Function_Generator_sweep {} {
 	switch $waveform {
 		"sine"     - 
 		"triangle" {
-			set ideal_rc [expr 1.0E9/(($stop_frequency + $start_frequency) * 0.5)*$LWFG(rc_fraction)]
+			set ideal_rc [expr 1.0E9/($stop_frequency)*$LWFG(rc_fraction)]
 			foreach {p code} $LWFG(rc_options) {
 				if {$p < $ideal_rc} {
 					set filter $code
@@ -315,7 +325,7 @@ proc Function_Generator_open {} {
 	foreach a {Type Frequency Amplitude Offset} {
 		set b [string tolower $a]
 		label $f.l$a -text "$a\:" -fg $config(label_color)
-		entry $f.e$a -textvariable Function_Generator_config(waveform_$b) -width 6
+		entry $f.e$a -textvariable Function_Generator_config(waveform_$b) -width 10
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -332,6 +342,9 @@ proc Function_Generator_open {} {
 		entry $f.e$b -textvariable Function_Generator_config(sweep_$b) -width 10
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
+
+	checkbutton $f.logarithmic -text "Logarithmic" -variable Function_Generator_config(logarithmic)
+	pack $f.logarithmic -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 90 20]
 	LWDAQ_print $info(text) "$info(name) Version $info(version) \n" purple
