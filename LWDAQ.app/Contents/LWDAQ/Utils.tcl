@@ -646,22 +646,43 @@ proc LWDAQ_post {event {place "end"}} {
 proc LWDAQ_queue_error {event error_result} {
 	global errorInfo LWDAQ_Info
 	if {$LWDAQ_Info(gui_enabled)} {
-		set w [LWDAQ_toplevel_text_window 60 20]
-		wm title $w "LWDAQ Event Manager Error Report"
-		LWDAQ_print $w.text "Event: \"$event\""
+		set w [LWDAQ_toplevel_text_window 100 10]
+		wm title $w "Event Manager Error Report, LWDAQ $LWDAQ_Info(program_patchlevel)"
 		LWDAQ_print $w.text "ERROR: $error_result"
-		LWDAQ_print $w.text "\nError Information:"
+		LWDAQ_print $w.text "EVENT: \"$event\""
 		if {[info exists errorInfo]} {
+			LWDAQ_print $w.text "DETAILS: " blue
 			LWDAQ_print $w.text $errorInfo blue
-		} {
-			LWDAQ_print $w.text "No error information available." blue
-		}
+		} 
 	} {
 		puts stdout "ERROR: \"$error_result\""
 		if {[info exists errorInfo]} {
 			puts stdout $errorInfo
 		} {
 			puts stdout "No error information available."
+		}
+	}
+	return ""
+}
+
+#
+# LWDAQ_report_error displays an error.
+#
+proc LWDAQ_report_error {task message} {
+	global errorInfo LWDAQ_Info
+	if {$LWDAQ_Info(gui_enabled)} {
+		set w [LWDAQ_toplevel_text_window 100 10]
+		wm title $w "Error Report, LWDAQ $LWDAQ_Info(program_patchlevel)"
+		LWDAQ_print $w.text "ERROR: $message"
+		LWDAQ_print $w.text "WHILE: \"$task\""
+		if {[info exists errorInfo]} {
+			LWDAQ_print $w.text "DETAILS: " blue
+			LWDAQ_print $w.text $errorInfo blue
+		}
+	} {
+		puts stdout "ERROR: \"$message\""
+		if {[info exists errorInfo]} {
+			puts stdout $errorInfo
 		}
 	}
 	return ""
