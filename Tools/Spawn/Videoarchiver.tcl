@@ -169,9 +169,9 @@ echo "SUCCESS"
 
 	# The following parameters will appear in the configuration panel, so the
 	# user can modify them by hand.
-	set config(transfer_period_s) "60"
 	set config(sync_period_s) "3600"
-	set info(prev_sync_time) "0"
+	set config(contact_period_ms) "1000"
+	set config(transfer_period_s) "60"
 	set config(transfer_max_files) "20"
 	set config(record_length_s) "600"
 	set config(connect_timeout_s) "5"
@@ -1751,6 +1751,16 @@ proc Videoarchiver_transfer {n {init 0}} {
   	if {![winfo exists $info(window)]} {
 		return ""
  	}
+ 	
+ 	# Know when to wait. The transfer process should not run too often, or its
+ 	# activity will slow down the camera.
+ 	if {[clock milliseconds] - $info(cam$n\_contact_prev_ms) \
+ 			< $config(contact_period_ms)} {
+		LWDAQ_post [list Videoarchiver_transfer $n $init]
+		return ""
+ 	} {
+ 		set info(cam$n\_contact_prev_ms) [clock milliseconds]
+ 	}
 
 	# Get IP address and open an interface socket.
 	set ip [Videoarchiver_ip $n]
@@ -1815,16 +1825,14 @@ proc Videoarchiver_transfer {n {init 0}} {
 		# transfer_max_files of them from the camera, save to the local segment
 		# directory, and delete from the camera.
 		if {$seg_list != ""} {
-			# Flash the background of the state label.
-			LWDAQ_set_bg $info(cam$n\_state_label) yellow
-		
+
 			# Sort the segment list into increasing order, which will be oldest
 			# to newest. Take from this list up to transfer_max_files names.
 			set seg_list [lrange [lsort -increasing $seg_list] \
 				0 [expr $config(transfer_max_files) - 1]]
 				
 			if {[catch {
-				# Indicate camera activity by making label yellow.
+				# Indicate camera activity by changing label background.
 				LWDAQ_set_bg $info(cam$n\_state_label) yellow
 			
 				# Open a socket to the camera. We will use the same socket to
@@ -2034,7 +2042,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 		# file by moving this segment into the recording directory.
 		if {[llength $seg_list] > 1} {
 
-			# Flash the background of the state label.
+			# Indicate camera activity by changing label background.
 			LWDAQ_set_bg $info(cam$n\_state_label) yellow
 			
 			# Calculate the number of segments to be included in each recording
@@ -2177,9 +2185,9 @@ proc Videoarchiver_transfer {n {init 0}} {
 		# If we are still recording, and enough time has passed, re-synchronize the
 		# camera clock.		
 		if {($info(cam$n\_state) == "Record") \
-			&& ([clock seconds] >= $info(prev_sync_time) + $config(sync_period_s))} {
+			&& ([clock seconds] >= $info(cam$n\_sync_prev_s) + $config(sync_period_s))} {
 			Videoarchiver_synchronize $n
-			set info(prev_sync_time) [clock seconds]
+			set info(cam$n\_sync_prev_s) [clock seconds]
 		}
 
 	} message]} {
@@ -2695,6 +2703,8 @@ proc Videoarchiver_remove {n} {
 		unset info(cam$n\_infrared)
 		unset info(cam$n\_lag)
 		unset info(cam$n\_laglabel)
+		unset info(cam$n\_sync_prev_s)
+		unset info(cam$n\_contact_prev_ms)
 	}
 	
 	return ""
@@ -2734,6 +2744,8 @@ proc Videoarchiver_add_camera {} {
 	set info(cam$n\_white) "0"
 	set info(cam$n\_infrared) "0"
 	set info(cam$n\_lag) "?"
+	set info(cam$n\_sync_prev_s) "0"
+	set info(cam$n\_contact_prev_ms) "0"
 	
 	# Re-draw the sensor list.
 	Videoarchiver_draw_list
