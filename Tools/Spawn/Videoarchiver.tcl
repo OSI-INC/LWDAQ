@@ -2498,8 +2498,8 @@ proc Videoarchiver_view {n} {
 }
 
 #
-# Videoarchiver_draw_list draws the current list of cameras in the 
-# Videoarchiver window.
+# Videoarchiver_draw_list draws the current list of cameras in the Videoarchiver
+# window.
 #
 proc Videoarchiver_draw_list {} {
 	upvar #0 Videoarchiver_config config
@@ -2525,6 +2525,8 @@ proc Videoarchiver_draw_list {} {
 			set info(cam$n\_white) "0"
 			set info(cam$n\_infrared) "0"
 			set info(cam$n\_lag) "?"
+			set info(cam$n\_sync_prev_s) "0"
+			set info(cam$n\_contact_prev_ms) "0"
 		}
 
 		set g $f.cam$n
