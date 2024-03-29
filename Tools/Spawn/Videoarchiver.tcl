@@ -30,7 +30,7 @@ proc Videoarchiver_init {} {
 	global LWDAQ_Info LWDAQ_Driver
 	
 	# Initialize the tool. Exit if the window is already open.
-	LWDAQ_tool_init "Videoarchiver" "35"
+	LWDAQ_tool_init "Videoarchiver" "36"
 	
 	# Set minimum camera compressor version.
 	set info(min_compressor_version) "31"
@@ -555,25 +555,36 @@ proc Videoarchiver_query {n} {
 		LWDAQ_socket_write $sock "llength \[glob -nocomplain tmp/V*.mp4\]\n"
 		set len [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $len]} {error $len}
-		LWDAQ_print $t "Number of compressed video segments\
-			on $info(cam$n\_id): $len" purple
+		LWDAQ_print -nonewline $t "Number of compressed video segments\
+			on $info(cam$n\_id): " purple
+		LWDAQ_print $t "$len"
 
 		LWDAQ_socket_write $sock "llength \[glob -nocomplain tmp/S*.mp4\]\n"
 		set len [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $len]} {error $len}
-		LWDAQ_print $t "Number video segments awaiting compression\
-			on $info(cam$n\_id): $len" purple
+		LWDAQ_print -nonewline $t "Number video segments awaiting compression\
+			on $info(cam$n\_id): " purple
+		LWDAQ_print $t "$len"
 
 		LWDAQ_socket_write $sock "gettemp\n"
 		set temp [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $temp]} {error $temp}
-		LWDAQ_print $t "Microprocessor core temperature (Centigrade): $temp" purple
+		LWDAQ_print -nonewline $t "Microprocessor core temperature (Centigrade): " purple
+		LWDAQ_print $t "$temp"
 
 		LWDAQ_socket_write $sock "getfreq\n"
 		set freq [LWDAQ_socket_read $sock line]
 		if {[LWDAQ_is_error_result $freq]} {error $freq}
-		LWDAQ_print $t "Microprocessor clock frequency (GHz): $freq" purple
+		LWDAQ_print -nonewline $t "Microprocessor clock frequency (GHz): " purple
+		LWDAQ_print $t "$freq"
 		
+		LWDAQ_socket_write $sock "clock milliseconds\n"
+		set camtime [LWDAQ_socket_read $sock line]
+		if {[LWDAQ_is_error_result $camtime]} {error $camtime}
+		LWDAQ_print -nonewline $t "Camera clock time: " purple
+		LWDAQ_print $t "[clock format [expr $camtime / 1000]]\
+			(delayed [expr [clock milliseconds]-$camtime] ms)"
+
 		LWDAQ_print $t "\n"
 		LWDAQ_socket_close $sock
 	} message]} {
