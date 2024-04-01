@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "169"
+	LWDAQ_tool_init "Neuroplayer" "170"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -621,7 +621,7 @@ proc Neuroplayer_init {} {
 	set info(video_channel) "none"
 	set info(video_process) "0"
 	set info(video_cache) [list]
-	set info(video_check_ms) "100"
+	set info(video_check_ms) "200"
 	set info(video_check_prev) "0"
 	set info(max_video_files) "100"
 	set os_dir [file join $info(videoarchiver_dir) $LWDAQ_Info(os)]
@@ -8074,7 +8074,7 @@ proc Neuroplayer_video_watchdog {} {
 			# of the next interval.
 			if {[clock milliseconds]-$info(video_check_prev) > $info(video_check_ms)} {
 				puts $info(video_channel) "videoplayer status"
-				set invo(video_check_prev) [clock milliseconds]
+				set info(video_check_prev) [clock milliseconds]
 			}
 		} message]} {
 		

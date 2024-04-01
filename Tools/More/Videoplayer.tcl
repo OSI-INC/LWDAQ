@@ -52,7 +52,7 @@ proc Videoplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Videoplayer" "4"
+	LWDAQ_tool_init "Videoplayer" "5"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -408,9 +408,10 @@ proc Videoplayer_png_extract {} {
 # playing the video at time "display_start_s" in seconds, continuing to
 # "display_end_s" seconds. If the end time is a wildcard character, it plays the
 # entire video from the start time. If the end time is a "+" character, it grabs
-# one frame and stops.
+# one frame and stops. If the forward flag is set, we increment the display
+# start and update the display end times.
 #
-proc Videoplayer_play {} {
+proc Videoplayer_play {{forward "0"}} {
 	upvar #0 Videoplayer_config config
 	upvar #0 Videoplayer_info info
 	
@@ -648,11 +649,21 @@ proc Videoplayer_play {} {
 	# Report on outcome of playback if verbose flag is set.
 	set video_s [format %.2f [expr 1.0*$info(frame_count)/$config(video_framerate)]]
 	set display_s [format %.2f [expr 0.001*([clock milliseconds] - $start_time)]]
-	set config(display_start_s) [format %.2f [expr $start + $video_s]]
-	set config(display_end_s) $end_code
 	Videoplayer_print "Read $info(frame_count) frames\
 		spanning $video_s s, displayed in $display_s s." verbose
 	set info(control) "Idle"
+	
+	# If the "forward" flag is set, we update the display start time so that 
+	# we can continue from the end of the playback interval. We update the end
+	# time too, in case the original end time required some correction.
+	if {$forward} {
+		set config(display_start_s) [format %.2f [expr $start + $video_s]]
+		set config(display_end_s) $end_code	
+	}
+	
+	# Return an empty string. Progress of this routine will be monitored by use
+	# of the status routine, which can run during the vwaits in the playback
+	# loop.
 	return ""
 }
 
