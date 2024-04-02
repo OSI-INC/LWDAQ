@@ -1880,7 +1880,9 @@ proc Videoarchiver_transfer {n {init 0}} {
 					# time to zero, set the lag to unknown, and clear the init
 					# flat.
 					if {$init} {
-						set info(cam$n\_fsegs) 0
+						set info(cam$n\_numsegs) 0
+						set info(cam$n\_fname) "V0000000000.mp4"
+						set info(cam$n\_snames) [list]
 						set lag "?"
 						exec $info(ffmpeg) -loglevel error -f lavfi \
 							-i color=size=$width\x$height\:rate=$framerate\:color=black \
@@ -2040,32 +2042,51 @@ proc Videoarchiver_transfer {n {init 0}} {
 
 			# Indicate camera activity by changing label background.
 			LWDAQ_set_bg $info(cam$n\_state_label) yellow
+			set full_num [expr $config(record_length_s)/$config(seg_length_s)]
+
+			# If the recording file is complete, look at the segment list and 
+			# find the optimal value for the recording file timestamp. Rename
+			# the recording file if necessary.
+			if {$info(cam$n\_numsegs) == $full_num} {
+				set when "renaming recording file"
+				set graph ""
+				set index 0
+				foreach sf $info(cam$n\_snames) {
+					regexp {V([0-9]{10})} $sf match ftime
+					append graph "$index $ftime "
+					if {$index == 0} {set name_time $ftime}
+					incr index
+				}
+				set fit [lwdaq straight_line_fit $graph]
+				set best_time [expr round([lindex $fit 1])]
+				if {$name_time != $best_time} {
+					set fname [file join $info(cam$n\_dir) V$best_time\.mp4]
+					Videoarchiver_print "$info(cam$n\_id)\
+						Renaming [file tail $info(cam$n\_fname)],\
+						as [file tail $fname]." verbose
+					file rename $info(cam$n\_fname) $fname
+					set info(cam$n\_fname) $fname
+				}
+			}
 			
-			# Calculate the number of segments to be included in each recording
-			# file. Determine the minumum number of segments we need to transfer
-			# later on.
-			set when "calculating constants"
-			set fsegs_full [expr $config(record_length_s)/$config(seg_length_s)]
-			set min_transfer_segs [expr $config(transfer_period_s)/$config(seg_length_s)]
-				
-			# If the existing recording file is complete, or if it is empty, as
-			# it will be during initialization, or if it is complete, use the
-			# oldest segment to create a new recording file. We move the oldest
-			# segment into the recording directory. We use its timestamp as the
-			# timestamp of the new recording file. We delete the segment name
-			# from our segment list. We store this recording file name in a
-			# global variable.
-			if {($info(cam$n\_fsegs) == 0) || ($info(cam$n\_fsegs) == $fsegs_full)} {
+			# Create a new recording file. We do this when the number of
+			# segments in the recording file is either zero or full. We move the
+			# oldest segment into the recording directory and use it as the
+			# foundation of the new file. We delete the segment name from our
+			# segment list. We store this recording file name in a global
+			# variable. We start making a list of the segments in the file
+			if {($info(cam$n\_numsegs) == 0) || ($info(cam$n\_numsegs) == $full_num)} {
 				set when "creating recording file"
 				set sf [lindex $seg_list 0]
 				set seg_list [lrange $seg_list 1 end]
 				regexp {V([0-9]{10})} $sf match ftime
 				set info(cam$n\_fname) [file join $info(cam$n\_dir) V$ftime\.mp4]
+				set info(cam$n\_snames) [list $sf]
+				set info(cam$n\_numsegs) 1
 				Videoarchiver_print "$info(cam$n\_id)\
 					Creating [file tail $info(cam$n\_fname)],\
 					start [clock format $ftime]." verbose
-				file rename [lindex $seg_list 0] $info(cam$n\_fname)
-				set info(cam$n\_fsegs) 1
+				file rename $sf $info(cam$n\_fname)
 			}
 		}
 	
@@ -2078,8 +2099,9 @@ proc Videoarchiver_transfer {n {init 0}} {
 			# If we have the minimum number of segments to make up the transfer period,
 			# or if we have stopped recording, transfer all available segments into the
 			# recording file until it is complete or we run out of segments.
+			set trans_num [expr $config(transfer_period_s)/$config(seg_length_s)]
 			if { ($info(cam$n\_state) != "Record") \
-				|| ([llength $seg_list] > $min_transfer_segs)} {
+					|| ([llength $seg_list] > $trans_num)} {
 	
 				# Open a text file into which we are going to write a list of
 				# segments to transfer to the recording file.
@@ -2102,10 +2124,11 @@ proc Videoarchiver_transfer {n {init 0}} {
 				# because this one may be loaded into the monitor.
 				set transfer_segments [list]
 				foreach infile [lrange $seg_list 0 end-1] {
-					if {$info(cam$n\_fsegs) < $fsegs_full} {
+					if {$info(cam$n\_numsegs) < $full_num} {
 						puts $ifl "file $infile"
 						lappend transfer_segments $infile
-						incr info(cam$n\_fsegs)
+						incr info(cam$n\_numsegs) 1
+						lappend info(cam$n\_snames) $infile
 					} else {
 						break
 					}
