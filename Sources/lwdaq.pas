@@ -6111,7 +6111,7 @@ the pose of the mount coordinate system. Rather, it accepts the ball positions
 and will deduce the pose of the mount coordinate system itself. To transform a
 point from global to local coordinate using the pose of the local coordinate
 system, use <a
-href=#xyz_local_from_global_point">xyz_local_from_global_point</i>.</p>
+href=#xyz_local_from_global_point">xyz_local_from_global_point</a>.</p>
 
 <p>In the following example, we transform the global
 point (0,1,0) into BCAM coordinates when our cone, slot and flat balls have
@@ -6154,7 +6154,7 @@ string. The routine returns the global coordinates of the point.</p>
 
 <p>To transform a point from local to global coordinate using the pose of the
 local coordinate system, use <a
-href=#xyz_global_from_local_point">xyz_global_from_local_point</i>.</p>
+href=#xyz_global_from_local_point">xyz_global_from_local_point</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6180,7 +6180,7 @@ details.</p>
 
 <p>To transform a vector from global to local coordinate using the pose of the
 local coordinate system, use <a
-href=#xyz_local_from_global_vector">xyz_local_from_global_vector</i>.</p>
+href=#xyz_local_from_global_vector">xyz_local_from_global_vector</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6209,7 +6209,7 @@ slot, flat.</p>
 
 <p>To transform a vector from local to global coordinate using the pose of the
 local coordinate system, use <a
-href=#xyz_global_from_local_point">xyz_global_from_local_point</i>.</p>
+href=#xyz_global_from_local_point">xyz_global_from_local_point</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
