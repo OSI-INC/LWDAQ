@@ -80,7 +80,11 @@ proc Videoarchiver_init {} {
 	# try to use both codecs, ffmpeg fails to concatinate them correctly on the
 	# data acquisition machine.
 	set config(compression_codec) "libx264"
+	
+	# The codec for video streams. We have individual frames compressed with JPEG.
 	set config(stream_codec) "MJPEG"
+	
+	# The compression controls.
 	set config(compression_num_cpu) "3"
 	set config(seg_length_s) "2"
 	set config(min_seg_frac) "0.95"
@@ -129,6 +133,7 @@ killall -9 raspivid
 killall -9 libcamera-vid
 cd Videoarchiver
 rm -f *_log.txt
+rm -f segment_list.txt
 rm -f tmp/*.mp4
 rm -f *.gif
 tclsh interface.tcl -port %Q >& interface_log.txt &
@@ -694,8 +699,8 @@ proc Videoarchiver_setlamp {n color intensity} {
 }
 
 #
-# Videoarchiver_cleanup gets rid of old segment and log files on the camera and
-# in the local segment directory.
+# Videoarchiver_cleanup gets rid of old segment and log files in the local
+# segment directory.
 #
 proc Videoarchiver_cleanup {n} {
 	upvar #0 Videoarchiver_config config
@@ -2046,19 +2051,15 @@ proc Videoarchiver_transfer {n {init 0}} {
 			# If the existing recording file is complete, or if it is empty, as
 			# it will be during initialization, or if it is complete, use the
 			# oldest segment to create a new recording file. We move the oldest
-			# into the recording directory. We delete its name from our segment
-			# list. We store this recording file name in a global variable. 
+			# segment into the recording directory. We use its timestamp as the
+			# timestamp of the new recording file. We delete the segment name
+			# from our segment list. We store this recording file name in a
+			# global variable.
 			if {($info(cam$n\_fsegs) == 0) || ($info(cam$n\_fsegs) == $fsegs_full)} {
 				set when "creating recording file"
 				set sf [lindex $seg_list 0]
 				set seg_list [lrange $seg_list 1 end]
-				if {($info(cam$n\_fsegs) == 0)} {
-					regexp {V([0-9]{10})} $sf match ftime
-				} {
-					regexp {V([0-9]{10})} $info(cam$n\_fname) match ftime
-					set ftime [expr $ftime + $config(record_length_s)]
-					regexp {V([0-9]{10})} $sf match ftime
-				}
+				regexp {V([0-9]{10})} $sf match ftime
 				set info(cam$n\_fname) [file join $info(cam$n\_dir) V$ftime\.mp4]
 				Videoarchiver_print "$info(cam$n\_id)\
 					Creating [file tail $info(cam$n\_fname)],\
@@ -2166,7 +2167,7 @@ proc Videoarchiver_transfer {n {init 0}} {
 					# segment, we must have at least one that we can transfer.
 					# But we find that we can end up here if we change the 
 					# recording length while we are recording.
-					error "Expected segments but found none"
+					Videoarchiver_print "WARNING: Expected segments but found none."
 				}
 			}
 		} 
