@@ -1,6 +1,6 @@
 # Stimulator, a LWDAQ Tool
 #
-# Copyright (C) 2014-2023 Kevan Hashemi, Open Source Instruments
+# Copyright (C) 2014-2024 Kevan Hashemi, Open Source Instruments
 #
 # The Stimulator controls implantable stimulator-transponders (ISTs).
 #
@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.11"
+	LWDAQ_tool_init "Stimulator" "3.12"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -562,8 +562,9 @@ proc Stimulator_monitor {} {
 		# If this is a confirmation message, proceed to next auxiliary message.
 		if {$fa == $info(at_conf)} {continue}
 
-		# If it is some other sort of message, look for a confirmation. If we 
-		# don't find one, proceed to next auxiliary message. If we do find
+		# If it is some other sort of message, look for a confirmation that
+		# arrived no more than conf_delay ticks after our auxiliary message. If
+		# we don't find one, proceed to next auxiliary message. If we do find
 		# one, use it to obtain the full device identifier.
 		set device_id "0"
 		foreach cam $aux_messages {
