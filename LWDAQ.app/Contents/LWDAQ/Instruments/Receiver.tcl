@@ -102,6 +102,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(max_id) "255"
 	set info(activity_rows) "32"
 	set info(aux_messages) ""
+	set info(aux_max_size) "100"
 	set info(set_size) "16"
 	set info(loop_on_error) "0"
 
@@ -221,10 +222,8 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			error $channels
 		}
 		
-		# We clear the auxiliary message list. Our assumption is that tools like
-		# the Stimulator will be do all the work they need to on the list before the
-		# next Receiver acquisition.
-		set info(aux_messages) ""
+		# We make sure our list of auxiliary messages is not too long.
+		set info(aux_messages) [lrange $info(aux_messages) 0 $info(aux_max_size)]
 
 		# We look for messages in the auxiliary channels.
 		set new_aux_messages [lwdaq_receiver $image_name \
@@ -242,15 +241,15 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			"-payload $config(payload_length) get 0"] %d%d%d cid bts fvn
 		
 		# We take each new auxiliary message and break it up into three parts.
-		# The first part is a four-bit ID, which is the primary channel number
-		# of the device producing the auxiliary message. The second part is a
-		# four-bit field address. The third is eight bits of data. These sixteen
-		# bits are the contents of the auxiliary message. We add a fourth
-		# number, which is the timestamp of message reception. We give the
-		# timestamp modulo 65536, which means the timestamp resets every two
-		# seconds. These four numbers make one entry in the auxiliary message
-		# list, so we append them to the existing list. If the four-bit ID is
-		# zero or fifteen, this is a bad message, so we don't store it.
+		# The first part is an eight-bit channel number. This might be the lower
+		# eight bits of a sixteen-bit device identifier, or the entire eight
+		# bits of a device identifier. The second part is a four-bit field
+		# address. The third is eight bits of data. These sixteen bits are the
+		# contents of the auxiliary message. We add a fourth number, which is
+		# the timestamp of message reception. We give the timestamp modulo
+		# 65536, which means the timestamp resets every two seconds. These four
+		# numbers make one entry in the auxiliary message list, so we append
+		# them to the existing list.
 		foreach {cn mt md} $new_aux_messages {
 			set id [expr ($md / 4096)]
 			if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
@@ -266,6 +265,12 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			set raw_data [lwdaq_receiver $image_name \
 				"-payload $config(payload_length) print 0 $info(show_messages)"]
 			LWDAQ_print $info(text) $raw_data
+			if {[llength $info(aux_messages)] > 0} {
+				LWDAQ_print $info(text) "Auxiliary Messages:"
+				foreach m $info(aux_messages) {
+					LWDAQ_print $info(text) $m
+				}
+			}
 		}
 		
 		# With an excessive number of errors, generate an execution error. If
