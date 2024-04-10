@@ -62,6 +62,7 @@ proc Stimulator_init {} {
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 	
+	set info(conf_delay) "3"
 	set config(aux_show) "0"
 	set config(aux_color) "orange"
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
@@ -568,7 +569,7 @@ proc Stimulator_monitor {} {
 		foreach cam $aux_messages {
 			scan $cam %d%d%d%d cid cfa cdb cts
 			if {$cfa != $info(at_conf)} {continue}
-			if {($cid == $id) && (($cts - $ts) % 65536 <= 1)} {
+			if {($cid == $id) && (($cts - $ts) % 65536 <= $info(conf_delay))} {
 				set device_id [format %04X [expr $cid + (256 * $cdb)]]
 				break
 			}
