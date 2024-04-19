@@ -34,7 +34,7 @@
 # Version 1.3 [28-MAR-24] Fix reset value of triangle wave: now zero volts.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide LWFG 1.3
+package provide LWFG 1.4
 
 # Clear the global EDF array if it already exists.
 if {[info exists LWFG]} {unset LWFG}
@@ -61,10 +61,11 @@ set LWFG(ch_cnt_hi) "255"
 set LWFG(ch_v_lo) "-10.0"
 set LWFG(ch_v_hi) "+10.0"
 
-set LWFG(rc_options) "5.1e1 0x11 4.0e2 0x21 3.0e3 0x41 \
-	2.3e4 0x81 1.7e5 0x82 1.3e6 0x48 9.8e6 0x88"
+set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1e3 0x21 \
+		2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
+		2.8e5 0x48 1.0e6 0x81 2.2e6 0x82 5.4e6 0x84 1.1e7 0x88"
 set LWFG(rc_fraction) "0.01"
-set LWFG(rc_default) "0x11"
+set LWFG(rc_default) "0x01"
 	
 #
 # LWDAQ_off sets the output of the function generator at address IP, channel number
