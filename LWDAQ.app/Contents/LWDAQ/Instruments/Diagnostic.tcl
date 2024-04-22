@@ -303,22 +303,15 @@ proc LWDAQ_transmit_Diagnostic {sock} {
 	upvar #0 LWDAQ_config_Diagnostic config
 	upvar #0 LWDAQ_info_Diagnostic info
 	LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
-	if {[llength $info(commands)] == 0} {
-		LWDAQ_print $info(text) "ERROR: no command specified."
-		return ""
-	}
+	LWDAQ_print -nonewline $info(text) \
+		"Transmitting \"$info(commands)\" to target [expr $info(repeat) + 1] times..."
 	if {[llength $info(commands)] == 1} {
-		LWDAQ_print -nonewline $info(text) \
-			"Transmitting $info(commands) (hex) to target [expr $info(repeat) + 1] times..."
 		LWDAQ_update
 		LWDAQ_set_repeat_counter $sock $info(repeat)
 		LWDAQ_transmit_command_hex $sock $info(commands)
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_print $info(text) "done."
-	}
-	if {[llength $info(commands)] > 1} {
-		LWDAQ_print -nonewline $info(text) \
-			"Transmitting \"$info(commands)\" to target [expr $info(repeat) + 1] times..."
+	} else {
 		for {set counter 0} {$counter <= $info(repeat)} {incr counter} {
 			foreach cmd $info(commands) {
 				LWDAQ_transmit_command_hex $sock $cmd
