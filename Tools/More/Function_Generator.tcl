@@ -8,7 +8,7 @@ proc Function_Generator_init {} {
 	upvar #0 Function_Generator_config config
 	global LWFG
 
-	LWDAQ_tool_init "Function_Generator" "1.1"
+	LWDAQ_tool_init "Function_Generator" "1.2"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set info(data) [list]
