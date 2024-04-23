@@ -6,6 +6,7 @@
 proc Function_Generator_init {} {
 	upvar #0 Function_Generator_info info
 	upvar #0 Function_Generator_config config
+	global LWFG
 
 	LWDAQ_tool_init "Function_Generator" "1.1"
 	if {[winfo exists $info(window)]} {return ""}
@@ -17,6 +18,7 @@ proc Function_Generator_init {} {
 	set info(control) "Idle"
 	set config(verbose) "0"
 	set config(logarithmic) "0"
+	set config(attnsw) "0.0dB"
 
 	set config(gen_ip) "10.0.0.37"
 	set config(gen_ch) [lindex $info(channel_names) 0]
@@ -32,6 +34,37 @@ proc Function_Generator_init {} {
 
 	set config(label_color) "green"
 
+# Setting variables for the LWFG package
+
+	set LWFG(data_portal) "63"
+	set LWFG(ch1_ram) "0x0000"
+	set LWFG(ch1_rc) "0x8000"
+	set LWFG(ch1_div) "0x8002"
+	set LWFG(ch1_len) "0x800A"
+
+	set LWFG(ch2_ram) "0x4000"
+	set LWFG(ch2_rc) "0x8001"
+	set LWFG(ch2_div) "0x8006"
+	set LWFG(ch2_len) "0x800C"
+	set LWFG(attenuation) "0x800E"
+
+	set LWFG(max_pts) "8192"
+	set LWFG(min_pts) "4000"
+	set LWFG(clock_hz) "40.000e6"
+	set LWFG(div_min) "2"
+
+	set LWFG(ch_cnt_lo) "0"
+	set LWFG(ch_cnt_z) "128"
+	set LWFG(ch_cnt_hi) "255"
+	set LWFG(ch_v_lo) "-10.0"
+	set LWFG(ch_v_hi) "+10.0"
+
+	set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1e3 0x21 \
+		2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
+		2.8e5 0x48 1.0e6 0x81 2.2e6 0x82 5.4e6 0x84 1.1e7 0x88"
+	set LWFG(rc_fraction) "0.01"
+	set LWFG(rc_default) "0x11"
+
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	}
@@ -39,14 +72,18 @@ proc Function_Generator_init {} {
 	return ""
 }
 
+# Output one constant frequency
 proc Function_Generator_on {} {
-	upvar #0 Function_Generator_info info 
-	upvar #0 Function_Generator_config config 
+	upvar #0 Function_Generator_info info
+	upvar #0 Function_Generator_config config
+	global LWFG
 
 	LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
 		$config(waveform_frequency) Hz,\
 		$config(waveform_amplitude) V amplitude,\
 		$config(waveform_offset) V offset." purple
+
+	# Determine the bounds of the waveform
 	set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
 	set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
 	set result [LWFG_configure $config(gen_ip) $config(gen_ch) \
@@ -73,36 +110,12 @@ proc Function_Generator_on {} {
 # frequency and the low and high voltages of the waveform.
 #
 proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
+	upvar #0 Function_Generator_info info
+	upvar #0 Function_Generator_config config
+	global LWFG
 
 	# Determine the lower and upper DAC values for our lower and upper waveform
 	# voltages.
-	set LWFG(data_portal) "63"
-	set LWFG(ch1_ram) "0x0000"
-	set LWFG(ch1_rc) "0x8000"
-	set LWFG(ch1_div) "0x8002"
-	set LWFG(ch1_len) "0x800A"
-
-	set LWFG(ch2_ram) "0x4000"
-	set LWFG(ch2_rc) "0x8001"
-	set LWFG(ch2_div) "0x8006"
-	set LWFG(ch2_len) "0x800C"
-
-	set LWFG(max_pts) "8192"
-	set LWFG(min_pts) "4000"
-	set LWFG(clock_hz) "40.000e6"
-	set LWFG(div_min) "2"
-
-	set LWFG(ch_cnt_lo) "0"
-	set LWFG(ch_cnt_z) "128"
-	set LWFG(ch_cnt_hi) "255"
-	set LWFG(ch_v_lo) "-10.0"
-	set LWFG(ch_v_hi) "+10.0"
-
-	set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1e3 0x21 \
-		2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
-		2.8e5 0x48 1.0e6 0x81 2.2e6 0x82 5.4e6 0x84 1.1e7 0x88"
-	set LWFG(rc_fraction) "0.01"
-	set LWFG(rc_default) "0x11"
 	set lsb [expr ($LWFG(ch_v_hi) - $LWFG(ch_v_lo)) \
 		/ ($LWFG(ch_cnt_hi) - $LWFG(ch_cnt_lo))]
 	set dac_lo [expr round(($v_lo - $LWFG(ch_v_lo)) / $lsb)]
@@ -192,6 +205,8 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 			}
 		}
 	}
+
+
 	
 	# Configure the function generator using TCPIP messaging.
 	if {[catch {
@@ -233,6 +248,7 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 proc Function_Generator_off {} {
 	upvar #0 Function_Generator_info info 
 	upvar #0 Function_Generator_config config 
+	global LWFG
 
 	LWDAQ_print $info(text) "Channel $config(gen_ch), 0 V amplitude, 0 V offset." purple
 	set result [LWFG_off $config(gen_ip) $config(gen_ch)]
@@ -244,38 +260,14 @@ proc Function_Generator_off {} {
 }
 
 proc LWFG_off {ip ch_num} {
+	upvar #0 Function_Generator_info info 
+	upvar #0 Function_Generator_config config 
+	global LWFG
 
 	# Configure the function generator for zero output.
 	if {[catch {
 
 		# Open a socket to the function generator.
-			set LWFG(data_portal) "63"
-		set LWFG(ch1_ram) "0x0000"
-		set LWFG(ch1_rc) "0x8000"
-		set LWFG(ch1_div) "0x8002"
-		set LWFG(ch1_len) "0x800A"
-
-		set LWFG(ch2_ram) "0x4000"
-		set LWFG(ch2_rc) "0x8001"
-		set LWFG(ch2_div) "0x8006"
-		set LWFG(ch2_len) "0x800C"
-
-		set LWFG(max_pts) "8192"
-		set LWFG(min_pts) "4000"
-		set LWFG(clock_hz) "40.000e6"
-		set LWFG(div_min) "2"
-
-		set LWFG(ch_cnt_lo) "0"
-		set LWFG(ch_cnt_z) "128"
-		set LWFG(ch_cnt_hi) "255"
-		set LWFG(ch_v_lo) "-10.0"
-		set LWFG(ch_v_hi) "+10.0"
-		set LWFG(rc_default) "0x11"
-
-		set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1e3 0x21 \
-			2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
-			2.8e5 0x48 1.0e6 0x81 2.2e6 0x82 5.4e6 0x84 1.1e7 0x88"
-		set LWFG(rc_fraction) "0.01"
 		set sock [LWDAQ_socket_open $ip]
 		
 		# Write a single zero to the waveform memory.
@@ -307,45 +299,18 @@ proc LWFG_off {ip ch_num} {
 	return ""
 }
 	
-
+# Output a waveform with changing frequency
 proc Function_Generator_sweep {} {
 
 	upvar #0 Function_Generator_info info 
 	upvar #0 Function_Generator_config config 
+	global LWFG
 
 	LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
 		$config(sweep_start_frequency) Hz to $config(sweep_stop_frequency) Hz over\
 		$config(sweep_time) seconds,\
 		$config(waveform_amplitude) V amplitude,\
 		$config(waveform_offset) V offset." purple
-
-	set LWFG(data_portal) "63"
-	set LWFG(ch1_ram) "0x0000"
-	set LWFG(ch1_rc) "0x8000"
-	set LWFG(ch1_div) "0x8002"
-	set LWFG(ch1_len) "0x800A"
-
-	set LWFG(ch2_ram) "0x4000"
-	set LWFG(ch2_rc) "0x8001"
-	set LWFG(ch2_div) "0x8006"
-	set LWFG(ch2_len) "0x800C"
-
-	set LWFG(max_pts) "8192"
-	set LWFG(min_pts) "4000"
-	set LWFG(clock_hz) "40.000e6"
-	set LWFG(div_min) "2"
-
-	set LWFG(ch_cnt_lo) "0"
-	set LWFG(ch_cnt_z) "128"
-	set LWFG(ch_cnt_hi) "255"
-	set LWFG(ch_v_lo) "-10.0"
-	set LWFG(ch_v_hi) "+10.0"
-	set LWFG(rc_default) "0x11"
-
-	set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1e3 0x21 \
-		2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
-		2.8e5 0x48 1.0e6 0x81 2.2e6 0x82 5.4e6 0x84 1.1e7 0x88"
-	set LWFG(rc_fraction) "0.01"
 
 	set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
 	set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
@@ -476,7 +441,7 @@ proc Function_Generator_sweep {} {
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_len)
 		LWDAQ_stream_write $sock $LWFG(data_portal) \
 			[binary format S [expr $num_pts - 1]]
-		
+
 		set id [LWDAQ_hardware_id $sock]
 		LWDAQ_socket_close $sock
 	} error_message]} {
@@ -494,6 +459,7 @@ proc Function_Generator_open {} {
 	upvar #0 Function_Generator_config config 
 	upvar #0 Function_Generator_info info 
 	upvar #0 LWDAQ_config_Receiver ipconfig
+	global LWFG
 
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}
@@ -543,6 +509,15 @@ proc Function_Generator_open {} {
 
 	set f [frame $w.batch]
 	pack $f -side top -fill x
+
+	label $f.mtz -text "Attenuation:" -fg $config(label_color)
+	tk_optionMenu $f.mtm Function_Generator_config(attnsw) 0.0dB
+	foreach s {-3.0dB -4.8dB -7.0dB -9.6dB} {
+		$f.mtm.menu add command -label $s \
+			-command "set Function_Generator_config(attnsw) $s"
+	}
+	set config(attnsw) "0.0dB"
+	pack $f.mtz $f.mtm -side left -expand 1
 
 	foreach a {Start_Frequency Stop_Frequency Time} {
 		set b [string tolower $a]
