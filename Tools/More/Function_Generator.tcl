@@ -68,14 +68,21 @@ proc Function_Generator_init {} {
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	}
+	
+	package require LWFG
 
 	return ""
 }
 
 # Output one constant frequency
 proc Function_Generator_on {} {
+<<<<<<< HEAD
 	upvar #0 Function_Generator_info info
 	upvar #0 Function_Generator_config config
+=======
+	upvar #0 Function_Generator_info info 
+	upvar #0 Function_Generator_config config 
+>>>>>>> a8ac59aa9c56ed6913c8af333c9779a282b6b5ce
 	global LWFG
 
 	LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
@@ -110,8 +117,11 @@ proc Function_Generator_on {} {
 # frequency and the low and high voltages of the waveform.
 #
 proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
+<<<<<<< HEAD
 	upvar #0 Function_Generator_info info
 	upvar #0 Function_Generator_config config
+=======
+>>>>>>> a8ac59aa9c56ed6913c8af333c9779a282b6b5ce
 	global LWFG
 
 	# Determine the lower and upper DAC values for our lower and upper waveform
@@ -260,8 +270,11 @@ proc Function_Generator_off {} {
 }
 
 proc LWFG_off {ip ch_num} {
+<<<<<<< HEAD
 	upvar #0 Function_Generator_info info 
 	upvar #0 Function_Generator_config config 
+=======
+>>>>>>> a8ac59aa9c56ed6913c8af333c9779a282b6b5ce
 	global LWFG
 
 	# Configure the function generator for zero output.
@@ -301,10 +314,13 @@ proc LWFG_off {ip ch_num} {
 	
 # Output a waveform with changing frequency
 proc Function_Generator_sweep {} {
-
 	upvar #0 Function_Generator_info info 
 	upvar #0 Function_Generator_config config 
 	global LWFG
+<<<<<<< HEAD
+=======
+	
+>>>>>>> a8ac59aa9c56ed6913c8af333c9779a282b6b5ce
 
 	LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
 		$config(sweep_start_frequency) Hz to $config(sweep_stop_frequency) Hz over\
