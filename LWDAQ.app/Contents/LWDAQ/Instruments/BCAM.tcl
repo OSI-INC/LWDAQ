@@ -422,11 +422,12 @@ proc LWDAQ_daq_BCAM {} {
 			}
 		}
 		"5" {
-			# Apply BCAM analysis to the image, using the current value of 
+			# Apply BCAM analysis to the image, using the current value of
 			# analysis_threshold, including its restrictions on the size and
 			# shape of the spots. Sort the spots in decreasing maximum intensity
-			# and use the brightness of the first spot as our measurement of the
-			# image intensity. We call this brightness the "spot maximum".
+			# and use the maximum intensity of the first spot as our measurement
+			# of the image intensity. We call this brightness the "spot
+			# maximum".
 			set result [lwdaq_bcam $config(memory_name) \
 				-num_spots 2 \
 				-threshold $config(analysis_threshold) \

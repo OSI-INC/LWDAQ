@@ -154,12 +154,18 @@ proc LWDAQ_spawn_tool {tool {commands ""} {cfn ""}} {
 	}
 	
 	# Open the configuration file and write the standalone commands into the
-	# file followed by any user-defined commands.
-	set f [open $cfn w]
-	puts $f "LWDAQ_run_tool $tool\.tcl Standalone"
-	if {$commands != ""} {puts $f $commands}
-	close $f
-	
+	# file followed by any user-defined commands. If we encounter an error 
+	# opening the file, we stop.
+	if {[catch {
+		set f [open $cfn w]
+		puts $f "LWDAQ_run_tool $tool\.tcl Standalone"
+		if {$commands != ""} {puts $f $commands}
+		close $f
+	} error_message]} {
+		LWDAQ_report_error "Spawning $tool, writing launch script." $error_message
+		return ""
+	}
+		
 	# Spawn a standalone LWDAQ process and give it the configuration file, which
 	# will cause our chosen tool to start up and take over the root window.
 	switch $LWDAQ_Info(os) {

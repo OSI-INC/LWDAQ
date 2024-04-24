@@ -2220,11 +2220,11 @@ begin
 end;
 
 {
-	string_match returns true if the subject string matches the key string.
-	The key string may contain the '*' string wild-card, or the '?'
-	character wild-card, but the subject string may not contain either wild
-	card. The routine converts both key and subject to upper-case before it
-	begins its comparison of the two strings, so the match is case insensitive.
+	string_match returns true if the subject string matches the key string. The
+	key string may contain the '*' string wild-card, or the '?' character
+	wild-card, but the subject string may not contain either wild card. The
+	routine converts both key and subject to upper-case before it begins its
+	comparison of the two strings, so the match is case insensitive.
 }
 function string_match(key,subject:string):boolean;
 

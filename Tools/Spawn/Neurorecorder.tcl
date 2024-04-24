@@ -48,7 +48,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "166"
+	LWDAQ_tool_init "Neurorecorder" "167"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -929,15 +929,19 @@ proc Neurorecorder_record {{command ""}} {
 		if {![LWDAQ_is_error_result $daq_result]} {
 			set message_length \
 				[expr $info(core_message_length) + $iconfig(payload_length)]
-			set new [lwdaq_image_contents $iconfig(memory_name) \
-					-truncate 1 -data_only 1 -record_size $message_length]
-			if {[string length $info(rbuff)] < $config(max_rbuff)} {
-				append info(rbuff) $new
-				if {[string length $info(rbuff)] >= $config(max_rbuff)} {
-					Neurorecorder_print "WARNING: Recording buffer overflow,\
-						[format %.1f [expr [string length $info(rbuff)]/1000000]] MB\
-						waiting to be written to disk."	
-				} 
+			if {[lwdaq_image_exists $iconfig(memory_name)] != ""} {
+				set new [lwdaq_image_contents $iconfig(memory_name) \
+						-truncate 1 -data_only 1 -record_size $message_length]
+				if {[string length $info(rbuff)] < $config(max_rbuff)} {
+					append info(rbuff) $new
+					if {[string length $info(rbuff)] >= $config(max_rbuff)} {
+						Neurorecorder_print "WARNING: Recording buffer overflow,\
+							[format %.1f [expr [string length $info(rbuff)]/1000000]] MB\
+							waiting to be written to disk."	
+					} 
+				}
+			} {
+				set new ""
 			}
 			Neurorecorder_print "Received [string length $new] bytes,\
 				buffer contains [string length $info(rbuff)] bytes." verbose

@@ -1871,9 +1871,9 @@ begin
 				writestr(result,result,id_num:1,' ',id_qty[id_num]:1,' ');
 	end;	
 {
-	If "auxiliary", we return all auxiliary messages in the message list. These 
-	are all those for which the lower four bits of the channel identifier are equal
-	to fifteen. For each message we return the 
+	If "auxiliary", we return all auxiliary messages in the message list. These
+	are all those for which the lower four bits of the channel identifier are
+	fifteen (0xF). For each message we return the 
 }
  	if instruction='auxiliary' then begin		
 		mark_time('auxiliary','lwdaq_sct_receiver');

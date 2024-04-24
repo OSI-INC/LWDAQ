@@ -60,7 +60,7 @@ proc Analyzer_init {} {
 	upvar #0 Analyzer_config config
 	global LWDAQ_Info
 	
-	LWDAQ_tool_init "Analyzer" "23"
+	LWDAQ_tool_init "Analyzer" "24"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set info(lines_per_measurement) 18
