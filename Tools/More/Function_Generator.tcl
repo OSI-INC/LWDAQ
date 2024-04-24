@@ -14,11 +14,12 @@ proc Function_Generator_init {} {
 	set info(data) [list]
 	set info(start_time) "0"
 	set info(channel_names) "1"
+	set info(attnsw_names) "-3.0 -4.8 -7.0 -9.6"
 
 	set info(control) "Idle"
 	set config(verbose) "0"
 	set config(logarithmic) "0"
-	set config(attnsw) "0.0dB"
+	set config(attnsw) [lindex $info(attnsw_names) 0]
 
 	set config(gen_ip) "10.0.0.37"
 	set config(gen_ch) [lindex $info(channel_names) 0]
@@ -72,7 +73,9 @@ proc Function_Generator_init {} {
 	return ""
 }
 
-# Output one constant frequency
+# Specify the variables necessary for the LWFG package to output a waveform of
+# constant frequency.
+#
 proc Function_Generator_on {} {
 	upvar #0 Function_Generator_info info
 	upvar #0 Function_Generator_config config
@@ -145,6 +148,8 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	# Generate the waveform.
 	set values [list]
 	set period [expr 1.0*$num_pts/$num_cycles]
+
+	# Based on the type of waveform calculate the values needed to be written to RAM.
 	switch $waveform {
 		"sine" {
 			set pi 3.141592654
@@ -245,6 +250,7 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 }
 
 
+# Tell the package LWFG to turn off a specific channel.
 proc Function_Generator_off {} {
 	upvar #0 Function_Generator_info info 
 	upvar #0 Function_Generator_config config 
@@ -259,6 +265,8 @@ proc Function_Generator_off {} {
 	return ""
 }
 
+# Shut off the function generator, write a zero to memory and set the registers to their reset values. This will
+# generate a constant 0V output.
 proc LWFG_off {ip ch_num} {
 	upvar #0 Function_Generator_info info 
 	upvar #0 Function_Generator_config config 
@@ -299,7 +307,9 @@ proc LWFG_off {ip ch_num} {
 	return ""
 }
 	
-# Output a waveform with changing frequency
+# Output a waveform with changing frequency. We allow the user to choose a starting frequency and a stopping frequency along with a "sweep period"
+# that dictates how long it takes to cycle through the range of frequencies. 
+#
 proc Function_Generator_sweep {} {
 
 	upvar #0 Function_Generator_info info 
@@ -338,6 +348,8 @@ proc Function_Generator_sweep {} {
 	# Generate the waveform.
 	set values [list]
 	set period [expr 1.0*$num_pts/$num_cycles]
+
+	# Based on the type of waveform calculate the values needed to be written to RAM.
 	switch $waveform {
 		"sine" {
 			set pi 3.141592654
@@ -376,31 +388,7 @@ proc Function_Generator_sweep {} {
 			}
 		}
 		"triangle" {
-			set pi 3.141592654
-			for {set i 0} {$i < $num_pts} {incr i} {\
-				set phase [expr fmod($i,$period)/$period]
-				if {$config(logarithmic) == "0"} {
-					set n [expr (sin(2*$pi*$phase*$sweep_period*($stop_frequency*$phase+$start_frequency)) + \
-					 $phase)]
-					if {$phase <= $n} { 
-						lappend values [expr $dac_lo + \
-							round(($dac_hi-$dac_lo)*$phase*$sweep_period*($stop_frequency*$phase+$start_frequency))]
-					} else {
-						lappend values [expr $dac_hi - \
-							round(($dac_hi-$dac_lo)*($phase-0.5)*$sweep_period*($stop_frequency*$phase+$start_frequency))]
-					}
-				} else {
-					set n [expr (sin(2*$pi*$phase*$sweep_period*($stop_frequency*$phase+$start_frequency)) + \
-						$phase)]
-					if {$phase <= $n} { 
-						lappend values [expr $dac_lo + \
-							round(($dac_hi-$dac_lo)*$phase*$sweep_period*($stop_frequency*$phase+$start_frequency))]
-					} else {
-						lappend values [expr $dac_hi - \
-							round(($dac_hi-$dac_lo)*($phase-0.5)*$sweep_period*($stop_frequency*$phase+$start_frequency))]
-					}
-				}
-			}
+			return "ERROR: Triangle sweep not implemented. Please choose either sine or square."
 		}
 		default {
 			return "ERROR: Unkown waveform \"$waveform\"."
@@ -454,7 +442,8 @@ proc Function_Generator_sweep {} {
 
 }
 
-
+# Open the display window for the tool, specify the layout of buttons and their spacing.
+#
 proc Function_Generator_open {} {
 	upvar #0 Function_Generator_config config 
 	upvar #0 Function_Generator_info info 
@@ -510,13 +499,13 @@ proc Function_Generator_open {} {
 	set f [frame $w.batch]
 	pack $f -side top -fill x
 
-	label $f.mtz -text "Attenuation:" -fg $config(label_color)
-	tk_optionMenu $f.mtm Function_Generator_config(attnsw) 0.0dB
-	foreach s {-3.0dB -4.8dB -7.0dB -9.6dB} {
+	label $f.mtz -text "Attenuation (dB):" -fg $config(label_color)
+	tk_optionMenu $f.mtm Function_Generator_config(attnsw) 0.0
+	foreach s [lindex $info(attnsw_names)] {
 		$f.mtm.menu add command -label $s \
 			-command "set Function_Generator_config(attnsw) $s"
 	}
-	set config(attnsw) "0.0dB"
+	set config(attnsw) "0.0"
 	pack $f.mtz $f.mtm -side left -expand 1
 
 	foreach a {Start_Frequency Stop_Frequency Time} {
@@ -556,6 +545,14 @@ Offset: The offset of the waveform average from zero. Subject to a signal range
 of -10 V to +10 V, the offset can be anything from -10 V to + 10 V.
 
 IP: The function generator IP address.
+
+Attenuation: Loss from attenuating the waveform through analog switches in dB.
+
+Start_Frequency: The frequency that the sweep will begin with in Hz.
+
+Stop_Frequency: The frequency that the sweep will reach at the end of its sweep period.
+
+Time: The peiod of time it takes to go from the start frequency to the stop frequency in seconds.
 
 Copyright (C) 2024, Nathan Sayer, Open Source Instruments Inc.
 
