@@ -81,7 +81,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(activity_threshold) "10"
 	set info(errors_for_stop) "10"
 	set info(clock_frequency) "128"
-	set info(max_block_reads) "20"
+	set info(max_block_reads) "100"
 	set info(min_msg_per_clock) "1"
 	set info(msg_per_clock) "1"
 	set info(min_clocks) "32"
@@ -409,7 +409,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 1
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
-					set info(max_block_reads) "20"
+					set info(max_block_reads) "50"
 				}
 				4  {
 					set info(receiver_type) "A3042"
@@ -418,7 +418,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 1
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 1
-					set info(max_block_reads) "20"
+					set info(max_block_reads) "50"
 				}
 				default {
 					set info(receiver_type) "?"
@@ -427,7 +427,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
-					set info(max_block_reads) "20"
+					set info(max_block_reads) "100"
 				}					
 			}
 		}

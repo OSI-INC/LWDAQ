@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "1.4"
+	LWDAQ_tool_init "SCT_Check" "1.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -415,7 +415,7 @@ proc SCT_Check_open {} {
 	foreach a {Glitch} {
 		set b [string tolower $a]
 		label $f.l$b -text "$a\:" -fg $config(label_color)
-		entry $f.e$b -textvariable SCT_Check_config($b) -width 4
+		entry $f.e$b -textvariable SCT_Check_config($b) -width 7
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 		
