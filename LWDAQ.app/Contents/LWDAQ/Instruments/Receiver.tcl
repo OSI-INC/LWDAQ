@@ -55,6 +55,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(daq_password) "no_password"
 	set info(daq_avail_cntr) "0"
 	set info(daq_fifo_unit) "512"
+	set info(daq_receiver_element) "1"
 	set info(daq_select_ms) "1.0"
 	set info(verbose_description) \
 		"{Channel Number} \
@@ -338,9 +339,11 @@ proc LWDAQ_reset_Receiver {} {
 		set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 		LWDAQ_login $sock $info(daq_password)
 		
-		# Select the data receiver.
+		# Select the data receiver with its device type, driver and multiplexer
+		# sockets, and internal device element number.
 		LWDAQ_set_device_type $sock $info(daq_device_type)
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
+		LWDAQ_set_device_element $sock $info(daq_receiver_element)
 		
 		# Reset the receiver message buffer and message detectors.
 		LWDAQ_transmit_command_hex $sock $info(reset_cmd)
@@ -701,10 +704,17 @@ proc LWDAQ_daq_Receiver {} {
 			set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 			LWDAQ_login $sock $info(daq_password)
 	
-			# Set the device type, select a driver and multiplexer socket. Wait for
-			# a short time so the cables can settle.
+			# Set the device type, select a driver and multiplexer socket.
+			# Select the internal device element that corresponds to the data
+			# receiver. In Octal Data Receivers (A3027), Animal Location
+			# Trackers (A3038), and the original Data Receiver (A3018), this
+			# element number is ignored. But in the Telemetry Control Box (TCB,
+			# A3042), the element number is used to direct commands to the
+			# receiver, stimulator, and interface controllers. We make sure that
+			# the element number selects the data receiver on the TCB.
 			LWDAQ_set_device_type $sock $info(daq_device_type)
 			LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
+			LWDAQ_set_device_element $sock $info(daq_receiver_element)
 			
 			# If we have a fifo block counter in the receiver, read the number
 			# of bytes available.
