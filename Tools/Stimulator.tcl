@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.12"
+	LWDAQ_tool_init "Stimulator" "4.1"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -48,6 +48,7 @@ proc Stimulator_init {} {
 	set config(rf_off_op) "0080"
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
+	set config(rf_element) "2"
 	set config(checksum_preload) "1111111111111111"
 	set config(log_enable) "0"
 	set config(log_file) "~/Desktop/Stimulator_Log.txt"
@@ -218,6 +219,7 @@ proc Stimulator_transmit {id commands} {
 			set sd $config(spacing_delay_A2071E)
 		}
 		LWDAQ_set_driver_mux $sock $config(driver_socket) 1
+		LWDAQ_set_device_element $sock $config(rf_element)
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		LWDAQ_transmit_command_hex $sock $config(rf_off_op)

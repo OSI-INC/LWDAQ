@@ -21,7 +21,7 @@ proc Configurator_init {} {
 	upvar #0 Configurator_config config
 	global LWDAQ_Info
 	
-	LWDAQ_tool_init "Configurator" "22"
+	LWDAQ_tool_init "Configurator" "23"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(contact_ip_addr) 10.0.0.37
@@ -69,15 +69,15 @@ proc Configurator_contact {} {
 			LWDAQ_print $info(text) "Controller Firmware Version: [LWDAQ_firmware_version $sock]" 
 		} {
 			LWDAQ_set_base_addr_hex $sock "00000000"
-			LWDAQ_print $info(text) "Interface Software Version: [LWDAQ_software_version $sock]"
-			LWDAQ_print $info(text) "Interface MAC Address: [LWDAQ_mac_read $sock]"
-			LWDAQ_print $info(text) "Interface Hardware ID: [LWDAQ_hardware_id $sock]" 
-			LWDAQ_print $info(text) "Interface Hardware Version: [LWDAQ_hardware_version $sock]" 
-			LWDAQ_print $info(text) "Interface Firmware Version: [LWDAQ_firmware_version $sock]" 
+			LWDAQ_print $info(text) "Relay Software Version: [LWDAQ_software_version $sock]"
+			LWDAQ_print $info(text) "Relay MAC Address: [LWDAQ_mac_read $sock]"
+			LWDAQ_print $info(text) "Relay Hardware ID: [LWDAQ_hardware_id $sock]" 
+			LWDAQ_print $info(text) "Relay Hardware Version: [LWDAQ_hardware_version $sock]" 
+			LWDAQ_print $info(text) "Relay Firmware Version: [LWDAQ_firmware_version $sock]" 
 			LWDAQ_set_base_addr_hex $sock $config(contact_base_addr)
-			LWDAQ_print $info(text) "Driver Hardware ID: [LWDAQ_hardware_id $sock]" 
-			LWDAQ_print $info(text) "Driver Hardware Version: [LWDAQ_hardware_version $sock]" 
-			LWDAQ_print $info(text) "Driver Firmware Version: [LWDAQ_firmware_version $sock]"
+			LWDAQ_print $info(text) "Controller Hardware ID: [LWDAQ_hardware_id $sock]" 
+			LWDAQ_print $info(text) "Controller Hardware Version: [LWDAQ_hardware_version $sock]" 
+			LWDAQ_print $info(text) "Controller Firmware Version: [LWDAQ_firmware_version $sock]"
 			LWDAQ_set_base_addr_hex $sock "00000000"
 		}
 		LWDAQ_print -nonewline $info(text) "Closing socket..." green
@@ -132,7 +132,7 @@ proc Configurator_write {} {
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_print $info(text) "succeeded." green
 		LWDAQ_socket_close $sock
-		LWDAQ_print $info(text)  "Reboot driver to load new configuration.\n"
+		LWDAQ_print $info(text)  "Reboot relay to load new configuration.\n"
 	} error_result]} {
 		LWDAQ_print $info(text)
 		LWDAQ_print $info(text)  "ERROR: $error_result\n"
