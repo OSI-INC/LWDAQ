@@ -30,6 +30,7 @@ proc Stimulator_init {} {
 	
 	set config(ip_addr) "10.0.0.37"
 	set config(driver_socket) "8"
+	set config(mux_socket) "1"
 	
 	set config(rck_khz) "32.768"
 	set config(rck_divisor) "32"
@@ -40,7 +41,7 @@ proc Stimulator_init {} {
 	set config(max_stimulus_len) [expr (256 * 256) - 1]
 	set config(min_current) "0"
 	set config(max_current) "15"
-	set config(initiate_delay) "0.010"
+	set config(initiate_delay) "0.005"
 	set config(spacing_delay_A2037E) "0.0000"
 	set config(spacing_delay_A2071E) "0.0014"
 	set config(spacing_delay_cmd) "0.0"
@@ -218,7 +219,7 @@ proc Stimulator_transmit {id commands} {
 		} {
 			set sd $config(spacing_delay_A2071E)
 		}
-		LWDAQ_set_driver_mux $sock $config(driver_socket) 1
+		LWDAQ_set_driver_mux $sock $config(driver_socket) $config(mux_socket)
 		LWDAQ_set_device_element $sock $config(rf_element)
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
