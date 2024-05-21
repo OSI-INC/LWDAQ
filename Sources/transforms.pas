@@ -157,7 +157,6 @@ implementation
 type {for pattern coordinates}
 	pattern_type=record
 		valid:boolean;{valid pattern}
-		padding:array [1..7] of byte; {force origin field to eight-byte boundary}
 		origin:xy_point_type; {pattern coordinate origin in image coordinates}
 		rotation:real; {radians}
 		pattern_x_width:real; {scaling factor going from pattern x to image}

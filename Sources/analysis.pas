@@ -1,6 +1,7 @@
 {
 	Analysis Library.
-	Copyright (C) 2007-2021 Kevan Hashemi, Brandeis University
+	Copyright (C) 2007-2021, Kevan Hashemi, Brandeis University
+	Copyright (C) 2021-2024, Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software; you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
@@ -20,8 +21,13 @@
 library analysis;
 
 {
-	This is a library of routines from our analysis units, which are list
-	in the library's uses clause.
+	This is a library of routines from our analysis units. When compiled with
+	our makefile, the result is a dynamically linked library (dylid on MacOS,
+	dll on Windows, and so on Linux and Raspbian) that you can load and link to
+	at run-time. The separate test.pas routine, aside from testing some of the
+	fundamental routines, prints out a list of the sizes of various data types
+	used by the library routines, in the hope that this will help you match
+	data types in your own code.
 }
 
 {$MODESWITCH CLASSICPROCVARS+}

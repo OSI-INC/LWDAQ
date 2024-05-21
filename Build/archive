@@ -118,7 +118,7 @@ mv $MASTER_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
 mv $MASTER_DIR/GIT $GIT_DIR
 
 # Copy documents to website.
-DOCS="Electronics/LWDAQ"
+DOCS="../Active/BNDHEP/Electronics/LWDAQ"
 if [ -d "$DOCS" ]
 then 
 	echo "FOUND: Local document folder."
