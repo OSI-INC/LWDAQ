@@ -4,7 +4,7 @@
 # the LWDAQ software.
 
 # Mount point for remote disk.
-RMT="/Users/kevan/BND-SFTP"
+RMT="/Users/kevan/BND-SFTP.localized"
 
 # Determine operating system. Default is Unknown. 
 OS=Unknown
@@ -141,7 +141,7 @@ then
 		cp $LWDAQ_DIR/Commands.html $RMTDOCS/Commands.html
 		rm $LWDAQ_DIR/Commands.html
 		echo "Uploading Acquisifier.html..."
-		cp Electronics/LWDAQ/Acquisifier.html $RMTDOCS/Acquisifier.html
+		cp $DOCS/Acquisifier.html $RMTDOCS/Acquisifier.html
 	else
 		echo "NOT FOUND: Remote document folder."
 	fi

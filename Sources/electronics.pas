@@ -1741,7 +1741,7 @@ begin
 					if length(result)>0 then message_string:=eol+message_string;
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
-						report_error('Too many messages for result string'
+						report_error('Too many messages for result string '
 							+'in lwdaq_sct_receiver');
 						exit;
 					end;
