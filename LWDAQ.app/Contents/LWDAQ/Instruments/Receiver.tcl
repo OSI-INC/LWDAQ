@@ -277,7 +277,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		# With an excessive number of errors, generate an execution error. If
 		# we are looping, and the loop_on_error flag is not set, stop looping.
 		# We use the keyword "corrupted" in our error message, so indicate a 
-		# problem other than a communication failre.
+		# problem other than a communication failure.
 		if {$num_errors > 0} {
 			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
 				set info(control) "Stop"

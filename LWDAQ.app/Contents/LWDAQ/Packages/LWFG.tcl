@@ -10,9 +10,10 @@
 # value 10.0.0.37, and from there we use the Configurator Tool to configure the
 # relay for our use. 
 #
-# Load within LWDAQ with the package require command. The routines the package
-# uses are to be found in the LWDAQ Driver.tcl file, from which the code that
-# performs the communication with the function generator may be copied.
+# Load the LWFG routine into your LWDAQ process with the "package require"
+# command. The routines the package uses are to be found in the LWDAQ Driver.tcl
+# file, from which the code that performs the communication with the function
+# generator may be copied.
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -32,6 +33,7 @@
 # Version 1.1 [01-FEB-24] First version, in use in the SCT Checkt tool.
 # Version 1.2 [20-MAR-24] Clip waveform DAC values to 0..255.
 # Version 1.3 [28-MAR-24] Fix reset value of triangle wave: now zero volts.
+# Version 1.4 [13-JUN-24] Update time constants to suite A3050B.
 
 # Load this package or routines into LWDAQ with "package require EDF".
 package provide LWFG 1.4
