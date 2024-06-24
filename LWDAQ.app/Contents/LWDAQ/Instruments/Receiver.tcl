@@ -214,37 +214,28 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		# panel, but don't abort analysis.
 		if {[LWDAQ_is_error_result $result]} {LWDAQ_print $info(text) $result}
 	
-		# If the activity window is open, obtain a list of the channels with at
-		# least one message present in the image, and the number of messages for
-		# each of these channels.
-		if {[winfo exists $info(window)\.activity]} {
+		# Clear the activity values for all channels.
+		for {set c $info(min_id)} {$c < $info(max_id)} {incr c} {
+			global LWDAQ_id$c\_Receiver
+			set LWDAQ_id$c\_Receiver 0
+		}
 		
-			# Clear the activity values for all channels.
-			for {set c $info(min_id)} {$c < $info(max_id)} {incr c} {
-				global LWDAQ_id$c\_Receiver
-				set LWDAQ_id$c\_Receiver 0
-			}
-			
-			# Get a list of active channels.
-			set channels [lwdaq_receiver $image_name \
-				"-payload $config(payload_length) list"]
+		# Get a list of active channels.
+		set channels [lwdaq_receiver $image_name "-payload $config(payload_length) list"]
 
-			# Update the activity values. If we encounter an error, just report
-			# the error to the text window.
-			if {![LWDAQ_is_error_result $channels]} {
-				set ca ""
-				foreach {c a} $channels {
-					if {$a > $info(activity_threshold)} {
-						append ca "$c\:$a "
-					}
-					if {[winfo exists $info(window)\.activity]} {
-						set LWDAQ_id$c\_Receiver $a
-					}
+		# Update the activity values. If we encounter an error, just report the
+		# error to the text window.
+		if {![LWDAQ_is_error_result $channels]} {
+			set ca ""
+			foreach {c a} $channels {
+				if {$a > $info(activity_threshold)} {
+					append ca "$c\:$a "
 				}
-				set info(channel_activity) $ca
-			} {
-				LWDAQ_print $info(text) $channels
+				set LWDAQ_id$c\_Receiver $a
 			}
+			set info(channel_activity) $ca
+		} {
+			LWDAQ_print $info(text) $channels
 		}
 				
 		# Make sure our list of auxiliary messages is not too long.
@@ -253,7 +244,10 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 		# Look for messages in the auxiliary channels. 
 		set new_aux_messages [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) auxiliary"]
-			
+		
+		# Provided our new auxiliary message list is not itself an error message, parse
+		# the list and append to our global auxialiary message list. If the list is an
+		# error message, we just print the error.
 		if {![LWDAQ_is_error_result $new_aux_messages]} {
 			
 			# Calculate a timestamp, with resolution one clock tick, for each
@@ -303,10 +297,11 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			}
 		}
 		
-		# If we encountered errors, generate an execution error. If we are
-		# looping, and the loop_on_error flag is not set, stop looping. We use
-		# the keyword "corrupted" in our error message, so indicate a problem
-		# other than a communication failure.
+		# If we encountered errors in our original run through the data, we now
+		# generate a corrupted data error. If we are looping, and the
+		# loop_on_error flag is not set, stop looping. We use the keyword
+		# "corrupted" in our error message, so indicate a problem other than a
+		# communication failure.
 		if {$num_errors > 0} {
 			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
 				set info(control) "Stop"
