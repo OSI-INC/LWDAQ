@@ -1,14 +1,15 @@
 # Neurorecorder.tcl, a LWDAQ Tool
 #
 # Copyright (C) 2007-2024 Kevan Hashemi, Open Source Instruments Inc.
-#
+
 # The Neurorecorder records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
-#
+
 # http://www.opensourceinstruments.com/Electronics/A3018/Neurorecorder.html
-#
-# The Neurorecorder stores telemetry data to NDF (Neuroscience Data Format) files.
-#
+
+# The Neurorecorder stores telemetry data to NDF (Neuroscience Data Format)
+# files.
+
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later

@@ -150,15 +150,25 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 	# text window. We don't want these errors to stop data acquisition.
 	if {[catch {
 	
-		# We get the number of errors, the number of clock messages, and the total
-		# number of messages. We also get the message index of the first clock message.
-		# We will use the first clock index later.
-		scan [lwdaq_receiver $image_name \
-			"-payload $config(payload_length) clocks 0"] %d%d%d%d \
-			num_errors num_clocks num_messages first_index
+		# Try to count the number of clock messages in the image.
+		set check [lwdaq_receiver $image_name "-payload $config(payload_length) clocks 0"]
 		
-		# We determine the display scale boundaries depending upon whether we have simple
-		# plot, centered plot, or normalized plot.
+		# If the result is an error, print the original error message to the
+		# instrument panel and return an error message that contains the keyword
+		# "corrupted" to show that analysis failed. If we cannot count clock
+		# messages, we can do nothing with the data.
+		if {[LWDAQ_is_error_result $check]} {
+			LWDAQ_print $info(text) $check
+			error "Data corrupted, analysis cannot count clock messages."
+		}
+	
+		# Get the number of errors, the number of clock messages, and the total
+		# number of messages. We also get the message index of the first clock
+		# message. We will use the first clock index later.
+		scan $check %d%d%d%d num_errors num_clocks num_messages first_index
+		
+		# Determine the display scale boundaries depending upon whether we have
+		# simple plot, centered plot, or normalized plot.
 		if {$info(display_mode) == "CP"} {
 			set display_min [expr - $info(display_range) / 2 ]
 			set display_max [expr + $info(display_range) / 2]
@@ -170,9 +180,10 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			set display_max [expr $info(display_offset) + $info(display_range)]
 		}
 		
-		# We compose a channel list from the analysis_channels string. The "*" character, 
-		# if it appears anywhere in the analysis_channel list, will result in a "*" channel
-		# number list. These channels are the ones we are going to plot and report on.
+		# Compose a channel list from the analysis_channels string. The "*"
+		# character, if it appears anywhere in the analysis_channel list, will
+		# result in a "*" channel number list. These channels are the ones we
+		# are going to plot and report on.
 		set id_list ""
 		foreach id $config(analysis_channels) {
 			if {$id == "*"} {
@@ -199,69 +210,87 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			plot $display_min $display_max \
 			$info(display_mode) $id_list"]
 			
-		# We obtain a list of the channels with at least one message present
-		# in the image, and the number of messages for each of these channels.
-		set channels [lwdaq_receiver $image_name "-payload $config(payload_length) list"]
+		# If the result is an error, print the error message to the instrument
+		# panel, but don't abort analysis.
+		if {[LWDAQ_is_error_result $result]} {LWDAQ_print $info(text) $result}
+	
+		# If the activity window is open, obtain a list of the channels with at
+		# least one message present in the image, and the number of messages for
+		# each of these channels.
 		if {[winfo exists $info(window)\.activity]} {
+		
+			# Clear the activity values for all channels.
 			for {set c $info(min_id)} {$c < $info(max_id)} {incr c} {
 				global LWDAQ_id$c\_Receiver
 				set LWDAQ_id$c\_Receiver 0
 			}
-		}
-		if {![LWDAQ_is_error_result $channels]} {
-			set ca ""
-			foreach {c a} $channels {
-				if {$a > $info(activity_threshold)} {
-					append ca "$c\:$a "
+			
+			# Get a list of active channels.
+			set channels [lwdaq_receiver $image_name \
+				"-payload $config(payload_length) list"]
+
+			# Update the activity values. If we encounter an error, just report
+			# the error to the text window.
+			if {![LWDAQ_is_error_result $channels]} {
+				set ca ""
+				foreach {c a} $channels {
+					if {$a > $info(activity_threshold)} {
+						append ca "$c\:$a "
+					}
+					if {[winfo exists $info(window)\.activity]} {
+						set LWDAQ_id$c\_Receiver $a
+					}
 				}
-				if {[winfo exists $info(window)\.activity]} {
-					set LWDAQ_id$c\_Receiver $a
-				}
+				set info(channel_activity) $ca
+			} {
+				LWDAQ_print $info(text) $channels
 			}
-			set info(channel_activity) $ca
-		} {
-			error $channels
 		}
-		
-		# We make sure our list of auxiliary messages is not too long.
+				
+		# Make sure our list of auxiliary messages is not too long.
 		set info(aux_messages) [lrange $info(aux_messages) 0 $info(aux_max_size)]
 
-		# We look for messages in the auxiliary channels.
+		# Look for messages in the auxiliary channels. 
 		set new_aux_messages [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) auxiliary"]
-
-		# We are going to calculate a timestamp, with resolution one clock tick,
-		# for each auxiliary message. The timestamps can be used as a form of
-		# addressing for slow data transmissions. To get the absolute timestamp,
-		# we get the value of the first clock message in the data, which should
-		# be the first message in the data. This time is a sixteen-bit value
-		# that has counted the number of times a 32.768 kHz clock has counted to
-		# 256 since the data receiver clock was last reset, wrapping around to
-		# zero every time it overflows.
-		scan [lwdaq_receiver $image_name \
-			"-payload $config(payload_length) get 0"] %d%d%d cid bts fvn
+			
+		if {![LWDAQ_is_error_result $new_aux_messages]} {
+			
+			# Calculate a timestamp, with resolution one clock tick, for each
+			# auxiliary message. The timestamps can be used as a form of addressing
+			# for slow data transmissions. To get the absolute timestamp, we get the
+			# value of the first clock message in the data, which should be the
+			# first message in the data. This time is a sixteen-bit value that has
+			# counted the number of times a 32.768 kHz clock has counted to 256
+			# since the data receiver clock was last reset, wrapping around to zero
+			# every time it overflows.
+			scan [lwdaq_receiver $image_name \
+				"-payload $config(payload_length) get 0"] %d%d%d cid bts fvn
 		
-		# We take each new auxiliary message and break it up into three parts.
-		# The first part is an eight-bit channel number. This might be the lower
-		# eight bits of a sixteen-bit device identifier, or the entire eight
-		# bits of a device identifier. The second part is a four-bit field
-		# address. The third is eight bits of data. These sixteen bits are the
-		# contents of the auxiliary message. We add a fourth number, which is
-		# the timestamp of message reception. We give the timestamp modulo
-		# 65536, which means the timestamp resets every two seconds. These four
-		# numbers make one entry in the auxiliary message list, so we append
-		# them to the existing list.
-		foreach {cn mt md} $new_aux_messages {
-			set id [expr ($md / 4096)]
-			if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
-			set id [expr (($cn / $info(set_size)) * $info(set_size)) + $id]
-			set fa [expr ($md / 256) % 16]
-			set d [expr $md % 256]
-			set ts  [expr ($mt + $bts * 256) % (65536)]
-			lappend info(aux_messages) "$id $fa $d $ts"
+			# Take each new auxiliary message and break it up into three parts. The
+			# first part is an eight-bit channel number. This might be the lower
+			# eight bits of a sixteen-bit device identifier, or the entire eight
+			# bits of a device identifier. The second part is a four-bit field
+			# address. The third is eight bits of data. These sixteen bits are the
+			# contents of the auxiliary message. We add a fourth number, which is
+			# the timestamp of message reception. We give the timestamp modulo
+			# 65536, which means the timestamp resets every two seconds. These four
+			# numbers make one entry in the auxiliary message list, so we append
+			# them to the existing list.
+			foreach {cn mt md} $new_aux_messages {
+				set id [expr ($md / 4096)]
+				if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
+				set id [expr (($cn / $info(set_size)) * $info(set_size)) + $id]
+				set fa [expr ($md / 256) % 16]
+				set d [expr $md % 256]
+				set ts  [expr ($mt + $bts * 256) % (65536)]
+				lappend info(aux_messages) "$id $fa $d $ts"
+			}
+		} {
+			LWDAQ_print $info(text) $new_aux_messages
 		}
-		
-		# If requested, we print the first block of raw message data to the screen.
+				
+		# If requested, print the first block of raw messages to the screen.
 		 if {$info(show_messages) > 0} {
 			set raw_data [lwdaq_receiver $image_name \
 				"-payload $config(payload_length) print 0 $info(show_messages)"]
@@ -274,10 +303,10 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			}
 		}
 		
-		# With an excessive number of errors, generate an execution error. If
-		# we are looping, and the loop_on_error flag is not set, stop looping.
-		# We use the keyword "corrupted" in our error message, so indicate a 
-		# problem other than a communication failure.
+		# If we encountered errors, generate an execution error. If we are
+		# looping, and the loop_on_error flag is not set, stop looping. We use
+		# the keyword "corrupted" in our error message, so indicate a problem
+		# other than a communication failure.
 		if {$num_errors > 0} {
 			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
 				set info(control) "Stop"
