@@ -30,10 +30,9 @@ proc LWDAQ_init_Receiver {} {
 	array unset config
 	array unset info
 	
-	# The info array elements will not be displayed in the 
-	# instrument window. The only info variables set in the 
-	# LWDAQ_open_Instrument procedure are those which are checked
-	# only when the instrument window is open.
+	# The info array elements will not be displayed in the instrument window.
+	# The only info variables set in the LWDAQ_open_Instrument procedure are
+	# those which are checked only when the instrument window is open.
 	set info(name) "Receiver"
 	set info(control) "Idle"
 	set info(window) [string tolower .$info(name)]
@@ -112,9 +111,9 @@ proc LWDAQ_init_Receiver {} {
 	set info(scratch_image) "_receiver_scratch_image_"
 	catch {lwdaq_image_destroy $info(scratch_image)}
 		
-	# All elements of the config array will be displayed in the
-	# instrument window. No config array variables can be set in the
-	# LWDAQ_open_Instrument procedure
+	# All elements of the config array will be displayed in the instrument
+	# window. No config array variables can be set in the LWDAQ_open_Instrument
+	# procedure
 	set config(image_source) "daq"
 	set config(file_name) "./Images/$info(name)\*"
 	set config(memory_name) "lwdaq_image_1"
@@ -133,16 +132,15 @@ proc LWDAQ_init_Receiver {} {
 }
 
 #
-# LWDAQ_analysis_Receiver applies receiver analysis to an image 
-# in the lwdaq image list. By default, the routine uses the
-# image $config(memory_name).
+# LWDAQ_analysis_Receiver applies receiver analysis to an image in the lwdaq
+# image list. By default, the routine uses the image $config(memory_name).
 #
 proc LWDAQ_analysis_Receiver {{image_name ""}} {
 	upvar #0 LWDAQ_config_Receiver config
 	upvar #0 LWDAQ_info_Receiver info
 
-	# By default, we use the image whose name we passed in to this routine,
-	# but if no such name was passed, we use the image named in the configuration
+	# By default, we use the image whose name we passed in to this routine, but
+	# if no such name was passed, we use the image named in the configuration
 	# array.
 	if {$image_name == ""} {set image_name $config(memory_name)}
 	
@@ -327,6 +325,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 proc LWDAQ_refresh_Receiver {} {
 	upvar #0 LWDAQ_config_Receiver config
 	upvar #0 LWDAQ_info_Receiver info
+	
 	if {[lwdaq_image_exists $config(memory_name)] != ""} {
 		LWDAQ_analysis_Receiver $config(memory_name)
 		lwdaq_draw $config(memory_name) $info(photo) \
