@@ -81,14 +81,21 @@ proc Function_Generator_on {} {
 	upvar #0 Function_Generator_config config
 	global LWFG
 
-	LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
-		$config(waveform_frequency) Hz,\
-		$config(waveform_amplitude) V amplitude,\
-		$config(waveform_offset) V offset." purple
-
-	# Determine the bounds of the waveform
 	set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
 	set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
+
+	if { $v_lo < -10 || $v_hi > 10} {
+			LWDAQ_print $info(text) "ERROR: Maximum output of +/-10V exceeded."
+		} else {
+			LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
+				$config(waveform_frequency) Hz,\
+				$config(waveform_amplitude) V amplitude,\
+				$config(waveform_offset) V offset." purple
+		}
+	
+
+	# Determine the bounds of the waveform
+
 	set result [LWFG_configure $config(gen_ip) $config(gen_ch) \
 		$config(waveform_type) \
 		$config(waveform_frequency) \
@@ -105,7 +112,7 @@ proc Function_Generator_on {} {
 		set actual [expr $LWFG(clock_hz)*$num_cycles/$num_pts/$divisor]
 		LWDAQ_print $info(text) "actual = [format %.3f $actual] Hz"
 		LWDAQ_print $info(text) "requested = [format %.3f $config(waveform_frequency)] Hz"
-	}
+	} 
 }
 
 # LWFG_configure configures a function generator for continuous generation of a square,
@@ -181,6 +188,12 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 				}
 			}
 		}
+		"arbitrary" {
+			for {set i 0} {$i < $num_pts} {incr i} {\
+				set phase [expr fmod($i,$period)/$period]
+				lappend values [expr int(rand()*255)]
+			}
+		}
 		default {
 			return "ERROR: Unkown waveform \"$waveform\"."
 		}
@@ -214,7 +227,10 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 
 	
 	# Configure the function generator using TCPIP messaging.
-	if {[catch {
+
+	if {$v_lo < -10 || $v_hi > 10} {
+		
+	} elseif {[catch {
 	
 		# Open a socket to the function generator.
 		set sock [LWDAQ_socket_open $ip]
@@ -316,14 +332,19 @@ proc Function_Generator_sweep {} {
 	upvar #0 Function_Generator_config config 
 	global LWFG
 
-	LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
-		$config(sweep_start_frequency) Hz to $config(sweep_stop_frequency) Hz over\
-		$config(sweep_time) seconds,\
-		$config(waveform_amplitude) V amplitude,\
-		$config(waveform_offset) V offset." purple
-
 	set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
 	set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
+
+	if { $v_lo < -10 || $v_hi > 10} {
+			LWDAQ_print $info(text) "ERROR: Maximum output of +/-10V exceeded."
+		} else {
+			LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
+				$config(sweep_start_frequency) Hz to $config(sweep_stop_frequency) Hz over\
+				$config(sweep_time) seconds,\
+				$config(waveform_amplitude) V amplitude,\
+				$config(waveform_offset) V offset." purple
+		}
+
 	set waveform $config(waveform_type)
 	set sweep_period $config(sweep_time)
 	set start_frequency $config(sweep_start_frequency)
@@ -413,7 +434,10 @@ proc Function_Generator_sweep {} {
 	
 	# Open a socket to the function generator and configure it through
 	# the data portal by means of stream write instructions.
-	if {[catch {
+
+	if {$v_lo < -10 || $v_hi > 10} {
+		
+	} elseif {[catch {
 		# Open a socket to the function generator.
 		set sock [LWDAQ_socket_open $ip]
 		
