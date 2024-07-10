@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "4.1"
+	LWDAQ_tool_init "Stimulator" "4.2"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -49,7 +49,7 @@ proc Stimulator_init {} {
 	set config(rf_off_op) "0080"
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
-	set config(rf_element) "2"
+	set config(stimulator_element) "2"
 	set config(checksum_preload) "1111111111111111"
 	set config(log_enable) "0"
 	set config(log_file) "~/Desktop/Stimulator_Log.txt"
@@ -64,7 +64,7 @@ proc Stimulator_init {} {
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 	
-	set info(conf_delay) "3"
+	set config(conf_delay) "20"
 	set config(aux_show) "0"
 	set config(aux_color) "orange"
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
@@ -220,7 +220,7 @@ proc Stimulator_transmit {id commands} {
 			set sd $config(spacing_delay_A2071E)
 		}
 		LWDAQ_set_driver_mux $sock $config(driver_socket) $config(mux_socket)
-		LWDAQ_set_device_element $sock $config(rf_element)
+		LWDAQ_set_device_element $sock $config(stimulator_element)
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		LWDAQ_transmit_command_hex $sock $config(rf_off_op)
@@ -573,7 +573,7 @@ proc Stimulator_monitor {} {
 		foreach cam $aux_messages {
 			scan $cam %d%d%d%d cid cfa cdb cts
 			if {$cfa != $info(at_conf)} {continue}
-			if {($cid == $id) && (($cts - $ts) % 65536 <= $info(conf_delay))} {
+			if {($cid == $id) && (($cts - $ts) % 65536 <= $config(conf_delay))} {
 				set device_id [format %04X [expr $cid + (256 * $cdb)]]
 				break
 			}

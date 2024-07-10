@@ -218,28 +218,28 @@ if {[catch {
 	# we catch whatever error it produces and move on regardless.
 	catch {pkg_mkIndex $LWDAQ_Info(package_dir)}
 
-	# set up LWDAQ event queue and load utility routines.
+	# Set up LWDAQ event queue and load utility routines.
 	source [file join $LWDAQ_Info(scripts_dir) Utils.tcl]
 	LWDAQ_utils_init
 	LWDAQ_queue_start
 
-	# set up the TCL commands that communicate with an LWDAQ Driver
+	# Set up the TCL commands that communicate with an LWDAQ Driver
 	source [file join $LWDAQ_Info(scripts_dir) Driver.tcl]
 	LWDAQ_driver_init
 
-	# set up TCL commands that manage instruments.
+	# Set up TCL commands that manage instruments.
 	source [file join $LWDAQ_Info(scripts_dir) Instruments.tcl]
 	LWDAQ_instruments_init
 
-	# set up TCL commands that manage tools.
+	# Set up TCL commands that manage tools.
 	source [file join $LWDAQ_Info(scripts_dir) Tools.tcl]
 	LWDAQ_tools_init
 
-	# set up TCL commands that create the graphical user interface (GUI).
+	# Set up TCL commands that create the graphical user interface (GUI).
 	source [file join $LWDAQ_Info(scripts_dir) Interface.tcl]
 	LWDAQ_interface_init
 
-	# close all sockets
+	# Close all sockets
 	LWDAQ_close_all_sockets
 
 	# Load the lwdaq dynamic library we compile from our Pascal source code. This

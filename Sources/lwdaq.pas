@@ -704,7 +704,7 @@ begin
 	if (argc<3)	or (not odd(argc)) then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Wrong number of arguments, must be "'
-			+'lwdaq_image_draw image photo ?option value?".');
+			+'lwdaq_draw image photo ?option value?".');
 		exit;
 	end;
 		
