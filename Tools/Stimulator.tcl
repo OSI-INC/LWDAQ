@@ -64,7 +64,7 @@ proc Stimulator_init {} {
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 	
-	set config(conf_delay) "20"
+	set config(conf_delay) "3"
 	set config(aux_show) "0"
 	set config(aux_color) "orange"
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
