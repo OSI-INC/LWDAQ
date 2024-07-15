@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "4.2"
+	LWDAQ_tool_init "Stimulator" "4.3"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -545,12 +545,17 @@ proc Stimulator_monitor {} {
 		return ""
 	}
 	
-	# Compose a list of device numbers with their sixteen-bit identifiers.
+	# Compose a list of active device numbers with their sixteen-bit identifiers,
+	# as listed in our Stimulator window.
 	set id_list ""
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_id)"}
 	
 	# Go through the auxiliary message list and find messages that could be from
-	# stimulators.
+	# stimulators. As we proceed, we save the previous valid auxiliary message
+	# so that we can avoid processing duplicates in the list.
+	set previd 0
+	set prevfa 0
+	set prevdb 0
 	foreach am $aux_messages {
 	
 		# Scan the auxiliary message for identifier, field address, data byte
@@ -564,6 +569,9 @@ proc Stimulator_monitor {} {
 		
 		# If this is a confirmation message, proceed to next auxiliary message.
 		if {$fa == $info(at_conf)} {continue}
+		
+		# If this is a repeat of a previously processed auxilliary message, proceed.
+		if {($previd == $id) && ($prevfa == $fa) && ($prevdb == $db)} {continue}
 
 		# If it is some other sort of message, look for a confirmation that
 		# arrived no more than conf_delay ticks after our auxiliary message. If
@@ -660,6 +668,10 @@ proc Stimulator_monitor {} {
 			Stimulator_print "Identification:\
 				device_id=$device_id ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
+
+			# Ignore version number reports from devices that are not in our list.
+			if {$n == 0} {continue}
+			
 			set info(dev$n\_version) "$db"
 			Stimulator_print "Version:\
 				device_id=$device_id value=$db ts=$ts $now_time"
@@ -668,6 +680,13 @@ proc Stimulator_monitor {} {
 			# We don't recognise this type of auxiliary message, so proceed.
 			continue
 		}
+		
+		# By this point, we have processed and report on the confirmed auxiliary 
+		# message, so record its identifier, field address, and data byte in order
+		# to avoid processing a subsequent duplicate.
+		set previd $id
+		set prevfa $fa
+		set prevdb $db
 	}
 	
 	# We post the monitor to the event queue and report success.
