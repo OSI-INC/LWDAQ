@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "170"
+	LWDAQ_tool_init "Neuroplayer" "171"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -5503,12 +5503,17 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					puts -nonewline $f $export_bytes
 					close $f
 				} elseif {$config(export_format) == "EDF"} {
-					if {!$config(export_combine) || \
-							[string match "$info(channel_num):*" \
-								[lindex $config(channel_selector) 0]]} {
-						EDF_num_records_incr $sfn
-					} 
-					EDF_append $sfn $info(values)
+					if {[file exists $sfn]} {
+						if {!$config(export_combine) || \
+								[string match "$info(channel_num):*" \
+									[lindex $config(channel_selector) 0]]} {
+							EDF_num_records_incr $sfn
+						} 
+						EDF_append $sfn $info(values)
+					} else {
+						LWDAQ_print $t "ERROR: File \"$sfn\" no longer exists."
+						return ""
+					}
 				}
 			}
 		
