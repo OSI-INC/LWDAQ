@@ -360,10 +360,20 @@ proc Neuroplayer_init {} {
 #
 	set config(play_index) 0
 #
-# Timing constants for the player, in seconds.
+# Timing constants for the player, in seconds. The play_time configuration
+# parameter may be set by the user or the player. Immediately after displaying
+# an interval, the player will set the config play time equal to the time at the
+# end of the interval. The player will save this play time to the info array.
+# The next time it has to play an interval, it looks to see if the config play
+# time is equal to the saved play time, and if so, it just reads more data from
+# the archive without trying to navigate to the correct point in the archive.
+# The play time copy is a copy of the play time that the player uses while it is
+# processing and displaying an interval, because it is possible that the user
+# can change the config play time during such processing and display.
 #
 	set config(play_time) 0.0
-	set info(t_min) $config(play_time)
+	set info(play_time_saved) $config(play_time)
+	set info(play_time_copy) $config(play_time)
 	set info(play_end_time) 0.0
 #
 # The jump offset is added to the time of an event, so that the start of the
@@ -411,14 +421,13 @@ proc Neuroplayer_init {} {
 # The saved play file name variable allows us to detect when the file name
 # has been changed since the last time it was used.
 #
-	set info(saved_play_time) "0000000000"
-	set info(saved_play_file) "None"
+	set info(play_file_saved) "None"
 #
-# The saved_play_file_mtime saves the play file modification time, which allows
+# The play_file_saved_mtime saves the play file modification time, which allows
 # us to recognise when the file has been modified, so we re-calculate the
 # end time, which is useful when the file is being written to by the Recorder.
 #
-	set info(saved_play_file_mtime) 0
+	set info(play_file_saved_mtime) 0
 #
 # Each new NDF file we create will have a metadata string of the following
 # size in characters.
@@ -595,6 +604,7 @@ proc Neuroplayer_init {} {
 	set config(export_powers) "0"
 	set config(export_format) "TXT"
 	set info(export_run_start) [clock seconds]
+	set info(export_size_s) "0"
 	set config(export_reps) "1"
 	set config(export_activity_max) "10000"
 #
@@ -772,7 +782,8 @@ proc Neuroplayer_print_event {{event ""}} {
 	if {![winfo exists $info(window)]} {return ""}
 
 	if {$event == ""} {
-		set event "$info(play_file_tail) $info(t_min) \"$config(channel_selector)\"\
+		set event "$info(play_file_tail) $info(play_time_copy)\
+			\"$config(channel_selector)\"\
 			\"Event in $config(play_interval)-s interval\""
 	}
 
@@ -4640,15 +4651,17 @@ proc Neuroexporter_begin {where} {
 		set t $info(text)
 	}
 
-	# Set the export start time according to where.	
+	# Set the export start time according to where we are in the archive. We use
+	# the start time of the archive and add our copy of the play time, which we
+	# round to the nearest second.	
 	switch $where {
 		"Interval" {
 			set config(export_start) [Neuroplayer_clock_convert \
 				[expr [Neuroplayer_clock_convert \
 					$info(datetime_start_time)] \
-					+ round($info(t_min)) ]]
+					+ round($info(play_time_copy)) ]]
 			LWDAQ_print $t "Export start time: $config(export_start),\
-				$info(t_min) s in [file tail $config(play_file)]."
+				$info(play_time_copy) s in [file tail $config(play_file)]."
 		}
 		default {
 			set config(export_start) $info(datetime_start_time)
@@ -4979,11 +4992,19 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				multiple of playback interval, actual duration will be longer."
 		}
 
-		# Start the exporter. Calculate Unix start and end times. The duration
-		# can be a mathematical expression, such as 24*60*60 for the number of
-		# seconds in a day.
+		# Start the exporter. Calculate Unix start time, the requested duration,
+		# and the ideal end time. The duration can be a mathematical expression,
+		# such as 24*60*60 for the number of seconds in a day. The ideal end
+		# time is the start time plus the duration. If we have video missing,
+		# the exporter will fill in the blank frames to complete a video of
+		# exactly the correct length, and remove extra frames as well. If we
+		# have telemetry data missing, the exporter behaves differently: it
+		# keeps reading data from disk until it has exported the correct number
+		# of seconds. So it might stop at the ideal end time, or it might go
+		# past the ideal end time.
 		set info(export_state) "Start"
 		set info(export_run_start) [clock seconds]	
+		set info(export_size_s) "0"
 		set start_s [Neuroplayer_clock_convert $config(export_start)]
 		if {$start_s == 0} {
 			LWDAQ_print $t "ERROR: Invalid time \"$config(export_start),\
@@ -4997,13 +5018,12 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		LWDAQ_print $t "\nStarting export of\
 				[expr $config(export_duration)] s\
 			from time $config(export_start)." purple
-		LWDAQ_print $t "Start absolute time $info(export_start_s) s,\
-			end absolute time $info(export_end_s) s."
-		set archive_start_time [expr \
-			$info(export_start_s) \
+		LWDAQ_print $t "Start time $info(export_start_s) s,\
+			ideal end time $info(export_end_s) s."
+		set archive_start_time [expr $info(export_start_s) \
 			- [Neuroplayer_clock_convert $info(datetime_start_time)]]
-		LWDAQ_print $t \
-			"Start archive time $archive_start_time s in [file tail $config(play_file)]."
+		LWDAQ_print $t "Start archive time $archive_start_time s\
+			in [file tail $config(play_file)]."
 		LWDAQ_print $t "Export directory \"$config(export_dir)\"."		
 		if {![file exists $config(export_dir)]} {
 			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
@@ -5472,8 +5492,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}
 		
 		# Continue to export, provided that we are not yet done.
-		set interval_start_s [Neuroplayer_clock_convert $info(datetime_play_time)]
-		if {$interval_start_s < $info(export_end_s)} {
+		if {$info(export_size_s) < $config(export_duration)} {
 
 			# Write the signal to disk. This is the reconstructed signal we
 			# receive from a transmitter. Each sample is a sixteen-bit unsigned
@@ -5668,14 +5687,23 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				}
 			}
 		}
+		
+		# Add the interval length to the size of our export.
+		if {[string match "$info(channel_num):*" \
+			[lindex $config(channel_selector) end]]} {
+			set info(export_size_s) [expr $info(export_size_s) + $config(play_interval)]
+		}
 
-		# We are done if the end of this interval exceeds our export end time, and we 
-		# have exported all channels already. 
-		if {[string match "$info(channel_num):*" [lindex $config(channel_selector) end]] \
-				&& ($interval_start_s + $info(play_interval_copy) \
-					>= $info(export_end_s))} {
-			LWDAQ_print $t "Export of [expr $config(export_duration)] s\
-				of recorded signal complete."
+		# We are done if the end of this interval equals or exceeds our export
+		# end time, and we have exported all channels already. 
+		if {[string match "$info(channel_num):*" \
+			[lindex $config(channel_selector) end]] \
+				&& ($info(export_size_s) >= $config(export_duration))} {
+			set info(export_end_s) [expr \
+				[Neuroplayer_clock_convert $info(datetime_start_time)] \
+				+ round($config(play_time) + $config(play_interval))]
+			LWDAQ_print $t "Extracted and exported [expr $info(export_size_s)] s,\
+				spanning $info(export_start_s) s to $info(export_end_s) s."
 			set info(play_control) "Stop"
 
 			# If there are no video files to deal with, stop.
@@ -5775,7 +5803,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	}
 
 	# At the end of an export, we check to see if we should repeat the export starting
-	# from the point immediately after the end of the previous export.
+	# from the point immediately after the end of the previous export. 
 	if {$cmd == "Repeat"} {
 		if {$info(export_state) != "Wait"} {
 			return ""
@@ -5792,12 +5820,19 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			set config(export_reps) 1
 		}
 		
+		# If we begin another export, we need to pick a new export start time.
+		# When we record archives with the clock synchronization, there will
+		# usually be a one-second gap between the absolute time of the end of
+		# one archive and the absolute time of the beginning of the next. When
+		# we determine the start time of the next export, we must not use
+		# our value for export_end_s, but rather the absolute time at the end
+		# of the current playback interval.
 		if {$repeat} {
 			LWDAQ_print $t "\nPreparing another export..." purple
-			set config(export_start) \
-				[Neuroplayer_clock_convert \
-				[expr [Neuroplayer_clock_convert $info(datetime_start_time)] \
-				+ round($info(t_min)) ]]
+			set config(export_start) [Neuroplayer_clock_convert [expr \
+				[Neuroplayer_clock_convert $info(datetime_start_time)] \
+				+ round($config(play_time)) ]]
+			LWDAQ_print $t $config(export_start)
 			set info(export_state) "Idle"
 			LWDAQ_post Neuroexporter_export
 			return ""	
@@ -6735,7 +6770,7 @@ proc Neuroplayer_play {{command ""}} {
 	if {$info(play_control) == "Pick"} {
 		Neuroplayer_pick play_file
 		set config(play_time) 0.0
-		set info(saved_play_time) $config(play_time)
+		set info(play_time_saved) $config(play_time)
 		Neuroplayer_fresh_graphs 1
 		if {![string match $config(play_dir)* $config(play_file)]} {
 			Neuroplayer_print "WARNING: Directory tree changed\
@@ -6756,9 +6791,9 @@ proc Neuroplayer_play {{command ""}} {
 	# Repeat. We update the clock times and set the export start time to the start
 	# time of the current archive.
 	if {$info(play_control) == "Reload"} {
-		set info(saved_play_file) "none"
+		set info(play_file_saved) "none"
 		set config(play_time) 0.0
-		set info(saved_play_time) 0.0
+		set info(play_time_saved) 0.0
 		Neuroplayer_fresh_graphs 1
 		set info(play_control) "Repeat"
 	}
@@ -6794,7 +6829,7 @@ proc Neuroplayer_play {{command ""}} {
 	}
 
 	# If we have changed files, check the new file is NDF.
-	if {$config(play_file) != $info(saved_play_file)} {
+	if {$config(play_file) != $info(play_file_saved)} {
 		if {[catch {LWDAQ_ndf_data_check $config(play_file)} error_message]} {
 			Neuroplayer_print "ERROR: Checking archive, $error_message."
 			LWDAQ_set_bg $info(play_control_label) white
@@ -6807,11 +6842,11 @@ proc Neuroplayer_play {{command ""}} {
 	# play time to the start of the file, read the payload length from the
 	# new file metadata, read tracker coordinates and background powers if
 	# they exist, and update the clock.
-	if {$config(play_file) != $info(saved_play_file)} {
+	if {$config(play_file) != $info(play_file_saved)} {
 		set config(play_index) 0
 		set info(play_file_tail) [file tail $config(play_file)]
-		set info(saved_play_file_mtime) [file mtime $config(play_file)]
-		set info(saved_play_file) $config(play_file)
+		set info(play_file_saved_mtime) [file mtime $config(play_file)]
+		set info(play_file_saved) $config(play_file)
 		
 		if {[catch {
 			set metadata [LWDAQ_ndf_string_read $config(play_file)]
@@ -6865,7 +6900,7 @@ proc Neuroplayer_play {{command ""}} {
 		if {$config(play_time) < 0} {
 			set config(play_time) 0.0
 		}
-		set info(saved_play_time) 0.0
+		set info(play_time_saved) 0.0
 		Neuroplayer_clock_update
 		lwdaq_data_manipulate $info(buffer_image) clear
 		set info(buffer_size) 0
@@ -6877,8 +6912,8 @@ proc Neuroplayer_play {{command ""}} {
 	# and play index as a starting point, so the routine will not have
 	# to start from the beginning of a file that is being recorded to
 	# disk while we play it back.
-	if {$info(saved_play_file_mtime) != [file mtime $config(play_file)]} {
-		set info(saved_play_file_mtime) [file mtime $config(play_file)]
+	if {$info(play_file_saved_mtime) != [file mtime $config(play_file)]} {
+		set info(play_file_saved_mtime) [file mtime $config(play_file)]
 		set info(play_end_time) \
 			[Neuroplayer_end_time $config(play_file) $info(player_payload)]
 	}
@@ -6953,7 +6988,7 @@ proc Neuroplayer_play {{command ""}} {
 
 	# If we have jumped since the previous interval display, we must seek
 	# the point in the archive that corresponds to the desired time.
-	if {$config(play_time) != $info(saved_play_time)} {
+	if {$config(play_time) != $info(play_time_saved)} {
 		# Because we are jumping to a new location, we set the previous clock
 		# variable to the undefined code.
 		set info(play_previous_clock) -1
@@ -6996,7 +7031,7 @@ proc Neuroplayer_play {{command ""}} {
 		set config(play_index) $new_play_index
 
 		# Set the saved play time and clear the data buffer standing value list.
-		set info(saved_play_time) $config(play_time)
+		set info(play_time_saved) $config(play_time)
 		Neuroplayer_clock_update	
 		lwdaq_data_manipulate $info(buffer_image) clear
 		set info(buffer_size) 0
@@ -7489,7 +7524,7 @@ proc Neuroplayer_play {{command ""}} {
 		if {$config(enable_vt)} {
 			Neuroplayer_plot_signal
 		}
-		set info(t_min) $config(play_time)
+		set info(play_time_copy) $config(play_time)
 		
 		if {$config(enable_af) || $config(af_calculate)} {
 			set info(spectrum) [Neuroplayer_spectrum]
@@ -7599,7 +7634,7 @@ proc Neuroplayer_play {{command ""}} {
 	# regardless of whaterver errors we may have encountered in the data.
 	set config(play_time) [Neuroplayer_play_time_format \
 		[expr $config(play_time) + $info(play_interval_copy)]]
-	set info(saved_play_time) $config(play_time)
+	set info(play_time_saved) $config(play_time)
 	
 	# We update the time values of the Clock Panel and format the play time in
 	# the Player window.
@@ -8469,7 +8504,7 @@ proc Neuroplayer_open {} {
 	entry $f.e_glitch -textvariable Neuroplayer_config(glitch_threshold) -width 5
 	pack $f.l_glitch $f.e_glitch -side left -expand yes	
 	label $f.lt_left -text "t_min:" -fg $info(label_color)
-	label $f.et_left -textvariable Neuroplayer_info(t_min) -width 7
+	label $f.et_left -textvariable Neuroplayer_info(play_time_copy) -width 7
 	pack $f.lt_left $f.et_left -side left -expand yes
 
 	set f $w.displays.spectrum
