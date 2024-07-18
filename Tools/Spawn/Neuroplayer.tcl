@@ -4943,9 +4943,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	# Establish file extension, which is the file format in lower case, and load
 	# any packages particular to the export format.
 	set ext [string tolower $config(export_format)]
-	if {$config(export_format) == "EDF"} {
-		package require EDF 1.2
-	}	
+	if {$config(export_format) == "EDF"} {package require EDF 1.2}
 	
 	# Set a flag to indicate that NDF export is requested. We might be exporting
 	# only video.
@@ -4974,22 +4972,39 @@ proc Neuroexporter_export {{cmd "Start"}} {
 
 		# Check the current state of the exporter.
 		if {$info(export_state) != "Idle"} {
-			LWDAQ_print $t "WARNING: Exporter already started,\
-				press stop before starting again."
+			LWDAQ_print $t "ERROR: Exporter is not idle,\
+				press Abort before starting again."
 			return ""
 		}
 
-		# Check for incompatible options.
+		# Check options.
 		if {$config(export_centroid) || $config(export_powers)} {
 			if {$config(export_format) == "EDF"} {
 				LWDAQ_print $t "ERROR: Cannot store centroid or powers in EDF."
 				return ""
 			}
 		}	
+		if {[catch {expr $config(export_duration)}]} {
+			LWDAQ_print $t "ERROR: Invalid duration expression\
+				\"$config(export_duration)\"."
+			return ""
+		}
 		if {round([expr $config(export_duration)]) \
 				% round($config(play_interval)) != 0} {
-			LWDAQ_print $t "WARNING: Export duration is not an exact\
-				multiple of playback interval, actual duration will be longer."
+			LWDAQ_print $t "ERROR: Export duration must be an exact\
+				multiple of playback interval."
+			return ""
+		}
+		set start_s [Neuroplayer_clock_convert $config(export_start)]
+		if {$start_s == 0} {
+			LWDAQ_print $t "ERROR: Invalid time \"$config(export_start),\
+				should be $info(datetime_error)."
+			return ""
+		}
+		if {![file exists $config(export_dir)]} {
+			LWDAQ_print $t "ERROR: Export directory\
+				\"$config(export_dir)\" does not exist."
+			return ""
 		}
 
 		# Start the exporter. Calculate Unix start time, the requested duration,
@@ -5005,31 +5020,19 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		set info(export_state) "Start"
 		set info(export_run_start) [clock seconds]	
 		set info(export_size_s) "0"
-		set start_s [Neuroplayer_clock_convert $config(export_start)]
-		if {$start_s == 0} {
-			LWDAQ_print $t "ERROR: Invalid time \"$config(export_start),\
-				should be $info(datetime_error)."
-			LWDAQ_post "Neuroexporter_export Abort"
-			return ""
-		}
 		set info(export_start_s) $start_s
 		set info(export_end_s) [expr $info(export_start_s) \
 			+ [expr $config(export_duration)]]
 		LWDAQ_print $t "\nStarting export of\
-				[expr $config(export_duration)] s\
+			[expr $config(export_duration)] s\
 			from time $config(export_start)." purple
 		LWDAQ_print $t "Start time $info(export_start_s) s,\
-			ideal end time $info(export_end_s) s."
+			end time $info(export_end_s) s."
 		set archive_start_time [expr $info(export_start_s) \
 			- [Neuroplayer_clock_convert $info(datetime_start_time)]]
 		LWDAQ_print $t "Start archive time $archive_start_time s\
 			in [file tail $config(play_file)]."
 		LWDAQ_print $t "Export directory \"$config(export_dir)\"."		
-		if {![file exists $config(export_dir)]} {
-			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
-			LWDAQ_post "Neuroexporter_export Abort"
-			return ""
-		}
 
 		# If we are playing an NDF, not just exporting video, we set up the playback
 		# and export.		
@@ -5211,6 +5214,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				LWDAQ_post "Neuroexporter_export Abort"
 				return ""
 			}
+			
 			# Stop stray processes, clear the process list, clear the video file
 			# list. Make sure the exporter scratch directory exists and clear up
 			# existing log files and video segments.
@@ -5488,12 +5492,18 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		# Check that the export directory exists.
 		if {![file exists $config(export_dir)]} {
 			LWDAQ_print $t "ERROR: Directory \"$config(export_dir)\" does not exist."
+			LWDAQ_post "Neuroexporter_export Abort"
 			return ""
 		}
 		
-		# Continue to export, provided that we are not yet done.
-		if {$info(export_size_s) < $config(export_duration)} {
-
+		# Determine interval start and end absolute times.
+		set interval_start_s [Neuroplayer_clock_convert $info(datetime_play_time)]
+		set interval_end_s [expr $interval_start_s + round($info(play_interval_copy))]
+		
+		# Check to see if the start of this interval occurs before our export 
+		# end time. If not, we will not export the interval.
+		if {$interval_start_s < $info(export_end_s)} {
+		
 			# Write the signal to disk. This is the reconstructed signal we
 			# receive from a transmitter. Each sample is a sixteen-bit unsigned
 			# integer and we save these in a manner suitable for each export
@@ -5535,7 +5545,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					}
 				}
 			}
-		
+	
 			# Write tracker centroid and powers to disk. The tracker values are
 			# stored in each channel's tracker history. The history is a list of
 			# tracker measurements, which we call "slices". The list begins with
@@ -5567,7 +5577,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					set tfn [file join $config(export_dir) \
 						"T$info(export_start_s)\_$info(channel_num)\.$ext"]
 				}
-				
+			
 				if {$config(export_format) == "TXT"} {
 					set export_string ""
 					foreach slice [lrange $history 1 end] {
@@ -5633,7 +5643,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					set afn [file join $config(export_dir) \
 						"A$info(export_start_s)\_$info(channel_num)\.$ext"]
 				}
-				
+			
 				if {$config(export_format) == "TXT"} {
 					set export_string ""
 					foreach slice [lrange $history 1 end] {
@@ -5687,38 +5697,43 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				}
 			}
 		}
-		
-		# Add the interval length to the size of our export.
-		if {[string match "$info(channel_num):*" \
-			[lindex $config(channel_selector) end]]} {
-			set info(export_size_s) [expr $info(export_size_s) + $config(play_interval)]
-		}
-
-		# We are done if the end of this interval equals or exceeds our export
-		# end time, and we have exported all channels already. 
-		if {[string match "$info(channel_num):*" \
-			[lindex $config(channel_selector) end]] \
-				&& ($info(export_size_s) >= $config(export_duration))} {
-			set info(export_end_s) [expr \
-				[Neuroplayer_clock_convert $info(datetime_start_time)] \
-				+ round($config(play_time) + $config(play_interval))]
-			LWDAQ_print $t "Extracted and exported [expr $info(export_size_s)] s,\
-				spanning $info(export_start_s) s to $info(export_end_s) s."
-			set info(play_control) "Stop"
-
-			# If there are no video files to deal with, stop.
-			if {[llength $info(export_vfl)] == 0} {
-				LWDAQ_print $t "Export complete in\
-					[expr [clock seconds] - $info(export_run_start)] s.\n" purple
-				set info(export_state) "Wait"
-				LWDAQ_post "Neuroexporter_export Repeat" 
-			} {
-				set info(export_state) "Wait"
-				LWDAQ_post "Neuroexporter_export Video"
-				LWDAQ_print $t "Waiting for video extractions to complete."
-			}
-		}
 				
+		# Check if we are exporting the final channel in the select list, in which case
+		# we are done exporting this interval and we can handle contingencies.
+		if {[string match "$info(channel_num):*" \
+				[lindex $config(channel_selector) end]]} {
+			
+			# If we recorded this interval, increment the export size. If we did not 
+			# record, then the player jumped from one file to another and in doing so
+			# skipped over the export end time.
+			if {$interval_start_s < $info(export_end_s)} {
+				set info(export_size_s) [expr $info(export_size_s) \
+					+ $info(play_interval_copy)]
+				LWDAQ_print $t [Neuroplayer_clock_convert $info(datetime_play_time)] green
+			} {
+				LWDAQ_print $t [Neuroplayer_clock_convert $info(datetime_play_time)] brown			
+			}
+
+
+			# If the end of the interval has reached the end time, we stop the export.
+			if {$interval_end_s >= $info(export_end_s)} {
+				LWDAQ_print $t "Extracted and exported [expr $info(export_size_s)] s,\
+					spanning $info(export_start_s) s to $info(export_end_s) s."
+				set info(play_control) "Stop"
+
+				# If there are no video files to deal with, stop.
+				if {[llength $info(export_vfl)] == 0} {
+					LWDAQ_print $t "Export complete in\
+						[expr [clock seconds] - $info(export_run_start)] s.\n" purple
+					set info(export_state) "Wait"
+					LWDAQ_post "Neuroexporter_export Repeat" 
+				} {
+					set info(export_state) "Wait"
+					LWDAQ_post "Neuroexporter_export Video"
+					LWDAQ_print $t "Waiting for video extractions to complete."
+				}
+			}		
+		}
 		return ""
 	}
 	
