@@ -594,9 +594,10 @@ proc Neuroplayer_init {} {
 	set config(export_dir) "~/Desktop"
 	set info(export_state) "Idle"
 	set info(export_vfl) ""
-	set info(export_epl) ""
+	set info(export_concat_pid) "0"
 	set config(export_video) "0"
-	set config(ffmpeg_offset_sbs) "1.0"
+	set info(ffmpeg_offset_sbs) "1.0"
+	set info(ffmpeg_extra_frames) "2"
 	set config(export_signal) "1"
 	set config(export_activity) "0"
 	set config(export_centroid) "0"
@@ -4496,148 +4497,9 @@ proc Neuroplayer_clock {} {
 }
 
 #
-# Neuroexporter_open creates the Export Panel, or raises it to the top 
-# for viewing if it already exists.
-#
-proc Neuroexporter_open {} {
-	upvar #0 Neuroplayer_info info
-	upvar #0 Neuroplayer_config config
-
-	# Open the export panel.
-	set w $info(export_panel)
-	if {[winfo exists $w]} {
-		raise $w
-		return ""
-	}
-	toplevel $w
-	wm title $w "Exporter Panel for Neuroplayer $info(version)"
-
-	set f [frame $w.control]
-	pack $f -side top -fill x
-	label $f.state -textvariable Neuroplayer_info(export_state) -fg blue -width 10
-	button $f.export -text "Start" -command "LWDAQ_post Neuroexporter_export"
-	button $f.stop -text "Abort" -command {Neuroexporter_export "Abort"}
-	pack $f.state $f.export $f.stop -side left -expand yes
-	
-	label $f.lformat -text "File:" -anchor w -fg $info(label_color)
-	pack $f.lformat -side left -expand yes
-	foreach a "TXT BIN EDF" {
-		set b [string tolower $a]
-		radiobutton $f.$b -variable Neuroplayer_config(export_format) \
-			-text $a -value $a
-		pack $f.$b -side left -expand yes
-	}
-	checkbutton $f.sf -variable Neuroplayer_config(export_combine) \
-		-text "Combine"
-	pack $f.sf -side left -expand yes	
-	
-	button $f.dir -text "PickDir" -command {
-		set ndir [LWDAQ_get_dir_name]
-		if {($ndir != "") && ([file exists $ndir])} {
-			set Neuroplayer_config(export_dir) $ndir
-			LWDAQ_print $Neuroplayer_info(export_text) \
-				"Set export directory to $Neuroplayer_config(export_dir)."
-		}
-	}
-	pack $f.dir -side left -expand yes
-
-	button $f.help -text "Help" -command "LWDAQ_url_open $info(export_help_url)"
-	pack $f.help -side left -expand yes
-	
-	set f [frame $w.limits]
-	pack $f -side top -fill x
-	
-	label $f.sl -text "Start:" -anchor w -fg $info(label_color) 
-	entry $f.slv -textvariable Neuroplayer_config(export_start) -width 20
-	pack $f.sl $f.slv -side left -expand yes 
-	
-	label $f.dl -text "Duration (s):" -anchor w -fg $info(label_color) 
-	entry $f.dlv -textvariable Neuroplayer_config(export_duration) -width 14
-	pack $f.dl $f.dlv -side left -expand yes 
-	
-	label $f.ql -text "Repetitions:" -anchor w -fg $info(label_color)
-	entry $f.qlv -textvariable Neuroplayer_config(export_reps) -width 3
-	pack $f.ql $f.qlv -side left -expand yes 
-	
-	button $f.ssi -text "Interval Beginning" -command {
-		Neuroexporter_begin "Interval"
-	}
-	button $f.ssa -text "Archive Beginning" -command {
-		Neuroexporter_begin "Archive"
-	}
-	pack $f.ssi $f.ssa -side left -expand yes 
-
-	button $f.clock -text "Clock" -command "LWDAQ_post Neuroplayer_clock"
-	pack $f.clock -side left -expand yes
-
-	set f [frame $w.select]
-	pack $f -side top -fill x
-	
-	label $f.lchannels -text "Select (ID:SPS):" -anchor w -fg $info(label_color)
-	entry $f.echannels -textvariable Neuroplayer_config(channel_selector) -width 70	
-	button $f.auto -text "Autofill" -command {
-		set Neuroplayer_config(channel_selector) "*"
-		for {set id $Neuroplayer_info(min_id)} \
-			{$id <= $Neuroplayer_info(max_id)} \
-			{incr id} {set Neuroplayer_info(status_$id) "None"}
-		LWDAQ_post [list Neuroplayer_play "Repeat"]
-		LWDAQ_post Neuroplayer_autofill
-	}
-	pack $f.lchannels $f.echannels $f.auto -side left -expand yes
-
-	set f [frame $w.data]
-	pack $f -side top -fill x
-	
-	label $f.ldata -text "Data to Export:" -anchor w -fg $info(label_color)
-	pack $f.ldata -side left -expand yes
-	
-	checkbutton $f.se -variable Neuroplayer_config(export_signal) \
-		-text "Signal" 
-	pack $f.se -side left -expand yes
-
-	checkbutton $f.ae -variable Neuroplayer_config(export_activity) \
-		-text "Activity" 
-	pack $f.ae -side left -expand yes
-
-	checkbutton $f.ve -variable Neuroplayer_config(export_video) \
-		-text "Video" 
-	pack $f.ve -side left -expand yes
-
-	checkbutton $f.ce -variable Neuroplayer_config(export_centroid) \
-		-text "Centroid" 
-	pack $f.ce -side left -expand yes
-
-	checkbutton $f.pe -variable Neuroplayer_config(export_powers) \
-		-text "Powers" 
-	pack $f.pe -side left -expand yes
-
-	label $f.lsetup -text "Setup:" -anchor w -fg $info(label_color)
-	pack $f.lsetup -side left -expand yes
-	
-	button $f.ts -text "Tracker" -command "LWDAQ_post Neurotracker_open"
-	pack $f.ts -side left -expand yes
-
-	button $f.edfs -text "EDF" -command "LWDAQ_post Neuroexporter_edf_setup"
-	pack $f.edfs -side left -expand yes
-
-	button $f.texts -text "TXT" -command "LWDAQ_post Neuroexporter_txt_setup"
-	pack $f.texts -side left -expand yes
-
-	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
-	
-	# If we have opened the Exporter Panel when the Exporter is Idle, we now
-	# initialize the export start time to the start of the current playback
-	# archive.
-	if {$info(export_state) == "Idle"} {
-		LWDAQ_post {Neuroplayer_play "Reload"}
-		LWDAQ_post {Neuroexporter_begin "Archive"}
-	}
-	return ""
-}
-
-#
 # Neuroexporter_begin sets the start time of the export to the beginning
-# of the current interval or the beginning of the current archive.
+# of the current interval or the beginning of the current archive, depending
+# upon whether we pass the keyword "Interval" or "Archive"
 #
 proc Neuroexporter_begin {where} {
 	upvar #0 Neuroplayer_info info
@@ -4926,7 +4788,9 @@ proc Neuroexporter_txt_save {w} {
 #
 # Neuroexporter_export manages the exporting of recorded signals to files,
 # tracker signals to files, and the creation of simultaneous video to
-# concatinated video files. that match the export intervals. 
+# concatinated video files that match the export intervals. It takes one
+# of the commands "Start", "Abort", "Play", "Video", and "Repeat". The default
+# is "Start". 
 #
 proc Neuroexporter_export {{cmd "Start"}} {
 	upvar #0 Neuroplayer_info info
@@ -4962,12 +4826,19 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				[file tail $config(play_file)].\n" purple
 		}
 		Neuroplayer_command "Stop"
-		foreach pid $info(export_epl) {LWDAQ_process_stop $pid}
+		LWDAQ_process_stop $info(export_concat_pid)
 		set info(export_state) "Idle"
 		return ""
 	}
 
-	# If the command is start, begin the export process.
+	# On "Start", begin the export process. We will check the input parameters
+	# and set up the export boundaries. If we are exporting from NDF, we create
+	# the output file, ready for us to write to when the exporter is called by
+	# the player. If we are exporting video, we make a list of video files that
+	# we are going to concatinate, and we pad or trim these files in preparation
+	# for a continuous concatination synchronous with the file timestamps. Once
+	# all this preparation is complete, we start playback of the archive and set
+	# the exporter state to "Play". 
 	if {$cmd == "Start"} {
 
 		# Check the current state of the exporter.
@@ -5006,6 +4877,11 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				\"$config(export_dir)\" does not exist."
 			return ""
 		}
+		
+		# Clean up after possible prior aborted exports.
+		LWDAQ_process_stop $info(export_concat_pid)
+		set info(export_concat_pid) "0"
+		set info(export_vfl) [list]
 
 		# Start the exporter. Calculate Unix start time, the requested duration,
 		# and the ideal end time. The duration can be a mathematical expression,
@@ -5028,9 +4904,9 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			from time $config(export_start)." purple
 		LWDAQ_print $t "Start time $info(export_start_s) s,\
 			end time $info(export_end_s) s."
-		set archive_start_time [expr $info(export_start_s) \
+		set export_start_in_archive [expr $info(export_start_s) \
 			- [Neuroplayer_clock_convert $info(datetime_start_time)]]
-		LWDAQ_print $t "Start archive time $archive_start_time s\
+		LWDAQ_print $t "Start time within archive $export_start_in_archive s\
 			in [file tail $config(play_file)]."
 		LWDAQ_print $t "Export directory \"$config(export_dir)\"."		
 
@@ -5202,8 +5078,16 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			} 
 		}
 		
-		# Prepare video segments for concatination. We pad segments that are too short.
-		# We trim segments that are too long.
+		# Prepare a list of video segments for concatination. In most cases, we
+		# will be adding the name of an existing video file to the list. But at
+		# the start and end of our export, we will need partial segments. These
+		# we create in our video export scratch directory, and we add their
+		# names to the start and end of the list. We pad segments that are too
+		# short and trim segments that are too long. The padded and trimmed
+		# segments are copies of the originals that we create in the scratch
+		# directory. We add their names to the list. Once we have the complete
+		# list of videos that are to be concatinated for this export, we are
+		# done with the Start command.
 		if {$config(export_video)} {
 
 			# First check that we have ffmpeg available.
@@ -5215,26 +5099,20 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				return ""
 			}
 			
-			# Stop stray processes, clear the process list, clear the video file
-			# list. Make sure the exporter scratch directory exists and clear up
+			# Make sure the exporter scratch directory exists and clear up
 			# existing log files and video segments.
-			foreach pid $info(export_epl) {LWDAQ_process_stop $pid}
-			set info(export_epl) [list]
-			set info(export_vfl) [list]
 			file mkdir $info(video_export_scratch)
 			cd $info(video_export_scratch)
 			file delete -- {*}[glob -nocomplain *.mp4]
 			file delete -- {*}[glob -nocomplain *.txt]
 			set bdur $info(video_blank_s)
 							
-			# Search through video directory.
+			# Search the video directory for files that we can use to construct
+			# the export video.
 			LWDAQ_print $t "Looking for video files in $config(video_dir)."
 			set vt $info(export_start_s)
 			set tclen 0
 			set tframes 0
-			
-			# Search through the video directory for files that we can use to 
-			# construct the export video.
 			while {$vt < $info(export_end_s)} {
 			
 				# Break out of the loop if the state is forced to Idle by an
@@ -5287,9 +5165,9 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				set vframes [expr round($vlen * $framerate)]
 				set cframes [expr round($clen * $framerate)]
 				
-				# If the actual video content of the file is shorter than the correct
-				# length of the file, we pad the video to the correct length and save
-				# the padded file in our scratch directory.
+				# If the actual video content of the file is shorter than the
+				# correct length of the file, we pad the video to the correct
+				# length and save the padded file in our scratch directory.
 				if {$vframes < $cframes} {
 				
 					# There is a limit to how much padding we are prepared to do.
@@ -5304,14 +5182,15 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					}
 
 					LWDAQ_print $t "[file tail $vfn]: Missing frames,\
-						add $pad_frames blank frames to make $cframes."
+						adding $pad_frames blank frames to make $cframes."
 					LWDAQ_update
 					
-					# When we extract our replacement video with ffmpeg, we find by
-					# observation that we see two extra frames in the output. So we
-					# reduce the duration we pass to ffmpeg by the length of two 
-					# frames.
-					set dur [format %.3f [expr $clen-2.0/$framerate]]
+					# When we extract our replacement video with ffmpeg, we find
+					# by observation that we see ffmpeg_extra_frames in the
+					# output. So we reduce the duration we pass to ffmpeg by the
+					# time length of this number of frames.
+					set dur [format %.3f [expr $clen \
+						- 1.0*$info(ffmpeg_extra_frames)/$framerate]]
 
 					# Check to see if the blank file exists. If not, create the blank
 					# file and store it in the scratch area.
@@ -5358,9 +5237,11 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						at $framerate fps."
 				}
 
-				# If the actual video content of the file is longer than the correct
-				# length of the file, we extract the correct length from the start
-				# of the file.
+				# If the actual video content of the file is longer than the
+				# correct length of the file, we extract the correct length from
+				# the start of the file, write the extracted segment to our
+				# scratch directory, and add its name to our concatination list
+				# in place of the original segment.
 				if {$vframes > $cframes} {
 					set extra [format %.2f [expr $vlen - $clen]]
 					set extra_frames [expr round($extra*$framerate)]
@@ -5373,7 +5254,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					set dur [format %.3f [expr $clen-2.0/$framerate]]
 
 					# Copy the correct length into a new segment in the scratch
-					# area. Use this file instead of the original.
+					# area. We will use this file instead of the original.
 					catch {file delete Trimmed.mp4}
 					exec $info(ffmpeg) -nostdin -loglevel error \
 						-t $dur -i [file nativename $vfn] -c:v copy \
@@ -5390,7 +5271,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						at $framerate fps."
 				}
 				
-				# Calculate how many frames wer are extracting.
+				# Calculate how many frames we are extracting.
 				set dframes [expr round($cdur * $framerate)]
 				set tframes [expr $dframes + $tframes]
 				
@@ -5398,14 +5279,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				# entire file. If we use only a portion, we make a new segment
 				# in the scratch area. Such partial segments are either at the
 				# beginning or end of our export, so we call them "boundary
-				# segments". When we are extracting a start segment, we find 
-				# that we must reduce the duration by the "ffmpeg_offset_sbs"
-				# in order to get the segment to come out the correct length.
+				# segments". When we are extracting a start segment, we find
+				# that we must reduce the duration by the ffmpeg_offset_sbs in
+				# order to get the segment to come out the correct length.
 				if {$cdur < $clen} {
 				
 					# Set time limits of extraction.
 					if {round($tseek) > 0} {
-						set dur [expr $cdur - $config(ffmpeg_offset_sbs)]
+						set dur [expr $cdur - $info(ffmpeg_offset_sbs)]
 						set tseek [expr round($clen - $dur)]
 					} else {
 						set tseek 0
@@ -5438,7 +5319,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					catch {file delete $vfn}
 					file rename $nvfn $vfn
 	
-					# Report on the segment we added to the concatination list.
+					# Report on the segment we are going to add to the
+					# concatination list.
 					set vfi [Neuroplayer_video_info $vfn]
 					scan $vfi %d%d%f%f width height framerate vlen
 					LWDAQ_print $t "[file tail $vfn]: After extraction,\
@@ -5446,16 +5328,17 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						at $framerate fps."
 					LWDAQ_update
 					
-					# Add segment to concatination list.
+					# Add the extracted segment to concatination list.
 					lappend info(export_vfl) $vfn				
 				} {
-					# Report on the segment.
+					# Report on the segment we are going to add to the
+					# concatination list.
 					LWDAQ_print $t "[file tail $vfn]: Using\
 						0 s to [expr round($clen)] s,\
 						tclen = $tclen s."
 					LWDAQ_update
 					
-					# Add to concatination list.
+					# Add to the segment to the concatination list.
 					lappend info(export_vfl) $vfn
 				}	
 				
@@ -5465,16 +5348,21 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			}
 		}
 	
+		# Preparation for export is complete. If we are exporting from NDF, disable
+		# video playback and start at playing with the interval that begins at the
+		# export start time. If we are not exporting from NDF, we set our state to
+		# Wait and we execute the Video command, which starts video concatination
+		# and waits for video concatination to complete.
 		if {$play_ndf} {
-			LWDAQ_print $t "Starting export of\
-				[expr $config(export_duration)] s from NDF archives."
+			LWDAQ_print $t "Starting export of [expr $config(export_duration)] s\
+				from NDF archives."
 			if {$config(video_enable)} {
 				LWDAQ_print $t "WARNING: Disabling video playback to accelerate export."
 				set config(video_enable) 0
 			}
 		
 			set info(export_state) "Play"	
-			set config(play_time) $archive_start_time
+			set config(play_time) $export_start_in_archive
 			Neuroplayer_command "Play"
 		} {
 			set info(export_state) "Wait"
@@ -5484,9 +5372,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		return ""
 	}
 
+	# The exporter Play command is executed by the player just after processing of
+	# each selected channel. In the Play code below, we will be exporting one channel
+	# to disk. All our disk formats allow us to write one channel as a block to the
+	# output file. 
 	if {$cmd == "Play"} {	
+	
 		# Check the current state of the exporter is "Play", or else we will ignore
-		# this request to play and return.
+		# this request and return.
 		if {$info(export_state) != "Play"} {return ""}
 		
 		# Check that the export directory exists.
@@ -5496,18 +5389,24 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			return ""
 		}
 		
-		# Determine interval start and end absolute times.
+		# Determine the absolute times of the interval start and end.
 		set interval_start_s [Neuroplayer_clock_convert $info(datetime_play_time)]
 		set interval_end_s [expr $interval_start_s + round($info(play_interval_copy))]
 		
 		# Check to see if the start of this interval occurs before our export 
-		# end time. If not, we will not export the interval.
+		# end time. If not, we will not export the interval. Somehow, we have
+		# jumped past the export end time, which is consistent with jumping from
+		# one file to the next, in which the first file did not provide a full
+		# interval, and the next file's time stamp is after the export end time.
 		if {$interval_start_s < $info(export_end_s)} {
 		
 			# Write the signal to disk. This is the reconstructed signal we
 			# receive from a transmitter. Each sample is a sixteen-bit unsigned
 			# integer and we save these in a manner suitable for each export
-			# format.
+			# format. If we are combining multiple channels into one file, we
+			# will write the same data to the combined file. Our export file
+			# will contain consecutive same-size blocks of data from the
+			# exported channels.
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
 					set sfn [file join $config(export_dir) \
@@ -5624,11 +5523,12 @@ proc Neuroexporter_export {{cmd "Start"}} {
 
 			# Write activity to disk. We use the same tracker history we
 			# describe in the comment above. Its seventh element (number six) is
-			# the activity in centimeters per second. For text, we print the 
+			# the activity in centimeters per second. For text, we print the
 			# real-valued activity in cm/s. For binary, we multiply by ten then
-			# round and write as a two-byte unsigned integer in big-endian format.
-			# For EDF, we fit the range min_activity to max_activity into the
-			# integer range 0-65535 before passing to our EDF append routine.
+			# round and write as a two-byte unsigned integer in big-endian
+			# format. For EDF, we fit the range min_activity to max_activity
+			# into the integer range 0-65535 before passing to our EDF append
+			# routine.
 			if {$config(export_activity)} {
 				upvar #0 Neuroplayer_info(tracker_$info(channel_num)) history
 				if {![info exists history]} {
@@ -5699,7 +5599,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}
 				
 		# Check if we are exporting the final channel in the select list, in which case
-		# we are done exporting this interval and we can handle contingencies.
+		# we are done exporting this interval.
 		if {[string match "$info(channel_num):*" \
 				[lindex $config(channel_selector) end]]} {
 			
@@ -5714,40 +5614,37 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				LWDAQ_print $t [Neuroplayer_clock_convert $info(datetime_play_time)] brown			
 			}
 
-
-			# If the end of the interval has reached the end time, we stop the export.
+			# If the end of the interval has reached the end time, we stop the player
+			# and complete the export. We enter the Wait state and either execute a
+			# Video command to concatinate our video file list, or execute a Repeat
+			# command to check if we are going to start another export.
 			if {$interval_end_s >= $info(export_end_s)} {
 				LWDAQ_print $t "Extracted and exported [expr $info(export_size_s)] s,\
 					spanning $info(export_start_s) s to $info(export_end_s) s."
-				set info(play_control) "Stop"
-
-				# If there are no video files to deal with, stop.
+				set info(play_control) "Stop"	
+				set info(export_state) "Wait"
 				if {[llength $info(export_vfl)] == 0} {
 					LWDAQ_print $t "Export complete in\
 						[expr [clock seconds] - $info(export_run_start)] s.\n" purple
-					set info(export_state) "Wait"
 					LWDAQ_post "Neuroexporter_export Repeat" 
 				} {
-					set info(export_state) "Wait"
-					LWDAQ_post "Neuroexporter_export Video"
 					LWDAQ_print $t "Waiting for video extractions to complete."
+					LWDAQ_post "Neuroexporter_export Video"
 				}
 			}		
 		}
 		return ""
 	}
 	
+	# The Video command handles the concatination of segments in the concatination
+	# list prepared by the Start command. 
 	if {$cmd == "Video"} {
-		# Check to see if video processes are still running, and if they are, keep
-		# waiting until they do complete.
+	
+		# If the Exporter is in its Wait state, it has completed export of signals
+		# from NDF files, and is now giving the Video command an opportunity to 
+		# perform concatination of its segment lis. We start the concatination
+		# process and set the state to Concat.
 		if {$info(export_state) == "Wait"} {
-			foreach pid $info(export_epl) {
-				if {[LWDAQ_process_exists $pid]} {
-					LWDAQ_post "Neuroexporter_export Video"
-					return ""
-				}
-			}
-			
 			set num_files [llength $info(export_vfl)]
 			LWDAQ_print $t "Concatinating $num_files video segments,\
 				expecting final video length\
@@ -5763,7 +5660,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			}
 			close $clf
 			catch {file delete Export.mp4}
-			lappend info(export_epl) [exec $info(ffmpeg) \
+			set info(export_concat_pid) [exec $info(ffmpeg) \
 				-nostdin -f concat -safe 0 -loglevel error \
 				-i concat_list.txt -c copy \
 				Export.mp4 > $info(video_export_log) &]
@@ -5771,12 +5668,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			return ""
 		}
 
-		# In the concatination state, we are watching the concatination process. When
-		# it completes, we clean up.
+		# In the Concat state, we are watching the concatination process. When
+		# it completes, we clean up, report on the outcome of the concatination,
+		# and then execute a Repeat command to check if we should start another
+		# export.
 		if {$info(export_state) == "Concat"} {
 		
 			# If there is an export process running, wait a while longer.
-			if {[LWDAQ_process_exists $info(export_epl)]} {
+			if {[LWDAQ_process_exists $info(export_concat_pid)]} {
 				LWDAQ_post "Neuroexporter_export Video"
 				return ""
 			}
@@ -5809,6 +5708,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				file delete -- {*}[glob -nocomplain *.mp4]
 			}			
 
+			# Report, change state to Wait and call Repeat command.
 			LWDAQ_print $t "Export complete in\
 				[expr [clock seconds] - $info(export_run_start)] s.\n" purple
 			set info(export_state) "Wait"
@@ -5817,8 +5717,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}
 	}
 
-	# At the end of an export, we check to see if we should repeat the export starting
-	# from the point immediately after the end of the previous export. 
+	# At the end of an export, the Repeat command checks to see if we should
+	# repeat the export starting just after the end of the previous export.
 	if {$cmd == "Repeat"} {
 		if {$info(export_state) != "Wait"} {
 			return ""
@@ -5857,6 +5757,150 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}		
 	}
 
+	return ""
+}
+
+#
+# Neuroexporter_open creates the Export Panel, or raises it to the top for
+# viewing if it already exists. Once an export has started, we can close the
+# export window, so this routine might be re-opening the panel while the
+# Exporter is open. If the Exporter is Idle, this routine, reloads the current
+# archive file, so that it can set the export start time to equal the archive
+# start time.
+#
+proc Neuroexporter_open {} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+
+	# Open the export panel.
+	set w $info(export_panel)
+	if {[winfo exists $w]} {
+		raise $w
+		return ""
+	}
+	toplevel $w
+	wm title $w "Exporter Panel for Neuroplayer $info(version)"
+
+	set f [frame $w.control]
+	pack $f -side top -fill x
+	label $f.state -textvariable Neuroplayer_info(export_state) -fg blue -width 10
+	button $f.export -text "Start" -command "LWDAQ_post Neuroexporter_export"
+	button $f.stop -text "Abort" -command {Neuroexporter_export "Abort"}
+	pack $f.state $f.export $f.stop -side left -expand yes
+	
+	label $f.lformat -text "File:" -anchor w -fg $info(label_color)
+	pack $f.lformat -side left -expand yes
+	foreach a "TXT BIN EDF" {
+		set b [string tolower $a]
+		radiobutton $f.$b -variable Neuroplayer_config(export_format) \
+			-text $a -value $a
+		pack $f.$b -side left -expand yes
+	}
+	checkbutton $f.sf -variable Neuroplayer_config(export_combine) \
+		-text "Combine"
+	pack $f.sf -side left -expand yes	
+	
+	button $f.dir -text "PickDir" -command {
+		set ndir [LWDAQ_get_dir_name]
+		if {($ndir != "") && ([file exists $ndir])} {
+			set Neuroplayer_config(export_dir) $ndir
+			LWDAQ_print $Neuroplayer_info(export_text) \
+				"Set export directory to $Neuroplayer_config(export_dir)."
+		}
+	}
+	pack $f.dir -side left -expand yes
+
+	button $f.help -text "Help" -command "LWDAQ_url_open $info(export_help_url)"
+	pack $f.help -side left -expand yes
+	
+	set f [frame $w.limits]
+	pack $f -side top -fill x
+	
+	label $f.sl -text "Start:" -anchor w -fg $info(label_color) 
+	entry $f.slv -textvariable Neuroplayer_config(export_start) -width 20
+	pack $f.sl $f.slv -side left -expand yes 
+	
+	label $f.dl -text "Duration (s):" -anchor w -fg $info(label_color) 
+	entry $f.dlv -textvariable Neuroplayer_config(export_duration) -width 14
+	pack $f.dl $f.dlv -side left -expand yes 
+	
+	label $f.ql -text "Repetitions:" -anchor w -fg $info(label_color)
+	entry $f.qlv -textvariable Neuroplayer_config(export_reps) -width 3
+	pack $f.ql $f.qlv -side left -expand yes 
+	
+	button $f.ssi -text "Interval Beginning" -command {
+		Neuroexporter_begin "Interval"
+	}
+	button $f.ssa -text "Archive Beginning" -command {
+		Neuroexporter_begin "Archive"
+	}
+	pack $f.ssi $f.ssa -side left -expand yes 
+
+	button $f.clock -text "Clock" -command "LWDAQ_post Neuroplayer_clock"
+	pack $f.clock -side left -expand yes
+
+	set f [frame $w.select]
+	pack $f -side top -fill x
+	
+	label $f.lchannels -text "Select (ID:SPS):" -anchor w -fg $info(label_color)
+	entry $f.echannels -textvariable Neuroplayer_config(channel_selector) -width 70	
+	button $f.auto -text "Autofill" -command {
+		set Neuroplayer_config(channel_selector) "*"
+		for {set id $Neuroplayer_info(min_id)} \
+			{$id <= $Neuroplayer_info(max_id)} \
+			{incr id} {set Neuroplayer_info(status_$id) "None"}
+		LWDAQ_post [list Neuroplayer_play "Repeat"]
+		LWDAQ_post Neuroplayer_autofill
+	}
+	pack $f.lchannels $f.echannels $f.auto -side left -expand yes
+
+	set f [frame $w.data]
+	pack $f -side top -fill x
+	
+	label $f.ldata -text "Data to Export:" -anchor w -fg $info(label_color)
+	pack $f.ldata -side left -expand yes
+	
+	checkbutton $f.se -variable Neuroplayer_config(export_signal) \
+		-text "Signal" 
+	pack $f.se -side left -expand yes
+
+	checkbutton $f.ae -variable Neuroplayer_config(export_activity) \
+		-text "Activity" 
+	pack $f.ae -side left -expand yes
+
+	checkbutton $f.ve -variable Neuroplayer_config(export_video) \
+		-text "Video" 
+	pack $f.ve -side left -expand yes
+
+	checkbutton $f.ce -variable Neuroplayer_config(export_centroid) \
+		-text "Centroid" 
+	pack $f.ce -side left -expand yes
+
+	checkbutton $f.pe -variable Neuroplayer_config(export_powers) \
+		-text "Powers" 
+	pack $f.pe -side left -expand yes
+
+	label $f.lsetup -text "Setup:" -anchor w -fg $info(label_color)
+	pack $f.lsetup -side left -expand yes
+	
+	button $f.ts -text "Tracker" -command "LWDAQ_post Neurotracker_open"
+	pack $f.ts -side left -expand yes
+
+	button $f.edfs -text "EDF" -command "LWDAQ_post Neuroexporter_edf_setup"
+	pack $f.edfs -side left -expand yes
+
+	button $f.texts -text "TXT" -command "LWDAQ_post Neuroexporter_txt_setup"
+	pack $f.texts -side left -expand yes
+
+	set info(export_text) [LWDAQ_text_widget $w 60 25 1 1]
+	
+	# If we have opened the Exporter Panel when the Exporter is Idle, we
+	# initialize the export start time to the start of the current playback
+	# archive.
+	if {$info(export_state) == "Idle"} {
+		LWDAQ_post {Neuroplayer_play "Reload"}
+		LWDAQ_post {Neuroexporter_begin "Archive"}
+	}
 	return ""
 }
 
