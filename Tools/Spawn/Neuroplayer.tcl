@@ -4998,6 +4998,10 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	# all this preparation is complete, we start playback of the archive and set
 	# the exporter state to "Play". 
 	if {$cmd == "Start"} {
+	
+		# Set the state to Idle temporarily, while we check for errors.
+		# Afterwards, we will set the state to Start.
+		set info(export_state) "Idle"
 
 		# Check the current state of the exporter.
 		if {$info(export_state) != "Idle"} {

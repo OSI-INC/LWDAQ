@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "167"
+	LWDAQ_tool_init "Neurorecorder" "168"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -170,7 +170,7 @@ proc Neurorecorder_init {} {
 # When we create a new archive, we either perform synchronization, or just
 # open a new file and keep recording to disk.
 #
-	set config(synchronize) 1
+	set config(synchronize) 0
 #
 # We record and play back data in intervals. Here we specify these intervals
 # in seconds. The Neurorecorder translates seconds to clock messages.
@@ -732,9 +732,12 @@ proc Neurorecorder_record {{command ""}} {
 		# Clear the buffer.
 		set info(rbuff) ""
 
-		# If the synchronization flag is set, or if we are starting a new recording,
-		# we wait until a new second begins so as to make the file time match the 
-		# time we reset the data receiver.
+		# If the synchronization flag is set, or if we are starting a new
+		# recording, we wait until a new second begins so as to make the file
+		# time match the time we reset the data receiver. When we are
+		# automatically creating the next archive in a recording, and the
+		# synchronize flag is clear, we will not wait, nor will we be resetting
+		# the receiver.
 		set ms_start [clock milliseconds]
 		if {($info(record_control) == "Start") || $config(synchronize)} {
 			while {[expr [clock milliseconds] % 1000] > $info(sync_window_ms)} {
@@ -750,11 +753,17 @@ proc Neurorecorder_record {{command ""}} {
 		}
 		set ms_stop [clock milliseconds]
 		
-		# Set the timestamp for the new file, with resolution one second.
+		# Set the timestamp for the new file using the computer clock, with
+		# resolution one second. If the computer and receiver clocks are in
+		# exact agreement, we turn off the synchronization option, and there is
+		# no data loss during the recording archive A, the timestamp of the next
+		# archive, B, will be equal to the timestamp of A plus the requested
+		# duration of A. 
 		set config(record_start_clock) [clock seconds]
 		
 		# If the synchronize flag is set, or if we are starting a new recording,
-		# reset the data receiver.
+		# reset the data receiver. We will not reset if this is an autocreation
+		# and the synchronize flag is cleared.
 		if {($info(record_control) == "Start") || $config(synchronize)} {
 			set info(recorder_error_time) 0
 			set info(recorder_message_interval) $info(initial_message_interval)
