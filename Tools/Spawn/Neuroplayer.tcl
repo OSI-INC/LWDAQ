@@ -4667,10 +4667,10 @@ proc Neuroexporter_set_start {where {report 1}} {
 	# to the start of the archive.
 	switch $where {
 		"Interval" {
-			set st [expr round($info(play_time_copy))]
+			set st [expr round($config(play_time))]
 		}
 		"Step" {
-			set st [expr round($info(play_time_copy) + $info(play_interval_copy))]
+			set st [expr round($config(play_time) + $info(play_interval_copy))]
 		}
 		default {
 			set st "0"
@@ -5068,7 +5068,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		set start_archive_time [format %.1f [expr \
 			$info(export_start_s) \
 			- [Neuroplayer_clock_convert $info(start_datetime)]]]
-		LWDAQ_print $t "\nStarting export of $duration_s\
+		LWDAQ_print $t "\nStarting export of $duration_s s\
 			from $info(export_start_s) s,\
 			$config(export_start_datetime)." purple
 		LWDAQ_print $t "Export directory \"$config(export_dir)\"."		
@@ -5770,17 +5770,10 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		if {[string match "$info(channel_num):*" \
 				[lindex $config(channel_selector) end]]} {
 			
-			# If we recorded this interval, increment the export size. If we did not 
-			# record, then the player jumped from one file to another and in doing so
-			# skipped over the export end time. If so, we set a flag indicating that
-			# any subsequent export should begin at the start of the newly-opened
-			# archive.
+			# If we recorded this interval, increment the export size.
 			if {$interval_start_s < $info(export_end_s)} {
 				set info(export_size_s) \
 					[expr $info(export_size_s) + $info(play_interval_copy)]
-				set info(export_backup) 0
-			} {
-				set info(export_backup) 1
 			}
 
 			# If the end of the interval has reached the end time, we stop the
@@ -5791,6 +5784,16 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			# in turn re-start the Player.
 			if {$interval_end_s >= $info(export_end_s)} {
 			
+				#  If we did not record, then the player jumped from one file to
+				#  another and in doing so skipped over the export end time. If
+				#  so, we set a flag indicating that any subsequent export
+				#  should begin at the start of the newly-opened archive.
+				if {$interval_start_s >= $info(export_end_s)} {
+					set info(export_backup) 1
+				} {
+					set info(export_backup) 0
+				}
+
 				# Report on export conclusion, including issuing warnings for
 				# imperfect agreement between requested and actual span and
 				# duration.
