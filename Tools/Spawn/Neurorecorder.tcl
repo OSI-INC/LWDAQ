@@ -935,7 +935,7 @@ proc Neurorecorder_record {{command ""}} {
 		# If we did not encounter an error during data aquisition from the
 		# receiver, append the new data to our buffer. If our recording buffer
 		# has overflowed, we discard the new data and print a warning. If the
-		# new data contains errors, print a warning.
+		# new data contains errors, print a warning. 
 		if {![LWDAQ_is_error_result $daq_result]} {
 			set message_length \
 				[expr $info(core_message_length) + $iconfig(payload_length)]

@@ -1015,32 +1015,42 @@ proc Neuroplayer_metadata_view {fn} {
 # exactly upon a clock message, the before and after clock messages will be the
 # same. When the routine searches through an archive for the correct clock
 # messages, it starts at the beginning and proceeds in steps small enough to be
-# less than one complete clock cycle (512 s for clock frequency 128 Hz). If the
-# archive is uncorrupted, it will contain a sequence of clock messages, each
-# with value one greater than the last, with the exception of clock messages
-# with value max_sample, which will be followed by one of value zero. The seek
-# routine is able to find time points in the archive quickly because it does not
-# have to look at all the clock messages in the archive. If the archive is
-# severely corrupted, with blocks of null messages and missing data, the seek
-# routine can fail to notice jumps in the clock messages values and so fail to
-# note that its time calculation is invalid. As an alternative to jumping
-# through the archive, the Neuroplayer_sequential_time starts at the first
-# clock message and counts clock messages, adding one clock period to its
-# measurement of archive time for every clock message, irrespective of the
-# values of the messages. Both seek_time routines take the same parameters and
-# return four numbers: lo_time, lo_index, hi_time, and hi_index. The routines
-# assume the archive contains a clock message immediately after the last message
-# in the archive, which we call the "end clock". The routine will choose the end
-# clock for hi_time and hi_index if the seek time is equal to or greater than
-# the length of the archive. If the seek time is -1, the routine takes this to
-# mean that it should find the end time of the archive, which will be the time
-# and index of the end clock, even though this end clock is not included in the
-# archive. Note that the index of a message is its index in the archive's data
-# block, when we divide the block into messages. Messages are at least
-# core_message_length long, and my have an arbitrary payload attached to the
-# end, as given by the payload parameter. The byte address of a message is the
-# byte number of the first byte of the message within the archive's data block.
-# The return string "0 2 0 2" means time zero occurs at message index 2 in the
+# less than one complete clock cycle. The clock messages use their sample value
+# to measure time. The sample value counts up from zero to max_sample and then
+# drops to zero again. The clock messages arrive at clocks_per_second. If
+# max_sample = 65536 and clocks_per_second = 128, as is the case for our
+# telemetry receivers, one complete clock cycle is 65536 / 128 Hz =  512 s. If
+# the archive is uncorrupted, it will contain a continuous sequence of clock
+# messages with incrementing sample values, with the exception of clock messages
+# with value max_sample, which will be followed by a message with sample value
+# zero. The seek routine finds time points in the archive quickly because it
+# does not have to look at all the clock messages in the archive. If the archive
+# is severely corrupted, with blocks of null messages and missing data, the seek
+# routine can fail to notice jumps in the clock messages and so fail to note
+# that its time calculation is invalid. As an alternative to jumping through the
+# archive, the Neuroplayer_sequential_time routine starts at the first clock
+# message and counts clock messages, adding one clock period to its measurement
+# of archive time for every clock message, irrespective of the values of the
+# messages. Both routines take the same parameters and return four numbers:
+# lo_time, lo_index, hi_time, and hi_index. The "end clock" is the clock message
+# that follows the last message in the archive. The end clock is not itself
+# included in the archive. If our Neurorecorder was free-running during our
+# recording, the end clock will be the first message in the next archive. If our
+# Neurorecorder was re-synchronizing, the end clock will have been discarded and
+# never written to disk. Even if the archive consists entirely of clock
+# messages, the seek routine assumes that the clock message corresponding to the
+# end of the archive is the one that would follow the final clock message in the
+# archive. The routine will choose the time of the end clock for hi_time and
+# hi_index if the seek time is equal to or greater than the length of the
+# archive. If the seek time is -1, the routine takes this to mean that it should
+# find the end time of the archive, which will be the time and index of the end
+# clock, even though this clock is not included in the archive. Note that the
+# index of a message is its index in the archive's data block, when we divide
+# the block into messages. Messages are at least core_message_length long, and
+# my have an arbitrary payload attached to the end, as given by the payload
+# parameter in the NDF's metadata. The byte address of a message is the byte
+# number of the first byte of the message within the archive's data block. The
+# return string "0 2 0 2" means time zero occurs at message index 2 in the
 # archive. The message with index 2 is the third message in the data block of
 # the archive. We might obtain such a result when we specify seek time of 0 and
 # apply it to an archive that, for some reason, does not start with a clock
@@ -4946,9 +4956,9 @@ proc Neuroexporter_txt_save {w} {
 #
 # Neuroexporter_export manages the exporting of recorded signals to files,
 # tracker signals to files, and the creation of simultaneous video to
-# concatinated video files that match the export intervals. It takes one
-# of the commands "Start", "Abort", "Play", "Video", and "Repeat". The default
-# is "Start". 
+# concatinated video files that match the export intervals. It takes one of the
+# commands "Start", "Abort", "Play", "Video", and "Repeat". The default is
+# "Start". 
 #
 proc Neuroexporter_export {{cmd "Start"}} {
 	upvar #0 Neuroplayer_info info
@@ -5788,10 +5798,10 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			# in turn re-start the Player.
 			if {$interval_end_s >= $info(export_end_s)} {
 			
-				#  If we did not record, then the player jumped from one file to
-				#  another and in doing so skipped over the export end time. If
-				#  so, we set a flag indicating that any subsequent export
-				#  should begin at the start of the newly-opened archive.
+				# If we did not record, then the player jumped from one file to
+				# another and in doing so skipped over the export end time. If
+				# so, we set a flag indicating that any subsequent export should
+				# begin at the start of the newly-opened archive.
 				if {$interval_start_s >= $info(export_end_s)} {
 					set info(export_backup) 1
 				} {
