@@ -935,7 +935,9 @@ proc Neurorecorder_record {{command ""}} {
 		# If we did not encounter an error during data aquisition from the
 		# receiver, append the new data to our buffer. If our recording buffer
 		# has overflowed, we discard the new data and print a warning. If the
-		# new data contains errors, print a warning. 
+		# new data contains errors, print a warning. If we add the new data
+		# from the receiver image to our recorder buffer, we increment the 
+		# recording end time by the recording interval.
 		if {![LWDAQ_is_error_result $daq_result]} {
 			set message_length \
 				[expr $info(core_message_length) + $iconfig(payload_length)]
@@ -944,6 +946,8 @@ proc Neurorecorder_record {{command ""}} {
 						-truncate 1 -data_only 1 -record_size $message_length]
 				if {[string length $info(rbuff)] < $config(max_rbuff)} {
 					append info(rbuff) $new
+					set config(record_end_time) \
+						[expr $config(record_end_time) + $config(record_interval)]
 					if {[string length $info(rbuff)] >= $config(max_rbuff)} {
 						Neurorecorder_print "WARNING: Recording buffer overflow,\
 							[format %.1f [expr [string length $info(rbuff)]/1000000]] MB\
@@ -1005,11 +1009,6 @@ proc Neurorecorder_record {{command ""}} {
 				$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
 			}
 		}
-
-		# Increment the record time, on the assumption that we obtained the 
-		# data we wanted.
-		set config(record_end_time) \
-			[expr $config(record_end_time) + $config(record_interval)]
 			
 		# If we are not dealing with no errors, set the record label to the
 		# inactive color.
