@@ -34,9 +34,10 @@
 # Version 1.2 [20-MAR-24] Clip waveform DAC values to 0..255.
 # Version 1.3 [28-MAR-24] Fix reset value of triangle wave: now zero volts.
 # Version 1.4 [13-JUN-24] Update time constants to suite A3050B.
+# Version 1.5 [25-JUN-24] Add sinusoidal sweep routine.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide LWFG 1.4
+package provide LWFG 1.5
 
 # Clear the global EDF array if it already exists.
 if {[info exists LWFG]} {unset LWFG}
@@ -126,9 +127,9 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	set dac_lo [expr round(($v_lo - $LWFG(ch_v_lo)) / $lsb)]
 	set dac_hi [expr round(($v_hi - $LWFG(ch_v_lo)) / $lsb)]
 
-	# We begin by getting getting the number of points we need for one period
-	# with the fastest sample rate, and if num_pts is too large, we increase
-	# the divisor until num_pts is small enough.
+	# Begin by getting getting the number of points we need for one period with
+	# the fastest sample rate, and if num_pts is too large, we increase the
+	# divisor until num_pts is small enough.
 	set divisor $LWFG(div_min)
 	set num_pts [expr round($LWFG(clock_hz) / $frequency / $divisor)]
 	while {$num_pts > $LWFG(max_pts)} {
@@ -246,3 +247,101 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	# Return enough information about the waveform for us to assess accuracy.
 	return "$dac_lo $dac_hi $divisor $num_pts $num_cycles [format %.0f $rc]"
 }
+
+#
+# LWFG_sweep_sine sets up a sinusoidal sweep that lasts for t_len seconds,
+# starting at f_lo, ending at f_hi, with the sinusoid spanning voltage v_lo to
+# v_hi, on channel ch_num. The log flag determines if the frequency will be
+# increased in a logarithmic or linear manner during the sweep.
+#
+proc LWFG_sweep_sine {ip ch_num f_lo f_hi v_lo v_hi t_len log} {
+	global LWFG
+
+	# Determine the lower and upper DAC values for our lower and upper waveform
+	# voltages.
+	set lsb [expr ($LWFG(ch_v_hi) - $LWFG(ch_v_lo)) \
+		/ ($LWFG(ch_cnt_hi) - $LWFG(ch_cnt_lo))]
+	set dac_lo [expr round(($v_lo - $LWFG(ch_v_lo)) / $lsb)]
+	set dac_hi [expr round(($v_hi - $LWFG(ch_v_lo)) / $lsb)]
+
+	# Our sweep will use the maximum number of locations in memory so as to give
+	# the finest definition.
+	set num_pts $LWFG(max_pts)
+	set divisor [expr round(($LWFG(clock_hz) * $t_len) / $num_pts) - "1"]
+	
+	# Generate the waveform.
+	set values [list]
+	set period [expr 1.0*$num_pts]
+	set pi 3.141592654
+	for {set i 0} {$i < $num_pts} {incr i} {
+		set phase [expr fmod($i,$period)/$period]
+		if {$log} {
+			lappend values [expr $dac_lo + \
+				round(($dac_hi - $dac_lo) * 0.5 * \
+					(1.0+sin(2*$pi*($f_lo*$t_len* \
+						((pow(($f_hi/$f_lo), ($phase)) - 1) \
+							/(log($f_hi/$f_lo)))))))]
+		} else {
+			lappend values [expr $dac_lo + \
+				round(($dac_hi - $dac_lo) * 0.5 * \
+					(1.0+sin(2*$pi*$t_len*(($f_lo+ \
+						(($f_hi-$f_lo)/2)*$phase)*$phase))))]
+		}
+	}
+
+	# Choose the filter.
+	set rc [lindex $LWFG(rc_options) 0]
+	set filter [lindex $LWFG(rc_options) 1]
+	switch $waveform {
+		"sine"     - 
+		"triangle" {
+			set ideal_rc [expr 1.0E9/($f_hi)*$LWFG(rc_fraction)]
+			foreach {p code} $LWFG(rc_options) {
+				if {$p < $ideal_rc} {
+					set filter $code
+					set rc $p
+				}
+			}
+		}
+	}
+	
+	# Limit the values to the range 0 to 255.
+	set clipped_values [list]
+	foreach value $values {
+		if {$value < 0} {set value 0}
+		if {$value > 255} {set value 255}
+		lappend clipped_values $value
+	}
+	set values $clipped_values
+	
+	# Configure the function generator using TCPIP messaging.
+	if {[catch {
+
+		# Open a socket to the function generator.
+		set sock [LWDAQ_socket_open $ip]
+		
+		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_ram)
+		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format c* $values]
+
+		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_rc)
+		LWDAQ_stream_write $sock $LWFG(data_portal) \
+			[binary format c [expr $filter]]
+		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_div)
+		LWDAQ_stream_write $sock $LWFG(data_portal) \
+			[binary format I [expr $divisor - 1]]
+		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_len)
+		LWDAQ_stream_write $sock $LWFG(data_portal) \
+			[binary format S [expr $num_pts - 1]]
+
+		set id [LWDAQ_hardware_id $sock]
+		LWDAQ_socket_close $sock
+	} error_message]} {
+		catch {LWDAQ_socket_close $sock}
+		return "ERROR: $error_message\."
+	}
+	
+	# Return enough information about the waveform for us to assess accuracy.
+	return "$dac_lo $dac_hi $divisor $num_pts 1 [format %.0f $rc]"
+}
+
+
