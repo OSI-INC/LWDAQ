@@ -172,14 +172,14 @@ proc LWDAQ_analysis_Rasnik {{image_name ""}} {
 
 	set img $image_name	
 	set shrink [expr $config(analysis_enable) / 10]
-	if {$shrink >= 1} {
-		set img [lwdaq_image_manipulate $img smooth -replace 0]
-	}
 	if {$shrink == 1} {
+		set img [lwdaq_image_manipulate $img smooth -replace 0]
 		lwdaq_image_manipulate $img smooth -replace 1
 	}
 	if {$shrink > 1} {
-		lwdaq_image_manipulate $img shrink_$shrink -replace 1
+		set img [lwdaq_image_manipulate $img shrink_$shrink -replace 0]
+		lwdaq_image_manipulate $img smooth -replace 1
+		lwdaq_image_manipulate $img smooth -replace 1
 		set pixel_size [expr $shrink * $info(analysis_pixel_size_um)]
 		set zoom [expr $shrink * $info(zoom)]
 	} {

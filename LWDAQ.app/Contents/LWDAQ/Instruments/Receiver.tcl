@@ -30,10 +30,9 @@ proc LWDAQ_init_Receiver {} {
 	array unset config
 	array unset info
 	
-	# The info array elements will not be displayed in the 
-	# instrument window. The only info variables set in the 
-	# LWDAQ_open_Instrument procedure are those which are checked
-	# only when the instrument window is open.
+	# The info array elements will not be displayed in the instrument window.
+	# The only info variables set in the LWDAQ_open_Instrument procedure are
+	# those which are checked only when the instrument window is open.
 	set info(name) "Receiver"
 	set info(control) "Idle"
 	set info(window) [string tolower .$info(name)]
@@ -55,6 +54,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(daq_password) "no_password"
 	set info(daq_avail_cntr) "0"
 	set info(daq_fifo_unit) "512"
+	set info(daq_receiver_element) "1"
 	set info(daq_select_ms) "1.0"
 	set info(verbose_description) \
 		"{Channel Number} \
@@ -81,7 +81,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(activity_threshold) "10"
 	set info(errors_for_stop) "10"
 	set info(clock_frequency) "128"
-	set info(max_block_reads) "20"
+	set info(max_block_reads) "100"
 	set info(min_msg_per_clock) "1"
 	set info(msg_per_clock) "1"
 	set info(min_clocks) "32"
@@ -111,9 +111,9 @@ proc LWDAQ_init_Receiver {} {
 	set info(scratch_image) "_receiver_scratch_image_"
 	catch {lwdaq_image_destroy $info(scratch_image)}
 		
-	# All elements of the config array will be displayed in the
-	# instrument window. No config array variables can be set in the
-	# LWDAQ_open_Instrument procedure
+	# All elements of the config array will be displayed in the instrument
+	# window. No config array variables can be set in the LWDAQ_open_Instrument
+	# procedure
 	set config(image_source) "daq"
 	set config(file_name) "./Images/$info(name)\*"
 	set config(memory_name) "lwdaq_image_1"
@@ -132,16 +132,15 @@ proc LWDAQ_init_Receiver {} {
 }
 
 #
-# LWDAQ_analysis_Receiver applies receiver analysis to an image 
-# in the lwdaq image list. By default, the routine uses the
-# image $config(memory_name).
+# LWDAQ_analysis_Receiver applies receiver analysis to an image in the lwdaq
+# image list. By default, the routine uses the image $config(memory_name).
 #
 proc LWDAQ_analysis_Receiver {{image_name ""}} {
 	upvar #0 LWDAQ_config_Receiver config
 	upvar #0 LWDAQ_info_Receiver info
 
-	# By default, we use the image whose name we passed in to this routine,
-	# but if no such name was passed, we use the image named in the configuration
+	# By default, we use the image whose name we passed in to this routine, but
+	# if no such name was passed, we use the image named in the configuration
 	# array.
 	if {$image_name == ""} {set image_name $config(memory_name)}
 	
@@ -149,15 +148,25 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 	# text window. We don't want these errors to stop data acquisition.
 	if {[catch {
 	
-		# We get the number of errors, the number of clock messages, and the total
-		# number of messages. We also get the message index of the first clock message.
-		# We will use the first clock index later.
-		scan [lwdaq_receiver $image_name \
-			"-payload $config(payload_length) clocks 0"] %d%d%d%d \
-			num_errors num_clocks num_messages first_index
+		# Try to count the number of clock messages in the image.
+		set check [lwdaq_receiver $image_name "-payload $config(payload_length) clocks 0"]
 		
-		# We determine the display scale boundaries depending upon whether we have simple
-		# plot, centered plot, or normalized plot.
+		# If the result is an error, print the original error message to the
+		# instrument panel and return an error message that contains the keyword
+		# "corrupted" to show that analysis failed. If we cannot count clock
+		# messages, we can do nothing with the data.
+		if {[LWDAQ_is_error_result $check]} {
+			LWDAQ_print $info(text) $check
+			error "Data corrupted, analysis cannot count clock messages."
+		}
+	
+		# Get the number of errors, the number of clock messages, and the total
+		# number of messages. We also get the message index of the first clock
+		# message. We will use the first clock index later.
+		scan $check %d%d%d%d num_errors num_clocks num_messages first_index
+		
+		# Determine the display scale boundaries depending upon whether we have
+		# simple plot, centered plot, or normalized plot.
 		if {$info(display_mode) == "CP"} {
 			set display_min [expr - $info(display_range) / 2 ]
 			set display_max [expr + $info(display_range) / 2]
@@ -169,9 +178,10 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			set display_max [expr $info(display_offset) + $info(display_range)]
 		}
 		
-		# We compose a channel list from the analysis_channels string. The "*" character, 
-		# if it appears anywhere in the analysis_channel list, will result in a "*" channel
-		# number list. These channels are the ones we are going to plot and report on.
+		# Compose a channel list from the analysis_channels string. The "*"
+		# character, if it appears anywhere in the analysis_channel list, will
+		# result in a "*" channel number list. These channels are the ones we
+		# are going to plot and report on.
 		set id_list ""
 		foreach id $config(analysis_channels) {
 			if {$id == "*"} {
@@ -198,69 +208,81 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			plot $display_min $display_max \
 			$info(display_mode) $id_list"]
 			
-		# We obtain a list of the channels with at least one message present
-		# in the image, and the number of messages for each of these channels.
-		set channels [lwdaq_receiver $image_name "-payload $config(payload_length) list"]
-		if {[winfo exists $info(window)\.activity]} {
-			for {set c $info(min_id)} {$c < $info(max_id)} {incr c} {
-				global LWDAQ_id$c\_Receiver
-				set LWDAQ_id$c\_Receiver 0
-			}
+		# If the result is an error, print the error message to the instrument
+		# panel, but don't abort analysis.
+		if {[LWDAQ_is_error_result $result]} {LWDAQ_print $info(text) $result}
+	
+		# Clear the activity values for all channels.
+		for {set c $info(min_id)} {$c < $info(max_id)} {incr c} {
+			global LWDAQ_id$c\_Receiver
+			set LWDAQ_id$c\_Receiver 0
 		}
+		
+		# Get a list of active channels.
+		set channels [lwdaq_receiver $image_name "-payload $config(payload_length) list"]
+
+		# Update the activity values. If we encounter an error, just report the
+		# error to the text window.
 		if {![LWDAQ_is_error_result $channels]} {
 			set ca ""
 			foreach {c a} $channels {
 				if {$a > $info(activity_threshold)} {
 					append ca "$c\:$a "
 				}
-				if {[winfo exists $info(window)\.activity]} {
-					set LWDAQ_id$c\_Receiver $a
-				}
+				set LWDAQ_id$c\_Receiver $a
 			}
 			set info(channel_activity) $ca
 		} {
-			error $channels
+			LWDAQ_print $info(text) $channels
 		}
-		
-		# We make sure our list of auxiliary messages is not too long.
+				
+		# Make sure our list of auxiliary messages is not too long.
 		set info(aux_messages) [lrange $info(aux_messages) 0 $info(aux_max_size)]
 
-		# We look for messages in the auxiliary channels.
+		# Look for messages in the auxiliary channels. 
 		set new_aux_messages [lwdaq_receiver $image_name \
 			"-payload $config(payload_length) auxiliary"]
-
-		# We are going to calculate a timestamp, with resolution one clock tick,
-		# for each auxiliary message. The timestamps can be used as a form of
-		# addressing for slow data transmissions. To get the absolute timestamp,
-		# we get the value of the first clock message in the data, which should
-		# be the first message in the data. This time is a sixteen-bit value
-		# that has counted the number of times a 32.768 kHz clock has counted to
-		# 256 since the data receiver clock was last reset, wrapping around to
-		# zero every time it overflows.
-		scan [lwdaq_receiver $image_name \
-			"-payload $config(payload_length) get 0"] %d%d%d cid bts fvn
 		
-		# We take each new auxiliary message and break it up into three parts.
-		# The first part is an eight-bit channel number. This might be the lower
-		# eight bits of a sixteen-bit device identifier, or the entire eight
-		# bits of a device identifier. The second part is a four-bit field
-		# address. The third is eight bits of data. These sixteen bits are the
-		# contents of the auxiliary message. We add a fourth number, which is
-		# the timestamp of message reception. We give the timestamp modulo
-		# 65536, which means the timestamp resets every two seconds. These four
-		# numbers make one entry in the auxiliary message list, so we append
-		# them to the existing list.
-		foreach {cn mt md} $new_aux_messages {
-			set id [expr ($md / 4096)]
-			if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
-			set id [expr (($cn / $info(set_size)) * $info(set_size)) + $id]
-			set fa [expr ($md / 256) % 16]
-			set d [expr $md % 256]
-			set ts  [expr ($mt + $bts * 256) % (65536)]
-			lappend info(aux_messages) "$id $fa $d $ts"
+		# Provided our new auxiliary message list is not itself an error message, parse
+		# the list and append to our global auxialiary message list. If the list is an
+		# error message, we just print the error.
+		if {![LWDAQ_is_error_result $new_aux_messages]} {
+			
+			# Calculate a timestamp, with resolution one clock tick, for each
+			# auxiliary message. The timestamps can be used as a form of addressing
+			# for slow data transmissions. To get the absolute timestamp, we get the
+			# value of the first clock message in the data, which should be the
+			# first message in the data. This time is a sixteen-bit value that has
+			# counted the number of times a 32.768 kHz clock has counted to 256
+			# since the data receiver clock was last reset, wrapping around to zero
+			# every time it overflows.
+			scan [lwdaq_receiver $image_name \
+				"-payload $config(payload_length) get 0"] %d%d%d cid bts fvn
+		
+			# Take each new auxiliary message and break it up into three parts. The
+			# first part is an eight-bit channel number. This might be the lower
+			# eight bits of a sixteen-bit device identifier, or the entire eight
+			# bits of a device identifier. The second part is a four-bit field
+			# address. The third is eight bits of data. These sixteen bits are the
+			# contents of the auxiliary message. We add a fourth number, which is
+			# the timestamp of message reception. We give the timestamp modulo
+			# 65536, which means the timestamp resets every two seconds. These four
+			# numbers make one entry in the auxiliary message list, so we append
+			# them to the existing list.
+			foreach {cn mt md} $new_aux_messages {
+				set id [expr ($md / 4096)]
+				if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
+				set id [expr (($cn / $info(set_size)) * $info(set_size)) + $id]
+				set fa [expr ($md / 256) % 16]
+				set d [expr $md % 256]
+				set ts  [expr ($mt + $bts * 256) % (65536)]
+				lappend info(aux_messages) "$id $fa $d $ts"
+			}
+		} {
+			LWDAQ_print $info(text) $new_aux_messages
 		}
-		
-		# If requested, we print the first block of raw message data to the screen.
+				
+		# If requested, print the first block of raw messages to the screen.
 		 if {$info(show_messages) > 0} {
 			set raw_data [lwdaq_receiver $image_name \
 				"-payload $config(payload_length) print 0 $info(show_messages)"]
@@ -273,10 +295,11 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			}
 		}
 		
-		# With an excessive number of errors, generate an execution error. If
-		# we are looping, and the loop_on_error flag is not set, stop looping.
-		# We use the keyword "corrupted" in our error message, so indicate a 
-		# problem other than a communication failre.
+		# If we encountered errors in our original run through the data, we now
+		# generate a corrupted data error. If we are looping, and the
+		# loop_on_error flag is not set, stop looping. We use the keyword
+		# "corrupted" in our error message, so indicate a problem other than a
+		# communication failure.
 		if {$num_errors > 0} {
 			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
 				set info(control) "Stop"
@@ -302,6 +325,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 proc LWDAQ_refresh_Receiver {} {
 	upvar #0 LWDAQ_config_Receiver config
 	upvar #0 LWDAQ_info_Receiver info
+	
 	if {[lwdaq_image_exists $config(memory_name)] != ""} {
 		LWDAQ_analysis_Receiver $config(memory_name)
 		lwdaq_draw $config(memory_name) $info(photo) \
@@ -338,9 +362,11 @@ proc LWDAQ_reset_Receiver {} {
 		set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 		LWDAQ_login $sock $info(daq_password)
 		
-		# Select the data receiver.
+		# Select the data receiver with its device type, driver and multiplexer
+		# sockets, and internal device element number.
 		LWDAQ_set_device_type $sock $info(daq_device_type)
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
+		LWDAQ_set_device_element $sock $info(daq_receiver_element)
 		
 		# Reset the receiver message buffer and message detectors.
 		LWDAQ_transmit_command_hex $sock $info(reset_cmd)
@@ -409,7 +435,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 1
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
-					set info(max_block_reads) "20"
+					set info(max_block_reads) "50"
 				}
 				4  {
 					set info(receiver_type) "A3042"
@@ -418,7 +444,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 1
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 1
-					set info(max_block_reads) "20"
+					set info(max_block_reads) "50"
 				}
 				default {
 					set info(receiver_type) "?"
@@ -427,7 +453,7 @@ proc LWDAQ_reset_Receiver {} {
 					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 0
-					set info(max_block_reads) "20"
+					set info(max_block_reads) "100"
 				}					
 			}
 		}
@@ -701,10 +727,17 @@ proc LWDAQ_daq_Receiver {} {
 			set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 			LWDAQ_login $sock $info(daq_password)
 	
-			# Set the device type, select a driver and multiplexer socket. Wait for
-			# a short time so the cables can settle.
+			# Set the device type, select a driver and multiplexer socket.
+			# Select the internal device element that corresponds to the data
+			# receiver. In Octal Data Receivers (A3027), Animal Location
+			# Trackers (A3038), and the original Data Receiver (A3018), this
+			# element number is ignored. But in the Telemetry Control Box (TCB,
+			# A3042), the element number is used to direct commands to the
+			# receiver, stimulator, and interface controllers. We make sure that
+			# the element number selects the data receiver on the TCB.
 			LWDAQ_set_device_type $sock $info(daq_device_type)
 			LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
+			LWDAQ_set_device_element $sock $info(daq_receiver_element)
 			
 			# If we have a fifo block counter in the receiver, read the number
 			# of bytes available.

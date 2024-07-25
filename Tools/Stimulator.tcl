@@ -25,11 +25,12 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "3.12"
+	LWDAQ_tool_init "Stimulator" "4.3"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
 	set config(driver_socket) "8"
+	set config(mux_socket) "1"
 	
 	set config(rck_khz) "32.768"
 	set config(rck_divisor) "32"
@@ -40,7 +41,7 @@ proc Stimulator_init {} {
 	set config(max_stimulus_len) [expr (256 * 256) - 1]
 	set config(min_current) "0"
 	set config(max_current) "15"
-	set config(initiate_delay) "0.010"
+	set config(initiate_delay) "0.005"
 	set config(spacing_delay_A2037E) "0.0000"
 	set config(spacing_delay_A2071E) "0.0014"
 	set config(spacing_delay_cmd) "0.0"
@@ -48,6 +49,7 @@ proc Stimulator_init {} {
 	set config(rf_off_op) "0080"
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
+	set config(stimulator_element) "2"
 	set config(checksum_preload) "1111111111111111"
 	set config(log_enable) "0"
 	set config(log_file) "~/Desktop/Stimulator_Log.txt"
@@ -62,7 +64,7 @@ proc Stimulator_init {} {
 	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 	
-	set info(conf_delay) "3"
+	set config(conf_delay) "3"
 	set config(aux_show) "0"
 	set config(aux_color) "orange"
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
@@ -217,7 +219,8 @@ proc Stimulator_transmit {id commands} {
 		} {
 			set sd $config(spacing_delay_A2071E)
 		}
-		LWDAQ_set_driver_mux $sock $config(driver_socket) 1
+		LWDAQ_set_driver_mux $sock $config(driver_socket) $config(mux_socket)
+		LWDAQ_set_device_element $sock $config(stimulator_element)
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		LWDAQ_transmit_command_hex $sock $config(rf_off_op)
@@ -542,12 +545,17 @@ proc Stimulator_monitor {} {
 		return ""
 	}
 	
-	# Compose a list of device numbers with their sixteen-bit identifiers.
+	# Compose a list of active device numbers with their sixteen-bit identifiers,
+	# as listed in our Stimulator window.
 	set id_list ""
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_id)"}
 	
 	# Go through the auxiliary message list and find messages that could be from
-	# stimulators.
+	# stimulators. As we proceed, we save the previous valid auxiliary message
+	# so that we can avoid processing duplicates in the list.
+	set previd 0
+	set prevfa 0
+	set prevdb 0
 	foreach am $aux_messages {
 	
 		# Scan the auxiliary message for identifier, field address, data byte
@@ -561,6 +569,9 @@ proc Stimulator_monitor {} {
 		
 		# If this is a confirmation message, proceed to next auxiliary message.
 		if {$fa == $info(at_conf)} {continue}
+		
+		# If this is a repeat of a previously processed auxilliary message, proceed.
+		if {($previd == $id) && ($prevfa == $fa) && ($prevdb == $db)} {continue}
 
 		# If it is some other sort of message, look for a confirmation that
 		# arrived no more than conf_delay ticks after our auxiliary message. If
@@ -570,7 +581,7 @@ proc Stimulator_monitor {} {
 		foreach cam $aux_messages {
 			scan $cam %d%d%d%d cid cfa cdb cts
 			if {$cfa != $info(at_conf)} {continue}
-			if {($cid == $id) && (($cts - $ts) % 65536 <= $info(conf_delay))} {
+			if {($cid == $id) && (($cts - $ts) % 65536 <= $config(conf_delay))} {
 				set device_id [format %04X [expr $cid + (256 * $cdb)]]
 				break
 			}
@@ -657,6 +668,10 @@ proc Stimulator_monitor {} {
 			Stimulator_print "Identification:\
 				device_id=$device_id ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
+
+			# Ignore version number reports from devices that are not in our list.
+			if {$n == 0} {continue}
+			
 			set info(dev$n\_version) "$db"
 			Stimulator_print "Version:\
 				device_id=$device_id value=$db ts=$ts $now_time"
@@ -665,6 +680,13 @@ proc Stimulator_monitor {} {
 			# We don't recognise this type of auxiliary message, so proceed.
 			continue
 		}
+		
+		# By this point, we have processed and report on the confirmed auxiliary 
+		# message, so record its identifier, field address, and data byte in order
+		# to avoid processing a subsequent duplicate.
+		set previd $id
+		set prevfa $fa
+		set prevdb $db
 	}
 	
 	# We post the monitor to the event queue and report success.
