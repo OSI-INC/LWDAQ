@@ -8,18 +8,16 @@ proc Function_Generator_init {} {
 	upvar #0 Function_Generator_config config
 	global LWFG
 
-	LWDAQ_tool_init "Function_Generator" "1.2"
+	LWDAQ_tool_init "Function_Generator" "1.3"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set info(data) [list]
 	set info(start_time) "0"
 	set info(channel_names) "1"
-	set info(attnsw_names) "-3.0 -4.8 -7.0 -9.6"
 
 	set info(control) "Idle"
 	set config(verbose) "0"
 	set config(logarithmic) "0"
-	set config(attnsw) [lindex $info(attnsw_names) 0]
 
 	set config(gen_ip) "10.0.0.37"
 	set config(gen_ch) [lindex $info(channel_names) 0]
@@ -59,6 +57,8 @@ proc Function_Generator_init {} {
 	set LWFG(ch_cnt_hi) "255"
 	set LWFG(ch_v_lo) "-10.0"
 	set LWFG(ch_v_hi) "+10.0"
+	set LWFG(ch_attn) "0x00"
+	set LWFG(ch_fact) "1.0"
 
 	set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1e3 0x21 \
 		2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
@@ -81,10 +81,50 @@ proc Function_Generator_on {} {
 	upvar #0 Function_Generator_config config
 	global LWFG
 
-	set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
-	set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
+	set a_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
+	set a_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
 
-	if { $v_lo < -10 || $v_hi > 10} {
+	if {$config(gen_ch) == 1 } {
+		if {$a_hi > 5 || $a_lo <-5} {
+			set LWFG(ch_attn) 0x00
+			set LWFG(ch_fact) 1.0
+		} elseif {($a_hi > 3.333 && $a_hi <= 5) || ($a_lo < -3.333 && $a_lo >= -5)} {
+			set LWFG(ch_attn) 0x01
+			set LWFG(ch_fact) 2.0
+		} elseif {($a_hi > 2 && $a_hi <= 3.333) || ($a_lo < -2 && $a_lo >= -3.333)} {
+			set LWFG(ch_attn) 0x08
+			set LWFG(ch_fact) 3.0
+		} elseif {($a_hi > 1.111 && $a_hi <= 2) || ($a_lo < -1.111 && $a_lo >= -2)} {
+			set LWFG(ch_attn) 0x04
+			set LWFG(ch_fact) 5.0
+		} elseif {($a_hi <= 1.111 || $a_lo >= -1.111)} {
+			set LWFG(ch_attn) 0x02
+			set LWFG(ch_fact) 9.0
+		}
+	} elseif {$config(gen_ch) == 2 } {
+		if {$a_hi > 5 || $a_lo <-5} {
+			set LWFG(ch_attn) 0x00
+			set LWFG(ch_fact) 1.0
+		} elseif {($a_hi > 3.333 && $a_hi <= 5) || ($a_lo < -3.333 && $a_lo >= -5)} {
+			set LWFG(ch_attn) 0x10
+			set LWFG(ch_fact) 2.0
+		} elseif {($a_hi > 2 && $a_hi <= 3.333) || ($a_lo < -2 && $a_lo >= -3.333)} {
+			set LWFG(ch_attn) 0x80
+			set LWFG(ch_fact) 3.0
+		} elseif {($a_hi > 1.111 && $a_hi <= 2) || ($a_lo < -1.111 && $a_lo >= -2)} {
+			set LWFG(ch_attn) 0x40
+			set LWFG(ch_fact) 5.0
+		} elseif {($a_hi <= 1.111 || $a_lo >= -1.111)} {
+			set LWFG(ch_attn) 0x20
+			set LWFG(ch_fact) 9.0
+		}
+	}
+
+	set v_lo [expr ($config(waveform_offset) - $config(waveform_amplitude)) * $LWFG(ch_fact)]
+	set v_hi [expr ($config(waveform_offset) + $config(waveform_amplitude)) * $LWFG(ch_fact)]
+
+	if { [expr $config(waveform_offset) - $config(waveform_amplitude)] < -10 || \
+	  [expr $config(waveform_offset) + $config(waveform_amplitude)] > 10} {
 			LWDAQ_print $info(text) "ERROR: Maximum output of +/-10V exceeded."
 		} else {
 			LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
@@ -228,7 +268,8 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	
 	# Configure the function generator using TCPIP messaging.
 
-	if {$v_lo < -10 || $v_hi > 10} {
+	if { [expr $config(waveform_offset) - $config(waveform_amplitude)] < -10 || \
+	  [expr $config(waveform_offset) + $config(waveform_amplitude)] > 10} {
 		
 	} elseif {[catch {
 	
@@ -250,6 +291,10 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 		# Set the waveform length.
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_len)
 		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format S [expr $num_pts - 1]]
+
+		# Set the attenuation configuration register.
+		LWDAQ_set_data_addr $sock $LWFG(attenuation)
+		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format c [expr $LWFG(ch_attn)]]
 		
 		# Wait for the controller to be done with configuration.
 		set id [LWDAQ_hardware_id $sock]
@@ -309,6 +354,10 @@ proc LWFG_off {ip ch_num} {
 		# Set the waveform length to zero.
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_len)
 		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format S 0]
+
+		# Set the attenuation configuration register.
+		LWDAQ_set_data_addr $sock $LWFG(attenuation)
+		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format c 0]
 		
 		# Wait for the controller to be done with configuration.
 		set id [LWDAQ_hardware_id $sock]
@@ -323,7 +372,8 @@ proc LWFG_off {ip ch_num} {
 	return ""
 }
 	
-# Output a waveform with changing frequency. We allow the user to choose a starting frequency and a stopping frequency along with a "sweep period"
+# Output a waveform with changing frequency. We allow the user to choose a starting frequency
+# and a stopping frequency along with a "sweep period"
 # that dictates how long it takes to cycle through the range of frequencies. 
 #
 proc Function_Generator_sweep {} {
@@ -332,10 +382,50 @@ proc Function_Generator_sweep {} {
 	upvar #0 Function_Generator_config config 
 	global LWFG
 
-	set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
-	set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
+	set a_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
+	set a_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
 
-	if { $v_lo < -10 || $v_hi > 10} {
+	if {$config(gen_ch) == 1 } {
+		if {$a_hi > 5 || $a_lo <-5} {
+			set LWFG(ch_attn) 0x00
+			set LWFG(ch_fact) 1.0
+		} elseif {($a_hi > 3.333 && $a_hi <= 5) || ($a_lo < -3.333 && $a_lo >= -5)} {
+			set LWFG(ch_attn) 0x01
+			set LWFG(ch_fact) 2.0
+		} elseif {($a_hi > 2 && $a_hi <= 3.333) || ($a_lo < -2 && $a_lo >= -3.333)} {
+			set LWFG(ch_attn) 0x08
+			set LWFG(ch_fact) 3.0
+		} elseif {($a_hi > 1.111 && $a_hi <= 2) || ($a_lo < -1.111 && $a_lo >= -2)} {
+			set LWFG(ch_attn) 0x04
+			set LWFG(ch_fact) 5.0
+		} elseif {($a_hi <= 1.111 || $a_lo >= -1.111)} {
+			set LWFG(ch_attn) 0x02
+			set LWFG(ch_fact) 9.0
+		}
+	} elseif {$config(gen_ch) == 2 } {
+		if {$a_hi > 5 || $a_lo <-5} {
+			set LWFG(ch_attn) 0x00
+			set LWFG(ch_fact) 1.0
+		} elseif {($a_hi > 3.333 && $a_hi <= 5) || ($a_lo < -3.333 && $a_lo >= -5)} {
+			set LWFG(ch_attn) 0x10
+			set LWFG(ch_fact) 2.0
+		} elseif {($a_hi > 2 && $a_hi <= 3.333) || ($a_lo < -2 && $a_lo >= -3.333)} {
+			set LWFG(ch_attn) 0x80
+			set LWFG(ch_fact) 3.0
+		} elseif {($a_hi > 1.111 && $a_hi <= 2) || ($a_lo < -1.111 && $a_lo >= -2)} {
+			set LWFG(ch_attn) 0x40
+			set LWFG(ch_fact) 5.0
+		} elseif {($a_hi <= 1.111 || $a_lo >= -1.111)} {
+			set LWFG(ch_attn) 0x20
+			set LWFG(ch_fact) 9.0
+		}
+	}
+
+	set v_lo [expr ($config(waveform_offset) - $config(waveform_amplitude)) * $LWFG(ch_fact)]
+	set v_hi [expr ($config(waveform_offset) + $config(waveform_amplitude)) * $LWFG(ch_fact)]
+
+	if { [expr $config(waveform_offset) - $config(waveform_amplitude)] < -10 || \
+	  [expr $config(waveform_offset) + $config(waveform_amplitude)] > 10} {
 			LWDAQ_print $info(text) "ERROR: Maximum output of +/-10V exceeded."
 		} else {
 			LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
@@ -359,9 +449,8 @@ proc Function_Generator_sweep {} {
 	set dac_lo [expr round(($v_lo - $LWFG(ch_v_lo)) / $lsb)]
 	set dac_hi [expr round(($v_hi - $LWFG(ch_v_lo)) / $lsb)]
 
-	# We begin by getting getting the number of points we need for one period
-	# with the fastest sample rate, and if num_pts is too large, we increase
-	# the divisor until num_pts is small enough.
+	# We begin by setting the number of points to its maximum to give us the greatest resolution possible during the sweep. 
+	# This prevents the high frequency end of the sweep from being scrambled due to low resolution.
 	set num_pts $LWFG(max_pts)
 	set num_cycles 1
 	set divisor [expr round(($LWFG(clock_hz) * $sweep_period) / $num_pts) - "1"]
@@ -409,7 +498,7 @@ proc Function_Generator_sweep {} {
 			}
 		}
 		"triangle" {
-			return "ERROR: Triangle sweep not implemented. Please choose either sine or square."
+			return "ERROR: Type of sweep not implemented. Please choose either sine or square."
 		}
 		default {
 			return "ERROR: Unkown waveform \"$waveform\"."
@@ -435,7 +524,8 @@ proc Function_Generator_sweep {} {
 	# Open a socket to the function generator and configure it through
 	# the data portal by means of stream write instructions.
 
-	if {$v_lo < -10 || $v_hi > 10} {
+	if { [expr $config(waveform_offset) - $config(waveform_amplitude)] < -10 || \
+	  [expr $config(waveform_offset) + $config(waveform_amplitude)] > 10} {
 		
 	} elseif {[catch {
 		# Open a socket to the function generator.
@@ -453,6 +543,9 @@ proc Function_Generator_sweep {} {
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_len)
 		LWDAQ_stream_write $sock $LWFG(data_portal) \
 			[binary format S [expr $num_pts - 1]]
+		LWDAQ_set_data_addr $sock $LWFG(attenuation)
+		LWDAQ_stream_write $sock $LWFG(data_portal) \
+			[binary format c [expr $LWFG(ch_attn)]]
 
 		set id [LWDAQ_hardware_id $sock]
 		LWDAQ_socket_close $sock
@@ -522,15 +615,6 @@ proc Function_Generator_open {} {
 
 	set f [frame $w.batch]
 	pack $f -side top -fill x
-
-	label $f.mtz -text "Attenuation (dB):" -fg $config(label_color)
-	tk_optionMenu $f.mtm Function_Generator_config(attnsw) 0.0
-	foreach s [lindex $info(attnsw_names)] {
-		$f.mtm.menu add command -label $s \
-			-command "set Function_Generator_config(attnsw) $s"
-	}
-	set config(attnsw) "0.0"
-	pack $f.mtz $f.mtm -side left -expand 1
 
 	foreach a {Start_Frequency Stop_Frequency Time} {
 		set b [string tolower $a]
