@@ -18,7 +18,7 @@
 
 #
 # Utils.tcl contains file input-output routines, the LWDAQ event queue,
-# time and date routines, debug and diagnostic routines, and LWDAQ help
+# time and date routines, debug and diagnostic routines, and the manual
 # routines. The LWDAQ Event Queue is an event scheduler that allows us
 # to perform simultaneous live data acquisition from multiple instruments 
 # by scheduling the acquision actions so they do not overlap with one another.

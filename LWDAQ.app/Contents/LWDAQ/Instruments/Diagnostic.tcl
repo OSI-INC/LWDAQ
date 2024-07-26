@@ -31,10 +31,9 @@ proc LWDAQ_init_Diagnostic {} {
 	array unset config
 	array unset info
 
-	# The info array elements will not be displayed in the 
-	# instrument window. The only info variables set in the 
-	# LWDAQ_open_Instrument procedure are those which are checked
-	# only when the instrument window is open.
+	# The info array elements will not be displayed in the instrument window.
+	# The only info variables set in the LWDAQ_open_Instrument procedure are
+	# those which are checked only when the instrument window is open.
 	set info(name) "Diagnostic"
 	set info(control) "Idle"
 	set info(window) [string tolower .$info(name)]
@@ -44,6 +43,7 @@ proc LWDAQ_init_Diagnostic {} {
 	set info(zoom) 1
 	set info(daq_extended) 0
 	set info(daq_device_type) 0
+	set info(daq_device_element) 0
 	set info(delete_old_images) 1
 	set info(file_use_daq_bounds) 0
 	set info(daq_image_width) 340
@@ -297,12 +297,16 @@ proc LWDAQ_loop_time_Diagnostic {sock} {
 
 #
 # LWDAQ_transmit_Diagnostic transmits each hex word in info(commands)
-# to the target device (info(repeat) + 1) times.
+# to the target device (info(repeat) + 1) times. We set the device element
+# number before transmitting any commands, because self-contained LWDAQ
+# systems (those of Form C) use the device element to direct the command
+# to different internal components. 
 #
 proc LWDAQ_transmit_Diagnostic {sock} {
 	upvar #0 LWDAQ_config_Diagnostic config
 	upvar #0 LWDAQ_info_Diagnostic info
 	LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
+	LWDAQ_set_device_element $sock $info(daq_device_element)
 	LWDAQ_print -nonewline $info(text) \
 		"Transmitting \"$info(commands)\" to target [expr $info(repeat) + 1] times..."
 	if {[llength $info(commands)] == 1} {

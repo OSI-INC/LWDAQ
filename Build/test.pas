@@ -1,10 +1,20 @@
 program test;
+{
+	test.pas tests many of the functions in our analysis library. As it tests
+	each function, it compares the function results to the known answers. It
+	reports disagreements and counts errors. The routine also serves as a report
+	on the structure of commonly-shared data types, such as rasnik_type and
+	ij_rectangle_type, so that you can plan how to link to these libraries from
+	your own code, which might be written in a different language or compiled
+	with something other than the FPC.
+}
 
 {$MODESWITCH CLASSICPROCVARS+}
 {$LONGSTRINGS ON}
 
 uses
-	utils;
+	utils,images,transforms,image_manip,rasnik,
+	spot,bcam,scam,shadow,wps,electronics,metrics;
 	
 const
 	bsize=1000000;
@@ -587,9 +597,46 @@ begin
 	gui_writeln:=console_write;
 	gui_readln:=console_read;
 	gui_writeln('Hello from gui_writeln.');
-	s:=gui_readln('Enter a number or press return. ');
+	s:=gui_readln('Enter a number or press return: ');
 	writeln('You entered: "',s,'".');
 	x:=real_from_string(s,good);
 	if not good then writeln('Hey! That was not a number')
 	else writeln('That was a number.');
+{
+	Report on sizes of selected types.
+}
+	writeln('Listing sizes of selected structured types:');
+	writeln('integer = ',sizeof(integer));
+	writeln('real = ',sizeof(real));
+	
+	writeln('ij_point_type = ',sizeof(ij_point_type));	
+	writeln('ij_line_type = ',sizeof(ij_line_type));
+	writeln('ij_rectangle_type = ',sizeof(ij_rectangle_type));
+	writeln('ij_ellipse_type = ',sizeof(ij_ellipse_type));
+	
+	writeln('xy_point_type = ',sizeof(xy_point_type));	
+	writeln('xy_line_type = ',sizeof(xy_line_type));	
+	
+	writeln('xyz_point_type = ',sizeof(xyz_point_type));
+	writeln('xyz_pose_type = ',sizeof(xyz_pose_type));
+	writeln('xyz_line_type = ',sizeof(xyz_line_type));
+	writeln('xyz_plane_type = ',sizeof(xyz_plane_type));
+
+	writeln('simplex_type = ',sizeof(simplex_type));
+	
+	writeln('image_type = ',sizeof(image_type));
+	
+	writeln('spot_type = ',sizeof(spot_type));
+	writeln('spot_list_type = ',sizeof(spot_list_type));
+	
+	writeln('device_calibration_type = ',sizeof(device_calibration_type));
+	writeln('apparatus_measurement_type = ',sizeof(apparatus_measurement_type));
+	
+	writeln('scam_sphere_type = ',sizeof(scam_sphere_type));
+	writeln('scam_shaft_type = ',sizeof(scam_shaft_type));
+	
+	writeln('rasnik_type = ',sizeof(rasnik_type));
+	writeln('rasnik_square_type = ',sizeof(rasnik_square_type));
+	writeln('rasnik_pattern_type = ',sizeof(rasnik_pattern_type));
+
 end.

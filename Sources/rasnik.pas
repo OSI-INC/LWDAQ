@@ -1,6 +1,7 @@
 {
 	Routines for Rasnik Image Analysis 
-	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
+	Copyright (C) 2004-2021, Kevan Hashemi, Brandeis University
+	Copyright (C) 2024, Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -103,7 +104,7 @@ const
 
 
 type
-	rasnik_square_type=packed record
+	rasnik_square_type=record
 		center_pp:xy_point_type; {center of square in pattern coordinates}
 		center_intensity:real; {average intensity of central region}
 		center_whiteness:real; {whiteness score, >0 for white, <=0 for black}
@@ -113,7 +114,6 @@ type
 		is_a_valid_square:boolean; {within the analysis boundaries}
 		is_a_code_square:boolean; {out of parity with the chessboard}
 		is_a_pivot_square:boolean; {at intersection of code line and column}
-		padding:array [1..13] of byte; {ample padding to eight-byte boundary}
 	end;
 	rasnik_square_ptr_type=^rasnik_square_type;
 	rasnik_square_array_type=
@@ -127,9 +127,10 @@ type
 	the center of the image, but any square in the image could provide the
 	origin.
 }
-	rasnik_pattern_type=packed record {based upon pattern_type of image_types}
+
+type {for pattern coordinates}
+	rasnik_pattern_type=record {based upon pattern_type of image_types}
 		valid:boolean;{most recent analysis yielded valid output}
-		padding:array [1..7] of byte;{force origin to eight-byte boundary}
 		origin:xy_point_type;{pattern coordinate origin in image coordinates}
 		rotation:real;{radians anticlockwize wrt image coords}
 		pattern_x_width,pattern_y_width:real;{square width in pixels along pattern coords}
@@ -143,12 +144,10 @@ type
 		analysis_center_cp:ij_point_type;{ccd coords of analysis bounds center}
 		analysis_width:real;{diagnonal width of anlysis bounds}
 		squares:rasnik_square_array_ptr_type;{array of rasnik squares}
-		more_padding:array [1..4] of byte;{force end to eight-byte boundary}
 	end;
 	rasnik_pattern_ptr_type=^rasnik_pattern_type;
-	rasnik_type=packed record
+	rasnik_type=record
 		valid:boolean;{no problems encountered during analysis}
-		padding:array [1..7] of byte;{force mask_point to eight-byte boundary}
 		mask_point:xy_point_type;{point in mask, um}
 		magnification_x,magnification_y:real;{magnification along pattern coords}
 		skew_x,skew_y:real;{skew in x and y directions in rad/m}
@@ -3061,9 +3060,9 @@ begin
 end;
 
 {
-	rasnik_analyze_image returns a rasnik_ptr_type to the results of
-	rasnik analysis applied to the specified image_type. It performs
-	no drawing in the image overlay.
+	rasnik_analyze_image returns a rasnik_ptr_type to the results of rasnik
+	analysis applied to the specified image_type. It performs no drawing in the
+	image overlay.
 }
 function rasnik_analyze_image(ip:image_ptr_type;
 	orientation_code:integer;
@@ -3100,27 +3099,24 @@ begin
 end;
 
 {
-	rasnik_simulated_image draws a rasnik pattern in an image. We
-	specify the origin.x, origin.y, x_width, y_width, rotation,
-	sharpness, and noise of the pattern with a command string. The
-	origin sets the offset of the pattern in units of pixels, from the
-	top-left corner of the top-left pixel, with x left to right and y
-	top to bottom. The x_width and y_width are the width and height of
-	the pattern squares in units of pixels. The rotation is in
-	milliradians, which the routine converts immediately into radians.
-	When the sharpness is 1, the pattern is a two-dimensional sinusoidal
-	intensity array varying in intensity from black to white. When zero,
-	the pattern has no intensity variation. When greater than 1, the
-	pattern is clipped to black and white. When sharpness is a large
-	number, the pattern is a chessboard with black and white squares.
-	The final number is the noise amplitude. We take this number and
-	multiply a random number between zero and one to get an additional
-	noise intensity. And example command string is "5 0 20 25 20 10" to
-	specify origin 5 pixels to the left, zero pixels down, square width
-	20 pixels, square height 25, sharpness 20 and noise 0-10 counts. The
-	rasnik image contains no code squares. It's just a plain chessboard.
-	We use the chessboard to check rasnik_find_pattern and
-	rasnik_refine_pattern. 
+	rasnik_simulated_image draws a rasnik pattern in an image. We specify the
+	origin.x, origin.y, x_width, y_width, rotation, sharpness, and noise of the
+	pattern with a command string. The origin sets the offset of the pattern in
+	units of pixels, from the top-left corner of the top-left pixel, with x left
+	to right and y top to bottom. The x_width and y_width are the width and
+	height of the pattern squares in units of pixels. The rotation is in
+	milliradians, which the routine converts immediately into radians. When the
+	sharpness is 1, the pattern is a two-dimensional sinusoidal intensity array
+	varying in intensity from black to white. When zero, the pattern has no
+	intensity variation. When greater than 1, the pattern is clipped to black
+	and white. When sharpness is a large number, the pattern is a chessboard
+	with black and white squares. The final number is the noise amplitude. We
+	take this number and multiply a random number between zero and one to get an
+	additional noise intensity. And example command string is "5 0 20 25 20 10"
+	to specify origin 5 pixels to the left, zero pixels down, square width 20
+	pixels, square height 25, sharpness 20 and noise 0-10 counts. The rasnik
+	image contains no code squares. It's just a plain chessboard. We use the
+	chessboard to check rasnik_find_pattern and rasnik_refine_pattern. 
 }
 procedure rasnik_simulated_image(ip:image_ptr_type;command:string);
 

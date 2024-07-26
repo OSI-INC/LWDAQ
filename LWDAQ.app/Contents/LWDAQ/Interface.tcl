@@ -931,9 +931,10 @@ proc LWDAQ_open_document {fn} {
 }
 
 #
-# LWDAQ_button_wait opens a toplevel window with a continue button
-# and waits until the user presses the button before closing the window
-# and continuing.
+# LWDAQ_button_wait opens a toplevel window with a continue button and waits
+# until the user presses the button before closing the window and continuing. An
+# optional message, s, may be printed in the window along with the continue
+# instruction.
 #
 proc LWDAQ_button_wait {{s ""}} {
 	if {$s == ""} {
@@ -946,7 +947,7 @@ proc LWDAQ_button_wait {{s ""}} {
 
 #
 # LWDAQ_button_warning opens a toplevel window called "Warning" and
-# prints message $s in the window. The procedure returns after
+# prints message, s, in the window. The procedure returns after
 # the user presses a button.
 #
 proc LWDAQ_button_warning {s} {
