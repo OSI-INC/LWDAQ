@@ -30,7 +30,7 @@ proc Fiber_Positioner_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "2.1"
+	LWDAQ_tool_init "Fiber_Positioner" "3.1"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The Fiber Positioner control variable tells us its current state. We can stop
@@ -304,8 +304,8 @@ proc Fiber_Positioner_spot_position {} {
 	set index 0
 	foreach fiber $config(injector_leds) {
 		incr index
-		set x [format %.1f [lindex $result 0]]
-		set y [format %.1f [lindex $result 1]]
+		set x [format %.2f [lindex $result 0]]
+		set y [format %.2f [lindex $result 1]]
 		append info(spot_positions) "$x $y "
 		set result [lrange $result 6 end]
 		if {$config(trace_enable)} {
@@ -805,10 +805,10 @@ proc Fiber_Positioner_travel_browse {} {
 	upvar #0 Fiber_Positioner_info info
 	upvar #0 Fiber_Positioner_config config
 
-	set fn [LWDAQ_get_file_name] 
-	if {$fn != ""} {
-		set config(travel_file) $fn
-	}
+	set dn [file dirname $config(travel_file)]
+	if {![file exists $dn]} {set dn ""}
+	set fn [LWDAQ_get_file_name 0 $dn] 
+	if {$fn != ""} {set config(travel_file) $fn}
 	return $config(travel_file)
 }
 
