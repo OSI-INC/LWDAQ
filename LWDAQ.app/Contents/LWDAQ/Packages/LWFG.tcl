@@ -42,12 +42,18 @@ package provide LWFG 1.5
 # Clear the global EDF array if it already exists.
 if {[info exists LWFG]} {unset LWFG}
 
+# The control address through which we communicate with the data address space on
+# the function generator, which is a LWDAQ system of type C.
 set LWFG(data_portal) "63"
+
+# Data addresses for channel one ram, time constant, clock divisor, waveform
+# length, and attenuition.
 set LWFG(ch1_ram) "0x0000"
 set LWFG(ch1_rc) "0x8000"
 set LWFG(ch1_div) "0x8002"
 set LWFG(ch1_len) "0x800A"
 
+# Data addresses for channel two.
 set LWFG(ch2_ram) "0x4000"
 set LWFG(ch2_rc) "0x8001"
 set LWFG(ch2_div) "0x8006"
@@ -64,12 +70,17 @@ set LWFG(ch_cnt_hi) "255"
 set LWFG(ch_v_lo) "-10.0"
 set LWFG(ch_v_hi) "+10.0"
 
+# The low-pass filter consists of a single resistor-capacitor (RC) time constant.
+# Here we list each available time constant in units of nanosectons, followed by 
+# the eight-bit code we send to the channel's time constant register to establish
+# the filter. We list them in order of increasing time constant.
 set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1e3 0x21 \
 		2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
 		2.8e5 0x48 1.0e6 0x81 2.2e6 0x82 5.4e6 0x84 1.1e7 0x88"
+		
+# The ideal filter has a time constant that is some fraction of the waveform period.
 set LWFG(rc_fraction) "0.01"
-set LWFG(rc_default) "0x01"
-	
+
 #
 # LWDAQ_off sets the output of the function generator at address IP, channel number
 # ch_num to zero, and sets the filter value to default.
@@ -87,9 +98,11 @@ proc LWFG_off {ip ch_num} {
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_ram)
 		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format c $LWFG(ch_cnt_z)]
 		
-		# Set the filter configuration register to its default value.
+		# Set the filter configuration register to its default value, which is the
+		# code for the first time constant in our list of time constant options.
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_rc)
-		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format c $LWFG(rc_default)]
+		LWDAQ_stream_write $sock $LWFG(data_portal) \
+			[binary format c [lindex LWFG(rc_options) 1]]
 		
 		# Set the clock divisor to one, for which we write a zero.
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_div)
