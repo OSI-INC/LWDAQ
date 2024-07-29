@@ -1,4 +1,4 @@
-# Direct Fiber Positioning System, a LWDAQ Tool
+# Direct Fiber Positioning System Manager, a LWDAQ Tool
 #
 # Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
 #
@@ -16,25 +16,25 @@
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
 #
-# Fiber_Positioner_init creates and initializes the tool's configuration
+# DFPS_Manager_init creates and initializes the tool's configuration
 # (config) and information (info) arrays. It reads saved configuration (but not
 # information) parameters from disk if we have previously saved our
 # configuration to disk. All the configuration parameters are visible in the
 # tool's configuration array, where there are save and unsave buttons to create
 # and delete a default configuration file.
 #
-proc Fiber_Positioner_init {} {
-	upvar #0 Fiber_Positioner_info info
-	upvar #0 Fiber_Positioner_config config
+proc DFPS_Manager_init {} {
+	upvar #0 DFPS_Manager_info info
+	upvar #0 DFPS_Manager_config config
 	upvar #0 LWDAQ_info_BCAM iinfo
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Fiber_Positioner" "3.1"
+	LWDAQ_tool_init "DFPS_Manager" "1.1"
 	if {[winfo exists $info(window)]} {return ""}
 
-	# The Fiber Positioner control variable tells us its current state. We can stop
-	# a Fiber Positioner process by setting the control variable to "Stop", after
+	# The control variable tells us the current state of the tool. We can stop a
+	# DFPS Manager process by setting the control variable to "Stop", after
 	# which the state will return to "Idle".
 	set info(control) "Idle"
 
@@ -42,7 +42,7 @@ proc Fiber_Positioner_init {} {
 	set config(zoom) 1.0
 	set config(intensify) "exact"
 		
-	# These numbers are used only when we open the Fiber Positioner panel for the 
+	# These numbers are used only when we open the DFPS Manager panel for the 
 	# first time, and need to allocate space for the fiber image.
 	set config(image_sensor) "ICX424"
 	set config(image_width) "700"
@@ -115,12 +115,12 @@ proc Fiber_Positioner_init {} {
 }
 
 #
-# Fiber_Positioner_id_bytes returns a list of two bytes as decimal numbers that represent
+# DFPS_Manager_id_bytes returns a list of two bytes as decimal numbers that represent
 # the identifier of the implant.
 #
-proc Fiber_Positioner_id_bytes {id_hex} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_id_bytes {id_hex} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 
 	set id [string trim $id_hex]
 	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
@@ -135,7 +135,7 @@ proc Fiber_Positioner_id_bytes {id_hex} {
 }
 
 #
-# Fiber_Positioner_transmit takes a string of command bytes and transmits them through a
+# DFPS_Manager_transmit takes a string of command bytes and transmits them through a
 # Command Transmitter such as the A3029A. The routine appends a sixteen-bit
 # checksum. The checksum is the two bytes necessary to return a sixteen-bit
 # linear feedback shift register to all zeros, thus performing a sixteen-bit
@@ -143,14 +143,14 @@ proc Fiber_Positioner_id_bytes {id_hex} {
 # with the checksum_preload value. The shift register has taps at locations 16,
 # 14, 13, and 11.
 #
-proc Fiber_Positioner_transmit {{commands ""}} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_transmit {{commands ""}} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	global LWDAQ_Driver
 	
 	# If we specify no commands, use those in the commands parameter.
 	if {$commands == ""} {
-		set commands [Fiber_Positioner_id_bytes $config(id)]
+		set commands [DFPS_Manager_id_bytes $config(id)]
 		append commands " "
 		append commands $config(commands)
 	}
@@ -212,16 +212,16 @@ proc Fiber_Positioner_transmit {{commands ""}} {
 }
 
 #
-# Fiber_Positioner_transmit_panel opens a new window and provides a button for
+# DFPS_Manager_transmit_panel opens a new window and provides a button for
 # transmitting a string of command bytes to a device. There are two entry boxes.
 # One for the device identifier, another for the command bytes. The identifier
 # is a four-hex value. The command bytes are each decimal values 0..255
 # separated by spaces. The routine parses the identifier into two bytes,
 # transmits all the command bytes, and appends the correct checksum on the end.
 #
-proc Fiber_Positioner_transmit_panel {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_transmit_panel {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	
 	set w $info(window)\.xmit_panel
 	if {[winfo exists $w]} {
@@ -235,44 +235,44 @@ proc Fiber_Positioner_transmit_panel {} {
 	pack $f -side top -fill x
 
 	button $f.transmit -text "Transmit" -command {
-		LWDAQ_post "Fiber_Positioner_transmit"
+		LWDAQ_post "DFPS_Manager_transmit"
 	}
 	pack $f.transmit -side left -expand yes
 	
 	label $f.lid -text "ID:" -fg $config(label_color) -width 4
-	entry $f.id -textvariable Fiber_Positioner_config(id) -width 6
+	entry $f.id -textvariable DFPS_Manager_config(id) -width 6
 	label $f.lcommands -text "Commands:" -fg $config(label_color)
-	entry $f.commands -textvariable Fiber_Positioner_config(commands) -width 50
+	entry $f.commands -textvariable DFPS_Manager_config(commands) -width 50
 	pack $f.lid $f.id $f.lcommands $f.commands -side left -expand yes
 
 	return "" 
 }
 
 #
-# Fiber_Positioner_set_nsew takes the north, south, east and west control values and
+# DFPS_Manager_set_nsew takes the north, south, east and west control values and
 # instructs the named positioner to set its converters accordingly.
 #
-proc Fiber_Positioner_set_nsew {id} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_set_nsew {id} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 
-	set command [Fiber_Positioner_id_bytes $id]
+	set command [DFPS_Manager_id_bytes $id]
 	append command " 1 $config(n_out) 0 2 $config(s_out) 0\
 		3 $config(e_out) 0 4 $config(w_out) 0"
-	Fiber_Positioner_transmit $command
+	DFPS_Manager_transmit $command
 	return ""
 }
 
 #
-# Fiber_Positioner_spot_position captures an image from the camera and finds the fiber
+# DFPS_Manager_spot_position captures an image from the camera and finds the fiber
 # tip image using the BCAM Instrument. If we have tracing enabled, it draws the entire
 # history of spot positions as a locus on the image. The routine checks for errors in
-# data acquisition and instructs the Fiber Positioner to stop any long-term operation
+# data acquisition and instructs the DFPS Manager to stop any long-term operation
 # if it does encounter an error.
 #
-proc Fiber_Positioner_spot_position {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_spot_position {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
@@ -325,7 +325,7 @@ proc Fiber_Positioner_spot_position {} {
 		}
 	}
 
-	# Draw the BCAM image in the Fiber Positioner window.
+	# Draw the BCAM image in the DFPS Manager window.
 	lwdaq_draw $iconfig(memory_name) $info(photo) \
 		-zoom $config(zoom) \
 		-intensify $config(intensify)
@@ -334,16 +334,16 @@ proc Fiber_Positioner_spot_position {} {
 }
 
 #
-# Fiber_Positioner_cmd takes a command, such as Zero, Move, Check, Stop, Step or
+# DFPS_Manager_cmd takes a command, such as Zero, Move, Check, Stop, Step or
 # Travel, and decides what to do about it. This routine does not execute the
-# Fiber Positioner operation itself, but instead posts the execution of the
+# DFPS Manager operation itself, but instead posts the execution of the
 # operation to the LWDAQ event queue, and then returns. We use this routine from
-# buttons, or from other programs that want to manipulate the Fiber Positioner
+# buttons, or from other programs that want to manipulate the DFPS Manager
 # because the routine does not stop or deley the graphical user interface.
 #
-proc Fiber_Positioner_cmd {cmd} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_cmd {cmd} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 
 	if {$info(control) != "Idle"} {
 		if {$cmd == "Stop"} {
@@ -361,10 +361,10 @@ proc Fiber_Positioner_cmd {cmd} {
 			# Set the control variable.
 			set info(control) $cmd
 			
-			# Here we construct the Fiber Positioner procedure name we want to
+			# Here we construct the DFPS Manager procedure name we want to
 			# call by converting the command to lower case, and trusting that
 			# such a procedure exists. We post its execution to the event queue.
-			LWDAQ_post Fiber_Positioner_[string tolower $cmd]
+			LWDAQ_post DFPS_Manager_[string tolower $cmd]
 		}
 	}
 	
@@ -372,13 +372,13 @@ proc Fiber_Positioner_cmd {cmd} {
 }
 
 #
-# Fiber_Positioner_report writes a report of the latest measurement to the text
+# DFPS_Manager_report writes a report of the latest measurement to the text
 # window. The report is a list of numbers, with some color coding and formatting
 # to make it easy to read.
 #
-proc Fiber_Positioner_report {{t ""}} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_report {{t ""}} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 
 	if {$t == ""} {set t $info(data)}
 	LWDAQ_print -nonewline $t "[format %.0f $config(n_out)]\
@@ -390,13 +390,13 @@ proc Fiber_Positioner_report {{t ""}} {
 }
 
 #
-# Fiber_Positioner_move asserts the latest control values, waits for the
+# DFPS_Manager_move asserts the latest control values, waits for the
 # settling time, measures the electrode voltages, measures the spot position,
 # and reports.
 #
-proc Fiber_Positioner_move {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_move {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 
 	if {![winfo exists $info(window)]} {
 		return ""
@@ -404,11 +404,11 @@ proc Fiber_Positioner_move {} {
 	
 	if {[catch {
 		foreach id $config(dfps_ids) {
-			Fiber_Positioner_set_nsew $id
+			DFPS_Manager_set_nsew $id
 		}
 		LWDAQ_wait_ms $config(settling_ms)
-		Fiber_Positioner_spot_position
-		Fiber_Positioner_report
+		DFPS_Manager_spot_position
+		DFPS_Manager_report
 	} error_result]} {
 		LWDAQ_print $info(log) "ERROR: $error_result"
 		set info(control) "Idle"
@@ -422,12 +422,12 @@ proc Fiber_Positioner_move {} {
 }
 
 #
-# Fiber_Positioner_zero sets all control values to their zero value, waits for the
+# DFPS_Manager_zero sets all control values to their zero value, waits for the
 # settling time, measures voltages, measures spot position, and reports.
 #
-proc Fiber_Positioner_zero {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_zero {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
@@ -437,11 +437,11 @@ proc Fiber_Positioner_zero {} {
 	
 	if {[catch {
 		foreach id $config(dfps_ids) {
-			Fiber_Positioner_set_nsew $id
+			DFPS_Manager_set_nsew $id
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
-		Fiber_Positioner_spot_position
-		Fiber_Positioner_report
+		DFPS_Manager_spot_position
+		DFPS_Manager_report
 	} error_result]} {
 		LWDAQ_print $info(log) "ERROR: $error_result"
 		set info(control) "Idle"
@@ -455,17 +455,17 @@ proc Fiber_Positioner_zero {} {
 }
 
 #
-# Fiber_Positioner_check does nothing to the voltages, just measures them,
+# DFPS_Manager_check does nothing to the voltages, just measures them,
 # measures spot position, and reports. It does not wait for the settling time.
 #
-proc Fiber_Positioner_check {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_check {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	
 	
 	if {[catch {
-		Fiber_Positioner_spot_position
-		Fiber_Positioner_report
+		DFPS_Manager_spot_position
+		DFPS_Manager_report
 	} error_result]} {
 		LWDAQ_print $info(log) "ERROR: $error_result"
 		set info(control) "Idle"
@@ -479,11 +479,11 @@ proc Fiber_Positioner_check {} {
 }
 
 #
-# Fiber_Positioner_clear clears the display traces.
+# DFPS_Manager_clear clears the display traces.
 #
-proc Fiber_Positioner_clear {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_clear {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
 
 	set index 0
@@ -507,17 +507,17 @@ proc Fiber_Positioner_clear {} {
 }
 
 #
-# Fiber_Positioner_reset sets the travel index, pass counter, and loop 
+# DFPS_Manager_reset sets the travel index, pass counter, and loop 
 # counters all to zero. It clears the traces.
 #
-proc Fiber_Positioner_reset {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_reset {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 
 	set config(travel_index) 0
 	set config(pass_counter) 0
 	set config(loop_counter) 0
-	Fiber_Positioner_clear
+	DFPS_Manager_clear
 	if {$info(control) == "Reset"} {
 		set info(control) "Idle"
 	}
@@ -526,30 +526,30 @@ proc Fiber_Positioner_reset {} {
 }
 
 #
-# Fiber_Positioner_step just calls the travel routine. We assume the control 
+# DFPS_Manager_step just calls the travel routine. We assume the control 
 # variable has been set to "Step", so the travel routine will know to stop
 # after one step.
 #
-proc Fiber_Positioner_step {} {
-	Fiber_Positioner_travel 
+proc DFPS_Manager_step {} {
+	DFPS_Manager_travel 
 	return ""
 }
 
 #
-# Fiber_Positioner_goto is designed for use in travel scripts that are executed
-# within the Fiber_Positioner_travel routine. The routine arranges for the
+# DFPS_Manager_goto is designed for use in travel scripts that are executed
+# within the DFPS_Manager_travel routine. The routine arranges for the
 # travel index to be equal to the index of a labelled line number at the end of
 # a travel step. To accomplish this result, the routine refers to the
-# travel_list available in Fiber_Positioner_travel, finds the index of the
+# travel_list available in DFPS_Manager_travel, finds the index of the
 # labelled line in the list, and sets the global travel index equal to the
 # labelled line's index minus one. The travel routine will subsequently
 # increment the index, thus leaving it equal to the labelled line's index at the
 # end fo the step. If the label does not exist in the travel file, we generate
 # an error.  
 #
-proc Fiber_Positioner_goto {name} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_goto {name} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	upvar travel_list travel_list
 
 	# Go through the list until we find "label name".
@@ -575,14 +575,14 @@ proc Fiber_Positioner_goto {name} {
 }
 
 #
-# Fiber_Positioner_travel allows us to step through a list of control values of 
+# DFPS_Manager_travel allows us to step through a list of control values of 
 # arbitrary length. A travel file consists of north, south, east, west control values
 # separated by spaces, each set of values on a separate line. We can include comments
 # in the travel file with hash characters.
 #
-proc Fiber_Positioner_travel {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_travel {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	global LWDAQ_Info
 	
 	# Because the travel operation can go on for some time, we must handle the 
@@ -656,7 +656,7 @@ proc Fiber_Positioner_travel {} {
 		
 		"label" {
 		# A label instruction does not itself do anything, but must specify a
-		# name. The Fiber_Positioner_goto command takes a a label name as its
+		# name. The DFPS_Manager_goto command takes a a label name as its
 		# argument, searches the travel file for "label name" and returns the
 		# index of the labeled line. This allows tcl code to jump to the
 		# labelled line, so we can build conditional branches or incrementing
@@ -745,7 +745,7 @@ proc Fiber_Positioner_travel {} {
 	
 			# Apply the new control values to all four electrodes.
 			if {[catch {
-				foreach id $config(dfps_ids) {Fiber_Positioner_set_nsew $id}
+				foreach id $config(dfps_ids) {DFPS_Manager_set_nsew $id}
 			} error_result]} {
 				LWDAQ_print $info(log) "ERROR: $error_result"
 				set info(control) "Idle"
@@ -755,8 +755,8 @@ proc Fiber_Positioner_travel {} {
 			# Wait for the fiber to settle, then measure voltages, spot position, and
 			# report to text window.
 			LWDAQ_wait_ms $config(settling_ms)	
-			Fiber_Positioner_spot_position
-			Fiber_Positioner_report
+			DFPS_Manager_spot_position
+			DFPS_Manager_report
 		}
 	}
 	
@@ -767,12 +767,12 @@ proc Fiber_Positioner_travel {} {
 		set info(control) "Idle"
 		return ""
 	} elseif {($config(travel_index) < [llength $travel_list])} {
-		LWDAQ_post "Fiber_Positioner_travel"
+		LWDAQ_post "DFPS_Manager_travel"
 		return ""
 	} else {
 		LWDAQ_print $info(log) "Travel Complete, Pass $config(pass_counter)." purple
 		if {$config(repeat)} {
-			LWDAQ_post "Fiber_Positioner_travel"
+			LWDAQ_post "DFPS_Manager_travel"
 			return ""
 		} else {
 			set info(control) "Idle"
@@ -782,13 +782,13 @@ proc Fiber_Positioner_travel {} {
 }
 
 #
-# Fiber_Positioner_travel_edit creats a travel list file if one does not exist
+# DFPS_Manager_travel_edit creats a travel list file if one does not exist
 # under the current file name, or reads an existing file. Displays the file for
 # editing, provides buttons to save under same or different names.
 #
-proc Fiber_Positioner_travel_edit {} {
-	upvar #0 Fiber_Positioner_info info
-	upvar #0 Fiber_Positioner_config config
+proc DFPS_Manager_travel_edit {} {
+	upvar #0 DFPS_Manager_info info
+	upvar #0 DFPS_Manager_config config
 	
 	if {![file exists $config(travel_file)]} {
 		LWDAQ_edit_script New 
@@ -799,11 +799,11 @@ proc Fiber_Positioner_travel_edit {} {
 }
 
 #
-# Fiber_Positioner_travel_browse allows us to choose a travel list file.
+# DFPS_Manager_travel_browse allows us to choose a travel list file.
 #
-proc Fiber_Positioner_travel_browse {} {
-	upvar #0 Fiber_Positioner_info info
-	upvar #0 Fiber_Positioner_config config
+proc DFPS_Manager_travel_browse {} {
+	upvar #0 DFPS_Manager_info info
+	upvar #0 DFPS_Manager_config config
 
 	set dn [file dirname $config(travel_file)]
 	if {![file exists $dn]} {set dn ""}
@@ -813,11 +813,11 @@ proc Fiber_Positioner_travel_browse {} {
 }
 
 #
-# Fiber_Positioner_open creates the Fiber Positioner window.
+# DFPS_Manager_open creates the DFPS Manager window.
 #
-proc Fiber_Positioner_open {} {
-	upvar #0 Fiber_Positioner_config config
-	upvar #0 Fiber_Positioner_info info
+proc DFPS_Manager_open {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}
@@ -828,11 +828,11 @@ proc Fiber_Positioner_open {} {
 	set f [frame $ff.controls]
 	pack $f -side top -fill x
 	
-	label $f.state -textvariable Fiber_Positioner_info(control) -width 20 -fg blue
+	label $f.state -textvariable DFPS_Manager_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
 	foreach a {Travel Step Stop Clear Reset} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "Fiber_Positioner_cmd $a"
+		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
 		pack $f.$b -side left -expand 1
 	}
 	foreach a {Help Configure} {
@@ -847,7 +847,7 @@ proc Fiber_Positioner_open {} {
 	foreach a {ip_addr dfps_sock injector_sock camera_sock \
 			flash_seconds settling_ms} {
 		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable Fiber_Positioner_config($a) \
+		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 2]
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
@@ -857,7 +857,7 @@ proc Fiber_Positioner_open {} {
 
 	foreach a {injector_leds} {
 		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 100
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 100
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -866,7 +866,7 @@ proc Fiber_Positioner_open {} {
 
 	foreach a {dfps_ids} {
 		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 100
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 100
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -876,16 +876,16 @@ proc Fiber_Positioner_open {} {
 	foreach d {n_out s_out e_out w_out} {
 		set a [string tolower $d]
 		label $f.l$a -text $d -fg $config(label_color)
-		entry $f.e$a -textvariable Fiber_Positioner_config($a) -width 5
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 5
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	foreach a {Move Zero Check} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "Fiber_Positioner_cmd $a"
+		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
 		pack $f.$b -side left -expand 1
 	}
 	button $f.txcmd -text "Transmit Panel" -command {
-		LWDAQ_post "Fiber_Positioner_transmit_panel"
+		LWDAQ_post "DFPS_Manager_transmit_panel"
 	}
 	pack $f.txcmd -side left -expand yes
 
@@ -893,23 +893,23 @@ proc Fiber_Positioner_open {} {
 	pack $f -side top -fill x
 
 	label $f.tl -text "travel_file" -fg $config(label_color)
-	entry $f.tlf -textvariable Fiber_Positioner_config(travel_file) -width 40
+	entry $f.tlf -textvariable DFPS_Manager_config(travel_file) -width 40
 	pack $f.tl $f.tlf -side left -expand yes
-	button $f.browse -text "Browse" -command Fiber_Positioner_travel_browse
-	button $f.edit -text "Edit" -command Fiber_Positioner_travel_edit
+	button $f.browse -text "Browse" -command DFPS_Manager_travel_browse
+	button $f.edit -text "Edit" -command DFPS_Manager_travel_edit
 	pack $f.browse $f.edit -side left -expand yes
-	checkbutton $f.repeat -text "Repeat" -variable Fiber_Positioner_config(repeat) 
+	checkbutton $f.repeat -text "Repeat" -variable DFPS_Manager_config(repeat) 
 	pack $f.repeat -side left -expand yes
-	checkbutton $f.trace -text "Trace" -variable Fiber_Positioner_config(trace_enable)
+	checkbutton $f.trace -text "Trace" -variable DFPS_Manager_config(trace_enable)
 	pack $f.trace -side left -expand yes
 	label $f.til -text "index:" -fg $config(label_color)
-	entry $f.tie -textvariable Fiber_Positioner_config(travel_index) -width 4
+	entry $f.tie -textvariable DFPS_Manager_config(travel_index) -width 4
 	pack $f.til $f.tie -side left -expand yes
 	label $f.tpl -text "pass:" -fg $config(label_color)
-	entry $f.tpe -textvariable Fiber_Positioner_config(pass_counter) -width 4
+	entry $f.tpe -textvariable DFPS_Manager_config(pass_counter) -width 4
 	pack $f.tpl $f.tpe -side left -expand yes
 	label $f.tll -text "loop:" -fg $config(label_color)
-	entry $f.tle -textvariable Fiber_Positioner_config(loop_counter) -width 4
+	entry $f.tle -textvariable DFPS_Manager_config(loop_counter) -width 4
 	pack $f.tll $f.tle -side left -expand yes
 	
 	set f [frame $w.image_frame]
@@ -920,19 +920,19 @@ proc Fiber_Positioner_open {} {
 	pack $f.image -side top -expand yes
 
 	set info(data) [LWDAQ_text_widget $f 80 5 1 1]
-	LWDAQ_print $info(data) "Fiber Positioner Data" purple
+	LWDAQ_print $info(data) "DFPS Manager Data" purple
 
 	set f [frame $w.log]
 	pack $f -side right -fill both -expand yes
 	
 	set info(log) [LWDAQ_text_widget $f 30 40 1 1]
-	LWDAQ_print $info(log) "Fiber Positioner Log" purple
+	LWDAQ_print $info(log) "DFPS Manager Log" purple
 	
 	return $w
 }
 
-Fiber_Positioner_init
-Fiber_Positioner_open
+DFPS_Manager_init
+DFPS_Manager_open
 	
 return ""
 
