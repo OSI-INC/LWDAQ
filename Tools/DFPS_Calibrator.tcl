@@ -35,14 +35,15 @@ proc DFPS_Calibrator_init {} {
 	set config(mount_left) "0 0 0 -21 0 -73 21 0 -73"
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	
-	set config(mount_right) "0 0 0 -21 0 -73 21 0 -73"
+	set config(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	set config(source_1) "6 14 D2"
+	set config(source_1) "6 14 D1"
 	set config(source_2) "6 14 D2"
-	set config(source_3) "6 14 D2"
-	set config(fit_bodies) "1 2 3"
-	set config(num_bodies) [llength $config(fit_bodies)]
+	set config(source_3) "6 14 D3"
+	set config(source_4) "6 14 D4"
+	set config(fit_sources) "1 2 3"
+	set config(num_sources) "4"
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
@@ -97,8 +98,8 @@ proc DFPS_Calibrator_clear {} {
 #
 # DFPS_Calibrator_examine opens a new window that displays the CMM measurements
 # of the left and right mounts, as well calibration constants of the left and
-# right cameras, as well as the calibration bodies. The window allows us to
-# modify the mount measurements and body definitions directly.
+# right cameras and the calibration sources. The window allows us to modify the
+# mount measurements and source positions directly.
 #
 proc DFPS_Calibrator_examine {} {
 	upvar #0 DFPS_Calibrator_config config
@@ -128,10 +129,10 @@ proc DFPS_Calibrator_examine {} {
 		pack $f.l$mount $f.e$mount -side left -expand yes
 	}
 
-	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+	for {set a 1} {$a <= $config(num_sources)} {incr a} {
 		set f [frame $w.$a]
 		pack $f -side top -fill x
-		label $f.l$a -text "Body $a\:"
+		label $f.l$a -text "Source $a\:"
 		entry $f.e$a -textvariable DFPS_Calibrator_config(source_$a) -width 70
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
@@ -185,7 +186,7 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 			incr a
 			set config(source_$a) "[lrange $s 1 3] 0 0 0 sphere 0 0 0 [lindex $s 0]"
 		}
-		set config(num_bodies) $a
+		set config(num_sources) $a
 	} else {
 		LWDAQ_print $info(text) "Cannot find \"$fn\"."
 		set info(state) "Idle"
@@ -193,7 +194,7 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 	}
 
 	set count 0
-	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+	for {set a 1} {$a <= $config(num_sources)} {incr a} {
 		foreach {s side} {L left R right} {
 			set ifn [file join $config(img_dir) $s$a\.gif]
 			if {[file exists $ifn]} {
@@ -203,7 +204,7 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		}
 	}
 	LWDAQ_print $info(text) "Read reference, left and right mounts.\
-		Read $config(num_bodies) bodies. Read $count images."
+		Read $config(num_sources) bodies. Read $count images."
 	
 	DFPS_Calibrator_clear
 		
@@ -256,8 +257,8 @@ proc DFPS_Calibrator_disagreement {params} {
 	# the one we want to display, we display it with the silhouette and model
 	# colors in the overlay.
 	set disagreement 0
-	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
-		if {[lsearch $config(fit_bodies) $a] >= 0} {set fit 1} else {set fit 0}
+	for {set a 1} {$a <= $config(num_sources)} {incr a} {
+		if {[lsearch $config(fit_sources) $a] >= 0} {set fit 1} else {set fit 0}
 		if {$a == $config(display_body)} {set display 1} else {set display 0}
 		if {$fit || $display} {
 			foreach side {left right} {
@@ -436,13 +437,13 @@ proc DFPS_Calibrator_check {} {
 		set mconfig($b) $config($b)
 	}
 	
-	for {set a 1} {$a <= $config(num_bodies)} {incr a} {
+	for {set a 1} {$a <= $config(num_sources)} {incr a} {
 		if {$config(stop_fit)} {
 			LWDAQ_print $info(text) "Check aborted by user."
 			set info(state) "Idle"
 			return ""
 		}
-		if {[lsearch $config(fit_bodies) $a] >= 0} {
+		if {[lsearch $config(fit_sources) $a] >= 0} {
 			set mconfig(bodies) [list $config(source_$a)]
 			lwdaq_image_manipulate img_left\_$a copy -name $minfo(img_left)
 			lwdaq_image_manipulate img_right\_$a copy -name $minfo(img_right)
@@ -519,7 +520,7 @@ proc DFPS_Calibrator_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach {a wd} {num_bodies 3 display_body 3 fit_bodies 30} {
+	foreach {a wd} {num_sources 3 display_body 3 fit_sources 30} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -635,11 +636,11 @@ left and right SCAMs. The fit applies the "scaling" values to the eight
 calibration constants of the cameras. We can fix any one of the eight parameters
 by setting its scaling value to zero. We always fix the pivot.z of SCAMs because
 this parameter has no geometric implementation. The fit uses only those
-calibration bodies specified in the fit_bodies string. If we want all bodies to
+calibration bodies specified in the fit_sources string. If we want all bodies to
 be used, we list all the body numbers from 1 to N for N bodies. If we want to
 use only two of them, we list their indeces. During the fit, we select one of
 the bodies to view by giving its index in the display_body entry. We can change
-both fit_bodies and display_bodies during the fit, and the fit will adapt as it
+both fit_sources and display_sources during the fit, and the fit will adapt as it
 proceeds.
 
 Stop: Abort fitting.
@@ -672,7 +673,7 @@ modification affects the fit by following with the Show button.
 
 Check: Opens the DFPS Manager Tool and uses its fitting routine to check the
 performance of the current camera calibration constants when applied to all
-bodies listed in fit_bodies. Leaves the DFPS Manager open at the end, with
+bodies listed in fit_sources. Leaves the DFPS Manager open at the end, with
 mounts and cameras updated.
 
 To use the calibrator, press Read and select your measurements. The calibrator
@@ -680,7 +681,7 @@ will display the images, silhouettes, and the modelled bodies. If the bodies are
 nowhere near the silhouettes, or they are not visible, you most likely have a
 mix-up in the mount coordinates. Check that you have the slot and cone balls
 named correctly for your black and blue SCAMs. If some bodies are in view of
-both cameras, but others are not, use fit_bodies to select two or more bodies
+both cameras, but others are not, use fit_sources to select two or more bodies
 that are in view of both cameras. Press Fit. Choose a body to display with
 display_body. The modelled body will start moving around. The status indicator
 on the top left will say "Fitting". After a minute or two, the fit will
