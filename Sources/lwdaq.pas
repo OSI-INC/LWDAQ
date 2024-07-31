@@ -6311,16 +6311,16 @@ origin is the top-left corner of the image sensor as seen on the screen. The
 units of image coordinates are microns, with x going left-right and y going
 top-bottom.</p>
 
-<pre>lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 75 0"
-1.720000 1.220000</pre>
+<pre>lwdaq bcam_image_position "0 0 750" "P0001 0 0 0 0 0 1 75 0"
+1.720 1.220</pre>
 
 <p>Here we see the image is at (1.72,1.22) in image coordinates, which is the
 center of a TC255P image sensor. You specify the BCAM itself with its
 calibration constants using the <i>camera</i> string, just as for <a
 href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
 
-<pre>lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 100 0"
-1.720000 1.220000</pre>
+<pre>lwdaq bcam_image_position "1 0 750" "P0001 0 0 0 0 0 1 75 0"
+1.620 1.220</pre>
 
 <p>Here we see movement of 1 mm at a range ten times the pivot-ccd distance
 causing a 100-um move on the image.</p>

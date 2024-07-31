@@ -2,6 +2,10 @@
 #
 # Copyright (C) 2024 Kevan Hashemi, Open Source Instruments Inc.
 #
+# The DFPS Calibrator calibrates the Fiber View Cameras (FVCs) of a Direct Fiber
+# Positioning System (DFPS). This version of the code assumes two FVCs, left and
+# right as seen looking in the positive z-direction into the telescope. We 
+#
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
@@ -27,23 +31,19 @@ proc DFPS_Calibrator_init {} {
 
 	set config(cam_left) "12.675 39.312 -2.0 0.0 0.0 2 19.0 0.0" 
 	set config(cam_right) "12.675 39.312 -2.0 0.0 0.0 2 19.0 0.0" 
-	set config(scaling) "0 0 0 1 1 0 1 1"
+	set config(scaling) "1 1 1 1 1 0 1 1"
 
-	set config(mount_reference) "0 0 0 -21 0 -73 21 0 -73"
-	set config(coord_reference) [lwdaq bcam_coord_from_mount $config(mount_reference)]
-	
 	set config(mount_left) "0 0 0 -21 0 -73 21 0 -73"
-	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	
 	set config(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
-	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	set config(source_1) "6 14 D1"
-	set config(source_2) "6 14 D2"
-	set config(source_3) "6 14 D3"
-	set config(source_4) "6 14 D4"
-	set config(fit_sources) "1 2 3"
+	set config(source_1) "0 105 -50"
+	set config(source_2) "30 105 -50"
+	set config(source_3) "0 75 -50"
+	set config(source_4) "30 75 -50"
+	set config(fit_sources) "1 3 4"
 	set config(num_sources) "4"
+	set config(spots_left) "100 100 200 100 100 200 200 200"
+	set config(spots_left) "100 100 200 100 100 200 200 200"
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
@@ -54,8 +54,9 @@ proc DFPS_Calibrator_init {} {
 	set config(intensify) "exact"
 	set config(num_lines) "2000"
 	set config(threshold) "10 %"
-	set config(line_width) "1"
 	set config(img_dir) "~/Desktop/DFPS"
+	
+	set config(cross_size) "1000"
 	
 	set info(state) "Idle"
 	
@@ -81,12 +82,6 @@ proc DFPS_Calibrator_clear {} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 
-	LWDAQ_print $info(text) "Coordinate Systems:"
-	foreach mount {reference left right} {
-		set config(coord_$mount) [lwdaq bcam_coord_from_mount $config(mount_$mount)]
-		LWDAQ_print $info(text) "$mount $config(coord_$mount)" brown
-	}
-
 	lwdaq_image_manipulate img_left none -clear 1
 	lwdaq_image_manipulate img_right none -clear 1	
 	lwdaq_draw img_left photo_left \
@@ -97,9 +92,9 @@ proc DFPS_Calibrator_clear {} {
 
 #
 # DFPS_Calibrator_examine opens a new window that displays the CMM measurements
-# of the left and right mounts, as well calibration constants of the left and
-# right cameras and the calibration sources. The window allows us to modify the
-# mount measurements and source positions directly.
+# of the left and right mounts, calibration constants of the left and right
+# cameras, and coordinates of the calibration sources. The window allows us to
+# modify the all these values by hand.
 #
 proc DFPS_Calibrator_examine {} {
 	upvar #0 DFPS_Calibrator_config config
@@ -121,7 +116,7 @@ proc DFPS_Calibrator_examine {} {
 	button $f.unsave -text "Unsave Configuration" -command "LWDAQ_tool_unsave $info(name)"
 	pack $f.unsave -side left -expand 1
 	
-	foreach mount {reference left right} {
+	foreach mount {left right} {
 		set f [frame $w.$mount]
 		pack $f -side top -fill x
 		label $f.l$mount -text "$mount\:"
@@ -141,14 +136,14 @@ proc DFPS_Calibrator_examine {} {
 }
 
 #
-# DFPS_Calibrator_read looks for a file called CMM.txt in a directory. We either
-# pass it the directory name or the routine will open a browser for us to choose
-# the directory. From the CMM.txt file the calibrator reads the global
-# coordinats of the balls in the reference mount, left SCAM mount, and right
-# SCAM mount. It reads the diameter and position of all object sphere
-# measurements, each of which represents a location of the sphere for which we
-# have accompanying DFPS images Lx.gif and Rx.gif, where x is 1 for the first
-# position, and so on. 
+# DFPS_Calibrator_read looks for a file called CMM.txt. We either pass it the
+# directory name or the routine will open a browser for us to choose the
+# directory. From the CMM.txt file the calibrator reads the global coordinates
+# of the balls in the left and right FVC mounts, and the locations of the four
+# calibration sources. Having read CMM.txt, the routine looks for L.gif and
+# R.gif, the images returned by the left and right FVCs viewing the four
+# calibration sources. In these two images, the sources must be arranged from 1
+# to 4 in an x-y grid, as recognised by the BCAM Instrument.
 #
 proc DFPS_Calibrator_read {{img_dir ""}} {
 	upvar #0 DFPS_Calibrator_config config
@@ -166,6 +161,7 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		set config(img_dir) $img_dir
 	}
 	
+	LWDAQ_print $info(text) "Reading mount and source positions from CMM.txt."
 	set fn [file join $img_dir CMM.txt]
 	if {[file exists $fn]} {
 		set f [open $fn r]
@@ -174,37 +170,41 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		set numbers [list]
 		foreach a $cmm {if {[string is double -strict $a]} {lappend numbers $a}}
 		set spheres [list]
-		foreach {d x y z} $numbers {lappend spheres "$x $y $z"}
-		set config(mount_reference) [join [lrange $spheres 0 2]]
-		set config(mount_left) [join [lrange $spheres 3 5]]
-		set config(mount_right) [join [lrange $spheres 6 8]]
-		set spheres [list]
-		foreach {d x y z} $numbers {lappend spheres "$d $x $y $z"}
-		set spheres [lrange $spheres 9 end]
-		set a 0
-		foreach s $spheres {
-			incr a
-			set config(source_$a) "[lrange $s 1 3] 0 0 0 sphere 0 0 0 [lindex $s 0]"
+		for {set sn 0} {$sn < 9} {incr sn} {
+			lappend spheres [lrange $numbers 1 3]
+			set numbers [lrange $numbers 4 end]
 		}
-		set config(num_sources) $a
+		set config(mount_left) [join [lrange $spheres 6 8]]
+		set config(mount_right) [join [lrange $spheres 3 5]]
+		for {set a 1} {$a <= $config(num_sources)} {incr a} {
+			set config(source_$a) [lrange $numbers 0 2]
+			set numbers [lrange $numbers 3 end]
+		}
 	} else {
 		LWDAQ_print $info(text) "Cannot find \"$fn\"."
 		set info(state) "Idle"
 		return ""
 	}
 
-	set count 0
-	for {set a 1} {$a <= $config(num_sources)} {incr a} {
-		foreach {s side} {L left R right} {
-			set ifn [file join $config(img_dir) $s$a\.gif]
-			if {[file exists $ifn]} {
-				LWDAQ_read_image_file $ifn img_$side\_$a
-				incr count
+	LWDAQ_print $info(text) "Reading and analyzing left and right FVC images."
+	foreach {s side} {L left R right} {
+		set ifn [file join $config(img_dir) $s\.gif]
+		if {[file exists $ifn]} {
+			LWDAQ_read_image_file $ifn img_$side
+			set result [LWDAQ_analysis_BCAM img_$side]
+			if {![LWDAQ_is_error_result $result]} {
+				set config(spots_$side) ""
+				foreach {x y num pk acc th} $result {
+					append config(spots_$side) "$x $y "
+				}
+				LWDAQ_print $info(text) $config(spots_$side) green
+			} else {
+				LWDAQ_print $info(text) $result
+				set info(state) "Idle"
+				return ""
 			}
 		}
 	}
-	LWDAQ_print $info(text) "Read reference, left and right mounts.\
-		Read $config(num_sources) bodies. Read $count images."
 	
 	DFPS_Calibrator_clear
 		
@@ -215,22 +215,22 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		DFPS_Calibrator_examine
 	}
 	
-	if {[catch {DFPS_Calibrator_show} error_message]} {
+	if {[catch {
+		DFPS_Calibrator_show
+	} error_message]} {
 		LWDAQ_print $info(text) "ERROR: $error_message\."
 		LWDAQ_print $info(text) \
-			"SUGGESTION: Check your CMM.txt file format and image names."	
+			"SUGGESTION: Check CMM.txt format, check L.gif and R.gif exist."	
 	}
 	
 	set info(state) "Idle"
 }
 
 #
-# DFPS_Calibrator_disagreement takes the eight SCAM images and obtains the
-# number of pixels in which our modelled bodies and their actual silhouettes
-# disagree. In doing so, the routine colors the overlay of the SCAM images to
-# show the modelled bodies and their silhouettes with the disagreement pixels
-# colored blue for model without silhouette and orange for silhouette without
-# model and no overlay color for agreement between the two.
+# DFPS_Calibrator_disagreement calculates root mean square square distance
+# between the actual image positions and the modelled image positions we obtain
+# when applying our mount measurements, FVC calibration constants, and the
+# measured source positions.
 #
 proc DFPS_Calibrator_disagreement {params} {
 	upvar #0 DFPS_Calibrator_config config
@@ -242,46 +242,49 @@ proc DFPS_Calibrator_disagreement {params} {
 		error "Cannot draw DFPS images: no DFPS window open."
 	}
 	
-	# Make sure messages from the SCAM routines get to the DFPS Calibrator's text
+	# Make sure messages from the BCAM routines get to the DFPS Calibrator's text
 	# window. Set the number of decimal places to three.
 	lwdaq_config -text_name $info(text)
 
 	# Extract the two sets of camera calibration constants from the parameters passed
 	# to us by the fitter.
-	set scam_left "SCAM_left [lrange $params 0 7]"
-	set scam_right "SCAM_left [lrange $params 8 15]"
+	set fvc_left "FVC_left [lrange $params 0 7]"
+	set fvc_right "FVC_left [lrange $params 8 15]"
 	
-	# Go through the list of bodies. For each body, we check to see if it is one
-	# chosen for the calibration fit. If so, we calculate disagreement for the
-	# left and right cameras and add to our disagreement total. If the body is
-	# the one we want to display, we display it with the silhouette and model
-	# colors in the overlay.
-	set disagreement 0
-	for {set a 1} {$a <= $config(num_sources)} {incr a} {
-		if {[lsearch $config(fit_sources) $a] >= 0} {set fit 1} else {set fit 0}
-		if {$a == $config(display_body)} {set display 1} else {set display 0}
-		if {$fit || $display} {
-			foreach side {left right} {
-				lwdaq_image_manipulate img_$side\_$a none -clear 1	
-				lwdaq_scam img_$side\_$a project \
-					$config(coord_$side) [set scam_$side] \
-					$config(source_$a) \
-					-num_lines $config(num_lines) -line_width $config(line_width)
-				set count [lindex [lwdaq_scam img_$side\_$a \
-					"disagreement" $config(threshold)] 0]
-				if {$fit} {
-					set disagreement [expr $disagreement + $count]
-				}
-				if {$display} {
-					lwdaq_draw img_$side\_$a photo_$side \
-						-intensify $config(intensify) -zoom $config(zoom)
-				}
+	# Go through the four sources. For each source, we calculate the modelled
+	# image position in each camera. We look up the actual image position in
+	# each camera, as we obtained when we read the two images. We square the
+	# distance between the actual and modelled positions and add to our
+	# disagreement.
+	set sum_squares 0
+	set count 0
+	foreach side {left right} {
+		lwdaq_image_manipulate img_$side none -clear 1	
+		set spots $config(spots_$side)
+		for {set a 1} {$a <= $config(num_sources)} {incr a} {
+			if {[lsearch $config(fit_sources) $a] >= 0} {
+				set sb [lwdaq bcam_from_global_point \
+					$config(source_$a) $config(mount_$side)]
+				set th [lwdaq bcam_image_position $sb [set fvc_$side]]
+				scan $th %f%f x_th y_th
+				set x_th [format %.2f [expr $x_th * 1000.0]]
+				set y_th [format %.2f [expr $y_th * 1000.0]]
+				set x_a [lindex $spots 0]
+				set y_a [lindex $spots 1]
+				set spots [lrange $spots 2 end]
+				set err [expr ($x_a-$x_th)*($x_a-$x_th) + ($y_a-$y_th)*($y_a-$y_th)]
+				LWDAQ_print $info(text) "$sb $th $x_a $y_a\
+					[format %.1f [expr sqrt($err)]]" orange
+				set sum_squares [expr $sum_squares + $err]
+				incr count
 			}
 		}
+		lwdaq_draw img_$side photo_$side \
+			-intensify $config(intensify) -zoom $config(zoom)
 	}
 	
 	# Return the total disagreement, which is our error value.
-	return $disagreement
+	return [format %.3f [expr sqrt($sum_squares/$count)]]
 }
 
 #
@@ -303,10 +306,10 @@ proc DFPS_Calibrator_get_params {} {
 
 #
 # DFPS_Calibrator_show gets the current camera calibration constants and shows
-# the locations of the modelled bodies in their left images. It calculates the
-# disagreement, and prints the current parameters and disagreement to the text
-# window. In case we have adjusted the mounts before showing, we calculate
-# again the pose of the mount from both sets of balls.
+# the locations of the modeled sources. It calculates the disagreement, and
+# prints the current parameters and disagreement to the text window. In case we
+# have adjusted the mounts before showing, we calculate again the pose of the
+# mount from both sets of balls.
 #
 proc DFPS_Calibrator_show {} {
 	upvar #0 DFPS_Calibrator_config config
@@ -411,58 +414,6 @@ proc DFPS_Calibrator_fit {} {
 }
 
 #
-# DFPS_Calibrator_check opens the DFPS Manager and uses its fitting routine to
-# measure the position of all calibration bodies using the current camera
-# calibration constants and mount measurements. It compares the DFPS measurement
-# to the CMM measurement and reports on the difference. Before the DFPS Manager
-# performs its fit, we displace its model of the calibration model so as to
-# blind it to the correct body pose. The results of the check we print in the
-# calibrator text window, giving the position of the body as measured by the
-# CMM, and the difference between the DFPS measurement and the CMM measurement.
-#
-proc DFPS_Calibrator_check {} {
-	upvar #0 DFPS_Calibrator_config config
-	upvar #0 DFPS_Calibrator_info info
-	upvar #0 DFPS_Manager_config mconfig
-	upvar #0 DFPS_Manager_info minfo
-	upvar #0 LWDAQ_config_SCAM iconfig
-	
-	set config(stop_fit) 0
-	set info(state) "Check"
-
-	set iconfig(analysis_threshold) $config(threshold)
-
-	LWDAQ_run_tool "DFPS_Manager"
-	foreach b {num_lines line_width cam_left cam_right mount_left mount_right} {
-		set mconfig($b) $config($b)
-	}
-	
-	for {set a 1} {$a <= $config(num_sources)} {incr a} {
-		if {$config(stop_fit)} {
-			LWDAQ_print $info(text) "Check aborted by user."
-			set info(state) "Idle"
-			return ""
-		}
-		if {[lsearch $config(fit_sources) $a] >= 0} {
-			set mconfig(bodies) [list $config(source_$a)]
-			lwdaq_image_manipulate img_left\_$a copy -name $minfo(img_left)
-			lwdaq_image_manipulate img_right\_$a copy -name $minfo(img_right)
-			DFPS_Manager_displace
-			set result [lindex [DFPS_Manager_fit] 0]
-			
-			LWDAQ_print $info(text) "$a [lrange $config(source_$a) 0 2]\
-				[format %.3f [expr [lindex $result 0]-[lindex $config(source_$a) 0]]]\
-				[format %.3f [expr [lindex $result 1]-[lindex $config(source_$a) 1]]]\
-				[format %.3f [expr [lindex $result 2]-[lindex $config(source_$a) 2]]]"
-		}
-	}
-	
-	set info(state) "Idle"
-	return ""
-
-}
-
-#
 # DFPS_Calibrator_open opens the DFPS Calibrator window.
 #
 proc DFPS_Calibrator_open {} {
@@ -493,10 +444,10 @@ proc DFPS_Calibrator_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	set f [frame $w.scam]
+	set f [frame $w.fvc]
 	pack $f -side top -fill x
 	
-	foreach {a wd} {threshold 6 num_lines 4 line_width 2 scaling 20} {
+	foreach {a wd} {threshold 6 scaling 20} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -514,13 +465,13 @@ proc DFPS_Calibrator_open {} {
 	set f [frame $w.measurements]
 	pack $f -side top -fill x
 
-	foreach a {Read Examine Check} {
+	foreach a {Read Examine} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Calibrator_$b"
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach {a wd} {num_sources 3 display_body 3 fit_sources 30} {
+	foreach {a wd} {fit_sources 30} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -550,26 +501,21 @@ return ""
 
 ----------Begin Help----------
 
-The Contactless Position Measurement System (DFPS) Calibrator calculates the
-calibration constants of the two Silhouette Cameras (SCAMs) mounted on a DFPS
+The Direct Fiber Positioning System (DFPS) Calibrator calculates the
+calibration constants of the two Fiber View Cameras (FVCs) mounted on a DFPS
 base plate. The routine assumes we have Coordinate Measuring Machine (CMM)
-measurements of a reference mount, a left SCAM mount, a right SCAM mount, and
-two or more bodies in the field of view of both SCAMs. These "bodies" can be the
-same or different bodies. This version of the Calibrator supports only
-single-sphere bodies, but future versions might permit calibration with shafts
-and pairs of spheres. The Calibrator assumes we have both left and right SCAM
-images to accompany all calibration bodies. 
+measurements of the left FVC mount, the right FVC mount, and
+four point sources visible to both cameras. The program takes as input two 
+images L.gif and R.gif from the left and right FVCs respectively, and CMM.txt
+from the CMM.
 
-The CMM output file must contain the diameter, and x, y, and z coordinates of
-the cone, slot, and flat balls in the mount we use to define the global
-coordinate system, followed by the same for the left and right mounts. Next come
-the diameter, x, y, and z coordinates of each calibration sphere. The file
-containing these measurements must be named CMM.txt. In addition to the measured
-diameters and coordinates, CMM.txt may contain any number of words that are not
-real number strings and any number of white space charcters. All words that are
-not real numbers will be ignored. An example CMM.txt file is to be found below.
-The images must be named L1, R1, L2, ... RN for the N spheres. The spheres can
-be GIF, PNG, or DAQ.
+The CMM.txt file must contain the diameter and x, y, and z coordinates of the
+cone, slot, and flat balls in the two FVC mounts. After that we must find x, y,
+and z coordinates of each calibration source. The file containing these
+measurements must be named CMM.txt. In addition to the measured diameters and
+coordinates, CMM.txt may contain any number of words that are not real number
+strings and any number of white space charcters. All words that are not real
+numbers will be ignored. An example CMM.txt file is to be found below.
 
 +---------------------+--------------+------+-----------+---------+
 | Feature Table       |              |      |           |         |
@@ -579,69 +525,64 @@ be GIF, PNG, or DAQ.
 | Data Alignments     | original     |      |           |         |
 |                     |              |      |           |         |
 | Name                | Control      | Nom  | Meas      | Tol     |
-| Cone                | Diameter     |      | 6.338     | ±1.000  |
-| Cone                | X            |      | 0.000     | ±1.000  |
-| Cone                | Y            |      | 0.000     | ±1.000  |
-| Cone                | Z            |      | 0.000     | ±1.000  |
-| Slot                | Diameter     |      | 6.339     | ±1.000  |
-| Slot                | X            |      | -20.975   | ±1.000  |
-| Slot                | Y            |      | 0.000     | ±1.000  |
-| Slot                | Z            |      | -72.999   | ±1.000  |
-| Flat                | Diameter     |      | 6.335     | ±1.000  |
-| Flat                | X            |      | 21.008    | ±1.000  |
-| Flat                | Y            |      | 0.000     | ±1.000  |
-| Flat                | Z            |      | -73.065   | ±1.000  |
-| ConeL               | Diameter     |      | 6.340     | ±1.000  |
-| ConeL               | X            |      | 91.877    | ±1.000  |
-| ConeL               | Y            |      | -19.475   | ±1.000  |
-| ConeL               | Z            |      | -3.330    | ±1.000  |
-| SlotL               | Diameter     |      | 6.338     | ±1.000  |
-| SlotL               | X            |      | 83.628    | ±1.000  |
-| SlotL               | Y            |      | -19.455   | ±1.000  |
-| SlotL               | Z            |      | -78.877   | ±1.000  |
-| FlatL               | Diameter     |      | 6.341     | ±1.000  |
-| FlatL               | X            |      | 124.975   | ±1.000  |
-| FlatL               | Y            |      | -19.476   | ±1.000  |
-| FlatL               | Z            |      | -71.682   | ±1.000  |
-| ConeR               | Diameter     |      | 6.336     | ±1.000  |
-| ConeR               | X            |      | -78.059   | ±1.000  |
-| ConeR               | Y            |      | -19.492   | ±1.000  |
-| ConeR               | Z            |      | -2.332    | ±1.000  |
-| SlotR               | Diameter     |      | 6.337     | ±1.000  |
-| SlotR               | X            |      | -75.026   | ±1.000  |
-| SlotR               | Y            |      | -19.497   | ±1.000  |
-| SlotR               | Z            |      | -78.231   | ±1.000  |
-| FlatR               | Diameter     |      | 6.339     | ±1.000  |
-| FlatR               | X            |      | -115.797  | ±1.000  |
-| FlatR               | Y            |      | -19.534   | ±1.000  |
-| FlatR               | Z            |      | -68.268   | ±1.000  |
-| S1                  | Diameter     |      | 38.060    | ±1.000  |
-| S1                  | X            |      | 21.098    | ±1.000  |
-| S1                  | Y            |      | 24.145    | ±1.000  |
-| S1                  | Z            |      | 386.482   | ±1.000  |
-| S2                  | Diameter     |      | 38.054    | ±1.000  |
-| S2                  | X            |      | 21.274    | ±1.000  |
-| S2                  | Y            |      | 12.845    | ±1.000  |
-| S2                  | Z            |      | 386.406   | ±1.000  |
+| Global1             | Diameter     |      | 12.25     | ±1.000  |
+| Global1             | X            |      | 0.000     | ±1.000  |
+| Global1             | Y            |      | 0.000     | ±1.000  |
+| Global1             | Z            |      | 0.000     | ±1.000  |
+| Global2             | Diameter     |      | 12.25     | ±1.000  |
+| Global2             | X            |      | 100.399   | ±1.000  |
+| Global2             | Y            |      | 0.000     | ±1.000  |
+| Global2             | Z            |      | 0.000     | ±1.000  |
+| Global3             | Diameter     |      | 12.25     | ±1.000  |
+| Global3             | X            |      | 1.008     | ±1.000  |
+| Global3             | Y            |      | -0.119    | ±1.000  |
+| Global3             | Z            |      | 175.239   | ±1.000  |
+| Right1              | Diameter     |      | 6.350     | ±1.000  |
+| Right1              | X            |      | -104.070  | ±1.000  |
+| Right1              | Y            |      | 51.174    | ±1.000  |
+| Right1              | Z            |      | 199.266   | ±1.000  |
+| Right2              | Diameter     |      | 6.350     | ±1.000  |
+| Right2              | X            |      | -108.719  | ±1.000  |
+| Right2              | Y            |      | 51.002    | ±1.000  |
+| Right2              | Z            |      | 275.087   | ±1.000  |
+| Right3              | Diameter     |      | 6.350     | ±1.000  |
+| Right3              | X            |      | -148.270  | ±1.000  |
+| Right3              | Y            |      | 50.965    | ±1.000  |
+| Right3              | Z            |      | 261.039   | ±1.000  |
+| Left1               | Diameter     |      | 6.350     | ±1.000  |
+| Left1               | X            |      | 79.596    | ±1.000  |
+| Left1               | Y            |      | 51.571    | ±1.000  |
+| Left1               | Z            |      | 199.741   | ±1.000  | 
+| Left2               | Diameter     |      | 6.350     | ±1.000  |
+| Left2               | X            |      | 119.754   | ±1.000  |
+| Left2               | Y            |      | 51.457    | ±1.000  |
+| Left2               | Z            |      | 264.248   | ±1.000  |
+| Left3               | Diameter     |      | 6.350     | ±1.000  |
+| Left3               | X            |      | 79.246    | ±1.000  | 
+| Left3               | Y            |      | 51.484    | ±1.000  |
+| Left3               | Z            |      | 275.697   | ±1.000  |
+| S1                  | X            |      | -28.580   | ±1.000  |
+| S1                  | Y            |      | 103.532   | ±1.000  |
+| S1                  | Z            |      | -91.733   | ±1.000  |
+| S2                  | X            |      | 1.422     | ±1.000  |
+| S2                  | Y            |      | 103.656   | ±1.000  |
+| S2                  | Z            |      | -92.246   | ±1.000  |
+| S3                  | X            |      | -28.496   | ±1.000  |
+| S3                  | Y            |      | 73.575    | ±1.000  |
+| S3                  | Z            |      | -92.210   | ±1.000  |
+| S4                  | X            |      | 1.415     | ±1.000  |
+| S4                  | Y            |      | 73.674    | ±1.000  |
+| S4                  | Z            |      | -92.317   | ±1.000  |
 +---------------------+--------------+------+-----------+---------+
 
-The calibrator works by minimizing disagreement between actual silhouettes and
-drawings of modelled spheres. The drawing should be filled, as when num_lines is
-2000, or else the fit may not converge correctly. The line width should be only
-one pixel, as with line_width is 1, or else the fill will make the modelled
-object appear too large. The silhouettes will be drawn using the intensity
-threshold dictated by the threshold string. When we press Fit, the simplex
-fitter starts minimizing the disagreement by adjusting the calibrations of the
-left and right SCAMs. The fit applies the "scaling" values to the eight
-calibration constants of the cameras. We can fix any one of the eight parameters
-by setting its scaling value to zero. We always fix the pivot.z of SCAMs because
-this parameter has no geometric implementation. The fit uses only those
-calibration bodies specified in the fit_sources string. If we want all bodies to
-be used, we list all the body numbers from 1 to N for N bodies. If we want to
-use only two of them, we list their indeces. During the fit, we select one of
-the bodies to view by giving its index in the display_body entry. We can change
-both fit_sources and display_sources during the fit, and the fit will adapt as it
-proceeds.
+The calibrator works by minimizing disagreement between actual spot positions
+and modelled spot positions. When we press Fit, the simplex fitter starts
+minimizing this disagreement by adjusting the calibrations of the left and right
+FVCs. The fit applies the "scaling" values to the eight calibration constants of
+the cameras. We can fix any one of the eight parameters by setting its scaling
+value to zero. We always fix the pivot.z scaling factor to zero because this
+parameter has no geometric implementation. The fit uses only those calibration
+sources specified in the fit_sources string.
 
 Stop: Abort fitting.
 
@@ -659,36 +600,21 @@ Configure: Open configuration panel with Save and Unsave buttons.
 Help: Get this help page.
 
 Read: Select a directory, read image files and CMM measurements. The images must
-be L1.gif, R1.gif, ... RN.gif, where N is the number of calibration spheres. The
-CMM measurements must be in a file called CMM.txt. The only real-valued words in
-the file must be diameter, x, y, z coordinates in millimeters of the three
-global coordinate system definition balls, the cone, slot, flat balls of the
-left and right SCAM mounts, and the calibration spheres. The text table below is
-an example of one produced by our CMM that satisfies the calibrator's
-requirements.
+be L.gif and R.gif.
 
-Examine: Open a window that displays the mount and body measurements produce by
-the CMM. We can modify any measurement in this window and see how our
+Examine: Open a window that displays the mount and source measurements produced
+by the CMM. We can modify any measurement in this window and see how our
 modification affects the fit by following with the Show button.
 
-Check: Opens the DFPS Manager Tool and uses its fitting routine to check the
-performance of the current camera calibration constants when applied to all
-bodies listed in fit_sources. Leaves the DFPS Manager open at the end, with
-mounts and cameras updated.
-
 To use the calibrator, press Read and select your measurements. The calibrator
-will display the images, silhouettes, and the modelled bodies. If the bodies are
-nowhere near the silhouettes, or they are not visible, you most likely have a
-mix-up in the mount coordinates. Check that you have the slot and cone balls
-named correctly for your black and blue SCAMs. If some bodies are in view of
-both cameras, but others are not, use fit_sources to select two or more bodies
-that are in view of both cameras. Press Fit. Choose a body to display with
-display_body. The modelled body will start moving around. The status indicator
-on the top left will say "Fitting". After a minute or two, the fit will
-converge. The status label will return to "Idle". The camera calibration
-constants are now ready.
+will display the images, the measured image positions, and the modelled image
+positions. If the bodies are nowhere near the silhouettes, or they are not
+visible, you most likely have a mix-up in the mount coordinates. Press Fit. The
+modelled sources will start moving around. The status indicator on the top left
+will say "Fitting". The status label will return to "Idle" when the fit is done.
+The camera calibration constants are now ready.
 
-(C) Kevan Hashemi, 2023, Open Source Instruments Inc.
+(C) Kevan Hashemi, 2023-2024, Open Source Instruments Inc.
 https://www.opensourceinstruments.com
 
 ----------End Help----------
