@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "1.5"
+	LWDAQ_tool_init "SCT_Check" "1.6"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -43,6 +43,9 @@ proc SCT_Check_init {} {
 	set config(waveform_amplitude) "3"
 	set config(waveform_offset) "0"
 	set config(waveform_frequency) "10"
+	set config(sweep_flo) "1"
+	set config(sweep_fhi) "1000"
+	set config(sweep_duration) "2"
 
 	set config(min_num_clocks) "64"
 	set config(max_num_clocks) "512"
@@ -125,28 +128,51 @@ proc SCT_Check_on {} {
 	upvar #0 SCT_Check_config config
 	global LWFG
 
-	LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
-		$config(waveform_frequency) Hz,\
-		$config(waveform_amplitude) V amplitude,\
-		$config(waveform_offset) V offset." purple
-	set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
-	set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
-	set result [LWFG_configure $config(gen_ip) $config(gen_ch) \
-		$config(waveform_type) \
-		$config(waveform_frequency) \
-		$v_lo $v_hi]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(text) $result
-	} elseif {$config(verbose)} {
-		foreach a {dac_lo dac_hi divisor num_pts num_cycles} {
-			set $a [lindex $result 0]
-			LWDAQ_print $info(text) "$a = [lindex $result 0]"
-			set result [lrange $result 1 end] 
+	if {$config(waveform_type) != "sweep"} {
+		LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
+			$config(waveform_frequency) Hz,\
+			$config(waveform_amplitude) V amplitude,\
+			$config(waveform_offset) V offset." purple
+		set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
+		set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
+		set result [LWFG_configure $config(gen_ip) $config(gen_ch) \
+			$config(waveform_type) \
+			$config(waveform_frequency) \
+			$v_lo $v_hi]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $info(text) $result
+		} elseif {$config(verbose)} {
+			foreach a {dac_lo dac_hi divisor num_pts num_cycles} {
+				set $a [lindex $result 0]
+				LWDAQ_print $info(text) "$a = [lindex $result 0]"
+				set result [lrange $result 1 end] 
+			}
+			LWDAQ_print $info(text) "rc = [format %3.f [expr 0.001*[lindex $result 0]]] us"
+			set actual [expr $LWFG(clock_hz)*$num_cycles/$num_pts/$divisor]
+			LWDAQ_print $info(text) "actual = [format %.3f $actual] Hz"
+			LWDAQ_print $info(text) "requested = [format %.3f $config(waveform_frequency)] Hz"
 		}
-		LWDAQ_print $info(text) "rc = [format %3.f [expr 0.001*[lindex $result 0]]] us"
-		set actual [expr $LWFG(clock_hz)*$num_cycles/$num_pts/$divisor]
-		LWDAQ_print $info(text) "actual = [format %.3f $actual] Hz"
-		LWDAQ_print $info(text) "requested = [format %.3f $config(waveform_frequency)] Hz"
+	} else {
+		LWDAQ_print $info(text) "Channel $config(gen_ch), sweep,\
+			$config(sweep_flo) to $config(sweep_fhi)) Hz,\
+			$config(sweep_duration) s,\
+			$config(waveform_amplitude) V amplitude,\
+			$config(waveform_offset) V offset." purple
+		set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
+		set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
+		set result [LWFG_sweep_sine $config(gen_ip) $config(gen_ch) \
+			$config(sweep_flo) $config(sweep_fhi) $v_lo $v_hi \
+			$config(sweep_duration) 1]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $info(text) $result
+		} elseif {$config(verbose)} {
+			foreach a {dac_lo dac_hi divisor num_pts num_cycles} {
+				set $a [lindex $result 0]
+				LWDAQ_print $info(text) "$a = [lindex $result 0]"
+				set result [lrange $result 1 end] 
+			}
+			LWDAQ_print $info(text) "rc = [format %3.f [expr 0.001*[lindex $result 0]]] us"
+		}
 	}
 	
 	return ""
@@ -454,8 +480,11 @@ return ""
 
 The Subcutaneous Transmitter (SCT) Check tool uses a data receiver and a
 function generator to measure the frequency response and battery voltages of
-SCTs during and after assembly and encapsulation. In particular, we use the tool
-to produce plots of gain versus frequency after encapsulation. The function
+SCTs during and after assembly and encapsulation. We use the tool to produce
+rapid frequency sweeps that allow us to see the approximate frequency response
+of a transmitter prior to encapsulation, or when we are checking the
+transmitters taking part in our accelerated aging tests. We use the tool to
+produce plots of gain versus frequency after encapsulation. The function
 generator must be one of our LWDAQ instruments, such as the Function Generator
 (A3050). The receiver must be one of our LWDAQ telemetry receivers, such as the
 Octal Data Receiver (A3027E) or Telemetry Control Box (TCB-A16). The tool uses
@@ -463,8 +492,11 @@ the LWFG package, included with LWDAQ, to configure the function generator. It
 uses the Receiver Instrument, included with LWDAQ, to download telemetry signals
 from the receiver.
 
-Type: The waveform type, by default a sinusoid, can be "sine", "square", or
-"triangle".
+Type: The waveform type, by default a sinusoid, can be "sine", "square",
+"triangle", or "sweep". If "sweep", we will get a logarithmic, sinusoidal sweep.
+The sweep will start at sweep_flo and end at sweep_fhi. It will take
+sweep_duration seconds. Its amplitude and offset will be the same as for any
+other waveform.
 
 Frequency: The waveform frequency, anything from 1 mHz to 1 MHz.
 
