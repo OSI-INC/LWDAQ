@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "1.6"
+	LWDAQ_tool_init "SCT_Check" "1.7"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -154,7 +154,7 @@ proc SCT_Check_on {} {
 		}
 	} else {
 		LWDAQ_print $info(text) "Channel $config(gen_ch), sweep,\
-			$config(sweep_flo) to $config(sweep_fhi)) Hz,\
+			$config(sweep_flo) to $config(sweep_fhi) Hz,\
 			$config(sweep_duration) s,\
 			$config(waveform_amplitude) V amplitude,\
 			$config(waveform_offset) V offset." purple
@@ -487,16 +487,17 @@ transmitters taking part in our accelerated aging tests. We use the tool to
 produce plots of gain versus frequency after encapsulation. The function
 generator must be one of our LWDAQ instruments, such as the Function Generator
 (A3050). The receiver must be one of our LWDAQ telemetry receivers, such as the
-Octal Data Receiver (A3027E) or Telemetry Control Box (TCB-A16). The tool uses
-the LWFG package, included with LWDAQ, to configure the function generator. It
-uses the Receiver Instrument, included with LWDAQ, to download telemetry signals
-from the receiver.
+Octal Data Receiver (A3027E), Animal Location Tracker, (ALT), or Telemetry
+Control Box (TCB). The tool uses the LWFG package, included with LWDAQ, to
+configure the function generator. It uses the Receiver Instrument, included with
+LWDAQ, to download telemetry signals from the receiver.
 
 Type: The waveform type, by default a sinusoid, can be "sine", "square",
-"triangle", or "sweep". If "sweep", we will get a logarithmic, sinusoidal sweep.
-The sweep will start at sweep_flo and end at sweep_fhi. It will take
-sweep_duration seconds. Its amplitude and offset will be the same as for any
-other waveform.
+"triangle", or "sweep". If "sine", "square", or "triangle", we will get a
+waveform of fixed frequency, amplitude, and offset. If "sweep", we will get a
+logarithmic, sinusoidal sweep. The sweep will start at sweep_flo and end at
+sweep_fhi. It will take sweep_duration seconds. Its amplitude and offset will be
+the same as for any other waveform.
 
 Frequency: The waveform frequency, anything from 1 mHz to 1 MHz.
 
