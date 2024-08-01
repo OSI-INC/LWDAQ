@@ -5356,7 +5356,7 @@ numbers may contain x-y value pairs, or x values only or y values only. The
 default is x-y values. With <i>y_only</i> = 1 it assumes y values only and
 assigns x-value 0 to the first y-value, 1 to the next, and so on. With
 <i>x_only</i> = 1 it assumes x values only and assigns y-value 0 to the first
-x-value, &minus;1 to the next, and so on. The negative-going x-values are
+x-value, &minus;1 to the next, and so on. The negative-going y-values are
 consistent with the negative-going vertical image coordinates, so that
 <i>x_only</i> is useful for plotting image properties on top of an image, such
 as vertical intensity profile. Thus the following code plots the vertical and

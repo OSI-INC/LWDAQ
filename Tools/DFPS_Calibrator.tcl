@@ -43,20 +43,22 @@ proc DFPS_Calibrator_init {} {
 	set config(fit_sources) "1 3 4"
 	set config(num_sources) "4"
 	set config(spots_left) "100 100 200 100 100 200 200 200"
-	set config(spots_left) "100 100 200 100 100 200 200 200"
+	set config(spots_right) "100 100 200 100 100 200 200 200"
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "0"
 	set config(fit_startsize) "1"
 	set config(fit_endsize) "0.005"
+	set config(fit_show) "1"
 	set config(stop_fit) "0"
 	set config(zoom) "0.5"
 	set config(intensify) "exact"
 	set config(num_lines) "2000"
-	set config(threshold) "10 %"
+	set config(bcam_threshold) "10 #"
+	set config(bcam_sort) "8"
 	set config(img_dir) "~/Desktop/DFPS"
 	
-	set config(cross_size) "1000"
+	set config(cross_size) "100"
 	
 	set info(state) "Idle"
 	
@@ -74,20 +76,51 @@ proc DFPS_Calibrator_init {} {
 	return ""   
 }
 
+
 #
-# DFPS_Calibrator_clear clears the overlay pixels in the DFPS images, so that we see
-# only the original silhouette images.
+# DFPS_Calibrator_show draws the left and right image overlays onto the display.
+#
+proc DFPS_Calibrator_show {} {
+	upvar #0 DFPS_Calibrator_config config
+	upvar #0 DFPS_Calibrator_info info
+	
+	foreach side {left right} {
+		lwdaq_draw img_$side photo_$side \
+			-intensify $config(intensify) -zoom $config(zoom)
+	}
+
+	return ""
+}
+
+#
+# DFPS_Calibrator_clear clears the overlay of the left and right image displays.
 #
 proc DFPS_Calibrator_clear {} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 
-	lwdaq_image_manipulate img_left none -clear 1
-	lwdaq_image_manipulate img_right none -clear 1	
-	lwdaq_draw img_left photo_left \
-		-intensify $config(intensify) -zoom $config(zoom)
-	lwdaq_draw img_right photo_right \
-		-intensify $config(intensify) -zoom $config(zoom)
+	foreach side {left right} {
+		lwdaq_image_manipulate img_$side none -clear 1
+	}
+	DFPS_Calibrator_show
+	return ""
+}
+
+#
+# DFPS_Calibrator_get_params puts together a string containing the parameters
+# the fitter can adjust to minimise the calibration disagreement. The fitter
+# will adjust any parameter for which we assign a scaling value greater than 
+# zero. The scaling string gives the scaling factors the fitter uses for each
+# camera calibration constant. The scaling factors are used twice: once for 
+# the left camera and once for the right. See the fitting routine for their
+# implementation.
+#
+proc DFPS_Calibrator_get_params {} {
+	upvar #0 DFPS_Calibrator_config config
+	upvar #0 DFPS_Calibrator_info info
+
+	set params "$config(cam_left) $config(cam_right)"
+	return $params
 }
 
 #
@@ -116,23 +149,108 @@ proc DFPS_Calibrator_examine {} {
 	button $f.unsave -text "Unsave Configuration" -command "LWDAQ_tool_unsave $info(name)"
 	pack $f.unsave -side left -expand 1
 	
-	foreach mount {left right} {
-		set f [frame $w.$mount]
+	foreach mount {Left Right} {
+		set b [string tolower $mount]
+		set f [frame $w.mnt$b]
 		pack $f -side top -fill x
-		label $f.l$mount -text "$mount\:"
-		entry $f.e$mount -textvariable DFPS_Calibrator_config(mount_$mount) -width 70
-		pack $f.l$mount $f.e$mount -side left -expand yes
+		label $f.l$b -text "$mount Mount:"
+		entry $f.e$b -textvariable DFPS_Calibrator_config(mount_$b) -width 70
+		pack $f.l$b $f.e$b -side left -expand yes
 	}
 
 	for {set a 1} {$a <= $config(num_sources)} {incr a} {
-		set f [frame $w.$a]
+		set f [frame $w.src$a]
 		pack $f -side top -fill x
 		label $f.l$a -text "Source $a\:"
 		entry $f.e$a -textvariable DFPS_Calibrator_config(source_$a) -width 70
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
+	foreach mount {Left Right} {
+		set b [string tolower $mount]
+		set f [frame $w.spt$b]
+		pack $f -side top -fill x
+		label $f.l$b -text "$mount Spots:"
+		entry $f.e$b -textvariable DFPS_Calibrator_config(spots_$b) -width 70
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+	
 	return ""
+}
+
+#
+# DFPS_Calibrator_disagreement calculates root mean square square distance
+# between the actual image positions and the modelled image positions we obtain
+# when applying our mount measurements, FVC calibration constants, and the
+# measured source positions.
+#
+proc DFPS_Calibrator_disagreement {{params ""}} {
+	upvar #0 DFPS_Calibrator_config config
+	upvar #0 DFPS_Calibrator_info info
+
+	# If user has closed the calibrator window, generate an error so that we stop any
+	# fitting that might be calling this routine. 
+	if {![winfo exists $info(window)]} {
+		error "No DFPS window open."
+	}
+	
+	# If no parameters specified, use those stored in configuration array.
+	if {$params == ""} {
+		set params [DFPS_Calibrator_get_params]
+	}
+	
+	# Make sure messages from the BCAM routines get to the DFPS Calibrator's text
+	# window. Set the number of decimal places to three.
+	lwdaq_config -text_name $info(text)
+
+	# Extract the two sets of camera calibration constants from the parameters passed
+	# to us by the fitter.
+	set fvc_left "FVC_L [lrange $params 0 7]"
+	set fvc_right "FVC_R [lrange $params 8 15]"
+	
+	# Clear the overlay if showing.
+	if {$config(fit_show)} {DFPS_Calibrator_clear}	
+	
+	# Go through the four sources. For each source, we calculate the modelled
+	# image position in each camera. We look up the actual image position in
+	# each camera, as we obtained when we read the two images. We square the
+	# distance between the actual and modelled positions and add to our
+	# disagreement.
+	set sum_squares 0
+	set count 0
+	foreach side {left right} {
+		set spots $config(spots_$side)
+		for {set a 1} {$a <= $config(num_sources)} {incr a} {
+			if {[lsearch $config(fit_sources) $a] >= 0} {
+				set sb [lwdaq bcam_from_global_point \
+					$config(source_$a) $config(mount_$side)]
+				set th [lwdaq bcam_image_position $sb [set fvc_$side]]
+				scan $th %f%f x_th y_th
+				set x_th [format %.2f [expr $x_th * 1000.0]]
+				set y_th [format %.2f [expr $y_th * 1000.0]]
+				set x_a [lindex $spots 0]
+				set y_a [lindex $spots 1]
+				set spots [lrange $spots 2 end]
+				set err [expr ($x_a-$x_th)*($x_a-$x_th) + ($y_a-$y_th)*($y_a-$y_th)]
+				set sum_squares [expr $sum_squares + $err]
+				incr count
+				
+				set y [expr 3848 - $y_th]
+				set x $x_th
+				set w $config(cross_size)
+				lwdaq_graph "[expr $x - $w] $y [expr $x + $w] $y" img_$side \
+					-entire 1 -x_min 0 -x_max 5180 -y_min 0 -y_max 3848 -color 2
+				lwdaq_graph "$x [expr $y - $w] $x [expr $y + $w]" img_$side \
+					-entire 1 -x_min 0 -x_max 5180 -y_min 0 -y_max 3848 -color 2
+			}
+		}
+	}
+	
+	# Draw the boxes and rectangles if showing.
+	if {$config(fit_show)} {DFPS_Calibrator_show}
+	
+	# Return the total disagreement, which is our error value.
+	return [format %.3f [expr sqrt($sum_squares/$count)]]
 }
 
 #
@@ -148,6 +266,7 @@ proc DFPS_Calibrator_examine {} {
 proc DFPS_Calibrator_read {{img_dir ""}} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
+	upvar #0 LWDAQ_config_BCAM iconfig
 
 	if {$info(state) != "Idle"} {return ""}
 	set info(state) "Reading"
@@ -174,8 +293,8 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 			lappend spheres [lrange $numbers 1 3]
 			set numbers [lrange $numbers 4 end]
 		}
-		set config(mount_left) [join [lrange $spheres 6 8]]
-		set config(mount_right) [join [lrange $spheres 3 5]]
+		set config(mount_left) [join [lrange $spheres 3 5]]
+		set config(mount_right) [join [lrange $spheres 6 8]]
 		for {set a 1} {$a <= $config(num_sources)} {incr a} {
 			set config(source_$a) [lrange $numbers 0 2]
 			set numbers [lrange $numbers 3 end]
@@ -191,13 +310,15 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		set ifn [file join $config(img_dir) $s\.gif]
 		if {[file exists $ifn]} {
 			LWDAQ_read_image_file $ifn img_$side
+			set iconfig(analysis_num_spots) "$config(num_sources) $config(bcam_sort)"
+			set iconfig(analysis_threshold) $config(bcam_threshold)
+			LWDAQ_set_image_sensor ICX424 BCAM
 			set result [LWDAQ_analysis_BCAM img_$side]
 			if {![LWDAQ_is_error_result $result]} {
 				set config(spots_$side) ""
 				foreach {x y num pk acc th} $result {
 					append config(spots_$side) "$x $y "
 				}
-				LWDAQ_print $info(text) $config(spots_$side) green
 			} else {
 				LWDAQ_print $info(text) $result
 				set info(state) "Idle"
@@ -205,128 +326,11 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 			}
 		}
 	}
-	
-	DFPS_Calibrator_clear
-		
-	set w $info(examine_window)
-	if {[winfo exists $w]} {
-		LWDAQ_print $info(text) "Updating calibration measurement window for new bodies."
-		destroy $w
-		DFPS_Calibrator_examine
-	}
-	
-	if {[catch {
-		DFPS_Calibrator_show
-	} error_message]} {
-		LWDAQ_print $info(text) "ERROR: $error_message\."
-		LWDAQ_print $info(text) \
-			"SUGGESTION: Check CMM.txt format, check L.gif and R.gif exist."	
-	}
+
+	DFPS_Calibrator_disagreement			
 	
 	set info(state) "Idle"
-}
-
-#
-# DFPS_Calibrator_disagreement calculates root mean square square distance
-# between the actual image positions and the modelled image positions we obtain
-# when applying our mount measurements, FVC calibration constants, and the
-# measured source positions.
-#
-proc DFPS_Calibrator_disagreement {params} {
-	upvar #0 DFPS_Calibrator_config config
-	upvar #0 DFPS_Calibrator_info info
-
-	# If user has closed the calibrator window, generate an error so that we stop any
-	# fitting that might be calling this routine. 
-	if {![winfo exists $info(window)]} {
-		error "Cannot draw DFPS images: no DFPS window open."
-	}
-	
-	# Make sure messages from the BCAM routines get to the DFPS Calibrator's text
-	# window. Set the number of decimal places to three.
-	lwdaq_config -text_name $info(text)
-
-	# Extract the two sets of camera calibration constants from the parameters passed
-	# to us by the fitter.
-	set fvc_left "FVC_left [lrange $params 0 7]"
-	set fvc_right "FVC_left [lrange $params 8 15]"
-	
-	# Go through the four sources. For each source, we calculate the modelled
-	# image position in each camera. We look up the actual image position in
-	# each camera, as we obtained when we read the two images. We square the
-	# distance between the actual and modelled positions and add to our
-	# disagreement.
-	set sum_squares 0
-	set count 0
-	foreach side {left right} {
-		lwdaq_image_manipulate img_$side none -clear 1	
-		set spots $config(spots_$side)
-		for {set a 1} {$a <= $config(num_sources)} {incr a} {
-			if {[lsearch $config(fit_sources) $a] >= 0} {
-				set sb [lwdaq bcam_from_global_point \
-					$config(source_$a) $config(mount_$side)]
-				set th [lwdaq bcam_image_position $sb [set fvc_$side]]
-				scan $th %f%f x_th y_th
-				set x_th [format %.2f [expr $x_th * 1000.0]]
-				set y_th [format %.2f [expr $y_th * 1000.0]]
-				set x_a [lindex $spots 0]
-				set y_a [lindex $spots 1]
-				set spots [lrange $spots 2 end]
-				set err [expr ($x_a-$x_th)*($x_a-$x_th) + ($y_a-$y_th)*($y_a-$y_th)]
-				LWDAQ_print $info(text) "$sb $th $x_a $y_a\
-					[format %.1f [expr sqrt($err)]]" orange
-				set sum_squares [expr $sum_squares + $err]
-				incr count
-			}
-		}
-		lwdaq_draw img_$side photo_$side \
-			-intensify $config(intensify) -zoom $config(zoom)
-	}
-	
-	# Return the total disagreement, which is our error value.
-	return [format %.3f [expr sqrt($sum_squares/$count)]]
-}
-
-#
-# DFPS_Calibrator_get_params puts together a string containing the parameters
-# the fitter can adjust to minimise the calibration disagreement. The fitter
-# will adjust any parameter for which we assign a scaling value greater than 
-# zero. The scaling string gives the scaling factors the fitter uses for each
-# camera calibration constant. The scaling factors are used twice: once for 
-# the left camera and once for the right. See the fitting routine for their
-# implementation.
-#
-proc DFPS_Calibrator_get_params {} {
-	upvar #0 DFPS_Calibrator_config config
-	upvar #0 DFPS_Calibrator_info info
-
-	set params "$config(cam_left) $config(cam_right)"
-	return $params
-}
-
-#
-# DFPS_Calibrator_show gets the current camera calibration constants and shows
-# the locations of the modeled sources. It calculates the disagreement, and
-# prints the current parameters and disagreement to the text window. In case we
-# have adjusted the mounts before showing, we calculate again the pose of the
-# mount from both sets of balls.
-#
-proc DFPS_Calibrator_show {} {
-	upvar #0 DFPS_Calibrator_config config
-	upvar #0 DFPS_Calibrator_info info
-
-	set info(control) "Show"
-	LWDAQ_update
-	
-	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
-	set params [DFPS_Calibrator_get_params]
-	set disagreement [DFPS_Calibrator_disagreement $params]
-	set result "$params $disagreement"
-	LWDAQ_print $info(text) $result
-	
-	set info(control) "Idle"
-	return 
+	return ""
 }
 
 #
@@ -344,8 +348,7 @@ proc DFPS_Calibrator_displace {} {
 					+ (rand()-0.5)*[lindex $config(scaling) $i]]]
 		}
 	}
-	set params [DFPS_Calibrator_get_params]
-	DFPS_Calibrator_disagreement $params
+	DFPS_Calibrator_disagreement
 	return $params
 } 
 
@@ -387,8 +390,6 @@ proc DFPS_Calibrator_fit {} {
 	set info(state) "Fitting"
 	
 	if {[catch {
-		set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-		set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 		set scaling "$config(scaling) $config(scaling)"
 		set start_params [DFPS_Calibrator_get_params] 
 		set end_params [lwdaq_simplex $start_params \
@@ -409,7 +410,7 @@ proc DFPS_Calibrator_fit {} {
 		return ""
 	}
 
-	DFPS_Calibrator_disagreement [DFPS_Calibrator_get_params]
+	DFPS_Calibrator_disagreement
 	set info(state) "Idle"
 }
 
@@ -432,7 +433,7 @@ proc DFPS_Calibrator_open {} {
 	button $f.stop -text "Stop" -command {set DFPS_Calibrator_config(stop_fit) 1}
 	pack $f.stop -side left -expand yes
 
-	foreach a {Show Clear Displace Fit} {
+	foreach a {Read Examine Fit Disagreement Clear Displace } {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Calibrator_$b"
 		pack $f.$b -side left -expand yes
@@ -447,7 +448,17 @@ proc DFPS_Calibrator_open {} {
 	set f [frame $w.fvc]
 	pack $f -side top -fill x
 	
-	foreach {a wd} {threshold 6 scaling 20} {
+	foreach {a wd} {fit_sources 10 zoom 4 bcam_threshold 6 fit_steps 8} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	checkbutton $f.show -text "Show" -variable DFPS_Calibrator_config(fit_show)
+	pack $f.show -side left -expand yes
+
+		
+	foreach {a wd} {scaling 20} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -462,21 +473,6 @@ proc DFPS_Calibrator_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	set f [frame $w.measurements]
-	pack $f -side top -fill x
-
-	foreach a {Read Examine} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post DFPS_Calibrator_$b"
-		pack $f.$b -side left -expand yes
-	}
-
-	foreach {a wd} {fit_sources 30} {
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-		
 	set f [frame $w.images]
 	pack $f -side top -fill x
 
@@ -537,18 +533,6 @@ numbers will be ignored. An example CMM.txt file is to be found below.
 | Global3             | X            |      | 1.008     | ±1.000  |
 | Global3             | Y            |      | -0.119    | ±1.000  |
 | Global3             | Z            |      | 175.239   | ±1.000  |
-| Right1              | Diameter     |      | 6.350     | ±1.000  |
-| Right1              | X            |      | -104.070  | ±1.000  |
-| Right1              | Y            |      | 51.174    | ±1.000  |
-| Right1              | Z            |      | 199.266   | ±1.000  |
-| Right2              | Diameter     |      | 6.350     | ±1.000  |
-| Right2              | X            |      | -108.719  | ±1.000  |
-| Right2              | Y            |      | 51.002    | ±1.000  |
-| Right2              | Z            |      | 275.087   | ±1.000  |
-| Right3              | Diameter     |      | 6.350     | ±1.000  |
-| Right3              | X            |      | -148.270  | ±1.000  |
-| Right3              | Y            |      | 50.965    | ±1.000  |
-| Right3              | Z            |      | 261.039   | ±1.000  |
 | Left1               | Diameter     |      | 6.350     | ±1.000  |
 | Left1               | X            |      | 79.596    | ±1.000  |
 | Left1               | Y            |      | 51.571    | ±1.000  |
@@ -561,6 +545,18 @@ numbers will be ignored. An example CMM.txt file is to be found below.
 | Left3               | X            |      | 79.246    | ±1.000  | 
 | Left3               | Y            |      | 51.484    | ±1.000  |
 | Left3               | Z            |      | 275.697   | ±1.000  |
+| Right1              | Diameter     |      | 6.350     | ±1.000  |
+| Right1              | X            |      | -104.070  | ±1.000  |
+| Right1              | Y            |      | 51.174    | ±1.000  |
+| Right1              | Z            |      | 199.266   | ±1.000  |
+| Right2              | Diameter     |      | 6.350     | ±1.000  |
+| Right2              | X            |      | -108.719  | ±1.000  |
+| Right2              | Y            |      | 51.002    | ±1.000  |
+| Right2              | Z            |      | 275.087   | ±1.000  |
+| Right3              | Diameter     |      | 6.350     | ±1.000  |
+| Right3              | X            |      | -148.270  | ±1.000  |
+| Right3              | Y            |      | 50.965    | ±1.000  |
+| Right3              | Z            |      | 261.039   | ±1.000  |
 | S1                  | X            |      | -28.580   | ±1.000  |
 | S1                  | Y            |      | 103.532   | ±1.000  |
 | S1                  | Z            |      | -91.733   | ±1.000  |
