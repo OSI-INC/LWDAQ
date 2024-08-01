@@ -4464,8 +4464,10 @@ end;
 	error function is provided by the process that uses the simplex fit: it
 	returns the altitude of a vertex. We pass the error function the vertex and
 	the generic pointer. The generic pointer allows the altitude function to
-	function to find the information it needs to determine the error of the
-	vertex. The simplex_step routine does not use the pointer at all.
+	find the information it needs to determine the error of the vertex. The
+	simplex_step routine does not use the pointer at all. We might use the 
+	generic pointer to point to a string containing, for example, the TCL
+	procedure we want to execute to obtain the error.
 }
 procedure simplex_step(var simplex:simplex_type;
 	sef:simplex_error_function_type;

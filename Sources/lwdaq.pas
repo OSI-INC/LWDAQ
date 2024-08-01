@@ -5171,7 +5171,7 @@ begin
 			simplex.scaling[i]:=read_real(scaling);
 	end;
 	simplex_construct(simplex,lwdaq_simplex_error,@error_proc);
-
+	
 	interation_num:=0;
 	repeat
 		if (report>0) and (interation_num mod report = 0) then begin
@@ -6111,7 +6111,11 @@ the pose of the mount coordinate system. Rather, it accepts the ball positions
 and will deduce the pose of the mount coordinate system itself. To transform a
 point from global to local coordinate using the pose of the local coordinate
 system, use <a
-href=#xyz_local_from_global_point">xyz_local_from_global_point</a>.</p>
+href=#xyz_local_from_global_point">xyz_local_from_global_point</a>. Using the pose
+rather than the ball positions is more efficient, because the conversion from
+ball positions to pose uses a simplex fitter, which takes a few milliseconds. Use 
+<a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> to convert ball positions
+into the pose of the BCAM coordinates once, then use this pose thereafter.</p>
 
 <p>In the following example, we transform the global
 point (0,1,0) into BCAM coordinates when our cone, slot and flat balls have
@@ -6154,7 +6158,11 @@ string. The routine returns the global coordinates of the point.</p>
 
 <p>To transform a point from local to global coordinate using the pose of the
 local coordinate system, use <a
-href=#xyz_global_from_local_point">xyz_global_from_local_point</a>.</p>
+href=#xyz_global_from_local_point">xyz_global_from_local_point</a>. Using the pose
+rather than the ball positions is more efficient, because the conversion from
+ball positions to pose uses a simplex fitter, which takes a few milliseconds. Use 
+<a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> to convert ball positions
+into the pose of the BCAM coordinates once, then use this pose thereafter.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix

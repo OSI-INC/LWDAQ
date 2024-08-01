@@ -29,13 +29,15 @@ proc DFPS_Calibrator_init {} {
 	LWDAQ_tool_init "DFPS_Calibrator" "1.1"
 	if {[winfo exists $info(window)]} {return ""}
 
-	set config(cam_default) "12.675 39.312 -2.0 0.0 0.0 2 19.0 0.0"
+	set config(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
 	set config(cam_left) $config(cam_default)
 	set config(cam_right) $config(cam_default)
-	set config(scaling) "1 1 1 1 1 0 1 1"
+	set config(scaling) "0 0 0 1 1 0 1 1"
 
 	set config(mount_left) "0 0 0 -21 0 -73 21 0 -73"
 	set config(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
 	set config(source_1) "0 105 -50"
 	set config(source_2) "30 105 -50"
@@ -57,6 +59,7 @@ proc DFPS_Calibrator_init {} {
 	set config(fit_startsize) "1"
 	set config(fit_endsize) "0.005"
 	set config(fit_show) "1"
+	set config(fit_details) "0"
 	set config(fit_report) "0"
 	set config(displace_scale) "1"
 	set config(stop_fit) "0"
@@ -235,6 +238,9 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 		}
 	}
 	
+	# Calculate root mean square error.
+	set err [format %.3f [expr sqrt($sum_squares/$count)]]	
+	
 	# Draw the boxes and rectangles if showing.
 	if {$config(fit_show)} {
 		foreach side {left right} {
@@ -244,7 +250,7 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 	}
 	
 	# Return the total disagreement, which is our error value.
-	return [format %.3f [expr sqrt($sum_squares/$count)]]
+	return $err
 }
 
 #
@@ -257,6 +263,8 @@ proc DFPS_Calibrator_show {} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 	
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	set err [DFPS_Calibrator_disagreement]
 	LWDAQ_print $info(text) "[DFPS_Calibrator_get_params] $err 0"
 	return ""
@@ -314,6 +322,9 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		set info(state) "Idle"
 		return ""
 	}
+
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
 	LWDAQ_print $info(text) "Reading and analyzing left and right FVC images."
 	foreach {s side} {L left R right} {
@@ -428,6 +439,9 @@ proc DFPS_Calibrator_fit {} {
 	if {[catch {
 		set scaling "$config(scaling) $config(scaling)"
 		set start_params [DFPS_Calibrator_get_params] 
+		set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+		set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
+		lwdaq_config -show_details $config(fit_details)
 		set end_params [lwdaq_simplex $start_params \
 			DFPS_Calibrator_altitude \
 			-report $config(fit_report) \
@@ -436,6 +450,7 @@ proc DFPS_Calibrator_fit {} {
 			-start_size $config(fit_startsize) \
 			-end_size $config(fit_endsize) \
 			-scaling $scaling]
+		lwdaq_config -show_details 0
 		if {[LWDAQ_is_error_result $end_params]} {error "$end_params"}
 		set config(cam_left) "[lrange $end_params 0 7]"
 		set config(cam_right) "[lrange $end_params 8 15]"
@@ -490,10 +505,6 @@ proc DFPS_Calibrator_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	checkbutton $f.show -text "Report" -variable DFPS_Calibrator_config(fit_report)
-	pack $f.show -side left -expand yes
-
-		
 	foreach {a wd} {scaling 20} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
