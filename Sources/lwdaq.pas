@@ -6102,24 +6102,24 @@ begin
 	option:=Tcl_ObjString(argv[1]);
 	if option='bcam_from_global_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in the coordinates
-defined by the three balls of a BCAM mount. The routine takes as input a
-<i>point</i> string containing the global xyz-position of point and a
-<i>mount</i> string containing the global xyz-position of the centers of the
-cone, slot, and flat balls of the mount. Note that the routine does not accept
-the pose of the mount coordinate system. Rather, it accepts the ball positions
-and will deduce the pose of the mount coordinate system itself. To transform a
-point from global to local coordinate using the pose of the local coordinate
-system, use <a
-href=#xyz_local_from_global_point">xyz_local_from_global_point</a>. Using the pose
-rather than the ball positions is more efficient, because the conversion from
-ball positions to pose uses a simplex fitter, which takes a few milliseconds. Use 
-<a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> to convert ball positions
-into the pose of the BCAM coordinates once, then use this pose thereafter.</p>
+<p><b>Obsolete Routine</b> Transforms a point in global coordinates to a point
+in bcam coordinates. The bcam coordinates are those defined by a kinematic mount
+holding a bcam. The routine takes as input a <i>point</i> string containing the
+global xyz-position of point and a <i>mount</i> string containing the global
+xyz-positions of the centers of the cone, slot, and flat balls of the mount. Note
+that the routine does not accept the pose of the mount coordinate system, but
+instead the positions of the kinematic mounting balls.</p>
 
-<p>In the following example, we transform the global
-point (0,1,0) into BCAM coordinates when our cone, slot and flat balls have
-coordinates (0,1,0), (-1,1,-1), and (1,1,-1).</p>
+<p>This routine deduces the pose of the mount coordinate system itself, which is
+computationally intensive and unecessary. Instead of deducing the mount
+coordinate pose every time we transform between global and mount coordinates,
+call <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> once to obtain
+the pose of the mount coordinates, and then pass this pose into <a
+href=#xyz_local_from_global_point">xyz_local_from_global_point</a>.</p>
+
+<p>In the following example, we transform the global point (0,1,0) into BCAM
+coordinates when our cone, slot and flat balls have coordinates (0,1,0),
+(-1,1,-1), and (1,1,-1).</p>
 
 <pre>lwdaq bcam_from_global_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 0.000000 0.000000</pre>
@@ -6147,22 +6147,23 @@ mount strings.</p>
 	end 
 	else if option='global_from_bcam_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in BCAM coordinates. It
-is the inverse of <a href="#bcam_from_global_point">bcam_from_global_point</a>.
-We pass it the BCAM coordinates of a point in the <i>point</i> string and the
-global coordinates of the BCAM's kinematic mounting balls in the <i>mount</i>
-string. The routine returns the global coordinates of the point.</p>
+<p><b>Obsolete Routine</b> Transforms a point in bcam coordinates to a point
+in global coordinates. The bcam coordinates are those defined by a kinematic mount
+holding a bcam. The routine takes as input a <i>point</i> string containing the
+bcam xyz-position of point and a <i>mount</i> string containing the global
+xyz-positions of the centers of the cone, slot, and flat balls of the mount. Note
+that the routine does not accept the pose of the mount coordinate system, but
+instead the positions of the kinematic mounting balls.</p>
 
 <pre>lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 2.000000 0.000000</pre>
 
-<p>To transform a point from local to global coordinate using the pose of the
-local coordinate system, use <a
-href=#xyz_global_from_local_point">xyz_global_from_local_point</a>. Using the pose
-rather than the ball positions is more efficient, because the conversion from
-ball positions to pose uses a simplex fitter, which takes a few milliseconds. Use 
-<a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> to convert ball positions
-into the pose of the BCAM coordinates once, then use this pose thereafter.</p>
+<p>This routine deduces the pose of the mount coordinate system itself, which is
+computationally intensive and unecessary. Instead of deducing the mount
+coordinate pose every time we transform between global and mount coordinates,
+call <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> once to obtain
+the pose of the mount coordinates, and then pass this pose into <a
+href=#xyz_global_from_local_point">xyz_global_from_local_point</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6179,15 +6180,22 @@ into the pose of the BCAM coordinates once, then use this pose thereafter.</p>
 	end 
 	else if option='bcam_from_global_vector' then begin
 {
-<p>Transforms a vector in global coordinates to a vector in BCAM coordinates.
-See <a href="#bcam_from_global_point">bcam_from_global_point</a> for more
-details.</p>
+<p><b>Obsolete Routine</b> Transforms a vector in global coordinates to a vector
+in bcam coordinates. The bcam coordinates are those defined by a kinematic mount
+holding a bcam. The routine takes as input a <i>vector</i> string containing the
+bcam xyz-components of vector and a <i>mount</i> string containing the global
+xyz-positions of the centers of the cone, slot, and flat balls of the mount. Note
+that the routine does not accept the pose of the mount coordinate system, but
+instead the positions of the kinematic mounting balls.</p>
 
 <pre>lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 1.000000 0.000000</pre>
 
-<p>To transform a vector from global to local coordinate using the pose of the
-local coordinate system, use <a
+<p>This routine deduces the pose of the mount coordinate system itself, which is
+computationally intensive and unecessary. Instead of deducing the mount
+coordinate pose every time we transform between global and mount coordinates,
+call <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> once to obtain
+the pose of the mount coordinates, and then pass this pose into <a
 href=#xyz_local_from_global_vector">xyz_local_from_global_vector</a>.</p>
 }
 		if (argc<>4) then begin
@@ -6205,19 +6213,23 @@ href=#xyz_local_from_global_vector">xyz_local_from_global_vector</a>.</p>
 	end 
 	else if option='global_from_bcam_vector' then begin
 {
-<p>Transforms a vector in BCAM coordinates to a vector in global coordinates. It
-is the inverse of <a
-href="#bcam_from_global_vector">bcam_from_global_vector</a>. It takes as input
-two string. One gives the xyz-components of the vector in BCAM coordinates, the
-other gives the global coordinates of the BCAM mounting balls in order cone,
-slot, flat.</p>
+<p><b>Obsolete Routine</b> Transforms a vector in bcam coordinates to a vector
+in global coordinates. The bcam coordinates are those defined by a kinematic mount
+holding a bcam. The routine takes as input a <i>vector</i> string containing the
+global xyz-components of vector and a <i>mount</i> string containing the global
+xyz-positions of the centers of the cone, slot, and flat balls of the mount. Note
+that the routine does not accept the pose of the mount coordinate system, but
+instead the positions of the kinematic mounting balls.</p>
 
 <pre>lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 1.000000 0.000000</pre>
 
-<p>To transform a vector from local to global coordinate using the pose of the
-local coordinate system, use <a
-href=#xyz_global_from_local_point">xyz_global_from_local_point</a>.</p>
+<p>This routine deduces the pose of the mount coordinate system itself, which is
+computationally intensive and unecessary. Instead of deducing the mount
+coordinate pose every time we transform between global and mount coordinates,
+call <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> once to obtain
+the pose of the mount coordinates, and then pass this pose into <a
+href=#xyz_global_from_local_vector">xyz_global_from_local_vector</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix

@@ -208,8 +208,8 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 		set spots $config(spots_$side)
 		for {set a 1} {$a <= $config(num_sources)} {incr a} {
 			if {[lsearch $config(fit_sources) $a] >= 0} {
-				set sb [lwdaq bcam_from_global_point \
-					$config(source_$a) $config(mount_$side)]
+				set sb [lwdaq xyz_local_from_global_point \
+					$config(source_$a) $config(coord_$side)]
 				set th [lwdaq bcam_image_position $sb [set fvc_$side]]
 				scan $th %f%f x_th y_th
 				set x_th [format %.2f [expr $x_th * 1000.0]]
