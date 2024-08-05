@@ -668,6 +668,7 @@ proc LWDAQ_set_multisource_element {sock value power} {
 	set cmd [format %02x $value]
 	append cmd 8[format %1x $power]
 	LWDAQ_set_command_reg_hex $sock $cmd
+
 	return ""
 }
 

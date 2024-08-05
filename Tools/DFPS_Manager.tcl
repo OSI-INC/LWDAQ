@@ -16,8 +16,8 @@
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
 #
-# DFPS_Manager_init creates and initializes the tool's configuration
-# (config) and information (info) arrays. It reads saved configuration (but not
+# DFPS_Manager_init creates and initializes the tool's configuration (config)
+# and information (info) arrays. It reads saved configuration (but not
 # information) parameters from disk if we have previously saved our
 # configuration to disk. All the configuration parameters are visible in the
 # tool's configuration array, where there are save and unsave buttons to create

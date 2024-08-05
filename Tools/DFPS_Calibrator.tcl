@@ -26,7 +26,7 @@ proc DFPS_Calibrator_init {} {
 	upvar #0 DFPS_Calibrator_info info
 	upvar #0 DFPS_Calibrator_config config
 	
-	LWDAQ_tool_init "DFPS_Calibrator" "1.1"
+	LWDAQ_tool_init "DFPS_Calibrator" "1.2"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set config(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
@@ -43,7 +43,7 @@ proc DFPS_Calibrator_init {} {
 	set config(source_2) "30 105 -50"
 	set config(source_3) "0 75 -50"
 	set config(source_4) "30 75 -50"
-	set config(fit_sources) "1 3 4"
+	set config(fit_sources) "1 2 3 4"
 	set config(num_sources) "4"
 	set config(spots_left) "100 100 200 100 100 200 200 200"
 	set config(spots_right) "100 100 200 100 100 200 200 200"
@@ -307,15 +307,15 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		set numbers [list]
 		foreach a $cmm {if {[string is double -strict $a]} {lappend numbers $a}}
 		set spheres [list]
-		for {set sn 0} {$sn < 9} {incr sn} {
-			lappend spheres [lrange $numbers 1 3]
-			set numbers [lrange $numbers 4 end]
+		foreach {d x y z} $numbers {
+			lappend spheres "$x $y $z"
 		}
+		LWDAQ_print $info(text) $spheres green
 		set config(mount_left) [join [lrange $spheres 3 5]]
 		set config(mount_right) [join [lrange $spheres 6 8]]
+		set spheres [lrange $spheres 9 end]
 		for {set a 1} {$a <= $config(num_sources)} {incr a} {
-			set config(source_$a) [lrange $numbers 0 2]
-			set numbers [lrange $numbers 3 end]
+			set config(source_$a) [lindex $spheres [expr $a-1]]
 		}
 	} else {
 		LWDAQ_print $info(text) "Cannot find \"$fn\"."
