@@ -79,7 +79,8 @@ proc DFPS_Calibrator_init {} {
 	} 
 
 	foreach side {left right} {
-		lwdaq_image_create -name img_$side -width 700 -height 520
+		set info(image_$side) dfps_calibrator_$side
+		lwdaq_image_create -name $info(image_$side) -width 700 -height 520
 	}
 
 	return ""   
@@ -105,9 +106,9 @@ proc DFPS_Calibrator_get_params {} {
 
 #
 # DFPS_Calibrator_examine opens a new window that displays the CMM measurements
-# of the left and right mounts, calibration constants of the left and right
-# cameras, and coordinates of the calibration sources. The window allows us to
-# modify the all these values by hand.
+# of the left and right mounting balls and the calibration sources. It displays
+# the spot positions for these calibration sources in the left and right FVCs.
+# The window allows us to modify the all these values by hand.
 #
 proc DFPS_Calibrator_examine {} {
 	upvar #0 DFPS_Calibrator_config config
@@ -193,7 +194,7 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 	# Clear the overlay if showing.
 	if {$config(fit_show)} {
 		foreach side {left right} {
-			lwdaq_image_manipulate img_$side none -clear 1
+			lwdaq_image_manipulate $info(image_$side) none -clear 1
 		}
 	}	
 	
@@ -226,11 +227,11 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 					set x $x_th
 					set w $config(cross_size)
 					lwdaq_graph "[expr $x - $w] $y [expr $x + $w] $y" \
-						img_$side -entire 1 \
+						$info(image_$side) -entire 1 \
 						-x_min 0 -x_max $config(bcam_width) \
 						-y_min 0 -y_max $config(bcam_height) -color 2
 					lwdaq_graph "$x [expr $y - $w] $x [expr $y + $w]" \
-						img_$side -entire 1 \
+						$info(image_$side) -entire 1 \
 						-x_min 0 -x_max $config(bcam_width) \
 						-y_min 0 -y_max $config(bcam_height) -color 2
 				}
@@ -244,7 +245,7 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 	# Draw the boxes and rectangles if showing.
 	if {$config(fit_show)} {
 		foreach side {left right} {
-			lwdaq_draw img_$side photo_$side \
+			lwdaq_draw $info(image_$side) dfps_calibrator_$side \
 				-intensify $config(intensify) -zoom $config(zoom)
 		}
 	}
@@ -310,7 +311,6 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		foreach {d x y z} $numbers {
 			lappend spheres "$x $y $z"
 		}
-		LWDAQ_print $info(text) $spheres green
 		set config(mount_left) [join [lrange $spheres 3 5]]
 		set config(mount_right) [join [lrange $spheres 6 8]]
 		set spheres [lrange $spheres 9 end]
@@ -330,7 +330,7 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 	foreach {s side} {L left R right} {
 		set ifn [file join $config(img_dir) $s\.gif]
 		if {[file exists $ifn]} {
-			LWDAQ_read_image_file $ifn img_$side
+			LWDAQ_read_image_file $ifn $info(image_$side)
 			set iconfig(analysis_num_spots) "$config(num_sources) $config(bcam_sort)"
 			set iconfig(analysis_threshold) $config(bcam_threshold)
 			LWDAQ_set_image_sensor $config(bcam_sensor) BCAM
@@ -338,7 +338,7 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 				* $iinfo(analysis_pixel_size_um)]
 			set config(bcam_height) [expr $iinfo(daq_image_height) \
 				* $iinfo(analysis_pixel_size_um)]
-			set result [LWDAQ_analysis_BCAM img_$side]
+			set result [LWDAQ_analysis_BCAM $info(image_$side)]
 			if {![LWDAQ_is_error_result $result]} {
 				set config(spots_$side) ""
 				foreach {x y num pk acc th} $result {
@@ -524,8 +524,8 @@ proc DFPS_Calibrator_open {} {
 	pack $f -side top -fill x
 
 	foreach a {left right} {
-		image create photo "photo_$a"
-		label $f.$a -image "photo_$a"
+		image create photo "dfps_calibrator_$a"
+		label $f.$a -image "dfps_calibrator_$a"
 		pack $f.$a -side left -expand yes
 	}
 	
@@ -536,7 +536,7 @@ proc DFPS_Calibrator_open {} {
 	
 	# Draw two blank images into the display.
 	foreach side {left right} {
-		lwdaq_draw img_$side photo_$side \
+		lwdaq_draw $info(image_$side) dfps_calibrator_$side \
 			-intensify $config(intensify) -zoom $config(zoom)
 	}
 	
@@ -550,79 +550,82 @@ return ""
 
 ----------Begin Help----------
 
-The Direct Fiber Positioning System (DFPS) Calibrator calculates the
-calibration constants of the two Fiber View Cameras (FVCs) mounted on a DFPS
-base plate. The routine assumes we have Coordinate Measuring Machine (CMM)
-measurements of the left FVC mount, the right FVC mount, and
-four point sources visible to both cameras. The program takes as input two 
-images L.gif and R.gif from the left and right FVCs respectively, and CMM.txt
-from the CMM.
+The Direct Fiber Positioning System (DFPS) Calibrator calculates the calibration
+constants of the two Fiber View Cameras (FVCs) mounted on a DFPS base plate. The
+routine assumes we have Coordinate Measuring Machine (CMM) measurements of the
+left FVC mount, the right FVC mount, and four point sources visible to both
+cameras. The program takes as input two images L.gif and R.gif from the left and
+right FVCs respectively, and CMM.txt from the CMM.
 
 The CMM.txt file must contain the diameter and x, y, and z coordinates of the
-cone, slot, and flat balls in the two FVC mounts. After that we must find x, y,
-and z coordinates of each calibration source. The file containing these
-measurements must be named CMM.txt. In addition to the measured diameters and
-coordinates, CMM.txt may contain any number of words that are not real number
-strings and any number of white space charcters. All words that are not real
-numbers will be ignored. An example CMM.txt file is to be found below.
+cone, slot, and flat balls in the two FVC mounts. After that we must find
+diameter, x, y, and z coordinates of each calibration source ferrule. The file
+containing these measurements must be named CMM.txt. In addition to the measured
+diameters and coordinates, CMM.txt may contain any number of words that are not
+real number strings and any number of white space charcters. All words that are
+not real numbers will be ignored. An example CMM.txt file is to be found below.
 
-+---------------------+--------------+------+-----------+---------+
-| Feature Table       |              |      |           |         |
-+---------------------+--------------+------+-----------+---------+
-| Length Units        | Millimeters  |      |           |         |
-| Coordinate Systems  | Global       |      |           |         | 
-| Data Alignments     | original     |      |           |         |
-|                     |              |      |           |         |
-| Name                | Control      | Nom  | Meas      | Tol     |
-| Global1             | Diameter     |      | 12.25     | ±1.000  |
-| Global1             | X            |      | 0.000     | ±1.000  |
-| Global1             | Y            |      | 0.000     | ±1.000  |
-| Global1             | Z            |      | 0.000     | ±1.000  |
-| Global2             | Diameter     |      | 12.25     | ±1.000  |
-| Global2             | X            |      | 100.399   | ±1.000  |
-| Global2             | Y            |      | 0.000     | ±1.000  |
-| Global2             | Z            |      | 0.000     | ±1.000  |
-| Global3             | Diameter     |      | 12.25     | ±1.000  |
-| Global3             | X            |      | 1.008     | ±1.000  |
-| Global3             | Y            |      | -0.119    | ±1.000  |
-| Global3             | Z            |      | 175.239   | ±1.000  |
-| Left1               | Diameter     |      | 6.350     | ±1.000  |
-| Left1               | X            |      | 79.596    | ±1.000  |
-| Left1               | Y            |      | 51.571    | ±1.000  |
-| Left1               | Z            |      | 199.741   | ±1.000  | 
-| Left2               | Diameter     |      | 6.350     | ±1.000  |
-| Left2               | X            |      | 119.754   | ±1.000  |
-| Left2               | Y            |      | 51.457    | ±1.000  |
-| Left2               | Z            |      | 264.248   | ±1.000  |
-| Left3               | Diameter     |      | 6.350     | ±1.000  |
-| Left3               | X            |      | 79.246    | ±1.000  | 
-| Left3               | Y            |      | 51.484    | ±1.000  |
-| Left3               | Z            |      | 275.697   | ±1.000  |
-| Right1              | Diameter     |      | 6.350     | ±1.000  |
-| Right1              | X            |      | -104.070  | ±1.000  |
-| Right1              | Y            |      | 51.174    | ±1.000  |
-| Right1              | Z            |      | 199.266   | ±1.000  |
-| Right2              | Diameter     |      | 6.350     | ±1.000  |
-| Right2              | X            |      | -108.719  | ±1.000  |
-| Right2              | Y            |      | 51.002    | ±1.000  |
-| Right2              | Z            |      | 275.087   | ±1.000  |
-| Right3              | Diameter     |      | 6.350     | ±1.000  |
-| Right3              | X            |      | -148.270  | ±1.000  |
-| Right3              | Y            |      | 50.965    | ±1.000  |
-| Right3              | Z            |      | 261.039   | ±1.000  |
-| S1                  | X            |      | -28.580   | ±1.000  |
-| S1                  | Y            |      | 103.532   | ±1.000  |
-| S1                  | Z            |      | -91.733   | ±1.000  |
-| S2                  | X            |      | 1.422     | ±1.000  |
-| S2                  | Y            |      | 103.656   | ±1.000  |
-| S2                  | Z            |      | -92.246   | ±1.000  |
-| S3                  | X            |      | -28.496   | ±1.000  |
-| S3                  | Y            |      | 73.575    | ±1.000  |
-| S3                  | Z            |      | -92.210   | ±1.000  |
-| S4                  | X            |      | 1.415     | ±1.000  |
-| S4                  | Y            |      | 73.674    | ±1.000  |
-| S4                  | Z            |      | -92.317   | ±1.000  |
-+---------------------+--------------+------+-----------+---------+
++---------------------+--------------+------+-----------+---------+------+-------+----------+
+| Feature Table       |              |      |           |         |      |       |          |
++---------------------+--------------+------+-----------+---------+------+-------+----------+
+| Length Units        | Millimeters  |      |           |         |      |       |          |
+| Coordinate Systems  | csys         |      |           |         |      |       |          |
+| Data Alignments     | original     |      |           |         |      |       |          |
+|                     |              |      |           |         |      |       |          |
+| Name                | Control      | Nom  | Meas      | Tol     | Dev  | Test  | Out Tol  |
+| g1                  | Diameter     |      | 12.702    | ±1.000  |      |       |          |
+| g1                  | X            |      | 0.000     | ±1.000  |      |       |          |
+| g1                  | Y            |      | 0.000     | ±1.000  |      |       |          |
+| g1                  | Z            |      | 0.000     | ±1.000  |      |       |          |
+| g2                  | Diameter     |      | 12.700    | ±1.000  |      |       |          |
+| g2                  | X            |      | 100.390   | ±1.000  |      |       |          |
+| g2                  | Y            |      | 0.000     | ±1.000  |      |       |          |
+| g2                  | Z            |      | 0.000     | ±1.000  |      |       |          |
+| g3                  | Diameter     |      | 12.698    | ±1.000  |      |       |          |
+| g3                  | X            |      | 1.023     | ±1.000  |      |       |          |
+| g3                  | Y            |      | -0.155    | ±1.000  |      |       |          |
+| g3                  | Z            |      | 175.224   | ±1.000  |      |       |          |
+| l1                  | Diameter     |      | 6.349     | ±1.000  |      |       |          |
+| l1                  | X            |      | 79.614    | ±1.000  |      |       |          |
+| l1                  | Y            |      | 51.505    | ±1.000  |      |       |          |
+| l1                  | Z            |      | 199.754   | ±1.000  |      |       |          |
+| l2                  | Diameter     |      | 6.347     | ±1.000  |      |       |          |
+| l2                  | X            |      | 119.777   | ±1.000  |      |       |          |
+| l2                  | Y            |      | 51.355    | ±1.000  |      |       |          |
+| l2                  | Z            |      | 264.265   | ±1.000  |      |       |          |
+| l3                  | Diameter     |      | 6.350     | ±1.000  |      |       |          |
+| l3                  | X            |      | 79.277    | ±1.000  |      |       |          |
+| l3                  | Y            |      | 51.400    | ±1.000  |      |       |          |
+| l3                  | Z            |      | 275.713   | ±1.000  |      |       |          |
+| r1                  | Diameter     |      | 6.352     | ±1.000  |      |       |          |
+| r1                  | X            |      | -104.039  | ±1.000  |      |       |          |
+| r1                  | Y            |      | 51.210    | ±1.000  |      |       |          |
+| r1                  | Z            |      | 199.297   | ±1.000  |      |       |          |
+| r2                  | Diameter     |      | 6.352     | ±1.000  |      |       |          |
+| r2                  | X            |      | -108.680  | ±1.000  |      |       |          |
+| r2                  | Y            |      | 51.004    | ±1.000  |      |       |          |
+| r2                  | Z            |      | 275.110   | ±1.000  |      |       |          |
+| r3                  | Diameter     |      | 6.354     | ±1.000  |      |       |          |
+| r3                  | X            |      | -148.231  | ±1.000  |      |       |          |
+| r3                  | Y            |      | 50.989    | ±1.000  |      |       |          |
+| r3                  | Z            |      | 261.059   | ±1.000  |      |       |          |
+| u1                  | Diameter     |      | 2.498     | ±1.000  |      |       |          |
+| u1                  | X            |      | -28.554   | ±1.000  |      |       |          |
+| u1                  | Y            |      | 103.614   | ±1.000  |      |       |          |
+| u1                  | Z            |      | -91.666   | ±1.000  |      |       |          |
+| u2                  | Diameter     |      | 2.399     | ±1.000  |      |       |          |
+| u2                  | X            |      | 1.447     | ±1.000  |      |       |          |
+| u2                  | Y            |      | 103.722   | ±1.000  |      |       |          |
+| u2                  | Z            |      | -92.199   | ±1.000  |      |       |          |
+| u3                  | Diameter     |      | 2.401     | ±1.000  |      |       |          |
+| u3                  | X            |      | -28.490   | ±1.000  |      |       |          |
+| u3                  | Y            |      | 73.650    | ±1.000  |      |       |          |
+| u3                  | Z            |      | -92.161   | ±1.000  |      |       |          |
+| u4                  | Diameter     |      | 2.372     | ±1.000  |      |       |          |
+| u4                  | X            |      | 1.433     | ±1.000  |      |       |          |
+| u4                  | Y            |      | 73.749    | ±1.000  |      |       |          |
+| u4                  | Z            |      | -92.267   | ±1.000  |      |       |          |
++---------------------+--------------+------+-----------+---------+------+-------+----------+
 
 The calibrator works by minimizing disagreement between actual spot positions
 and modelled spot positions. When we press Fit, the simplex fitter starts

@@ -39,17 +39,13 @@ proc DFPS_Manager_init {} {
 	set info(control) "Idle"
 
 	# A zoom value for the display, and a choice of intensification.
-	set config(zoom) 1.0
+	set config(zoom) 0.5
 	set config(intensify) "exact"
 		
 	# These numbers are used only when we open the DFPS Manager panel for the 
 	# first time, and need to allocate space for the fiber image.
 	set config(image_sensor) "ICX424"
-	set config(image_width) "700"
-	set config(image_height) "520"
-	set config(daq_image_bottom) "516"
-	set config(daq_image_right) "695"
-	set config(analysis_threshold) "50 #"
+	set config(analysis_threshold) "10 #"
 	
 	# We configure the BCAM image sensor and adjust analysis bounds.
 	LWDAQ_set_image_sensor $config(image_sensor) BCAM
@@ -58,15 +54,26 @@ proc DFPS_Manager_init {} {
 	set config(dac_zero) "125"
 	
 	# Data acquisition addresses.
-	set config(ip_addr) "192.168.1.11"
-	set config(dfps_sock) "8 14"
-	set config(fiber_type) "9"
-	set config(injector_sock) "8 1"
-	set config(injector_leds) "A1"
-	set config(dfps_ids) "A123"
-	set config(camera_sock) "8 8"
-	set config(flash_seconds) "0.003"
+	set config(ip_addr) "192.168.1.10"
+	set config(fvc_left_sock) "4 0"
+	set config(fvc_right_sock) "5 0"
+	set config(source_type) "9"
+	set config(injector_sock) "3 0"
+	set config(fiducial_leds) "D2 D4 D6 D10"
 	set config(sort_code) "8"
+	set config(guide_leds) "A1"
+	set config(flash_seconds) "0.0"
+	set config(controller_sock) "7 0"
+	set config(controller_ids) "A123"
+	
+	# Fiber view camera geometry.
+	set config(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
+	set config(cam_left) $config(cam_default)
+	set config(cam_right) $config(cam_default)
+	set config(mount_left) "0 0 0 -21 0 -73 21 0 -73"
+	set config(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	
 	# Default north, south, east, and west control values.
 	set config(n_out) $config(dac_zero) 
@@ -76,9 +83,7 @@ proc DFPS_Manager_init {} {
 	
 	# Command transmission values.
 	set config(initiate_delay) "0.010"
-	set config(spacing_delay_A2037E) "0.0000"
-	set config(spacing_delay_A2071E) "0.0014"
-	set config(spacing_delay_cmd) "0.0"
+	set config(spacing_delay) "0.0014"
 	set config(byte_processing_time) "0.0002"
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
@@ -87,12 +92,9 @@ proc DFPS_Manager_init {} {
 	set config(commands) "8"
 	
 	# The history of spot positions for the tracing.
-	set info(trace_history) [list]
-	set config(trace_enable) "0"
-	set config(trace_persistence) "1000"
 	set config(repeat) "0"
 	set info(travel_wait) "0"
-	set info(spot_positions) ""
+	set info(spots) ""
 	
 	# Travel configuration.
 	set config(travel_index) "0"
@@ -102,6 +104,7 @@ proc DFPS_Manager_init {} {
 	
 	# Panel appearance.
 	set config(label_color) "green"
+	set info(examine_window) "$info(window).examine_window"
 	
 	# Waiting time after setting control voltages before we make measurements.
 	set config(settling_ms) "1000"
@@ -111,7 +114,61 @@ proc DFPS_Manager_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
+	# Create images to store FVC images as they come in from the BCAM.
+	foreach side {left right} {
+		set info(image_$side) dfps_manager_$side
+		lwdaq_image_create -name $info(image_$side) -width 700 -height 520
+	}
+
 	return ""   
+}
+
+#
+# DFPS_Manager_examine opens a new window that displays the CMM measurements of
+# the left and right mounts, and the calibration constants of the left and right
+# cameras. The window allows us to modify the all these values by hand.
+#
+proc DFPS_Manager_examine {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set w $info(examine_window)
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "Coordinate Measurements, DFPS Manager $info(version)"
+	} {
+		raise $w
+		return ""
+	}
+
+	set f [frame $w.buttons]
+	pack $f -side top -fill x
+	button $f.save -text "Save Configuration" -command "LWDAQ_tool_save $info(name)"
+	pack $f.save -side left -expand 1
+	button $f.unsave -text "Unsave Configuration" -command "LWDAQ_tool_unsave $info(name)"
+	pack $f.unsave -side left -expand 1
+	
+	foreach mount {Left Right} {
+		set b [string tolower $mount]
+		set f [frame $w.mnt$b]
+		pack $f -side top -fill x
+		label $f.l$b -text "$mount Mount:"
+		entry $f.e$b -textvariable DFPS_Manager_config(mount_$b) -width 70
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+
+	foreach mount {Left Right} {
+		set b [string tolower $mount]
+		set f [frame $w.cam$b]
+		pack $f -side top -fill x
+		label $f.l$b -text "$mount Camera:"
+		entry $f.e$b -textvariable DFPS_Manager_config(cam_$b) -width 70
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+
+	set info(control) "Idle"
+	
+	return ""
 }
 
 #
@@ -128,20 +185,20 @@ proc DFPS_Manager_id_bytes {id_hex} {
 	} elseif {$id == "*"} {
 		return "255 255"
 	} else {
-		LWDAQ_print $info(log) "ERROR: Bad device identifier \"$id\",\
+		LWDAQ_print $info(text) "ERROR: Bad device identifier \"$id\",\
 			defaulting to null identifier."
 		return "0 0"
 	}
 }
 
 #
-# DFPS_Manager_transmit takes a string of command bytes and transmits them through a
-# Command Transmitter such as the A3029A. The routine appends a sixteen-bit
-# checksum. The checksum is the two bytes necessary to return a sixteen-bit
-# linear feedback shift register to all zeros, thus performing a sixteen-bit
-# cyclic redundancy check. We assume the destination shift register is preloaded
-# with the checksum_preload value. The shift register has taps at locations 16,
-# 14, 13, and 11.
+# DFPS_Manager_transmit takes a string of command bytes and transmits them
+# through a Command Transmitter such as the A3029A. The routine appends a
+# sixteen-bit checksum. The checksum is the two bytes necessary to return a
+# sixteen-bit linear feedback shift register to all zeros, thus performing a
+# sixteen-bit cyclic redundancy check. We assume the destination shift register
+# is preloaded with the checksum_preload value. The shift register has taps at
+# locations 16, 14, 13, and 11.
 #
 proc DFPS_Manager_transmit {{commands ""}} {
 	upvar #0 DFPS_Manager_config config
@@ -156,7 +213,7 @@ proc DFPS_Manager_transmit {{commands ""}} {
 	}
 
 	# Print the commands to the text window.
-	LWDAQ_print $info(log) "Transmitting: $commands"
+	LWDAQ_print $info(text) "Transmitting: $commands"
 
 	# Append a two-byte checksum.
 	set checksum $config(checksum_preload)
@@ -183,11 +240,7 @@ proc DFPS_Manager_transmit {{commands ""}} {
 	# command, including the checksum.
 	if {[catch {
 		set sock [LWDAQ_socket_open $config(ip_addr)]
-		if {[LWDAQ_hardware_id $sock] == "37"} {
-			set sd $config(spacing_delay_A2037E)		
-		} {
-			set sd $config(spacing_delay_A2071E)
-		}
+		set sd $config(spacing_delay)
 		LWDAQ_set_driver_mux $sock \
 			[lindex $config(dfps_sock) 0] [lindex $config(dfps_sock) 1]
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
@@ -264,73 +317,106 @@ proc DFPS_Manager_set_nsew {id} {
 }
 
 #
-# DFPS_Manager_spot_position captures an image from the camera and finds the fiber
-# tip image using the BCAM Instrument. If we have tracing enabled, it draws the entire
-# history of spot positions as a locus on the image. The routine checks for errors in
-# data acquisition and instructs the DFPS Manager to stop any long-term operation
-# if it does encounter an error.
+# DFPS_Manager_spots captures an image of all available fiducial and guide
+# fibers in each of the left and right fiber view camers. It returns the spot
+# positions in the left and right cameras for each fiber. The returned list
+# takes the form of one entry "xl yl xr yr" for each fiducial fiber followed by
+# similar entries for the guide fibers. The fiducial fibers are those listed in
+# the fiducial_leds list, and the guides are in guide_leds. 
 #
-proc DFPS_Manager_spot_position {} {
+proc DFPS_Manager_spots {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
-	# Prepare the BCAM Instrument.
-	set info(spot_positions) ""
+	# Prepare the BCAM Instrument for fiber view camera (FVC) acquisition.
+	set info(spots) ""
 	set iconfig(daq_ip_addr) $config(ip_addr)
 	set iconfig(daq_source_driver_socket) [lindex $config(injector_sock) 0]
 	set iconfig(daq_source_mux_socket) [lindex $config(injector_sock) 1]
-	set iconfig(daq_source_device_element) $config(injector_leds)
-	set iinfo(daq_source_device_type) $config(fiber_type)
-	set iconfig(daq_driver_socket) [lindex $config(camera_sock) 0]
-	set iconfig(daq_mux_socket) [lindex $config(camera_sock) 1]
-	set iconfig(daq_flash_seconds) $config(flash_seconds)
+	set iconfig(daq_source_device_element) \
+		[string trim "$config(fiducial_leds) $config(guide_leds)"]
+	set iinfo(daq_source_device_type) $config(source_type)
+		set iconfig(daq_flash_seconds) $config(flash_seconds)
 	set iconfig(analysis_num_spots) \
-		"[llength $config(injector_leds)] $config(sort_code)"
-	set iinfo(daq_image_bottom) $config(daq_image_bottom)
-	set iinfo(daq_image_right) $config(daq_image_right)
+		"[llength $iconfig(daq_source_device_element)] $config(sort_code)"
 	set iconfig(analysis_threshold) $config(analysis_threshold)
-
-	# Acquire from BCAM Instrument.	
-	set result [LWDAQ_acquire BCAM]
-	if {[LWDAQ_is_error_result $result]} {
-		LWDAQ_print $info(log) "$result"
-		return ""
+	
+	# Acquire from both FVCs.
+	foreach side {left right} {
+		set iconfig(daq_driver_socket) [lindex $config(fvc_$side\_sock) 0]
+		set iconfig(daq_mux_socket) [lindex $config(fvc_$side\_sock) 1]
+		set result [LWDAQ_acquire BCAM]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $info(text) "$result"
+			return ""
+		} else {
+			set result_$side [lrange $result 1 end]
+			lwdaq_image_manipulate $iconfig(memory_name) \
+				copy -name $info(image_$side)
+			lwdaq_image_manipulate $info(image_$side) \
+				transfer_overlay $iconfig(memory_name)
+			lwdaq_draw $info(image_$side) dfps_manager_$side \
+				-intensify $config(intensify) -zoom $config(zoom)
+		}
 	}
 	
 	# Parse result string.
-	set result [lreplace $result 0 0]	
-	set index 0
-	foreach fiber $config(injector_leds) {
-		incr index
-		set x [format %.2f [lindex $result 0]]
-		set y [format %.2f [lindex $result 1]]
-		append info(spot_positions) "$x $y "
-		set result [lrange $result 6 end]
-		if {$config(trace_enable)} {
-			set x_min [expr $iinfo(daq_image_left) * $iinfo(analysis_pixel_size_um)]
-			set y_min [expr $iinfo(daq_image_top) * $iinfo(analysis_pixel_size_um)]
-			set x_max [expr $iinfo(daq_image_right) * $iinfo(analysis_pixel_size_um)]
-			set y_max [expr $iinfo(daq_image_bottom) * $iinfo(analysis_pixel_size_um)]
-			lappend info(trace_history_$index) "$x [expr $y_max - $y + $y_min]"
-			if {[llength $info(trace_history_$index)] > $config(trace_persistence)} {
-				set info(trace_history_$index) \
-					[lrange $info(trace_history_$index) 1 end]
-			}
-			lwdaq_graph [join $info(trace_history_$index)] $iconfig(memory_name) \
-				-x_max $x_max -y_max $y_max -y_min $y_min -x_min $x_min -color 5
-		} {
-			set info(trace_history_$index) [list]
+	set spots [list]
+	foreach fiber "$iconfig(daq_source_device_element)" {
+		set spot ""
+		foreach side {left right} {
+			append spot "[lindex [set result_$side] 0] [lindex [set result_$side] 1] "
+			set result_$side [lrange [set result_$side] 6 end]
 		}
+		lappend spots [string trim $spot]
 	}
-
-	# Draw the BCAM image in the DFPS Manager window.
-	lwdaq_draw $iconfig(memory_name) $info(photo) \
-		-zoom $config(zoom) \
-		-intensify $config(intensify)
 	
-	return ""
+	set info(spots) $spots
+	return $spots
+}
+
+#
+# DFPS_Manager_sources returns the global xyz position of all the sources
+# in a list. Each source entry consists of the position the source's image
+# in the left and right FVC, in the form "xl yl xr yr" in microns from the
+# center of the top-left corner pixel.
+#
+proc DFPS_Manager_sources {spots} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
+	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
+
+	set sources ""
+	foreach spot $spots {
+		scan $spot %f%f%f%f x_left y_left x_right y_right
+		set x_left [expr 0.001 * $x_left]
+		set y_left [expr 0.001 * $y_left]
+		set x_right [expr 0.001 * $x_right]
+		set y_right [expr 0.001 * $y_right]
+	
+		foreach side {left right} {
+			set b_$side [lwdaq bcam_source_bearing \
+				"[set x_$side] [set y_$side]" "$side $config(cam_$side)"]
+			LWDAQ_print $info(text) "[set b_$side]" brown
+			set gbp_$side [lwdaq xyz_global_from_local_point \
+				[lrange [set b_$side] 0 2] $config(coord_$side)]
+			set gbv_$side [lwdaq xyz_global_from_local_vector \
+				[lrange [set b_$side] 3 5] $config(coord_$side)]
+			LWDAQ_print $info(text) "[set gbp_$side] [set gbv_$side]" green
+		}
+		
+		set bridge [lwdaq xyz_line_line_bridge \
+			"$gbp_left $gbv_left" "$gbp_right $gbv_right"]
+		LWDAQ_print $info(text) $bridge orange
+	}
+	
+	set info(sources) $sources
+	return $sources
+
 }
 
 #
@@ -350,13 +436,13 @@ proc DFPS_Manager_cmd {cmd} {
 			set info(control) "Stop"
 		} else {
 			if {$cmd != $info(control)} {
-				LWDAQ_print $info(log) "ERROR: Cannot $cmd during $info(control)."
+				LWDAQ_print $info(text) "ERROR: Cannot $cmd during $info(control)."
 			}
 		}
 	} else {
 		if {$cmd == "Stop"} {
 			# The stop command does not do anything when we are already stopped.
-			LWDAQ_print $info(log) "ERROR: Cannot stop while idle."
+			LWDAQ_print $info(text) "ERROR: Cannot stop while idle."
 		} else {
 			# Set the control variable.
 			set info(control) $cmd
@@ -376,16 +462,15 @@ proc DFPS_Manager_cmd {cmd} {
 # window. The report is a list of numbers, with some color coding and formatting
 # to make it easy to read.
 #
-proc DFPS_Manager_report {{t ""}} {
+proc DFPS_Manager_report {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	if {$t == ""} {set t $info(data)}
-	LWDAQ_print -nonewline $t "[format %.0f $config(n_out)]\
+	LWDAQ_print -nonewline $info(text) "[format %.0f $config(n_out)]\
 		[format %.0f $config(s_out)]\
 		[format %.0f $config(e_out)]\
 		[format %.0f $config(w_out)] " green
-	LWDAQ_print $t "$info(spot_positions)" black
+	LWDAQ_print $info(text) "$info(spots)" black
 	return ""
 }
 
@@ -407,10 +492,10 @@ proc DFPS_Manager_move {} {
 			DFPS_Manager_set_nsew $id
 		}
 		LWDAQ_wait_ms $config(settling_ms)
-		DFPS_Manager_spot_position
+		DFPS_Manager_spots
 		DFPS_Manager_report
 	} error_result]} {
-		LWDAQ_print $info(log) "ERROR: $error_result"
+		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
 		return ""
 	}
@@ -440,10 +525,10 @@ proc DFPS_Manager_zero {} {
 			DFPS_Manager_set_nsew $id
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
-		DFPS_Manager_spot_position
+		DFPS_Manager_spots
 		DFPS_Manager_report
 	} error_result]} {
-		LWDAQ_print $info(log) "ERROR: $error_result"
+		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
 		return ""
 	}
@@ -464,10 +549,11 @@ proc DFPS_Manager_check {} {
 	
 	
 	if {[catch {
-		DFPS_Manager_spot_position
+		DFPS_Manager_spots
+		DFPS_Manager_sources $info(spots)
 		DFPS_Manager_report
 	} error_result]} {
-		LWDAQ_print $info(log) "ERROR: $error_result"
+		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
 		return ""
 	}
@@ -487,16 +573,13 @@ proc DFPS_Manager_clear {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 
 	set index 0
-	foreach fiber $config(injector_leds) {
-		incr index
-		set info(trace_history_$index) [list]
-	}
-	
 	if {[lwdaq_image_exists $iconfig(memory_name)] != ""} {
-		lwdaq_image_manipulate $iconfig(memory_name) none -clear 1
-		lwdaq_draw $iconfig(memory_name) $info(photo) \
-			-zoom $config(zoom) \
-			-intensify $config(intensify)
+		foreach side {left right} {
+			lwdaq_image_manipulate $info(image_$side) none -clear 1
+			lwdaq_draw $info(image_$side) dfps_manager_$side \
+				-zoom $config(zoom) \
+				-intensify $config(intensify)
+		}
 	}
 	
 	if {$info(control) == "Clear"} {
@@ -598,7 +681,7 @@ proc DFPS_Manager_travel {} {
 		close $f
 	} error_result]} {
 		catch {close $f}
-		LWDAQ_print $info(log) "ERROR: $error_result."
+		LWDAQ_print $info(text) "ERROR: $error_result."
 		set info(control) "Idle"		
 		return ""
 	}
@@ -618,14 +701,13 @@ proc DFPS_Manager_travel {} {
 		set config(travel_index) 0
 	}
 	
-	# If this is the first step, clear excess lines from the data and log windows and
+	# If this is the first step, clear excess lines from the text window and
 	# increment the travel counter.
 	if {$config(travel_index) == 0} {
 		incr config(pass_counter)
-		LWDAQ_print $info(log) "\nStarting [file tail $config(travel_file)],\
+		LWDAQ_print $info(text) "\nStarting [file tail $config(travel_file)],\
 			Pass $config(pass_counter)." purple
-		$info(log) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
-		$info(data) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
+		$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
 		
 	}
 		
@@ -633,10 +715,10 @@ proc DFPS_Manager_travel {} {
 	set line [string trim [lindex $travel_list $config(travel_index)]]
 	set first_word [lindex $line 0]
 
-	# Print out the line in the log window with its line number, but don't keep
+	# Print out the line in the text window with its line number, but don't keep
 	# re-printing a wait command line.
 	if {($first_word != "wait") || ($info(travel_wait) == 0)} {
-		LWDAQ_print $info(log) "[format %-3d $config(travel_index)] $line"
+		LWDAQ_print $info(text) "[format %-3d $config(travel_index)] $line"
 	}
 	
 	# Address commands and the default behavior, which is to treat the line as four
@@ -663,7 +745,7 @@ proc DFPS_Manager_travel {} {
 		# loops into our travel scripts.
 			set label [regsub {label[ \t]*} $line ""]
 			if {![string is wordchar $label]} {
-				LWDAQ_print $info(log) "ERROR: Bad label name \"$label\"."
+				LWDAQ_print $info(text) "ERROR: Bad label name \"$label\"."
 				set info(control) "Idle"
 				return ""
 			}
@@ -676,7 +758,7 @@ proc DFPS_Manager_travel {} {
 			if {[catch {
 				eval [regsub {tcl[ \t]*} $line ""]
 			} error_result]} {
-				LWDAQ_print $info(log) "ERROR: $error_result"
+				LWDAQ_print $info(text) "ERROR: $error_result"
 				set info(control) "Idle"
 				return ""
 			}
@@ -690,14 +772,14 @@ proc DFPS_Manager_travel {} {
 			set sft [lindex $line 1]
 			set sfn [file join [file dirname $config(travel_file)] $sft]
 			if {![file exists $sfn]} {
-				LWDAQ_print $info(log) "ERROR: No such file \"$sfn\"."
+				LWDAQ_print $info(text) "ERROR: No such file \"$sfn\"."
 				set info(control) "Idle"
 				return ""				
 			}
 			if {[catch {
 				source $sfn
 			} error_result]} {
-				LWDAQ_print $info(log) "ERROR: $error_result"
+				LWDAQ_print $info(text) "ERROR: $error_result"
 				set info(control) "Idle"
 				return ""
 			}
@@ -709,7 +791,7 @@ proc DFPS_Manager_travel {} {
 		# post itself to the event loop, so will respond to Stop commands.
 			set wait_seconds [lindex $line 1]
 			if {![string is integer -strict $wait_seconds]} {
-				LWDAQ_print $info(log) "ERROR: Invalid wait time \"$wait_seconds\"."
+				LWDAQ_print $info(text) "ERROR: Invalid wait time \"$wait_seconds\"."
 				set info(control) "Idle"
 				return ""
 			}
@@ -734,7 +816,7 @@ proc DFPS_Manager_travel {} {
 				if {![string is integer -strict [lindex $line $i]] \
 					|| ([lindex $line $i] < 0) \
 					|| ([lindex $line $i] > 255)} {
-					LWDAQ_print $info(log) "ERROR: Invalid control value \"$line\"."
+					LWDAQ_print $info(text) "ERROR: Invalid control value \"$line\"."
 					set info(control) "Idle"
 					return ""
 				}
@@ -747,7 +829,7 @@ proc DFPS_Manager_travel {} {
 			if {[catch {
 				foreach id $config(dfps_ids) {DFPS_Manager_set_nsew $id}
 			} error_result]} {
-				LWDAQ_print $info(log) "ERROR: $error_result"
+				LWDAQ_print $info(text) "ERROR: $error_result"
 				set info(control) "Idle"
 				return ""
 			}
@@ -755,7 +837,7 @@ proc DFPS_Manager_travel {} {
 			# Wait for the fiber to settle, then measure voltages, spot position, and
 			# report to text window.
 			LWDAQ_wait_ms $config(settling_ms)	
-			DFPS_Manager_spot_position
+			DFPS_Manager_spots
 			DFPS_Manager_report
 		}
 	}
@@ -770,7 +852,7 @@ proc DFPS_Manager_travel {} {
 		LWDAQ_post "DFPS_Manager_travel"
 		return ""
 	} else {
-		LWDAQ_print $info(log) "Travel Complete, Pass $config(pass_counter)." purple
+		LWDAQ_print $info(text) "Travel Complete, Pass $config(pass_counter)." purple
 		if {$config(repeat)} {
 			LWDAQ_post "DFPS_Manager_travel"
 			return ""
@@ -830,7 +912,7 @@ proc DFPS_Manager_open {} {
 	
 	label $f.state -textvariable DFPS_Manager_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
-	foreach a {Travel Step Stop Clear Reset} {
+	foreach a {Travel Step Stop Clear Reset Examine} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
 		pack $f.$b -side left -expand 1
@@ -844,8 +926,8 @@ proc DFPS_Manager_open {} {
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
 
-	foreach a {ip_addr dfps_sock injector_sock camera_sock \
-			flash_seconds settling_ms} {
+	foreach a {ip_addr fvc_left_sock fvc_right_sock injector_sock  \
+			controller_sock flash_seconds} {
 		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 2]
@@ -855,18 +937,21 @@ proc DFPS_Manager_open {} {
 	set f [frame $ff.leds]
 	pack $f -side top -fill x
 
-	foreach a {injector_leds} {
+	foreach a {fiducial_leds} {
 		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 100
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 30
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	set f [frame $ff.positioners]
-	pack $f -side top -fill x
-
-	foreach a {dfps_ids} {
+	foreach a {guide_leds} {
 		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 100
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 30
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+
+	foreach a {controller_ids} {
+		label $f.l$a -text $a -fg $config(label_color)
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 30
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
@@ -879,6 +964,7 @@ proc DFPS_Manager_open {} {
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 5
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
+	
 	foreach a {Move Zero Check} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
@@ -913,21 +999,20 @@ proc DFPS_Manager_open {} {
 	pack $f.tll $f.tle -side left -expand yes
 	
 	set f [frame $w.image_frame]
-	pack $f -side left -fill y -expand yes
+	pack $f -side top -fill x -expand no
 	
-	set info(photo) [image create photo -width 300 -height 200]
-	label $f.image -image $info(photo) 
-	pack $f.image -side top -expand yes
+	foreach a {left right} {
+		image create photo "dfps_manager_$a"
+		label $f.$a -image "dfps_manager_$a"
+		pack $f.$a -side left -expand yes
+	}
+	
+	set f [frame $w.text_frame]
+	pack $f -side top -fill both -expand yes
+	
+	set info(text) [LWDAQ_text_widget $f 80 20 1 1]
+	LWDAQ_print $info(text) "DFPS Manager Text Output" purple
 
-	set info(data) [LWDAQ_text_widget $f 80 5 1 1]
-	LWDAQ_print $info(data) "DFPS Manager Data" purple
-
-	set f [frame $w.log]
-	pack $f -side right -fill both -expand yes
-	
-	set info(log) [LWDAQ_text_widget $f 30 40 1 1]
-	LWDAQ_print $info(log) "DFPS Manager Log" purple
-	
 	return $w
 }
 

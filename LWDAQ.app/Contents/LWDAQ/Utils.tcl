@@ -2311,7 +2311,11 @@ proc LWDAQ_html_tables { {file_name ""} } {
 
 #
 # LWDAQ_command_reference generates the LWDAQ software command reference manual
-# automatically, using ./Sources/lwdaq.pas and ./LWDAQ.app/Contents/LWDAQ/CRT.html.
+# automatically, using the files ./Sources/lwdaq.pas for Pascal library routine
+# entries and the template file ./LWDAQ.app/Contents/LWDAQ/CRT.html, as well as
+# our LWDAQ command listing and help extraction routines. By default, the
+# routine creates the command reference in the current LWDAQ working directory,
+# and names it Commands.html.
 #
 proc LWDAQ_command_reference { {file_name ""} } {
 	global LWDAQ_Info
