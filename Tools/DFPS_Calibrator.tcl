@@ -268,20 +268,76 @@ proc DFPS_Calibrator_show {} {
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 	set err [DFPS_Calibrator_disagreement]
 	LWDAQ_print $info(text) "[DFPS_Calibrator_get_params] $err 0"
+
 	return ""
 }
 
 #
-# DFPS_Calibrator_read looks for a file called CMM.txt. We either pass it the
-# directory name or the routine will open a browser for us to choose the
-# directory. From the CMM.txt file the calibrator reads the global coordinates
-# of the balls in the left and right FVC mounts, and the locations of the four
-# calibration sources. Having read CMM.txt, the routine looks for L.gif and
-# R.gif, the images returned by the left and right FVCs viewing the four
-# calibration sources. In these two images, the sources must be arranged from 1
-# to 4 in an x-y grid, as recognised by the BCAM Instrument.
+# DFPS_Calibrator_check projects the image of each source in the left and right
+# cameras to make a bearing line in the left and right mount coordinates using
+# the current camera calibration constants, transforms to global coordinates
+# using the mounting ball coordinates, and finds the mid-point of the shortest
+# line between these two lines. This mid-point is the FVC measurement of the
+# source position. It compares this position to the measured source position and
+# reports the difference between the two.
 #
-proc DFPS_Calibrator_read {{img_dir ""}} {
+proc DFPS_Calibrator_check {} {
+	upvar #0 DFPS_Calibrator_config config
+	upvar #0 DFPS_Calibrator_info info
+	
+	LWDAQ_print $info(text) "\nGlobal Measured Position and Error\
+		(xm, ym, zm, xe, ye, ze in mm):" purple
+	set sources ""
+	set sum_squares 0.0
+	for {set i 1} {$i <= 4} {incr i} {	
+		lwdaq_config -fsd 6
+		foreach side {left right} {
+			set x [expr 0.001 * [lindex $config(spots_$side) [expr ($i-1)*2]]]
+			set y [expr 0.001 * [lindex $config(spots_$side) [expr ($i-1)*2+1]]]
+			set b [lwdaq bcam_source_bearing "$x $y" "$side $config(cam_$side)"]
+			set point_$side [lwdaq xyz_global_from_local_point \
+				[lrange [set b] 0 2] $config(coord_$side)]
+			set dir_$side [lwdaq xyz_global_from_local_vector \
+				[lrange [set b] 3 5] $config(coord_$side)]
+		}
+		lwdaq_config -fsd 3
+		
+		set bridge [lwdaq xyz_line_line_bridge \
+			"$point_left $dir_left" "$point_right $dir_right"]
+		scan $bridge %f%f%f%f%f%f x y z dx dy dz
+		
+		set x_src [format %8.3f [expr $x + 0.5*$dx]]
+		set y_src [format %8.3f [expr $y + 0.5*$dy]]
+		set z_src [format %8.3f [expr $z + 0.5*$dz]]
+		
+		set a $config(source_$i)
+		set x_err [format %6.3f [expr [lindex $a 0]-$x_src]]
+		set y_err [format %6.3f [expr [lindex $a 1]-$y_src]]
+		set z_err [format %6.3f [expr [lindex $a 2]-$z_src]]
+		
+		LWDAQ_print $info(text) "Source_$i\: $x_src $y_src $z_src\
+			$x_err $y_err $z_err"
+		
+		set sum_squares [expr $sum_squares + $x_err*$x_err \
+			+ $y_err*$y_err + $z_err*$z_err] 
+	}
+
+	set err [expr sqrt($sum_squares / $config(num_sources))]
+	LWDAQ_print $info(text) "Root Mean Square Error (mm): [format %.3f $err]"
+
+	return ""
+}
+
+#
+# DFPS_Calibrator_read either reads a specified CMM measurement file or browses
+# for one. The calibrator reads the global coordinates of the balls in the left
+# and right FVC mounts, and the locations of the four calibration sources.
+# Having read the CMM file the routine looks for L.gif and R.gif in the same
+# directory. These should be the images returned by the left and right FVCs of
+# the four calibration sources. In these two images, the sources must be
+# arranged from 1 to 4 in an x-y grid, as recognised by the BCAM Instrument.
+#
+proc DFPS_Calibrator_read {{fn ""}} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
@@ -291,43 +347,38 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 	set info(state) "Reading"
 	LWDAQ_update
 	
-	if {$img_dir == ""} {set img_dir [LWDAQ_get_dir_name]}
-	if {$img_dir == ""} {
+	if {$fn == ""} {set fn [LWDAQ_get_file_name]}
+	if {$fn == ""} {
 		set info(state) "Idle"
 		return ""
 	} {
-		set config(img_dir) $img_dir
+		set config(img_dir) [file dirname $fn]
 	}
 	
-	LWDAQ_print $info(text) "Reading mount and source positions from CMM.txt."
-	set fn [file join $img_dir CMM.txt]
-	if {[file exists $fn]} {
-		set f [open $fn r]
-		set cmm [read $f]
-		close $f
-		set numbers [list]
-		foreach a $cmm {if {[string is double -strict $a]} {lappend numbers $a}}
-		set spheres [list]
-		foreach {d x y z} $numbers {
-			lappend spheres "$x $y $z"
-		}
-		set config(mount_left) [join [lrange $spheres 3 5]]
-		set config(mount_right) [join [lrange $spheres 6 8]]
-		set spheres [lrange $spheres 9 end]
-		for {set a 1} {$a <= $config(num_sources)} {incr a} {
-			set config(source_$a) [lindex $spheres [expr $a-1]]
-		}
-	} else {
-		LWDAQ_print $info(text) "Cannot find \"$fn\"."
-		set info(state) "Idle"
-		return ""
+	LWDAQ_print $info(text) "\nReading measurements from disk." purple
+	
+	LWDAQ_print $info(text) "Reading CMM measurements from [file tail $fn]."
+	set f [open $fn r]
+	set cmm [read $f]
+	close $f
+	set numbers [list]
+	foreach a $cmm {if {[string is double -strict $a]} {lappend numbers $a}}
+	set spheres [list]
+	foreach {d x y z} $numbers {
+		lappend spheres "$x $y $z"
+	}
+	set config(mount_left) [join [lrange $spheres 3 5]]
+	set config(mount_right) [join [lrange $spheres 6 8]]
+	set spheres [lrange $spheres 9 end]
+	for {set a 1} {$a <= $config(num_sources)} {incr a} {
+		set config(source_$a) [lindex $spheres [expr $a-1]]
 	}
 
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	LWDAQ_print $info(text) "Reading and analyzing left and right FVC images."
 	foreach {s side} {L left R right} {
+		LWDAQ_print $info(text) "Reading and analyzing image $a\.gif from $side camera."
 		set ifn [file join $config(img_dir) $s\.gif]
 		if {[file exists $ifn]} {
 			LWDAQ_read_image_file $ifn $info(image_$side)
@@ -352,8 +403,9 @@ proc DFPS_Calibrator_read {{img_dir ""}} {
 		}
 	}
 
-	DFPS_Calibrator_show		
-	
+	set err [DFPS_Calibrator_disagreement]
+	LWDAQ_print $info(text) "Current spot position fit error is $err um rms."
+
 	set info(state) "Idle"
 	return ""
 }
@@ -484,7 +536,7 @@ proc DFPS_Calibrator_open {} {
 	button $f.stop -text "Stop" -command {set DFPS_Calibrator_config(stop_fit) 1}
 	pack $f.stop -side left -expand yes
 
-	foreach a {Read Show Displace Defaults Examine Fit} {
+	foreach a {Read Show Check Displace Defaults Examine Fit} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Calibrator_$b"
 		pack $f.$b -side left -expand yes

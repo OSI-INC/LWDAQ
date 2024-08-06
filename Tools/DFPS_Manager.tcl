@@ -65,6 +65,8 @@ proc DFPS_Manager_init {} {
 	set config(flash_seconds) "0.0"
 	set config(controller_sock) "7 0"
 	set config(controller_ids) "A123"
+	set config(spots_left) ""
+	set config(spots_right) ""
 	
 	# Fiber view camera geometry.
 	set config(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
@@ -74,7 +76,7 @@ proc DFPS_Manager_init {} {
 	set config(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
-	
+
 	# Default north, south, east, and west control values.
 	set config(n_out) $config(dac_zero) 
 	set config(s_out) $config(dac_zero) 
@@ -94,7 +96,6 @@ proc DFPS_Manager_init {} {
 	# The history of spot positions for the tracing.
 	set config(repeat) "0"
 	set info(travel_wait) "0"
-	set info(spots) ""
 	
 	# Travel configuration.
 	set config(travel_index) "0"
@@ -318,11 +319,12 @@ proc DFPS_Manager_set_nsew {id} {
 
 #
 # DFPS_Manager_spots captures an image of all available fiducial and guide
-# fibers in each of the left and right fiber view camers. It returns the spot
-# positions in the left and right cameras for each fiber. The returned list
-# takes the form of one entry "xl yl xr yr" for each fiducial fiber followed by
-# similar entries for the guide fibers. The fiducial fibers are those listed in
-# the fiducial_leds list, and the guides are in guide_leds. 
+# fibers in each of the left and right fiber view camers. It fills the two spot
+# position lists, spots_left and spots right, giving the spot positions in the
+# left and right cameras for each fiber. The returned list takes the form of one
+# entry "xl yl xr yr" for each fiducial fiber followed by similar entries for
+# the guide fibers. The fiducial fibers are those listed in the fiducial_leds
+# list, and the guides are in guide_leds. 
 #
 proc DFPS_Manager_spots {} {
 	upvar #0 DFPS_Manager_config config
@@ -363,25 +365,24 @@ proc DFPS_Manager_spots {} {
 	}
 	
 	# Parse result string.
-	set spots [list]
-	foreach fiber "$iconfig(daq_source_device_element)" {
-		set spot ""
-		foreach side {left right} {
-			append spot "[lindex [set result_$side] 0] [lindex [set result_$side] 1] "
+	foreach side {left right} {
+		set config(spots_$side) ""
+		foreach fiber "$iconfig(daq_source_device_element)" {
+			append config(spots_$side) \
+				"[lindex [set result_$side] 0] [lindex [set result_$side] 1] "
 			set result_$side [lrange [set result_$side] 6 end]
 		}
-		lappend spots [string trim $spot]
+		set config(spots_$side) [string trim $config(spots_$side)]
 	}
 	
-	set info(spots) $spots
-	return $spots
+	return ""
 }
 
 #
-# DFPS_Manager_sources returns the global xyz position of all the sources
-# in a list. Each source entry consists of the position the source's image
-# in the left and right FVC, in the form "xl yl xr yr" in microns from the
-# center of the top-left corner pixel.
+# DFPS_Manager_sources fills the global sources list, which contains the xyz
+# position of all the sources in fiducial and guide lists. Each source entry
+# consists of the position the source's image in the left and right FVC, in the
+# form "xl yl xr yr" in microns from the center of the top-left corner pixel.
 #
 proc DFPS_Manager_sources {spots} {
 	upvar #0 DFPS_Manager_config config
@@ -390,33 +391,35 @@ proc DFPS_Manager_sources {spots} {
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	set sources ""
-	foreach spot $spots {
-		scan $spot %f%f%f%f x_left y_left x_right y_right
-		set x_left [expr 0.001 * $x_left]
-		set y_left [expr 0.001 * $y_left]
-		set x_right [expr 0.001 * $x_right]
-		set y_right [expr 0.001 * $y_right]
-	
+	set config(sources) ""
+	set num_sources [llength [string trim "$config(fiducial_leds) $config(guide_leds)"]]
+	for {set i 0} {$i < $num_sources} {incr i} {	
+		lwdaq_config -fsd 6
 		foreach side {left right} {
-			set b_$side [lwdaq bcam_source_bearing \
-				"[set x_$side] [set y_$side]" "$side $config(cam_$side)"]
-			LWDAQ_print $info(text) "[set b_$side]" brown
-			set gbp_$side [lwdaq xyz_global_from_local_point \
-				[lrange [set b_$side] 0 2] $config(coord_$side)]
-			set gbv_$side [lwdaq xyz_global_from_local_vector \
-				[lrange [set b_$side] 3 5] $config(coord_$side)]
-			LWDAQ_print $info(text) "[set gbp_$side] [set gbv_$side]" green
+			set x [expr 0.001 * [lindex $config(spots_$side) [expr $i*2]]]
+			set y [expr 0.001 * [lindex $config(spots_$side) [expr $i*2+1]]]
+			set b [lwdaq bcam_source_bearing "$x $y" "$side $config(cam_$side)"]
+			set point_$side [lwdaq xyz_global_from_local_point \
+				[lrange [set b] 0 2] $config(coord_$side)]
+			set dir_$side [lwdaq xyz_global_from_local_vector \
+				[lrange [set b] 3 5] $config(coord_$side)]
 		}
+		lwdaq_config -fsd 3
 		
 		set bridge [lwdaq xyz_line_line_bridge \
-			"$gbp_left $gbv_left" "$gbp_right $gbv_right"]
-		LWDAQ_print $info(text) $bridge orange
+			"$point_left $dir_left" "$point_right $dir_right"]
+		scan $bridge %f%f%f%f%f%f x y z dx dy dz
+		
+		set x_src [format %8.3f [expr $x + 0.5*$dx]]
+		set y_src [format %8.3f [expr $y + 0.5*$dy]]
+		set z_src [format %8.3f [expr $z + 0.5*$dz]]
+		
+		set source "$x_src $y_src $z_src"
+		LWDAQ_print $info(text) "$i\: $source"
+		lappend config(sources) $source
 	}
-	
-	set info(sources) $sources
-	return $sources
 
+	return ""
 }
 
 #
