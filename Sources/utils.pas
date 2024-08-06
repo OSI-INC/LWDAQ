@@ -4360,12 +4360,17 @@ end;
 	structure, with sides of length given by the construction size field of the
 	simlex structure itself. The routine leaves the first vertex of the simplex
 	unchanged and uses it to create the remaining vertices. We assume the first
-	vertex is the currently-optimal vertex with the lowest altitude. We
-	re-calculate the error array using an error function. This function takes a
-	vertex and a generic pointer, so we pass the pointer into simplex_construct
-	as well. The simplex_construct routine makes no use of the pointer other
-	than to pass it into the error function, where the pointer allows the error
-	function to find the values it needs to determine its result.
+	vertex is the currently-optimal vertex with the lowest altitude. The routine
+	supports disabling fitting of parameters by marking vertices as dublicates
+	of the first vertex when we encounter a zero scaling factor. By this means,
+	the simplex dimension is reduced by the number of disabled parameters. If we
+	have sixteen parameters, eight of which we disable with zero scaling factor,
+	we will have nine duplicate vertices in our simplex. We re-calculate the
+	error array using an error function. This function takes a vertex and a
+	generic pointer, so we pass the pointer into simplex_construct as well. The
+	simplex_construct routine makes no use of the pointer other than to pass it
+	into the error function, where the pointer allows the error function to find
+	the values it needs to determine its result.
 }
 procedure simplex_construct(var simplex:simplex_type;
 	sef:simplex_error_function_type;
@@ -4377,6 +4382,7 @@ var
 begin
 	with simplex do begin
 		errors[1]:=sef(vertices[1],ep);
+		for i:=1 to n+1 do duplicate[i]:=false;
 		for i:=2 to n+1 do begin
 			vertices[i]:=simplex_vertex_copy(vertices[1]);
 			if (scaling[i-1]<>0) then begin
@@ -4464,8 +4470,10 @@ end;
 	error function is provided by the process that uses the simplex fit: it
 	returns the altitude of a vertex. We pass the error function the vertex and
 	the generic pointer. The generic pointer allows the altitude function to
-	function to find the information it needs to determine the error of the
-	vertex. The simplex_step routine does not use the pointer at all.
+	find the information it needs to determine the error of the vertex. The
+	simplex_step routine does not use the pointer at all. We might use the 
+	generic pointer to point to a string containing, for example, the TCL
+	procedure we want to execute to obtain the error.
 }
 procedure simplex_step(var simplex:simplex_type;
 	sef:simplex_error_function_type;
@@ -4481,7 +4489,7 @@ procedure simplex_step(var simplex:simplex_type;
 const
 	expand_scale=2;
 	contract_scale=0.5;
-	shrink_scale=0.2;
+	shrink_scale=0.5;
 	
 var 
 	i,j,count:integer;
@@ -4583,14 +4591,11 @@ begin
 	Our contracted vertex has given us no improvement. We we must do something
 	to get going again. We can either "restart" the fit by constructing a new
 	simplex around the first vertex, or we can "shrink" the simplex by moving
-	all its vertices towards the first vertex. Our policy restart a number of
-	times and then start shrinking. When we reconstruct, we do so with smaller
-	and smaller simplex sizes, useing the shrink scale. When we shrink, we do so
-	by the shrink scale as well. If shrinking reduces the size of the simplex to
-	our end size, the fit has converged and we set the done flag.
+	all its vertices towards the first vertex. Our policy is to restart a number
+	of times and then start shrinking. When shrinking has reduced the size of the
+	simplex to our end size, the fit has converged and we set the done flag.
 }
 				if restart_cntr<max_restarts then begin
-					start_size:=start_size*shrink_scale;
 					simplex_construct(simplex,sef,ep);
 					inc(restart_cntr);
 					if show_details then

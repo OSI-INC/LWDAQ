@@ -5171,7 +5171,7 @@ begin
 			simplex.scaling[i]:=read_real(scaling);
 	end;
 	simplex_construct(simplex,lwdaq_simplex_error,@error_proc);
-
+	
 	interation_num:=0;
 	repeat
 		if (report>0) and (interation_num mod report = 0) then begin
@@ -5356,7 +5356,7 @@ numbers may contain x-y value pairs, or x values only or y values only. The
 default is x-y values. With <i>y_only</i> = 1 it assumes y values only and
 assigns x-value 0 to the first y-value, 1 to the next, and so on. With
 <i>x_only</i> = 1 it assumes x values only and assigns y-value 0 to the first
-x-value, &minus;1 to the next, and so on. The negative-going x-values are
+x-value, &minus;1 to the next, and so on. The negative-going y-values are
 consistent with the negative-going vertical image coordinates, so that
 <i>x_only</i> is useful for plotting image properties on top of an image, such
 as vertical intensity profile. Thus the following code plots the vertical and
@@ -6102,20 +6102,24 @@ begin
 	option:=Tcl_ObjString(argv[1]);
 	if option='bcam_from_global_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in the coordinates
-defined by the three balls of a BCAM mount. The routine takes as input a
-<i>point</i> string containing the global xyz-position of point and a
-<i>mount</i> string containing the global xyz-position of the centers of the
-cone, slot, and flat balls of the mount. Note that the routine does not accept
-the pose of the mount coordinate system. Rather, it accepts the ball positions
-and will deduce the pose of the mount coordinate system itself. To transform a
-point from global to local coordinate using the pose of the local coordinate
-system, use <a
+<p><b>Obsolete Routine</b> Transforms a point in global coordinates to a point
+in bcam coordinates. The bcam coordinates are those defined by a kinematic mount
+holding a bcam. The routine takes as input a <i>point</i> string containing the
+global xyz-position of point and a <i>mount</i> string containing the global
+xyz-positions of the centers of the cone, slot, and flat balls of the mount. Note
+that the routine does not accept the pose of the mount coordinate system, but
+instead the positions of the kinematic mounting balls.</p>
+
+<p>This routine deduces the pose of the mount coordinate system itself, which is
+computationally intensive and unecessary. Instead of deducing the mount
+coordinate pose every time we transform between global and mount coordinates,
+call <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> once to obtain
+the pose of the mount coordinates, and then pass this pose into <a
 href=#xyz_local_from_global_point">xyz_local_from_global_point</a>.</p>
 
-<p>In the following example, we transform the global
-point (0,1,0) into BCAM coordinates when our cone, slot and flat balls have
-coordinates (0,1,0), (-1,1,-1), and (1,1,-1).</p>
+<p>In the following example, we transform the global point (0,1,0) into BCAM
+coordinates when our cone, slot and flat balls have coordinates (0,1,0),
+(-1,1,-1), and (1,1,-1).</p>
 
 <pre>lwdaq bcam_from_global_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 0.000000 0.000000</pre>
@@ -6143,17 +6147,22 @@ mount strings.</p>
 	end 
 	else if option='global_from_bcam_point' then begin
 {
-<p>Transforms a point in global coordinates to a point in BCAM coordinates. It
-is the inverse of <a href="#bcam_from_global_point">bcam_from_global_point</a>.
-We pass it the BCAM coordinates of a point in the <i>point</i> string and the
-global coordinates of the BCAM's kinematic mounting balls in the <i>mount</i>
-string. The routine returns the global coordinates of the point.</p>
+<p><b>Obsolete Routine</b> Transforms a point in bcam coordinates to a point
+in global coordinates. The bcam coordinates are those defined by a kinematic mount
+holding a bcam. The routine takes as input a <i>point</i> string containing the
+bcam xyz-position of point and a <i>mount</i> string containing the global
+xyz-positions of the centers of the cone, slot, and flat balls of the mount. Note
+that the routine does not accept the pose of the mount coordinate system, but
+instead the positions of the kinematic mounting balls.</p>
 
 <pre>lwdaq global_from_bcam_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 2.000000 0.000000</pre>
 
-<p>To transform a point from local to global coordinate using the pose of the
-local coordinate system, use <a
+<p>This routine deduces the pose of the mount coordinate system itself, which is
+computationally intensive and unecessary. Instead of deducing the mount
+coordinate pose every time we transform between global and mount coordinates,
+call <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> once to obtain
+the pose of the mount coordinates, and then pass this pose into <a
 href=#xyz_global_from_local_point">xyz_global_from_local_point</a>.</p>
 }
 		if (argc<>4) then begin
@@ -6171,15 +6180,22 @@ href=#xyz_global_from_local_point">xyz_global_from_local_point</a>.</p>
 	end 
 	else if option='bcam_from_global_vector' then begin
 {
-<p>Transforms a vector in global coordinates to a vector in BCAM coordinates.
-See <a href="#bcam_from_global_point">bcam_from_global_point</a> for more
-details.</p>
+<p><b>Obsolete Routine</b> Transforms a vector in global coordinates to a vector
+in bcam coordinates. The bcam coordinates are those defined by a kinematic mount
+holding a bcam. The routine takes as input a <i>vector</i> string containing the
+bcam xyz-components of vector and a <i>mount</i> string containing the global
+xyz-positions of the centers of the cone, slot, and flat balls of the mount. Note
+that the routine does not accept the pose of the mount coordinate system, but
+instead the positions of the kinematic mounting balls.</p>
 
 <pre>lwdaq bcam_from_global_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 1.000000 0.000000</pre>
 
-<p>To transform a vector from global to local coordinate using the pose of the
-local coordinate system, use <a
+<p>This routine deduces the pose of the mount coordinate system itself, which is
+computationally intensive and unecessary. Instead of deducing the mount
+coordinate pose every time we transform between global and mount coordinates,
+call <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> once to obtain
+the pose of the mount coordinates, and then pass this pose into <a
 href=#xyz_local_from_global_vector">xyz_local_from_global_vector</a>.</p>
 }
 		if (argc<>4) then begin
@@ -6197,19 +6213,23 @@ href=#xyz_local_from_global_vector">xyz_local_from_global_vector</a>.</p>
 	end 
 	else if option='global_from_bcam_vector' then begin
 {
-<p>Transforms a vector in BCAM coordinates to a vector in global coordinates. It
-is the inverse of <a
-href="#bcam_from_global_vector">bcam_from_global_vector</a>. It takes as input
-two string. One gives the xyz-components of the vector in BCAM coordinates, the
-other gives the global coordinates of the BCAM mounting balls in order cone,
-slot, flat.</p>
+<p><b>Obsolete Routine</b> Transforms a vector in bcam coordinates to a vector
+in global coordinates. The bcam coordinates are those defined by a kinematic mount
+holding a bcam. The routine takes as input a <i>vector</i> string containing the
+global xyz-components of vector and a <i>mount</i> string containing the global
+xyz-positions of the centers of the cone, slot, and flat balls of the mount. Note
+that the routine does not accept the pose of the mount coordinate system, but
+instead the positions of the kinematic mounting balls.</p>
 
 <pre>lwdaq global_from_bcam_vector "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 1.000000 0.000000</pre>
 
-<p>To transform a vector from local to global coordinate using the pose of the
-local coordinate system, use <a
-href=#xyz_global_from_local_point">xyz_global_from_local_point</a>.</p>
+<p>This routine deduces the pose of the mount coordinate system itself, which is
+computationally intensive and unecessary. Instead of deducing the mount
+coordinate pose every time we transform between global and mount coordinates,
+call <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> once to obtain
+the pose of the mount coordinates, and then pass this pose into <a
+href=#xyz_global_from_local_vector">xyz_global_from_local_vector</a>.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6311,16 +6331,16 @@ origin is the top-left corner of the image sensor as seen on the screen. The
 units of image coordinates are microns, with x going left-right and y going
 top-bottom.</p>
 
-<pre>lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 75 0"
-1.720000 1.220000</pre>
+<pre>lwdaq bcam_image_position "0 0 750" "P0001 0 0 0 0 0 1 75 0"
+1.720 1.220</pre>
 
 <p>Here we see the image is at (1.72,1.22) in image coordinates, which is the
 center of a TC255P image sensor. You specify the BCAM itself with its
 calibration constants using the <i>camera</i> string, just as for <a
 href="#bcam_source_bearing">bcam_source_bearing</a>.</p>
 
-<pre>lwdaq bcam_image_position "1 0 1000" "P0001 1 0 0 0 0 1 100 0"
-1.720000 1.220000</pre>
+<pre>lwdaq bcam_image_position "1 0 750" "P0001 0 0 0 0 0 1 75 0"
+1.620 1.220</pre>
 
 <p>Here we see movement of 1 mm at a range ten times the pivot-ccd distance
 causing a 100-um move on the image.</p>
@@ -6341,11 +6361,11 @@ causing a 100-um move on the image.</p>
 {
 <p>Convert the ball positions of a BCAM-style kinematic mount into the pose of
 the mount's coordinate system. These three balls mate with a cone, slot, and
-flat depression under the BCAM. We pass the routine the global xyz-position of
-the three balls in the order cone, slot, flat. The routine returns the location
-and orientation of the mount coordinate system. Because SCAMs and WPSs use the
-same kinematic mount, we can use this routine to obtain the pose of SCAM and WPS
-coordinate systems as well. We describe how the three balls define the mount
+flat depression under a metrology device such as a Boston CCD Angle Monitor
+(BCAM), Silhouette Camera (SCAM), Wire Position Sensor (WPS), or Fiber View
+Camera (FVC). We pass the routine the global xyz-position of the three balls in
+the order cone, slot, flat. The routine returns the location and orientation of
+the mount coordinate system. We describe how the three balls define the mount
 coordinate system in the <a
 href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User Manual</a>.
 See <i>bcam_coordinates_from_mount</i> in <a
@@ -6403,9 +6423,9 @@ global axes by 90&deg; about the x-axis.</p>
 <pre>lwdaq xyz_local_from_global_vector "0 0 1" "10 0 0 1.570796327 0 0"
 0.000000 1.000000 -0.000000</pre>
 
-<p>When working with BCAMs, SCAMs, and WPSs, we can obtain the pose of the
-sensor mount coordinate system by passing the global coordinates of their three
-mounting balls to <a
+<p>When working with devices that sit on a BCAM-style kinematic mount, we obtain
+the pose of the sensor's mount coordinate system by passing the global
+coordinates of their three mounting balls to <a
 href="#bcam_coord_from_mount">bcam_coord_from_mount</a>.</p>
 
 <pre>lwdaq xyz_local_from_global_vector "5 0 0" "10 0 0 0 0.1 0"
@@ -6474,13 +6494,13 @@ coordinate description consists of six numbers. The first three are the location
 in global coordinates of the local origin. The next three are the rotations about
 the global x, y, and z axes that transform the global axis unit vectors into the
 local axis unit vectors. The units of angle are radians. The routine returns the
-scam coordinates of the point.</p>
+local coordinates of the point.</p>
 
 <pre>lwdaq xyz_local_from_global_point "0 1 0" "10 0 0 1.570796327 0 0"
 -10.000000 -0.000000 -1.000000</pre>
 
 <p>We use <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> to obtain the pose
-of the mount coordinate systems for BCAMs, SCAMs, and WPSs.</p>
+of the mount coordinate systems of BCAM-style kinematic mounts.</p>
 
 <pre>lwdaq xyz_local_from_global_point "0 0 0" "10 0 0 0 0.1 0"
 -9.950042 0.000000 -0.998334</pre>
@@ -6512,7 +6532,7 @@ routine returns the global coordinates of the point.</p>
 0.000000 1.000000 -0.000000</pre>
 
 <p>We use <a href="#bcam_coord_from_mount">bcam_coord_from_mount</a> to obtain the pose
-of the mount coordinate systems for BCAMs, SCAMs, and WPSs.</p>
+of the mount coordinate systems for BCAM-style kinematic mounts.</p>
 
 <pre>lwdaq xyz_global_from_local_point "-9.950042 0.000000 -0.998334" "10 0 0 0 0.1 0"
 -0.000000 0.000000 0.000000</pre>
@@ -6524,7 +6544,7 @@ that corresponds to the origin of global coordinates.</p>
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' point scam".');
+				+'"lwdaq '+option+' point local".');
 			exit;
 		end;
 		Tcl_SetReturnString(interp,
