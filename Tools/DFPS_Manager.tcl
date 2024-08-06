@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "1.1"
+	LWDAQ_tool_init "DFPS_Manager" "1.2"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The control variable tells us the current state of the tool. We can stop a
@@ -53,27 +53,34 @@ proc DFPS_Manager_init {} {
 	# The control value for which the control voltages are closest to zero.
 	set config(dac_zero) "125"
 	
-	# Data acquisition addresses.
+	# Data acquisition parameters.
 	set config(ip_addr) "192.168.1.10"
 	set config(fvc_left_sock) "4 0"
 	set config(fvc_right_sock) "5 0"
-	set config(source_type) "9"
 	set config(injector_sock) "3 0"
 	set config(fiducial_leds) "D2 D4 D6 D10"
 	set config(sort_code) "8"
-	set config(guide_leds) "A1"
-	set config(flash_seconds) "0.0"
+	set config(guide_leds) ""
+	set config(flash_seconds) "0.000000"
 	set config(controller_sock) "7 0"
-	set config(controller_ids) "A123"
+	set config(controller_ids) ""
+	set config(source_type) "9"
+	set config(camera_element) "2"
+	set config(source_power) "1"
+
+	# Analysis results.
 	set config(spots_left) ""
 	set config(spots_right) ""
 	
 	# Fiber view camera geometry.
-	set config(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
-	set config(cam_left) $config(cam_default)
-	set config(cam_right) $config(cam_default)
-	set config(mount_left) "0 0 0 -21 0 -73 21 0 -73"
-	set config(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
+	set config(cam_left) \
+		"12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266"
+	set config(cam_right) \
+		"12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316"
+	set config(mount_left) \
+		"79.614 51.505 199.754 119.777 51.355 264.265 79.277 51.400 275.713"
+	set config(mount_right) \
+		"-104.039 51.210 199.297 -108.680 51.004 275.110 -148.231 50.989 261.059"
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
@@ -340,6 +347,8 @@ proc DFPS_Manager_spots {} {
 	set iconfig(daq_source_device_element) \
 		[string trim "$config(fiducial_leds) $config(guide_leds)"]
 	set iinfo(daq_source_device_type) $config(source_type)
+	set iinfo(daq_source_power) $config(source_power)
+	set iconfig(daq_device_element) $config(camera_element)
 		set iconfig(daq_flash_seconds) $config(flash_seconds)
 	set iconfig(analysis_num_spots) \
 		"[llength $iconfig(daq_source_device_element)] $config(sort_code)"
@@ -410,14 +419,16 @@ proc DFPS_Manager_sources {spots} {
 			"$point_left $dir_left" "$point_right $dir_right"]
 		scan $bridge %f%f%f%f%f%f x y z dx dy dz
 		
-		set x_src [format %8.3f [expr $x + 0.5*$dx]]
-		set y_src [format %8.3f [expr $y + 0.5*$dy]]
-		set z_src [format %8.3f [expr $z + 0.5*$dz]]
+		set x_src [format %.3f [expr $x + 0.5*$dx]]
+		set y_src [format %.3f [expr $y + 0.5*$dy]]
+		set z_src [format %.3f [expr $z + 0.5*$dz]]
 		
 		set source "$x_src $y_src $z_src"
-		LWDAQ_print $info(text) "$i\: $source"
+		LWDAQ_print -nonewline $info(text) "$source "
 		lappend config(sources) $source
 	}
+	
+	LWDAQ_print $info(text) ""
 
 	return ""
 }
@@ -461,19 +472,25 @@ proc DFPS_Manager_cmd {cmd} {
 }
 
 #
-# DFPS_Manager_report writes a report of the latest measurement to the text
-# window. The report is a list of numbers, with some color coding and formatting
-# to make it easy to read.
+# DFPS_Manager_check does nothing to the voltages, just measures them,
+# measures spot position, and reports. It does not wait for the settling time.
 #
-proc DFPS_Manager_report {} {
+proc DFPS_Manager_check {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
-
-	LWDAQ_print -nonewline $info(text) "[format %.0f $config(n_out)]\
-		[format %.0f $config(s_out)]\
-		[format %.0f $config(e_out)]\
-		[format %.0f $config(w_out)] " green
-	LWDAQ_print $info(text) "$info(spots)" black
+	
+	if {[catch {
+		DFPS_Manager_spots
+		DFPS_Manager_sources $info(spots)
+	} error_result]} {
+		LWDAQ_print $info(text) "ERROR: $error_result"
+		set info(control) "Idle"
+		return ""
+	}
+	
+	if {$info(control) == "Check"} {
+		set info(control) "Idle"
+	}
 	return ""
 }
 
@@ -496,7 +513,7 @@ proc DFPS_Manager_move {} {
 		}
 		LWDAQ_wait_ms $config(settling_ms)
 		DFPS_Manager_spots
-		DFPS_Manager_report
+		DFPS_Manager_sources $info(spots)
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
@@ -529,7 +546,7 @@ proc DFPS_Manager_zero {} {
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
 		DFPS_Manager_spots
-		DFPS_Manager_report
+		DFPS_Manager_sources $info(spots)
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
@@ -537,31 +554,6 @@ proc DFPS_Manager_zero {} {
 	}
 
 	if {$info(control) == "Zero"} {
-		set info(control) "Idle"
-	}
-	return ""
-}
-
-#
-# DFPS_Manager_check does nothing to the voltages, just measures them,
-# measures spot position, and reports. It does not wait for the settling time.
-#
-proc DFPS_Manager_check {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-	
-	
-	if {[catch {
-		DFPS_Manager_spots
-		DFPS_Manager_sources $info(spots)
-		DFPS_Manager_report
-	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: $error_result"
-		set info(control) "Idle"
-		return ""
-	}
-	
-	if {$info(control) == "Check"} {
 		set info(control) "Idle"
 	}
 	return ""
@@ -915,7 +907,7 @@ proc DFPS_Manager_open {} {
 	
 	label $f.state -textvariable DFPS_Manager_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
-	foreach a {Travel Step Stop Clear Reset Examine} {
+	foreach a {Check Travel Step Stop Clear Reset Examine} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
 		pack $f.$b -side left -expand 1
@@ -933,7 +925,7 @@ proc DFPS_Manager_open {} {
 			controller_sock flash_seconds} {
 		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
-			-width [expr [string length $config($a)] + 2]
+			-width [expr [string length $config($a)] + 1]
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
@@ -968,7 +960,7 @@ proc DFPS_Manager_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	foreach a {Move Zero Check} {
+	foreach a {Move Zero} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
 		pack $f.$b -side left -expand 1
@@ -1014,7 +1006,7 @@ proc DFPS_Manager_open {} {
 	pack $f -side top -fill both -expand yes
 	
 	set info(text) [LWDAQ_text_widget $f 80 20 1 1]
-	LWDAQ_print $info(text) "DFPS Manager Text Output" purple
+	LWDAQ_print $info(text) "DFPS Manager Text Output\n" purple
 
 	return $w
 }
