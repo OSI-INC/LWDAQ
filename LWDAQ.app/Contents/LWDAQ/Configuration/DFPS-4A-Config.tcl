@@ -7,7 +7,6 @@
 LWDAQ_run_tool DFPS_Manager.tcl Standalone
 
 # Open, configure and start the System Server.
-LWDAQ_server_open
 set LWDAQ_Info(server_address_filter) "127.0.0.1"
 set LWDAQ_Info(server_listening_port) "1090"
 set LWDAQ_Info(server_mode) "execute"

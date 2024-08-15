@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "1.2"
+	LWDAQ_tool_init "DFPS_Manager" "1.3"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The control variable tells us the current state of the tool. We can stop a
@@ -58,7 +58,7 @@ proc DFPS_Manager_init {} {
 	set config(fvc_left_sock) "4 0"
 	set config(fvc_right_sock) "5 0"
 	set config(injector_sock) "3 0"
-	set config(fiducial_leds) "D2 D4 D6 D10"
+	set config(fiducial_leds) "D2 D4 D6 D8"
 	set config(sort_code) "8"
 	set config(guide_leds) ""
 	set config(flash_seconds) "0.000000"
@@ -68,10 +68,10 @@ proc DFPS_Manager_init {} {
 	set config(camera_element) "2"
 	set config(source_power) "1"
 
-	# Analysis results.
-	set config(spots_left) ""
-	set config(spots_right) ""
-	
+	# Data acquisition and analysis results.
+	set config(spots) ""
+	set config(sources) ""
+		
 	# Fiber view camera geometry.
 	set config(cam_left) \
 		"12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266"
@@ -323,29 +323,31 @@ proc DFPS_Manager_set_nsew {id} {
 	DFPS_Manager_transmit $command
 	return ""
 }
-
+		
 #
-# DFPS_Manager_spots captures an image of all available fiducial and guide
-# fibers in each of the left and right fiber view camers. It fills the two spot
-# position lists, spots_left and spots right, giving the spot positions in the
-# left and right cameras for each fiber. The returned list takes the form of one
-# entry "xl yl xr yr" for each fiducial fiber followed by similar entries for
-# the guide fibers. The fiducial fibers are those listed in the fiducial_leds
-# list, and the guides are in guide_leds. 
+# DFPS_Manager_spots captures an image of the sources whose elements are listed
+# in the elements argument. If we pass an empty string for the elements, the
+# routine combines the fiducial and guide elements to obtain a list of all
+# available sources. It returns the coordinates of the two images of each source
+# in the left and right cameras in the format "x1l y1l x1r y1r... xnl ynl xnr
+# ynr", where "n" is the number of sources it flashes.
 #
-proc DFPS_Manager_spots {} {
+proc DFPS_Manager_spots {{elements ""}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
+	# Default elements.
+	if {$elements == ""} {
+		set elements [string trim "$config(fiducial_leds) $config(guide_leds)"]
+	}
+	
 	# Prepare the BCAM Instrument for fiber view camera (FVC) acquisition.
-	set info(spots) ""
 	set iconfig(daq_ip_addr) $config(ip_addr)
 	set iconfig(daq_source_driver_socket) [lindex $config(injector_sock) 0]
 	set iconfig(daq_source_mux_socket) [lindex $config(injector_sock) 1]
-	set iconfig(daq_source_device_element) \
-		[string trim "$config(fiducial_leds) $config(guide_leds)"]
+	set iconfig(daq_source_device_element) $elements 
 	set iinfo(daq_source_device_type) $config(source_type)
 	set iinfo(daq_source_power) $config(source_power)
 	set iconfig(daq_device_element) $config(camera_element)
@@ -374,63 +376,82 @@ proc DFPS_Manager_spots {} {
 	}
 	
 	# Parse result string.
-	foreach side {left right} {
-		set config(spots_$side) ""
-		foreach fiber "$iconfig(daq_source_device_element)" {
-			append config(spots_$side) \
-				"[lindex [set result_$side] 0] [lindex [set result_$side] 1] "
+	set spots ""
+	foreach fiber "$iconfig(daq_source_device_element)" {
+		foreach side {left right} {
+			append spots "[lindex [set result_$side] 0] [lindex [set result_$side] 1] "
 			set result_$side [lrange [set result_$side] 6 end]
 		}
-		set config(spots_$side) [string trim $config(spots_$side)]
 	}
 	
-	return ""
+	# Return the results string and store in configuration array.
+	set config(spots) [string trim $spots]
+	return $config(spots)
 }
 
 #
-# DFPS_Manager_sources fills the global sources list, which contains the xyz
-# position of all the sources in fiducial and guide lists. Each source entry
-# consists of the position the source's image in the left and right FVC, in the
-# form "xl yl xr yr" in microns from the center of the top-left corner pixel.
+# DFPS_Manager_sources calculates source positions from a set of left and right
+# camera image positions. We think of each image as a "spot" with a centroid
+# position measured in microns from the center of the image sensor's top-left
+# pixel. We pass it a list containing the coordinates of the spots in the forma
+# "x1l y1l x1r y1r... xnl ynl xnr ynr" where "n" is the number of sources, "l"
+# specifies the left camera, and "r" specifies the right camera. The routine
+# returns a list of source positions in global coordinates "x1 y1 z1 ... xn yn
+# zn".
 #
 proc DFPS_Manager_sources {spots} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
+	# Refresh the left and right camera mount coordinate systems in case we have
+	# changed the left and right mounting ball coordinates since our previous
+	# use of the mount coordinates.
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	set config(sources) ""
-	set num_sources [llength [string trim "$config(fiducial_leds) $config(guide_leds)"]]
-	for {set i 0} {$i < $num_sources} {incr i} {	
+	# For each source, we extract the left and right camera spot coordinates and
+	# use these to measure the source position.
+	set sources ""
+	foreach {x_left y_left x_right y_right} $spots {	
+	
+		# We need six decimal places of resolution in our bearing directions in
+		# order to obtain one-micron precision in source position.
 		lwdaq_config -fsd 6
+		
+		# For each camera, we transform the image position in to mount
+		# coordinates, then project the image position through the pivot point
+		# of the camera to obtain a bearing line. We transform the bearing line
+		# into global coordinates.
 		foreach side {left right} {
-			set x [expr 0.001 * [lindex $config(spots_$side) [expr $i*2]]]
-			set y [expr 0.001 * [lindex $config(spots_$side) [expr $i*2+1]]]
+			set x [expr 0.001 * [set x_$side]]
+			set y [expr 0.001 * [set y_$side]]
 			set b [lwdaq bcam_source_bearing "$x $y" "$side $config(cam_$side)"]
 			set point_$side [lwdaq xyz_global_from_local_point \
 				[lrange [set b] 0 2] $config(coord_$side)]
 			set dir_$side [lwdaq xyz_global_from_local_vector \
 				[lrange [set b] 3 5] $config(coord_$side)]
 		}
+		
+		# Go back to three decimal places so our position string will be compact.
 		lwdaq_config -fsd 3
 		
+		# Find the point and direction that define the shortest vector between the
+		# two bearings in global coordinates.
 		set bridge [lwdaq xyz_line_line_bridge \
 			"$point_left $dir_left" "$point_right $dir_right"]
 		scan $bridge %f%f%f%f%f%f x y z dx dy dz
 		
+		# Use the midpoint of this vector as our position measurement, append to
+		# our source list.
 		set x_src [format %.3f [expr $x + 0.5*$dx]]
 		set y_src [format %.3f [expr $y + 0.5*$dy]]
 		set z_src [format %.3f [expr $z + 0.5*$dz]]
-		
-		set source "$x_src $y_src $z_src"
-		LWDAQ_print -nonewline $info(text) "$source "
-		lappend config(sources) $source
+		append sources "$x_src $y_src $z_src "
 	}
-	
-	LWDAQ_print $info(text) ""
 
-	return ""
+	# Store source positions in configuration array and return them too.
+	set config(sources) [string trim $sources]	
+	return $config(sources)
 }
 
 #
@@ -480,8 +501,10 @@ proc DFPS_Manager_check {} {
 	upvar #0 DFPS_Manager_info info
 	
 	if {[catch {
-		DFPS_Manager_spots
-		DFPS_Manager_sources $info(spots)
+		set elements [string trim "$config(fiducial_leds) $config(guide_leds)"]
+		set spots [DFPS_Manager_spots $elements]
+		set sources [DFPS_Manager_sources $spots]
+		LWDAQ_print $info(text) $sources
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
@@ -917,6 +940,8 @@ proc DFPS_Manager_open {} {
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
 	}
+	button $f.server -text "Server" -command "LWDAQ_server_open"
+	pack $f.server -side left -expand 1
 	
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
