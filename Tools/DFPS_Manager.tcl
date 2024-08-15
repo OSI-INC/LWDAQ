@@ -514,7 +514,8 @@ proc DFPS_Manager_check {} {
 	if {$info(control) == "Check"} {
 		set info(control) "Idle"
 	}
-	return ""
+	
+	return $sources
 }
 
 #
