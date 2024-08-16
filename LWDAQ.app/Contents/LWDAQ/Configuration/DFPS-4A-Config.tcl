@@ -4,7 +4,7 @@
 # Place in the LWDAQ Configuration Directory.
 
 # Open the DFPS_Manager
-LWDAQ_run_tool DFPS_Manager.tcl
+LWDAQ_run_tool DFPS_Manager.tcl Standalone
 
 # Open, configure and start the System Server.
 set LWDAQ_Info(server_address_filter) "127.0.0.1"

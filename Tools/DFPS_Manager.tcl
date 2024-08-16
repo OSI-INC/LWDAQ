@@ -38,15 +38,15 @@ proc DFPS_Manager_init {} {
 
 	# Data acquisition parameters.
 	set config(ip_addr) "192.168.1.10"
-	set config(fvc_left_sock) "4 0"
-	set config(fvc_right_sock) "5 0"
-	set config(injector_sock) "3 0"
-	set config(fiducial_leds) "D2 D4 D6 D8"
+	set config(fvc_left) "4 0"
+	set config(fvc_right) "5 0"
+	set config(injector) "3 0"
+	set config(fiducials) "D4 D6 D8"
 	set config(sort_code) "8"
-	set config(guide_leds) ""
-	set config(flash_seconds) "0.000000"
-	set config(controller_sock) "7 0"
-	set config(controller_ids) ""
+	set config(guides) "D2 "
+	set config(flash) "0.000000"
+	set config(transceiver) "7 0"
+	set config(controllers) "FFFF"
 	set config(source_type) "9"
 	set config(camera_element) "2"
 	set config(source_power) "1"
@@ -100,7 +100,7 @@ proc DFPS_Manager_init {} {
 	# Panel appearance.
 	set config(label_color) "green"
 	set info(examine_window) "$info(window).examine_window"
-	set config(zoom) 0.5
+	set config(zoom) 1.0
 	set config(intensify) "exact"
 	
 	# If we have a settings file, read and implement.	
@@ -205,7 +205,7 @@ proc DFPS_Manager_transmit {{commands ""}} {
 	}
 
 	# Print the commands to the text window.
-	if {$config(verbose)} {LWDAQ_print $info(text) "Transmitting: $commands"}
+	if {$config(verbose)} {LWDAQ_print $info(text) "Transmitting: $commands" orange}
 
 	# Append a two-byte checksum.
 	set checksum $config(checksum_preload)
@@ -234,7 +234,7 @@ proc DFPS_Manager_transmit {{commands ""}} {
 		set sock [LWDAQ_socket_open $config(ip_addr)]
 		set sd $config(spacing_delay)
 		LWDAQ_set_driver_mux $sock \
-			[lindex $config(controller_sock) 0] [lindex $config(controller_sock) 1]
+			[lindex $config(transceiver) 0] [lindex $config(transceiver) 1]
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		foreach c $commands {
@@ -327,31 +327,32 @@ proc DFPS_Manager_spots {{elements ""}} {
 	
 	# Default elements.
 	if {$elements == ""} {
-		set elements [string trim "$config(fiducial_leds) $config(guide_leds)"]
+		set elements [string trim "$config(fiducials) $config(guides)"]
 	}
 	
 	# Prepare the BCAM Instrument for fiber view camera (FVC) acquisition.
 	set iconfig(daq_ip_addr) $config(ip_addr)
-	set iconfig(daq_source_driver_socket) [lindex $config(injector_sock) 0]
-	set iconfig(daq_source_mux_socket) [lindex $config(injector_sock) 1]
+	set iconfig(daq_source_driver_socket) [lindex $config(injector) 0]
+	set iconfig(daq_source_mux_socket) [lindex $config(injector) 1]
 	set iconfig(daq_source_device_element) $elements 
 	set iinfo(daq_source_device_type) $config(source_type)
 	set iinfo(daq_source_power) $config(source_power)
 	set iconfig(daq_device_element) $config(camera_element)
-		set iconfig(daq_flash_seconds) $config(flash_seconds)
+		set iconfig(daq_flash_seconds) $config(flash)
 	set iconfig(analysis_num_spots) \
 		"[llength $iconfig(daq_source_device_element)] $config(sort_code)"
 	set iconfig(analysis_threshold) $config(analysis_threshold)
 	
 	# Acquire from both FVCs.
 	foreach side {left right} {
-		set iconfig(daq_driver_socket) [lindex $config(fvc_$side\_sock) 0]
-		set iconfig(daq_mux_socket) [lindex $config(fvc_$side\_sock) 1]
+		set iconfig(daq_driver_socket) [lindex $config(fvc_$side) 0]
+		set iconfig(daq_mux_socket) [lindex $config(fvc_$side) 1]
 		set result [LWDAQ_acquire BCAM]
 		if {[LWDAQ_is_error_result $result]} {
 			LWDAQ_print $info(text) "$result"
 			return ""
 		} else {
+			if {$config(verbose)} {LWDAQ_print $info(text) "Left: $result" brown}
 			set result_$side [lrange $result 1 end]
 			lwdaq_image_manipulate $iconfig(memory_name) \
 				copy -name $info(image_$side)
@@ -373,7 +374,7 @@ proc DFPS_Manager_spots {{elements ""}} {
 	
 	# Return the results string and store in configuration array.
 	set config(spots) [string trim $spots]
-	if {$config(verbose)} {LWDAQ_print $info(text) "Spots: $spots"}
+	if {$config(verbose)} {LWDAQ_print $info(text) "Spots: $spots" brown}
 	return $config(spots)
 }
 
@@ -447,7 +448,7 @@ proc DFPS_Manager_sources {spots} {
 
 	# Store source positions in configuration array and return them too.
 	set config(sources) [string trim $sources]	
-	if {$config(verbose)} {LWDAQ_print $info(text) "Sources: $sources"}
+	if {$config(verbose)} {LWDAQ_print $info(text) "Sources: $sources" brown}
 	return $config(sources)
 }
 
@@ -462,7 +463,7 @@ proc DFPS_Manager_check {{elements ""}} {
 	
 	if {[catch {
 		if {$elements == ""} {
-			set elements [string trim "$config(fiducial_leds) $config(guide_leds)"]
+			set elements [string trim "$config(fiducials) $config(guides)"]
 		}
 		set spots [DFPS_Manager_spots $elements]
 		set sources [DFPS_Manager_sources $spots]
@@ -494,8 +495,11 @@ proc DFPS_Manager_move_all {} {
 	}
 	
 	if {[catch {
-		DFPS_Manager_set $info(wildcard_id) \
-			$config(n_all) $config(s_all) $config(e_all) $config(w_all)
+		foreach id $config(controllers) {
+			DFPS_Manager_set $id \
+				$config(n_all) $config(s_all) \
+				$config(e_all) $config(w_all)
+		}
 		LWDAQ_wait_ms $config(settling_ms)	
 		set sources [DFPS_Manager_check]
 	} error_result]} {
@@ -521,8 +525,11 @@ proc DFPS_Manager_zero_all {} {
 	upvar #0 DFPS_Manager_info info
 	
 	if {[catch {
-		DFPS_Manager_set $info(wildcard_id) \
-			$config(dac_zero) $config(dac_zero) $config(dac_zero) $config(dac_zero) 
+		foreach id $config(controllers) {
+			DFPS_Manager_set $id \
+				$config(dac_zero) $config(dac_zero) \
+				$config(dac_zero) $config(dac_zero) 
+		}
 		LWDAQ_wait_ms $config(settling_ms)	
 		set sources [DFPS_Manager_check]
 	} error_result]} {
@@ -671,7 +678,7 @@ proc DFPS_Manager_travel {} {
 	# re-printing a wait command line.
 	if {($first_word != "wait") || ($info(travel_wait) == 0)} {
 		if {$config(verbose)} {
-			LWDAQ_print $info(text) "[format %-3d $config(travel_index)] $line"
+			LWDAQ_print $info(text) "[format %-3d $config(travel_index)] $line" purple
 		}
 	}
 	
@@ -881,10 +888,7 @@ proc DFPS_Manager_cmd {cmd} {
 			}
 		}
 	} else {
-		if {$cmd == "Stop"} {
-			# The stop command does not do anything when we are already stopped.
-			LWDAQ_print $info(text) "ERROR: Cannot stop while idle."
-		} else {
+		if {$cmd != "Stop"} {
 			# Set the control variable.
 			set info(control) $cmd
 			
@@ -928,12 +932,13 @@ proc DFPS_Manager_open {} {
 	}
 	button $f.server -text "Server" -command "LWDAQ_server_open"
 	pack $f.server -side left -expand 1
+	button $f.calibrator -text "Calibrator" -command "LWDAQ_run_tool DFPS_Calibrator"
+	pack $f.calibrator -side left -expand 1
 	
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
 
-	foreach a {ip_addr fvc_left_sock fvc_right_sock injector_sock  \
-			controller_sock flash_seconds} {
+	foreach a {ip_addr fvc_left fvc_right injector transceiver flash} {
 		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 1]
@@ -943,19 +948,7 @@ proc DFPS_Manager_open {} {
 	set f [frame $ff.leds]
 	pack $f -side top -fill x
 
-	foreach a {fiducial_leds} {
-		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 30
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-
-	foreach a {guide_leds} {
-		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 30
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-
-	foreach a {controller_ids} {
+	foreach a {fiducials guides controllers} {
 		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 30
 		pack $f.l$a $f.e$a -side left -expand yes
