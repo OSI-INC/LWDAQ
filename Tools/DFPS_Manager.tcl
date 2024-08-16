@@ -607,12 +607,12 @@ proc DFPS_Manager_jump {name} {
 
 #
 # DFPS_Manager_travel allows us to step through a list travel commands. The
-# default travel command consists of a text line with a four-digit hexadecimal
-# identifier for a fiber controller and four integers 0-65535. Other valid
-# travel commands are "label" to name a line and "jump" to jump to a labeled
-# line. We have "tcl" to execute the rest of the command line as a Tcl command,
-# "tcl_source" to load and execute a named Tcl script file, and "wait" to wait a
-# number of seconds.
+# default travel command consists of a text line with a four integers 0-65535
+# that will be used to set the control voltages of all controllers listed in the
+# controllers parameter. Other valid travel commands are "label" to name a line
+# and "jump" to jump to a labeled line. We have "tcl" to execute the rest of the
+# command line as a Tcl command, "tcl_source" to load and execute a named Tcl
+# script file, and "wait" to wait a number of seconds.
 #
 proc DFPS_Manager_travel {} {
 	upvar #0 DFPS_Manager_config config
@@ -776,11 +776,13 @@ proc DFPS_Manager_travel {} {
 		# controller id and four control values.
 
 			# Extract the id and four integers from the line.	
-			scan $line %s%d%d%d%d id n s e w
+			scan $line %d%d%d%d n s e w
 	
 			# Apply the new control values to all four electrodes.
 			if {[catch {
-				DFPS_Manager_set $id $n $s $e $w
+				foreach id $config(controllers) {
+					DFPS_Manager_set $id $n $s $e $w
+				}
 			} error_result]} {
 				LWDAQ_print $info(text) "ERROR: $error_result"
 				set info(control) "Idle"
