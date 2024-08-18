@@ -49,7 +49,7 @@ proc DFPS_Manager_init {} {
 	set config(controllers) "FFFF"
 	set config(source_type) "9"
 	set config(camera_element) "2"
-	set config(source_power) "1"
+	set config(source_power) "4"
 	set info(wildcard_id) "FFFF"
 	set config(settling_ms) "1000"
 	set config(dac_zero) "32000"
