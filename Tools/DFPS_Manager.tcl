@@ -37,19 +37,19 @@ proc DFPS_Manager_init {} {
 	set info(control) "Idle"
 
 	# Data acquisition parameters.
-	set config(ip_addr) "192.168.1.10"
-	set config(fvc_left) "4 0"
-	set config(fvc_right) "5 0"
-	set config(injector) "3 0"
-	set config(fiducials) "D4 D6 D8"
+	set config(ip_addr) "192.168.1.30"
+	set config(fvc_left) "5 0"
+	set config(fvc_right) "4 0"
+	set config(injector) "8 0"
+	set config(fiducials) "D2 D4 D6 D8"
 	set config(sort_code) "8"
-	set config(guides) "D2 "
-	set config(flash) "0.000000"
-	set config(transceiver) "7 0"
+	set config(guides) ""
+	set config(flash) "0.001"
+	set config(transceiver) "1 0"
 	set config(controllers) "FFFF"
 	set config(source_type) "9"
 	set config(camera_element) "2"
-	set config(source_power) "4"
+	set config(source_power) "3"
 	set info(wildcard_id) "FFFF"
 	set config(settling_ms) "1000"
 	set config(dac_zero) "32000"
@@ -940,7 +940,7 @@ proc DFPS_Manager_open {} {
 
 	foreach a {fiducials guides controllers} {
 		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 30
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 20
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 

@@ -54,7 +54,7 @@ proc LWDAQ_init_BCAM {} {
 	set info(daq_image_right) [expr $info(daq_image_width) - 1]
 	set info(daq_image_top) 1
 	set info(daq_image_bottom) [expr $info(daq_image_height) - 1]
-	set info(daq_wake_ms) 0
+	set info(daq_wake_ms) 0.01
 	set info(flash_seconds_max) 1.0
 	set info(flash_seconds_step) 0.000001
 	set info(flash_seconds_reduce) 0.2
