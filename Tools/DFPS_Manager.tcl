@@ -118,33 +118,23 @@ proc DFPS_Manager_init {} {
 }
 
 #
-# DFPS_Manager_examine opens a new window that displays the CMM measurements of
-# the left and right mounts and the calibration constants of the left and right
-# cameras. The window allows us to modify the all these values by hand.
+# DFPS_Manager_configure opens the configuration panel and adds entries for us
+# to examine the mount measurements and camera calibration constants in more
+# detail. Most of the work of the routine is done by the LWDAQ tool configure
+# routine, which destroys any existing configuration panel before creating most
+# of the entry boxes and returning the name of a frame in which we create larger
+# boxes for the mount and camera parameters. The routine returns the contents
+# of the configuration array as a list of "name" and "value".
 #
-proc DFPS_Manager_examine {} {
+proc DFPS_Manager_configure {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set w $info(examine_window)
-	if {![winfo exists $w]} {
-		toplevel $w
-		wm title $w "Coordinate Measurements, DFPS Manager $info(version)"
-	} {
-		raise $w
-		return ""
-	}
+	set ff [LWDAQ_tool_configure DFPS_Manager]
 
-	set f [frame $w.buttons]
-	pack $f -side top -fill x
-	button $f.save -text "Save Configuration" -command "LWDAQ_tool_save $info(name)"
-	pack $f.save -side left -expand 1
-	button $f.unsave -text "Unsave Configuration" -command "LWDAQ_tool_unsave $info(name)"
-	pack $f.unsave -side left -expand 1
-	
 	foreach mount {Left Right} {
 		set b [string tolower $mount]
-		set f [frame $w.mnt$b]
+		set f [frame $ff.mnt$b]
 		pack $f -side top -fill x
 		label $f.l$b -text "$mount Mount:"
 		entry $f.e$b -textvariable DFPS_Manager_config(mount_$b) -width 70
@@ -153,16 +143,14 @@ proc DFPS_Manager_examine {} {
 
 	foreach mount {Left Right} {
 		set b [string tolower $mount]
-		set f [frame $w.cam$b]
+		set f [frame $ff.cam$b]
 		pack $f -side top -fill x
 		label $f.l$b -text "$mount Camera:"
 		entry $f.e$b -textvariable DFPS_Manager_config(cam_$b) -width 70
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 
-	set info(control) "Idle"
-	
-	return ""
+	return [array get config]
 }
 
 #
@@ -546,6 +534,19 @@ proc DFPS_Manager_zero_all {} {
 }
 
 #
+# DFPS_Manager_stop stops the travel and sets the control state to Idle.
+#
+proc DFPS_Manager_stop {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set config(travel_index) 0
+	set config(pass_counter) 0
+	set info(control) "Idle"
+	return ""
+}
+
+#
 # DFPS_Manager_clear clears the display overlays.
 #
 proc DFPS_Manager_clear {} {
@@ -558,11 +559,6 @@ proc DFPS_Manager_clear {} {
 			-zoom $config(zoom) \
 			-intensify $config(intensify)
 	}
-	
-	if {$info(control) == "Clear"} {
-		set info(control) "Idle"
-	}
-	
 	return ""
 }
 
@@ -817,19 +813,6 @@ proc DFPS_Manager_travel {} {
 }
 
 #
-# DFPS_Manager_stop stops the travel and sets the control state to Idle.
-#
-proc DFPS_Manager_stop {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	set config(travel_index) 0
-	set config(pass_counter) 0
-	set info(control) "Idle"
-	return ""
-}
-
-#
 # DFPS_Manager_step calls the travel routine. We assume the control variable has
 # been set to "Step", so the travel routine will know to stop after one step.
 #
@@ -922,12 +905,17 @@ proc DFPS_Manager_open {} {
 	
 	label $f.state -textvariable DFPS_Manager_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
-	foreach a {Check Travel Step Stop Clear Examine} {
+	foreach a {Check Travel Step} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
 		pack $f.$b -side left -expand 1
 	}
-	foreach a {Help Configure} {
+	foreach a {Stop Clear Configure} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "DFPS_Manager_$b"
+		pack $f.$b -side left -expand 1
+	}
+	foreach a {Help} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
