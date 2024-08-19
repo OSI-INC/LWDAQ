@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "1.3"
+	LWDAQ_tool_init "DFPS_Manager" "1.4"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The control variable tells us the current state of the tool.
@@ -41,10 +41,10 @@ proc DFPS_Manager_init {} {
 	set config(fvc_left) "5 0"
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
-	set config(fiducials) "D2 D4 D6 D8"
+	set config(fiducials) "A5 A6 A7 A8"
 	set config(sort_code) "8"
-	set config(guides) ""
-	set config(flash) "0.001"
+	set config(guides) "D1"
+	set config(flash) "0.0005"
 	set config(transceiver) "1 0"
 	set config(controllers) "FFFF"
 	set config(source_type) "9"
@@ -455,7 +455,7 @@ proc DFPS_Manager_check {{elements ""}} {
 		}
 		set spots [DFPS_Manager_spots $elements]
 		set sources [DFPS_Manager_sources $spots]
-		LWDAQ_print $info(text) "$sources"
+		LWDAQ_print $info(text) "[clock seconds] $sources"
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
@@ -801,7 +801,9 @@ proc DFPS_Manager_travel {} {
 		LWDAQ_post "DFPS_Manager_travel"
 		return ""
 	} else {
-		LWDAQ_print $info(text) "Travel Complete, Pass $config(pass_counter)." purple
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "Travel Complete, Pass $config(pass_counter)." purple
+		}
 		if {$config(repeat)} {
 			LWDAQ_post "DFPS_Manager_travel"
 			return ""
@@ -922,6 +924,8 @@ proc DFPS_Manager_open {} {
 	}
 	button $f.server -text "Server" -command "LWDAQ_server_open"
 	pack $f.server -side left -expand 1
+	button $f.bcam -text "BCAM" -command "LWDAQ_open BCAM"
+	pack $f.bcam -side left -expand 1
 	button $f.calibrator -text "Calibrator" -command "LWDAQ_run_tool DFPS_Calibrator"
 	pack $f.calibrator -side left -expand 1
 	
