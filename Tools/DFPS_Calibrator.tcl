@@ -55,7 +55,7 @@ proc DFPS_Calibrator_init {} {
 	set config(bcam_sort) "8"
 
 	set config(fit_steps) "1000"
-	set config(fit_restarts) "2"
+	set config(fit_restarts) "4"
 	set config(fit_startsize) "1"
 	set config(fit_endsize) "0.005"
 	set config(fit_show) "1"

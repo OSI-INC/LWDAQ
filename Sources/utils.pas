@@ -4489,6 +4489,7 @@ procedure simplex_step(var simplex:simplex_type;
 const
 	expand_scale=2;
 	contract_scale=0.5;
+	restart_scale=0.9;
 	shrink_scale=0.5;
 	
 var 
@@ -4592,10 +4593,13 @@ begin
 	to get going again. We can either "restart" the fit by constructing a new
 	simplex around the first vertex, or we can "shrink" the simplex by moving
 	all its vertices towards the first vertex. Our policy is to restart a number
-	of times and then start shrinking. When shrinking has reduced the size of the
-	simplex to our end size, the fit has converged and we set the done flag.
+	of times and then start shrinking. When restarting we reduce the starting
+	size by restart_scale, which could be set to 1.0 or some fraction. When
+	shrinking has reduced the size of the simplex to our end size, the fit has
+	converged and we set the done flag.
 }
 				if restart_cntr<max_restarts then begin
+					start_size:=start_size*restart_scale;
 					simplex_construct(simplex,sef,ep);
 					inc(restart_cntr);
 					if show_details then
