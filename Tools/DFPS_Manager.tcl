@@ -38,18 +38,22 @@ proc DFPS_Manager_init {} {
 
 	# Data acquisition parameters.
 	set config(ip_addr) "192.168.1.30"
+# Breadboard OSI Local: 192.168.1.10
+# DFPS-4A OSI Local: 192.168.1.30
+# DFPS-4A OSI Global: 71.174.73.186
+# DFPS-4A McDonald Local: 198.214.229
 	set config(fvc_left) "5 0"
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
 	set config(fiducials) "A5 A6 A7 A8"
 	set config(sort_code) "8"
 	set config(guides) "D1"
-	set config(flash) "0.0005"
+	set config(flash) "0.004"
 	set config(transceiver) "1 0"
 	set config(controllers) "FFFF"
 	set config(source_type) "9"
 	set config(camera_element) "2"
-	set config(source_power) "3"
+	set config(source_power) "2"
 	set info(wildcard_id) "FFFF"
 	set config(settling_ms) "1000"
 	set config(dac_zero) "32000"
@@ -64,12 +68,12 @@ proc DFPS_Manager_init {} {
 		
 	# Fiber view camera geometry.
 	set config(cam_left) \
-		"12.675 39.312 1.000 -7.416 0.947 2.000 18.986 5.569"
-# DFPS-4A: Y71010 12.675 39.312 1.000 -7.416 0.947 2.000 18.986 5.569
+		"12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113"
+# DFPS-4A: Y71010 12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113
 # Breadboard: Y71066 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
 	set config(cam_right) \
-		"12.675 39.312 1.000 3.017 -1.421 2.000 19.123 6.488"
-# DFPS-4A: Y71003 12.675 39.312 1.000 3.017 -1.421 2.000 19.123 6.488
+		"12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220"
+# DFPS-4A: Y71003 12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220
 # Breadboard: Y71080 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
 	set config(mount_left) \
 		"80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868"
