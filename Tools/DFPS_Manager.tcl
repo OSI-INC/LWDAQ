@@ -47,7 +47,7 @@ proc DFPS_Manager_init {} {
 	set config(injector) "8 0"
 	set config(fiducials) "A5 A6 A7 A8"
 	set config(sort_code) "8"
-	set config(guides) "D1"
+	set config(guides) "D1 D2"
 	set config(flash) "0.004"
 	set config(transceiver) "1 0"
 	set config(controllers) "FFFF"
@@ -540,18 +540,6 @@ proc DFPS_Manager_zero_all {} {
 }
 
 #
-# DFPS_Manager_stop sets the control variable to Stop if it's not Idle, indicating 
-# that whatever process is running should stop.
-#
-proc DFPS_Manager_stop {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	if {$info(control) != "Idle"} {set info(control) "Stop"}
-	return $info(control)
-}
-
-#
 # DFPS_Manager_open creates the DFPS Manager window.
 #
 proc DFPS_Manager_open {} {
@@ -572,11 +560,6 @@ proc DFPS_Manager_open {} {
 	foreach a {Check Move_All Zero_All Configure} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
-		pack $f.$b -side left -expand 1
-	}
-	foreach a {Stop} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "DFPS_Manager_stop"
 		pack $f.$b -side left -expand 1
 	}
 	foreach a {Help} {
