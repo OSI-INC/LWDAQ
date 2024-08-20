@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "1.4"
+	LWDAQ_tool_init "DFPS_Manager" "2.1"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The control variable tells us the current state of the tool.
@@ -38,10 +38,10 @@ proc DFPS_Manager_init {} {
 
 	# Data acquisition parameters.
 	set config(ip_addr) "192.168.1.30"
-# Breadboard OSI Local: 192.168.1.10
-# DFPS-4A OSI Local: 192.168.1.30
-# DFPS-4A OSI Global: 71.174.73.186
-# DFPS-4A McDonald Local: 198.214.229
+	# Breadboard OSI Local: 192.168.1.10
+	# DFPS-4A OSI Local: 192.168.1.30
+	# DFPS-4A OSI Global: 71.174.73.186
+	# DFPS-4A McDonald Local: 198.214.229
 	set config(fvc_left) "5 0"
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
@@ -69,28 +69,26 @@ proc DFPS_Manager_init {} {
 	# Fiber view camera geometry.
 	set config(cam_left) \
 		"12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113"
-# DFPS-4A: Y71010 12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113
-# Breadboard: Y71066 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
+	# DFPS-4A: Y71010 12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113
+	# Breadboard: Y71066 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
 	set config(cam_right) \
 		"12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220"
-# DFPS-4A: Y71003 12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220
-# Breadboard: Y71080 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
+	# DFPS-4A: Y71003 12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220
+	# Breadboard: Y71080 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
 	set config(mount_left) \
 		"80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868"
-# DFPS-4A: 80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868
-# Breadboard: 79.614 51.505 199.754 119.777 51.355 264.265 79.277 51.400 275.713
+	# DFPS-4A: 80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868
+	# Breadboard: 79.614 51.505 199.754 119.777 51.355 264.265 79.277 51.400 275.713
 	set config(mount_right) \
 		"-104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948"
-# DFPS-4A: -104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948
-# Breadboard: -104.039 51.210 199.297 -108.680 51.004 275.110 -148.231 50.989 261.059
+	# DFPS-4A: -104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948
+	# Breadboard: -104.039 51.210 199.297 -108.680 51.004 275.110 -148.231 50.989 261.059
 	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
 	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
 
-	# Default north, south, east, and west control values.
-	set config(n_all) $config(dac_zero) 
-	set config(s_all) $config(dac_zero) 
-	set config(e_all) $config(dac_zero) 
-	set config(w_all) $config(dac_zero) 
+	# Default north-south, and east-west control values.
+	set config(ns_all) $config(dac_zero) 
+	set config(ew_all) $config(dac_zero) 
 	
 	# Command transmission values.
 	set config(initiate_delay) "0.010"
@@ -102,17 +100,10 @@ proc DFPS_Manager_init {} {
 	set config(id) "FFFF"
 	set config(commands) "8"
 	
-	# Travel configuration.
-	set config(repeat) "0"
-	set info(travel_wait) "0"
-	set config(travel_index) "0"
-	set config(pass_counter) "0"
-	set config(travel_file) [file normalize ~/Desktop/Travel.txt]
-	
 	# Panel appearance.
 	set config(label_color) "green"
 	set info(examine_window) "$info(window).examine_window"
-	set config(zoom) 1.0
+	set config(zoom) "0.5"
 	set config(intensify) "exact"
 	
 	# If we have a settings file, read and implement.	
@@ -298,17 +289,21 @@ proc DFPS_Manager_transmit_panel {} {
 # instructs the named positioner to set its converters accordingly. The control
 # values must be unsigned integers between 0 and 65535.
 #
-proc DFPS_Manager_set {id n s e w} {
+proc DFPS_Manager_set {id ns ew} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	set command [DFPS_Manager_id_bytes $id]
+	set n $ns
+	set s [expr 65535 - $ns]
+	set e $ew
+	set w [expr 65535 - $ew]
 	append command " 1 [expr $n / 256] [expr $n % 256]\
 		2 [expr $s / 256] [expr $s % 256]\
 		3 [expr $e / 256] [expr $e % 256]\
 		4 [expr $w / 256] [expr $w % 256]"
 	DFPS_Manager_transmit $command
-	return ""
+	return "$command"
 }
 		
 #
@@ -461,6 +456,12 @@ proc DFPS_Manager_check {{elements ""}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
+	if {![winfo exists $info(window)]} {
+		return ""
+	}
+	
+	set info(control) "Check"	
+
 	if {[catch {
 		if {$elements == ""} {
 			set elements [string trim "$config(fiducials) $config(guides)"]
@@ -474,17 +475,14 @@ proc DFPS_Manager_check {{elements ""}} {
 		return ""
 	}
 	
-	if {$info(control) == "Check"} {
-		set info(control) "Idle"
-	}
-	
+	set info(control) "Idle"	
 	return $sources
 }
 
 #
 # DFPS_Manager_move_all sets the control values of all actuators to the values
-# specified in the n_all, s_all, e_all, and w_all parameters, waits for the
-# settling time, and checks positions. It returns the positions of all sources.
+# specified in the ns_all and ew_all parameters, waits for the settling time,
+# and checks positions. It returns the positions of all sources.
 #
 proc DFPS_Manager_move_all {} {
 	upvar #0 DFPS_Manager_config config
@@ -494,25 +492,21 @@ proc DFPS_Manager_move_all {} {
 		return ""
 	}
 	
+	set info(control) "Move_All"	
+
 	if {[catch {
 		foreach id $config(controllers) {
-			DFPS_Manager_set $id \
-				$config(n_all) $config(s_all) \
-				$config(e_all) $config(w_all)
+			DFPS_Manager_set $id $config(ns_all) $config(ew_all)
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
-		set sources [DFPS_Manager_check]
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
 		return ""
 	}
-	
-	if {$info(control) == "Move_All"} {
-		set info(control) "Idle"
-	}
-	
-	return $sources
+
+	set info(control) "Idle"	
+	return "$config(ns_all) $config(ew_all)"
 }
 
 #
@@ -524,380 +518,36 @@ proc DFPS_Manager_zero_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
+	if {![winfo exists $info(window)]} {
+		return ""
+	}
+	
+	set info(control) "Zero_All"	
+
 	if {[catch {
 		foreach id $config(controllers) {
-			DFPS_Manager_set $id \
-				$config(dac_zero) $config(dac_zero) \
-				$config(dac_zero) $config(dac_zero) 
+			DFPS_Manager_set $id $config(dac_zero) $config(dac_zero)
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
-		set sources [DFPS_Manager_check]
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(control) "Idle"
 		return ""
 	}
 
-	if {$info(control) == "Zero_All"} {
-		set info(control) "Idle"
-	}
-	
-	return $sources
+	set info(control) "Idle"	
+	return "$config(dac_zero) $config(dac_zero)"
 }
 
 #
-# DFPS_Manager_stop stops the travel and sets the control state to Idle.
+# DFPS_Manager_stop sets the control variable to Stop if it's not Idle, indicating 
+# that whatever process is running should stop.
 #
 proc DFPS_Manager_stop {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set config(travel_index) 0
-	set config(pass_counter) 0
-	set info(control) "Idle"
-	return ""
-}
-
-#
-# DFPS_Manager_clear clears the display overlays.
-#
-proc DFPS_Manager_clear {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	foreach side {left right} {
-		lwdaq_image_manipulate $info(image_$side) none -clear 1
-		lwdaq_draw $info(image_$side) dfps_manager_$side \
-			-zoom $config(zoom) \
-			-intensify $config(intensify)
-	}
-	return ""
-}
-
-#
-# DFPS_Manager_jump arranges for travel script execution to move to a labeled
-# line in the script. The routine finds the labelled line in the script and sets
-# the travel index equal to the labelled line's index minus one. The travel
-# routine will subsequently increment the index, thus leaving it equal to the
-# labeled line's index at the end fo the step. If the label does not exist in
-# the travel file, we generate an error. We can call this goto routine with a
-# "goto" instruction in a travel script, and also with the full name of the
-# routine from within a Tcl script being executed by the travel process. In both
-# cases, the goto routine refers to the travel list available in the travel
-# procedure.
-#
-proc DFPS_Manager_jump {name} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-	upvar travel_list travel_list
-
-	# Go through the list until we find "label name".
-	set goto_index -1
-	for {set index 0} {$index < [llength $travel_list]} {incr index} {
-		set line [string trim [lindex $travel_list $index]]
-		if {([lindex $line 0] == "label") && ([lindex $line 1] == $name)} {
-			set goto_index $index
-			break
-		}
-	}
-	
-	# If we did not find the label, generate and error.
-	if {$goto_index < 0} {
-		error "cannot find label \"$name\"."
-	}
-	
-	# Otherwise, set the travel index to the goto_index minus one.
-	set config(travel_index) [expr $goto_index - 1]
-	
-	# Return the index.
-	return $goto_index
-}
-
-#
-# DFPS_Manager_travel allows us to step through a list travel commands. The
-# default travel command consists of a text line with a four integers 0-65535
-# that will be used to set the control voltages of all controllers listed in the
-# controllers parameter. Other valid travel commands are "label" to name a line
-# and "jump" to jump to a labeled line. We have "tcl" to execute the rest of the
-# command line as a Tcl command, "tcl_source" to load and execute a named Tcl
-# script file, and "wait" to wait a number of seconds.
-#
-proc DFPS_Manager_travel {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-	global LWDAQ_Info
-	
-	# Because the travel operation can go on for some time, we must handle the 
-	# closing of the window gracefully: we abort if the window is no longer open.
-	if {![winfo exists $info(window)]} {
-		return ""
-	}
-	
-	# If the state is Idle, we exit.
-	if {$info(control) == "Idle"} {
-		return ""
-	}
-
-	# Read the travel file, if we can find it. If not, abort and report an error.
-	if {[catch {
-		set f [open $config(travel_file) r]
-		set travel_list [string trim [read $f]]
-		close $f
-	} error_result]} {
-		catch {close $f}
-		LWDAQ_print $info(text) "ERROR: $error_result."
-		set info(control) "Idle"		
-		return ""
-	}
-	
-	# Our travel output file name we construct from the travel file name by
-	# appending a suffix "_Out".
-	set outfile [file root $config(travel_file)]_Out.txt
-	
-	# Split the travel list using line breaks.
-	set travel_list [split $travel_list \n]
-		
-	# If the travel index is not an integer, or is out of range, we set it
-	# to zero.
-	if {![string is integer -strict $config(travel_index)] \
-		|| ($config(travel_index) < 0) \
-		|| ($config(travel_index) >= [llength $travel_list])} {
-		set config(travel_index) 0
-	}
-	
-	# If this is the first step, clear excess lines from the text window and
-	# increment the travel counter.
-	if {$config(travel_index) == 0} {
-		incr config(pass_counter)
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "\nStarting\
-			[file tail $config(travel_file)],\
-			Pass $config(pass_counter)." purple
-		}
-		$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
-		
-	}
-		
-	# Get the travel_index'th line and extract the first word, which may be a command.
-	set line [string trim [lindex $travel_list $config(travel_index)]]
-	set first_word [lindex $line 0]
-
-	# Print out the line in the text window with its line number, but don't keep
-	# re-printing a wait command line.
-	if {($first_word != "wait") || ($info(travel_wait) == 0)} {
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "[format %-3d $config(travel_index)] $line" purple
-		}
-	}
-	
-	# Address commands and the default behavior, which is to treat the line as four
-	# integer control values.
-	switch $first_word {
-		"" {
-		# We do nothing for empty lines, but we increment the index later, so as
-		# to make sure the index matches the line number in the travel file.
-		
-		}
-		
-		"#" {
-		# We do nothing for comment lines, but we increment the index later, so
-		# as to make sure the index matches the line number in the travel file.
-		
-		}
-		
-		"label" {
-		# A label instruction specifies a line that we can jump to with a "goto"
-		# command.
-			set label [regsub {label[ \t]*} $line ""]
-			if {![string is wordchar $label]} {
-				LWDAQ_print $info(text) "ERROR: Bad label name \"$label\"."
-				set info(control) "Idle"
-				return ""
-			}
-		}
-		
-		"jump" {
-		# Jump to the named line.
-			set label [regsub {goto[ \t]*} $line ""]
-			if {![string is wordchar $label]} {
-				LWDAQ_print $info(text) "ERROR: Bad label name \"$label\"."
-				set info(control) "Idle"
-				return ""
-			}
-			DFPS_Manager_jump $label
-		}
-		
-		"tcl" {
-		# The tcl instruction specifies that the rest of the line should be
-		# executed as a TCL command. We delete the tcl key word in the line
-		# and pass to TCL interpreter with the "eval" command.
-			if {[catch {
-				eval [regsub {tcl[ \t]*} $line ""]
-			} error_result]} {
-				LWDAQ_print $info(text) "ERROR: $error_result"
-				set info(control) "Idle"
-				return ""
-			}
-		}
-		
-		"tcl_source" {
-		# The tcl_source instruction specifies that the next entry in the line
-		# is the name of a file in the same directory as the travel script, and
-		# this file should be executed as a tcl script using the TCL "source"
-		# command.
-			set sft [lindex $line 1]
-			set sfn [file join [file dirname $config(travel_file)] $sft]
-			if {![file exists $sfn]} {
-				LWDAQ_print $info(text) "ERROR: No such file \"$sfn\"."
-				set info(control) "Idle"
-				return ""				
-			}
-			if {[catch {
-				source $sfn
-			} error_result]} {
-				LWDAQ_print $info(text) "ERROR: $error_result"
-				set info(control) "Idle"
-				return ""
-			}
-		}
-		
-		"wait" {
-		# The wait instruction holds the travel operation at the same step until
-		# a specified number of seconds has elapsed. The operation continues to
-		# post itself to the event loop, so will respond to Stop commands.
-			set wait_seconds [lindex $line 1]
-			if {$info(travel_wait) == 0} {
-				set info(travel_wait) [clock milliseconds]
-				incr config(travel_index) -1
-			} else {
-				if {[clock milliseconds] - $info(travel_wait) \
-						>= [expr 1000*$wait_seconds]} {
-					set info(travel_wait) 0
-				} else {
-					incr config(travel_index) -1
-				}
-			}
-		}
-		
-		default {
-		# At this point, the only valid option for the line is that it contains a
-		# controller id and four control values.
-
-			# Extract the id and four integers from the line.	
-			scan $line %d%d%d%d n s e w
-	
-			# Apply the new control values to all four electrodes.
-			if {[catch {
-				foreach id $config(controllers) {
-					DFPS_Manager_set $id $n $s $e $w
-				}
-			} error_result]} {
-				LWDAQ_print $info(text) "ERROR: $error_result"
-				set info(control) "Idle"
-				return ""
-			}
-	
-			# Wait for the fiber to settle, then check the spot positions.
-			LWDAQ_wait_ms $config(settling_ms)	
-			DFPS_Manager_check
-		}
-	}
-	
-	# Decide what to do next: continue through list, start at beginning again or
-	# finish.
-	incr config(travel_index)
-	if {($info(control) == "Stop") || ($info(control) == "Step")} {
-		set info(control) "Idle"
-		return ""
-	} elseif {($config(travel_index) < [llength $travel_list])} {
-		LWDAQ_post "DFPS_Manager_travel"
-		return ""
-	} else {
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "Travel Complete, Pass $config(pass_counter)." purple
-		}
-		if {$config(repeat)} {
-			LWDAQ_post "DFPS_Manager_travel"
-			return ""
-		} else {
-			set info(control) "Idle"
-			return ""
-		}
-	}
-}
-
-#
-# DFPS_Manager_step calls the travel routine. We assume the control variable has
-# been set to "Step", so the travel routine will know to stop after one step.
-#
-proc DFPS_Manager_step {} {
-	DFPS_Manager_travel 
-	return ""
-}
-
-#
-# DFPS_Manager_travel_edit creats a travel list file if one does not exist
-# under the current file name, or reads an existing file. Displays the file for
-# editing, provides buttons to save under same or different names.
-#
-proc DFPS_Manager_travel_edit {} {
-	upvar #0 DFPS_Manager_info info
-	upvar #0 DFPS_Manager_config config
-	
-	if {![file exists $config(travel_file)]} {
-		LWDAQ_edit_script New 
-	} else {
-		LWDAQ_edit_script Open $config(travel_file)
-	}
-	return ""
-}
-
-#
-# DFPS_Manager_travel_browse allows us to choose a travel list file.
-#
-proc DFPS_Manager_travel_browse {} {
-	upvar #0 DFPS_Manager_info info
-	upvar #0 DFPS_Manager_config config
-
-	set dn [file dirname $config(travel_file)]
-	if {![file exists $dn]} {set dn ""}
-	set fn [LWDAQ_get_file_name 0 $dn] 
-	if {$fn != ""} {set config(travel_file) $fn}
-	return $config(travel_file)
-}
-
-#
-# DFPS_Manager_cmd takes a command, such as Zero, Move, Check, Stop, Step or
-# Travel, and decides what to do about it. This routine does not execute the
-# DFPS Manager operation itself, but instead posts the execution of the
-# operation to the LWDAQ event queue, and then returns. We use this routine from
-# buttons, or from other programs that want to manipulate the DFPS Manager
-# because the routine does not stop or deley the graphical user interface.
-#
-proc DFPS_Manager_cmd {cmd} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	if {$info(control) != "Idle"} {
-		if {$cmd == "Stop"} {
-			set info(control) "Stop"
-		} else {
-			if {$cmd != $info(control)} {
-				LWDAQ_print $info(text) "ERROR: Cannot $cmd during $info(control)."
-			}
-		}
-	} else {
-		if {$cmd != "Stop"} {
-			# Set the control variable.
-			set info(control) $cmd
-			
-			# Here we construct the DFPS Manager procedure name we want to
-			# call by converting the command to lower case, and trusting that
-			# such a procedure exists. We post its execution to the event queue.
-			LWDAQ_post DFPS_Manager_[string tolower $cmd]
-		}
-	}
-	
+	if {$info(control) != "Idle"} {set info(control) "Stop"}
 	return $info(control)
 }
 
@@ -919,14 +569,14 @@ proc DFPS_Manager_open {} {
 	
 	label $f.state -textvariable DFPS_Manager_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
-	foreach a {Check Travel Step} {
+	foreach a {Check Move_All Zero_All Configure} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
+		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
 		pack $f.$b -side left -expand 1
 	}
-	foreach a {Stop Clear Configure} {
+	foreach a {Stop} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "DFPS_Manager_$b"
+		button $f.$b -text $a -command "DFPS_Manager_stop"
 		pack $f.$b -side left -expand 1
 	}
 	foreach a {Help} {
@@ -938,8 +588,6 @@ proc DFPS_Manager_open {} {
 	pack $f.server -side left -expand 1
 	button $f.bcam -text "BCAM" -command "LWDAQ_open BCAM"
 	pack $f.bcam -side left -expand 1
-	button $f.calibrator -text "Calibrator" -command "LWDAQ_run_tool DFPS_Calibrator"
-	pack $f.calibrator -side left -expand 1
 	
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
@@ -963,43 +611,24 @@ proc DFPS_Manager_open {} {
 	set f [frame $ff.dacs]
 	pack $f -side top -fill x
 	
-	foreach d {n_all s_all e_all w_all} {
+	foreach d {ns_all ew_all} {
 		set a [string tolower $d]
 		label $f.l$a -text $d -fg $config(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 5
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	foreach a {Move_All Zero_All} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "DFPS_Manager_cmd $a"
-		pack $f.$b -side left -expand 1
-	}
 	button $f.txcmd -text "Transmit Panel" -command {
 		LWDAQ_post "DFPS_Manager_transmit_panel"
 	}
 	pack $f.txcmd -side left -expand yes
+	button $f.calibrator -text "Calibrator" -command "LWDAQ_run_tool DFPS_Calibrator"
+	pack $f.calibrator -side left -expand 1
+	button $f.toolmaker -text "Toolmaker" -command "LWDAQ_Toolmaker"
+	pack $f.toolmaker -side left -expand 1
 	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
 	pack $f.verbose -side left -expand yes
 
-	set f [frame $ff.travel]
-	pack $f -side top -fill x
-
-	label $f.tl -text "travel_file" -fg $config(label_color)
-	entry $f.tlf -textvariable DFPS_Manager_config(travel_file) -width 40
-	pack $f.tl $f.tlf -side left -expand yes
-	button $f.browse -text "Browse" -command DFPS_Manager_travel_browse
-	button $f.edit -text "Edit" -command DFPS_Manager_travel_edit
-	pack $f.browse $f.edit -side left -expand yes
-	checkbutton $f.repeat -text "Repeat" -variable DFPS_Manager_config(repeat) 
-	pack $f.repeat -side left -expand yes
-	label $f.til -text "index:" -fg $config(label_color)
-	entry $f.tie -textvariable DFPS_Manager_config(travel_index) -width 4
-	pack $f.til $f.tie -side left -expand yes
-	label $f.tpl -text "pass:" -fg $config(label_color)
-	entry $f.tpe -textvariable DFPS_Manager_config(pass_counter) -width 4
-	pack $f.tpl $f.tpe -side left -expand yes
-	
 	set f [frame $w.image_frame]
 	pack $f -side top -fill x -expand no
 	
