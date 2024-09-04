@@ -569,8 +569,11 @@ proc DFPS_Manager_open {} {
 	}
 	button $f.server -text "Server" -command "LWDAQ_server_open"
 	pack $f.server -side left -expand 1
-	button $f.bcam -text "BCAM" -command "LWDAQ_open BCAM"
-	pack $f.bcam -side left -expand 1
+	foreach a {BCAM Diagnostic} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_open $a"
+		pack $f.$b -side left -expand 1
+	}
 	
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
