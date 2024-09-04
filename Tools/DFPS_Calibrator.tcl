@@ -26,33 +26,35 @@ proc DFPS_Calibrator_init {} {
 	upvar #0 DFPS_Calibrator_info info
 	upvar #0 DFPS_Calibrator_config config
 	
-	LWDAQ_tool_init "DFPS_Calibrator" "1.2"
+	LWDAQ_tool_init "DFPS_Calibrator" "1.3"
 	if {[winfo exists $info(window)]} {return ""}
 
-	set config(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
-	set config(cam_left) $config(cam_default)
-	set config(cam_right) $config(cam_default)
-	set config(scaling) "0 0 0 1 1 0 1 1"
+	set info(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
+	set info(cam_left) $info(cam_default)
+	set info(cam_right) $info(cam_default)
+	set config(fit_scaling) "0 0 0 1 1 0 1 1"
 
-	set config(mount_left) "0 0 0 -21 0 -73 21 0 -73"
-	set config(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
-	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
+	set info(mount_left) "0 0 0 -21 0 -73 21 0 -73"
+	set info(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
+	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
+	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 
-	set config(source_1) "0 105 -50"
-	set config(source_2) "30 105 -50"
-	set config(source_3) "0 75 -50"
-	set config(source_4) "30 75 -50"
-	set config(fit_sources) "1 2 3 4"
-	set config(num_sources) "4"
-	set config(spots_left) "100 100 200 100 100 200 200 200"
-	set config(spots_right) "100 100 200 100 100 200 200 200"
+	set info(source_1) "0 105 -50"
+	set info(source_2) "30 105 -50"
+	set info(source_3) "0 75 -50"
+	set info(source_4) "30 75 -50"
+	set info(num_sources) "4"
+	set info(spots_left) "100 100 200 100 100 200 200 200"
+	set info(spots_right) "100 100 200 100 100 200 200 200"
 	
 	set config(bcam_sensor) "ICX424"
 	set config(bcam_width) "5180"
 	set config(bcam_height) "3848"
 	set config(bcam_threshold) "10 #"
 	set config(bcam_sort) "8"
+
+	set config(displace_scale) "1"
+	set config(cross_size) "100"
 
 	set config(fit_steps) "1000"
 	set config(fit_restarts) "4"
@@ -61,26 +63,23 @@ proc DFPS_Calibrator_init {} {
 	set config(fit_show) "1"
 	set config(fit_details) "0"
 	set config(fit_report) "0"
-	set config(displace_scale) "1"
-	set config(stop_fit) "0"
-	set config(zoom) "1.0"
-	set config(intensify) "exact"
-	set config(num_lines) "2000"
-	set config(img_dir) "~/Desktop/DFPS"
-	set config(cross_size) "100"
+	set config(fit_stop) "0"
 	
-	set info(state) "Idle"
+	set config(fvcc_zoom) "1.0"
+	set config(fvcc_intensify) "exact"
 	
-	set info(examine_window) "$info(window).examine_window"
-	set info(state) "Idle"
+	set info(fvcc_state) "Idle"
+	
+	set info(fvcc_examine_window) "$info(window).fvcc_examine_window"
+	set info(fvcc_state) "Idle"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
 	foreach side {left right} {
-		set info(image_$side) dfps_calibrator_$side
-		lwdaq_image_create -name $info(image_$side) -width 700 -height 520
+		set info(fvc_$side) fvcc_$side
+		lwdaq_image_create -name $info(fvc_$side) -width 700 -height 520
 	}
 
 	return ""   
@@ -100,7 +99,7 @@ proc DFPS_Calibrator_get_params {} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 
-	set params "$config(cam_left) $config(cam_right)"
+	set params "$info(cam_left) $info(cam_right)"
 	return $params
 }
 
@@ -114,7 +113,7 @@ proc DFPS_Calibrator_examine {} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 
-	set w $info(examine_window)
+	set w $info(fvcc_examine_window)
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Coordinate Measurements, DFPS Calibrator $info(version)"
@@ -123,27 +122,20 @@ proc DFPS_Calibrator_examine {} {
 		return ""
 	}
 
-	set f [frame $w.buttons]
-	pack $f -side top -fill x
-	button $f.save -text "Save Configuration" -command "LWDAQ_tool_save $info(name)"
-	pack $f.save -side left -expand 1
-	button $f.unsave -text "Unsave Configuration" -command "LWDAQ_tool_unsave $info(name)"
-	pack $f.unsave -side left -expand 1
-	
 	foreach mount {Left Right} {
 		set b [string tolower $mount]
 		set f [frame $w.mnt$b]
 		pack $f -side top -fill x
 		label $f.l$b -text "$mount Mount:"
-		entry $f.e$b -textvariable DFPS_Calibrator_config(mount_$b) -width 70
+		entry $f.e$b -textvariable DFPS_Calibrator_info(mount_$b) -width 70
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 
-	for {set a 1} {$a <= $config(num_sources)} {incr a} {
+	for {set a 1} {$a <= $info(num_sources)} {incr a} {
 		set f [frame $w.src$a]
 		pack $f -side top -fill x
 		label $f.l$a -text "Source $a\:"
-		entry $f.e$a -textvariable DFPS_Calibrator_config(source_$a) -width 70
+		entry $f.e$a -textvariable DFPS_Calibrator_info(source_$a) -width 70
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
@@ -152,7 +144,7 @@ proc DFPS_Calibrator_examine {} {
 		set f [frame $w.spt$b]
 		pack $f -side top -fill x
 		label $f.l$b -text "$mount Spots:"
-		entry $f.e$b -textvariable DFPS_Calibrator_config(spots_$b) -width 70
+		entry $f.e$b -textvariable DFPS_Calibrator_info(spots_$b) -width 70
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 	
@@ -194,7 +186,7 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 	# Clear the overlay if showing.
 	if {$config(fit_show)} {
 		foreach side {left right} {
-			lwdaq_image_manipulate $info(image_$side) none -clear 1
+			lwdaq_image_manipulate $info(fvc_$side) none -clear 1
 		}
 	}	
 	
@@ -206,35 +198,33 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 	set sum_squares 0
 	set count 0
 	foreach side {left right} {
-		set spots $config(spots_$side)
-		for {set a 1} {$a <= $config(num_sources)} {incr a} {
-			if {[lsearch $config(fit_sources) $a] >= 0} {
-				set sb [lwdaq xyz_local_from_global_point \
-					$config(source_$a) $config(coord_$side)]
-				set th [lwdaq bcam_image_position $sb [set fvc_$side]]
-				scan $th %f%f x_th y_th
-				set x_th [format %.2f [expr $x_th * 1000.0]]
-				set y_th [format %.2f [expr $y_th * 1000.0]]
-				set x_a [lindex $spots 0]
-				set y_a [lindex $spots 1]
-				set spots [lrange $spots 2 end]
-				set err [expr ($x_a-$x_th)*($x_a-$x_th) + ($y_a-$y_th)*($y_a-$y_th)]
-				set sum_squares [expr $sum_squares + $err]
-				incr count
-				
-				if {$config(fit_show)} {
-					set y [expr $config(bcam_height) - $y_th]
-					set x $x_th
-					set w $config(cross_size)
-					lwdaq_graph "[expr $x - $w] $y [expr $x + $w] $y" \
-						$info(image_$side) -entire 1 \
-						-x_min 0 -x_max $config(bcam_width) \
-						-y_min 0 -y_max $config(bcam_height) -color 2
-					lwdaq_graph "$x [expr $y - $w] $x [expr $y + $w]" \
-						$info(image_$side) -entire 1 \
-						-x_min 0 -x_max $config(bcam_width) \
-						-y_min 0 -y_max $config(bcam_height) -color 2
-				}
+		set spots $info(spots_$side)
+		for {set a 1} {$a <= $info(num_sources)} {incr a} {
+			set sb [lwdaq xyz_local_from_global_point \
+				$info(source_$a) $info(coord_$side)]
+			set th [lwdaq bcam_image_position $sb [set fvc_$side]]
+			scan $th %f%f x_th y_th
+			set x_th [format %.2f [expr $x_th * 1000.0]]
+			set y_th [format %.2f [expr $y_th * 1000.0]]
+			set x_a [lindex $spots 0]
+			set y_a [lindex $spots 1]
+			set spots [lrange $spots 2 end]
+			set err [expr ($x_a-$x_th)*($x_a-$x_th) + ($y_a-$y_th)*($y_a-$y_th)]
+			set sum_squares [expr $sum_squares + $err]
+			incr count
+			
+			if {$config(fit_show)} {
+				set y [expr $config(bcam_height) - $y_th]
+				set x $x_th
+				set w $config(cross_size)
+				lwdaq_graph "[expr $x - $w] $y [expr $x + $w] $y" \
+					$info(fvc_$side) -entire 1 \
+					-x_min 0 -x_max $config(bcam_width) \
+					-y_min 0 -y_max $config(bcam_height) -color 2
+				lwdaq_graph "$x [expr $y - $w] $x [expr $y + $w]" \
+					$info(fvc_$side) -entire 1 \
+					-x_min 0 -x_max $config(bcam_width) \
+					-y_min 0 -y_max $config(bcam_height) -color 2
 			}
 		}
 	}
@@ -245,8 +235,8 @@ proc DFPS_Calibrator_disagreement {{params ""}} {
 	# Draw the boxes and rectangles if showing.
 	if {$config(fit_show)} {
 		foreach side {left right} {
-			lwdaq_draw $info(image_$side) dfps_calibrator_$side \
-				-intensify $config(intensify) -zoom $config(zoom)
+			lwdaq_draw $info(fvc_$side) dfps_calibrator_$side \
+				-intensify $config(fvcc_intensify) -zoom $config(fvcc_zoom)
 		}
 	}
 	
@@ -264,8 +254,8 @@ proc DFPS_Calibrator_show {} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 	
-	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
+	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
+	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 	set err [DFPS_Calibrator_disagreement]
 	LWDAQ_print $info(text) "[DFPS_Calibrator_get_params] $err 0"
 
@@ -292,13 +282,13 @@ proc DFPS_Calibrator_check {} {
 	for {set i 1} {$i <= 4} {incr i} {	
 		lwdaq_config -fsd 6
 		foreach side {left right} {
-			set x [expr 0.001 * [lindex $config(spots_$side) [expr ($i-1)*2]]]
-			set y [expr 0.001 * [lindex $config(spots_$side) [expr ($i-1)*2+1]]]
-			set b [lwdaq bcam_source_bearing "$x $y" "$side $config(cam_$side)"]
+			set x [expr 0.001 * [lindex $info(spots_$side) [expr ($i-1)*2]]]
+			set y [expr 0.001 * [lindex $info(spots_$side) [expr ($i-1)*2+1]]]
+			set b [lwdaq bcam_source_bearing "$x $y" "$side $info(cam_$side)"]
 			set point_$side [lwdaq xyz_global_from_local_point \
-				[lrange [set b] 0 2] $config(coord_$side)]
+				[lrange [set b] 0 2] $info(coord_$side)]
 			set dir_$side [lwdaq xyz_global_from_local_vector \
-				[lrange [set b] 3 5] $config(coord_$side)]
+				[lrange [set b] 3 5] $info(coord_$side)]
 		}
 		lwdaq_config -fsd 3
 		
@@ -310,7 +300,7 @@ proc DFPS_Calibrator_check {} {
 		set y_src [format %8.3f [expr $y + 0.5*$dy]]
 		set z_src [format %8.3f [expr $z + 0.5*$dz]]
 		
-		set a $config(source_$i)
+		set a $info(source_$i)
 		set x_err [format %6.3f [expr [lindex $a 0]-$x_src]]
 		set y_err [format %6.3f [expr [lindex $a 1]-$y_src]]
 		set z_err [format %6.3f [expr [lindex $a 2]-$z_src]]
@@ -322,7 +312,7 @@ proc DFPS_Calibrator_check {} {
 			+ $y_err*$y_err + $z_err*$z_err] 
 	}
 
-	set err [expr sqrt($sum_squares / $config(num_sources))]
+	set err [expr sqrt($sum_squares / $info(num_sources))]
 	LWDAQ_print $info(text) "Root Mean Square Error (mm): [format %.3f $err]"
 
 	return ""
@@ -343,16 +333,16 @@ proc DFPS_Calibrator_read {{fn ""}} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 
-	if {$info(state) != "Idle"} {return ""}
-	set info(state) "Reading"
+	if {$info(fvcc_state) != "Idle"} {return ""}
+	set info(fvcc_state) "Reading"
 	LWDAQ_update
 	
 	if {$fn == ""} {set fn [LWDAQ_get_file_name]}
 	if {$fn == ""} {
-		set info(state) "Idle"
+		set info(fvcc_state) "Idle"
 		return ""
 	} {
-		set config(img_dir) [file dirname $fn]
+		set img_dir [file dirname $fn]
 	}
 	
 	LWDAQ_print $info(text) "\nReading measurements from disk." purple
@@ -367,37 +357,37 @@ proc DFPS_Calibrator_read {{fn ""}} {
 	foreach {d x y z} $numbers {
 		lappend spheres "$x $y $z"
 	}
-	set config(mount_left) [join [lrange $spheres 3 5]]
-	set config(mount_right) [join [lrange $spheres 6 8]]
+	set info(mount_left) [join [lrange $spheres 3 5]]
+	set info(mount_right) [join [lrange $spheres 6 8]]
 	set spheres [lrange $spheres 9 end]
-	for {set a 1} {$a <= $config(num_sources)} {incr a} {
-		set config(source_$a) [lindex $spheres [expr $a-1]]
+	for {set a 1} {$a <= $info(num_sources)} {incr a} {
+		set info(source_$a) [lindex $spheres [expr $a-1]]
 	}
 
-	set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
+	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
+	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 
 	foreach {s side} {L left R right} {
 		LWDAQ_print $info(text) "Reading and analyzing image $a\.gif from $side camera."
-		set ifn [file join $config(img_dir) $s\.gif]
+		set ifn [file join $img_dir $s\.gif]
 		if {[file exists $ifn]} {
-			LWDAQ_read_image_file $ifn $info(image_$side)
-			set iconfig(analysis_num_spots) "$config(num_sources) $config(bcam_sort)"
+			LWDAQ_read_image_file $ifn $info(fvc_$side)
+			set iconfig(analysis_num_spots) "$info(num_sources) $config(bcam_sort)"
 			set iconfig(analysis_threshold) $config(bcam_threshold)
 			LWDAQ_set_image_sensor $config(bcam_sensor) BCAM
 			set config(bcam_width) [expr $iinfo(daq_image_width) \
 				* $iinfo(analysis_pixel_size_um)]
 			set config(bcam_height) [expr $iinfo(daq_image_height) \
 				* $iinfo(analysis_pixel_size_um)]
-			set result [LWDAQ_analysis_BCAM $info(image_$side)]
+			set result [LWDAQ_analysis_BCAM $info(fvc_$side)]
 			if {![LWDAQ_is_error_result $result]} {
-				set config(spots_$side) ""
+				set info(spots_$side) ""
 				foreach {x y num pk acc th} $result {
-					append config(spots_$side) "$x $y "
+					append info(spots_$side) "$x $y "
 				}
 			} else {
 				LWDAQ_print $info(text) $result
-				set info(state) "Idle"
+				set info(fvcc_state) "Idle"
 				return ""
 			}
 		}
@@ -406,7 +396,7 @@ proc DFPS_Calibrator_read {{fn ""}} {
 	set err [DFPS_Calibrator_disagreement]
 	LWDAQ_print $info(text) "Current spot position fit error is $err um rms."
 
-	set info(state) "Idle"
+	set info(fvcc_state) "Idle"
 	return ""
 }
 
@@ -423,12 +413,12 @@ proc DFPS_Calibrator_displace {} {
 	upvar #0 DFPS_Calibrator_info info
 
 	foreach side {left right} {
-		for {set i 0} {$i < [llength $config(cam_$side)]} {incr i} {
-			lset config(cam_$side) $i [format %.3f \
-				[expr [lindex $config(cam_$side) $i] \
+		for {set i 0} {$i < [llength $info(cam_$side)]} {incr i} {
+			lset info(cam_$side) $i [format %.3f \
+				[expr [lindex $info(cam_$side) $i] \
 					+ ((rand()-0.5) \
 						*$config(displace_scale) \
-						*[lindex $config(scaling) $i])]]
+						*[lindex $config(fit_scaling) $i])]]
 		}
 	}
 	DFPS_Calibrator_disagreement
@@ -444,7 +434,7 @@ proc DFPS_Calibrator_defaults {} {
 	upvar #0 DFPS_Calibrator_info info
 
 	foreach side {left right} {
-		set config(cam_$side) $config(cam_default)
+		set info(cam_$side) $info(cam_default)
 	}
 	DFPS_Calibrator_disagreement
 	return ""
@@ -460,7 +450,7 @@ proc DFPS_Calibrator_altitude {params} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 
-	if {$config(stop_fit)} {error "Fit aborted by user"}
+	if {$config(fit_stop)} {error "Fit aborted by user"}
 	if {![winfo exists $info(window)]} {error "Tool window destroyed"}
 	set altitude [DFPS_Calibrator_disagreement "$params"]
 	LWDAQ_support
@@ -485,14 +475,14 @@ proc DFPS_Calibrator_fit {} {
 	upvar #0 DFPS_Calibrator_config config
 	upvar #0 DFPS_Calibrator_info info
 
-	set config(stop_fit) 0
-	set info(state) "Fitting"
+	set config(fit_stop) 0
+	set info(fvcc_state) "Fitting"
 	
 	if {[catch {
-		set scaling "$config(scaling) $config(scaling)"
+		set scaling "$config(fit_scaling) $config(fit_scaling)"
 		set start_params [DFPS_Calibrator_get_params] 
-		set config(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-		set config(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
+		set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
+		set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 		lwdaq_config -show_details $config(fit_details)
 		set end_params [lwdaq_simplex $start_params \
 			DFPS_Calibrator_altitude \
@@ -504,17 +494,17 @@ proc DFPS_Calibrator_fit {} {
 			-scaling $scaling]
 		lwdaq_config -show_details 0
 		if {[LWDAQ_is_error_result $end_params]} {error "$end_params"}
-		set config(cam_left) "[lrange $end_params 0 7]"
-		set config(cam_right) "[lrange $end_params 8 15]"
+		set info(cam_left) "[lrange $end_params 0 7]"
+		set info(cam_right) "[lrange $end_params 8 15]"
 		LWDAQ_print $info(text) "$end_params"
 	} error_message]} {
 		LWDAQ_print $info(text) $error_message
-		set info(state) "Idle"
+		set info(fvcc_state) "Idle"
 		return ""
 	}
 
 	DFPS_Calibrator_disagreement
-	set info(state) "Idle"
+	set info(fvcc_state) "Idle"
 }
 
 #
@@ -530,10 +520,10 @@ proc DFPS_Calibrator_open {} {
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.state -textvariable DFPS_Calibrator_info(state) -fg blue -width 10
+	label $f.state -textvariable DFPS_Calibrator_info(fvcc_state) -fg blue -width 10
 	pack $f.state -side left -expand yes
 
-	button $f.stop -text "Stop" -command {set DFPS_Calibrator_config(stop_fit) 1}
+	button $f.stop -text "Stop" -command {set DFPS_Calibrator_config(fit_stop) 1}
 	pack $f.stop -side left -expand yes
 
 	foreach a {Read Show Check Displace Defaults Examine Fit} {
@@ -551,13 +541,8 @@ proc DFPS_Calibrator_open {} {
 	set f [frame $w.fvc]
 	pack $f -side top -fill x
 	
-	foreach {a wd} {fit_sources 10 zoom 4 bcam_threshold 6 fit_steps 8} {
-		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-	
-	foreach {a wd} {scaling 20} {
+	foreach {a wd} {bcam_threshold 6 fit_steps 8 fit_restarts 3 \
+			fit_endsize 10 fit_report 2 fit_details 2 fit_scaling 20} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -568,7 +553,7 @@ proc DFPS_Calibrator_open {} {
 
 	foreach {a wd} {cam_left 50 cam_right 50} {
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable DFPS_Calibrator_config($a) -width $wd
+		entry $f.e$a -textvariable DFPS_Calibrator_info($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
@@ -588,8 +573,8 @@ proc DFPS_Calibrator_open {} {
 	
 	# Draw two blank images into the display.
 	foreach side {left right} {
-		lwdaq_draw $info(image_$side) dfps_calibrator_$side \
-			-intensify $config(intensify) -zoom $config(zoom)
+		lwdaq_draw $info(fvc_$side) dfps_calibrator_$side \
+			-intensify $config(fvcc_intensify) -zoom $config(fvcc_zoom)
 	}
 	
 	return $w
@@ -682,7 +667,7 @@ not real numbers will be ignored. An example CMM.txt file is to be found below.
 The calibrator works by minimizing disagreement between actual spot positions
 and modelled spot positions. When we press Fit, the simplex fitter starts
 minimizing this disagreement by adjusting the calibrations of the left and right
-FVCs. The fit applies the "scaling" values to the eight calibration constants of
+FVCs. The fit applies the "fit_scaling" values to the eight calibration constants of
 the cameras. We can fix any one of the eight parameters by setting its scaling
 value to zero. We always fix the pivot.z scaling factor to zero because this
 parameter has no geometric implementation. The fit uses only those calibration
