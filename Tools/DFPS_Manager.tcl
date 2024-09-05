@@ -57,8 +57,8 @@ proc DFPS_Manager_init {} {
 	set info(wildcard_id) "FFFF"
 	set config(settling_ms) "1000"
 	set config(dac_zero) "32000"
-	set config(image_sensor) "ICX424"
-	LWDAQ_set_image_sensor $config(image_sensor) BCAM
+	set info(image_sensor) "ICX424"
+	LWDAQ_set_image_sensor $info(image_sensor) BCAM
 	set config(analysis_threshold) "10 #"
 	set config(guide_1) "6 0 1"
 	set config(guide_2) "6 0 2"
@@ -149,11 +149,23 @@ proc DFPS_Manager_init {} {
 	
 	# Fiducial Plate Calibrator settings.
 	set info(fpc_orientations) "0 90 180 270"
+	set config(fpc_analysis_enable) "31"
+	set config(fpc_analysis_square_size_um) "340"
+	set config(fpc_daq_flash_seconds) "0.05"
+	set config(fpc_daq_source_driver_socket) "9"
+	set config(fpc_analysis_reference_code) "0"
+	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
 	set config(fpc_zoom) "0.5"
 	set config(fpc_intensify) "exact"
 	set info(fpc_examine_window) "$info(window).fpc_examine_window"
 	set info(fpc_state) "Idle"
-	
+	foreach orientation $info(fpc_orientations) {
+		set info(fpc_mask_$orientation) ""
+		foreach guide $info(guide_sensors) {
+			append info(fpc_mask_$orientation) "-1 -1 -1 "
+		}
+	}
+
 	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -175,8 +187,7 @@ proc DFPS_Manager_init {} {
 	# Create spaces to store guide sensor images read from the Rasnik
 	# Instrument.
 	foreach guide $info(guide_sensors) {
-		set info(fpc_$guide) fpc_$guide
-		lwdaq_image_create -name $info(fpc_$guide) -width 700 -height 520
+		lwdaq_image_create -name fpc_$guide -width 700 -height 520
 	}
 
 	return ""   
@@ -1095,6 +1106,61 @@ proc DFPS_Manager_fvcc_open {} {
 }
 
 #
+# DFPS_Manager_fpc_acquire reads images from all four guide sensors, displays
+# them in the FPC window, analyzes them with the correct orientation codes, and
+# returns the mask x and y coordinates of the top-left corner of the image, as
+# well as the anti-clockwise rotation of the mask image with respect to the
+# image sensor. We must specify an orientation of the fiducial plate so that
+# we can get the rasnik analysis orientation code correct.
+#
+proc DFPS_Manager_fpc_acquire {orientation} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	upvar #0 LWDAQ_config_Rasnik iconfig 
+
+	switch $orientation {
+		0 {set iconfig(analysis_orientation_code) 1}
+		90 {set iconfig(analysis_orientation_code) 2}
+		180 {set iconfig(analysis_orientation_code) 4}
+		270 {set iconfig(analysis_orientation_code) 3}
+		default {set iconfig(analysis_orientation_code) 0}
+	}
+	set iconfig(daq_ip_addr) $config(ip_addr)
+	LWDAQ_set_image_sensor $info(image_sensor) Rasnik 
+	foreach param {analysis_enable analysis_square_size_um \
+			daq_flash_seconds daq_source_driver_socket \
+			analysis_reference_code} {
+		set iconfig($param) $config(fpc_$param)
+	}
+
+	set result ""
+	foreach guide $info(guide_sensors) {
+		scan $config(guide_$guide) %d%d%d \
+			iconfig(daq_driver_socket) \
+			iconfig(daq_mux_socket) \
+			iconfig(daq_device_element)
+		set rasnik [LWDAQ_acquire Rasnik]
+		lwdaq_image_manipulate $iconfig(memory_name) copy -name fpc_$guide
+		lwdaq_image_manipulate fpc_$guide transfer_overlay $iconfig(memory_name)
+		lwdaq_draw fpc_$guide fpc_$guide \
+			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
+		if {![LWDAQ_is_error_result $rasnik]} {
+			append result "[lindex $rasnik 1] [lindex $rasnik 2] [lindex $rasnik 5] "
+		} else {
+			append rasnik " (Guide $guide, Orient $orientation, Time [clock seconds])"
+			LWDAQ_print $info(fpc_text) $rasnik
+			append result "-1 -1 -1 "
+		}
+	}
+	
+	set iconfig(analysis_orientation_code) 0
+	
+	if {$orientation != ""} {set info(fpc_mask_$orientation) $result}
+	LWDAQ_print $info(fpc_text) "$orientation $result" green
+	return $result
+}
+
+#
 # DFPS_Manager_fpc_open opens the Fiducial Plate Calibrator window.
 #
 proc DFPS_Manager_fpc_open {} {
@@ -1116,8 +1182,8 @@ proc DFPS_Manager_fpc_open {} {
 	pack $f.state -side left -expand yes
 
 	foreach a $info(fpc_orientations) {
-		button $f.acq$a -text "Acquire $a" \
-			-command "LWDAQ_post DFPS_Manager_fpc_acquire $a"
+		button $f.acq$a -text "Acquire $a" -command \
+			[list LWDAQ_post "DFPS_Manager_fpc_acquire $a"]
 		pack $f.acq$a -side left -expand yes
 	}
 
@@ -1130,36 +1196,43 @@ proc DFPS_Manager_fpc_open {} {
 	set f [frame $w.options]
 	pack $f -side top -fill x
 	
-	foreach {a wd} {fvc_analysis 31} {
+	foreach {a wd} {analysis_enable 2 analysis_square_size_um 4 \
+			daq_flash_seconds 10 analysis_reference_code 4} {
 		label $f.l$a -text "$a\:"
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width $wd
+		entry $f.e$a -textvariable DFPS_Manager_config(fpc_$a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
+	}
+
+	foreach orientation $info(fpc_orientations) {
+		set f [frame $w.orientation_$orientation]
+		pack $f -side top -fill x
+		label $f.l -text "Result $orientation"
+		entry $f.e -textvariable DFPS_Manager_info(fpc_mask_$orientation) -width 100
+		pack $f.l $f.e -side left -expand yes
 	}
 	
 	set f [frame $w.images]
 	pack $f -side top -fill x
 
-	foreach a $info(guide_sensors) {
-		image create photo "fpc_$a"
-		label $f.$a -image "fpc_$a"
-		pack $f.$a -side left -expand yes
+	foreach guide $info(guide_sensors) {
+		image create photo "fpc_$guide"
+		label $f.$guide -image "fpc_$guide"
+		pack $f.$guide -side left -expand yes
 	}
 	
 	# Create the text window and direct the lwdaq library routines to print to this
 	# window.
-	set info(fpc_text) [LWDAQ_text_widget $w 120 15]
+	set info(fpc_text) [LWDAQ_text_widget $w 100 15]
 	lwdaq_config -text_name $info(fpc_text) -fsd 3	
 	
 	# Draw blank images into the guide sensor displays.
-	foreach a $info(guide_sensors) {
-		lwdaq_draw $info(fpc_$a) fpc_$a \
+	foreach guide $info(guide_sensors) {
+		lwdaq_draw fpc_$guide fpc_$guide \
 			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
 	}
 	
 	return $w
 }
-
-
 
 #
 # DFPS_Manager_open creates the DFPS Manager window.
