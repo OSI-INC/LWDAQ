@@ -16,12 +16,12 @@
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
 #
-# DFPS_Manager_init creates and initializes the tool's configuration (config)
-# and information (info) arrays. It reads saved configuration (but not
-# information) parameters from disk if we have previously saved our
-# configuration to disk. All the configuration parameters are visible in the
-# tool's configuration array, where there are save and unsave buttons to create
-# and delete a default configuration file.
+# DFPS_Manager_init creates and initializes the DFPS Manager Tool's
+# configuration (config) and information (info) arrays. It reads saved
+# configuration (but not information) parameters from disk if we have previously
+# saved our configuration to disk. All the configuration parameters are visible
+# in the tool's configuration array, where there are save and unsave buttons to
+# create and delete a default configuration file.
 #
 proc DFPS_Manager_init {} {
 	upvar #0 DFPS_Manager_info info
@@ -36,7 +36,7 @@ proc DFPS_Manager_init {} {
 	# The control variable tells us the current state of the tool.
 	set info(control) "Idle"
 
-	# Data acquisition parameters.
+	# Data acquisition parameters for the DFPS-4A.
 	set config(ip_addr) "192.168.1.30"
 	# Breadboard OSI Local: 192.168.1.10
 	# DFPS-4A OSI Local: 192.168.1.30
@@ -60,7 +60,12 @@ proc DFPS_Manager_init {} {
 	set config(image_sensor) "ICX424"
 	LWDAQ_set_image_sensor $config(image_sensor) BCAM
 	set config(analysis_threshold) "10 #"
-
+	set config(guide_1) "6 0 1"
+	set config(guide_2) "6 0 2"
+	set config(guide_3) "7 0 1"
+	set config(guide_4) "7 0 2"
+	set info(guide_sensors) "1 2 3 4"
+	
 	# Data acquisition and analysis results.
 	set config(spots) ""
 	set config(sources) ""
@@ -141,22 +146,37 @@ proc DFPS_Manager_init {} {
 	set config(fvcc_intensify) "exact"
 	set info(fvcc_examine_window) "$info(window).fvcc_examine_window"
 	set info(fvcc_state) "Idle"
-
+	
+	# Fiducial Plate Calibrator settings.
+	set info(fpc_orientations) "0 90 180 270"
+	set config(fpc_zoom) "0.5"
+	set config(fpc_intensify) "exact"
+	set info(fpc_examine_window) "$info(window).fpc_examine_window"
+	set info(fpc_state) "Idle"
+	
 	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	# Create images to store FVC images as they come in from the BCAM.
+	# Create spaces to store FVC images as they come in from the BCAM
+	# Instrument.
 	foreach side {left right} {
 		set info(image_$side) dfps_manager_$side
 		lwdaq_image_create -name $info(image_$side) -width 700 -height 520
 	}
 
-	# Create images to store FVC images read from disk.
+	# Create spaces to store FVC images read from disk.
 	foreach side {left right} {
 		set info(fvcc_$side) fvcc_$side
 		lwdaq_image_create -name $info(fvcc_$side) -width 700 -height 520
+	}
+
+	# Create spaces to store guide sensor images read from the Rasnik
+	# Instrument.
+	foreach guide $info(guide_sensors) {
+		set info(fpc_$guide) fpc_$guide
+		lwdaq_image_create -name $info(fpc_$guide) -width 700 -height 520
 	}
 
 	return ""   
@@ -671,7 +691,7 @@ proc DFPS_Manager_fvcc_disagreement {{params ""}} {
 	
 	# Make sure messages from the BCAM routines get to the DFPS Calibrator's text
 	# window. Set the number of decimal places to three.
-	lwdaq_config -text_name $info(text)
+	lwdaq_config -text_name $info(fvcc_text)
 
 	# Extract the two sets of camera calibration constants from the parameters passed
 	# to us by the fitter.
@@ -752,7 +772,7 @@ proc DFPS_Manager_fvcc_show {} {
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 	set err [DFPS_Manager_fvcc_disagreement]
-	LWDAQ_print $info(text) "[DFPS_Manager_fvcc_get_params] $err 0"
+	LWDAQ_print $info(fvcc_text) "[DFPS_Manager_fvcc_get_params] $err 0"
 
 	return ""
 }
@@ -770,7 +790,7 @@ proc DFPS_Manager_fvcc_check {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
-	LWDAQ_print $info(text) "\nGlobal Measured Position and Error\
+	LWDAQ_print $info(fvcc_text) "\nGlobal Measured Position and Error\
 		(xm, ym, zm, xe, ye, ze in mm):" purple
 	set sources ""
 	set sum_squares 0.0
@@ -800,7 +820,7 @@ proc DFPS_Manager_fvcc_check {} {
 		set y_err [format %6.3f [expr [lindex $a 1]-$y_src]]
 		set z_err [format %6.3f [expr [lindex $a 2]-$z_src]]
 		
-		LWDAQ_print $info(text) "Source_$i\: $x_src $y_src $z_src\
+		LWDAQ_print $info(fvcc_text) "Source_$i\: $x_src $y_src $z_src\
 			$x_err $y_err $z_err"
 		
 		set sum_squares [expr $sum_squares + $x_err*$x_err \
@@ -808,7 +828,7 @@ proc DFPS_Manager_fvcc_check {} {
 	}
 
 	set err [expr sqrt($sum_squares / $info(num_sources))]
-	LWDAQ_print $info(text) "Root Mean Square Error (mm): [format %.3f $err]"
+	LWDAQ_print $info(fvcc_text) "Root Mean Square Error (mm): [format %.3f $err]"
 
 	return ""
 }
@@ -840,9 +860,9 @@ proc DFPS_Manager_fvcc_read {{fn ""}} {
 		set img_dir [file dirname $fn]
 	}
 	
-	LWDAQ_print $info(text) "\nReading measurements from disk." purple
+	LWDAQ_print $info(fvcc_text) "\nReading measurements from disk." purple
 	
-	LWDAQ_print $info(text) "Reading CMM measurements from [file tail $fn]."
+	LWDAQ_print $info(fvcc_text) "Reading CMM measurements from [file tail $fn]."
 	set f [open $fn r]
 	set cmm [read $f]
 	close $f
@@ -863,7 +883,7 @@ proc DFPS_Manager_fvcc_read {{fn ""}} {
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 
 	foreach {s side} {L left R right} {
-		LWDAQ_print $info(text) "Reading and analyzing image $s\.gif from $side camera."
+		LWDAQ_print $info(fvcc_text) "Reading and analyzing image $s\.gif from $side camera."
 		set ifn [file join $img_dir $s\.gif]
 		if {[file exists $ifn]} {
 			LWDAQ_read_image_file $ifn $info(fvcc_$side)
@@ -881,7 +901,7 @@ proc DFPS_Manager_fvcc_read {{fn ""}} {
 					append info(spots_$side) "$x $y "
 				}
 			} else {
-				LWDAQ_print $info(text) $result
+				LWDAQ_print $info(fvcc_text) $result
 				set info(fvcc_state) "Idle"
 				return ""
 			}
@@ -889,7 +909,7 @@ proc DFPS_Manager_fvcc_read {{fn ""}} {
 	}
 
 	set err [DFPS_Manager_fvcc_disagreement]
-	LWDAQ_print $info(text) "Current spot position fit error is $err um rms."
+	LWDAQ_print $info(fvcc_text) "Current spot position fit error is $err um rms."
 
 	set info(fvcc_state) "Idle"
 	return ""
@@ -991,9 +1011,9 @@ proc DFPS_Manager_fvcc_fit {} {
 		if {[LWDAQ_is_error_result $end_params]} {error "$end_params"}
 		set info(cam_left) "[lrange $end_params 0 7]"
 		set info(cam_right) "[lrange $end_params 8 15]"
-		LWDAQ_print $info(text) "$end_params"
+		LWDAQ_print $info(fvcc_text) "$end_params"
 	} error_message]} {
-		LWDAQ_print $info(text) $error_message
+		LWDAQ_print $info(fvcc_text) $error_message
 		set info(fvcc_state) "Idle"
 		return ""
 	}
@@ -1003,7 +1023,7 @@ proc DFPS_Manager_fvcc_fit {} {
 }
 
 #
-# DFPS_Manager_fvcc_open opens the DFPS Calibrator window.
+# DFPS_Manager_fvcc_open opens the Fiber View Camera Calibrator window.
 #
 proc DFPS_Manager_fvcc_open {} {
 	upvar #0 DFPS_Manager_config config
@@ -1032,12 +1052,6 @@ proc DFPS_Manager_fvcc_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {Configure Help} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
-		pack $f.$b -side left -expand 1
-	}
-	
 	set f [frame $w.fvc]
 	pack $f -side top -fill x
 	
@@ -1068,8 +1082,8 @@ proc DFPS_Manager_fvcc_open {} {
 	
 	# Create the text window and direct the lwdaq library routines to print to this
 	# window.
-	set info(text) [LWDAQ_text_widget $w 120 15]
-	lwdaq_config -text_name $info(text) -fsd 3	
+	set info(fvcc_text) [LWDAQ_text_widget $w 120 15]
+	lwdaq_config -text_name $info(fvcc_text) -fsd 3	
 	
 	# Draw two blank images into the display.
 	foreach side {left right} {
@@ -1079,6 +1093,73 @@ proc DFPS_Manager_fvcc_open {} {
 	
 	return $w
 }
+
+#
+# DFPS_Manager_fpc_open opens the Fiducial Plate Calibrator window.
+#
+proc DFPS_Manager_fpc_open {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set w $info(window)\.fpc
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "Fiducial Plate Calibrator, DFPS Manager $info(version)"
+	} {
+		raise $w
+	}
+	
+	set f [frame $w.controls]
+	pack $f -side top -fill x
+	
+	label $f.state -textvariable DFPS_Manager_info(fvcc_state) -fg blue -width 10
+	pack $f.state -side left -expand yes
+
+	foreach a $info(fpc_orientations) {
+		button $f.acq$a -text "Acquire $a" \
+			-command "LWDAQ_post DFPS_Manager_fpc_acquire $a"
+		pack $f.acq$a -side left -expand yes
+	}
+
+	foreach a {Rasnik} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_open $a"
+		pack $f.$b -side left -expand 1
+	}
+
+	set f [frame $w.options]
+	pack $f -side top -fill x
+	
+	foreach {a wd} {fvc_analysis 31} {
+		label $f.l$a -text "$a\:"
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width $wd
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	set f [frame $w.images]
+	pack $f -side top -fill x
+
+	foreach a $info(guide_sensors) {
+		image create photo "fpc_$a"
+		label $f.$a -image "fpc_$a"
+		pack $f.$a -side left -expand yes
+	}
+	
+	# Create the text window and direct the lwdaq library routines to print to this
+	# window.
+	set info(fpc_text) [LWDAQ_text_widget $w 120 15]
+	lwdaq_config -text_name $info(fpc_text) -fsd 3	
+	
+	# Draw blank images into the guide sensor displays.
+	foreach a $info(guide_sensors) {
+		lwdaq_draw $info(fpc_$a) fpc_$a \
+			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
+	}
+	
+	return $w
+}
+
+
 
 #
 # DFPS_Manager_open creates the DFPS Manager window.
@@ -1145,12 +1226,14 @@ proc DFPS_Manager_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	button $f.txcmd -text "Transmit Panel" -command {
-		LWDAQ_post "DFPS_Manager_transmit_panel"
-	}
+	button $f.txcmd -text "Transmit Panel" \
+		-command "LWDAQ_post DFPS_Manager_transmit_panel"
 	pack $f.txcmd -side left -expand yes
-	button $f.calibrator -text "FVCC" -command "DFPS_Manager_fvcc_open"
-	pack $f.calibrator -side left -expand 1
+	foreach a {FVCC FPC} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "DFPS_Manager_$b\_open"
+		pack $f.$b -side left -expand 1
+	}
 	button $f.toolmaker -text "Toolmaker" -command "LWDAQ_Toolmaker"
 	pack $f.toolmaker -side left -expand 1
 	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
@@ -1305,6 +1388,13 @@ visible, you most likely have a mix-up in the mount coordinates. Press Fit. The
 modelled sources will start moving around. The status indicator on the top left
 will say "Fitting". The status label will return to "Idle" when the fit is done.
 The camera calibration constants are now ready.
+
+
+Fiducial Plate Calibrator
+=========================
+
+Help coming soon.
+
 
 (C) Kevan Hashemi, 2023-2024, Open Source Instruments Inc.
 https://www.opensourceinstruments.com
