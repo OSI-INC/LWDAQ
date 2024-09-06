@@ -60,10 +60,10 @@ proc DFPS_Manager_init {} {
 	set info(image_sensor) "ICX424"
 	LWDAQ_set_image_sensor $info(image_sensor) BCAM
 	set config(analysis_threshold) "10 #"
-	set config(guide_1) "6 0 1"
-	set config(guide_2) "6 0 2"
+	set config(guide_1) "7 0 2"
+	set config(guide_2) "6 0 1"
 	set config(guide_3) "7 0 1"
-	set config(guide_4) "7 0 2"
+	set config(guide_4) "6 0 2"
 	set info(guide_sensors) "1 2 3 4"
 	
 	# Data acquisition and analysis results.
@@ -110,7 +110,7 @@ proc DFPS_Manager_init {} {
 	set config(zoom) "0.5"
 	set config(intensify) "exact"
 	
-	# Fiber View Camera Calibrator settings.
+	# Fiber View Camera Calibrator (FVCC) settings.
 	set info(fvcc_state) "Idle"
 	set info(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
 	set info(cam_left) $info(cam_default)
@@ -126,7 +126,6 @@ proc DFPS_Manager_init {} {
 	set info(num_sources) "4"
 	set info(spots_left) "100 100 200 100 100 200 200 200"
 	set info(spots_right) "100 100 200 100 100 200 200 200"
-	set config(bcam_sensor) "ICX424"
 	set config(bcam_width) "5180"
 	set config(bcam_height) "3848"
 	set config(bcam_threshold) "10 #"
@@ -147,23 +146,35 @@ proc DFPS_Manager_init {} {
 	set info(fvcc_examine_window) "$info(window).fvcc_examine_window"
 	set info(fvcc_state) "Idle"
 	
-	# Fiducial Plate Calibrator settings.
+	# Fiducial Plate Calibrator (FPC) settings.
 	set info(fpc_orientations) "0 90 180 270"
+	set info(fpc_swaps) "1 0 1 0"
+	set info(fpc_orientation_codes) "1 2 4 3"
 	set config(fpc_analysis_enable) "31"
 	set config(fpc_analysis_square_size_um) "340"
 	set config(fpc_daq_flash_seconds) "0.05"
 	set config(fpc_daq_source_driver_socket) "9"
-	set config(fpc_analysis_reference_code) "0"
+	set config(fpc_analysis_reference_code) "3"
+	set config(fpc_analysis_reference_x_um) "0"
+	set config(fpc_analysis_reference_y_um) "3848"
 	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
 	set config(fpc_zoom) "0.5"
 	set config(fpc_intensify) "exact"
 	set info(fpc_examine_window) "$info(window).fpc_examine_window"
 	set info(fpc_state) "Idle"
-	foreach orientation $info(fpc_orientations) {
-		set info(fpc_mask_$orientation) ""
-		foreach guide $info(guide_sensors) {
-			append info(fpc_mask_$orientation) "-1 -1 -1 "
-		}
+	
+	# Fiducial Plate Calibrator (FPC) data. We have default values for rasnik
+	# mask measurements from all four guide sensors in all four orientations,
+	# for use in testing FPC calculations.
+	set fpc_data {
+24.315 68.403 4.776 69.198 68.384 3.833 24.233 23.443 0.848 69.284 23.490 9.864 
+29.141 24.061 4.892 29.181 68.942 3.805 74.108 23.969 0.987 74.083 69.016 9.386 
+73.477 28.849 5.348 28.594 28.884 3.947 73.558 73.819 0.832 28.537 73.766 9.426 
+68.694 73.226 4.103 68.663 28.327 3.893 23.723 73.299 0.837 23.765 28.252 9.873 
+	}
+	set fpc_data [split [string trim $fpc_data] "\n"]
+	for {set i 0} {$i < [llength $info(fpc_orientations)]} {incr i} {
+		set info(fpc_mask_[lindex $info(fpc_orientations) $i]) [lindex $fpc_data $i]
 	}
 
 	# If we have a settings file, read and implement.	
@@ -642,7 +653,7 @@ proc DFPS_Manager_fvcc_examine {} {
 	set w $info(fvcc_examine_window)
 	if {![winfo exists $w]} {
 		toplevel $w
-		wm title $w "Coordinate Measurements, DFPS Calibrator $info(version)"
+		wm title $w "FVCC Coordinate Measurements, DFPS Calibrator $info(version)"
 	} {
 		raise $w
 		return ""
@@ -900,7 +911,7 @@ proc DFPS_Manager_fvcc_read {{fn ""}} {
 			LWDAQ_read_image_file $ifn $info(fvcc_$side)
 			set iconfig(analysis_num_spots) "$info(num_sources) $config(bcam_sort)"
 			set iconfig(analysis_threshold) $config(bcam_threshold)
-			LWDAQ_set_image_sensor $config(bcam_sensor) BCAM
+			LWDAQ_set_image_sensor $config(image_sensor) BCAM
 			set config(bcam_width) [expr $iinfo(daq_image_width) \
 				* $iinfo(analysis_pixel_size_um)]
 			set config(bcam_height) [expr $iinfo(daq_image_height) \
@@ -1117,20 +1128,26 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	upvar #0 LWDAQ_config_Rasnik iconfig 
+	upvar #0 LWDAQ_info_Rasnik iinfo
 
-	switch $orientation {
-		0 {set iconfig(analysis_orientation_code) 1}
-		90 {set iconfig(analysis_orientation_code) 2}
-		180 {set iconfig(analysis_orientation_code) 4}
-		270 {set iconfig(analysis_orientation_code) 3}
-		default {set iconfig(analysis_orientation_code) 0}
+	set i [lsearch $info(fpc_orientations) $orientation]
+	set ocode 0
+	set swap 0
+	if {$i >= 0} {
+		set ocode [lindex $info(fpc_orientation_codes) $i]
+		set swap [lindex $info(fpc_swaps) $i]
 	}
+	
+	set iconfig(analysis_orientation_code) $ocode
 	set iconfig(daq_ip_addr) $config(ip_addr)
 	LWDAQ_set_image_sensor $info(image_sensor) Rasnik 
 	foreach param {analysis_enable analysis_square_size_um \
 			daq_flash_seconds daq_source_driver_socket \
 			analysis_reference_code} {
 		set iconfig($param) $config(fpc_$param)
+	}
+	foreach param {analysis_reference_x_um analysis_reference_y_um} {
+		set iinfo($param) $config(fpc_$param)
 	}
 
 	set result ""
@@ -1145,7 +1162,15 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 		lwdaq_draw fpc_$guide fpc_$guide \
 			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
 		if {![LWDAQ_is_error_result $rasnik]} {
-			append result "[lindex $rasnik 1] [lindex $rasnik 2] [lindex $rasnik 5] "
+			if {$swap} {
+				append result "[format %.3f [expr 0.001*[lindex $rasnik 2]]]\
+					[format %.3f [expr 0.001*[lindex $rasnik 1]]]\
+					[lindex $rasnik 5] "
+			} else {
+				append result "[format %.3f [expr 0.001*[lindex $rasnik 1]]]\
+					[format %.3f [expr 0.001*[lindex $rasnik 2]]]\
+					[lindex $rasnik 5] "
+			}
 		} else {
 			append rasnik " (Guide $guide, Orient $orientation, Time [clock seconds])"
 			LWDAQ_print $info(fpc_text) $rasnik
@@ -1156,8 +1181,68 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 	set iconfig(analysis_orientation_code) 0
 	
 	if {$orientation != ""} {set info(fpc_mask_$orientation) $result}
-	LWDAQ_print $info(fpc_text) "$orientation $result" green
+	LWDAQ_print $info(fpc_text) "[format %3d $orientation] $result" green
 	return $result
+}
+
+#
+# DFPS_Manager_fpc_calculate takes the four rasnik measurements we have obtained
+# from the four orientations of the mask and calculates the mask origin in frame
+# coordiates, the mask rotation with respect to frame coordinates,
+# counter-clockwise positive, and the origins of the four guide sensors in frame
+# coordinates as well as their rotations counter-clockwise positive with respect
+# to frame coordinates.
+#
+proc DFPS_Manager_fpc_calculate {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+ 	foreach {o1 o2} "0 180 90 270" {
+		set m1 $info(fpc_mask_$o1)
+		set m2 $info(fpc_mask_$o2)
+		foreach gs $info(guide_sensors) {
+			set x1 [lindex $m1 [expr ($gs-1)*3+0]]
+			set y1 [lindex $m1 [expr ($gs-1)*3+1]]
+			set x2 [lindex $m2 [expr ($gs-1)*3+0]]
+			set y2 [lindex $m2 [expr ($gs-1)*3+1]]
+			set x [format %.3f [expr 0.5*($x1+$x2)]]
+			set y [format %.3f [expr 0.5*($y1+$y2)]]
+			LWDAQ_print $info(fpc_text) "[format %4d $o1]\
+				[format %4d $o2]\
+				[format %4d $gs]\
+				[format %10.3f $x]\
+				[format %10.3f $y]"
+		}
+	}
+
+	return ""
+}
+
+#
+# DFPS_Manager_fpc_examine
+#
+proc DFPS_Manager_fpc_examine {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set w $info(fpc_examine_window)
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "FPC Rasnik Measurements, DFPS Calibrator $info(version)"
+	} {
+		raise $w
+		return ""
+	}
+
+	foreach orientation $info(fpc_orientations) {
+		set f [frame $w.orientation_$orientation]
+		pack $f -side top -fill x
+		label $f.l -text "Orientation $orientation\:"
+		entry $f.e -textvariable DFPS_Manager_info(fpc_mask_$orientation) -width 100
+		pack $f.l $f.e -side left -expand yes
+	}
+		
+	return ""
 }
 
 #
@@ -1187,6 +1272,12 @@ proc DFPS_Manager_fpc_open {} {
 		pack $f.acq$a -side left -expand yes
 	}
 
+	foreach a {Calculate Examine} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command [list LWDAQ_post "DFPS_Manager_fpc_$b"]
+		pack $f.$b -side left -expand yes
+	}
+	
 	foreach a {Rasnik} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_open $a"
@@ -1197,20 +1288,13 @@ proc DFPS_Manager_fpc_open {} {
 	pack $f -side top -fill x
 	
 	foreach {a wd} {analysis_enable 2 analysis_square_size_um 4 \
-			daq_flash_seconds 10 analysis_reference_code 4} {
+			daq_flash_seconds 10 analysis_reference_x_um 5 \
+			analysis_reference_y_um 5} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Manager_config(fpc_$a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	foreach orientation $info(fpc_orientations) {
-		set f [frame $w.orientation_$orientation]
-		pack $f -side top -fill x
-		label $f.l -text "Result $orientation"
-		entry $f.e -textvariable DFPS_Manager_info(fpc_mask_$orientation) -width 100
-		pack $f.l $f.e -side left -expand yes
-	}
-	
 	set f [frame $w.images]
 	pack $f -side top -fill x
 
