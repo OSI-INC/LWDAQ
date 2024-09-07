@@ -48,6 +48,7 @@ function image_negate(ip:image_ptr_type):image_ptr_type;
 function image_histogram(ip:image_ptr_type):xy_graph_type;
 function image_invert(ip:image_ptr_type):image_ptr_type;
 function image_reverse_rows(ip:image_ptr_type):image_ptr_type;
+function image_rows_to_columns(ip:image_ptr_type):image_ptr_type;
 function image_soec(ip:image_ptr_type):image_ptr_type;
 function image_soer(ip:image_ptr_type):image_ptr_type;
 function image_crop(oip:image_ptr_type):image_ptr_type;
@@ -627,6 +628,43 @@ begin
 	end;
 	
 	image_reverse_rows:=nip;
+end;
+
+{
+	image_rows_to_columns mirrors and rotates the image by making the first row
+	of the new image the first column of the original image. The first column of
+	the new image is the first row of the original image.
+}
+function image_rows_to_columns(ip:image_ptr_type):image_ptr_type;
+
+var
+	i,j:integer;
+	nip:image_ptr_type;
+	
+begin
+	image_rows_to_columns:=nil;
+	if not valid_image_ptr(ip) then exit;
+	if not valid_analysis_bounds(ip) then begin
+		report_error('Invalid analysis bounds in ip in image_reverse_rows.');
+		exit;
+	end;
+
+	nip:=new_image(ip^.i_size,ip^.j_size);
+	if nip=nil then exit;
+	with nip^.analysis_bounds do begin
+		top:=ip^.analysis_bounds.left;
+		bottom:=ip^.analysis_bounds.right;
+		left:=ip^.analysis_bounds.top;
+		right:=ip^.analysis_bounds.bottom;
+	end;
+	
+	for j:=0 to ip^.j_size-1 do begin
+		for i:=0 to ip^.i_size-1 do begin
+			set_px(nip,i,j,get_px(ip,j,i));
+		end;
+	end;
+	
+	image_rows_to_columns:=nip;
 end;
 
 {

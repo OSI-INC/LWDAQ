@@ -148,15 +148,15 @@ proc DFPS_Manager_init {} {
 	
 	# Fiducial Plate Calibrator (FPC) settings.
 	set info(fpc_orientations) "0 90 180 270"
-	set info(fpc_swaps) "1 0 1 0"
+	set info(fpc_swaps) "0 1 0 1"
 	set info(fpc_orientation_codes) "1 2 4 3"
-	set config(fpc_analysis_enable) "31"
+	set config(fpc_analysis_enable) "21"
 	set config(fpc_analysis_square_size_um) "340"
-	set config(fpc_daq_flash_seconds) "0.05"
+	set config(fpc_daq_flash_seconds) "0.02"
 	set config(fpc_daq_source_driver_socket) "9"
 	set config(fpc_analysis_reference_code) "3"
 	set config(fpc_analysis_reference_x_um) "0"
-	set config(fpc_analysis_reference_y_um) "3848"
+	set config(fpc_analysis_reference_y_um) "5180"
 	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
 	set config(fpc_zoom) "0.5"
 	set config(fpc_intensify) "exact"
@@ -198,7 +198,7 @@ proc DFPS_Manager_init {} {
 	# Create spaces to store guide sensor images read from the Rasnik
 	# Instrument.
 	foreach guide $info(guide_sensors) {
-		lwdaq_image_create -name fpc_$guide -width 700 -height 520
+		lwdaq_image_create -name fpc_$guide -width 520 -height 700
 	}
 
 	return ""   
@@ -1130,6 +1130,8 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 	upvar #0 LWDAQ_config_Rasnik iconfig 
 	upvar #0 LWDAQ_info_Rasnik iinfo
 
+	set info(fvcc_state) "Acquire"
+
 	set i [lsearch $info(fpc_orientations) $orientation]
 	set ocode 0
 	set swap 0
@@ -1140,8 +1142,9 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 	
 	set iconfig(analysis_orientation_code) $ocode
 	set iconfig(daq_ip_addr) $config(ip_addr)
+	set iconfig(analysis_enable) "0"
 	LWDAQ_set_image_sensor $info(image_sensor) Rasnik 
-	foreach param {analysis_enable analysis_square_size_um \
+	foreach param {analysis_square_size_um \
 			daq_flash_seconds daq_source_driver_socket \
 			analysis_reference_code} {
 		set iconfig($param) $config(fpc_$param)
@@ -1157,19 +1160,28 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 			iconfig(daq_mux_socket) \
 			iconfig(daq_device_element)
 		set rasnik [LWDAQ_acquire Rasnik]
+		if {[LWDAQ_is_error_result $rasnik]} {
+			append rasnik " (Guide $guide, Orient $orientation, Time [clock seconds])"
+			LWDAQ_print $info(fpc_text) $rasnik
+			append result "-1 -1 -1 "
+			continue
+		}
 		lwdaq_image_manipulate $iconfig(memory_name) copy -name fpc_$guide
-		lwdaq_image_manipulate fpc_$guide transfer_overlay $iconfig(memory_name)
+		lwdaq_image_manipulate fpc_$guide invert -replace 1
+		lwdaq_image_manipulate fpc_$guide rows_to_columns -replace 1
+		set iconfig(analysis_enable) $config(fpc_analysis_enable)
+		set rasnik [LWDAQ_analysis_Rasnik fpc_$guide]
 		lwdaq_draw fpc_$guide fpc_$guide \
 			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
 		if {![LWDAQ_is_error_result $rasnik]} {
 			if {$swap} {
-				append result "[format %.3f [expr 0.001*[lindex $rasnik 2]]]\
-					[format %.3f [expr 0.001*[lindex $rasnik 1]]]\
-					[lindex $rasnik 5] "
-			} else {
 				append result "[format %.3f [expr 0.001*[lindex $rasnik 1]]]\
-					[format %.3f [expr 0.001*[lindex $rasnik 2]]]\
-					[lindex $rasnik 5] "
+					[format %.3f [expr 0.001*[lindex $rasnik 0]]]\
+					[lindex $rasnik 4] "
+			} else {
+				append result "[format %.3f [expr 0.001*[lindex $rasnik 0]]]\
+					[format %.3f [expr 0.001*[lindex $rasnik 1]]]\
+					[lindex $rasnik 4] "
 			}
 		} else {
 			append rasnik " (Guide $guide, Orient $orientation, Time [clock seconds])"
@@ -1182,6 +1194,7 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 	
 	if {$orientation != ""} {set info(fpc_mask_$orientation) $result}
 	LWDAQ_print $info(fpc_text) "[format %3d $orientation] $result" green
+	set info(fvcc_state) "Idle"
 	return $result
 }
 
@@ -1258,6 +1271,7 @@ proc DFPS_Manager_fpc_open {} {
 		wm title $w "Fiducial Plate Calibrator, DFPS Manager $info(version)"
 	} {
 		raise $w
+		return ""
 	}
 	
 	set f [frame $w.controls]
@@ -1303,7 +1317,7 @@ proc DFPS_Manager_fpc_open {} {
 		label $f.$guide -image "fpc_$guide"
 		pack $f.$guide -side left -expand yes
 	}
-	
+		
 	# Create the text window and direct the lwdaq library routines to print to this
 	# window.
 	set info(fpc_text) [LWDAQ_text_widget $w 100 15]

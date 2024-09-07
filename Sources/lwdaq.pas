@@ -1488,6 +1488,7 @@ follows.</p>
 <tr><td>negate</td><td>Negate the image. Each pixel will have value max_intensity &minus; original_intensity.</td></tr>
 <tr><td>rasnik</td><td>Create an artificial rasnik pattern in the image.</td></tr>
 <tr><td>reverse_rows</td><td>Reverse the order of the rows. The top row becomes the bottom row.</td></tr>
+<tr><td>rows_to_columns</td><td>Top row becomes left column, left column becomes top row.</td></tr>
 <tr><td>rotate</td><td>Rotate the image about a point by an angle in radians.</td></tr>
 <tr><td>shrink_<i>n</i></td><td>Shrink the image by an integer factor <i>n</i>, where values 2, 3, and 4 are supported.</td></tr>
 <tr><td>soec</td><td>Swap odd and even columns.</td></tr>
@@ -1522,6 +1523,14 @@ deleted to make way for the new image, thus assuring us that the new image is
 the only one with its name. With the -replace option we disturb the behavior of
 the <i>copy</i> manipulationg by deleting the original image and replacing it
 with the copy.</p>
+
+<p>The <i>invert</i>, <i>reverse_rows</i>, and <i>rows_to_columns</i> operations
+can be combined to obtain arbitrary square rotations of an image, as well as
+mirroring. If we want to rotate an image by 90&deg; clockwise, we use
+<i>reverse_rows</i> followed by <i>rows_to_columns</i>. If we want to make the
+top-left corner the bottom-right corner while keeping the bottom-left corner in
+place, which is a rotation and a reflection, we use <i>invert</i> and then
+<i>rows_to_columns</i>.</p>
 
 <p>The <i>combine</i> manipulation allows you to write over the data in an
 image, starting with the <i>offset</i>'th pixel. You specify <i>offset</i> after
@@ -1578,8 +1587,12 @@ containing a rasnik pattern with origin at the top-left corner of the top-left
 pixel in the image, each square 20 pixels wide and 30 pixels high, rotated by 2
 mrad anti-clockwise, with sharp edges.</p>
 
-<p>The <i>rotate</i> manipulation rotates the entire image about a point. We
-specify the rotation in radians. We specify the point in <i>image
+<p>The <i>rotate</i> manipulation rotates the entire image about a point. Do not
+use this routine to rotate an image in the traditional sense or right, left, or
+invert rotations. The routine is designed to perform non-square rotations, and
+will always lose some of the image that falls off the sides when we rotate. Use
+combinations of reverse_rows, rows_to_columns, and invert to produce traditional
+rotations. We specify the rotation in radians. We specify the point in <i>image
 coordinates</i>, where point (0,0) is the top-left corner of the top-left pixel,
 the <i>x</i>-axis runs left to right, the <i>y</i>-axis runs top to bottom, and
 the units of length are pixels. The point (0.5,0.5) is the center of the
@@ -1775,6 +1788,7 @@ begin
 	else if manipulation='invert' then nip:=image_invert(ip)
 	else if manipulation='crop' then nip:=image_crop(ip)
 	else if manipulation='reverse_rows' then nip:=image_reverse_rows(ip)
+	else if manipulation='rows_to_columns' then nip:=image_rows_to_columns(ip)
 	else if manipulation='soec' then nip:=image_soec(ip)
 	else if manipulation='soer' then nip:=image_soer(ip)
 	else if manipulation='subtract_row' then nip:=image_subtract_row_average(ip)
@@ -1820,7 +1834,8 @@ begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Bad manipulation "'+manipulation
 			+'", must be one of "none accumulate copy crop enlarge_2 enlarge_3 enlarge_4 '
-			+'grad grad_i grad_i_s grad_j grad_j_s invert negate reverse_rows soec '
+			+'grad grad_i grad_i_s grad_j grad_j_s negate '
+			+'invert reverse_rows rows_to_columns '
 			+'shrink_2 shrink_3 shrink_4 smooth subtract subtract_bounds subtract_row '
 			+'subtract_gradient transfer_overlay soec soer" in '
 			+'lwdaq_image_manipulate.');
