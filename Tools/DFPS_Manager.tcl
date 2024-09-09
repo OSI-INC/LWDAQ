@@ -137,9 +137,8 @@ proc DFPS_Manager_init {} {
 	set config(fit_restarts) "4"
 	set config(fit_startsize) "1"
 	set config(fit_endsize) "0.005"
-	set config(fit_show) "1"
+	set config(fit_show) "0"
 	set config(fit_details) "0"
-	set config(fit_report) "0"
 	set config(fit_stop) "0"
 	set config(fvcc_zoom) "1.0"
 	set config(fvcc_intensify) "exact"
@@ -690,13 +689,20 @@ proc DFPS_Manager_fvcc_examine {} {
 
 #
 # DFPS_Manager_fvcc_disagreement calculates root mean square square distance
-# between the actual image positions and the modelled image positions we obtain
-# when applying our mount measurements, FVC calibration constants, and the
-# measured source positions. If show_fit is set, the routine clears the image
-# overlays and draws blue crosses to mark the modelled positions of the 
-# sources.
+# between the actual image positions and the modeled image positions we obtain
+# when applying our mount measurements, FVC calibration constants, and measured
+# source positions. We pass our FVC calibration constants into the routine with
+# the params argument. If we omit this argument, the routine uses the constants
+# stored in the left and right camera entries of our config array. Another
+# optional parameter enables or disables the display of the blue crosses that
+# show where the current parameters suggest the sources must be. By default, the
+# display is enabled. This routine is called by the simplex fitter two or three
+# hundred times do obtain the optimal camera calibration constants. The fit
+# takes a fraction of a second with the display disabled, roughly ten seconds
+# with the display enabled. All the time goes into clearing and drawing the
+# images on the screen.
 #
-proc DFPS_Manager_fvcc_disagreement {{params ""}} {
+proc DFPS_Manager_fvcc_disagreement {{params ""} {show "1"}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
@@ -721,7 +727,7 @@ proc DFPS_Manager_fvcc_disagreement {{params ""}} {
 	set fvc_right "FVC_R [lrange $params 8 15]"
 	
 	# Clear the overlay if showing.
-	if {$config(fit_show)} {
+	if {$show} {
 		foreach side {left right} {
 			lwdaq_image_manipulate $info(fvcc_$side) none -clear 1
 		}
@@ -750,7 +756,7 @@ proc DFPS_Manager_fvcc_disagreement {{params ""}} {
 			set sum_squares [expr $sum_squares + $err]
 			incr count
 			
-			if {$config(fit_show)} {
+			if {$show} {
 				set y [expr $config(bcam_height) - $y_th]
 				set x $x_th
 				set w $config(cross_size)
@@ -770,7 +776,7 @@ proc DFPS_Manager_fvcc_disagreement {{params ""}} {
 	set err [format %.3f [expr sqrt($sum_squares/$count)]]	
 	
 	# Draw the boxes and rectangles if showing.
-	if {$config(fit_show)} {
+	if {$show} {
 		foreach side {left right} {
 			lwdaq_draw $info(fvcc_$side) fvcc_$side \
 				-intensify $config(fvcc_intensify) -zoom $config(fvcc_zoom)
@@ -911,7 +917,7 @@ proc DFPS_Manager_fvcc_read {{fn ""}} {
 			LWDAQ_read_image_file $ifn $info(fvcc_$side)
 			set iconfig(analysis_num_spots) "$info(num_sources) $config(bcam_sort)"
 			set iconfig(analysis_threshold) $config(bcam_threshold)
-			LWDAQ_set_image_sensor $config(image_sensor) BCAM
+			LWDAQ_set_image_sensor $info(image_sensor) BCAM
 			set config(bcam_width) [expr $iinfo(daq_image_width) \
 				* $iinfo(analysis_pixel_size_um)]
 			set config(bcam_height) [expr $iinfo(daq_image_height) \
@@ -932,6 +938,8 @@ proc DFPS_Manager_fvcc_read {{fn ""}} {
 
 	set err [DFPS_Manager_fvcc_disagreement]
 	LWDAQ_print $info(fvcc_text) "Current spot position fit error is $err um rms."
+
+	LWDAQ_print $info(fvcc_text) "Done: measurements loaded and displayed." purple
 
 	set info(fvcc_state) "Idle"
 	return ""
@@ -989,7 +997,7 @@ proc DFPS_Manager_fvcc_altitude {params} {
 
 	if {$config(fit_stop)} {error "Fit aborted by user"}
 	if {![winfo exists $info(window)]} {error "Tool window destroyed"}
-	set altitude [DFPS_Manager_fvcc_disagreement "$params"]
+	set altitude [DFPS_Manager_fvcc_disagreement "$params" $config(fit_show)]
 	LWDAQ_support
 	return $altitude
 }
@@ -1015,6 +1023,11 @@ proc DFPS_Manager_fvcc_fit {} {
 	set config(fit_stop) 0
 	set info(fvcc_state) "Fitting"
 	
+	if {$config(verbose)} {
+		LWDAQ_print $info(fvcc_text) "\nFitting camera parameters with settings\
+		fit_show = $config(fit_show), fit_details = $config(fit_details)." purple
+	}
+	set start_time [clock milliseconds]
 	if {[catch {
 		set scaling "$config(fit_scaling) $config(fit_scaling)"
 		set start_params [DFPS_Manager_fvcc_get_params] 
@@ -1023,7 +1036,7 @@ proc DFPS_Manager_fvcc_fit {} {
 		lwdaq_config -show_details $config(fit_details)
 		set end_params [lwdaq_simplex $start_params \
 			DFPS_Manager_fvcc_altitude \
-			-report $config(fit_report) \
+			-report $config(fit_show) \
 			-steps $config(fit_steps) \
 			-restarts $config(fit_restarts) \
 			-start_size $config(fit_startsize) \
@@ -1034,6 +1047,12 @@ proc DFPS_Manager_fvcc_fit {} {
 		set info(cam_left) "[lrange $end_params 0 7]"
 		set info(cam_right) "[lrange $end_params 8 15]"
 		LWDAQ_print $info(fvcc_text) "$end_params"
+		if {$config(verbose)} {
+			LWDAQ_print $info(fvcc_text) "Fit converged in\
+				[format %.2f [expr 0.001*([clock milliseconds]-$start_time)]] s\
+				taking [lindex $end_params 17] steps\
+				final error [format %.1f [lindex $end_params 16]] um." purple
+		}
 	} error_message]} {
 		LWDAQ_print $info(fvcc_text) $error_message
 		set info(fvcc_state) "Idle"
@@ -1073,12 +1092,14 @@ proc DFPS_Manager_fvcc_open {} {
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_fvcc_$b"
 		pack $f.$b -side left -expand yes
 	}
+	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
+	pack $f.verbose -side left -expand yes
 
 	set f [frame $w.fvc]
 	pack $f -side top -fill x
 	
 	foreach {a wd} {bcam_threshold 6 fit_steps 8 fit_restarts 3 \
-			fit_endsize 10 fit_report 2 fit_details 2 fit_scaling 20} {
+			fit_endsize 10 fit_show 2 fit_details 2 fit_scaling 20} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
