@@ -69,7 +69,7 @@ proc DFPS_Manager_init {} {
 	# Data acquisition and analysis results.
 	set config(spots) ""
 	set config(sources) ""
-	set config(verbose) "0"
+	set config(verbose) "1"
 		
 	# Fiber view camera geometry.
 	set config(cam_left) \
@@ -104,6 +104,12 @@ proc DFPS_Manager_init {} {
 	set info(checksum_preload) "1111111111111111"	
 	set config(id) "FFFF"
 	set config(commands) "8"
+	
+	# Watchdog timing.
+	set info(fiducial_check_time) "0"
+	set info(mast_check_time) "0"
+	set config(fiducial_check_period) "100"
+	set config(mast_check_period) "10"
 	
 	# Panel appearance.
 	set config(label_color) "green"
@@ -152,7 +158,6 @@ proc DFPS_Manager_init {} {
 	set config(fpc_analysis_enable) "21"
 	set config(fpc_analysis_square_size_um) "340"
 	set config(fpc_daq_flash_seconds) "0.02"
-	set config(fpc_daq_source_driver_socket) "9"
 	set config(fpc_analysis_reference_code) "3"
 	set config(fpc_analysis_reference_x_um) "0"
 	set config(fpc_analysis_reference_y_um) "5180"
@@ -188,16 +193,17 @@ proc DFPS_Manager_init {} {
 		lwdaq_image_create -name $info(image_$side) -width 700 -height 520
 	}
 
+	# Create spaces to store guide images as they come in from the Camera
+	# Instrument.
+	foreach guide $info(guide_sensors) {
+		set info(image_$guide) dfps_manager_$guide
+		lwdaq_image_create -name $info(image_$guide) -width 520 -height 700
+	}
+
 	# Create spaces to store FVC images read from disk.
 	foreach side {left right} {
 		set info(fvcc_$side) fvcc_$side
 		lwdaq_image_create -name $info(fvcc_$side) -width 700 -height 520
-	}
-
-	# Create spaces to store guide sensor images read from the Rasnik
-	# Instrument.
-	foreach guide $info(guide_sensors) {
-		lwdaq_image_create -name fpc_$guide -width 520 -height 700
 	}
 
 	return ""   
@@ -1138,6 +1144,40 @@ proc DFPS_Manager_fvcc_open {} {
 }
 
 #
+# DFPS_Manager_guide_acquire acquires an image from one of the DFPS guide
+# sensors with a specified exposure time. It stores the image in LWDAQ image
+# array called dfps_manager_n, where n is the guide sensor number. It returns a
+# string of information about the image, as obtained from the Camera Instrument.
+# If the string is an error message, it will begin with "ERROR:". Otherwise it
+# will contain the word "Guide_n" where n is the guide number, followed by the left,
+# top, right, and bottom analysis boundaries, the average, stdev, maximum, and
+# minimum intensity, and finally the number or rows and the number of columns.
+# Multiply the number of rows by the number of columns to get the image size in
+# bytes.
+#
+proc DFPS_Manager_guide_acquire {guide exposure_s} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	upvar #0 LWDAQ_config_Camera iconfig 
+
+	LWDAQ_set_image_sensor $info(image_sensor) Camera
+	set iconfig(analysis_manipulation) "invert rows_to_columns"
+	set iconfig(daq_ip_addr) $config(ip_addr)
+	set iconfig(intensify) $config(intensify) 
+	scan $config(guide_$guide) %d%d%d \
+		iconfig(daq_driver_socket) \
+		iconfig(daq_mux_socket) \
+		iconfig(daq_device_element)
+	set iconfig(daq_exposure_seconds) $exposure_s
+	set camera [LWDAQ_acquire Camera]
+	if {![LWDAQ_is_error_result $camera]} {
+		lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_manager_$guide
+		set camera "Guide_$guide [lrange $camera 1 end]"
+	}
+	return $camera
+}
+
+#
 # DFPS_Manager_fpc_acquire reads images from all four guide sensors, displays
 # them in the FPC window, analyzes them with the correct orientation codes, and
 # returns the mask x and y coordinates of the top-left corner of the image, as
@@ -1162,12 +1202,8 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 	}
 	
 	set iconfig(analysis_orientation_code) $ocode
-	set iconfig(daq_ip_addr) $config(ip_addr)
-	set iconfig(analysis_enable) "0"
 	LWDAQ_set_image_sensor $info(image_sensor) Rasnik 
-	foreach param {analysis_square_size_um \
-			daq_flash_seconds daq_source_driver_socket \
-			analysis_reference_code} {
+	foreach param {analysis_square_size_um analysis_reference_code} {
 		set iconfig($param) $config(fpc_$param)
 	}
 	foreach param {analysis_reference_x_um analysis_reference_y_um} {
@@ -1176,23 +1212,15 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 
 	set result ""
 	foreach guide $info(guide_sensors) {
-		scan $config(guide_$guide) %d%d%d \
-			iconfig(daq_driver_socket) \
-			iconfig(daq_mux_socket) \
-			iconfig(daq_device_element)
-		set rasnik [LWDAQ_acquire Rasnik]
-		if {[LWDAQ_is_error_result $rasnik]} {
+		set camera [DFPS_Manager_guide_acquire $guide $config(fpc_daq_flash_seconds)]
+		if {[LWDAQ_is_error_result $camera]} {
 			append rasnik " (Guide $guide, Orient $orientation, Time [clock seconds])"
 			LWDAQ_print $info(fpc_text) $rasnik
 			append result "-1 -1 -1 "
 			continue
 		}
-		lwdaq_image_manipulate $iconfig(memory_name) copy -name fpc_$guide
-		lwdaq_image_manipulate fpc_$guide invert -replace 1
-		lwdaq_image_manipulate fpc_$guide rows_to_columns -replace 1
-		set iconfig(analysis_enable) $config(fpc_analysis_enable)
-		set rasnik [LWDAQ_analysis_Rasnik fpc_$guide]
-		lwdaq_draw fpc_$guide fpc_$guide \
+		set rasnik [LWDAQ_analysis_Rasnik dfps_manager_$guide]
+		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
 			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
 		if {![LWDAQ_is_error_result $rasnik]} {
 			if {$swap} {
@@ -1313,7 +1341,7 @@ proc DFPS_Manager_fpc_open {} {
 		pack $f.$b -side left -expand yes
 	}
 	
-	foreach a {Rasnik} {
+	foreach a {Rasnik Camera} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_open $a"
 		pack $f.$b -side left -expand 1
@@ -1334,8 +1362,8 @@ proc DFPS_Manager_fpc_open {} {
 	pack $f -side top -fill x
 
 	foreach guide $info(guide_sensors) {
-		image create photo "fpc_$guide"
-		label $f.$guide -image "fpc_$guide"
+		image create photo "dfps_manager_$guide"
+		label $f.$guide -image "dfps_manager_$guide"
 		pack $f.$guide -side left -expand yes
 	}
 		
@@ -1346,12 +1374,95 @@ proc DFPS_Manager_fpc_open {} {
 	
 	# Draw blank images into the guide sensor displays.
 	foreach guide $info(guide_sensors) {
-		lwdaq_draw fpc_$guide fpc_$guide \
+		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
 			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
 	}
 	
 	return $w
 }
+
+#
+# DFPS_Manager_watchdog watches the system commands list for incoming commands.
+# It manages the position of fibers by comparing measured positions to target
+# positions and adjusting control voltages to minimize disagreement. It monitors
+# fiducial fibers and adjusts the fiducial frame pose in fiber view camera
+# coordinates.
+#
+proc DFPS_Manager_watchdog {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	global LWDAQ_server_commands
+	set t .serverwindow.text
+	
+	# Default value for result string.
+	set result ""
+	
+	# At intervals, check mast positions with fiber view cameras and adjust.
+	if {[clock seconds] - $info(mast_check_time) \
+			>= $config(mast_check_period)} {
+		set info(mast_check_time) [clock seconds]
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "Checking masts. (Time [clock seconds])"
+		}
+		set result $info(mast_check_time)
+	}
+	
+	# At intervals, adjust frame coordinate pose in global coordinates using
+	# fiducial fiber positions measured by fiber view cameras.
+	if {[clock seconds] - $info(fiducial_check_time) \
+			>= $config(fiducial_check_period)} {
+		set info(fiducial_check_time) [clock seconds]
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "Checking fiducials. (Time [clock seconds])"
+		}
+		DFPS_Manager_check
+		set result $info(fiducial_check_time)
+	}
+
+	# Handle incoming server commands.
+	if {[llength $LWDAQ_server_commands] > 0} {
+		set cmd [lindex $LWDAQ_server_commands 0 0]
+		set sock [lindex $LWDAQ_server_commands 0 1]
+		set LWDAQ_server_commands [lrange $LWDAQ_server_commands 1 end]
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "SERVER: $cmd $sock"
+		}
+		
+		if {[string match "LWDAQ_server_info" $cmd]} {
+			append cmd " $sock"
+		}
+		
+		if {[catch {
+			set result [uplevel #0 $cmd]
+			if {$config(verbose)} {LWDAQ_print $info(text) "SERVER: $result"}
+		} error_result]} {
+			set result "ERROR: $error_result"
+		}		
+		
+		if {$result != ""} {
+			if {[catch {puts $sock $result} sock_error]} {
+				LWDAQ_print -nonewline $t "$sock\: " blue
+				LWDAQ_print $t "ERROR: $sock_error"
+				LWDAQ_socket_close $sock
+				LWDAQ_print -nonewline $t "$sock\: " blue
+				LWDAQ_print $t "Closed after fatal socket error."
+				LWDAQ_print $info(text) "ERROR: $sock_error"
+			} {
+				if {[string length $result] > 50} {
+					LWDAQ_print -nonewline $t "$sock\: " blue
+					LWDAQ_print $t "Wrote \"[string range $result 0 49]\...\""
+				} {
+					LWDAQ_print -nonewline $t "$sock\: " blue
+					LWDAQ_print $t "Wrote \"$result\""
+				}
+			}
+		}
+	}
+	
+	LWDAQ_post DFPS_Manager_watchdog
+	return $result
+}
+
 
 #
 # DFPS_Manager_open creates the DFPS Manager window.
@@ -1459,6 +1570,30 @@ return ""
 
 Direct Fiber Positioning System Manager
 =======================================
+
+# Specify a guide sensor number and a position in the guide sensor image and
+# this routine returns the fiducial coordinates of that position. The result
+# will be in millimeters.
+DFPS_Manager_guide_to_fc sensor_num sensor_x_mm sensor_y_mm
+
+# Specify a detector fiber and get its position in fiducial coordinates. The
+# result will contain the x and y position in millimeters. We choose a detector
+# by first specifying a mast (1-4), then a detector (1-2).
+DFPS_Manager_detector_get_fc mast_num detector_num
+
+# Specify a detector fiber number and set its position in fiducial coordinates.
+# The result will contain the actual x and y position in millimeters following
+# the initial movement,
+DFPS_Manager_detector_set_fc mast_num detector_num fc_x_mm fc_y_mm
+
+# Get the corners of a detector fiber's range of motion. Returns fiducial
+# coordinates of top, right, bottom, and left corners of the forty-five degree
+# rotated square that defines the detector fiber's range of motion.
+DFPS_Manager_detector_get_range_fc detector_num
+
+# Get the positions of the fiducial fibers. Returns the fiducial coordinates of
+# the four fibers top-left, top-right, bottom-left, bottom-right.
+DFPS_Manager_fiducial_get_fc
 
 Help coming soon.
 

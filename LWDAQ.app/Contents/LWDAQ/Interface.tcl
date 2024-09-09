@@ -21,12 +21,12 @@
 #
 
 #
-# LWDAQ_interface_init initializes the interface routines, installs
-# operating-system dependent event handlers, and configures the default fonts
-# for the graphical user interface.
+# LWDAQ_interface_init initializes the interface routines, installs operating
+# system dependent event handlers, and configures the default fonts for the
+# graphical user interface.
 #
 proc LWDAQ_interface_init {} {
-	global LWDAQ_Info LWDAQ_server_line
+	global LWDAQ_Info LWDAQ_server_line LWDAQ_server_commands
 	
 	set LWDAQ_Info(monitor_ms) 100
 	
@@ -36,6 +36,7 @@ proc LWDAQ_interface_init {} {
 	set LWDAQ_Info(server_control) "Stop"
 	set LWDAQ_Info(server_mode) "execute"
 	set LWDAQ_server_line ""
+	set LWDAQ_server_commands [list]
 		
 	set LWDAQ_Info(default_to_stdout) 0
 	set LWDAQ_Info(error_color) red
@@ -1238,10 +1239,10 @@ proc LWDAQ_server_open {} {
 		pack $f.l$i $f.e$i -side left
 	}
 	label $f.lmode -text "mode" -width 10
-	tk_optionMenu $f.emode LWDAQ_Info(server_mode) execute echo receive
+	tk_optionMenu $f.emode LWDAQ_Info(server_mode) execute post echo receive
 	pack $f.lmode $f.emode -side left
 
-	LWDAQ_text_widget $w 60 20
+	LWDAQ_text_widget $w 80 20
 	return ""
 }
 
@@ -1330,11 +1331,17 @@ proc LWDAQ_server_info {{sock "nosocket"}} {
 }
 
 #
-# LWDAQ_server_interpreter receives commands from a TCPIP socket.
+# LWDAQ_server_interpreter receives commands from a TCPIP socket and handles them
+# according to the server mode. With execute and post modes, the routine executes
+# the line it receives as a Tcl command at the global scope. With echo mode, it
+# writes back the same line. In receive mode it sets the global server line variable
+# to the line just received, and adds a new entry to the server commands list. This
+# new entry is itself a list containing the line as its first element and the socket
+# through which the line was received in the second element.
 #
 proc LWDAQ_server_interpreter {sock} {
 	upvar #0 LWDAQ_Info info
-	global LWDAQ_server_line
+	global LWDAQ_server_line LWDAQ_server_commands
 	set t .serverwindow.text
 
 	if {[eof $sock]} {
@@ -1364,8 +1371,6 @@ proc LWDAQ_server_interpreter {sock} {
 		}
 	}
 
-	set LWDAQ_server_line $line
-
 	if {[string length $line] > 50} {
 		LWDAQ_print -nonewline $t "$sock\: " blue
 		LWDAQ_print $t "Read \"[string range $line 0 49]\...\""
@@ -1385,6 +1390,14 @@ proc LWDAQ_server_interpreter {sock} {
 			set result [uplevel #0 $line]
 		} error_result]} {
 			set result "ERROR: $error_result"
+		}
+	}
+	
+	if {$info(server_mode) == "receive"} {
+		set LWDAQ_server_line $line
+		lappend LWDAQ_server_commands [list $line $sock]
+		if {[llength $LWDAQ_server_commands] > 100} {
+			set LWDAQ_server_commands [lrange $LWDAQ_server_commands end-99 end]
 		}
 	}
 	
