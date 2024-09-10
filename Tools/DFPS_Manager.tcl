@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.2"
+	LWDAQ_tool_init "DFPS_Manager" "2.3"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The control variable tells us the current state of the tool.
@@ -60,37 +60,62 @@ proc DFPS_Manager_init {} {
 	set info(image_sensor) "ICX424"
 	LWDAQ_set_image_sensor $info(image_sensor) BCAM
 	set config(analysis_threshold) "10 #"
-	set config(guide_1) "7 0 2"
-	set config(guide_2) "6 0 1"
-	set config(guide_3) "7 0 1"
-	set config(guide_4) "6 0 2"
+	set config(guide_daq_1) "7 0 2"
+	set config(guide_daq_2) "6 0 1"
+	set config(guide_daq_3) "7 0 1"
+	set config(guide_daq_4) "6 0 2"
 	set info(guide_sensors) "1 2 3 4"
+	set info(fiducials) "1 2 3 4"
 	
 	# Data acquisition and analysis results.
 	set config(spots) ""
 	set config(sources) ""
 	set config(verbose) "1"
 		
-	# Fiber view camera geometry.
-	set config(cam_left) \
+	# Fiber view camera calibration constants.
+	set info(cam_left) \
 		"12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113"
 	# DFPS-4A: Y71010 12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113
 	# Breadboard: Y71066 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
-	set config(cam_right) \
+	set info(cam_right) \
 		"12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220"
 	# DFPS-4A: Y71003 12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220
 	# Breadboard: Y71080 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
-	set config(mount_left) \
+	
+	# Fiber view camera mount measurents.
+	set info(mount_left) \
 		"80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868"
 	# DFPS-4A: 80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868
 	# Breadboard: 79.614 51.505 199.754 119.777 51.355 264.265 79.277 51.400 275.713
-	set config(mount_right) \
+	set info(mount_right) \
 		"-104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948"
 	# DFPS-4A: -104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948
 	# Breadboard: -104.039 51.210 199.297 -108.680 51.004 275.110 -148.231 50.989 261.059
-	set info(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set info(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
-
+	
+	# We obtain the pose of the mount coordinats by a fit to the mount measurements.
+	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
+	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
+	
+	# Fiducial fiber positions in fiducial coordinates.
+	set info(fiducial_1) "-15 +15 0"
+	# DFPS-4A: 
+	set info(fiducial_2) "+15 +15 0"
+	# DFPS-4A: 
+	set info(fiducial_3) "-15 -15 0"
+	# DFPS-4A: 
+	set info(fiducial_4) "+15 -15 0"
+	# DFPS-4A: 
+	
+	# Guide sensor positions and orientations in fiducial coordinates.
+	set info(guide_1) "-24.598 19.792 5.028"
+	# DFPS-4A: 
+	set info(guide_2) "20.268 19.770 3.874"
+	# DFPS-4A: 
+	set info(guide_3) "-24.685 -25.170 0.917"
+	# DFPS-4A: 
+	set info(guide_4) "20.347 -25.146 9.414"
+	# DFPS-4A: 
+	
 	# Default north-south, and east-west control values.
 	set config(ns_all) $config(dac_zero) 
 	set config(ew_all) $config(dac_zero) 
@@ -105,33 +130,32 @@ proc DFPS_Manager_init {} {
 	set config(id) "FFFF"
 	set config(commands) "8"
 	
-	# Watchdog timing.
+	# Watchdog control.
 	set info(fiducial_check_time) "0"
 	set info(mast_check_time) "0"
 	set config(fiducial_check_period) "100"
 	set config(mast_check_period) "10"
+	set config(check_masts) "0"
+	set config(check_fiducials) "0"
 	
-	# Panel appearance.
+	# Window settings.
 	set config(label_color) "green"
-	set config(zoom) "0.5"
+	set config(guide_zoom) "0.3"
+	set config(fvc_zoom) "0.5"
 	set config(intensify) "exact"
+	set info(examine_window) "$info(window).examine_window"
 	
 	# Fiber View Camera Calibrator (FVCC) settings.
 	set info(fvcc_state) "Idle"
-	set info(cam_default) "12.675 39.312 1.0 0.0 0.0 2 19.0 0.0"
-	set info(cam_left) $info(cam_default)
-	set info(cam_right) $info(cam_default)
-	set info(mount_left) "0 0 0 -21 0 -73 21 0 -73"
-	set info(mount_right) "0 0 0 -2 1 0 -73 21 0 -73"
-	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
-	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
-	set info(source_1) "0 105 -50"
-	set info(source_2) "30 105 -50"
-	set info(source_3) "0 75 -50"
-	set info(source_4) "30 75 -50"
 	set info(num_sources) "4"
-	set info(spots_left) "100 100 200 100 100 200 200 200"
-	set info(spots_right) "100 100 200 100 100 200 200 200"
+	set info(fvcc_src_1) "-28.223 104.229 -91.363"
+	set info(fvcc_src_2) "1.717 104.294 -91.613"
+	set info(fvcc_src_3) "-28.229 74.268 -91.925"
+	set info(fvcc_src_4) "1.631 74.257 -91.437"
+	set info(spots_left) \
+		"1572.16 1192.59 3377.92 1154.19 1594.61 3038.75 3381.78 3051.64"
+	set info(spots_right) \
+		"2223.58 1109.76 4000.05 1117.53 2232.85 3038.02 4017.75 2984.44"
 	set config(bcam_width) "5180"
 	set config(bcam_height) "3848"
 	set config(bcam_threshold) "10 #"
@@ -210,39 +234,60 @@ proc DFPS_Manager_init {} {
 }
 
 #
-# DFPS_Manager_configure opens the configuration panel and adds entries for us
-# to examine the mount measurements and camera calibration constants in more
-# detail. Most of the work of the routine is done by the LWDAQ tool configure
-# routine, which destroys any existing configuration panel before creating most
-# of the entry boxes and returning the name of a frame in which we create larger
-# boxes for the mount and camera parameters. The routine returns the contents
-# of the configuration array as a list of "name" and "value".
+# DFPS_Manager_examine opens a new window that displays the CMM measurements
+# of the left and right mounting balls, the camera calibration constants,
+# and the fiducial plate measurements.
 #
-proc DFPS_Manager_configure {} {
+proc DFPS_Manager_examine {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set ff [LWDAQ_tool_configure DFPS_Manager]
+	set w $info(examine_window)
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "Calibration Constants, DFPS Manager $info(version)"
+	} {
+		raise $w
+		return ""
+	}
 
-	foreach mount {Left Right} {
-		set b [string tolower $mount]
-		set f [frame $ff.mnt$b]
+	foreach a {Left Right} {
+		set b [string tolower $a]
+		set f [frame $w.mnt$b]
 		pack $f -side top -fill x
-		label $f.l$b -text "$mount Mount:"
-		entry $f.e$b -textvariable DFPS_Manager_config(mount_$b) -width 70
+		label $f.l$b -text "Mount $a:"
+		entry $f.e$b -textvariable DFPS_Manager_info(mount_$b) -width 70
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 
-	foreach mount {Left Right} {
-		set b [string tolower $mount]
-		set f [frame $ff.cam$b]
+	foreach a {Left Right} {
+		set b [string tolower $a]
+		set f [frame $w.cam$b]
 		pack $f -side top -fill x
-		label $f.l$b -text "$mount Camera:"
-		entry $f.e$b -textvariable DFPS_Manager_config(cam_$b) -width 70
+		label $f.l$b -text "Camera $a:"
+		entry $f.e$b -textvariable DFPS_Manager_info(cam_$b) -width 70
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 
-	return [array get config]
+	foreach a {1 2 3 4} {
+		set b [string tolower $a]
+		set f [frame $w.fid$b]
+		pack $f -side top -fill x
+		label $f.l$b -text "Fiducial $a:"
+		entry $f.e$b -textvariable DFPS_Manager_info(fiducial_$b) -width 70
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+
+	foreach a {1 2 3 4} {
+		set b [string tolower $a]
+		set f [frame $w.gd$b]
+		pack $f -side top -fill x
+		label $f.l$b -text "Guide $a:"
+		entry $f.e$b -textvariable DFPS_Manager_info(guide_$b) -width 70
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+
+	return ""
 }
 
 #
@@ -337,14 +382,14 @@ proc DFPS_Manager_transmit {{commands ""}} {
 }
 
 #
-# DFPS_Manager_transmit_panel opens a new window and provides a button for
-# transmitting a string of command bytes to a device. There are two entry boxes.
-# One for the device identifier, another for the command bytes. The identifier
-# is a four-hex value. The command bytes are each decimal values 0..255
-# separated by spaces. The routine parses the identifier into two bytes,
-# transmits all the command bytes, and appends the correct checksum on the end.
+# DFPS_Manager_txp opens a new window and provides a button for transmitting a
+# string of command bytes to a device. There are two entry boxes. One for the
+# device identifier, another for the command bytes. The identifier is a four-hex
+# value. The command bytes are each decimal values 0..255 separated by spaces.
+# The routine parses the identifier into two bytes, transmits all the command
+# bytes, and appends the correct checksum on the end.
 #
-proc DFPS_Manager_transmit_panel {} {
+proc DFPS_Manager_txp {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -443,7 +488,7 @@ proc DFPS_Manager_spots {{elements ""}} {
 			lwdaq_image_manipulate $info(image_$side) \
 				transfer_overlay $iconfig(memory_name)
 			lwdaq_draw $info(image_$side) dfps_manager_$side \
-				-intensify $config(intensify) -zoom $config(zoom)
+				-intensify $config(intensify) -zoom $config(fvc_zoom)
 		}
 	}
 	
@@ -481,8 +526,8 @@ proc DFPS_Manager_sources {spots} {
 	# Refresh the left and right camera mount coordinate systems in case we have
 	# changed the left and right mounting ball coordinates since our previous
 	# use of the mount coordinates.
-	set info(coord_left) [lwdaq bcam_coord_from_mount $config(mount_left)]
-	set info(coord_right) [lwdaq bcam_coord_from_mount $config(mount_right)]
+	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
+	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 
 	# For each source, we extract the left and right camera spot coordinates and
 	# use these to measure the source position.
@@ -506,7 +551,7 @@ proc DFPS_Manager_sources {spots} {
 		foreach side {left right} {
 			set x [expr 0.001 * [set x_$side]]
 			set y [expr 0.001 * [set y_$side]]
-			set b [lwdaq bcam_source_bearing "$x $y" "$side $config(cam_$side)"]
+			set b [lwdaq bcam_source_bearing "$x $y" "$side $info(cam_$side)"]
 			set point_$side [lwdaq xyz_global_from_local_point \
 				[lrange [set b] 0 2] $info(coord_$side)]
 			set dir_$side [lwdaq xyz_global_from_local_vector \
@@ -569,11 +614,11 @@ proc DFPS_Manager_check {{elements ""}} {
 }
 
 #
-# DFPS_Manager_move_all sets the control values of all actuators to the values
+# DFPS_Manager_move sets the control values of all actuators to the values
 # specified in the ns_all and ew_all parameters, waits for the settling time,
 # and checks positions. It returns the positions of all sources.
 #
-proc DFPS_Manager_move_all {} {
+proc DFPS_Manager_move {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
@@ -581,7 +626,7 @@ proc DFPS_Manager_move_all {} {
 		return ""
 	}
 	
-	set info(control) "Move_All"	
+	set info(control) "Move"	
 
 	if {[catch {
 		foreach id $config(controllers) {
@@ -599,11 +644,11 @@ proc DFPS_Manager_move_all {} {
 }
 
 #
-# DFPS_Manager_zero_all sets the control values of all actuators to the value
+# DFPS_Manager_zero sets the control values of all actuators to the value
 # specified in dac_zero, waits for the settling time, and checks positions. It
 # returns the positions of all sources.
 #
-proc DFPS_Manager_zero_all {} {
+proc DFPS_Manager_zero {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -611,7 +656,7 @@ proc DFPS_Manager_zero_all {} {
 		return ""
 	}
 	
-	set info(control) "Zero_All"	
+	set info(control) "Zero"	
 
 	if {[catch {
 		foreach id $config(controllers) {
@@ -673,11 +718,11 @@ proc DFPS_Manager_fvcc_examine {} {
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 
-	for {set a 1} {$a <= $info(num_sources)} {incr a} {
+	foreach a {1 2 3 4} {
 		set f [frame $w.src$a]
 		pack $f -side top -fill x
 		label $f.l$a -text "Source $a\:"
-		entry $f.e$a -textvariable DFPS_Manager_info(source_$a) -width 70
+		entry $f.e$a -textvariable DFPS_Manager_info(fvcc_src_$a) -width 70
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
@@ -750,7 +795,7 @@ proc DFPS_Manager_fvcc_disagreement {{params ""} {show "1"}} {
 		set spots $info(spots_$side)
 		for {set a 1} {$a <= $info(num_sources)} {incr a} {
 			set sb [lwdaq xyz_local_from_global_point \
-				$info(source_$a) $info(coord_$side)]
+				$info(fvcc_src_$a) $info(coord_$side)]
 			set th [lwdaq bcam_image_position $sb [set fvc_$side]]
 			scan $th %f%f x_th y_th
 			set x_th [format %.2f [expr $x_th * 1000.0]]
@@ -849,12 +894,12 @@ proc DFPS_Manager_fvcc_check {} {
 		set y_src [format %8.3f [expr $y + 0.5*$dy]]
 		set z_src [format %8.3f [expr $z + 0.5*$dz]]
 		
-		set a $info(source_$i)
+		set a $info(fvcc_src_$i)
 		set x_err [format %6.3f [expr [lindex $a 0]-$x_src]]
 		set y_err [format %6.3f [expr [lindex $a 1]-$y_src]]
 		set z_err [format %6.3f [expr [lindex $a 2]-$z_src]]
 		
-		LWDAQ_print $info(fvcc_text) "Source_$i\: $x_src $y_src $z_src\
+		LWDAQ_print $info(fvcc_text) "fvcc_src_$i\: $x_src $y_src $z_src\
 			$x_err $y_err $z_err"
 		
 		set sum_squares [expr $sum_squares + $x_err*$x_err \
@@ -910,7 +955,7 @@ proc DFPS_Manager_fvcc_read {{fn ""}} {
 	set info(mount_right) [join [lrange $spheres 6 8]]
 	set spheres [lrange $spheres 9 end]
 	for {set a 1} {$a <= $info(num_sources)} {incr a} {
-		set info(source_$a) [lindex $spheres [expr $a-1]]
+		set info(fvcc_src_$a) [lindex $spheres [expr $a-1]]
 	}
 
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
@@ -1164,7 +1209,7 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	set iconfig(analysis_manipulation) "invert rows_to_columns"
 	set iconfig(daq_ip_addr) $config(ip_addr)
 	set iconfig(intensify) $config(intensify) 
-	scan $config(guide_$guide) %d%d%d \
+	scan $config(guide_daq_$guide) %d%d%d \
 		iconfig(daq_driver_socket) \
 		iconfig(daq_mux_socket) \
 		iconfig(daq_device_element)
@@ -1172,6 +1217,8 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	set camera [LWDAQ_acquire Camera]
 	if {![LWDAQ_is_error_result $camera]} {
 		lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_manager_$guide
+		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
+			-intensify $config(intensify) -zoom $config(guide_zoom)
 		set camera "Guide_$guide [lrange $camera 1 end]"
 	}
 	return $camera
@@ -1220,7 +1267,7 @@ proc DFPS_Manager_fpc_acquire {orientation} {
 			continue
 		}
 		set rasnik [LWDAQ_analysis_Rasnik dfps_manager_$guide]
-		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
+		lwdaq_draw dfps_manager_$guide fpc_$guide \
 			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
 		if {![LWDAQ_is_error_result $rasnik]} {
 			if {$swap} {
@@ -1281,7 +1328,8 @@ proc DFPS_Manager_fpc_calculate {} {
 }
 
 #
-# DFPS_Manager_fpc_examine
+# DFPS_Manager_fpc_examine displays the rasnik measurements we obtained when acquiring
+# from the four orientations.
 #
 proc DFPS_Manager_fpc_examine {} {
 	upvar #0 DFPS_Manager_config config
@@ -1362,8 +1410,8 @@ proc DFPS_Manager_fpc_open {} {
 	pack $f -side top -fill x
 
 	foreach guide $info(guide_sensors) {
-		image create photo "dfps_manager_$guide"
-		label $f.$guide -image "dfps_manager_$guide"
+		image create photo "fpc_$guide"
+		label $f.$guide -image "fpc_$guide"
 		pack $f.$guide -side left -expand yes
 	}
 		
@@ -1374,7 +1422,7 @@ proc DFPS_Manager_fpc_open {} {
 	
 	# Draw blank images into the guide sensor displays.
 	foreach guide $info(guide_sensors) {
-		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
+		lwdaq_draw dfps_manager_$guide fpc_$guide \
 			-intensify $config(fpc_intensify) -zoom $config(fpc_zoom)
 	}
 	
@@ -1398,25 +1446,33 @@ proc DFPS_Manager_watchdog {} {
 	set result ""
 	
 	# At intervals, check mast positions with fiber view cameras and adjust.
-	if {[clock seconds] - $info(mast_check_time) \
-			>= $config(mast_check_period)} {
-		set info(mast_check_time) [clock seconds]
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "Checking masts. (Time [clock seconds])"
+	if {$config(check_masts)} {
+		if {[clock seconds] - $info(mast_check_time) \
+				>= $config(mast_check_period)} {
+			set info(mast_check_time) [clock seconds]
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "Checking masts. (Time [clock seconds])"
+			}
+			set result $info(mast_check_time)
 		}
-		set result $info(mast_check_time)
+	} {
+		set info(mast_check_time) "0"
 	}
 	
 	# At intervals, adjust frame coordinate pose in global coordinates using
 	# fiducial fiber positions measured by fiber view cameras.
-	if {[clock seconds] - $info(fiducial_check_time) \
-			>= $config(fiducial_check_period)} {
-		set info(fiducial_check_time) [clock seconds]
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "Checking fiducials. (Time [clock seconds])"
+	if {$config(check_fiducials)} {
+		if {[clock seconds] - $info(fiducial_check_time) \
+				>= $config(fiducial_check_period)} {
+			set info(fiducial_check_time) [clock seconds]
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "Checking fiducials. (Time [clock seconds])"
+			}
+			DFPS_Manager_check
+			set result $info(fiducial_check_time)
 		}
-		DFPS_Manager_check
-		set result $info(fiducial_check_time)
+	} {
+		set info(fiducial_check_time) "0"
 	}
 
 	# Handle incoming server commands.
@@ -1482,28 +1538,23 @@ proc DFPS_Manager_open {} {
 	
 	label $f.state -textvariable DFPS_Manager_info(control) -width 20 -fg blue
 	pack $f.state -side left -expand 1
-	foreach a {Check Move_All Zero_All Configure} {
+	foreach a {Check Move Zero Examine} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
 		pack $f.$b -side left -expand 1
 	}
-	foreach a {Help} {
+	foreach a {Configure Help} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
 		pack $f.$b -side left -expand 1
 	}
 	button $f.server -text "Server" -command "LWDAQ_server_open"
 	pack $f.server -side left -expand 1
-	foreach a {BCAM Diagnostic} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_open $a"
-		pack $f.$b -side left -expand 1
-	}
 	
 	set f [frame $ff.fiber]
 	pack $f -side top -fill x
 
-	foreach a {ip_addr fvc_left fvc_right injector transceiver flash} {
+	foreach a {ip_addr fvc_left fvc_right injector flash transceiver} {
 		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 1]
@@ -1515,13 +1566,10 @@ proc DFPS_Manager_open {} {
 
 	foreach a {fiducials guides controllers} {
 		label $f.l$a -text $a -fg $config(label_color)
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 20
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 12
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	set f [frame $ff.dacs]
-	pack $f -side top -fill x
-	
 	foreach d {ns_all ew_all} {
 		set a [string tolower $d]
 		label $f.l$a -text $d -fg $config(label_color)
@@ -1529,26 +1577,49 @@ proc DFPS_Manager_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	button $f.txcmd -text "Transmit Panel" \
-		-command "LWDAQ_post DFPS_Manager_transmit_panel"
-	pack $f.txcmd -side left -expand yes
-	foreach a {FVCC FPC} {
+	set f [frame $ff.dacs]
+	pack $f -side top -fill x
+	
+	foreach a {FVCC FPC TXP} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "DFPS_Manager_$b\_open"
 		pack $f.$b -side left -expand 1
 	}
+	foreach a {BCAM Diagnostic} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_open $a"
+		pack $f.$b -side left -expand 1
+	}
+	
 	button $f.toolmaker -text "Toolmaker" -command "LWDAQ_Toolmaker"
 	pack $f.toolmaker -side left -expand 1
-	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
-	pack $f.verbose -side left -expand yes
+	
+	foreach a {Verbose Check_Masts Check_Fiducials} {
+		set b [string tolower $a]
+		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
+		pack $f.$b -side left -expand yes
+	}
 
-	set f [frame $w.image_frame]
+	set f [frame $w.guide_images]
 	pack $f -side top -fill x -expand no
 	
-	foreach a {left right} {
-		image create photo "dfps_manager_$a"
-		label $f.$a -image "dfps_manager_$a"
-		pack $f.$a -side left -expand yes
+	foreach guide $info(guide_sensors) {
+		image create photo "dfps_manager_$guide"
+		label $f.$guide -image "dfps_manager_$guide"
+		pack $f.$guide -side left -expand yes
+		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
+			-intensify $config(intensify) -zoom $config(guide_zoom)
+	}
+		
+	set f [frame $w.fvc_images]
+	pack $f -side top -fill x -expand no
+	
+	foreach side {left right} {
+		image create photo "dfps_manager_$side"
+		label $f.$side -image "dfps_manager_$side"
+		pack $f.$side -side left -expand yes
+		lwdaq_draw dfps_manager_$side dfps_manager_$side \
+			-intensify $config(intensify) -zoom $config(fvc_zoom)	
 	}
 	
 	set f [frame $w.text_frame]
