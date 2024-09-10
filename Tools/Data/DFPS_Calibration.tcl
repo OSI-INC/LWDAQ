@@ -1,0 +1,8 @@
+set DFPS_Manager_info(gsrasnik_mask_0) "24.315 68.403 -4.776 69.198 68.384 -3.833 24.233 23.443 -0.848 69.284 23.490 -9.864 "
+set DFPS_Manager_info(gsrasnik_mask_90) "29.141 24.061 -4.892 29.181 68.942 -3.805 74.108 23.969 -0.987 74.083 69.016 -9.386 "
+set DFPS_Manager_info(gsrasnik_mask_180) "73.477 28.849 -5.348 28.594 28.884 -3.947 73.558 73.819 -0.832 28.537 73.766 -9.426 "
+set DFPS_Manager_info(gsrasnik_mask_270) "68.694 73.226 -4.103 68.663 28.327 -3.893 23.723 73.299 -0.837 23.765 28.252 -9.873"
+set DFPS_Manager_info(guide_1) "-24.595 19.770 4.876"
+set DFPS_Manager_info(guide_2) "20.288 19.751 3.933"
+set DFPS_Manager_info(guide_3) "-24.677 -25.190 0.948"
+set DFPS_Manager_info(guide_4) "20.374 -25.143 9.964"
