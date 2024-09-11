@@ -45,10 +45,10 @@ proc DFPS_Manager_init {} {
 	set config(fvc_left) "5 0"
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
-	set config(fiducials) "A5 A6 A7 A8"
-	set config(sort_code) "8"
-	set config(guides) "D1 D2"
+	set config(fiducial_leds) "A5 A6 A7 A8"
+	set config(guide_leds) "D1 D2"
 	set config(flash_s) "0.004"
+	set config(sort_code) "8"
 	set config(transceiver) "1 0"
 	set config(controllers) "FFFF"
 	set config(source_type) "9"
@@ -66,7 +66,7 @@ proc DFPS_Manager_init {} {
 	set config(guide_daq_4) "6 0 2"
 	set info(guide_sensors) "1 2 3 4"
 	set info(guide_manipulations) "invert rows_to_columns"
-	set info(fiducials) "1 2 3 4"
+	set info(fiducial_fibers) "1 2 3 4"
 	
 	# Data acquisition and analysis results.
 	set config(spots) ""
@@ -97,8 +97,8 @@ proc DFPS_Manager_init {} {
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 	
-	# Pose of plate coordinates with respect to rasnik coordinates.
-	set info(plate_rasnik_pose) "48.800 48.300 0.000 0.000 0.000 0.000"
+	# Fiducial coordinate pose with respect to frame coordinates.
+	set info(fiducial_coord_offset) "65.0"
 	
 	# Fiducial fiber positions in fiducial coordinates.
 	set info(fiducial_1) "-15 +15 0"
@@ -121,8 +121,8 @@ proc DFPS_Manager_init {} {
 	# DFPS-4A: 
 	
 	# Default north-south, and east-west control values.
-	set config(ns_all) $config(dac_zero) 
-	set config(ew_all) $config(dac_zero) 
+	set config(ns) $config(dac_zero) 
+	set config(ew) $config(dac_zero) 
 	
 	# Command transmission values.
 	set config(initiate_delay) "0.010"
@@ -187,9 +187,6 @@ proc DFPS_Manager_init {} {
 	set info(gsrasnik_refcode) "3"
 	set config(gsrasnik_ref_x_um) "0"
 	set config(gsrasnik_ref_y_um) "5180"
-	set config(gsrasnik_rot_mrad) "-0.10"
-	set config(gsrasnik_width) "130.000"
-	set config(gsrasnik_height) "130.000"
 	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
 	set config(gsrasnik_zoom) "0.5"
 	set config(gsrasnik_intensify) "exact"
@@ -198,17 +195,17 @@ proc DFPS_Manager_init {} {
 	# GSRasnik data. We have default values for rasnik mask measurements from
 	# all four guide sensors in all four orientations, for use in testing
 	# GSRasnik calculations.
-	set gsrasnik_data {
-24.315 68.403 -4.776 69.198 68.384 -3.833 24.233 23.443 -0.848 69.284 23.490 -9.864 
-29.141 24.061 -4.892 29.181 68.942 -3.805 74.108 23.969 -0.987 74.083 69.016 -9.386 
-73.477 28.849 -5.348 28.594 28.884 -3.947 73.558 73.819 -0.832 28.537 73.766 -9.426 
-68.694 73.226 -4.103 68.663 28.327 -3.893 23.723 73.299 -0.837 23.765 28.252 -9.873 
-	}
-	set gsrasnik_data [split [string trim $gsrasnik_data] "\n"]
-	for {set i 0} {$i < [llength $info(gsrasnik_orientations)]} {incr i} {
-		set info(gsrasnik_mask_[lindex $info(gsrasnik_orientations) $i]) \
-			[lindex $gsrasnik_data $i]
-	}
+	set info(gsrasnik_mask_0) "24.315 68.403 -4.776 69.198 68.384 -3.833 \
+		24.233 23.443 -0.848 69.284 23.490 -9.864"
+	set info(gsrasnik_mask_90) "29.141 24.061 -4.892 29.181 68.942 -3.805 \
+		74.108 23.969 -0.987 74.083 69.016 -9.386"
+	set info(gsrasnik_mask_180) "73.477 28.849 -5.348 28.594 28.884 -3.947 \
+		73.558 73.819 -0.832 28.537 73.766 -9.426"
+	set info(gsrasnik_mask_270) "68.694 73.226 -4.103 68.663 28.327 -3.893 \
+		23.723 73.299 -0.837 23.765 28.252 -9.873"
+	set info(gsrasnik_rot_mrad) "-0.10"
+	set info(gsrasnik_width) "130.000"
+	set info(gsrasnik_height) "130.000"
 	
 	# Fiducial Fiber Rotation Calibration (FFRotate) settings.
 	
@@ -251,9 +248,9 @@ proc DFPS_Manager_init {} {
 }
 
 #
-# DFPS_Manager_examine opens a new window that displays the CMM measurements
-# of the left and right mounting balls, the camera calibration constants,
-# and the fiducial plate measurements.
+# DFPS_Manager_examine opens a new window that displays the CMM measurements of
+# the left and right mounting balls, the camera calibration constants, and the
+# fiducial plate measurements.
 #
 proc DFPS_Manager_examine {} {
 	upvar #0 DFPS_Manager_config config
@@ -459,7 +456,7 @@ proc DFPS_Manager_spots {{elements ""}} {
 	
 	# Default elements.
 	if {$elements == ""} {
-		set elements [string trim "$config(fiducials) $config(guides)"]
+		set elements [string trim "$config(fiducial_leds) $config(guide_leds)"]
 	}
 	
 	# Prepare the BCAM Instrument for fiber view camera (FVC) acquisition.
@@ -601,7 +598,7 @@ proc DFPS_Manager_check {{elements ""}} {
 
 	if {[catch {
 		if {$elements == ""} {
-			set elements [string trim "$config(fiducials) $config(guides)"]
+			set elements [string trim "$config(fiducial_leds) $config(guide_leds)"]
 		}
 		set spots [DFPS_Manager_spots $elements]
 		set sources [DFPS_Manager_sources $spots]
@@ -618,7 +615,7 @@ proc DFPS_Manager_check {{elements ""}} {
 
 #
 # DFPS_Manager_move sets the control values of all actuators to the values
-# specified in the ns_all and ew_all parameters, waits for the settling time,
+# specified in the ns and ew parameters, waits for the settling time,
 # and checks positions. It returns the positions of all sources.
 #
 proc DFPS_Manager_move {} {
@@ -633,7 +630,7 @@ proc DFPS_Manager_move {} {
 
 	if {[catch {
 		foreach id $config(controllers) {
-			DFPS_Manager_set $id $config(ns_all) $config(ew_all)
+			DFPS_Manager_set $id $config(ns) $config(ew)
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
 	} error_result]} {
@@ -643,7 +640,7 @@ proc DFPS_Manager_move {} {
 	}
 
 	set info(state) "Idle"	
-	return "$config(ns_all) $config(ew_all)"
+	return "$config(ns) $config(ew)"
 }
 
 #
@@ -1355,26 +1352,29 @@ proc DFPS_Manager_gsrasnik_calculate {} {
 		[format %10.3f $y_stdev]"
 	LWDAQ_print $info(gsrasnik_text) "------------------------------------" 
 
-	set info(plate_rasnik_pose) \
-		"[format %10.3f $x_ave]\
-		[format %10.3f $y_ave]\
-		0.000000\
-		0.000000\
-		[format %10.6f [expr 0.001*$config(gsrasnik_rot_mrad)]]"
-	LWDAQ_print $info(gsrasnik_text) $info(plate_rasnik_pose)
+	set pose "[format %10.3f $x_ave] [format %10.3f $y_ave] 0.0 0.0\
+		[format %10.6f [expr -0.001*$info(gsrasnik_rot_mrad)]]"
 
-	
+	LWDAQ_print $info(gsrasnik_text) "\nGuide Sensor Poses" purple
+	LWDAQ_print $info(gsrasnik_text) "-------------------------------------" 
+	LWDAQ_print $info(gsrasnik_text) " GS   X (mm)     Y (mm)    rot (mrad)" 
+	LWDAQ_print $info(gsrasnik_text) "-------------------------------------" 
 	foreach gs $info(guide_sensors) {
 		set x [lindex $info(gsrasnik_mask_0) [expr ($gs-1)*3+0]]
 		set y [lindex $info(gsrasnik_mask_0) [expr ($gs-1)*3+1]]
 		set rot [lindex $info(gsrasnik_mask_0) [expr ($gs-1)*3+2]]
 		lwdaq_config -fsd 3
-		set gsxyz [lwdaq xyz_local_from_global_point "$x $y 0" $info(plate_rasnik_pose)]
+		set gsxyz [lwdaq xyz_local_from_global_point "$x $y 0" $pose]
 		lwdaq_config -fsd 6
-		set info(guide_$gs) "[lindex $gsxyz 0] [lindex $gsxyz 1]\
-			[format %.3f [expr -$rot-$config(gsrasnik_rot_mrad)]]"
-		LWDAQ_print $info(gsrasnik_text) "Guide $gs\: $info(guide_$gs)"
+		scan $gsxyz %f%f%f xx yy zz
+		set xx [expr $xx + 0.5*$info(gsrasnik_width) - $info(fiducial_coord_offset)]
+		set yy [expr $yy + 0.5*$info(gsrasnik_height) - $info(fiducial_coord_offset)]
+		set rr [expr 0 - $rot - $info(gsrasnik_rot_mrad)]
+		set info(guide_$gs) "[format %.3f $xx] [format %.3f $yy] [format %.3f $rr]"
+		LWDAQ_print $info(gsrasnik_text) \
+			" $gs [format %9.3f $xx] [format %9.3f $yy] [format %9.3f $rr]"
 	}
+	LWDAQ_print $info(gsrasnik_text) "-------------------------------------" 
 
 	return ""
 }
@@ -1400,7 +1400,7 @@ proc DFPS_Manager_gsrasnik_examine {} {
 		set f [frame $w.orientation_$orientation]
 		pack $f -side top -fill x
 		label $f.l -text "Orientation $orientation\:"
-		entry $f.e -textvariable DFPS_Manager_info(gsrasnik_mask_$orientation) -width 100
+		entry $f.e -textvariable DFPS_Manager_info(gsrasnik_mask_$orientation) -width 80
 		pack $f.l $f.e -side left -expand yes
 	}
 		
@@ -1408,7 +1408,15 @@ proc DFPS_Manager_gsrasnik_examine {} {
 		set f [frame $w.guide_$guide]
 		pack $f -side top -fill x
 		label $f.l -text "Guide Sensor $guide\:"
-		entry $f.e -textvariable DFPS_Manager_info(guide_$guide) -width 100
+		entry $f.e -textvariable DFPS_Manager_info(guide_$guide) -width 80
+		pack $f.l $f.e -side left -expand yes
+	}
+	
+	foreach a {rot_mrad width height} {
+		set f [frame $w.$a]
+		pack $f -side top -fill x
+		label $f.l -text "$a\:"
+		entry $f.e -textvariable DFPS_Manager_info(gsrasnik_$a) -width 80
 		pack $f.l $f.e -side left -expand yes
 	}
 		
@@ -1458,8 +1466,7 @@ proc DFPS_Manager_gsrasnik_open {} {
 	set f [frame $w.options]
 	pack $f -side top -fill x
 	
-	foreach {a wd} {algorithm 2 square_um 4 ref_x_um 5 ref_y_um 5 flash_s 10 \
-			rot_mrad 10 height 10 width 10} {
+	foreach {a wd} {algorithm 2 square_um 4 ref_x_um 5 ref_y_um 5 flash_s 10} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Manager_config(gsrasnik_$a) -width $wd
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -1619,18 +1626,30 @@ proc DFPS_Manager_save_calibration {} {
 	upvar #0 DFPS_Manager_info info
 
 	set f [open $config(calibration_file) w]
-	
-	foreach orientation $info(gsrasnik_orientations) {
-		puts $f "set DFPS_Manager_info(gsrasnik_mask_$orientation)\
-			\"$info(gsrasnik_mask_$orientation)\""
+	foreach or $info(gsrasnik_orientations) {
+		puts $f "set DFPS_Manager_info(gsrasnik_mask_$or) \"$info(gsrasnik_mask_$or)\""
 	}
-		
+	foreach a {rot_mrad width height} {
+		puts $f "set DFPS_Manager_info(gsrasnik_$a) \"$info(gsrasnik_$a)\""
+	}
 	foreach guide $info(guide_sensors) {
-		puts $f "set DFPS_Manager_info(guide_$guide)\
-			\"$info(guide_$guide)\""
+		puts $f "set DFPS_Manager_info(guide_$guide) \"$info(guide_$guide)\""
 	}
-	
+	foreach a {left right} {
+		puts $f "set DFPS_Manager_info(mount_$a) \"$info(mount_$a)\""
+		puts $f "set DFPS_Manager_info(cam_$a) \"$info(cam_$a)\""
+	}
+	foreach a $info(fiducial_fibers) {
+		puts $f "set DFPS_Manager_info(fiducial_$a) \"$info(fiducial_$a)\""
+	}
 	close $f
+	
+	if {$config(verbose)} {
+		set f [open $config(calibration_file) r]
+		set contents [read $f]
+		close $f
+		LWDAQ_print $info(text) $contents brown
+	}
 	return ""
 }
 
@@ -1743,13 +1762,13 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.leds]
 	pack $f -side top -fill x
 
-	foreach a {fiducials guides controllers} {
+	foreach a {fiducial_leds guide_leds controllers} {
 		label $f.l$a -text $a -fg $config(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 12
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	foreach d {ns_all ew_all} {
+	foreach d {ns ew} {
 		set a [string tolower $d]
 		label $f.l$a -text $d -fg $config(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 5
