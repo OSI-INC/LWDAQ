@@ -105,7 +105,7 @@ proc DFPS_Manager_init {} {
 	set info(fiducial_coord_offset) "65.0"
 
 	# Fiducial coordinate pose in global coordinates.
-	set info(fiducial_coord_pose) "-13.0 90.0 -92.0 0.0 0.0 0.0"
+	set info(fiducial_coord) "-13.0 90.0 -92.0 0.0 0.0 0.0"
 	# Nominal -13.0 90.0 -92.0 0 0 0
 	# DFPS-4A -12.904 89.042 -96.586 0.001 -0.001 0.000
 	
@@ -239,9 +239,9 @@ proc DFPS_Manager_init {} {
 	set info(ffrotate_measurements) [list]
 	set info(ffrotate_orientations) "0 90 180 270"
 	set info(ffrotate_0) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
-	set info(ffrotate_90) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
-	set info(ffrotate_180) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
-	set info(ffrotate_270) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
+	set info(ffrotate_90) "0.0 +105.0 -90.0 0.0 +75 -90.0 -30.0 +105.0 -90.0 -30.0 +75.0 -90.0"
+	set info(ffrotate_180) "0.0 +75.0 -90.0 -30.0 +75 -90.0 0.0 +105.0 -90.0 -30.0 +105.0 -90.0"
+	set info(ffrotate_270) "-30.0 +75.0 -90.0 -30.0 +105 -90.0 0.0 +75.0 -90.0 0.0 +105.0 -90.0"
 	set info(ffrotate_wait_ms) "100"
 	set config(ffrotate_leds) "A5 A7 A6 A8"
 	set info(ffrotate_width) "130.00"
@@ -342,7 +342,7 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 	foreach a $info(fiducial_fibers) {
 		puts $f "set DFPS_Manager_info(fiducial_$a) \"$info(fiducial_$a)\""
 	}
-	puts $f "set DFPS_Manager_info(fiducial_coord_pose) \"$info(fiducial_coord_pose)\""
+	puts $f "set DFPS_Manager_info(fiducial_coord) \"$info(fiducial_coord)\""
 	close $f
 	
 	if {$config(verbose)} {
@@ -395,8 +395,8 @@ proc DFPS_Manager_examine_calibration {} {
 		grid $f.fl$a $f.fe$a -sticky nsew
 	}
 	
-	label $f.fcpl -text "fiducial_coord_pose" -fg $info(label_color)
-	entry $f.fcpe -textvariable DFPS_Manager_info(fiducial_coord_pose) -width $ew
+	label $f.fcpl -text "fiducial_coord" -fg $info(label_color)
+	entry $f.fcpe -textvariable DFPS_Manager_info(fiducial_coord) -width $ew
 	grid $f.fcpl $f.fcpe -sticky nsew
 	
 	foreach a {1 2 3 4} {
@@ -1846,7 +1846,7 @@ proc DFPS_Manager_fvc_reset {} {
 		return ""
 	}
 
-	set start_params $info(fiducial_coord_pose)
+	set start_params $info(fiducial_coord)
 	lwdaq_config -show_details $config(fit_details) -text_name $info(text) -fsd 3	
 	set end_params [lwdaq_simplex $start_params \
 		DFPS_Manager_fvc_reset_err \
@@ -1864,7 +1864,7 @@ proc DFPS_Manager_fvc_reset {} {
 	}
 	
 	LWDAQ_print $info(text) "$end_params"
-	set info(fiducial_coord_pose) [lrange $end_params 0 5]
+	set info(fiducial_coord) [lrange $end_params 0 5]
 	
 	return ""
 }
