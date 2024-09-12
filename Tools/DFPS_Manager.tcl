@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.4"
+	LWDAQ_tool_init "DFPS_Manager" "2.5"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The state variable tells us the current state of the tool.
@@ -170,10 +170,10 @@ proc DFPS_Manager_init {} {
 	
 	# Fiber View Camera Coordinate Measuring Machine Calibration (FVCCMM) settings.
 	set info(num_sources) "4"
-	set info(fvccmm_src_1) "-28.223 104.229 -91.363"
-	set info(fvccmm_src_2) "1.717 104.294 -91.613"
-	set info(fvccmm_src_3) "-28.229 74.268 -91.925"
-	set info(fvccmm_src_4) "1.631 74.257 -91.437"
+	set info(fvccmm_fid_1) "-28.223 104.229 -91.363"
+	set info(fvccmm_fid_2) "1.717 104.294 -91.613"
+	set info(fvccmm_fid_3) "-28.229 74.268 -91.925"
+	set info(fvccmm_fid_4) "1.631 74.257 -91.437"
 	set info(spots_left) "1572.16 1192.59 3377.92 1154.19 1594.61 3038.75 3381.78 3051.64"
 	set info(spots_right) "2223.58 1109.76 4000.05 1117.53 2232.85 3038.02 4017.75 2984.44"
 	set config(bcam_width) "5180"
@@ -405,12 +405,6 @@ proc DFPS_Manager_examine_calibration {} {
 		grid $f.gl$a $f.ge$a -sticky nsew
 	}
 
-	foreach a {1 2 3 4} {
-		label $f.sl$a -text "source_$a" -fg brown
-		entry $f.se$a -textvariable DFPS_Manager_info(fvccmm_src_$a) -width $ew
-		grid $f.sl$a $f.se$a -sticky nsew
-	}
-	
 	foreach a $info(gsrasnik_orientations) {
 		label $f.maskl$a -text "gsrasnik_mask_$a\:" -fg brown
 		entry $f.maske$a -textvariable DFPS_Manager_info(gsrasnik_mask_$a) -width $ew
@@ -860,7 +854,7 @@ proc DFPS_Manager_fvccmm_disagreement {{params ""} {show "1"}} {
 		set spots $info(spots_$side)
 		for {set a 1} {$a <= $info(num_sources)} {incr a} {
 			set sb [lwdaq xyz_local_from_global_point \
-				$info(fvccmm_src_$a) $info(coord_$side)]
+				$info(fvccmm_fid_$a) $info(coord_$side)]
 			set th [lwdaq bcam_image_position $sb [set fvc_$side]]
 			scan $th %f%f x_th y_th
 			set x_th [format %.2f [expr $x_th * 1000.0]]
@@ -959,12 +953,12 @@ proc DFPS_Manager_fvccmm_check {} {
 		set y_src [format %8.3f [expr $y + 0.5*$dy]]
 		set z_src [format %8.3f [expr $z + 0.5*$dz]]
 		
-		set a $info(fvccmm_src_$i)
+		set a $info(fvccmm_fid_$i)
 		set x_err [format %6.3f [expr [lindex $a 0]-$x_src]]
 		set y_err [format %6.3f [expr [lindex $a 1]-$y_src]]
 		set z_err [format %6.3f [expr [lindex $a 2]-$z_src]]
 		
-		LWDAQ_print $info(fvccmm_text) "fvccmm_src_$i\: $x_src $y_src $z_src\
+		LWDAQ_print $info(fvccmm_text) "fvccmm_fid_$i\: $x_src $y_src $z_src\
 			$x_err $y_err $z_err"
 		
 		set sum_squares [expr $sum_squares + $x_err*$x_err \
@@ -972,7 +966,7 @@ proc DFPS_Manager_fvccmm_check {} {
 	}
 
 	set err [expr sqrt($sum_squares / $info(num_sources))]
-	LWDAQ_print $info(fvccmm_text) "Root Mean Square Error (mm): [format %.3f $err]"
+	LWDAQ_print $info(fvccmm_text) "Root Mean Square Error (mm): [format %.3f $err]\n"
 
 	return ""
 }
@@ -1018,10 +1012,13 @@ proc DFPS_Manager_fvccmm_read {{fn ""}} {
 		lappend spheres "$x $y $z"
 	}
 	set info(mount_left) [join [lrange $spheres 3 5]]
+	LWDAQ_print $info(fvccmm_text) "Left Mount: $info(mount_left)"
 	set info(mount_right) [join [lrange $spheres 6 8]]
+	LWDAQ_print $info(fvccmm_text) "Right Mount: $info(mount_right)"
 	set spheres [lrange $spheres 9 end]
 	for {set a 1} {$a <= $info(num_sources)} {incr a} {
-		set info(fvccmm_src_$a) [lindex $spheres [expr $a-1]]
+		set info(fvccmm_fid_$a) [lindex $spheres [expr $a-1]]
+		LWDAQ_print $info(fvccmm_text) "Fiducial $a\: $info(fvccmm_fid_$a)"
 	}
 
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
@@ -1054,9 +1051,7 @@ proc DFPS_Manager_fvccmm_read {{fn ""}} {
 	}
 
 	set err [DFPS_Manager_fvccmm_disagreement]
-	LWDAQ_print $info(fvccmm_text) "Current spot position fit error is $err um rms."
-
-	LWDAQ_print $info(fvccmm_text) "Done: measurements loaded and displayed." purple
+	LWDAQ_print $info(fvccmm_text) "Current spot position fit error is $err um rms.\n"
 
 	set info(state) "Idle"
 	return ""
@@ -1541,7 +1536,18 @@ proc DFPS_Manager_ffrotate_acquire {orientation} {
 #
 # DFPS_Manager_ffrotate_calculate takes the four measurements of fidicial fibers
 # from four orientations and calculates for each fiducial fiber its position in
-# frame coordinates.
+# frame coordinates. For each orienation we construct the two-dimensional
+# rotation matrix that transforms vectors in the 0-degree orientation to those
+# in the new orienation. For the 0-degree orientaion this matrix is the identity
+# matris. For each fiber and each pair of orientations, we subtract the second
+# rotation matrix from the first, invert the difference matrix, and apply this
+# transform to the vector between the two global positions of the fibers. The
+# result is the vector from the center of the plate to the fiber. We now correct
+# for a plate whose center is not exactly at our fiducial coordinate origin. If
+# the width of the plate is 140 mm, for example, and our coordinate origin is at
+# 65 mm, the center is 5 mm to the right of the coordinate origin, so we must
+# add 5 mm to the x-coordinate of the vector from the center to the fiber in
+# order to obtain the x-coordinate of the vector from the origin to the fiber.
 #
 proc DFPS_Manager_ffrotate_calculate {} {
 	upvar #0 DFPS_Manager_config config
@@ -1591,6 +1597,8 @@ proc DFPS_Manager_ffrotate_calculate {} {
 			set dy [expr $y2-$y1]
 			set x [expr $m11*$dx + $m12*$dy]
 			set y [expr $m21*$dx + $m22*$dy]
+			set x [expr $x + 0.5*$info(ffrotate_width) - $info(fiducial_coord_offset)]
+			set y [expr $y + 0.5*$info(ffrotate_height) - $info(fiducial_coord_offset)]
 			LWDAQ_print -nonewline $info(ffrotate_text) \
 				"[format %8.3f $x] [format %8.3f $y] "
 			set sum_x_$ff [expr [set sum_x_$ff] + $x]
