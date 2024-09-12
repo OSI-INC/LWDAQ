@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.5"
+	LWDAQ_tool_init "DFPS_Manager" "2.6"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The state variable tells us the current state of the tool.
@@ -162,7 +162,7 @@ proc DFPS_Manager_init {} {
 	set config(check_fiducials) "0"
 	
 	# Window settings.
-	set config(label_color) "green"
+	set info(label_color) "brown"
 	set config(guide_zoom) "0.3"
 	set config(fvc_zoom) "0.5"
 	set config(intensify) "exact"
@@ -378,53 +378,53 @@ proc DFPS_Manager_examine_calibration {} {
 	pack $f -side top -fill x
 
 	foreach a {left right} {
-		label $f.ml$a -text "mount_$a" -fg brown
+		label $f.ml$a -text "mount_$a" -fg $info(label_color)
 		entry $f.me$a -textvariable DFPS_Manager_info(mount_$a) -width $ew
 		grid $f.ml$a $f.me$a -sticky nsew
 	}
 
 	foreach a {left right} {
-		label $f.cl$a -text "cam_$a" -fg brown
+		label $f.cl$a -text "cam_$a" -fg $info(label_color)
 		entry $f.ce$a -textvariable DFPS_Manager_info(cam_$a) -width $ew
 		grid $f.cl$a $f.ce$a -sticky nsew
 	}
 
 	foreach a {1 2 3 4} {
-		label $f.fl$a -text "fiducial_$a" -fg brown
+		label $f.fl$a -text "fiducial_$a" -fg $info(label_color)
 		entry $f.fe$a -textvariable DFPS_Manager_info(fiducial_$a) -width $ew
 		grid $f.fl$a $f.fe$a -sticky nsew
 	}
 	
-	label $f.fcpl -text "fiducial_coord_pose" -fg brown
+	label $f.fcpl -text "fiducial_coord_pose" -fg $info(label_color)
 	entry $f.fcpe -textvariable DFPS_Manager_info(fiducial_coord_pose) -width $ew
 	grid $f.fcpl $f.fcpe -sticky nsew
 	
 	foreach a {1 2 3 4} {
-		label $f.gl$a -text "guide_$a" -fg brown
+		label $f.gl$a -text "guide_$a" -fg $info(label_color)
 		entry $f.ge$a -textvariable DFPS_Manager_info(guide_$a) -width $ew
 		grid $f.gl$a $f.ge$a -sticky nsew
 	}
 
 	foreach a $info(gsrasnik_orientations) {
-		label $f.maskl$a -text "gsrasnik_mask_$a\:" -fg brown
+		label $f.maskl$a -text "gsrasnik_mask_$a\:" -fg $info(label_color)
 		entry $f.maske$a -textvariable DFPS_Manager_info(gsrasnik_mask_$a) -width $ew
 		grid $f.maskl$a $f.maske$a -sticky nsew
 	}
 		
 	foreach a {rot_mrad width height} {
-		label $f.gsl$a -text "gsrasnik_$a" -fg brown
+		label $f.gsl$a -text "gsrasnik_$a" -fg $info(label_color)
 		entry $f.gse$a -textvariable DFPS_Manager_info(gsrasnik_$a) -width $ew
 		grid $f.gsl$a $f.gse$a -sticky nsew
 	}
 	
 	foreach a $info(ffrotate_orientations) {
-		label $f.ffl$a -text "ffrotate_$a" -fg brown
+		label $f.ffl$a -text "ffrotate_$a" -fg $info(label_color)
 		entry $f.ffe$a -textvariable DFPS_Manager_info(ffrotate_$a) -width $ew
 		grid $f.ffl$a $f.ffe$a -sticky nsew
 	}
 	
 	foreach a {width height} {
-		label $f.ffl$a -text "ffrotate_$a" -fg brown
+		label $f.ffl$a -text "ffrotate_$a" -fg $info(label_color)
 		entry $f.ffe$a -textvariable DFPS_Manager_info(gsrasnik_$a) -width $ew
 		grid $f.ffl$a $f.ffe$a -sticky nsew
 	}
@@ -1528,8 +1528,8 @@ proc DFPS_Manager_ffrotate_acquire {orientation} {
 		append measurement " "
 		LWDAQ_wait_ms $info(ffrotate_wait_ms)
 	}
-	set info(ffrotate_$orientation) [string trim "$orientation $measurement"]
-	LWDAQ_print $info(ffrotate_text) $info(ffrotate_$orientation)
+	set info(ffrotate_$orientation) [string trim "$measurement"]
+	LWDAQ_print $info(ffrotate_text) "$orientation $info(ffrotate_$orientation)"
 	return ""
 }
 
@@ -1588,11 +1588,10 @@ proc DFPS_Manager_ffrotate_calculate {} {
 		scan $R_unlink %f%f%f%f m11 m12 m21 m22
 		LWDAQ_print -nonewline $info(ffrotate_text) "[format %4d $o1] [format %4d $o2] "
 		foreach ff $info(fiducial_fibers) {
-			set x1 [lindex $m1 [expr ($ff-1)*3+1]]
-			set y1 [lindex $m1 [expr ($ff-1)*3+2]]
-			set z1 [lindex $m1 [expr ($ff-1)*3+3]]
-			set x2 [lindex $m2 [expr ($ff-1)*3+1]]
-			set y2 [lindex $m2 [expr ($ff-1)*3+2]]
+			set x1 [lindex $m1 [expr ($ff-1)*3+0]]
+			set y1 [lindex $m1 [expr ($ff-1)*3+1]]
+			set x2 [lindex $m2 [expr ($ff-1)*3+0]]
+			set y2 [lindex $m2 [expr ($ff-1)*3+1]]
 			set dx [expr $x2-$x1]
 			set dy [expr $y2-$y1]
 			set x [expr $m11*$dx + $m12*$dy]
@@ -1660,8 +1659,6 @@ proc DFPS_Manager_ffrotate_open {} {
 		return ""
 	}
 
-	LWDAQ_print $info(text) "hello from ffrotate_open $w" green
-	
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
@@ -1902,10 +1899,14 @@ proc DFPS_Manager_utilities {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	button $f.toolmaker -text "Toolmaker" -command "LWDAQ_Toolmaker"
+	button $f.toolmaker -text "Toolmaker" -command "LWDAQ_post LWDAQ_Toolmaker"
 	pack $f.toolmaker -side left -expand 1
 
-	button $f.server -text "Server" -command "LWDAQ_server_open"
+	button $f.configurator -text "Configurator" \
+		-command [list LWDAQ_post "LWDAQ_run_tool Configurator"]
+	pack $f.configurator -side left -expand 1
+
+	button $f.server -text "Server" -command "LWDAQ_post LWDAQ_server_open"
 	pack $f.server -side left -expand 1
 
 	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
@@ -1933,7 +1934,7 @@ proc DFPS_Manager_utilities {} {
 	set f [frame $w.cfile]
 	pack $f -side top -fill x
 	
-	label $f.title -text "Calibration File:"
+	label $f.title -text "Calibration File:" -fg $info(label_color)
 	entry $f.entry -textvariable DFPS_Manager_config(calib_file) -width 90
 	pack $f.title $f.entry -side left -expand 1
 
@@ -1945,9 +1946,9 @@ proc DFPS_Manager_utilities {} {
 	}
 	pack $f.transmit -side left -expand yes
 	
-	label $f.lid -text "Controller:" -fg $config(label_color)
+	label $f.lid -text "Controller:" -fg $info(label_color)
 	entry $f.id -textvariable DFPS_Manager_config(txp_controller) -width 10
-	label $f.lcommands -text "Commands:" -fg $config(label_color)
+	label $f.lcommands -text "Commands:" -fg $info(label_color)
 	entry $f.commands -textvariable DFPS_Manager_config(commands) -width 50
 	pack $f.lid $f.id $f.lcommands $f.commands -side left -expand yes
 
@@ -1988,7 +1989,7 @@ proc DFPS_Manager_open {} {
 	pack $f -side top -fill x
 
 	foreach a {ip_addr fvc_left fvc_right injector flash_s transceiver} {
-		label $f.l$a -text $a -fg $config(label_color)
+		label $f.l$a -text $a -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 1]
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -1998,14 +1999,14 @@ proc DFPS_Manager_open {} {
 	pack $f -side top -fill x
 
 	foreach a {fiducial_leds guide_leds controllers} {
-		label $f.l$a -text $a -fg $config(label_color)
+		label $f.l$a -text $a -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 12
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
 	foreach d {ns ew} {
 		set a [string tolower $d]
-		label $f.l$a -text $d -fg $config(label_color)
+		label $f.l$a -text $d -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 5
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
@@ -2084,11 +2085,6 @@ DFPS_Manager_detector_set_fc mast_num detector_num fc_x_mm fc_y_mm
 # rotated square that defines the detector fiber's range of motion.
 DFPS_Manager_detector_get_range_fc detector_num
 
-# Get the positions of the fiducial fibers. Returns the fiducial coordinates of
-# the four fibers top-left, top-right, bottom-left, bottom-right.
-DFPS_Manager_fiducial_get_fc
-
-Help coming soon.
 
 Fiber View Camera by Coordinate Measurement Machine Calibrator
 ==============================================================
@@ -2211,11 +2207,15 @@ will say "Fitting". The status label will return to "Idle" when the fit is done.
 The camera calibration constants are now ready.
 
 
-Fiducial Plate Calibrator
-=========================
+Guide Sensor by Rasnik Mask Calibrator
+======================================
 
 Help coming soon.
 
+Fiducial Fiber by Rotation Calibrator
+=====================================
+
+Help coming soon.
 
 (C) Kevan Hashemi, 2023-2024, Open Source Instruments Inc.
 https://www.opensourceinstruments.com
