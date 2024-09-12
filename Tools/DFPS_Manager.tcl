@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.6"
+	LWDAQ_tool_init "DFPS_Manager" "2.7"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The state variable tells us the current state of the tool.
