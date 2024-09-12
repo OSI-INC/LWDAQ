@@ -30,11 +30,12 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.3"
+	LWDAQ_tool_init "DFPS_Manager" "2.4"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The state variable tells us the current state of the tool.
 	set info(state) "Idle"
+	set config(verbose) "0"
 
 	# Data acquisition parameters for the DFPS-4A.
 	set config(ip_addr) "192.168.1.30"
@@ -45,7 +46,7 @@ proc DFPS_Manager_init {} {
 	set config(fvc_left) "5 0"
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
-	set config(fiducial_leds) "A5 A6 A7 A8"
+	set config(fiducial_leds) "A5 A7 A6 A8"
 	set config(guide_leds) "D1 D2"
 	set config(flash_s) "0.004"
 	set config(sort_code) "8"
@@ -59,27 +60,30 @@ proc DFPS_Manager_init {} {
 	set config(dac_zero) "32000"
 	set info(image_sensor) "ICX424"
 	LWDAQ_set_image_sensor $info(image_sensor) BCAM
+	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
+	LWDAQ_set_image_sensor $info(image_sensor) Camera
 	set config(analysis_threshold) "10 #"
 	set config(guide_daq_1) "7 0 2"
 	set config(guide_daq_2) "6 0 1"
 	set config(guide_daq_3) "7 0 1"
 	set config(guide_daq_4) "6 0 2"
-	set info(guide_sensors) "1 2 3 4"
 	set info(guide_manipulations) "invert rows_to_columns"
-	set info(fiducial_fibers) "1 2 3 4"
 	
-	# Data acquisition and analysis results.
-	set config(spots) ""
-	set config(sources) ""
-	set config(verbose) "1"
+	# Temporary acquisition and analysis results.
+	set info(spots) ""
+	set info(sources) ""
+	
+	# Calibration file. By default, we store calibration constants in the
+	# LWDAQ Tools/Data directory.
+	set config(calib_file) [file join $LWDAQ_Info(tools_dir) Data DFPS_Calibration.tcl]
 		
 	# Fiber view camera calibration constants.
-	set info(cam_left) \
-		"12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113"
+	set info(cam_left) "12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113"
+	# Nominal: FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
 	# DFPS-4A: Y71010 12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113
 	# Breadboard: Y71066 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
-	set info(cam_right) \
-		"12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220"
+	set info(cam_right) "12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220"
+	# Nominal: FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
 	# DFPS-4A: Y71003 12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220
 	# Breadboard: Y71080 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
 	
@@ -97,28 +101,43 @@ proc DFPS_Manager_init {} {
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 	
-	# Fiducial coordinate pose with respect to frame coordinates.
+	# Fiducial coordinate offset with respect to frame coordinates.
 	set info(fiducial_coord_offset) "65.0"
+
+	# Fiducial coordinate pose in global coordinates.
+	set info(fiducial_coord_pose) "-13.0 90.0 -92.0 0.0 0.0 0.0"
+	# Nominal -13.0 90.0 -92.0 0 0 0
+	# DFPS-4A -12.904 89.042 -96.586 0.001 -0.001 0.000
 	
 	# Fiducial fiber positions in fiducial coordinates.
-	set info(fiducial_1) "-15 +15 0"
-	# DFPS-4A: 
-	set info(fiducial_2) "+15 +15 0"
-	# DFPS-4A: 
-	set info(fiducial_3) "-15 -15 0"
-	# DFPS-4A: 
-	set info(fiducial_4) "+15 -15 0"
-	# DFPS-4A: 
+	set info(fiducial_fibers) "1 2 3 4"
+	set info(fiducial_1) "-15.0 +15.0 2.8"
+	# Nominal: -15.0 +15.0 2.8
+	# DFPS-4A: -15.255 14.899 2.800
+	set info(fiducial_2) "+15.0 +15.0 2.8"
+	# Nominal: +15.0 +15.0 2.8
+	# DFPS-4A:  14.684 14.941 2.550
+	set info(fiducial_3) "-15.0 -15.0 2.8"
+	# Nominal: -15.0 -15.0 2.8
+	# DFPS-4A: -15.292 -15.074 2.238
+	set info(fiducial_4) "+15.0 -15.0 2.8"
+	# Nominal: +15.0 -15.0 2.8
+	# DFPS-4A:  14.562 -15.076 2.726
 	
 	# Guide sensor positions and orientations in fiducial coordinates.
+	set info(guide_sensors) "1 2 3 4"
 	set info(guide_1) "-24.598 19.792 5.028"
-	# DFPS-4A: 
+	# Nominal: -24.400 19.900 0.100
+	# DFPS-4A: -24.572 19.714 5.188
 	set info(guide_2) "20.268 19.770 3.874"
-	# DFPS-4A: 
+	# Nominal: 20.600 19.900 0.100
+	# DFPS-4A: 20.310 19.685 3.932
 	set info(guide_3) "-24.685 -25.170 0.917"
-	# DFPS-4A: 
+	# Nominal: -24.400 -25.100 0.100
+	# DFPS-4A: -24.651 -25.258 0.987
 	set info(guide_4) "20.347 -25.146 9.414"
-	# DFPS-4A: 
+	# Nominal: 20.600 -25.100 0.100
+	# DFPS-4A: 20.391 -25.227 9.697
 	
 	# Default north-south, and east-west control values.
 	set config(ns) $config(dac_zero) 
@@ -131,7 +150,7 @@ proc DFPS_Manager_init {} {
 	set info(rf_on_op) "0081"
 	set info(rf_xmit_op) "82"
 	set info(checksum_preload) "1111111111111111"	
-	set config(id) "FFFF"
+	set config(txp_controller) "FFFF"
 	set config(commands) "8"
 	
 	# Watchdog control.
@@ -155,10 +174,8 @@ proc DFPS_Manager_init {} {
 	set info(fvccmm_src_2) "1.717 104.294 -91.613"
 	set info(fvccmm_src_3) "-28.229 74.268 -91.925"
 	set info(fvccmm_src_4) "1.631 74.257 -91.437"
-	set info(spots_left) \
-		"1572.16 1192.59 3377.92 1154.19 1594.61 3038.75 3381.78 3051.64"
-	set info(spots_right) \
-		"2223.58 1109.76 4000.05 1117.53 2232.85 3038.02 4017.75 2984.44"
+	set info(spots_left) "1572.16 1192.59 3377.92 1154.19 1594.61 3038.75 3381.78 3051.64"
+	set info(spots_right) "2223.58 1109.76 4000.05 1117.53 2232.85 3038.02 4017.75 2984.44"
 	set config(bcam_width) "5180"
 	set config(bcam_height) "3848"
 	set config(bcam_threshold) "10 #"
@@ -175,53 +192,73 @@ proc DFPS_Manager_init {} {
 	set config(fit_stop) "0"
 	set config(fvccmm_zoom) "1.0"
 	set config(fvccmm_intensify) "exact"
-	set info(fvccmm_examine_window) "$info(window).fvccmm_examine_window"
 	
 	# Guide Sensor with Rasnik Calibration (GSRasnik) settings.
 	set info(gsrasnik_orientations) "0 90 180 270"
 	set info(gsrasnik_swaps) "0 1 0 1"
-	set info(gsrasnik_orientation_codes) "1 2 4 3"
+	set config(gsrasnik_orientation_codes) "1 3 4 2"
 	set config(gsrasnik_algorithm) "21"
 	set config(gsrasnik_square_um) "340"
 	set config(gsrasnik_flash_s) "0.02"
 	set info(gsrasnik_refcode) "3"
 	set config(gsrasnik_ref_x_um) "0"
 	set config(gsrasnik_ref_y_um) "5180"
-	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
 	set config(gsrasnik_zoom) "0.5"
 	set config(gsrasnik_intensify) "exact"
-	set info(gsrasnik_examine_window) "$info(window).gsrasnik_examine_window"
 	
 	# GSRasnik data. We have default values for rasnik mask measurements from
 	# all four guide sensors in all four orientations, for use in testing
 	# GSRasnik calculations.
-	set info(gsrasnik_mask_0) "24.315 68.403 -4.776 69.198 68.384 -3.833 \
-		24.233 23.443 -0.848 69.284 23.490 -9.864"
-	set info(gsrasnik_mask_90) "29.141 24.061 -4.892 29.181 68.942 -3.805 \
-		74.108 23.969 -0.987 74.083 69.016 -9.386"
-	set info(gsrasnik_mask_180) "73.477 28.849 -5.348 28.594 28.884 -3.947 \
-		73.558 73.819 -0.832 28.537 73.766 -9.426"
-	set info(gsrasnik_mask_270) "68.694 73.226 -4.103 68.663 28.327 -3.893 \
-		23.723 73.299 -0.837 23.765 28.252 -9.873"
+	set info(gsrasnik_mask_0) \
+		"24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597"
+	# Nominal: 24.4 68.2 0 69.4 68.2 0 24.4 23.2 0 69.4 23.2 0
+	# DFPS-4A: 24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597 
+	set info(gsrasnik_mask_90) \
+		"29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000"
+	# Nominal: 28.9 23.9 0 28.9 68.9 0 73.9 23.9 0 73.9 68.9 0
+	# DFPS-4A: 29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000 
+	set info(gsrasnik_mask_180) \
+		"73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665"
+	# Nominal: 73.2 28.4 0 28.2 28.4 0 73.2 73.4 0 28.2 73.4 0
+	# DFPS-4A: 73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665 
+	set info(gsrasnik_mask_270) \
+		"68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795"
+	# Nominal: 68.7 72.7 0 68.7 27.7 0 23.7 72.7 0 23.7 27.7 0
+	# DFPS-4A: 68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795 
 	set info(gsrasnik_rot_mrad) "-0.10"
+	# Nominal: 0.00
+	# Actual: -0.10
 	set info(gsrasnik_width) "130.000"
+	# Nominal: 130.0
+	# Actual: 130.00
 	set info(gsrasnik_height) "130.000"
+	# Nominal: 130.0
+	# Actual: 130.00
 	
 	# Fiducial Fiber Rotation Calibration (FFRotate) settings.
+	set info(ffrotate_measurements) [list]
+	set info(ffrotate_orientations) "0 90 180 270"
+	set info(ffrotate_0) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
+	set info(ffrotate_90) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
+	set info(ffrotate_180) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
+	set info(ffrotate_270) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
+	set info(ffrotate_wait_ms) "100"
+	set config(ffrotate_leds) "A5 A7 A6 A8"
+	set info(ffrotate_width) "130.00"
+	# Nominal: 130.0
+	# Actual: 130.00
+	set info(ffrotate_height) "130.00"
+	# Nominal: 130.0
+	# Actual: 130.00
 	
-	
-	# Fiber View Camera Gauge Block Calibration (FVCGauge) settings.
-
 	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 	
-	# Calibration file.
-	set config(calibration_file) \
-		[file join $LWDAQ_Info(tools_dir) Data DFPS_Calibration.tcl]
-	if {[file exists $config(calibration_file)]} {
-		uplevel #0 [list source $config(calibration_file)]
+	# Read the calibration file, if it exists.
+	if {[file exists $config(calib_file)]} {
+		uplevel #0 [list source $config(calib_file)]
 	} 
 
 	# Create spaces to store FVC images as they come in from the BCAM
@@ -248,11 +285,81 @@ proc DFPS_Manager_init {} {
 }
 
 #
-# DFPS_Manager_examine opens a new window that displays the CMM measurements of
-# the left and right mounting balls, the camera calibration constants, and the
-# fiducial plate measurements.
+# DFPS_Manager_read_calibration reads calibration constants from a named file, or
+# from the default file if no file is specified.
 #
-proc DFPS_Manager_examine {} {
+proc DFPS_Manager_read_calibration {{fn ""}} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {$fn == ""} {set fn [LWDAQ_get_file_name]}
+	if {$fn != ""} {
+		set config(calib_file) $fn
+		uplevel #0 [list source $config(calib_file)]
+	}
+	
+	return ""
+}
+
+#
+# DFPS_Manager_save_calibration saves the fiber view mounts, camera parameters, fiducial
+# positions, guide sensor positions, detector fiber offsets, actuator ranges, and
+# actuator maps to disk in the Tools/Settings folder.
+#
+proc DFPS_Manager_save_calibration {{fn ""}} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {$fn == ""} {
+		set fn [LWDAQ_put_file_name $config(calib_file)]
+	}
+	if {$fn == ""} {
+		return ""
+	} else {
+		set config(calib_file) $fn
+	}
+	
+	set f [open $config(calib_file) w]
+	foreach or $info(gsrasnik_orientations) {
+		puts $f "set DFPS_Manager_info(gsrasnik_mask_$or) \"$info(gsrasnik_mask_$or)\""
+	}
+	foreach a {rot_mrad width height} {
+		puts $f "set DFPS_Manager_info(gsrasnik_$a) \"$info(gsrasnik_$a)\""
+	}
+	foreach guide $info(guide_sensors) {
+		puts $f "set DFPS_Manager_info(guide_$guide) \"$info(guide_$guide)\""
+	}
+	foreach or $info(ffrotate_orientations) {
+		puts $f "set DFPS_Manager_info(ffrotate_$or) \"$info(ffrotate_$or)\""
+	}
+	foreach a {width height} {
+		puts $f "set DFPS_Manager_info(ffrotate_$a) \"$info(ffrotate_$a)\""
+	}
+	foreach a {left right} {
+		puts $f "set DFPS_Manager_info(mount_$a) \"$info(mount_$a)\""
+		puts $f "set DFPS_Manager_info(cam_$a) \"$info(cam_$a)\""
+	}
+	foreach a $info(fiducial_fibers) {
+		puts $f "set DFPS_Manager_info(fiducial_$a) \"$info(fiducial_$a)\""
+	}
+	puts $f "set DFPS_Manager_info(fiducial_coord_pose) \"$info(fiducial_coord_pose)\""
+	close $f
+	
+	if {$config(verbose)} {
+		set f [open $config(calib_file) r]
+		set contents [read $f]
+		close $f
+		LWDAQ_print $info(text) $contents
+	}
+	return ""
+}
+
+#
+# DFPS_Manager_examine_calibration opens a new window that displays the CMM
+# measurements of the left and right mounting balls, the camera calibration
+# constants, and the fiducial plate measurements.
+#
+proc DFPS_Manager_examine_calibration {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
@@ -264,45 +371,73 @@ proc DFPS_Manager_examine {} {
 		raise $w
 		return ""
 	}
+	
+	set ew 90
+	
+	set f [frame $w.params]
+	pack $f -side top -fill x
 
-	foreach a {Left Right} {
-		set b [string tolower $a]
-		set f [frame $w.mnt$b]
-		pack $f -side top -fill x
-		label $f.l$b -text "Mount $a:"
-		entry $f.e$b -textvariable DFPS_Manager_info(mount_$b) -width 70
-		pack $f.l$b $f.e$b -side left -expand yes
+	foreach a {left right} {
+		label $f.ml$a -text "mount_$a" -fg brown
+		entry $f.me$a -textvariable DFPS_Manager_info(mount_$a) -width $ew
+		grid $f.ml$a $f.me$a -sticky nsew
 	}
 
-	foreach a {Left Right} {
-		set b [string tolower $a]
-		set f [frame $w.cam$b]
-		pack $f -side top -fill x
-		label $f.l$b -text "Camera $a:"
-		entry $f.e$b -textvariable DFPS_Manager_info(cam_$b) -width 70
-		pack $f.l$b $f.e$b -side left -expand yes
-	}
-
-	foreach a {1 2 3 4} {
-		set b [string tolower $a]
-		set f [frame $w.fid$b]
-		pack $f -side top -fill x
-		label $f.l$b -text "Fiducial $a:"
-		entry $f.e$b -textvariable DFPS_Manager_info(fiducial_$b) -width 70
-		pack $f.l$b $f.e$b -side left -expand yes
+	foreach a {left right} {
+		label $f.cl$a -text "cam_$a" -fg brown
+		entry $f.ce$a -textvariable DFPS_Manager_info(cam_$a) -width $ew
+		grid $f.cl$a $f.ce$a -sticky nsew
 	}
 
 	foreach a {1 2 3 4} {
-		set b [string tolower $a]
-		set f [frame $w.gd$b]
-		pack $f -side top -fill x
-		label $f.l$b -text "Guide $a:"
-		entry $f.e$b -textvariable DFPS_Manager_info(guide_$b) -width 70
-		pack $f.l$b $f.e$b -side left -expand yes
+		label $f.fl$a -text "fiducial_$a" -fg brown
+		entry $f.fe$a -textvariable DFPS_Manager_info(fiducial_$a) -width $ew
+		grid $f.fl$a $f.fe$a -sticky nsew
+	}
+	
+	label $f.fcpl -text "fiducial_coord_pose" -fg brown
+	entry $f.fcpe -textvariable DFPS_Manager_info(fiducial_coord_pose) -width $ew
+	grid $f.fcpl $f.fcpe -sticky nsew
+	
+	foreach a {1 2 3 4} {
+		label $f.gl$a -text "guide_$a" -fg brown
+		entry $f.ge$a -textvariable DFPS_Manager_info(guide_$a) -width $ew
+		grid $f.gl$a $f.ge$a -sticky nsew
+	}
+
+	foreach a {1 2 3 4} {
+		label $f.sl$a -text "source_$a" -fg brown
+		entry $f.se$a -textvariable DFPS_Manager_info(fvccmm_src_$a) -width $ew
+		grid $f.sl$a $f.se$a -sticky nsew
+	}
+	
+	foreach a $info(gsrasnik_orientations) {
+		label $f.maskl$a -text "gsrasnik_mask_$a\:" -fg brown
+		entry $f.maske$a -textvariable DFPS_Manager_info(gsrasnik_mask_$a) -width $ew
+		grid $f.maskl$a $f.maske$a -sticky nsew
+	}
+		
+	foreach a {rot_mrad width height} {
+		label $f.gsl$a -text "gsrasnik_$a" -fg brown
+		entry $f.gse$a -textvariable DFPS_Manager_info(gsrasnik_$a) -width $ew
+		grid $f.gsl$a $f.gse$a -sticky nsew
+	}
+	
+	foreach a $info(ffrotate_orientations) {
+		label $f.ffl$a -text "ffrotate_$a" -fg brown
+		entry $f.ffe$a -textvariable DFPS_Manager_info(ffrotate_$a) -width $ew
+		grid $f.ffl$a $f.ffe$a -sticky nsew
+	}
+	
+	foreach a {width height} {
+		label $f.ffl$a -text "ffrotate_$a" -fg brown
+		entry $f.ffe$a -textvariable DFPS_Manager_info(gsrasnik_$a) -width $ew
+		grid $f.ffl$a $f.ffe$a -sticky nsew
 	}
 
 	return ""
 }
+
 
 #
 # DFPS_Manager_id_bytes returns a list of two bytes as decimal numbers that represent
@@ -340,11 +475,11 @@ proc DFPS_Manager_transmit {{commands ""}} {
 	
 	# If we specify no commands, use those in the commands parameter.
 	if {$commands == ""} {
-		set commands "[DFPS_Manager_id_bytes $config(id)] $config(commands)"
+		set commands "[DFPS_Manager_id_bytes $config(txp_controller)] $config(commands)"
 	}
 
 	# Print the commands to the text window.
-	if {$config(verbose)} {LWDAQ_print $info(text) "Transmitting: $commands" orange}
+	LWDAQ_print $info(utility_text) "Transmitting: $commands"
 
 	# Append a two-byte checksum.
 	set checksum $info(checksum_preload)
@@ -386,36 +521,14 @@ proc DFPS_Manager_transmit {{commands ""}} {
 		LWDAQ_socket_close $sock
 	} error_result]} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
-		error $error_result
+		LWDAQ_print $info(utility_text) "ERROR: $error_result"
+		return ""
 	}
 	
 	# If we get here, we have no reason to believe the transmission failed, although
 	# we could have instructed an empty driver socket or the positioner could have
 	# failed to receive the command.
 	return ""
-}
-
-#
-# DFPS_Manager_txp opens a new window and provides a button for transmitting a
-# string of command bytes to a device. There are two entry boxes. One for the
-# device identifier, another for the command bytes. The identifier is a four-hex
-# value. The command bytes are each decimal values 0..255 separated by spaces.
-# The routine parses the identifier into two bytes, transmits all the command
-# bytes, and appends the correct checksum on the end.
-#
-proc DFPS_Manager_txp {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-	
-	set w $info(window)\.xmit_panel
-	if {[winfo exists $w]} {
-		raise $w
-		return ""
-	}
-	toplevel $w
-	wm title $w "Fiber_Positioner $info(version) Transmit Command Panel"
-
-	return "" 
 }
 
 #
@@ -481,7 +594,7 @@ proc DFPS_Manager_spots {{elements ""}} {
 			LWDAQ_print $info(text) "$result"
 			return ""
 		} else {
-			if {$config(verbose)} {LWDAQ_print $info(text) "Left: $result" brown}
+			if {$config(verbose)} {LWDAQ_print $info(text) "Left: $result"}
 			set result_$side [lrange $result 1 end]
 			lwdaq_image_manipulate $iconfig(memory_name) \
 				copy -name $info(image_$side)
@@ -502,9 +615,11 @@ proc DFPS_Manager_spots {{elements ""}} {
 	}
 	
 	# Return the results string and store in configuration array.
-	set config(spots) [string trim $spots]
-	if {$config(verbose)} {LWDAQ_print $info(text) "Spots: $spots" brown}
-	return $config(spots)
+	set info(spots) [string trim $spots]
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "Spots: $spots"
+	}
+	return $info(spots)
 }
 
 #
@@ -576,17 +691,19 @@ proc DFPS_Manager_sources {spots} {
 	}
 
 	# Store source positions in configuration array and return them too.
-	set config(sources) [string trim $sources]	
-	if {$config(verbose)} {LWDAQ_print $info(text) "Sources: $sources" brown}
-	return $config(sources)
+	set info(sources) [string trim $sources]	
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "Sources: $sources"
+	}
+	return $info(sources)
 }
 
 #
-# DFPS_Manager_check measures spot position, and reports. We can pass it a list
+# DFPS_Manager_measure measures spot position, and reports. We can pass it a list
 # of source elements to flash and measure, or else the routine will generate its
 # own list by combining the fiducial and guide LED elements.
 #
-proc DFPS_Manager_check {{elements ""}} {
+proc DFPS_Manager_measure {{elements ""}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -594,7 +711,7 @@ proc DFPS_Manager_check {{elements ""}} {
 		return ""
 	}
 	
-	set info(state) "Check"	
+	set info(state) "Measure"	
 
 	if {[catch {
 		if {$elements == ""} {
@@ -691,54 +808,6 @@ proc DFPS_Manager_fvccmm_get_params {} {
 }
 
 #
-# DFPS_Manager_fvccmm_examine opens a new window that displays the CMM measurements
-# of the left and right mounting balls and the calibration sources. It displays
-# the spot positions for these calibration sources in the left and right FVCs.
-# The window allows us to modify the all these values by hand.
-#
-proc DFPS_Manager_fvccmm_examine {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	set w $info(fvccmm_examine_window)
-	if {![winfo exists $w]} {
-		toplevel $w
-		wm title $w "FVCCMM Measurements, DFPS Calibrator $info(version)"
-	} {
-		raise $w
-		return ""
-	}
-
-	foreach mount {Left Right} {
-		set b [string tolower $mount]
-		set f [frame $w.mnt$b]
-		pack $f -side top -fill x
-		label $f.l$b -text "$mount Mount:"
-		entry $f.e$b -textvariable DFPS_Manager_info(mount_$b) -width 70
-		pack $f.l$b $f.e$b -side left -expand yes
-	}
-
-	foreach a {1 2 3 4} {
-		set f [frame $w.src$a]
-		pack $f -side top -fill x
-		label $f.l$a -text "Source $a\:"
-		entry $f.e$a -textvariable DFPS_Manager_info(fvccmm_src_$a) -width 70
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-	
-	foreach mount {Left Right} {
-		set b [string tolower $mount]
-		set f [frame $w.spt$b]
-		pack $f -side top -fill x
-		label $f.l$b -text "$mount Spots:"
-		entry $f.e$b -textvariable DFPS_Manager_info(spots_$b) -width 70
-		pack $f.l$b $f.e$b -side left -expand yes
-	}
-	
-	return ""
-}
-
-#
 # DFPS_Manager_fvccmm_disagreement calculates root mean square square distance
 # between the actual image positions and the modeled image positions we obtain
 # when applying our mount measurements, FVC calibration constants, and measured
@@ -757,8 +826,8 @@ proc DFPS_Manager_fvccmm_disagreement {{params ""} {show "1"}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	# If user has closed the calibrator window, generate an error so that we stop any
-	# fitting that might be calling this routine. 
+	# If user has closed the manager window, generate an error so that we stop
+	# any fitting that might be calling this routine. 
 	if {![winfo exists $info(window)]} {
 		error "No DFPS window open."
 	}
@@ -768,10 +837,6 @@ proc DFPS_Manager_fvccmm_disagreement {{params ""} {show "1"}} {
 		set params [DFPS_Manager_fvccmm_get_params]
 	}
 	
-	# Make sure messages from the BCAM routines get to the DFPS Calibrator's text
-	# window. Set the number of decimal places to three.
-	lwdaq_config -text_name $info(fvccmm_text)
-
 	# Extract the two sets of camera calibration constants from the parameters passed
 	# to us by the fitter.
 	set fvc_left "FVC_L [lrange $params 0 7]"
@@ -913,13 +978,14 @@ proc DFPS_Manager_fvccmm_check {} {
 }
 
 #
-# DFPS_Manager_fvccmm_read either reads a specified CMM measurement file or browses
-# for one. The calibrator reads the global coordinates of the balls in the left
-# and right FVC mounts, and the locations of the four calibration sources.
-# Having read the CMM file the routine looks for L.gif and R.gif in the same
-# directory. These should be the images returned by the left and right FVCs of
-# the four calibration sources. In these two images, the sources must be
-# arranged from 1 to 4 in an x-y grid, as recognised by the BCAM Instrument.
+# DFPS_Manager_fvccmm_read either reads a specified CMM measurement file or
+# browses for one. The fiber view calibrator reads the global coordinates of the
+# balls in the left and right FVC mounts, and the locations of the four
+# calibration sources. Having read the CMM file the routine looks for L.gif and
+# R.gif in the same directory. These should be the images returned by the left
+# and right FVCs of the four calibration sources. In these two images, the
+# sources must be arranged from 1 to 4 in an x-y grid, as recognised by the BCAM
+# Instrument.
 #
 proc DFPS_Manager_fvccmm_read {{fn ""}} {
 	upvar #0 DFPS_Manager_config config
@@ -969,7 +1035,6 @@ proc DFPS_Manager_fvccmm_read {{fn ""}} {
 			LWDAQ_read_image_file $ifn $info(fvccmm_$side)
 			set iconfig(analysis_num_spots) "$info(num_sources) $config(bcam_sort)"
 			set iconfig(analysis_threshold) $config(bcam_threshold)
-			LWDAQ_set_image_sensor $info(image_sensor) BCAM
 			set config(bcam_width) [expr $iinfo(daq_image_width) \
 				* $iinfo(analysis_pixel_size_um)]
 			set config(bcam_height) [expr $iinfo(daq_image_height) \
@@ -1140,7 +1205,7 @@ proc DFPS_Manager_fvccmm_open {} {
 	button $f.stop -text "Stop" -command {set DFPS_Manager_config(fit_stop) 1}
 	pack $f.stop -side left -expand yes
 
-	foreach a {Read Show Check Displace Defaults Examine Fit} {
+	foreach a {Read Show Check Displace Defaults Fit} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_fvccmm_$b"
 		pack $f.$b -side left -expand yes
@@ -1176,12 +1241,10 @@ proc DFPS_Manager_fvccmm_open {} {
 		pack $f.$a -side left -expand yes
 	}
 	
-	# Create the text window and direct the lwdaq library routines to print to this
-	# window.
 	set info(fvccmm_text) [LWDAQ_text_widget $w 120 15]
-	LWDAQ_print $info(fvccmm_text) "FVCCMM Text Output\n" purple
+	LWDAQ_print $info(fvccmm_text) \
+		"Fiber View Camera CMM Calibration Text Output\n" purple
 	
-	# Draw two blank images into the display.
 	foreach side {left right} {
 		lwdaq_draw $info(fvccmm_$side) fvccmm_$side \
 			-intensify $config(fvccmm_intensify) -zoom $config(fvccmm_zoom)
@@ -1207,7 +1270,6 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	upvar #0 DFPS_Manager_info info
 	upvar #0 LWDAQ_config_Camera iconfig 
 
-	LWDAQ_set_image_sensor $info(image_sensor) Camera
 	set iconfig(analysis_manipulation) $info(guide_manipulations)
 	set iconfig(daq_ip_addr) $config(ip_addr)
 	set iconfig(intensify) $config(intensify) 
@@ -1247,17 +1309,17 @@ proc DFPS_Manager_gsrasnik_acquire {orientation} {
 	set ocode 0
 	set swap 0
 	if {$i >= 0} {
-		set ocode [lindex $info(gsrasnik_orientation_codes) $i]
+		set ocode [lindex $config(gsrasnik_orientation_codes) $i]
 		set swap [lindex $info(gsrasnik_swaps) $i]
 	}
 	
 	set iconfig(analysis_orientation_code) $ocode
-	LWDAQ_set_image_sensor $info(image_sensor) Rasnik 
 	set iconfig(analysis_enable) $config(gsrasnik_algorithm)
 	set iconfig(analysis_reference_code) $info(gsrasnik_refcode)
 	set iconfig(analysis_square_size_um) $config(gsrasnik_square_um)
 	set iinfo(analysis_reference_x_um) $config(gsrasnik_ref_x_um)
 	set iinfo(analysis_reference_y_um) $config(gsrasnik_ref_y_um)
+	set iconfig(image_source) "memory"
 
 	set result ""
 	foreach guide $info(guide_sensors) {
@@ -1268,18 +1330,19 @@ proc DFPS_Manager_gsrasnik_acquire {orientation} {
 			append result "-1 -1 -1 "
 			continue
 		}
-		set rasnik [LWDAQ_analysis_Rasnik dfps_manager_$guide]
+		set iconfig(memory_name) dfps_manager_$guide
+		set rasnik [LWDAQ_acquire Rasnik]
 		lwdaq_draw dfps_manager_$guide gsrasnik_$guide \
 			-intensify $config(gsrasnik_intensify) -zoom $config(gsrasnik_zoom)
 		if {![LWDAQ_is_error_result $rasnik]} {
 			if {$swap} {
-				append result "[format %.3f [expr 0.001*[lindex $rasnik 1]]]\
-					[format %.3f [expr 0.001*[lindex $rasnik 0]]]\
-					[lindex $rasnik 4] "
-			} else {
-				append result "[format %.3f [expr 0.001*[lindex $rasnik 0]]]\
+				append result "[format %.3f [expr 0.001*[lindex $rasnik 2]]]\
 					[format %.3f [expr 0.001*[lindex $rasnik 1]]]\
-					[lindex $rasnik 4] "
+					[lindex $rasnik 5] "
+			} else {
+				append result "[format %.3f [expr 0.001*[lindex $rasnik 1]]]\
+					[format %.3f [expr 0.001*[lindex $rasnik 2]]]\
+					[lindex $rasnik 5] "
 			}
 		} else {
 			append rasnik " (Guide $guide, Orient $orientation, Time [clock seconds])"
@@ -1288,10 +1351,8 @@ proc DFPS_Manager_gsrasnik_acquire {orientation} {
 		}
 	}
 	
-	set iconfig(analysis_orientation_code) 0
-	
 	if {$orientation != ""} {set info(gsrasnik_mask_$orientation) $result}
-	LWDAQ_print $info(gsrasnik_text) "[format %3d $orientation] $result" green
+	LWDAQ_print $info(gsrasnik_text) "[format %3d $orientation] $result" 
 	set info(state) "Idle"
 	return $result
 }
@@ -1308,7 +1369,7 @@ proc DFPS_Manager_gsrasnik_calculate {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	LWDAQ_print $info(gsrasnik_text) "Rasnik Mask Center" purple
+	LWDAQ_print $info(gsrasnik_text) "\nRasnik Mask Center" purple
 	LWDAQ_print $info(gsrasnik_text) "------------------------------------" 
 	LWDAQ_print $info(gsrasnik_text) "  O1   O2   GS     X (mm)     Y (mm)" 
 	LWDAQ_print $info(gsrasnik_text) "------------------------------------" 
@@ -1345,8 +1406,12 @@ proc DFPS_Manager_gsrasnik_calculate {} {
 	LWDAQ_print $info(gsrasnik_text) "Average       \
 		[format %10.3f $x_ave]\
 		[format %10.3f $y_ave]"
-	set x_stdev [format %.3f [expr sqrt(($sum_sqr_x/$cnt)-($x_ave*$x_ave))]]
-	set y_stdev [format %.3f [expr sqrt(($sum_sqr_y/$cnt)-($y_ave*$y_ave))]]
+	set x_var [expr ($sum_sqr_x/$cnt)-($x_ave*$x_ave)]
+	if {$x_var < 0} {set x_var 0}
+	set x_stdev [format %.3f [expr sqrt($x_var)]]
+	set y_var [expr ($sum_sqr_y/$cnt)-($y_ave*$y_ave)]
+	if {$y_var < 0} {set y_var 0}
+	set y_stdev [format %.3f [expr sqrt($y_var)]]
 	LWDAQ_print $info(gsrasnik_text) "Stdev         \
 		[format %10.3f $x_stdev]\
 		[format %10.3f $y_stdev]"
@@ -1380,50 +1445,6 @@ proc DFPS_Manager_gsrasnik_calculate {} {
 }
 
 #
-# DFPS_Manager_gsrasnik_examine displays the rasnik measurements we obtained when acquiring
-# from the four orientations.
-#
-proc DFPS_Manager_gsrasnik_examine {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	set w $info(gsrasnik_examine_window)
-	if {![winfo exists $w]} {
-		toplevel $w
-		wm title $w "Guide Sensor Rasnik Measurements, DFPS Calibrator $info(version)"
-	} {
-		raise $w
-		return ""
-	}
-
-	foreach orientation $info(gsrasnik_orientations) {
-		set f [frame $w.orientation_$orientation]
-		pack $f -side top -fill x
-		label $f.l -text "Orientation $orientation\:"
-		entry $f.e -textvariable DFPS_Manager_info(gsrasnik_mask_$orientation) -width 80
-		pack $f.l $f.e -side left -expand yes
-	}
-		
-	foreach guide $info(guide_sensors) {
-		set f [frame $w.guide_$guide]
-		pack $f -side top -fill x
-		label $f.l -text "Guide Sensor $guide\:"
-		entry $f.e -textvariable DFPS_Manager_info(guide_$guide) -width 80
-		pack $f.l $f.e -side left -expand yes
-	}
-	
-	foreach a {rot_mrad width height} {
-		set f [frame $w.$a]
-		pack $f -side top -fill x
-		label $f.l -text "$a\:"
-		entry $f.e -textvariable DFPS_Manager_info(gsrasnik_$a) -width 80
-		pack $f.l $f.e -side left -expand yes
-	}
-		
-	return ""
-}
-
-#
 # DFPS_Manager_gsrasnik_open opens the Fiducial Plate Calibrator window.
 #
 proc DFPS_Manager_gsrasnik_open {} {
@@ -1451,7 +1472,7 @@ proc DFPS_Manager_gsrasnik_open {} {
 		pack $f.acq$a -side left -expand yes
 	}
 
-	foreach a {Calculate Examine} {
+	foreach a {Calculate} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command [list LWDAQ_post "DFPS_Manager_gsrasnik_$b"]
 		pack $f.$b -side left -expand yes
@@ -1462,6 +1483,9 @@ proc DFPS_Manager_gsrasnik_open {} {
 		button $f.$b -text $a -command "LWDAQ_open $a"
 		pack $f.$b -side left -expand 1
 	}
+
+	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
+	pack $f.verbose -side left -expand yes
 
 	set f [frame $w.options]
 	pack $f -side top -fill x
@@ -1481,16 +1505,185 @@ proc DFPS_Manager_gsrasnik_open {} {
 		pack $f.$guide -side left -expand yes
 	}
 		
-	# Create the text window and direct the lwdaq library routines to print to this
-	# window.
 	set info(gsrasnik_text) [LWDAQ_text_widget $w 100 15]
-	LWDAQ_print $info(gsrasnik_text) "GSRasnik Text Output\n" purple
+	LWDAQ_print $info(gsrasnik_text) \
+		"Guide Sensor Rasnik Calibration Text Output\n" purple
 	
-	# Draw blank images into the guide sensor displays.
 	foreach guide $info(guide_sensors) {
 		lwdaq_draw dfps_manager_$guide gsrasnik_$guide \
 			-intensify $config(gsrasnik_intensify) -zoom $config(gsrasnik_zoom)
 	}
+	
+	return $w
+}
+
+#
+# DFPS_Manager_ffrotate_acquire takes an orientation name as input, which directs
+# where its output will be saved. It goes through the fiducial fibers listed in
+# the manager's fiducial_leds string and checks their positions one after another.
+# It saves their positions in the ffrotate measurement for the named position.
+#
+proc DFPS_Manager_ffrotate_acquire {orientation} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	set measurement ""
+	foreach led $config(ffrotate_leds) {
+		append measurement [DFPS_Manager_check $led]
+		append measurement " "
+		LWDAQ_wait_ms $info(ffrotate_wait_ms)
+	}
+	set info(ffrotate_$orientation) [string trim "$orientation $measurement"]
+	LWDAQ_print $info(ffrotate_text) $info(ffrotate_$orientation)
+	return ""
+}
+
+#
+# DFPS_Manager_ffrotate_calculate takes the four measurements of fidicial fibers
+# from four orientations and calculates for each fiducial fiber its position in
+# frame coordinates.
+#
+proc DFPS_Manager_ffrotate_calculate {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	set pi 3.141592654
+	foreach o {0 90 180 270} {
+		set r [expr $o*1.0/360*2*$pi]
+		set R_$o "[format %6.3f [expr cos($r)]] \
+			[format %6.3f [expr 1.0*sin($r)]] \
+			[format %6.3f [expr -1.0*sin($r)]] \
+			[format %6.3f [expr cos($r)]]"
+	}
+	
+	LWDAQ_print $info(ffrotate_text) "\nFiducial Fiber Positions" purple
+	LWDAQ_print $info(ffrotate_text) \
+	"--------------------------------------------------------------------------------"
+	LWDAQ_print $info(ffrotate_text) "  O1   O2     X1       Y1       X2      \
+		Y2       X3       Y3       X4       Y4"
+	LWDAQ_print $info(ffrotate_text) \
+	"--------------------------------------------------------------------------------"
+
+	foreach ff $info(fiducial_fibers) {
+		set sum_x_$ff 0.0
+		set sum_sqr_x_$ff 0.0
+		set sum_y_$ff 0.0
+		set sum_sqr_y_$ff 0.0
+	}
+	set cnt 0
+ 	foreach {o1 o2} "0 90 0 180 0 270 90 180 90 270 180 270 " {
+		set m1 $info(ffrotate_$o1)
+		set m2 $info(ffrotate_$o2)
+		set R_link ""
+		for {set i 0} {$i < 4} {incr i} {
+			lappend R_link [expr [lindex [set R_$o2] $i] - [lindex [set R_$o1] $i]]
+		}
+		set R_unlink [lwdaq matrix_inverse $R_link]
+		scan $R_unlink %f%f%f%f m11 m12 m21 m22
+		LWDAQ_print -nonewline $info(ffrotate_text) "[format %4d $o1] [format %4d $o2] "
+		foreach ff $info(fiducial_fibers) {
+			set x1 [lindex $m1 [expr ($ff-1)*3+1]]
+			set y1 [lindex $m1 [expr ($ff-1)*3+2]]
+			set z1 [lindex $m1 [expr ($ff-1)*3+3]]
+			set x2 [lindex $m2 [expr ($ff-1)*3+1]]
+			set y2 [lindex $m2 [expr ($ff-1)*3+2]]
+			set dx [expr $x2-$x1]
+			set dy [expr $y2-$y1]
+			set x [expr $m11*$dx + $m12*$dy]
+			set y [expr $m21*$dx + $m22*$dy]
+			LWDAQ_print -nonewline $info(ffrotate_text) \
+				"[format %8.3f $x] [format %8.3f $y] "
+			set sum_x_$ff [expr [set sum_x_$ff] + $x]
+			set sum_sqr_x_$ff [expr [set sum_sqr_x_$ff] + ($x*$x)]
+			set sum_y_$ff [expr [set sum_y_$ff] + $y]
+			set sum_sqr_y_$ff [expr [set sum_sqr_y_$ff] + ($y*$y)]
+		}
+		LWDAQ_print $info(ffrotate_text) ""
+		incr cnt
+	}
+
+	LWDAQ_print $info(ffrotate_text) \
+	"--------------------------------------------------------------------------------"
+
+	LWDAQ_print -nonewline $info(ffrotate_text) "Average   "
+	foreach ff $info(fiducial_fibers) {
+		set x_ave [expr [set sum_x_$ff]/$cnt]
+		set y_ave [expr [set sum_y_$ff]/$cnt]
+		LWDAQ_print -nonewline $info(ffrotate_text) \
+			"[format %8.3f $x_ave] [format %8.3f $y_ave] "
+		lset info(fiducial_$ff) 0 [format %.3f $x_ave]
+		lset info(fiducial_$ff) 1 [format %.3f $y_ave]
+	}
+	LWDAQ_print $info(ffrotate_text) ""
+	LWDAQ_print -nonewline $info(ffrotate_text) "Stdev     "
+	foreach ff $info(fiducial_fibers) {
+		set x_ave [expr [set sum_x_$ff]/$cnt]
+		set y_ave [expr [set sum_y_$ff]/$cnt]
+		set x_var [expr ([set sum_sqr_x_$ff]/$cnt)-($x_ave*$x_ave)]
+		if {$x_var < 0} {set x_var 0}
+		set x_stdev [format %.3f [expr sqrt($x_var)]]
+		set y_var [expr ([set sum_sqr_y_$ff]/$cnt)-($y_ave*$y_ave)]
+		if {$y_var < 0} {set y_var 0}
+		set y_stdev [format %.3f [expr sqrt($y_var)]]
+		LWDAQ_print -nonewline $info(ffrotate_text) \
+			"[format %8.3f $x_stdev] [format %8.3f $y_stdev] "
+	}
+	LWDAQ_print $info(ffrotate_text) ""
+
+	LWDAQ_print $info(ffrotate_text) \
+	"--------------------------------------------------------------------------------"
+
+	return ""
+}
+
+#
+# DFPS_Manager_ffrotate_open opens the Fiducial Fiber Rotation Calibration window.
+#
+proc DFPS_Manager_ffrotate_open {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set w $info(window)\.ffrotate
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "Fiducial Fiber Rotation Calibration, DFPS Manager $info(version)"
+	} {
+		raise $w
+		return ""
+	}
+
+	LWDAQ_print $info(text) "hello from ffrotate_open $w" green
+	
+	set f [frame $w.controls]
+	pack $f -side top -fill x
+	
+	label $f.state -textvariable DFPS_Manager_info(state) -fg blue -width 10
+	pack $f.state -side left -expand yes
+
+	foreach a $info(ffrotate_orientations) {
+		button $f.acq$a -text "Acquire $a" -command \
+			[list LWDAQ_post "DFPS_Manager_ffrotate_acquire $a"]
+		pack $f.acq$a -side left -expand yes
+	}
+
+	foreach a {Calculate} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command [list LWDAQ_post "DFPS_Manager_ffrotate_$b"]
+		pack $f.$b -side left -expand yes
+	}
+	
+	foreach a {BCAM} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_open $a"
+		pack $f.$b -side left -expand 1
+	}
+
+	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
+	pack $f.verbose -side left -expand yes
+
+	set info(ffrotate_text) [LWDAQ_text_widget $w 100 15]
+	LWDAQ_print $info(ffrotate_text) \
+		"Fiducial Fiber Rotation Calibration Text Output\n" purple
 	
 	return $w
 }
@@ -1586,70 +1779,88 @@ proc DFPS_Manager_watchdog {} {
 }
 
 #
-# DFPS_Manager_ffrotate_open opens the Fiducial Fiber Rotation (FFRotate) Calibration
-# panel.
+# DFPS_Manager_fvc_reset_err returns a measure of the disagreement between the
+# measured positions of the fiducial fibers and the positions we predict from
+# our calibration of the fiducial fibers and our fiducial coordinate pose. This
+# routine will be called by the simplex fitter.
 #
-proc DFPS_Manager_ffrotate_open {} {
+proc DFPS_Manager_fvc_reset_err {params} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set w $info(window)\.ffrotate
-	if {![winfo exists $w]} {
-		toplevel $w
-		wm title $w "Fidicual Fiber Rotation Calibration, DFPS Manager $info(version)"
-	} {
-		raise $w
-		return ""
+	# If user has closed the calibrator window or asserted the stop flag abort with
+	# an error. 
+	LWDAQ_support
+	if {$config(fit_stop)} {error "Fit aborted by user"}
+	if {![winfo exists $info(window)]} {error "Tool window destroyed"}
+	
+	# Go through the four fiducial fibers. We transform the fiber's fiducial coordinates
+	# into global coordinates using the current fiducial coordinate pose. We obtain the
+	# length of the vector from actual to transformed positions, square its length and 
+	# add to our disagreement measurement.
+	set sum_sqr 0
+	set count 0
+	foreach {x y z} $info(sources) {
+		incr count
+		set ffg [lwdaq xyz_global_from_local_point $info(fiducial_$count) $params]
+		scan $ffg %f%f%f xx yy zz
+		set sqr [expr ($xx-$x)*($xx-$x) + ($yy-$y)*($yy-$y) +($zz-$z)*($zz-$z)]
+		set sum_sqr [expr $sum_sqr + $sqr]
 	}
 	
-	set f [frame $w.acquire]
-
-	label $f.state -textvariable DFPS_Manager_info(state) -width 20 -fg blue
-	pack $f.state -side left -expand 1
+	# Calculate root mean square error.
+	set err [format %.3f [expr sqrt($sum_sqr/$count)]]	
 	
-	set f [frame $w.text_frame]
-	pack $f -side top -fill both -expand yes
-	
-	set info(ffrotate_text) [LWDAQ_text_widget $f 80 20 1 1]
-	LWDAQ_print $info(ffrotate_text) "FFRotate Text Output\n" purple
-	
-	return $w
+	# Return the total disagreement, which is our error value.
+	return $err
 }
 
 #
-# DFPS_Manager_save_calibration saves the fiber view mounts, camera parameters, fiducial
-# positions, guide sensor positions, detector fiber offsets, actuator ranges, and
-# actuator maps to disk in the Tools/Settings folder.
+# DFPS_Manager_fvcr measures the four fiducial fiber positions in the global coordinate
+# system of the fiber view cameras. It then adjusts the pose of the fiducial coordinates
+# so as to match the calibrated fiducial positions with the observed fiducial positions.
+# If we execute this routine, translate the fiducial plate by 5 mm in x, and execute
+# again, the pose of the fiducial coordinates will move by 5 mm in x. Knowing the pose
+# of the fiducial coordinates, we can transform global measurements of guide fibers into
+# fiducial coordinates, and so connect them with the fiducial coordinates of star image
+# on the guide sensors.
 #
-proc DFPS_Manager_save_calibration {} {
+proc DFPS_Manager_fvc_reset {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set f [open $config(calibration_file) w]
-	foreach or $info(gsrasnik_orientations) {
-		puts $f "set DFPS_Manager_info(gsrasnik_mask_$or) \"$info(gsrasnik_mask_$or)\""
-	}
-	foreach a {rot_mrad width height} {
-		puts $f "set DFPS_Manager_info(gsrasnik_$a) \"$info(gsrasnik_$a)\""
-	}
-	foreach guide $info(guide_sensors) {
-		puts $f "set DFPS_Manager_info(guide_$guide) \"$info(guide_$guide)\""
-	}
-	foreach a {left right} {
-		puts $f "set DFPS_Manager_info(mount_$a) \"$info(mount_$a)\""
-		puts $f "set DFPS_Manager_info(cam_$a) \"$info(cam_$a)\""
-	}
-	foreach a $info(fiducial_fibers) {
-		puts $f "set DFPS_Manager_info(fiducial_$a) \"$info(fiducial_$a)\""
-	}
-	close $f
+	set info(state) "FVC_Reset"
 	
-	if {$config(verbose)} {
-		set f [open $config(calibration_file) r]
-		set contents [read $f]
-		close $f
-		LWDAQ_print $info(text) $contents brown
+	if {[catch {
+		set info(sources) \
+			[DFPS_Manager_sources \
+				[DFPS_Manager_spots $config(fiducial_leds)]]
+	} error_result]} {
+		LWDAQ_print $info(text) "ERROR: $error_result"
+		set info(state) "Idle"
+		return ""
 	}
+
+	set start_params $info(fiducial_coord_pose)
+	lwdaq_config -show_details $config(fit_details) -text_name $info(text) -fsd 3	
+	set end_params [lwdaq_simplex $start_params \
+		DFPS_Manager_fvc_reset_err \
+		-report $config(fit_show) \
+		-steps $config(fit_steps) \
+		-restarts $config(fit_restarts) \
+		-start_size $config(fit_startsize) \
+		-end_size $config(fit_endsize) \
+		-scaling "1.0 1.0 1.0 0.1 0.1 0.1"]
+	lwdaq_config -show_details 0 -text_name $info(text) -fsd 6
+	if {[LWDAQ_is_error_result $end_params]} {
+		LWDAQ_print $info(text) "ERROR: $end_params"
+		set info(state) "Idle"
+		return ""
+	}
+	
+	LWDAQ_print $info(text) "$end_params"
+	set info(fiducial_coord_pose) [lrange $end_params 0 5]
+	
 	return ""
 }
 
@@ -1671,28 +1882,13 @@ proc DFPS_Manager_utilities {} {
 		return ""
 	}
 	
-	set f [frame $w.calibration]
+	set f [frame $w.tools]
 	pack $f -side top -fill x
 	
 	label $f.state -textvariable DFPS_Manager_info(state) -width 20 -fg blue
 	pack $f.state -side left -expand 1
 	
-	foreach a {FVCCMM FVCGauge GSRasnik FFRotate} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "DFPS_Manager_$b\_open"
-		pack $f.$b -side left -expand 1
-	}
-
-	set f [frame $w.tools]
-	pack $f -side top -fill x
-
-	foreach a {Examine Save_Calibration} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
-		pack $f.$b -side left -expand 1
-	}
-	
-	foreach a {BCAM Diagnostic} {
+	foreach a {BCAM Camera Rasnik Diagnostic} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_open $a"
 		pack $f.$b -side left -expand 1
@@ -1704,6 +1900,35 @@ proc DFPS_Manager_utilities {} {
 	button $f.server -text "Server" -command "LWDAQ_server_open"
 	pack $f.server -side left -expand 1
 
+	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
+	pack $f.verbose -side left -expand yes
+
+	set f [frame $w.calibutils]
+	pack $f -side top -fill x
+
+	foreach {a b} {"Fiber View Camera CMM Calibration" fvccmm \
+			"Guide Sensor Rasnik Calibration" gsrasnik \
+			"Fiducial Fiber Rotation Calibration" ffrotate} {
+		button $f.$b -text $a -command "DFPS_Manager_$b\_open"
+		pack $f.$b -side left -expand 1
+	}
+
+	set f [frame $w.calibmanip]
+	pack $f -side top -fill x
+
+	foreach a {Examine_Calibration Save_Calibration Read_Calibration} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
+		pack $f.$b -side left -expand 1
+	}
+	
+	set f [frame $w.cfile]
+	pack $f -side top -fill x
+	
+	label $f.title -text "Calibration File:"
+	entry $f.entry -textvariable DFPS_Manager_config(calib_file) -width 90
+	pack $f.title $f.entry -side left -expand 1
+
 	set f [frame $w.tx]
 	pack $f -side top -fill x
 
@@ -1712,11 +1937,14 @@ proc DFPS_Manager_utilities {} {
 	}
 	pack $f.transmit -side left -expand yes
 	
-	label $f.lid -text "ID:" -fg $config(label_color) -width 4
-	entry $f.id -textvariable DFPS_Manager_config(id) -width 6
+	label $f.lid -text "Controller:" -fg $config(label_color)
+	entry $f.id -textvariable DFPS_Manager_config(txp_controller) -width 10
 	label $f.lcommands -text "Commands:" -fg $config(label_color)
 	entry $f.commands -textvariable DFPS_Manager_config(commands) -width 50
 	pack $f.lid $f.id $f.lcommands $f.commands -side left -expand yes
+
+	set info(utility_text) [LWDAQ_text_widget $w 80 20 1 1]
+	LWDAQ_print $info(utility_text) "Utility Text Output\n" purple
 
 	return $w
 }
@@ -1735,19 +1963,18 @@ proc DFPS_Manager_open {} {
 	pack $f -side top -fill x
 	
 	label $f.state -textvariable DFPS_Manager_info(state) -width 20 -fg blue
-	pack $f.state -side left -expand 1
+	pack $f.state -side left -expand yes
 	
-	foreach a {Check Move Zero Utilities} {
+	foreach a {Measure Move Zero Utilities} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
-		pack $f.$b -side left -expand 1
+		pack $f.$b -side left -expand yes
 	}
 	
-	foreach a {Configure Help} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
-		pack $f.$b -side left -expand 1
-	}
+	button $f.configure -text "Configure" -command "LWDAQ_tool_configure DFPS_Manager 4"
+	pack $f.configure -side left -expand yes
+	button $f.help -text "Help" -command "LWDAQ_tool_help DFPS_Manager"
+	pack $f.help -side left -expand yes
 	
 	set f [frame $w.fiber]
 	pack $f -side top -fill x
@@ -1778,13 +2005,13 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.dacs]
 	pack $f -side top -fill x
 	
-	foreach a {Calibration} {
+	foreach a {FVC_Reset} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "DFPS_Manager_$b"
-		pack $f.$b -side left -expand 1
+		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
+		pack $f.$b -side left -expand yes
 	}
 	
-	foreach a {Verbose Check_Masts Check_Fiducials} {
+	foreach a {Check_Masts Check_Fiducials Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
 		pack $f.$b -side left -expand yes
@@ -1812,10 +2039,7 @@ proc DFPS_Manager_open {} {
 			-intensify $config(intensify) -zoom $config(fvc_zoom)	
 	}
 	
-	set f [frame $w.text_frame]
-	pack $f -side top -fill both -expand yes
-	
-	set info(text) [LWDAQ_text_widget $f 80 20 1 1]
+	set info(text) [LWDAQ_text_widget $w 80 20 1 1]
 	LWDAQ_print $info(text) "DFPS Manager Text Output\n" purple
 
 	return $w
