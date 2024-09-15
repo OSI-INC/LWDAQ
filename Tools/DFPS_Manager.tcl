@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.7"
+	LWDAQ_tool_init "DFPS_Manager" "2.8"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The state variable tells us the current state of the tool.
@@ -473,7 +473,7 @@ proc DFPS_Manager_transmit {{commands ""}} {
 	}
 
 	# Print the commands to the text window.
-	LWDAQ_print $info(utility_text) "Transmitting: $commands"
+	LWDAQ_print $info(text) "command $commands"
 
 	# Append a two-byte checksum.
 	set checksum $info(checksum_preload)
@@ -515,7 +515,7 @@ proc DFPS_Manager_transmit {{commands ""}} {
 		LWDAQ_socket_close $sock
 	} error_result]} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
-		LWDAQ_print $info(utility_text) "ERROR: $error_result"
+		LWDAQ_print $info(text) "ERROR: $error_result"
 		return ""
 	}
 	
@@ -1863,9 +1863,10 @@ proc DFPS_Manager_fvc_reset {} {
 		return ""
 	}
 	
-	LWDAQ_print $info(text) "$end_params"
+	LWDAQ_print $info(text) "fiducial_coord $end_params"
 	set info(fiducial_coord) [lrange $end_params 0 5]
 	
+	set info(state) "Idle"
 	return ""
 }
 
