@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.8"
+	LWDAQ_tool_init "DFPS_Manager" "2.9"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The state variable tells us the current state of the tool.
@@ -47,7 +47,7 @@ proc DFPS_Manager_init {} {
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
 	set config(fiducial_leds) "A5 A7 A6 A8"
-	set config(guide_leds) "D1 D2"
+	set config(guide_leds) "D1 D2 D3 D4"
 	set config(flash_s) "0.004"
 	set config(sort_code) "8"
 	set config(transceiver) "1 0"
@@ -101,11 +101,11 @@ proc DFPS_Manager_init {} {
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 	
-	# Fiducial coordinate offset with respect to frame coordinates.
-	set info(fiducial_coord_offset) "65.0"
+	# Local coordinate offset with respect to frame coordinates.
+	set info(local_coord_offset) "65.0"
 
 	# Fiducial coordinate pose in global coordinates.
-	set info(fiducial_coord) "-13.0 90.0 -92.0 0.0 0.0 0.0"
+	set info(local_coord) "-13.0 90.0 -92.0 0.0 0.0 0.0"
 	# Nominal -13.0 90.0 -92.0 0 0 0
 	# DFPS-4A -12.904 89.042 -96.586 0.001 -0.001 0.000
 	
@@ -140,8 +140,8 @@ proc DFPS_Manager_init {} {
 	# DFPS-4A: 20.391 -25.227 9.697
 	
 	# Default north-south, and east-west control values.
-	set config(ns) $config(dac_zero) 
-	set config(ew) $config(dac_zero) 
+	set config(north) $config(dac_zero) 
+	set config(east) $config(dac_zero) 
 	
 	# Command transmission values.
 	set config(initiate_delay) "0.010"
@@ -150,8 +150,6 @@ proc DFPS_Manager_init {} {
 	set info(rf_on_op) "0081"
 	set info(rf_xmit_op) "82"
 	set info(checksum_preload) "1111111111111111"	
-	set config(txp_controller) "FFFF"
-	set config(commands) "8"
 	
 	# Watchdog control.
 	set info(fiducial_check_time) "0"
@@ -167,6 +165,10 @@ proc DFPS_Manager_init {} {
 	set config(fvc_zoom) "0.5"
 	set config(intensify) "exact"
 	set info(examine_window) "$info(window).examine_window"
+	
+	# Utility panel parameters.
+	set config(utils_ctrl) "FFFF"
+	set config(utils_cmd) "8"	
 	
 	# Fiber View Camera Coordinate Measuring Machine Calibration (FVCCMM) settings.
 	set info(num_sources) "4"
@@ -342,7 +344,7 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 	foreach a $info(fiducial_fibers) {
 		puts $f "set DFPS_Manager_info(fiducial_$a) \"$info(fiducial_$a)\""
 	}
-	puts $f "set DFPS_Manager_info(fiducial_coord) \"$info(fiducial_coord)\""
+	puts $f "set DFPS_Manager_info(local_coord) \"$info(local_coord)\""
 	close $f
 	
 	if {$config(verbose)} {
@@ -395,8 +397,8 @@ proc DFPS_Manager_examine_calibration {} {
 		grid $f.fl$a $f.fe$a -sticky nsew
 	}
 	
-	label $f.fcpl -text "fiducial_coord" -fg $info(label_color)
-	entry $f.fcpe -textvariable DFPS_Manager_info(fiducial_coord) -width $ew
+	label $f.fcpl -text "local_coord" -fg $info(label_color)
+	entry $f.fcpe -textvariable DFPS_Manager_info(local_coord) -width $ew
 	grid $f.fcpl $f.fcpe -sticky nsew
 	
 	foreach a {1 2 3 4} {
@@ -462,18 +464,13 @@ proc DFPS_Manager_id_bytes {id_hex} {
 # is preloaded with the checksum_preload value. The shift register has taps at
 # locations 16, 14, 13, and 11.
 #
-proc DFPS_Manager_transmit {{commands ""}} {
+proc DFPS_Manager_transmit {commands} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	global LWDAQ_Driver
 	
-	# If we specify no commands, use those in the commands parameter.
-	if {$commands == ""} {
-		set commands "[DFPS_Manager_id_bytes $config(txp_controller)] $config(commands)"
-	}
-
 	# Print the commands to the text window.
-	LWDAQ_print $info(text) "command $commands"
+	if {$config(verbose)} {LWDAQ_print $info(text) "transmit $commands"}
 
 	# Append a two-byte checksum.
 	set checksum $info(checksum_preload)
@@ -515,8 +512,7 @@ proc DFPS_Manager_transmit {{commands ""}} {
 		LWDAQ_socket_close $sock
 	} error_result]} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
-		LWDAQ_print $info(text) "ERROR: $error_result"
-		return ""
+		error $error_result
 	}
 	
 	# If we get here, we have no reason to believe the transmission failed, although
@@ -526,19 +522,19 @@ proc DFPS_Manager_transmit {{commands ""}} {
 }
 
 #
-# DFPS_Manager_set takes the north, south, east and west control values and
-# instructs the named positioner to set its converters accordingly. The control
-# values must be unsigned integers between 0 and 65535.
+# DFPS_Manager_set takes the north and east control values and instructs the
+# named positioner to set its converters accordingly. The control values must be
+# unsigned integers between 0 and 65535.
 #
-proc DFPS_Manager_set {id ns ew} {
+proc DFPS_Manager_set {id north east} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	set command [DFPS_Manager_id_bytes $id]
-	set n $ns
-	set s [expr 65535 - $ns]
-	set e $ew
-	set w [expr 65535 - $ew]
+	set n $north
+	set s [expr 65535 - $north]
+	set e $east
+	set w [expr 65535 - $east]
 	append command " 1 [expr $n / 256] [expr $n % 256]\
 		2 [expr $s / 256] [expr $s % 256]\
 		3 [expr $e / 256] [expr $e % 256]\
@@ -693,9 +689,13 @@ proc DFPS_Manager_sources {spots} {
 }
 
 #
-# DFPS_Manager_measure measures spot position, and reports. We can pass it a list
-# of source elements to flash and measure, or else the routine will generate its
-# own list by combining the fiducial and guide LED elements.
+# DFPS_Manager_measure measures the location of guide fibers in fiducial
+# coordinates. We can pass it a list of source elements to flash and measure, or
+# else the routine will use the list of guide LED elements. The routine first
+# measures the position of the sources in global coordinates, then uses the
+# fiducial coordinate pose to transform into fiducial coordinates. We assume the
+# fiducial coordinate pose is correct, as it will be if obtained recently by
+# fvc_reset.
 #
 proc DFPS_Manager_measure {{elements ""}} {
 	upvar #0 DFPS_Manager_config config
@@ -709,11 +709,18 @@ proc DFPS_Manager_measure {{elements ""}} {
 
 	if {[catch {
 		if {$elements == ""} {
-			set elements [string trim "$config(fiducial_leds) $config(guide_leds)"]
+			set elements [string trim "$config(guide_leds)"]
 		}
 		set spots [DFPS_Manager_spots $elements]
-		set sources [DFPS_Manager_sources $spots]
-		LWDAQ_print $info(text) "[clock seconds] $sources"
+		set guides_global [DFPS_Manager_sources $spots]
+		LWDAQ_print $info(text) "GUIDES_GLOBAL: $guides_global"
+		set guides_fiducial ""
+		foreach {x y z} $guides_global {
+			set gf [lwdaq xyz_local_from_global_point "$x $y $z" $info(local_coord)]
+			append guides_fiducial "$gf "
+		}
+		set guides_fiducial [string trim $guides_fiducial]
+		LWDAQ_print $info(text) "GUIDES_LOCAL: $guides_fiducial"
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(state) "Idle"
@@ -721,7 +728,7 @@ proc DFPS_Manager_measure {{elements ""}} {
 	}
 	
 	set info(state) "Idle"	
-	return $sources
+	return $guides_fiducial
 }
 
 #
@@ -741,7 +748,7 @@ proc DFPS_Manager_move {} {
 
 	if {[catch {
 		foreach id $config(controllers) {
-			DFPS_Manager_set $id $config(ns) $config(ew)
+			DFPS_Manager_set $id $config(north) $config(east)
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
 	} error_result]} {
@@ -751,7 +758,7 @@ proc DFPS_Manager_move {} {
 	}
 
 	set info(state) "Idle"	
-	return "$config(ns) $config(ew)"
+	return "$config(north) $config(east)"
 }
 
 #
@@ -1427,8 +1434,8 @@ proc DFPS_Manager_gsrasnik_calculate {} {
 		set gsxyz [lwdaq xyz_local_from_global_point "$x $y 0" $pose]
 		lwdaq_config -fsd 6
 		scan $gsxyz %f%f%f xx yy zz
-		set xx [expr $xx + 0.5*$info(gsrasnik_width) - $info(fiducial_coord_offset)]
-		set yy [expr $yy + 0.5*$info(gsrasnik_height) - $info(fiducial_coord_offset)]
+		set xx [expr $xx + 0.5*$info(gsrasnik_width) - $info(local_coord_offset)]
+		set yy [expr $yy + 0.5*$info(gsrasnik_height) - $info(local_coord_offset)]
 		set rr [expr 0 - $rot - $info(gsrasnik_rot_mrad)]
 		set info(guide_$gs) "[format %.3f $xx] [format %.3f $yy] [format %.3f $rr]"
 		LWDAQ_print $info(gsrasnik_text) \
@@ -1596,8 +1603,8 @@ proc DFPS_Manager_ffrotate_calculate {} {
 			set dy [expr $y2-$y1]
 			set x [expr $m11*$dx + $m12*$dy]
 			set y [expr $m21*$dx + $m22*$dy]
-			set x [expr $x + 0.5*$info(ffrotate_width) - $info(fiducial_coord_offset)]
-			set y [expr $y + 0.5*$info(ffrotate_height) - $info(fiducial_coord_offset)]
+			set x [expr $x + 0.5*$info(ffrotate_width) - $info(local_coord_offset)]
+			set y [expr $y + 0.5*$info(ffrotate_height) - $info(local_coord_offset)]
 			LWDAQ_print -nonewline $info(ffrotate_text) \
 				"[format %8.3f $x] [format %8.3f $y] "
 			set sum_x_$ff [expr [set sum_x_$ff] + $x]
@@ -1821,14 +1828,15 @@ proc DFPS_Manager_fvc_reset_err {params} {
 }
 
 #
-# DFPS_Manager_fvcr measures the four fiducial fiber positions in the global coordinate
-# system of the fiber view cameras. It then adjusts the pose of the fiducial coordinates
-# so as to match the calibrated fiducial positions with the observed fiducial positions.
-# If we execute this routine, translate the fiducial plate by 5 mm in x, and execute
-# again, the pose of the fiducial coordinates will move by 5 mm in x. Knowing the pose
-# of the fiducial coordinates, we can transform global measurements of guide fibers into
-# fiducial coordinates, and so connect them with the fiducial coordinates of star image
-# on the guide sensors.
+# DFPS_Manager_fvcr measures the four fiducial fiber positions in the global
+# coordinate system of the fiber view cameras and then proceeds to adjust the
+# pose of the fiducial coordinates so as to match the calibrated fiducial
+# positions with the observed fiducial positions. If we execute this routine,
+# translate the fiducial plate by 5 mm in x, and execute again, the pose of the
+# fiducial coordinates will move by 5 mm in x. Knowing the pose of the fiducial
+# coordinates, we can transform global measurements of guide fibers into
+# fiducial coordinates, and so connect them with the fiducial coordinates of
+# star image on the guide sensors.
 #
 proc DFPS_Manager_fvc_reset {} {
 	upvar #0 DFPS_Manager_config config
@@ -1840,13 +1848,14 @@ proc DFPS_Manager_fvc_reset {} {
 		set info(sources) \
 			[DFPS_Manager_sources \
 				[DFPS_Manager_spots $config(fiducial_leds)]]
+		LWDAQ_print $info(text) "FIDUCIALS_GLOBAL: $info(sources)"
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(state) "Idle"
 		return ""
 	}
 
-	set start_params $info(fiducial_coord)
+	set start_params $info(local_coord)
 	lwdaq_config -show_details $config(fit_details) -text_name $info(text) -fsd 3	
 	set end_params [lwdaq_simplex $start_params \
 		DFPS_Manager_fvc_reset_err \
@@ -1863,26 +1872,51 @@ proc DFPS_Manager_fvc_reset {} {
 		return ""
 	}
 	
-	LWDAQ_print $info(text) "fiducial_coord $end_params"
-	set info(fiducial_coord) [lrange $end_params 0 5]
+	LWDAQ_print $info(text) "FIT_DETAILS: Convergeance in [lindex $end_params 7] steps,\
+		disagreement [format %.1f [expr 1000*[lindex $end_params 6]]] um."
+	
+	set info(local_coord) [lrange $end_params 0 5]
+	LWDAQ_print $info(text) "POSE_LOCAL: $info(local_coord)"
 	
 	set info(state) "Idle"
 	return ""
 }
 
 #
-# DFPS_Manager_utilities opens the utilities panel, where we have various options for
+# DFPS_Manager_utils_transmit sends command utils_cmd to controller utils_ctrl.
+#
+proc DFPS_Manager_utils_transmit {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	set info(state) "Transmit"
+
+	set commands "[DFPS_Manager_id_bytes $config(utils_ctrl)] $config(utils_cmd)"
+	
+	if {[catch {
+		LWDAQ_print $info(utils_text) "TRANSMIT: $commands"
+		DFPS_Manager_transmit $commands
+	} error_result]} {
+		LWDAQ_print $info(utils_text) "ERROR: $error_result"
+	}
+
+	set info(state) "Idle"
+	return ""
+}
+
+#
+# DFPS_Manager_utils opens the Utilities Panel, where we have various options for
 # calibrating the DFPS optical components, transmitting commands to fiber controllers,
 # and opening LWDAQ instruments.
 #
-proc DFPS_Manager_utilities {} {
+proc DFPS_Manager_utils {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set w $info(window)\.utilities
+	set w $info(window)\.utils
 	if {![winfo exists $w]} {
 		toplevel $w
-		wm title $w "Utilities, DFPS Manager $info(version)"
+		wm title $w "Utilities Panel, DFPS Manager $info(version)"
 	} {
 		raise $w
 		return ""
@@ -1942,19 +1976,17 @@ proc DFPS_Manager_utilities {} {
 	set f [frame $w.tx]
 	pack $f -side top -fill x
 
-	button $f.transmit -text "Transmit" -command {
-		LWDAQ_post "DFPS_Manager_transmit"
-	}
+	button $f.transmit -text "Transmit" -command "LWDAQ_post DFPS_Manager_utils_transmit"
 	pack $f.transmit -side left -expand yes
 	
 	label $f.lid -text "Controller:" -fg $info(label_color)
 	entry $f.id -textvariable DFPS_Manager_config(txp_controller) -width 10
 	label $f.lcommands -text "Commands:" -fg $info(label_color)
-	entry $f.commands -textvariable DFPS_Manager_config(commands) -width 50
+	entry $f.commands -textvariable DFPS_Manager_config(utils_cmd) -width 50
 	pack $f.lid $f.id $f.lcommands $f.commands -side left -expand yes
 
-	set info(utility_text) [LWDAQ_text_widget $w 80 20 1 1]
-	LWDAQ_print $info(utility_text) "Utility Text Output\n" purple
+	set info(utils_text) [LWDAQ_text_widget $w 80 20 1 1]
+	LWDAQ_print $info(utils_text) "Utility Text Output\n" purple
 
 	return $w
 }
@@ -1975,7 +2007,7 @@ proc DFPS_Manager_open {} {
 	label $f.state -textvariable DFPS_Manager_info(state) -width 20 -fg blue
 	pack $f.state -side left -expand yes
 	
-	foreach a {Measure Move Zero Utilities} {
+	foreach a {Measure Move Zero Utils} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -2005,7 +2037,7 @@ proc DFPS_Manager_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	foreach d {ns ew} {
+	foreach d {north east} {
 		set a [string tolower $d]
 		label $f.l$a -text $d -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 5
