@@ -40,7 +40,7 @@ proc DFPS_Manager_init {} {
 	# Instrument fundamentals.
 	set info(fiducial_fibers) "1 2 3 4"
 	set info(guide_sensors) "1 2 3 4"
-	set info(fiber_positioners) "1 2 3 4"
+	set info(positioner_masts) "1 2 3 4"
 	set info(detector_fibers) "1 2"	
 
 	# Data acquisition parameters for the DFPS-4A.
@@ -157,10 +157,10 @@ proc DFPS_Manager_init {} {
 	
 	# Watchdog control.
 	set info(fiducial_monitor_time) "0"
-	set info(guide_monitor_time) "0"
+	set info(mast_monitor_time) "0"
 	set config(fiducial_monitor_period) "100"
-	set config(guide_monitor_period) "10"
-	set config(monitor_guides) "0"
+	set config(mast_monitor_period) "10"
+	set config(monitor_masts) "0"
 	set config(monitor_fiducials) "0"
 	
 	# Window settings.
@@ -258,15 +258,19 @@ proc DFPS_Manager_init {} {
 	# Actual: 130.00
 	
 	# Detector Fiber Calibration (DFCalib) settings
-	set info(detector_1_1) "0 0"
-	set info(detector_1_2) "0 0"
-	set info(detector_2_1) "0 0"
-	set info(detector_2_2) "0 0"
-	set info(detector_3_1) "0 0"
-	set info(detector_3_2) "0 0"
-	set info(detector_4_1) "0 0"
-	set info(detector_4_2) "0 0"
+	set info(detector_1_1) "0.000 0.000"
+	set info(detector_1_2) "0.000 0.000"
+	set info(detector_2_1) "0.000 0.000"
+	set info(detector_2_2) "0.000 0.000"
+	set info(detector_3_1) "0.000 0.000"
+	set info(detector_3_2) "0.000 0.000"
+	set info(detector_4_1) "0.000 0.000"
+	set info(detector_4_2) "0.000 0.000"
 	set config(dfcalib_pwr) "7"
+	set config(dfcalib_mast) "1"
+	set config(dfcalib_detector) "1"
+	set config(dfcalib_led) "A1"
+	set config(dfcalib_flash) "0.1"
 	
 	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
@@ -360,9 +364,10 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 		puts $f "set DFPS_Manager_info(fiducial_$a) \"$info(fiducial_$a)\""
 	}
 	puts $f "set DFPS_Manager_info(local_coord) \"$info(local_coord)\""
-	foreach a $info(fiber_positioners) {
+	foreach a $info(positioner_masts) {
 		foreach b $info(detector_fibers) {
-			puts $f "set DFPS_Manager_info(detector_$a\_$b) \"$info(fiducial_$a\_$b)\""
+			puts $f "set DFPS_Manager_info(detector_$a\_$b)\
+				\"$info(detector_$a\_$b)\""
 		}
 	}
 	close $f
@@ -394,61 +399,91 @@ proc DFPS_Manager_examine_calibration {} {
 		return ""
 	}
 	
-	set ew 90
+	set big 90
+	set sl 14
+	set se 20
+	set i 0
 	
-	set f [frame $w.params]
-	pack $f -side top -fill x
-
 	foreach a {left right} {
+		set f [frame $w.f[incr i]]
+		pack $f -side top -fill x
 		label $f.ml$a -text "mount_$a" -fg $info(label_color)
-		entry $f.me$a -textvariable DFPS_Manager_info(mount_$a) -width $ew
-		grid $f.ml$a $f.me$a -sticky nsew
+		entry $f.me$a -textvariable DFPS_Manager_info(mount_$a) -width $big
+		pack $f.ml$a $f.me$a -side left -expand yes
 	}
 
 	foreach a {left right} {
+		set f [frame $w.f[incr i]]
+		pack $f -side top -fill x
 		label $f.cl$a -text "cam_$a" -fg $info(label_color)
-		entry $f.ce$a -textvariable DFPS_Manager_info(cam_$a) -width $ew
-		grid $f.cl$a $f.ce$a -sticky nsew
+		entry $f.ce$a -textvariable DFPS_Manager_info(cam_$a) -width $big
+		pack $f.cl$a $f.ce$a -side left -expand yes
 	}
 
-	foreach a {1 2 3 4} {
-		label $f.fl$a -text "fiducial_$a" -fg $info(label_color)
-		entry $f.fe$a -textvariable DFPS_Manager_info(fiducial_$a) -width $ew
-		grid $f.fl$a $f.fe$a -sticky nsew
-	}
-	
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
 	label $f.fcpl -text "local_coord" -fg $info(label_color)
-	entry $f.fcpe -textvariable DFPS_Manager_info(local_coord) -width $ew
-	grid $f.fcpl $f.fcpe -sticky nsew
+	entry $f.fcpe -textvariable DFPS_Manager_info(local_coord) -width $big
+	pack $f.fcpl $f.fcpe -side left -expand yes
 	
-	foreach a {1 2 3 4} {
-		label $f.gl$a -text "guide_$a" -fg $info(label_color)
-		entry $f.ge$a -textvariable DFPS_Manager_info(guide_$a) -width $ew
-		grid $f.gl$a $f.ge$a -sticky nsew
-	}
-
 	foreach a $info(gsrasnik_orientations) {
+		set f [frame $w.f[incr i]]
+		pack $f -side top -fill x
 		label $f.maskl$a -text "gsrasnik_mask_$a\:" -fg $info(label_color)
-		entry $f.maske$a -textvariable DFPS_Manager_info(gsrasnik_mask_$a) -width $ew
-		grid $f.maskl$a $f.maske$a -sticky nsew
+		entry $f.maske$a -textvariable DFPS_Manager_info(gsrasnik_mask_$a) -width $big
+		pack $f.maskl$a $f.maske$a -side left -expand yes
 	}
-		
+	
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
 	foreach a {rot_mrad width height} {
-		label $f.gsl$a -text "gsrasnik_$a" -fg $info(label_color)
-		entry $f.gse$a -textvariable DFPS_Manager_info(gsrasnik_$a) -width $ew
-		grid $f.gsl$a $f.gse$a -sticky nsew
+		label $f.gsl$a -text "gsrasnik_$a" -fg $info(label_color) -width $sl
+		entry $f.gse$a -textvariable DFPS_Manager_info(gsrasnik_$a) -width $se
+		pack $f.gsl$a $f.gse$a -side left -expand yes
 	}
 	
 	foreach a $info(ffrotate_orientations) {
+		set f [frame $w.f[incr i]]
+		pack $f -side top -fill x
 		label $f.ffl$a -text "ffrotate_$a" -fg $info(label_color)
-		entry $f.ffe$a -textvariable DFPS_Manager_info(ffrotate_$a) -width $ew
-		grid $f.ffl$a $f.ffe$a -sticky nsew
+		entry $f.ffe$a -textvariable DFPS_Manager_info(ffrotate_$a) -width $big
+		pack $f.ffl$a $f.ffe$a -side left -expand yes
 	}
 	
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
 	foreach a {width height} {
-		label $f.ffl$a -text "ffrotate_$a" -fg $info(label_color)
-		entry $f.ffe$a -textvariable DFPS_Manager_info(gsrasnik_$a) -width $ew
-		grid $f.ffl$a $f.ffe$a -sticky nsew
+		label $f.ffl$a -text "ffrotate_$a" -fg $info(label_color) -width $sl
+		entry $f.ffe$a -textvariable DFPS_Manager_info(gsrasnik_$a) -width $se
+		pack $f.ffl$a $f.ffe$a -side left -expand yes
+	}
+	
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+	foreach a $info(guide_sensors) {
+		label $f.gl$a -text "guide_$a" -fg $info(label_color) -width $sl
+		entry $f.ge$a -textvariable DFPS_Manager_info(guide_$a) -width $se
+		pack $f.gl$a $f.ge$a -side left -expand yes
+	}
+	
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+	foreach a $info(fiducial_fibers) {
+		label $f.fl$a -text "fiducial_$a" -fg $info(label_color) -width $sl
+		entry $f.fe$a -textvariable DFPS_Manager_info(fiducial_$a) -width $se
+		pack $f.fl$a $f.fe$a -side left -expand yes
+	}
+	
+	foreach b $info(detector_fibers) {
+		set f [frame $w.f[incr i]]
+		pack $f -side top -fill x
+		foreach a $info(positioner_masts) {
+			label $f.dfl$a\_$b -text "detector_$a\_$b" \
+				-fg $info(label_color) -width $sl
+			entry $f.dfe$a\_$b \
+				-textvariable DFPS_Manager_info(detector_$a\_$b) -width $se
+			pack $f.dfl$a\_$b $f.dfe$a\_$b -side left -expand yes
+		}
 	}
 
 	return ""
@@ -1551,7 +1586,7 @@ proc DFPS_Manager_ffrotate_acquire {orientation} {
 	
 	set measurement ""
 	foreach led $config(ffrotate_leds) {
-		append measurement [DFPS_Manager_check $led]
+		append measurement [DFPS_Manager_measure $led]
 		append measurement " "
 		LWDAQ_wait_ms $info(ffrotate_wait_ms)
 	}
@@ -1737,18 +1772,18 @@ proc DFPS_Manager_watchdog {} {
 	set result ""
 	
 	# At intervals, check mast positions with fiber view cameras and adjust.
-	if {$config(monitor_guides)} {
-		if {[clock seconds] - $info(guide_monitor_time) \
-				>= $config(guide_monitor_period)} {
-			set info(guide_monitor_time) [clock seconds]
+	if {$config(monitor_masts)} {
+		if {[clock seconds] - $info(mast_monitor_time) \
+				>= $config(mast_monitor_period)} {
+			set info(mast_monitor_time) [clock seconds]
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) "Measuring guide fibers. (Time [clock seconds])"
 			}
 			DFPS_Manager_measure
-			set result $info(guide_monitor_time)
+			set result $info(mast_monitor_time)
 		}
 	} {
-		set info(guide_monitor_time) "0"
+		set info(mast_monitor_time) "0"
 	}
 	
 	# At intervals, adjust frame coordinate pose in global coordinates using
@@ -1907,6 +1942,92 @@ proc DFPS_Manager_fvc_reset {} {
 }
 
 #
+# DFPS_Manager_dfcalib measures the position of the dfcalib mast guide fiber,
+# measures the position of the chosen detector fiber by flashing the calibration
+# light source, and subtracts the local global coordinates of the two to obtain
+# and x-y offset in local coordinates, which is the calibration of the guide
+# fiber.
+#
+proc DFPS_Manager_dfcalib {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set m $config(dfcalib_mast)
+	set d $config(dfcalib_detector)
+	set led [lindex $config(guide_leds) [expr $m - 1]]
+	if {$config(verbose)} {
+		LWDAQ_print $info(dfcalib_text) \
+			"Calibrating detector $d in mast $m using source $config(dfcalib_led)."
+	}
+	
+	set mast_position [DFPS_Manager_measure $led]
+	if {$config(verbose)} {
+		LWDAQ_print $info(dfcalib_text) "Mast position: $mast_position."
+	}
+	
+	set saved_pwr $config(source_pwr)
+	set config(source_pwr) $config(dfcalib_pwr)
+	set saved_flash $config(flash_s)
+	set config(flash_s) $config(dfcalib_flash)
+	set detector_position [DFPS_Manager_measure $config(dfcalib_led)]
+	set config(source_pwr) $saved_pwr
+	set config(flash_s) $saved_flash
+	if {$config(verbose)} {
+		LWDAQ_print $info(dfcalib_text) "Detector position: $detector_position."
+	}
+	
+	scan $detector_position %f%f%f xd yd zd
+	scan $mast_position %f%f%f xm ym zm
+	set offset "[format %.3f [expr $xd-$xm]] [format %.3f [expr $yd-$ym]]"
+	set info(detector_$m\_$d) $offset
+	LWDAQ_print $info(dfcalib_text) "$m $d $offset"
+	
+	return "$mast_position $offset"
+}
+
+#
+# DFPS_Manager_dfcalib_open opens the Detector Fiber Calibration window.
+#
+proc DFPS_Manager_dfcalib_open {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set w $info(window)\.dfcalib
+	if {![winfo exists $w]} {
+		toplevel $w
+		wm title $w "Detector Fiber Calibration, DFPS Manager $info(version)"
+	} {
+		raise $w
+		return ""
+	}
+
+	set f [frame $w.controls]
+	pack $f -side top -fill x
+	
+	label $f.state -textvariable DFPS_Manager_info(state) -fg blue -width 10
+	pack $f.state -side left -expand yes
+
+	foreach a {mast detector led flash pwr} {
+		label $f.l$a -text $a -fg $info(label_color)
+		entry $f.e$a -textvariable DFPS_Manager_config(dfcalib_$a) -width 5
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	button $f.calib -text "Calibrate" -command "LWDAQ_post DFPS_Manager_dfcalib"
+	pack $f.calib -side left -expand yes
+	
+	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
+	pack $f.verbose -side left -expand yes
+
+	set info(dfcalib_text) [LWDAQ_text_widget $w 100 15]
+	LWDAQ_print $info(dfcalib_text) \
+		"Fiducial Fiber Rotation Calibration Text Output\n" purple
+	
+	return $w
+}
+
+
+#
 # DFPS_Manager_utils_transmit sends command utils_cmd to controller utils_ctrl.
 #
 proc DFPS_Manager_utils_transmit {} {
@@ -1976,7 +2097,8 @@ proc DFPS_Manager_utils {} {
 
 	foreach {a b} {"Fiber View Camera CMM Calibration" fvccmm \
 			"Guide Sensor Rasnik Calibration" gsrasnik \
-			"Fiducial Fiber Rotation Calibration" ffrotate} {
+			"Fiducial Fiber Rotation Calibration" ffrotate \
+			"Detector Fiber Calibration" dfcalib} {
 		button $f.$b -text $a -command "DFPS_Manager_$b\_open"
 		pack $f.$b -side left -expand 1
 	}
@@ -2004,7 +2126,7 @@ proc DFPS_Manager_utils {} {
 	pack $f.transmit -side left -expand yes
 	
 	label $f.lid -text "Controller:" -fg $info(label_color)
-	entry $f.id -textvariable DFPS_Manager_config(txp_controller) -width 10
+	entry $f.id -textvariable DFPS_Manager_config(utils_ctrl) -width 10
 	label $f.lcommands -text "Commands:" -fg $info(label_color)
 	entry $f.commands -textvariable DFPS_Manager_config(utils_cmd) -width 50
 	pack $f.lid $f.id $f.lcommands $f.commands -side left -expand yes
@@ -2077,7 +2199,7 @@ proc DFPS_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 	
-	foreach a {Monitor_Guides Monitor_Fiducials Verbose} {
+	foreach a {Monitor_Masts Monitor_Fiducials Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
 		pack $f.$b -side left -expand yes
@@ -2269,10 +2391,18 @@ Guide Sensor by Rasnik Mask Calibrator
 
 Help coming soon.
 
+
 Fiducial Fiber by Rotation Calibrator
 =====================================
 
 Help coming soon.
+
+
+Detector Fiber Calibrator
+=========================
+
+Help coming soon.
+
 
 (C) Kevan Hashemi, 2023-2024, Open Source Instruments Inc.
 https://www.opensourceinstruments.com
