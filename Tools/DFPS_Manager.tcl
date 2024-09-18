@@ -36,6 +36,12 @@ proc DFPS_Manager_init {} {
 	# The state variable tells us the current state of the tool.
 	set info(state) "Idle"
 	set config(verbose) "0"
+	
+	# Instrument fundamentals.
+	set info(fiducial_fibers) "1 2 3 4"
+	set info(guide_sensors) "1 2 3 4"
+	set info(fiber_positioners) "1 2 3 4"
+	set info(detector_fibers) "1 2"	
 
 	# Data acquisition parameters for the DFPS-4A.
 	set config(ip_addr) "192.168.1.30"
@@ -47,14 +53,14 @@ proc DFPS_Manager_init {} {
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
 	set config(fiducial_leds) "A5 A7 A6 A8"
-	set config(guide_leds) "D1 D2 D3 D4"
+	set config(guide_leds) "D3 D4 D2 D1"
 	set config(flash_s) "0.004"
 	set config(sort_code) "8"
 	set config(transceiver) "1 0"
-	set config(controllers) "FFFF"
+	set config(controllers) "6912 1834 C323 1845"
 	set config(source_type) "9"
 	set config(camera_element) "2"
-	set config(source_power) "2"
+	set config(source_pwr) "2"
 	set info(wildcard_id) "FFFF"
 	set config(settling_ms) "1000"
 	set config(dac_zero) "32000"
@@ -110,7 +116,6 @@ proc DFPS_Manager_init {} {
 	# DFPS-4A -12.904 89.042 -96.586 0.001 -0.001 0.000
 	
 	# Fiducial fiber positions in fiducial coordinates.
-	set info(fiducial_fibers) "1 2 3 4"
 	set info(fiducial_1) "-15.0 +15.0 2.8"
 	# Nominal: -15.0 +15.0 2.8
 	# DFPS-4A: -15.255 14.899 2.800
@@ -125,7 +130,6 @@ proc DFPS_Manager_init {} {
 	# DFPS-4A:  14.562 -15.076 2.726
 	
 	# Guide sensor positions and orientations in fiducial coordinates.
-	set info(guide_sensors) "1 2 3 4"
 	set info(guide_1) "-24.598 19.792 5.028"
 	# Nominal: -24.400 19.900 0.100
 	# DFPS-4A: -24.572 19.714 5.188
@@ -152,12 +156,12 @@ proc DFPS_Manager_init {} {
 	set info(checksum_preload) "1111111111111111"	
 	
 	# Watchdog control.
-	set info(fiducial_check_time) "0"
-	set info(mast_check_time) "0"
-	set config(fiducial_check_period) "100"
-	set config(mast_check_period) "10"
-	set config(check_masts) "0"
-	set config(check_fiducials) "0"
+	set info(fiducial_monitor_time) "0"
+	set info(guide_monitor_time) "0"
+	set config(fiducial_monitor_period) "100"
+	set config(guide_monitor_period) "10"
+	set config(monitor_guides) "0"
+	set config(monitor_fiducials) "0"
 	
 	# Window settings.
 	set info(label_color) "brown"
@@ -253,6 +257,17 @@ proc DFPS_Manager_init {} {
 	# Nominal: 130.0
 	# Actual: 130.00
 	
+	# Detector Fiber Calibration (DFCalib) settings
+	set info(detector_1_1) "0 0"
+	set info(detector_1_2) "0 0"
+	set info(detector_2_1) "0 0"
+	set info(detector_2_2) "0 0"
+	set info(detector_3_1) "0 0"
+	set info(detector_3_2) "0 0"
+	set info(detector_4_1) "0 0"
+	set info(detector_4_2) "0 0"
+	set config(dfcalib_pwr) "7"
+	
 	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -345,6 +360,11 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 		puts $f "set DFPS_Manager_info(fiducial_$a) \"$info(fiducial_$a)\""
 	}
 	puts $f "set DFPS_Manager_info(local_coord) \"$info(local_coord)\""
+	foreach a $info(fiber_positioners) {
+		foreach b $info(detector_fibers) {
+			puts $f "set DFPS_Manager_info(detector_$a\_$b) \"$info(fiducial_$a\_$b)\""
+		}
+	}
 	close $f
 	
 	if {$config(verbose)} {
@@ -568,7 +588,7 @@ proc DFPS_Manager_spots {{elements ""}} {
 	set iconfig(daq_source_mux_socket) [lindex $config(injector) 1]
 	set iconfig(daq_source_device_element) $elements 
 	set iinfo(daq_source_device_type) $config(source_type)
-	set iinfo(daq_source_power) $config(source_power)
+	set iinfo(daq_source_power) $config(source_pwr)
 	set iconfig(daq_device_element) $config(camera_element)
 	set iconfig(daq_flash_seconds) $config(flash_s)
 	set iconfig(analysis_num_spots) \
@@ -1717,33 +1737,34 @@ proc DFPS_Manager_watchdog {} {
 	set result ""
 	
 	# At intervals, check mast positions with fiber view cameras and adjust.
-	if {$config(check_masts)} {
-		if {[clock seconds] - $info(mast_check_time) \
-				>= $config(mast_check_period)} {
-			set info(mast_check_time) [clock seconds]
+	if {$config(monitor_guides)} {
+		if {[clock seconds] - $info(guide_monitor_time) \
+				>= $config(guide_monitor_period)} {
+			set info(guide_monitor_time) [clock seconds]
 			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Checking masts. (Time [clock seconds])"
+				LWDAQ_print $info(text) "Measuring guide fibers. (Time [clock seconds])"
 			}
-			set result $info(mast_check_time)
+			DFPS_Manager_measure
+			set result $info(guide_monitor_time)
 		}
 	} {
-		set info(mast_check_time) "0"
+		set info(guide_monitor_time) "0"
 	}
 	
 	# At intervals, adjust frame coordinate pose in global coordinates using
 	# fiducial fiber positions measured by fiber view cameras.
-	if {$config(check_fiducials)} {
-		if {[clock seconds] - $info(fiducial_check_time) \
-				>= $config(fiducial_check_period)} {
-			set info(fiducial_check_time) [clock seconds]
+	if {$config(monitor_fiducials)} {
+		if {[clock seconds] - $info(fiducial_monitor_time) \
+				>= $config(fiducial_monitor_period)} {
+			set info(fiducial_monitor_time) [clock seconds]
 			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Checking fiducials. (Time [clock seconds])"
+				LWDAQ_print $info(text) "Fiber view camera reset. (Time [clock seconds])"
 			}
-			DFPS_Manager_check
-			set result $info(fiducial_check_time)
+			DFPS_Manager_fvc_reset
+			set result $info(fiducial_monitor_time)
 		}
 	} {
-		set info(fiducial_check_time) "0"
+		set info(fiducial_monitor_time) "0"
 	}
 
 	# Handle incoming server commands.
@@ -1872,8 +1893,11 @@ proc DFPS_Manager_fvc_reset {} {
 		return ""
 	}
 	
-	LWDAQ_print $info(text) "FIT_DETAILS: Convergeance in [lindex $end_params 7] steps,\
-		disagreement [format %.1f [expr 1000*[lindex $end_params 6]]] um."
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "Fiber View Camera Reset converged in\
+		[lindex $end_params 7] steps,\
+		final error [format %.1f [expr 1000*[lindex $end_params 6]]] um."
+	}
 	
 	set info(local_coord) [lrange $end_params 0 5]
 	LWDAQ_print $info(text) "POSE_LOCAL: $info(local_coord)"
@@ -2053,7 +2077,7 @@ proc DFPS_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 	
-	foreach a {Check_Masts Check_Fiducials Verbose} {
+	foreach a {Monitor_Guides Monitor_Fiducials Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
 		pack $f.$b -side left -expand yes
