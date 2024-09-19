@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.9"
+	LWDAQ_tool_init "DFPS_Manager" "2.10"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# The state variable tells us the current state of the tool.
@@ -63,7 +63,9 @@ proc DFPS_Manager_init {} {
 	set config(source_pwr) "2"
 	set info(wildcard_id) "FFFF"
 	set config(settling_ms) "1000"
-	set config(dac_zero) "32000"
+	set info(dac_zero) "32000"
+	set info(dac_max) "65535"
+	set info(dac_min) "0"
 	set info(image_sensor) "ICX424"
 	LWDAQ_set_image_sensor $info(image_sensor) BCAM
 	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
@@ -78,30 +80,50 @@ proc DFPS_Manager_init {} {
 	# Temporary acquisition and analysis results.
 	set info(spots) ""
 	set info(sources) ""
+	set info(mast_1) "0 0"
+	set info(mast_2) "0 0"
+	set info(mast_3) "0 0"
+	set info(mast_4) "0 0"
+	set info(target_1) "0 0"
+	set info(target_2) "0 0"
+	set info(target_3) "0 0"
+	set info(target_4) "0 0"
 	
 	# Calibration file. By default, we store calibration constants in the
 	# LWDAQ Tools/Data directory.
 	set config(calib_file) [file join $LWDAQ_Info(tools_dir) Data DFPS_Calibration.tcl]
 		
 	# Fiber view camera calibration constants.
-	set info(cam_left) "12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113"
-	# Nominal: FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
-	# DFPS-4A: Y71010 12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113
-	# Breadboard: Y71066 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
-	set info(cam_right) "12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220"
-	# Nominal: FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
-	# DFPS-4A: Y71003 12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220
-	# Breadboard: Y71080 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
+	set info(cam_left) \
+"12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113"
+# Nominal FVC:
+# 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
+# DFPS-4A Y71010:
+# 12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113
+# Breadboard Y71066:
+# 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
+	set info(cam_right) \
+"12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220"
+# Nominal: 
+# FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
+# DFPS-4A Y71003:
+# 12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220
+# Breadboard Y71080:
+# 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
 	
 	# Fiber view camera mount measurents.
 	set info(mount_left) \
-		"80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868"
-	# DFPS-4A: 80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868
-	# Breadboard: 79.614 51.505 199.754 119.777 51.355 264.265 79.277 51.400 275.713
+"80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868"
+# DFPS-4A: 
+# 80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868
+# Breadboard: 
+# 79.614 51.505 199.754 119.777 51.355 264.265 79.277 51.400 275.713
 	set info(mount_right) \
-		"-104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948"
-	# DFPS-4A: -104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948
-	# Breadboard: -104.039 51.210 199.297 -108.680 51.004 275.110 -148.231 50.989 261.059
+"-104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948"
+# DFPS-4A: 
+# -104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948
+# Breadboard: 
+# -104.039 51.210 199.297 -108.680 51.004 275.110 -148.231 50.989 261.059
 	
 	# We obtain the pose of the mount coordinats by a fit to the mount measurements.
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
@@ -110,12 +132,12 @@ proc DFPS_Manager_init {} {
 	# Local coordinate offset with respect to frame coordinates.
 	set info(local_coord_offset) "65.0"
 
-	# Fiducial coordinate pose in global coordinates.
+	# Local coordinate pose in global coordinates.
 	set info(local_coord) "-13.0 90.0 -92.0 0.0 0.0 0.0"
 	# Nominal -13.0 90.0 -92.0 0 0 0
 	# DFPS-4A -12.904 89.042 -96.586 0.001 -0.001 0.000
 	
-	# Fiducial fiber positions in fiducial coordinates.
+	# Fiducial fiber positions in local coordinates.
 	set info(fiducial_1) "-15.0 +15.0 2.8"
 	# Nominal: -15.0 +15.0 2.8
 	# DFPS-4A: -15.255 14.899 2.800
@@ -129,7 +151,7 @@ proc DFPS_Manager_init {} {
 	# Nominal: +15.0 -15.0 2.8
 	# DFPS-4A:  14.562 -15.076 2.726
 	
-	# Guide sensor positions and orientations in fiducial coordinates.
+	# Guide sensor positions and orientations in local coordinates.
 	set info(guide_1) "-24.598 19.792 5.028"
 	# Nominal: -24.400 19.900 0.100
 	# DFPS-4A: -24.572 19.714 5.188
@@ -144,8 +166,8 @@ proc DFPS_Manager_init {} {
 	# DFPS-4A: 20.391 -25.227 9.697
 	
 	# Default north-south, and east-west control values.
-	set config(north) $config(dac_zero) 
-	set config(east) $config(dac_zero) 
+	set config(north) $info(dac_zero) 
+	set config(east) $info(dac_zero) 
 	
 	# Command transmission values.
 	set config(initiate_delay) "0.010"
@@ -180,8 +202,10 @@ proc DFPS_Manager_init {} {
 	set info(fvccmm_fid_2) "1.717 104.294 -91.613"
 	set info(fvccmm_fid_3) "-28.229 74.268 -91.925"
 	set info(fvccmm_fid_4) "1.631 74.257 -91.437"
-	set info(spots_left) "1572.16 1192.59 3377.92 1154.19 1594.61 3038.75 3381.78 3051.64"
-	set info(spots_right) "2223.58 1109.76 4000.05 1117.53 2232.85 3038.02 4017.75 2984.44"
+	set info(spots_left) \
+"1572.16 1192.59 3377.92 1154.19 1594.61 3038.75 3381.78 3051.64"
+	set info(spots_right) \
+"2223.58 1109.76 4000.05 1117.53 2232.85 3038.02 4017.75 2984.44"
 	set config(bcam_width) "5180"
 	set config(bcam_height) "3848"
 	set config(bcam_threshold) "10 #"
@@ -216,21 +240,29 @@ proc DFPS_Manager_init {} {
 	# all four guide sensors in all four orientations, for use in testing
 	# GSRasnik calculations.
 	set info(gsrasnik_mask_0) \
-		"24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597"
-	# Nominal: 24.4 68.2 0 69.4 68.2 0 24.4 23.2 0 69.4 23.2 0
-	# DFPS-4A: 24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597 
+"24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597"
+# Nominal: 
+# 24.4 68.2 0 69.4 68.2 0 24.4 23.2 0 69.4 23.2 0
+# DFPS-4A: 
+# 24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597 
 	set info(gsrasnik_mask_90) \
-		"29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000"
-	# Nominal: 28.9 23.9 0 28.9 68.9 0 73.9 23.9 0 73.9 68.9 0
-	# DFPS-4A: 29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000 
+"29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000"
+# Nominal: 
+# 28.9 23.9 0 28.9 68.9 0 73.9 23.9 0 73.9 68.9 0
+# DFPS-4A: 
+# 29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000 
 	set info(gsrasnik_mask_180) \
-		"73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665"
-	# Nominal: 73.2 28.4 0 28.2 28.4 0 73.2 73.4 0 28.2 73.4 0
-	# DFPS-4A: 73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665 
+"73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665"
+# Nominal: 
+# 73.2 28.4 0 28.2 28.4 0 73.2 73.4 0 28.2 73.4 0
+# DFPS-4A: 
+# 73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665 
 	set info(gsrasnik_mask_270) \
-		"68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795"
-	# Nominal: 68.7 72.7 0 68.7 27.7 0 23.7 72.7 0 23.7 27.7 0
-	# DFPS-4A: 68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795 
+"68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795"
+# Nominal: 
+# 68.7 72.7 0 68.7 27.7 0 23.7 72.7 0 23.7 27.7 0
+# DFPS-4A: 
+# 68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795 
 	set info(gsrasnik_rot_mrad) "-0.10"
 	# Nominal: 0.00
 	# Actual: -0.10
@@ -244,10 +276,14 @@ proc DFPS_Manager_init {} {
 	# Fiducial Fiber Rotation Calibration (FFRotate) settings.
 	set info(ffrotate_measurements) [list]
 	set info(ffrotate_orientations) "0 90 180 270"
-	set info(ffrotate_0) "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
-	set info(ffrotate_90) "0.0 +105.0 -90.0 0.0 +75 -90.0 -30.0 +105.0 -90.0 -30.0 +75.0 -90.0"
-	set info(ffrotate_180) "0.0 +75.0 -90.0 -30.0 +75 -90.0 0.0 +105.0 -90.0 -30.0 +105.0 -90.0"
-	set info(ffrotate_270) "-30.0 +75.0 -90.0 -30.0 +105 -90.0 0.0 +75.0 -90.0 0.0 +105.0 -90.0"
+	set info(ffrotate_0) \
+"-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
+	set info(ffrotate_90) \
+"0.0 +105.0 -90.0 0.0 +75 -90.0 -30.0 +105.0 -90.0 -30.0 +75.0 -90.0"
+	set info(ffrotate_180) \
+"0.0 +75.0 -90.0 -30.0 +75 -90.0 0.0 +105.0 -90.0 -30.0 +105.0 -90.0"
+	set info(ffrotate_270) \
+"-30.0 +75.0 -90.0 -30.0 +105 -90.0 0.0 +75.0 -90.0 0.0 +105.0 -90.0"
 	set info(ffrotate_wait_ms) "100"
 	set config(ffrotate_leds) "A5 A7 A6 A8"
 	set info(ffrotate_width) "130.00"
@@ -257,7 +293,13 @@ proc DFPS_Manager_init {} {
 	# Nominal: 130.0
 	# Actual: 130.00
 	
-	# Detector Fiber Calibration (DFCalib) settings
+	# Detector Fiber Calibration (DFCalib) settings. We have detector offsets
+	# from the guide fibers, x and y in local coordinates, to be added to mast
+	# position (the guide fiber position) to obtain the detector position. We
+	# have data acquisition parameters for the calibration. We have the mast
+	# ranges expressed as a rotated square. We have the square center x and y
+	# in local coordinates, the side of the square, and its rotation counter
+	# clockwise as seen from in front of the mast, in radians.
 	set info(detector_1_1) "0.000 0.000"
 	set info(detector_1_2) "0.000 0.000"
 	set info(detector_2_1) "0.000 0.000"
@@ -271,6 +313,10 @@ proc DFPS_Manager_init {} {
 	set config(dfcalib_detector) "1"
 	set config(dfcalib_led) "A1"
 	set config(dfcalib_flash) "0.1"
+	set info(mrange_1) "-2.5 2.5 3.5 0"
+	set info(mrange_2) "+2.5 2.5 3.5 0"
+	set info(mrange_3) "-2.5 -2.5 3.5 0"
+	set info(mrange_4) "+2.5 -2.5 3.5 0"	
 	
 	# If we have a settings file, read and implement.	
 	if {[file exists $info(settings_file_name)]} {
@@ -323,9 +369,9 @@ proc DFPS_Manager_read_calibration {{fn ""}} {
 }
 
 #
-# DFPS_Manager_save_calibration saves the fiber view mounts, camera parameters, fiducial
-# positions, guide sensor positions, detector fiber offsets, actuator ranges, and
-# actuator maps to disk in the Tools/Settings folder.
+# DFPS_Manager_save_calibration saves the fiber view mounts, camera parameters,
+# fiducial positions, guide sensor positions, detector fiber offsets, actuator
+# ranges, and actuator maps to disk in the Tools/Settings folder.
 #
 proc DFPS_Manager_save_calibration {{fn ""}} {
 	upvar #0 DFPS_Manager_config config
@@ -364,6 +410,9 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 		puts $f "set DFPS_Manager_info(fiducial_$a) \"$info(fiducial_$a)\""
 	}
 	puts $f "set DFPS_Manager_info(local_coord) \"$info(local_coord)\""
+	foreach m $info(positioner_masts) {
+		puts $f "set DFPS_Manager_info(mast_$m) \"$info(mrange_$m)\""
+	}
 	foreach a $info(positioner_masts) {
 		foreach b $info(detector_fibers) {
 			puts $f "set DFPS_Manager_info(detector_$a\_$b)\
@@ -474,6 +523,14 @@ proc DFPS_Manager_examine_calibration {} {
 		pack $f.fl$a $f.fe$a -side left -expand yes
 	}
 	
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+	foreach a $info(positioner_masts) {
+		label $f.fl$a -text "mrange_$a" -fg $info(label_color) -width $sl
+		entry $f.fe$a -textvariable DFPS_Manager_info(mrange_$a) -width $se
+		pack $f.fl$a $f.fe$a -side left -expand yes
+	}
+	
 	foreach b $info(detector_fibers) {
 		set f [frame $w.f[incr i]]
 		pack $f -side top -fill x
@@ -525,7 +582,7 @@ proc DFPS_Manager_transmit {commands} {
 	global LWDAQ_Driver
 	
 	# Print the commands to the text window.
-	if {$config(verbose)} {LWDAQ_print $info(text) "transmit $commands"}
+	if {$config(verbose)} {LWDAQ_print $info(text) "Transmit: $commands"}
 
 	# Append a two-byte checksum.
 	set checksum $info(checksum_preload)
@@ -562,7 +619,8 @@ proc DFPS_Manager_transmit {commands} {
 			if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
 		}
 		LWDAQ_transmit_command_hex $sock "0000"
-		LWDAQ_delay_seconds $sock [expr $config(byte_processing_time)*[llength $commands]]
+		LWDAQ_delay_seconds $sock \
+			[expr $config(byte_processing_time)*[llength $commands]]
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 	} error_result]} {
@@ -599,29 +657,29 @@ proc DFPS_Manager_set {id north east} {
 }
 		
 #
-# DFPS_Manager_spots captures an image of the sources whose elements are listed
-# in the elements argument. If we pass an empty string for the elements, the
+# DFPS_Manager_spots captures an image of the sources whose light sources are
+# listed in the leds argument. If we pass an empty string for the elements, the
 # routine combines the fiducial and guide elements to obtain a list of all
 # available sources. It returns the coordinates of the two images of each source
 # in the left and right cameras in the format "x1l y1l x1r y1r... xnl ynl xnr
 # ynr", where "n" is the number of sources it flashes.
 #
-proc DFPS_Manager_spots {{elements ""}} {
+proc DFPS_Manager_spots {{leds ""}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	upvar #0 LWDAQ_config_BCAM iconfig
 	upvar #0 LWDAQ_info_BCAM iinfo
 	
-	# Default elements.
-	if {$elements == ""} {
-		set elements [string trim "$config(fiducial_leds) $config(guide_leds)"]
+	# Default leds.
+	if {$leds == ""} {
+		set leds [string trim "$config(fiducial_leds) $config(guide_leds)"]
 	}
 	
 	# Prepare the BCAM Instrument for fiber view camera (FVC) acquisition.
 	set iconfig(daq_ip_addr) $config(ip_addr)
 	set iconfig(daq_source_driver_socket) [lindex $config(injector) 0]
 	set iconfig(daq_source_mux_socket) [lindex $config(injector) 1]
-	set iconfig(daq_source_device_element) $elements 
+	set iconfig(daq_source_device_element) $leds 
 	set iinfo(daq_source_device_type) $config(source_type)
 	set iinfo(daq_source_power) $config(source_pwr)
 	set iconfig(daq_device_element) $config(camera_element)
@@ -669,15 +727,15 @@ proc DFPS_Manager_spots {{elements ""}} {
 
 #
 # DFPS_Manager_sources calculates source positions from a set of left and right
-# camera image positions. We think of each image as a "spot" with a centroid
-# position measured in microns from the center of the image sensor's top-left
-# pixel. We pass it a list containing the coordinates of the spots in the forma
-# "x1l y1l x1r y1r... xnl ynl xnr ynr" where "n" is the number of sources, "l"
-# specifies the left camera, and "r" specifies the right camera. The routine
-# returns a list of source positions in global coordinates "x1 y1 z1 ... xn yn
-# zn". The routine checks to see if the spot positions are invalid, which is
-# marked by coordinates "-1 -1 -1 -1", and if so, it returns for the source 
-# position the global coordinate origin.
+# camera image positions. Each image is a "spot" with a centroid position
+# measured in microns from the center of the image sensor's top-left pixel. We
+# pass it a list containing the coordinates of the spots in the forma "x1l y1l
+# x1r y1r... xnl ynl xnr ynr" where "n" is the number of sources, "l" specifies
+# the left camera, and "r" specifies the right camera. The routine returns a
+# list of source positions in global coordinates "x1 y1 z1 ... xn yn zn". The
+# routine checks to see if the spot positions are invalid, which is marked by
+# coordinates "-1 -1 -1 -1", and if so, it returns for the source position the
+# global coordinate origin.
 #
 proc DFPS_Manager_sources {spots} {
 	upvar #0 DFPS_Manager_config config
@@ -744,15 +802,15 @@ proc DFPS_Manager_sources {spots} {
 }
 
 #
-# DFPS_Manager_measure measures the location of guide fibers in fiducial
-# coordinates. We can pass it a list of source elements to flash and measure, or
-# else the routine will use the list of guide LED elements. The routine first
-# measures the position of the sources in global coordinates, then uses the
-# fiducial coordinate pose to transform into fiducial coordinates. We assume the
-# fiducial coordinate pose is correct, as it will be if obtained recently by
-# fvc_reset.
+# DFPS_Manager_measure measures the location of a mast in local coordinates,
+# which is the location of the center of its guide fiber. We can pass it a list
+# of masts to flash and measure, or else the routine will flash all guide fibers
+# and measure all masts. The routine first measures the position of the masts in
+# global coordinates, then uses the local coordinate pose to transform into
+# local coordinates. We assume the local coordinate pose is correct, as it will
+# be if obtained recently by fvc_reset.
 #
-proc DFPS_Manager_measure {{elements ""}} {
+proc DFPS_Manager_measure {{masts ""}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -763,19 +821,32 @@ proc DFPS_Manager_measure {{elements ""}} {
 	set info(state) "Measure"	
 
 	if {[catch {
-		if {$elements == ""} {
-			set elements [string trim "$config(guide_leds)"]
+		if {$masts == ""} {
+			set masts [string trim "$info(positioner_masts)"]
 		}
-		set spots [DFPS_Manager_spots $elements]
-		set guides_global [DFPS_Manager_sources $spots]
-		LWDAQ_print $info(text) "GUIDES_GLOBAL: $guides_global"
-		set guides_fiducial ""
-		foreach {x y z} $guides_global {
-			set gf [lwdaq xyz_local_from_global_point "$x $y $z" $info(local_coord)]
-			append guides_fiducial "$gf "
+		set leds ""
+		foreach m $masts {lappend leds [lindex $config(guide_leds) [expr $m-1]]}
+		set spots [DFPS_Manager_spots $leds]
+		set masts_global [DFPS_Manager_sources $spots]
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "Global: $masts_global"
 		}
-		set guides_fiducial [string trim $guides_fiducial]
-		LWDAQ_print $info(text) "GUIDES_LOCAL: $guides_fiducial"
+		set masts_local ""
+		foreach {x y z} $masts_global {
+			set ml [lwdaq xyz_local_from_global_point "$x $y $z" $info(local_coord)]
+			append masts_local "$ml "
+		}
+		set masts_local [string trim $masts_local]
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "Local: $masts_local"
+		}
+		set i 0
+		foreach m $masts {
+			set local [lrange $masts_local $i $i+1]
+			incr i 3
+			set info(mast_$m) $local
+		}
+		
 	} error_result]} {
 		LWDAQ_print $info(text) "ERROR: $error_result"
 		set info(state) "Idle"
@@ -783,27 +854,53 @@ proc DFPS_Manager_measure {{elements ""}} {
 	}
 	
 	set info(state) "Idle"	
-	return $guides_fiducial
+	return $masts_local
 }
 
 #
-# DFPS_Manager_move sets the control values of all actuators to the values
-# specified in the ns and ew parameters, waits for the settling time,
-# and checks positions. It returns the positions of all sources.
+# DFPS_Manager_move sets the drive voltages of the listed controllers to the
+# value specified in the north and east parameters. If we provide a list of
+# controller IDs, the routine will use them. Otherwise it will use the IDs in
+# the controllers parameter. The routine waits for the settling time before
+# returning.
 #
-proc DFPS_Manager_move {} {
+proc DFPS_Manager_move {{controllers ""}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	if {![winfo exists $info(window)]} {
 		return ""
+	}
+	
+	if {$controllers == ""} {
+		set controllers $config(controllers)
+	}
+
+	if {$config(north) > $info(dac_max)} {
+		LWDAQ_print $info(text) "WARNING: Specified north clipped to $info(dac_max)."
+		set config(north) $info(dac_max)
+	}
+	if {$config(east) > $info(dac_max)} {
+		LWDAQ_print $info(text) "WARNING: Specified east clipped to $info(dac_max)."
+		set config(east) $info(dac_max)
+	}
+	if {$config(north) < $info(dac_min)} {
+		LWDAQ_print $info(text) "WARNING: Specified north clipped to $info(dac_min)."
+		set config(north) $info(dac_min)
+	}
+	if {$config(east) < $info(dac_min)} {
+		LWDAQ_print $info(text) "WARNING: Specified east clipped to $info(dac_min)."
+		set config(east) $info(dac_min)
 	}
 	
 	set info(state) "Move"	
 
 	if {[catch {
-		foreach id $config(controllers) {
+		foreach id $controllers {
 			DFPS_Manager_set $id $config(north) $config(east)
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "Move: 0x$id $config(north) $config(east)"
+			}
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
 	} error_result]} {
@@ -813,15 +910,16 @@ proc DFPS_Manager_move {} {
 	}
 
 	set info(state) "Idle"	
-	return "$config(north) $config(east)"
+	return ""
 }
 
 #
-# DFPS_Manager_zero sets the control values of all actuators to the value
-# specified in dac_zero, waits for the settling time, and checks positions. It
-# returns the positions of all sources.
+# DFPS_Manager_zero sets the drive voltages of the listed controllers to their
+# zero values. If we provide a list of controller IDs, the routine will use
+# them. Otherwise it will use the IDs in the controllers parameter. The routine
+# waits for the settling time before returning.
 #
-proc DFPS_Manager_zero {} {
+proc DFPS_Manager_zero {{controllers ""}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -829,11 +927,21 @@ proc DFPS_Manager_zero {} {
 		return ""
 	}
 	
+	if {$controllers == ""} {
+		set controllers $config(controllers)
+	}
+	
 	set info(state) "Zero"	
+	
+	set config(north) $info(dac_zero)
+	set config(east) $info(dac_zero)
 
 	if {[catch {
 		foreach id $config(controllers) {
-			DFPS_Manager_set $id $config(dac_zero) $config(dac_zero)
+			DFPS_Manager_set $id $config(north) $config(east)
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "Zero: 0x$id $config(north) $config(east)"
+			}
 		}
 		LWDAQ_wait_ms $config(settling_ms)	
 	} error_result]} {
@@ -843,7 +951,7 @@ proc DFPS_Manager_zero {} {
 	}
 
 	set info(state) "Idle"	
-	return "$config(dac_zero) $config(dac_zero)"
+	return ""
 }
 
 #
@@ -1942,11 +2050,22 @@ proc DFPS_Manager_fvc_reset {} {
 }
 
 #
-# DFPS_Manager_dfcalib measures the position of the dfcalib mast guide fiber,
-# measures the position of the chosen detector fiber by flashing the calibration
-# light source, and subtracts the local global coordinates of the two to obtain
-# and x-y offset in local coordinates, which is the calibration of the guide
-# fiber.
+# DFPS_Manager_dfcalib measures the position of a guide fiber in local
+# coordinates, measures the position of the chosen detector fiber in local
+# coordinates, and subtracts the detector position from the guide position to
+# obtain the x-y offset of the detector with respect to the guide fiber. We add
+# this offset to the mast position, which is the guide fiber position, to obtain
+# the detector position. The routine assumes that we have the detector
+# calibration fiber plugged into the detector fiber output connector on the
+# DFPS, so that light enters the detector and can be seen by the fiber view
+# cameras. The optical energy we must inject into the detector must be intense:
+# thousands of times more energy than we need to see the guide fiber. The fiber
+# view cameras will be seeing the detector fibers outside their cone of
+# emission, so that we see only traces of light at the fringes of the detector
+# numerical aperture. During the calibration we will see the guide fiber flash
+# twice, once for each FVC, and the detector fiber flash twice. Both will appear
+# to be in the same location to the naked eye, but the detector fiber will be
+# much brighter when seen looking down its axis.
 #
 proc DFPS_Manager_dfcalib {} {
 	upvar #0 DFPS_Manager_config config
@@ -1985,6 +2104,43 @@ proc DFPS_Manager_dfcalib {} {
 	return "$mast_position $offset"
 }
 
+# 
+# DFPS_Manager_mranges measures the center of the range of motion of a set of
+# masts, the length of the side of the rotated square that is the range, and the
+# rotation of the range counter-clockwise in local coordinates as seen looking
+# down on the mast tip from the aperture of the instrument. The rotation is in
+# radians. The routine stores these values in each mast's range parameter. If no
+# masts are specified, all masts are measured. In order to make sure the masts
+# do not interfere with one another, the procedure moves all masts together,
+# using the controller wild card. It waits for the settling time at each corner
+# before recording the position. At the end of the process, mranges returns all
+# masts to their zero position.
+#
+proc DFPS_Manager_mranges {{masts ""}} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {$masts == ""} {set masts $info(positioner_masts)}
+	
+	foreach {n e c} "$info(dac_min) $info(dac_min) bottom\
+			$info(dac_max) $info(dac_min) left\
+			$info(dac_max) $info(dac_max) top\
+			$info(dac_min) $info(dac_max) right" {
+		set config(north) $n
+		set config(east) $e
+		LWDAQ_print $info(dfcalib_text) "Move: $c $n $e"
+		DFPS_Manager_move $info(wildcard_id)
+		LWDAQ_wait_ms $config(settling_ms)
+		foreach m $masts {
+			set ml [DFPS_Manager_measure $m]
+			LWDAQ_print $info(dfcalib_text) "Corner: $m $ml"
+		}		
+	}
+	DFPS_Manager_zero $info(wildcard_id)
+		
+	return ""
+}
+
 #
 # DFPS_Manager_dfcalib_open opens the Detector Fiber Calibration window.
 #
@@ -2015,6 +2171,9 @@ proc DFPS_Manager_dfcalib_open {} {
 	
 	button $f.calib -text "Calibrate" -command "LWDAQ_post DFPS_Manager_dfcalib"
 	pack $f.calib -side left -expand yes
+	
+	button $f.mranges -text "MRanges" -command "LWDAQ_post DFPS_Manager_mranges"
+	pack $f.mranges -side left -expand yes
 	
 	checkbutton $f.verbose -text "Verbose" -variable DFPS_Manager_config(verbose)
 	pack $f.verbose -side left -expand yes
@@ -2217,9 +2376,32 @@ proc DFPS_Manager_open {} {
 	}
 		
 	set f [frame $w.fvc_images]
-	pack $f -side top -fill x -expand no
+	pack $f -side top -fill x
 	
-	foreach side {left right} {
+	foreach side {left} {
+		image create photo "dfps_manager_$side"
+		label $f.$side -image "dfps_manager_$side"
+		pack $f.$side -side left -expand yes
+		lwdaq_draw dfps_manager_$side dfps_manager_$side \
+			-intensify $config(intensify) -zoom $config(fvc_zoom)	
+	}
+	
+	set ff [frame $f.masts]
+	pack $ff -side left -fill y
+	foreach m $info(positioner_masts) {
+		set fff [frame $ff.m$m]
+		pack $fff -side top -fill x
+		label $fff.lm -text "A$m" -width 3 -fg $info(label_color)
+		entry $fff.em -textvariable DFPS_Manager_info(mast_$m) -width 12
+		pack $fff.lm $fff.em -side left -expand yes
+		set fff [frame $ff.t$m]
+		pack $fff -side top -fill x
+		label $fff.lt -text "T$m" -width 3 -fg $info(label_color)
+		entry $fff.et -textvariable DFPS_Manager_info(target_$m) -width 12
+		pack $fff.lt $fff.et -side left -expand yes
+	}
+
+	foreach side {right} {
 		image create photo "dfps_manager_$side"
 		label $f.$side -image "dfps_manager_$side"
 		pack $f.$side -side left -expand yes
@@ -2284,67 +2466,67 @@ diameters and coordinates, CMM.txt may contain any number of words that are not
 real number strings and any number of white space charcters. All words that are
 not real numbers will be ignored. An example CMM.txt file is to be found below.
 
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
-| Feature Table       |              |      |           |         |      |       |          |
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
-| Length Units        | Millimeters  |      |           |         |      |       |          |
-| Coordinate Systems  | csys         |      |           |         |      |       |          |
-| Data Alignments     | original     |      |           |         |      |       |          |
-|                     |              |      |           |         |      |       |          |
-| Name                | Control      | Nom  | Meas      | Tol     | Dev  | Test  | Out Tol  |
-| g1                  | Diameter     |      | 12.702    | ±1.000  |      |       |          |
-| g1                  | X            |      | 0.000     | ±1.000  |      |       |          |
-| g1                  | Y            |      | 0.000     | ±1.000  |      |       |          |
-| g1                  | Z            |      | 0.000     | ±1.000  |      |       |          |
-| g2                  | Diameter     |      | 12.700    | ±1.000  |      |       |          |
-| g2                  | X            |      | 100.390   | ±1.000  |      |       |          |
-| g2                  | Y            |      | 0.000     | ±1.000  |      |       |          |
-| g2                  | Z            |      | 0.000     | ±1.000  |      |       |          |
-| g3                  | Diameter     |      | 12.698    | ±1.000  |      |       |          |
-| g3                  | X            |      | 1.023     | ±1.000  |      |       |          |
-| g3                  | Y            |      | -0.155    | ±1.000  |      |       |          |
-| g3                  | Z            |      | 175.224   | ±1.000  |      |       |          |
-| l1                  | Diameter     |      | 6.349     | ±1.000  |      |       |          |
-| l1                  | X            |      | 79.614    | ±1.000  |      |       |          |
-| l1                  | Y            |      | 51.505    | ±1.000  |      |       |          |
-| l1                  | Z            |      | 199.754   | ±1.000  |      |       |          |
-| l2                  | Diameter     |      | 6.347     | ±1.000  |      |       |          |
-| l2                  | X            |      | 119.777   | ±1.000  |      |       |          |
-| l2                  | Y            |      | 51.355    | ±1.000  |      |       |          |
-| l2                  | Z            |      | 264.265   | ±1.000  |      |       |          |
-| l3                  | Diameter     |      | 6.350     | ±1.000  |      |       |          |
-| l3                  | X            |      | 79.277    | ±1.000  |      |       |          |
-| l3                  | Y            |      | 51.400    | ±1.000  |      |       |          |
-| l3                  | Z            |      | 275.713   | ±1.000  |      |       |          |
-| r1                  | Diameter     |      | 6.352     | ±1.000  |      |       |          |
-| r1                  | X            |      | -104.039  | ±1.000  |      |       |          |
-| r1                  | Y            |      | 51.210    | ±1.000  |      |       |          |
-| r1                  | Z            |      | 199.297   | ±1.000  |      |       |          |
-| r2                  | Diameter     |      | 6.352     | ±1.000  |      |       |          |
-| r2                  | X            |      | -108.680  | ±1.000  |      |       |          |
-| r2                  | Y            |      | 51.004    | ±1.000  |      |       |          |
-| r2                  | Z            |      | 275.110   | ±1.000  |      |       |          |
-| r3                  | Diameter     |      | 6.354     | ±1.000  |      |       |          |
-| r3                  | X            |      | -148.231  | ±1.000  |      |       |          |
-| r3                  | Y            |      | 50.989    | ±1.000  |      |       |          |
-| r3                  | Z            |      | 261.059   | ±1.000  |      |       |          |
-| u1                  | Diameter     |      | 2.498     | ±1.000  |      |       |          |
-| u1                  | X            |      | -28.554   | ±1.000  |      |       |          |
-| u1                  | Y            |      | 103.614   | ±1.000  |      |       |          |
-| u1                  | Z            |      | -91.666   | ±1.000  |      |       |          |
-| u2                  | Diameter     |      | 2.399     | ±1.000  |      |       |          |
-| u2                  | X            |      | 1.447     | ±1.000  |      |       |          |
-| u2                  | Y            |      | 103.722   | ±1.000  |      |       |          |
-| u2                  | Z            |      | -92.199   | ±1.000  |      |       |          |
-| u3                  | Diameter     |      | 2.401     | ±1.000  |      |       |          |
-| u3                  | X            |      | -28.490   | ±1.000  |      |       |          |
-| u3                  | Y            |      | 73.650    | ±1.000  |      |       |          |
-| u3                  | Z            |      | -92.161   | ±1.000  |      |       |          |
-| u4                  | Diameter     |      | 2.372     | ±1.000  |      |       |          |
-| u4                  | X            |      | 1.433     | ±1.000  |      |       |          |
-| u4                  | Y            |      | 73.749    | ±1.000  |      |       |          |
-| u4                  | Z            |      | -92.267   | ±1.000  |      |       |          |
-+---------------------+--------------+------+-----------+---------+------+-------+----------+
++---------------------+--------------+------+-----------+---------+
+| Feature Table       |              |      |           |         | 
++---------------------+--------------+------+-----------+---------+
+| Length Units        | Millimeters  |      |           |         |
+| Coordinate Systems  | csys         |      |           |         |
+| Data Alignments     | original     |      |           |         |
+|                     |              |      |           |         |
+| Name                | Control      | Nom  | Meas      | Tol     |
+| g1                  | Diameter     |      | 12.702    | ±1.000  |
+| g1                  | X            |      | 0.000     | ±1.000  |
+| g1                  | Y            |      | 0.000     | ±1.000  |
+| g1                  | Z            |      | 0.000     | ±1.000  |
+| g2                  | Diameter     |      | 12.700    | ±1.000  |
+| g2                  | X            |      | 100.390   | ±1.000  |
+| g2                  | Y            |      | 0.000     | ±1.000  |
+| g2                  | Z            |      | 0.000     | ±1.000  |
+| g3                  | Diameter     |      | 12.698    | ±1.000  |
+| g3                  | X            |      | 1.023     | ±1.000  |
+| g3                  | Y            |      | -0.155    | ±1.000  |
+| g3                  | Z            |      | 175.224   | ±1.000  |
+| l1                  | Diameter     |      | 6.349     | ±1.000  |
+| l1                  | X            |      | 79.614    | ±1.000  |
+| l1                  | Y            |      | 51.505    | ±1.000  |
+| l1                  | Z            |      | 199.754   | ±1.000  |
+| l2                  | Diameter     |      | 6.347     | ±1.000  |
+| l2                  | X            |      | 119.777   | ±1.000  |
+| l2                  | Y            |      | 51.355    | ±1.000  |
+| l2                  | Z            |      | 264.265   | ±1.000  |
+| l3                  | Diameter     |      | 6.350     | ±1.000  |
+| l3                  | X            |      | 79.277    | ±1.000  |
+| l3                  | Y            |      | 51.400    | ±1.000  |
+| l3                  | Z            |      | 275.713   | ±1.000  |
+| r1                  | Diameter     |      | 6.352     | ±1.000  |
+| r1                  | X            |      | -104.039  | ±1.000  |
+| r1                  | Y            |      | 51.210    | ±1.000  |
+| r1                  | Z            |      | 199.297   | ±1.000  |
+| r2                  | Diameter     |      | 6.352     | ±1.000  |
+| r2                  | X            |      | -108.680  | ±1.000  |
+| r2                  | Y            |      | 51.004    | ±1.000  |
+| r2                  | Z            |      | 275.110   | ±1.000  |
+| r3                  | Diameter     |      | 6.354     | ±1.000  |
+| r3                  | X            |      | -148.231  | ±1.000  |
+| r3                  | Y            |      | 50.989    | ±1.000  |
+| r3                  | Z            |      | 261.059   | ±1.000  |
+| u1                  | Diameter     |      | 2.498     | ±1.000  |
+| u1                  | X            |      | -28.554   | ±1.000  |
+| u1                  | Y            |      | 103.614   | ±1.000  |
+| u1                  | Z            |      | -91.666   | ±1.000  |
+| u2                  | Diameter     |      | 2.399     | ±1.000  |
+| u2                  | X            |      | 1.447     | ±1.000  |
+| u2                  | Y            |      | 103.722   | ±1.000  |
+| u2                  | Z            |      | -92.199   | ±1.000  |
+| u3                  | Diameter     |      | 2.401     | ±1.000  |
+| u3                  | X            |      | -28.490   | ±1.000  |
+| u3                  | Y            |      | 73.650    | ±1.000  |
+| u3                  | Z            |      | -92.161   | ±1.000  |
+| u4                  | Diameter     |      | 2.372     | ±1.000  |
+| u4                  | X            |      | 1.433     | ±1.000  |
+| u4                  | Y            |      | 73.749    | ±1.000  |
+| u4                  | Z            |      | -92.267   | ±1.000  |
++---------------------+--------------+------+-----------+---------+
 
 The calibrator works by minimizing disagreement between actual spot positions
 and modelled spot positions. When we press Fit, the simplex fitter starts

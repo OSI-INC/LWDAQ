@@ -24,19 +24,11 @@ set DFPS_Manager_info(fiducial_2) "14.684 14.941 2.550"
 set DFPS_Manager_info(fiducial_3) "-15.292 -15.074 2.238"
 set DFPS_Manager_info(fiducial_4) "14.561 -15.076 2.726"
 set DFPS_Manager_info(local_coord) "-12.973 89.196 -94.657 0.000 -0.002 -0.000"
-set DFPS_Manager_info(detector_1_1) "-0.134 0.078
-"
-set DFPS_Manager_info(detector_1_2) "-0.222 -0.137
-"
-set DFPS_Manager_info(detector_2_1) "0.117 0.035
-"
-set DFPS_Manager_info(detector_2_2) "0.099 -0.141
-"
-set DFPS_Manager_info(detector_3_1) "0.251 -0.065
-"
-set DFPS_Manager_info(detector_3_2) "0.094 -0.2
-"
-set DFPS_Manager_info(detector_4_1) "-0.102 -0.078
-"
-set DFPS_Manager_info(detector_4_2) "0.032 -0.224
-"
+set DFPS_Manager_info(detector_1_1) "-0.135 0.071"
+set DFPS_Manager_info(detector_1_2) "-0.223 -0.126"
+set DFPS_Manager_info(detector_2_1) "0.118 0.044"
+set DFPS_Manager_info(detector_2_2) "0.102 -0.133"
+set DFPS_Manager_info(detector_3_1) "0.252 -0.069"
+set DFPS_Manager_info(detector_3_2) "0.094 -0.203"
+set DFPS_Manager_info(detector_4_1) "-0.102 -0.079"
+set DFPS_Manager_info(detector_4_2) "0.028 -0.215"
