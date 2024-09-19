@@ -313,6 +313,7 @@ proc DFPS_Manager_init {} {
 	set config(dfcalib_detector) "1"
 	set config(dfcalib_led) "A1"
 	set config(dfcalib_flash) "0.1"
+	set info(mrange_corners) "bottom left top right"
 	set info(mrange_1) "-2.5 2.5 3.5 0"
 	set info(mrange_2) "+2.5 2.5 3.5 0"
 	set info(mrange_3) "-2.5 -2.5 3.5 0"
@@ -2122,10 +2123,12 @@ proc DFPS_Manager_mranges {{masts ""}} {
 
 	if {$masts == ""} {set masts $info(positioner_masts)}
 	
-	foreach {n e c} "$info(dac_min) $info(dac_min) bottom\
-			$info(dac_max) $info(dac_min) left\
-			$info(dac_max) $info(dac_max) top\
-			$info(dac_min) $info(dac_max) right" {
+	set i 0
+	foreach {n e} "$info(dac_min) $info(dac_min)\
+			$info(dac_max) $info(dac_min)\
+			$info(dac_max) $info(dac_max)\
+			$info(dac_min) $info(dac_max)" {
+		set c [lindex $info(mrange_corners) $i]
 		set config(north) $n
 		set config(east) $e
 		LWDAQ_print $info(dfcalib_text) "Move: $c $n $e"
@@ -2134,9 +2137,42 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		foreach m $masts {
 			set ml [DFPS_Manager_measure $m]
 			LWDAQ_print $info(dfcalib_text) "Corner: $m $ml"
+			set m_$m\_$c [lrange $ml 0 1]
 		}		
+		incr i
 	}
 	DFPS_Manager_zero $info(wildcard_id)
+	
+	set n [llength $info(mrange_corners)]
+	foreach m $masts {
+		set x_sum 0
+		set y_sum 0
+		set perimeter 0
+		scan [set m_$m\_[lindex $info(mrange_corners) end]] %f%f x_prev y_prev
+		foreach c $info(mrange_corners) {
+			scan [set m_$m\_$c] %f%f x y
+			set side [format %.3f [expr sqrt( \
+				($x-$x_prev)*($x-$x_prev) + \
+				($y-$y_prev)*($y-$y_prev))]]
+			LWDAQ_print $info(dfcalib_text) "$m $c $x $y $side"
+			set x_sum [expr $x_sum + $x]
+			set y_sum [expr $y_sum + $y]
+			set perimeter [expr $perimeter + $side]
+			set x_prev $x
+			set y_prev $y
+		}
+		set x_ave [format %.3f [expr $x_sum / $n]]
+		set y_ave [format %.3f [expr $y_sum / $n]]
+		set side [format %.3f [expr $perimeter / $n]]
+		
+		set x_top [lindex [set m_$m\_top] 0]
+		set x_bottom [lindex [set m_$m\_bottom] 0]
+		set x_rot [format %.3f [expr atan(($x_bottom-$x_top)/$side/sqrt(2))]]
+		set y_left [lindex [set m_$m\_left] 1]
+		set y_right [lindex [set m_$m\_right] 1]
+		set y_rot [format %.3f [expr atan(($y_right-$y_left)/$side/sqrt(2))]]
+		LWDAQ_print $info(dfcalib_text) "$x_ave $y_ave $side $x_rot $y_rot"
+	}
 		
 	return ""
 }
