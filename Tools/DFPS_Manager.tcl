@@ -2201,9 +2201,6 @@ proc DFPS_Manager_mranges {{masts ""}} {
 
 	if {$masts == ""} {set masts $info(positioner_masts)}
 	
-	set info(mcalib_state) "Ranges"
-	LWDAQ_update
-	
 	set i 0
 	foreach {n e} "$info(dac_min) $info(dac_min)\
 			$info(dac_max) $info(dac_min)\
@@ -2212,16 +2209,19 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		set c [lindex $info(mrange_corners) $i]
 		set config(upleft) $n
 		set config(upright) $e
+		set info(mcalib_state) "Move_$c"	
 		if {$config(verbose)} {
 			LWDAQ_print $info(mcalib_text) "Corner: $c $n $e" $info(vcolor)
 		}
 		DFPS_Manager_move $info(wildcard_id)
 		set st $config(mcalib_settling_ms)
+		set info(mcalib_state) "Settle"	
 		if {$config(verbose)} {
 			LWDAQ_print $info(mcalib_text) "Settling: $st" $info(vcolor)
 		}
 		LWDAQ_wait_ms $st
 		foreach m $masts {
+			set info(mcalib_state) "Measure_$m"	
 			set ml [DFPS_Manager_mast_measure $m]
 			if {$config(verbose)} {
 				LWDAQ_print $info(mcalib_text) "Mast: $m $ml" $info(vcolor)
@@ -2230,8 +2230,12 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		}		
 		incr i
 	}
+
+	set info(mcalib_state) "Zero"	
 	DFPS_Manager_zero $info(wildcard_id)
 	
+	set info(mcalib_state) "Calculate"	
+	LWDAQ_update
 	set n [llength $info(mrange_corners)]
 	foreach m $masts {
 		set x_sum 0
@@ -2490,7 +2494,11 @@ proc DFPS_Manager_measure_masts {} {
 	upvar #0 DFPS_Manager_info info
 
 	set info(state) "Measure"
-	DFPS_Manager_mast_measure $info(positioner_masts)
+	set positions [DFPS_Manager_mast_measure $info(positioner_masts)]
+	foreach p $positions {
+		LWDAQ_print -nonewline $info(text) "[format %.3f $p] "
+	}
+	LWDAQ_print $info(text) ""
 	set info(state) "Idle"
 	
 	return ""
@@ -2508,14 +2516,14 @@ proc DFPS_Manager_reset_masts {} {
 	set info(state) "Reset"
 	
 	LWDAQ_print $info(text) "\nPositioner Reset Start" purple
+	LWDAQ_print $info(text) "Zeroing actuator voltages position..."
+	DFPS_Manager_zero
 	LWDAQ_print $info(text) "Resetting fiber view cameras..."
 	DFPS_Manager_fvc_reset
 	LWDAQ_print $info(text) "Setting target positions to range centers..."
 	foreach m $info(positioner_masts) {
 		set info(target_$m) [lrange $info(mrange_$m) 0 1]
 	}
-	LWDAQ_print $info(text) "Moving masts to zero position..."
-	DFPS_Manager_zero
 	LWDAQ_print $info(text) "Measuring mast positions..."
 	DFPS_Manager_measure_masts
 	LWDAQ_print $info(text) "Positioner Reset Complete" purple
