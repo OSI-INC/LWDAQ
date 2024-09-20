@@ -32,6 +32,10 @@ proc DFPS_Manager_init {} {
 	
 	LWDAQ_tool_init "DFPS_Manager" "2.10"
 	if {[winfo exists $info(window)]} {return ""}
+	
+	# Set the precision of the lwdaq libraries. We need six places after the
+	# decimal point so we can see microradians in radian values.
+	lwdaq_config -fsd 6
 
 	# The state variable tells us the current state of the tool.
 	set info(state) "Idle"
@@ -715,11 +719,12 @@ proc DFPS_Manager_spots {{leds ""}} {
 			lwdaq_draw $info(image_$side) dfps_manager_$side \
 				-intensify $config(intensify) -zoom $config(fvc_zoom)
 		}
+		
 	}
 	
 	# Parse result string.
 	set spots ""
-	foreach fiber "$iconfig(daq_source_device_element)" {
+	foreach led $leds {
 		foreach side {left right} {
 			append spots "[lindex [set result_$side] 0] [lindex [set result_$side] 1] "
 			set result_$side [lrange [set result_$side] 6 end]
@@ -748,7 +753,8 @@ proc DFPS_Manager_sources_global {spots} {
 
 	# Refresh the left and right camera mount coordinate systems in case we have
 	# changed the left and right mounting ball coordinates since our previous
-	# use of the mount coordinates.
+	# use of the mount coordinates. We need six decimal places of resolution in
+	# order to get the angles correct.
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 
@@ -763,10 +769,6 @@ proc DFPS_Manager_sources_global {spots} {
 			continue
 		}
 		
-		# We need six decimal places of resolution in our bearing directions in
-		# order to obtain one-micron precision in source position.
-		lwdaq_config -fsd 6
-		
 		# For each camera, we transform the image position in to mount
 		# coordinates, then project the image position through the pivot point
 		# of the camera to obtain a bearing line. We transform the bearing line
@@ -780,9 +782,6 @@ proc DFPS_Manager_sources_global {spots} {
 			set dir_$side [lwdaq xyz_global_from_local_vector \
 				[lrange [set b] 3 5] $info(coord_$side)]
 		}
-		
-		# Go back to three decimal places so our position string will be compact.
-		lwdaq_config -fsd 3
 		
 		# Find the point and direction that define the shortest vector between the
 		# two bearings in global coordinates.
@@ -869,7 +868,7 @@ proc DFPS_Manager_mast_measure {{masts ""}} {
 		
 		foreach {x y z} $masts_local {
 			set m [lindex $masts 0]
-			set info(mast_$m) "$x $y"
+			set info(mast_$m) "[format %.3f $x] [format %.3f $y]"
 			scan $info(target_$m) %f%f xt yt
 			set xo [format %.3f [expr $x - $xt]]
 			set yo [format %.3f [expr $y - $yt]]
@@ -1110,8 +1109,10 @@ proc DFPS_Manager_fvccmm_show {} {
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 	set err [DFPS_Manager_fvccmm_disagreement]
-	LWDAQ_print $info(fvccmm_text) "[DFPS_Manager_fvccmm_get_params] $err 0"
-
+	foreach v "[DFPS_Manager_fvccmm_get_params] $err" {
+		LWDAQ_print -nonewline $info(fvccmm_text) "[format %.3f $v] "
+	}
+	
 	return ""
 }
 
@@ -1133,7 +1134,6 @@ proc DFPS_Manager_fvccmm_check {} {
 	set sources ""
 	set sum_squares 0.0
 	for {set i 1} {$i <= 4} {incr i} {	
-		lwdaq_config -fsd 6
 		foreach side {left right} {
 			set x [expr 0.001 * [lindex $info(spots_$side) [expr ($i-1)*2]]]
 			set y [expr 0.001 * [lindex $info(spots_$side) [expr ($i-1)*2+1]]]
@@ -1143,7 +1143,6 @@ proc DFPS_Manager_fvccmm_check {} {
 			set dir_$side [lwdaq xyz_global_from_local_vector \
 				[lrange [set b] 3 5] $info(coord_$side)]
 		}
-		lwdaq_config -fsd 3
 		
 		set bridge [lwdaq xyz_line_line_bridge \
 			"$point_left $dir_left" "$point_right $dir_right"]
@@ -1345,8 +1344,7 @@ proc DFPS_Manager_fvccmm_fit {} {
 		set start_params [DFPS_Manager_fvccmm_get_params] 
 		set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
 		set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
-		lwdaq_config -show_details $config(fit_details) \
-			-text_name $info(fvccmm_text) -fsd 3	
+		lwdaq_config -show_details $config(fit_details) -text_name $info(fvccmm_text)
 		set end_params [lwdaq_simplex $start_params \
 			DFPS_Manager_fvccmm_altitude \
 			-report $config(fit_show) \
@@ -1355,11 +1353,16 @@ proc DFPS_Manager_fvccmm_fit {} {
 			-start_size $config(fit_startsize) \
 			-end_size $config(fit_endsize) \
 			-scaling $scaling]
-		lwdaq_config -show_details 0 -text_name $info(text) -fsd 6
+		lwdaq_config -show_details 0 -text_name $info(text)
 		if {[LWDAQ_is_error_result $end_params]} {error "$end_params"}
 		set info(cam_left) "[lrange $end_params 0 7]"
 		set info(cam_right) "[lrange $end_params 8 15]"
-		LWDAQ_print $info(fvccmm_text) "$end_params"
+		set disagreement [lindex $end_params 16]
+		set iterations [lindex $end_params 17]
+		foreach v [join "$info(cam_left) [join $info(cam_right)] $disagreement"] {
+			LWDAQ_print -nonewline $info(fvccmm_text) "[format %.3f $v] "
+		}
+		LWDAQ_print $info(fvccmm_text) "$iterations"
 		if {$config(verbose)} {
 			LWDAQ_print $info(fvccmm_text) "Fit converged in\
 				[format %.2f [expr 0.001*([clock milliseconds]-$start_time)]] s\
@@ -1627,9 +1630,7 @@ proc DFPS_Manager_gsrasnik_calculate {} {
 		set x [lindex $info(gsrasnik_mask_0) [expr ($gs-1)*3+0]]
 		set y [lindex $info(gsrasnik_mask_0) [expr ($gs-1)*3+1]]
 		set rot [lindex $info(gsrasnik_mask_0) [expr ($gs-1)*3+2]]
-		lwdaq_config -fsd 3
 		set gsxyz [lwdaq xyz_local_from_global_point "$x $y 0" $pose]
-		lwdaq_config -fsd 6
 		scan $gsxyz %f%f%f xx yy zz
 		set xx [expr $xx + 0.5*$info(gsrasnik_width) - $info(local_coord_offset)]
 		set yy [expr $yy + 0.5*$info(gsrasnik_height) - $info(local_coord_offset)]
@@ -2081,7 +2082,7 @@ proc DFPS_Manager_fvc_reset {} {
 	set info(utils_state) "Analyze"
 	
 	set start_params $info(local_coord)
-	lwdaq_config -show_details $config(fit_details) -text_name $info(text) -fsd 3	
+	lwdaq_config -show_details $config(fit_details) -text_name $info(text)	
 	set end_params [lwdaq_simplex $start_params \
 		DFPS_Manager_fvc_reset_err \
 		-report $config(fit_show) \
@@ -2090,14 +2091,16 @@ proc DFPS_Manager_fvc_reset {} {
 		-start_size $config(fit_startsize) \
 		-end_size $config(fit_endsize) \
 		-scaling "1.0 1.0 1.0 0.1 0.1 0.1"]
-	lwdaq_config -show_details 0 -text_name $info(text) -fsd 6
+	lwdaq_config -show_details 0 -text_name $info(text)
 	if {[LWDAQ_is_error_result $end_params]} {
 		LWDAQ_print $info(text) "ERROR: $end_params"
 		set info(state) "Idle"
 		return ""
 	}
 	
-	set info(local_coord) [lrange $end_params 0 5]
+	set pl ""
+	foreach p [lrange $end_params 0 5] {append pl "[format %.3f $p] "}
+	set info(local_coord) [string trim $pl]
 
 	if {[winfo exists $info(utils_text)]} {
 		if {$config(verbose)} {
@@ -2220,7 +2223,9 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		LWDAQ_wait_ms $st
 		foreach m $masts {
 			set ml [DFPS_Manager_mast_measure $m]
-			LWDAQ_print $info(mcalib_text) "Mast: $m $ml" $info(vcolor)
+			if {$config(verbose)} {
+				LWDAQ_print $info(mcalib_text) "Mast: $m $ml" $info(vcolor)
+			}
 			set m_$m\_$c [lrange $ml 0 1]
 		}		
 		incr i
@@ -2458,35 +2463,6 @@ proc DFPS_Manager_utilities {} {
 }
 
 #
-# DFPS_Manager_reset_masts re-calculates the local coordinate pose, sets the
-# mast targets to the centers of the mast ranges, zeros the control voltages on
-# all positioners, and re-measures the mast positions.
-#
-proc DFPS_Manager_reset_masts {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-	
-	set info(state) "Reset"
-	
-	LWDAQ_print $info(text) "\nPositioner Reset Start" purple
-	LWDAQ_print $info(text) "Resetting fiber view cameras..."
-	DFPS_Manager_fvc_reset
-	LWDAQ_print $info(text) "Setting target positions to range centers..."
-	foreach m $info(positioner_masts) {
-		set info(target_$m) [lrange $info(mrange_$m) 0 1]
-	}
-	LWDAQ_print $info(text) "Moving masts to zero position..."
-	DFPS_Manager_zero
-	LWDAQ_print $info(text) "Measuring mast positions..."
-	DFPS_Manager_measure_masts
-	LWDAQ_print $info(text) "Positioner Reset Complete" purple
-
-	set info(state) "Idle"
-	
-	return ""
-}
-
-#
 # DFPS_Manager_acquire_guides capture images from all guide sensors and displays them in
 # the manager window. It uses the default guide exposure time exposure_s.
 #
@@ -2515,6 +2491,35 @@ proc DFPS_Manager_measure_masts {} {
 
 	set info(state) "Measure"
 	DFPS_Manager_mast_measure $info(positioner_masts)
+	set info(state) "Idle"
+	
+	return ""
+}
+
+#
+# DFPS_Manager_reset_masts re-calculates the local coordinate pose, sets the
+# mast targets to the centers of the mast ranges, zeros the control voltages on
+# all positioners, and re-measures the mast positions.
+#
+proc DFPS_Manager_reset_masts {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	set info(state) "Reset"
+	
+	LWDAQ_print $info(text) "\nPositioner Reset Start" purple
+	LWDAQ_print $info(text) "Resetting fiber view cameras..."
+	DFPS_Manager_fvc_reset
+	LWDAQ_print $info(text) "Setting target positions to range centers..."
+	foreach m $info(positioner_masts) {
+		set info(target_$m) [lrange $info(mrange_$m) 0 1]
+	}
+	LWDAQ_print $info(text) "Moving masts to zero position..."
+	DFPS_Manager_zero
+	LWDAQ_print $info(text) "Measuring mast positions..."
+	DFPS_Manager_measure_masts
+	LWDAQ_print $info(text) "Positioner Reset Complete" purple
+
 	set info(state) "Idle"
 	
 	return ""
