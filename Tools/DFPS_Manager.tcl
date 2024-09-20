@@ -39,7 +39,7 @@ proc DFPS_Manager_init {} {
 
 	# The state variable tells us the current state of the tool.
 	set info(state) "Idle"
-	set config(verbose) "1"
+	set config(verbose) "0"
 	set info(vcolor) "brown"
 	
 	# Instrument fundamentals.
@@ -181,10 +181,14 @@ proc DFPS_Manager_init {} {
 	# Watchdog control.
 	set info(fiducial_monitor_time) "0"
 	set info(mast_monitor_time) "0"
-	set config(fiducial_monitor_period) "100"
+	set config(fiducial_monitor_period) "600"
 	set config(mast_monitor_period) "10"
-	set config(monitor_masts) "0"
+	set config(control_masts) "0"
 	set config(monitor_fiducials) "0"
+	foreach m $info(positioner_masts) {
+		set info(control_$m) "$info(dac_zero) $info(dac_zero)"
+	}
+	set config(control_gain) "10000"
 	
 	# Window settings.
 	set info(label_color) "brown"
@@ -641,27 +645,108 @@ proc DFPS_Manager_transmit {commands} {
 }
 
 #
-# DFPS_Manager_set takes the upleft and upright control values and
-# instructs the named positioner to set its converters accordingly. The control
-# values must be unsigned integers between 0 and 65535.
+# DFPS_Manager_set takes the upleft and upright control values and instructs the
+# named positioner to set its converters accordingly. The control values must be
+# unsigned integers between 0 and 65535. If the routine encounters an error, it
+# prints a message and returns DAC values -1.
 #
 proc DFPS_Manager_set {id upleft upright} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set commands [DFPS_Manager_id_bytes $id]
-	set n $upleft
-	set s [expr 65535 - $upleft]
-	set e $upright
-	set w [expr 65535 - $upright]
-	append commands " 1 [expr $n / 256] [expr $n % 256]\
-		2 [expr $s / 256] [expr $s % 256]\
-		3 [expr $e / 256] [expr $e % 256]\
-		4 [expr $w / 256] [expr $w % 256]"
-	set commands [DFPS_Manager_transmit $commands]
-	return "$commands"
+	if {$upleft > $info(dac_max)} {
+		LWDAQ_print $info(text) "WARNING: Specified upleft clipped to $info(dac_max)."
+		set upleft $info(dac_max)
+	}
+	if {$upright > $info(dac_max)} {
+		LWDAQ_print $info(text) "WARNING: Specified upright clipped to $info(dac_max)."
+		set upright $info(dac_max)
+	}
+	if {$upleft < $info(dac_min)} {
+		LWDAQ_print $info(text) "WARNING: Specified upleft clipped to $info(dac_min)."
+		set upleft $info(dac_min)
+	}
+	if {$upright < $info(dac_min)} {
+		LWDAQ_print $info(text) "WARNING: Specified upright clipped to $info(dac_min)."
+		set upright $info(dac_min)
+	}
+	
+	if {[catch {
+		set commands [DFPS_Manager_id_bytes $id]
+		set n $upleft
+		set s [expr 65535 - $upleft]
+		set e $upright
+		set w [expr 65535 - $upright]
+		append commands " 1 [expr $n / 256] [expr $n % 256]\
+			2 [expr $s / 256] [expr $s % 256]\
+			3 [expr $e / 256] [expr $e % 256]\
+			4 [expr $w / 256] [expr $w % 256]"
+		set commands [DFPS_Manager_transmit $commands]
+	} error_result]} {
+		LWDAQ_print $info(text) "ERROR: $error_result"
+		return "$id -1 -1"
+	}
+	
+	return "$id $upleft $upright"
 }
 		
+#
+# DFPS_Manager_move sets the drive voltages of a mast's actuators to the
+# specified values. We give the mast index. In a system with four masts, the
+# index will be 1-4.
+#
+proc DFPS_Manager_move {mast upleft upright} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {![winfo exists $info(window)]} {
+		return ""
+	}
+	
+	set id [lindex $config(controllers) [expr $mast-1]]
+	set result [DFPS_Manager_set $id $upleft $upright]
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "Move: $result" $info(vcolor)
+	}
+
+	return "$result"
+}
+
+#
+# DFPS_Manager_move_all sets the drive voltages of all actuators to the values 
+# specified in the upleft and upright configuration parameters.
+#
+proc DFPS_Manager_move_all {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set info(state) "Move_All"
+	foreach m $info(positioner_masts) {
+		set info(control_$m) "$config(upleft) $config(upright)"
+	}
+	DFPS_Manager_set $info(wildcard_id) $config(upleft) $config(upright)
+	set info(state) "Idle"
+	return ""
+}
+
+#
+# DFPS_Manager_zero_all sets the drive voltages of all mast actuators to their 
+# zero values.
+#
+proc DFPS_Manager_zero_all {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	set info(state) "Zero_All"
+	
+	foreach m $info(positioner_masts) {
+		set info(control_$m) "$info(dac_zero) $info(dac_zero)"
+	}
+	DFPS_Manager_set $info(wildcard_id) $info(dac_zero) $info(dac_zero)
+	set info(state) "Idle"
+	return ""
+}
+
 #
 # DFPS_Manager_spots captures an image of the sources whose light sources are
 # listed in the leds argument. If we pass an empty string for the elements, the
@@ -733,6 +818,21 @@ proc DFPS_Manager_spots {{leds ""}} {
 	
 	# Return the spot list.
 	return [string trim $spots]
+}
+
+#
+# DFPS_Manager_show_sources flashes all the fiducials and guides so we can see them
+# all in the fiber view images. It finds all the spots too, but may get them mixed
+# up.
+#
+proc DFPS_Manager_show_sources {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set info(state) "Show_Sources"
+	set result [DFPS_Manager_spots]
+	set info(state) "Idle"
+	return $result
 }
 
 #
@@ -886,101 +986,6 @@ proc DFPS_Manager_mast_measure {{masts ""}} {
 	
 	set info(state) "Idle"	
 	return $masts_local
-}
-
-#
-# DFPS_Manager_move sets the drive voltages of the listed controllers to the
-# value specified in the upleft and upright parameters. If we provide a
-# list of controller IDs, the routine will use them. Otherwise it will use the
-# IDs in the controllers parameter.
-#
-proc DFPS_Manager_move {{controllers ""}} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	if {![winfo exists $info(window)]} {
-		return ""
-	}
-	
-	if {$controllers == ""} {
-		set controllers $config(controllers)
-	}
-
-	if {$config(upleft) > $info(dac_max)} {
-		LWDAQ_print $info(text) "WARNING: Specified upleft clipped to $info(dac_max)."
-		set config(upleft) $info(dac_max)
-	}
-	if {$config(upright) > $info(dac_max)} {
-		LWDAQ_print $info(text) "WARNING: Specified upright clipped to $info(dac_max)."
-		set config(upright) $info(dac_max)
-	}
-	if {$config(upleft) < $info(dac_min)} {
-		LWDAQ_print $info(text) "WARNING: Specified upleft clipped to $info(dac_min)."
-		set config(upleft) $info(dac_min)
-	}
-	if {$config(upright) < $info(dac_min)} {
-		LWDAQ_print $info(text) "WARNING: Specified upright clipped to $info(dac_min)."
-		set config(upright) $info(dac_min)
-	}
-	
-	set info(state) "Move"	
-
-	if {[catch {
-		foreach id $controllers {
-			DFPS_Manager_set $id $config(upleft) $config(upright)
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) \
-					"Move: 0x$id $config(upleft) $config(upright)" $info(vcolor)
-			}
-		}
-	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: $error_result"
-		set info(state) "Idle"
-		return ""
-	}
-
-	set info(state) "Idle"	
-	return "$config(upleft) $config(upright)"
-}
-
-#
-# DFPS_Manager_zero sets the drive voltages of the listed controllers to their
-# zero values. If we provide a list of controller IDs, the routine will use
-# them. Otherwise it will use the IDs in the controllers parameter.
-#
-proc DFPS_Manager_zero {{controllers ""}} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-	
-	if {![winfo exists $info(window)]} {
-		return ""
-	}
-	
-	if {$controllers == ""} {
-		set controllers $config(controllers)
-	}
-	
-	set info(state) "Zero"	
-	
-	set config(upleft) $info(dac_zero)
-	set config(upright) $info(dac_zero)
-
-	if {[catch {
-		foreach id $config(controllers) {
-			DFPS_Manager_set $id $config(upleft) $config(upright)
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) \
-					"Zero: 0x$id $config(upleft) $config(upright)" $info(vcolor)
-			}
-		}
-	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: $error_result"
-		set info(state) "Idle"
-		return ""
-	}
-
-	set info(state) "Idle"	
-	return "$config(upleft) $config(upright)"
 }
 
 #
@@ -1929,18 +1934,28 @@ proc DFPS_Manager_watchdog {} {
 	# Default value for result string.
 	set result ""
 	
-	# At intervals, check mast positions with fiber view cameras and adjust.
-	if {$config(monitor_masts)} {
+	# At intervals, adjust mast positions. We measure the mast positions, look at the
+	# offsets from their target positions, and adjust their control voltages so as to
+	# move the mast towards the target.
+	if {$config(control_masts)} {
 		if {[clock seconds] - $info(mast_monitor_time) \
 				>= $config(mast_monitor_period)} {
 			set info(mast_monitor_time) [clock seconds]
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) \
-					"Measuring guide fibers. (Time [clock seconds])" $info(vcolor)
+					"Adjusting masts. (Time [clock seconds])" $info(vcolor)
 			}
-			DFPS_Manager_mast_measure
-			set result $info(mast_monitor_time)
-			
+			DFPS_Manager_measure_masts
+			foreach m $info(positioner_masts) {
+				scan $info(control_$m) %d%d upleft upright
+				scan $info(offset_$m) %f%f xo yo
+				set ulo [format %.3f [expr $yo/sqrt(2)-$xo/sqrt(2)]]
+				set uro [format %.3f [expr $yo/sqrt(2)+$xo/sqrt(2)]]
+				set upleft [format %.0f [expr $upleft - $config(control_gain)*$ulo]]
+				set upright [format %.0f [expr $upright - $config(control_gain)*$uro]]
+				set result [DFPS_Manager_move $m $upleft $upright]
+				set info(control_$m) "[lrange $result 1 2]"
+			}
 		}
 	} {
 		set info(mast_monitor_time) "0"
@@ -1957,7 +1972,6 @@ proc DFPS_Manager_watchdog {} {
 					"Resetting fiber view camers. (Time [clock seconds])" $info(vcolor)
 			}
 			DFPS_Manager_fvc_reset
-			set result $info(fiducial_monitor_time)
 		}
 	} {
 		set info(fiducial_monitor_time) "0"
@@ -2213,7 +2227,7 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		if {$config(verbose)} {
 			LWDAQ_print $info(mcalib_text) "Corner: $c $n $e" $info(vcolor)
 		}
-		DFPS_Manager_move $info(wildcard_id)
+		DFPS_Manager_set $info(wildcard_id) $config(upleft) $config(upright)
 		set st $config(mcalib_settling_ms)
 		set info(mcalib_state) "Settle"	
 		if {$config(verbose)} {
@@ -2232,7 +2246,9 @@ proc DFPS_Manager_mranges {{masts ""}} {
 	}
 
 	set info(mcalib_state) "Zero"	
-	DFPS_Manager_zero $info(wildcard_id)
+	set config(upleft) $info(dac_zero)
+	set config(upright) $info(dac_zero)
+	DFPS_Manager_set $info(wildcard_id) $config(upleft) $config(upright)
 	
 	set info(mcalib_state) "Calculate"	
 	LWDAQ_update
@@ -2431,16 +2447,42 @@ proc DFPS_Manager_utilities {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach a {fiducial_leds guide_leds controllers} {
+	foreach a {Zero_All Move_All} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
+		pack $f.$b -side left -expand yes
+	}
+	
+	foreach d {upleft upright control_gain} {
+		set a [string tolower $d]
+		label $f.l$a -text $d -fg $info(label_color)
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 7
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+
+	foreach a {controllers} {
+		label $f.l$a -text $a -fg $info(label_color)
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 20
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	foreach a {transceiver} {
+		label $f.l$a -text $a -fg $info(label_color)
+		entry $f.e$a -textvariable DFPS_Manager_config($a) \
+			-width [expr [string length $config($a)] + 1]
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
+	
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+
+	foreach a {fiducial_leds guide_leds} {
 		label $f.l$a -text $a -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 20
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 
-	set f [frame $w.f[incr i]]
-	pack $f -side top -fill x
-
-	foreach a {fvc_left fvc_right injector transceiver} {
+	foreach a {fvc_left fvc_right injector} {
 		label $f.l$a -text $a -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 1]
@@ -2487,21 +2529,28 @@ proc DFPS_Manager_acquire_guides {} {
 }
 
 #
-# DFPS_Manager_measure_masts measures the positions of all masts.
+# DFPS_Manager_measure_masts measures the positions of all masts one by one, sets their
+# positions, and returns their positions.
 #
 proc DFPS_Manager_measure_masts {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	set info(state) "Measure"
-	set positions [DFPS_Manager_mast_measure $info(positioner_masts)]
+	set positions [list]
+	foreach m $info(positioner_masts) {
+		set mp [DFPS_Manager_mast_measure $m]
+		scan $mp %f%f%f x y z
+		set info(mast_$m) "[format %.3f $x] [format %.3f $y]"
+		lappend positions $x $y
+	}
 	foreach p $positions {
 		LWDAQ_print -nonewline $info(text) "[format %.3f $p] "
 	}
 	LWDAQ_print $info(text) ""
 	set info(state) "Idle"
 	
-	return ""
+	return $positions
 }
 
 #
@@ -2517,17 +2566,23 @@ proc DFPS_Manager_reset_masts {} {
 	
 	LWDAQ_print $info(text) "\nPositioner Reset Start" purple
 	LWDAQ_print $info(text) "Zeroing actuator voltages position..."
-	DFPS_Manager_zero
+	DFPS_Manager_zero_all
+	foreach m $info(positioner_masts) {
+		set info(control_$m) "$info(dac_zero) $info(dac_zero)"
+	}
 	LWDAQ_print $info(text) "Resetting fiber view cameras..."
 	DFPS_Manager_fvc_reset
 	LWDAQ_print $info(text) "Setting target positions to range centers..."
 	foreach m $info(positioner_masts) {
 		set info(target_$m) [lrange $info(mrange_$m) 0 1]
 	}
-	LWDAQ_print $info(text) "Measuring mast positions..."
+	LWDAQ_print $info(text) "Measuring mast positions (x y) in local coordinates..."
 	DFPS_Manager_measure_masts
-	LWDAQ_print $info(text) "Positioner Reset Complete" purple
 
+	LWDAQ_print $info(text) "Showing all sources..."
+	DFPS_Manager_spots
+
+	LWDAQ_print $info(text) "Positioner Reset Complete" purple
 	set info(state) "Idle"
 	
 	return ""
@@ -2550,7 +2605,7 @@ proc DFPS_Manager_open {} {
 	label $f.state -textvariable DFPS_Manager_info(state) -width 20 -fg blue
 	pack $f.state -side left -expand yes
 	
-	foreach a {Measure_Masts Acquire_Guides Reset_Masts Utilities} {
+	foreach a {Measure_Masts Acquire_Guides Show_Sources Reset_Masts Utilities} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -2564,6 +2619,12 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
+	foreach a {Control_Masts Monitor_Fiducials Verbose} {
+		set b [string tolower $a]
+		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
+		pack $f.$b -side left -expand yes
+	}
+
 	foreach a {ip_addr flash_s expose_s} {
 		label $f.l$a -text $a -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
@@ -2571,31 +2632,6 @@ proc DFPS_Manager_open {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	set f [frame $w.f[incr i]]
-	pack $f -side top -fill x
-
-	foreach a {Move Zero} {
-		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
-		pack $f.$b -side left -expand yes
-	}
-	
-	foreach d {upleft upright} {
-		set a [string tolower $d]
-		label $f.l$a -text $d -fg $info(label_color)
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 5
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-	
-	set f [frame $w.f[incr i]]
-	pack $f -side top -fill x
-	
-	foreach a {Monitor_Masts Monitor_Fiducials Verbose} {
-		set b [string tolower $a]
-		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
-		pack $f.$b -side left -expand yes
-	}
-
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 	
@@ -2634,6 +2670,16 @@ proc DFPS_Manager_open {} {
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(offset_$m) -width 16
+		pack $f.e$m -side left -expand yes
+	}
+
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+
+	label $f.title -text "Mast Control:" -fg $info(label_color) -width 20
+	pack $f.title -side left -expand yes
+	foreach m $info(positioner_masts) {
+		entry $f.e$m -textvariable DFPS_Manager_info(control_$m) -width 16
 		pack $f.e$m -side left -expand yes
 	}
 
