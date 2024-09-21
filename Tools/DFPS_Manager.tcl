@@ -556,8 +556,8 @@ proc DFPS_Manager_examine_calibration {} {
 
 
 #
-# DFPS_Manager_id_bytes returns a list of two bytes as decimal numbers that represent
-# the identifier of the implant.
+# DFPS_Manager_id_bytes returns a list of two bytes as decimal numbers that
+# represent the identifier of the controller. Thus FF10 returns as "255 16".
 #
 proc DFPS_Manager_id_bytes {id_hex} {
 	upvar #0 DFPS_Manager_config config
@@ -582,7 +582,7 @@ proc DFPS_Manager_id_bytes {id_hex} {
 # sixteen-bit linear feedback shift register to all zeros, thus performing a
 # sixteen-bit cyclic redundancy check. We assume the destination shift register
 # is preloaded with the checksum_preload value. The shift register has taps at
-# locations 16, 14, 13, and 11.
+# locations 16, 14, 13, and 11. 
 #
 proc DFPS_Manager_transmit {commands} {
 	upvar #0 DFPS_Manager_config config
@@ -635,7 +635,8 @@ proc DFPS_Manager_transmit {commands} {
 		LWDAQ_socket_close $sock
 	} error_result]} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
-		error $error_result
+		LWDAQ_print $info(text) "ERROR: $error_result"
+		return "ERROR: $error_result"
 	}
 	
 	# If we get here, we have no reason to believe the transmission failed, although
@@ -671,23 +672,21 @@ proc DFPS_Manager_voltage_set {id upleft upright} {
 		set upright $info(dac_min)
 	}
 	
-	if {[catch {
-		set commands [DFPS_Manager_id_bytes $id]
-		set n $upleft
-		set s [expr 65535 - $upleft]
-		set e $upright
-		set w [expr 65535 - $upright]
-		append commands " 1 [expr $n / 256] [expr $n % 256]\
-			2 [expr $s / 256] [expr $s % 256]\
-			3 [expr $e / 256] [expr $e % 256]\
-			4 [expr $w / 256] [expr $w % 256]"
-		set commands [DFPS_Manager_transmit $commands]
-	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: $error_result"
-		return ""
+	set commands [DFPS_Manager_id_bytes $id]
+	set n $upleft
+	set s [expr 65535 - $upleft]
+	set e $upright
+	set w [expr 65535 - $upright]
+	append commands " 1 [expr $n / 256] [expr $n % 256]\
+		2 [expr $s / 256] [expr $s % 256]\
+		3 [expr $e / 256] [expr $e % 256]\
+		4 [expr $w / 256] [expr $w % 256]"
+	set commands [DFPS_Manager_transmit $commands]
+	if {[LWDAQ_is_error_result $commands]} {
+		return $commands
+	} else {
+		return "$id $upleft $upright"
 	}
-	
-	return "$id $upleft $upright"
 }
 		
 #
@@ -705,8 +704,7 @@ proc DFPS_Manager_move {mast upleft upright} {
 	
 	set id [lindex $config(controllers) [expr $mast-1]]
 	set result [DFPS_Manager_voltage_set $id $upleft $upright]
-	if {$result == ""} {set result "failed"}
-	if {$config(verbose)} {
+	if {![LWDAQ_is_error_result $result] && $config(verbose)} {
 		LWDAQ_print $info(text) "Move: $result" $info(vcolor)
 	}
 
@@ -788,7 +786,7 @@ proc DFPS_Manager_spots {{leds ""}} {
 		set result [LWDAQ_acquire BCAM]
 		if {[LWDAQ_is_error_result $result]} {
 			LWDAQ_print $info(text) "$result"
-			return ""
+			return "$result"
 		} else {
 			if {$config(verbose)} {
 				LWDAQ_print -nonewline $info(text) "$Side\: "  $info(vcolor)
@@ -940,13 +938,14 @@ proc DFPS_Manager_global_from_local {points} {
 }
 
 #
-# DFPS_Manager_mast_measure measures the location of a mast. The position of the
-# mast is the optical center of its guide fiber. The routine takes a list of
-# mast numbers as input, or measures all masts by default. It returns the
-# positions of the masts in local coordinates. The routine first measures the
-# position of the masts in global coordinates, then uses the local coordinate
-# pose to transform into local coordinates. We assume the local coordinate pose
-# is correct. The routine catches errors in its data acquisition and calculations.
+# DFPS_Manager_mast_measure measures the location of one or more masts. The
+# position of the mast is the optical center of its guide fiber. The routine
+# takes a list of mast numbers as input, or measures all masts by default. It
+# returns the positions of the masts in local coordinates. The routine first
+# measures the position of the masts in global coordinates, then uses the local
+# coordinate pose to transform into local coordinates. We assume the local
+# coordinate pose is correct. The routine catches errors in its data acquisition
+# and calculations.
 #
 proc DFPS_Manager_mast_measure {{masts ""}} {
 	upvar #0 DFPS_Manager_config config
@@ -958,31 +957,29 @@ proc DFPS_Manager_mast_measure {{masts ""}} {
 	
 	set info(state) "Measure"	
 
-	if {[catch {
-		if {$masts == ""} {set masts [string trim "$info(positioner_masts)"]}
-		set leds ""
-		foreach m $masts {lappend leds [lindex $config(guide_leds) [expr $m-1]]}
-		
-		set spots [DFPS_Manager_spots $leds]
-		set masts_global [DFPS_Manager_sources_global $spots]
-		set masts_local [DFPS_Manager_local_from_global $masts_global]
-		
-		foreach {x y z} $masts_local {
-			set m [lindex $masts 0]
-			set info(mast_$m) "[format %.3f $x] [format %.3f $y]"
-			scan $info(target_$m) %f%f xt yt
-			set xo [format %.3f [expr $x - $xt]]
-			set yo [format %.3f [expr $y - $yt]]
-			set info(offset_$m) "$xo $yo"
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Offset $m\: $info(offset_$m)" $info(vcolor)
-			}
-			set masts [lrange $masts 1 end]
-		}
-	} error_result]} {
-		LWDAQ_print $info(text) "ERROR: $error_result"
+	if {$masts == ""} {set masts [string trim "$info(positioner_masts)"]}
+	set leds ""
+	foreach m $masts {lappend leds [lindex $config(guide_leds) [expr $m-1]]}
+	
+	set spots [DFPS_Manager_spots $leds]
+	if {[LWDAQ_is_error_result $spots]} {
 		set info(state) "Idle"
-		return ""
+		return $spots
+	}
+	set masts_global [DFPS_Manager_sources_global $spots]
+	set masts_local [DFPS_Manager_local_from_global $masts_global]
+	
+	foreach {x y z} $masts_local {
+		set m [lindex $masts 0]
+		set info(mast_$m) "[format %.3f $x] [format %.3f $y]"
+		scan $info(target_$m) %f%f xt yt
+		set xo [format %.3f [expr $x - $xt]]
+		set yo [format %.3f [expr $y - $yt]]
+		set info(offset_$m) "$xo $yo"
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "Offset $m\: $info(offset_$m)" $info(vcolor)
+		}
+		set masts [lrange $masts 1 end]
 	}
 	
 	set info(state) "Idle"	
@@ -1250,7 +1247,7 @@ proc DFPS_Manager_fvccmm_read {{fn ""}} {
 			} else {
 				LWDAQ_print $info(fvccmm_text) $result
 				set info(fvccmm) "Idle"
-				return ""
+				return $result
 			}
 		}
 	}
@@ -1345,44 +1342,45 @@ proc DFPS_Manager_fvccmm_fit {} {
 			fit_details = $config(fit_details)." purple
 	}
 	set start_time [clock milliseconds]
-	if {[catch {
-		set scaling "$config(fit_scaling) $config(fit_scaling)"
-		set start_params [DFPS_Manager_fvccmm_get_params] 
-		set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
-		set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
-		lwdaq_config -show_details $config(fit_details) -text_name $info(fvccmm_text)
-		set end_params [lwdaq_simplex $start_params \
-			DFPS_Manager_fvccmm_altitude \
-			-report $config(fit_show) \
-			-steps $config(fit_steps) \
-			-restarts $config(fit_restarts) \
-			-start_size $config(fit_startsize) \
-			-end_size $config(fit_endsize) \
-			-scaling $scaling]
-		lwdaq_config -show_details 0 -text_name $info(text)
-		if {[LWDAQ_is_error_result $end_params]} {error "$end_params"}
-		set info(cam_left) "[lrange $end_params 0 7]"
-		set info(cam_right) "[lrange $end_params 8 15]"
-		set disagreement [lindex $end_params 16]
-		set iterations [lindex $end_params 17]
-		foreach v [join "$info(cam_left) [join $info(cam_right)] $disagreement"] {
-			LWDAQ_print -nonewline $info(fvccmm_text) "[format %.3f $v] "
-		}
-		LWDAQ_print $info(fvccmm_text) "$iterations"
-		if {$config(verbose)} {
-			LWDAQ_print $info(fvccmm_text) "Fit converged in\
-				[format %.2f [expr 0.001*([clock milliseconds]-$start_time)]] s\
-				taking [lindex $end_params 17] steps\
-				final error [format %.1f [lindex $end_params 16]] um." purple
-		}
-	} error_message]} {
+	set scaling "$config(fit_scaling) $config(fit_scaling)"
+	set start_params [DFPS_Manager_fvccmm_get_params] 
+	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
+	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
+	lwdaq_config -show_details $config(fit_details) -text_name $info(fvccmm_text)
+	
+	set end_params [lwdaq_simplex $start_params \
+		DFPS_Manager_fvccmm_altitude \
+		-report $config(fit_show) \
+		-steps $config(fit_steps) \
+		-restarts $config(fit_restarts) \
+		-start_size $config(fit_startsize) \
+		-end_size $config(fit_endsize) \
+		-scaling $scaling]
+	lwdaq_config -show_details 0 -text_name $info(text)
+	if {[LWDAQ_is_error_result $end_params]} {
 		LWDAQ_print $info(fvccmm_text) $error_message
 		set info(fvccmm) "Idle"
-		return ""
+		return $error_message
+	}
+	
+	set info(cam_left) "[lrange $end_params 0 7]"
+	set info(cam_right) "[lrange $end_params 8 15]"
+	set disagreement [lindex $end_params 16]
+	set iterations [lindex $end_params 17]
+	foreach v [join "$info(cam_left) [join $info(cam_right)] $disagreement"] {
+		LWDAQ_print -nonewline $info(fvccmm_text) "[format %.3f $v] "
+	}
+	LWDAQ_print $info(fvccmm_text) "$iterations"
+	if {$config(verbose)} {
+		LWDAQ_print $info(fvccmm_text) "Fit converged in\
+			[format %.2f [expr 0.001*([clock milliseconds]-$start_time)]] s\
+			taking [lindex $end_params 17] steps\
+			final error [format %.1f [lindex $end_params 16]] um." purple
 	}
 
 	DFPS_Manager_fvccmm_disagreement
 	set info(fvccmm) "Idle"
+	return $end_params
 }
 
 #
@@ -1489,6 +1487,8 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
 			-intensify $config(intensify) -zoom $config(guide_zoom)
 		set camera "Guide_$guide [lrange $camera 1 end]"
+	} else {
+		LWDAQ_print $info(text) $camera
 	}
 	return $camera
 }
@@ -1735,14 +1735,12 @@ proc DFPS_Manager_frot_acquire {orientation} {
 	
 	set info(frot_state) "Acquire"
 
-	set fiducials_global \
-		[DFPS_Manager_sources_global \
-			[DFPS_Manager_spots $config(fiducial_leds)]]
-	if {$fiducials_global == ""} {
-		LWDAQ_print $info(frot_text) "ERROR: Empty fiducial position string."
+	set spots [DFPS_Manager_spots $config(fiducial_leds)]
+	if {[LWDAQ_is_error_result $spots]} {
 		set info(frot_state) "Idle"
-		return ""
+		return $spots
 	}
+	set fiducials_global [DFPS_Manager_sources_global $spots]
 	set info(frot_$orientation) $fiducials_global
 	LWDAQ_print $info(frot_text) "$orientation $fiducials_global"	
 
@@ -1940,7 +1938,7 @@ proc DFPS_Manager_watchdog {} {
 				LWDAQ_print $info(text) \
 					"Adjusting masts. (Time [clock seconds])" $info(vcolor)
 			}
-			DFPS_Manager_masts_measure
+			DFPS_Manager_mast_measure_all
 			foreach m $info(positioner_masts) {
 				scan $info(voltage_$m) %d%d upleft upright
 				scan $info(offset_$m) %f%f xo yo
@@ -2076,17 +2074,16 @@ proc DFPS_Manager_fsurvey {} {
 	set info(utils_state) "FSurvey"
 	if {![winfo exists $info(utils_text)]} {set info(utils_text) $info(text)}
 
-	set spots \
-		[DFPS_Manager_sources_global \
-			[DFPS_Manager_spots $config(fiducial_leds)]]
+	set spots [DFPS_Manager_spots $config(fiducial_leds)]
 	
-	if {$spots == ""} {
-		LWDAQ_print $info(utils_text) "ERROR: Empty guide spot position string."
+	if {[LWDAQ_is_error_result $spots]} {
+		LWDAQ_print $info(utils_text) $spots
 		set info(utils_state) "Idle"
-		return ""
+		return $spots
 	}
-
-	set info(fiducial_sources) $spots
+	
+	set sources [DFPS_Manager_sources_global $spots]
+	set info(fiducial_sources) $sources
 
 	set start_params $info(local_coord)
 	lwdaq_config -show_details $config(fit_details) -text_name $info(text)	
@@ -2101,7 +2098,7 @@ proc DFPS_Manager_fsurvey {} {
 	lwdaq_config -show_details 0 -text_name $info(text)
 
 	if {[LWDAQ_is_error_result $end_params]} {
-		LWDAQ_print $info(text) "ERROR: $end_params"
+		LWDAQ_print $info(utils_text) "ERROR: $end_params"
 		set info(utils_state) "Idle"
 		return ""
 	}
@@ -2156,10 +2153,10 @@ proc DFPS_Manager_dfcalib {} {
 	}
 	
 	set spots [DFPS_Manager_spots $led]
-	if {$spots == ""} {
-		LWDAQ_print $info(mcalib_text) "ERROR: Empty guide spot position string."
+	if {[LWDAQ_is_error_result $spots]} {
+		LWDAQ_print $info(mcalib_text) $spots
 		set info(mcalib_state) "Idle"
-		return ""
+		return $spots
 	}
 	
 	set mast_global [DFPS_Manager_sources_global $spots]
@@ -2178,10 +2175,10 @@ proc DFPS_Manager_dfcalib {} {
 	set config(source_pwr) $saved_pwr
 	set config(flash_s) $saved_flash
 
-	if {$spots == ""} {
-		LWDAQ_print $info(mcalib_text) "ERROR: Empty detector spot position string."
+	if {[LWDAQ_is_error_result $spots]} {
+		LWDAQ_print $info(mcalib_text) $spots
 		set info(mcalib_state) "Idle"
-		return ""
+		return $spots
 	}
 
 	set detector_global [DFPS_Manager_sources_global $spots]
@@ -2240,10 +2237,10 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		foreach m $masts {
 			set info(mcalib_state) "Measure_$m"	
 			set ml [DFPS_Manager_mast_measure $m]
-			if {$ml == ""} {
-				LWDAQ_print $info(mcalib_text) "ERROR: Empty mast measurement string."
+			if {[LWDAQ_is_error_result $ml]} {
+				LWDAQ_print $info(mcalib_text) $ml
 				set info(mcalib_state) "Idle"
-				return ""
+				return $ml
 			}
 			if {$config(verbose)} {
 				LWDAQ_print $info(mcalib_text) "Mast: $m $ml" $info(vcolor)
@@ -2366,16 +2363,16 @@ proc DFPS_Manager_utils_transmit {} {
 	if {![winfo exists $info(utils_text)]} {set info(utils_text) $info(text)}
 
 	set commands "[DFPS_Manager_id_bytes $config(utils_ctrl)] $config(utils_cmd)"
-	
-	if {[catch {
-		LWDAQ_print $info(utils_text) "Transmit: $commands"
-		DFPS_Manager_transmit $commands
-	} error_result]} {
-		LWDAQ_print $info(utils_text) "ERROR: $error_result"
+	LWDAQ_print $info(utils_text) "Transmit: $commands"
+	set result [DFPS_Manager_transmit $commands]
+	if {[LWDAQ_is_error_result $result]} {
+		LWDAQ_print $info(utils_text) $result
+		set info(utils_state) "Idle"
+		return $result
+	} else {
+		set info(utils_state) "Idle"
+		return ""
 	}
-
-	set info(utils_state) "Idle"
-	return ""
 }
 
 #
@@ -2544,20 +2541,23 @@ proc DFPS_Manager_acquire_guides {} {
 	set info(state) "Guides"
 	foreach g $info(guide_sensors) {
 		set result [DFPS_Manager_guide_acquire $g $config(expose_s)]
-		if {[LWDAQ_is_error_result $result] || $config(verbose)} {
+		if {[LWDAQ_is_error_result $result]} {
+			set info(state) "Idle"
+			return $result
+		}
+		if {$config(verbose)} {
 			LWDAQ_print $info(text) $result $info(vcolor)
 		}
 	}
 	set info(state) "Idle"
-	
 	return ""
 }
 
 #
-# DFPS_Manager_masts_measure measures the positions of all masts one by one, sets their
+# DFPS_Manager_mast_measure_all measures the positions of all masts one by one, sets their
 # positions, and returns their positions.
 #
-proc DFPS_Manager_masts_measure {} {
+proc DFPS_Manager_mast_measure_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
@@ -2565,9 +2565,9 @@ proc DFPS_Manager_masts_measure {} {
 	set positions [list]
 	foreach m $info(positioner_masts) {
 		set mp [DFPS_Manager_mast_measure $m]
-		if {$mp == ""} {
+		if {[LWDAQ_is_error_result $mp]} {
 			set info(state) "Idle"
-			return ""			
+			return $mp
 		}
 		scan $mp %f%f%f x y z
 		set info(mast_$m) "[format %.3f $x] [format %.3f $y]"
@@ -2607,7 +2607,7 @@ proc DFPS_Manager_reset_masts {} {
 		set info(target_$m) [lrange $info(mrange_$m) 0 1]
 	}
 	LWDAQ_print $info(text) "Measuring mast positions (x y) in local coordinates..."
-	DFPS_Manager_masts_measure
+	DFPS_Manager_mast_measure_all
 
 	LWDAQ_print $info(text) "Showing all sources..."
 	DFPS_Manager_spots
@@ -2635,7 +2635,7 @@ proc DFPS_Manager_open {} {
 	label $f.state -textvariable DFPS_Manager_info(state) -width 20 -fg blue
 	pack $f.state -side left -expand yes
 	
-	foreach {a b} {"Masts" masts_measure \
+	foreach {a b} {"Masts" mast_measure_all \
 		"Show" show_spots \
 		"Reset" reset_masts \
 		"Guides" acquire_guides \
