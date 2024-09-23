@@ -40,6 +40,7 @@ proc DFPS_Manager_init {} {
 	# The state variable tells us the current state of the tool.
 	set info(state) "Idle"
 	set config(verbose) "0"
+	set config(report) "0"
 	set info(vcolor) "brown"
 	
 	# Instrument fundamentals.
@@ -95,20 +96,21 @@ proc DFPS_Manager_init {} {
 	set config(calib_file) [file join $LWDAQ_Info(tools_dir) Data DFPS_Calibration.tcl]
 		
 	# Fiber view camera calibration constants.
+	set info(cam_default) "12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000" 
 	set info(cam_left) \
-"12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113"
+"12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172"
 # Nominal FVC:
 # 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
 # DFPS-4A Y71010:
-# 12.675 39.312 1.000 -7.272 0.897 2.000 19.028 5.113
+# 12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172
 # Breadboard Y71066:
 # 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
 	set info(cam_right) \
-"12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220"
+"12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765"
 # Nominal: 
 # FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
 # DFPS-4A Y71003:
-# 12.675 39.312 1.000 2.718 -1.628 2.000 19.165 8.220
+# 12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765
 # Breadboard Y71080:
 # 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
 	
@@ -178,17 +180,17 @@ proc DFPS_Manager_init {} {
 	set info(rf_xmit_op) "82"
 	set info(checksum_preload) "1111111111111111"	
 	
-	# Watchdog control.
-	set info(fiducial_monitor_time) "0"
-	set info(mast_monitor_time) "0"
-	set config(fiducial_monitor_period) "600"
-	set config(mast_monitor_period) "10"
-	set config(mast_control) "0"
-	set config(fiducial_monitoring) "0"
+	# Mast control system.
+	set info(fiducial_monitor_cnt) "0"
+	set info(mast_control_time) "0"
+	set config(fiducial_monitor_ratio) "10"
+	set config(mast_control_period) "10"
+	set config(enable_mast_control) "0"
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
 	set config(gain) "10000"
+	set config(displacement) "1.0 0"
 	
 	# Window settings.
 	set info(label_color) "brown"
@@ -201,7 +203,7 @@ proc DFPS_Manager_init {} {
 	set config(utils_ctrl) "FFFF"
 	set config(utils_cmd) "8"	
 	set info(utils_state) "Idle"
-	set info(utils_text) $info(text)
+	set info(utils_text) "none"
 	
 	# Fiber View Camera Coordinate Measuring Machine Calibration (FVCCMM) settings.
 	set info(fvccmm_state) "Idle"
@@ -367,7 +369,7 @@ proc DFPS_Manager_read_calibration {{fn ""}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	if {$fn == ""} {set fn [LWDAQ_get_file_name]}
+	if {$fn == ""} {set fn [LWDAQ_get_file_name 0 [file dirname $config(calib_file)]]}
 	if {$fn != ""} {
 		set config(calib_file) $fn
 		uplevel #0 [list source $config(calib_file)]
@@ -610,8 +612,8 @@ proc DFPS_Manager_transmit {commands} {
 	append commands " $d22 $d21"
 		
 	# Print the commands to the text window.
-	if {$config(verbose)} {
-		LWDAQ_print $info(text) "Transmit: $commands" $info(vcolor)
+	if {[winfo exists $info(utils_text)] && $config(verbose)} {
+		LWDAQ_print $info(utils_text) "Transmit: $commands" $info(vcolor)
 	}
 
 	# Open a socket to the command transmitter's LWDAQ server, select the
@@ -636,6 +638,9 @@ proc DFPS_Manager_transmit {commands} {
 	} error_result]} {
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		LWDAQ_print $info(text) "ERROR: $error_result"
+		if {[winfo exists $info(utils_text)]} {
+			LWDAQ_print $info(utils_text) "ERROR: $error_result"
+		}
 		return "ERROR: $error_result"
 	}
 	
@@ -648,27 +653,24 @@ proc DFPS_Manager_transmit {commands} {
 #
 # DFPS_Manager_voltage_set takes the upleft and upright control values and
 # instructs the named positioner to set its converters accordingly. The control
-# values must be unsigned integers between 0 and 65535. If the routine
-# encounters an error, it prints a message and returns an empty string.
+# values must be unsigned integers between 0 and 65535. If the values exceed
+# this range, they will be clipped to the range. The return string consits of
+# the controller id and the DAC values that were applied, clipped if clipped.
 #
 proc DFPS_Manager_voltage_set {id upleft upright} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	if {$upleft > $info(dac_max)} {
-		LWDAQ_print $info(text) "WARNING: Specified upleft clipped to $info(dac_max)."
 		set upleft $info(dac_max)
 	}
 	if {$upright > $info(dac_max)} {
-		LWDAQ_print $info(text) "WARNING: Specified upright clipped to $info(dac_max)."
 		set upright $info(dac_max)
 	}
 	if {$upleft < $info(dac_min)} {
-		LWDAQ_print $info(text) "WARNING: Specified upleft clipped to $info(dac_min)."
 		set upleft $info(dac_min)
 	}
 	if {$upright < $info(dac_min)} {
-		LWDAQ_print $info(text) "WARNING: Specified upright clipped to $info(dac_min)."
 		set upright $info(dac_min)
 	}
 	
@@ -712,19 +714,22 @@ proc DFPS_Manager_move {mast upleft upright} {
 }
 
 #
-# DFPS_Manager_move_all sets the drive voltages of all actuators to the values 
+# DFPS_Manager_set_all sets the drive voltages of all actuators to the values 
 # specified in the upleft and upright configuration parameters.
 #
-proc DFPS_Manager_move_all {} {
+proc DFPS_Manager_set_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set info(state) "Move_All"
+	set info(utils_state) "SetAll"
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$config(upleft) $config(upright)"
 	}
 	DFPS_Manager_voltage_set $info(wildcard_id) $config(upleft) $config(upright)
-	set info(state) "Idle"
+	if {[winfo exists $info(utils_text)]} {
+		LWDAQ_print $info(utils_text) "Voltages: $config(upleft) $config(upright)"
+	}
+	set info(utils_state) "Idle"
 	return ""
 }
 
@@ -736,13 +741,38 @@ proc DFPS_Manager_zero_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
-	set info(state) "Zero_All"
-	
+	set info(utils_state) "ZeroAll"	
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
 	DFPS_Manager_voltage_set $info(wildcard_id) $info(dac_zero) $info(dac_zero)
-	set info(state) "Idle"
+	if {[winfo exists $info(utils_text)]} {
+		LWDAQ_print $info(utils_text) "Voltages: $info(dac_zero) $info(dac_zero)"
+	}
+	set info(utils_state) "Idle"
+	return ""
+}
+
+#
+# DFPS_Manager_move_all adds a displacement to the mast target positions.
+#
+proc DFPS_Manager_move_all {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	set info(utils_state) "MoveAll"	
+	set move_report "MoveAll: "
+	foreach m $info(positioner_masts) {
+		scan $info(target_$m) %f%f xt yt
+		scan $config(displacement) %f%f xd yd
+		set info(target_$m) "[format %.3f [expr $xt+$xd]]\
+			[format %.3f [expr $yt+$yd]]"
+		append move_report "$info(target_$m) "
+	}
+	if {[winfo exists $info(utils_text)]} {
+		LWDAQ_print $info(utils_text) $move_report
+	}
+	set info(utils_state) "Idle"
 	return ""
 }
 
@@ -1347,6 +1377,7 @@ proc DFPS_Manager_fvccmm_fit {} {
 	set info(coord_left) [lwdaq bcam_coord_from_mount $info(mount_left)]
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 	lwdaq_config -show_details $config(fit_details) -text_name $info(fvccmm_text)
+	lwdaq_config -fsd 3
 	
 	set end_params [lwdaq_simplex $start_params \
 		DFPS_Manager_fvccmm_altitude \
@@ -1363,6 +1394,7 @@ proc DFPS_Manager_fvccmm_fit {} {
 		return $error_message
 	}
 	
+	lwdaq_config -fsd 6
 	set info(cam_left) "[lrange $end_params 0 7]"
 	set info(cam_right) "[lrange $end_params 8 15]"
 	set disagreement [lindex $end_params 16]
@@ -1921,8 +1953,13 @@ proc DFPS_Manager_frot {} {
 proc DFPS_Manager_watchdog {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
-	global LWDAQ_server_commands
+	global LWDAQ_server_commands LWDAQ_Info
 	set t .serverwindow.text
+	
+	# Trim the manager text window to a maximum number of lines.
+	if {[$info(text) index end] > 1.2 * $LWDAQ_Info(num_lines_keep)} {
+		$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
+	}
 	
 	# Default value for result string.
 	set result ""
@@ -1930,14 +1967,15 @@ proc DFPS_Manager_watchdog {} {
 	# At intervals, adjust mast positions. We measure the mast positions, look at the
 	# offsets from their target positions, and adjust their control voltages so as to
 	# move the mast towards the target.
-	if {$config(mast_control)} {
-		if {[clock seconds] - $info(mast_monitor_time) \
-				>= $config(mast_monitor_period)} {
-			set info(mast_monitor_time) [clock seconds]
+	if {$config(enable_mast_control)} {
+		if {[clock seconds] - $info(mast_control_time) \
+				>= $config(mast_control_period)} {
+			set info(mast_control_time) [clock seconds]
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) \
 					"Adjusting masts. (Time [clock seconds])" $info(vcolor)
 			}
+			set control_report "[clock seconds] "
 			DFPS_Manager_mast_measure_all
 			foreach m $info(positioner_masts) {
 				scan $info(voltage_$m) %d%d upleft upright
@@ -1948,28 +1986,34 @@ proc DFPS_Manager_watchdog {} {
 				set upright [format %.0f [expr $upright - $config(gain)*$uro]]
 				set result [DFPS_Manager_move $m $upleft $upright]
 				set info(voltage_$m) "[lrange $result 1 2]"
+				append control_report "$xo $yo $info(voltage_$m) "
+			}
+			if {[winfo exists $info(utils_text)] && $config(report)} {
+				LWDAQ_print $info(utils_text) $control_report
+			} 
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) $control_report $info(vcolor)
+			}
+			
+			# At intervals, adjust frame coordinate pose in global coordinates using
+			# fiducial positions measured by fiber view cameras.
+			if {$info(fiducial_monitor_cnt) == "0"} {
+				set info(fiducial_monitor_cnt) \
+					[expr $config(fiducial_monitor_ratio)-1]
+				if {$config(verbose)} {
+					LWDAQ_print $info(text) \
+						"Surveying fiducials and recalculating local coordinate pose.\
+							(Time [clock seconds])" $info(vcolor)
+				}
+				DFPS_Manager_fsurvey
+			} else {
+				incr info(fiducial_monitor_cnt) "-1"
 			}
 		}
 	} {
-		set info(mast_monitor_time) "0"
+		set info(mast_control_time) "0"
 	}
 	
-	# At intervals, adjust frame coordinate pose in global coordinates using
-	# fiducial positions measured by fiber view cameras.
-	if {$config(fiducial_monitoring)} {
-		if {[clock seconds] - $info(fiducial_monitor_time) \
-				>= $config(fiducial_monitor_period)} {
-			set info(fiducial_monitor_time) [clock seconds]
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) \
-					"Surveying fiducial. (Time [clock seconds])" $info(vcolor)
-			}
-			DFPS_Manager_fsurvey
-		}
-	} {
-		set info(fiducial_monitor_time) "0"
-	}
-
 	# Handle incoming server commands.
 	if {[llength $LWDAQ_server_commands] > 0} {
 		set cmd [lindex $LWDAQ_server_commands 0 0]
@@ -2072,12 +2116,16 @@ proc DFPS_Manager_fsurvey {} {
 	upvar #0 DFPS_Manager_info info
 	
 	set info(utils_state) "FSurvey"
-	if {![winfo exists $info(utils_text)]} {set info(utils_text) $info(text)}
-
+	if {[winfo exists $info(utils_text)]} {
+		set t $info(utils_text)
+	} else {
+		set t $info(text)
+	}
+	
 	set spots [DFPS_Manager_spots $config(fiducial_leds)]
 	
 	if {[LWDAQ_is_error_result $spots]} {
-		LWDAQ_print $info(utils_text) $spots
+		LWDAQ_print $t $spots
 		set info(utils_state) "Idle"
 		return $spots
 	}
@@ -2098,7 +2146,7 @@ proc DFPS_Manager_fsurvey {} {
 	lwdaq_config -show_details 0 -text_name $info(text)
 
 	if {[LWDAQ_is_error_result $end_params]} {
-		LWDAQ_print $info(utils_text) "ERROR: $end_params"
+		LWDAQ_print $t "ERROR: $end_params"
 		set info(utils_state) "Idle"
 		return ""
 	}
@@ -2108,13 +2156,15 @@ proc DFPS_Manager_fsurvey {} {
 	set info(local_coord) [string trim $pl]
 
 	if {$config(verbose)} {
-		LWDAQ_print $info(utils_text) \
+		LWDAQ_print $t \
 			"Converged in [lindex $end_params 7] steps,\
 			final error [format %.1f [expr 1000*[lindex $end_params 6]]] um." \
 			$info(vcolor)
 	}
-	LWDAQ_print $info(utils_text) "$info(local_coord)"
-		
+	if {$config(report)} {
+		LWDAQ_print $t "Coordinates: $info(local_coord)"
+	}
+	
 	set info(utils_state) "Idle"
 	return "$info(local_coord)"
 }
@@ -2360,8 +2410,6 @@ proc DFPS_Manager_utils_transmit {} {
 	upvar #0 DFPS_Manager_info info
 	
 	set info(utils_state) "Transmit"
-	if {![winfo exists $info(utils_text)]} {set info(utils_text) $info(text)}
-
 	set commands "[DFPS_Manager_id_bytes $config(utils_ctrl)] $config(utils_cmd)"
 	LWDAQ_print $info(utils_text) "Transmit: $commands"
 	set result [DFPS_Manager_transmit $commands]
@@ -2463,7 +2511,7 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach {a b} {"Zero" zero_all "Move" move_all} {
+	foreach {a b} {"ZeroAll" zero_all "SetAll" set_all} {
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
@@ -2513,6 +2561,10 @@ proc DFPS_Manager_utils {} {
 
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
+	
+	button $f.move -text "MoveAll" -command "LWDAQ_post DFPS_Manager_move_all"
+	entry $f.disp -textvariable DFPS_Manager_config(displacement) -width 12
+	pack $f.move $f.disp -side left -expand yes
 
 	button $f.transmit -text "Transmit" \
 		-command "LWDAQ_post DFPS_Manager_utils_transmit"
@@ -2573,10 +2625,13 @@ proc DFPS_Manager_mast_measure_all {} {
 		set info(mast_$m) "[format %.3f $x] [format %.3f $y]"
 		lappend positions $x $y
 	}
-	foreach p $positions {
-		LWDAQ_print -nonewline $info(text) "[format %.3f $p] "
+	if {$config(report)} {
+		LWDAQ_print -nonewline $info(text) "Masts: "
+		foreach p $positions {
+			LWDAQ_print -nonewline $info(text) "[format %.3f $p] "
+		}
+		LWDAQ_print $info(text) ""
 	}
-	LWDAQ_print $info(text) ""
 	set info(state) "Idle"
 	
 	return $positions
@@ -2595,18 +2650,18 @@ proc DFPS_Manager_reset_masts {} {
 	set info(state) "Reset"
 	
 	LWDAQ_print $info(text) "\nPositioner Reset Start" purple
-	LWDAQ_print $info(text) "Zeroing actuator voltages position..."
+	LWDAQ_print $info(text) "Zeroing actuator voltages..."
 	DFPS_Manager_zero_all
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
 	LWDAQ_print $info(text) "Surveying fiducials..."
 	DFPS_Manager_fsurvey
-	LWDAQ_print $info(text) "Setting target positions to range centers..."
+	LWDAQ_print $info(text) "Setting mast targets to range centers..."
 	foreach m $info(positioner_masts) {
 		set info(target_$m) [lrange $info(mrange_$m) 0 1]
 	}
-	LWDAQ_print $info(text) "Measuring mast positions (x y) in local coordinates..."
+	LWDAQ_print $info(text) "Measuring mast positions..."
 	DFPS_Manager_mast_measure_all
 
 	LWDAQ_print $info(text) "Showing all sources..."
@@ -2652,7 +2707,7 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach a {Mast_Control Fiducial_Monitoring Verbose} {
+	foreach a {Enable_Mast_Control Report Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
 		pack $f.$b -side left -expand yes
