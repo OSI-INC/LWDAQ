@@ -195,10 +195,20 @@ proc DFPS_Manager_init {} {
 	# Window settings.
 	set info(label_color) "brown"
 	set config(guide_zoom) "0.3"
+	set config(guide_mag_zoom) "1.0"
 	set config(fvc_zoom) "0.5"
-	set config(intensify) "exact"
-	set info(examine_window) "$info(window).examine_window"
+	set config(intensify) "exact"	
+	set config(mouse_offset_x) "0"
+	set config(mouse_offset_y) "2"
 	
+	# Image dimensions.
+	set info(guide_width) "3848"
+	set info(guide_height) "5180"
+	set info(bcam_width) "5180"
+	set info(bcam_height) "3848"
+	set info(icx424_col) "700"
+	set info(icx424_row) "520"
+
 	# Utility panel parameters.
 	set config(utils_ctrl) "FFFF"
 	set config(utils_cmd) "8"	
@@ -216,9 +226,6 @@ proc DFPS_Manager_init {} {
 "1572.16 1192.59 3377.92 1154.19 1594.61 3038.75 3381.78 3051.64"
 	set info(spots_right) \
 "2223.58 1109.76 4000.05 1117.53 2232.85 3038.02 4017.75 2984.44"
-	set config(bcam_width) "5180"
-	set config(bcam_height) "3848"
-	set config(bcam_threshold) "10 #"
 	set config(bcam_sort) "8"
 	set config(displace_scale) "1"
 	set config(cross_size) "100"
@@ -341,21 +348,24 @@ proc DFPS_Manager_init {} {
 	# Create spaces to store FVC images as they come in from the BCAM
 	# Instrument.
 	foreach side {left right} {
-		set info(image_$side) dfps_manager_$side
-		lwdaq_image_create -name $info(image_$side) -width 700 -height 520
+		set info(image_$side) dfps_fvc_$side
+		lwdaq_image_create -name $info(image_$side) \
+			-width $info(icx424_col) -height $info(icx424_row)
 	}
 
 	# Create spaces to store guide images as they come in from the Camera
 	# Instrument.
 	foreach guide $info(guide_sensors) {
-		set info(image_$guide) dfps_manager_$guide
-		lwdaq_image_create -name $info(image_$guide) -width 520 -height 700
+		set info(image_$guide) dfps_guide_$guide
+		lwdaq_image_create -name $info(image_$guide) \
+			-width $info(icx424_row) -height $info(icx424_col)
 	}
 
 	# Create spaces to store FVC images read from disk.
 	foreach side {left right} {
 		set info(fvcalib_$side) fvcalib_$side
-		lwdaq_image_create -name $info(fvcalib_$side) -width 700 -height 520
+		lwdaq_image_create -name $info(fvcalib_$side) \
+			-width $info(icx424_col) -height $info(icx424_row)
 	}
 	
 	return ""   
@@ -449,7 +459,7 @@ proc DFPS_Manager_examine_calibration {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set w $info(examine_window)
+	set w "$info(window).examine_window"
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Calibration Constants, DFPS Manager $info(version)"
@@ -835,7 +845,7 @@ proc DFPS_Manager_spots {{leds ""}} {
 				copy -name $info(image_$side)
 			lwdaq_image_manipulate $info(image_$side) \
 				transfer_overlay $iconfig(memory_name)
-			lwdaq_draw $info(image_$side) dfps_manager_$side \
+			lwdaq_draw $info(image_$side) dfps_fvc_$side \
 				-intensify $config(intensify) -zoom $config(fvc_zoom)
 		}
 		
@@ -1104,17 +1114,17 @@ proc DFPS_Manager_fvcalib_disagreement {{params ""} {show "1"}} {
 			incr count
 			
 			if {$show} {
-				set y [expr $config(bcam_height) - $y_th]
+				set y [expr $info(bcam_height) - $y_th]
 				set x $x_th
 				set w $config(cross_size)
 				lwdaq_graph "[expr $x - $w] $y [expr $x + $w] $y" \
 					$info(fvcalib_$side) -entire 1 \
-					-x_min 0 -x_max $config(bcam_width) \
-					-y_min 0 -y_max $config(bcam_height) -color 2
+					-x_min 0 -x_max $info(bcam_width) \
+					-y_min 0 -y_max $info(bcam_height) -color 2
 				lwdaq_graph "$x [expr $y - $w] $x [expr $y + $w]" \
 					$info(fvcalib_$side) -entire 1 \
-					-x_min 0 -x_max $config(bcam_width) \
-					-y_min 0 -y_max $config(bcam_height) -color 2
+					-x_min 0 -x_max $info(bcam_width) \
+					-y_min 0 -y_max $info(bcam_height) -color 2
 			}
 		}
 	}
@@ -1268,10 +1278,10 @@ proc DFPS_Manager_fvcalib_read {{fn ""}} {
 		if {[file exists $ifn]} {
 			LWDAQ_read_image_file $ifn $info(fvcalib_$side)
 			set iconfig(analysis_num_spots) "$info(num_sources) $config(bcam_sort)"
-			set iconfig(analysis_threshold) $config(bcam_threshold)
-			set config(bcam_width) [expr $iinfo(daq_image_width) \
+			set iconfig(analysis_threshold) $config(analysis_threshold)
+			set info(bcam_width) [expr $iinfo(daq_image_width) \
 				* $iinfo(analysis_pixel_size_um)]
-			set config(bcam_height) [expr $iinfo(daq_image_height) \
+			set info(bcam_height) [expr $iinfo(daq_image_height) \
 				* $iinfo(analysis_pixel_size_um)]
 			set result [LWDAQ_analysis_BCAM $info(fvcalib_$side)]
 			if {![LWDAQ_is_error_result $result]} {
@@ -1456,7 +1466,7 @@ proc DFPS_Manager_fvcalib {} {
 	set f [frame $w.fvc]
 	pack $f -side top -fill x
 	
-	foreach {a wd} {bcam_threshold 6 fit_steps 8 fit_restarts 3 \
+	foreach {a wd} {analysis_threshold 6 fit_steps 8 fit_restarts 3 \
 			fit_endsize 10 fit_show 2 fit_details 2 fit_scaling 20} {
 		label $f.l$a -text "$a\:"
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width $wd
@@ -1496,7 +1506,7 @@ proc DFPS_Manager_fvcalib {} {
 #
 # DFPS_Manager_guide_acquire acquires an image from one of the DFPS guide
 # sensors with a specified exposure time. It stores the image in the LWDAQ image
-# array with the name dfps_manager_n, where n is the guide sensor number. It
+# array with the name dfps_guide_n, where n is the guide sensor number. It
 # returns a string of information about the image, as obtained from the Camera
 # Instrument. If the string is an error message, it will begin with "ERROR:".
 # Otherwise it will contain the word "Guide_n" where n is the guide number,
@@ -1520,9 +1530,13 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	set iconfig(daq_exposure_seconds) $exposure_s
 	set camera [LWDAQ_acquire Camera]
 	if {![LWDAQ_is_error_result $camera]} {
-		lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_manager_$guide
-		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
+		lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_guide_$guide
+		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 			-intensify $config(intensify) -zoom $config(guide_zoom)
+		if {[winfo exists $info(window).mag_$guide]} {
+			lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+				-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+		}
 		set camera "Guide_$guide [lrange $camera 1 end]"
 	} else {
 		LWDAQ_print $info(text) $camera
@@ -1572,9 +1586,9 @@ proc DFPS_Manager_gscalib_acquire {orientation} {
 			append result "-1 -1 -1 "
 			continue
 		}
-		set iconfig(memory_name) dfps_manager_$guide
+		set iconfig(memory_name) dfps_guide_$guide
 		set rasnik [LWDAQ_acquire Rasnik]
-		lwdaq_draw dfps_manager_$guide gscalib_$guide \
+		lwdaq_draw dfps_guide_$guide gscalib_$guide \
 			-intensify $config(gscalib_intensify) -zoom $config(gscalib_zoom)
 		if {![LWDAQ_is_error_result $rasnik]} {
 			if {$swap} {
@@ -1753,7 +1767,7 @@ proc DFPS_Manager_gscalib {} {
 		"Guide Sensor Rasnik Calibration Text Output" purple
 	
 	foreach guide $info(guide_sensors) {
-		lwdaq_draw dfps_manager_$guide gscalib_$guide \
+		lwdaq_draw dfps_guide_$guide gscalib_$guide \
 			-intensify $config(gscalib_intensify) -zoom $config(gscalib_zoom)
 	}
 	
@@ -2694,6 +2708,118 @@ proc DFPS_Manager_reset_masts {} {
 }
 
 #
+# DFPS_Manager_local_from_guide takes a guide sensor number and an x and y coordinate
+# in a guide sensor image, and returns the local coordinates of the image point.
+#
+proc DFPS_Manager_local_from_guide {guide xg yg} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	if {[lsearch $info(guide_sensors) $guide] < 0} {
+		return "ERROR: No guide sensor number \"$guide\"."
+	}
+	
+	scan $info(guide_$guide) %f%f%f xorigin yorigin rot
+	set xl [format %.3f [expr $xorigin + $xg*cos($rot*0.001) - $yg*sin($rot*0.001)]]
+	set yl [format %.3f [expr $yorigin + $yg*cos($rot*0.001) + $xg*sin($rot*0.001)]]
+	
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "local_from_guide: $guide $xg $yg $xl $yl" $info(vcolor)
+	}
+	return "$xl $yl"
+}
+
+#
+# DFPS_Manager_guide_from_local takes a local coordinate position and transforms it into
+# the coordinates of one of the guide sensors.
+#
+proc DFPS_Manager_guide_from_local {guide xl yl} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	if {[lsearch $info(guide_sensors) $guide] < 0} {
+		return "ERROR: No guide sensor number \"$guide\"."
+	}
+	
+	scan $info(guide_$guide) %f%f%f xorigin yorigin rot
+	set xg [format %.3f [expr \
+		($xl - $xorigin)*cos($rot*0.001) + ($yl - $yorigin)*sin($rot*0.001)]]
+	set yg [format %.3f [expr \
+		($yl - $yorigin)*cos($rot*0.001) - ($xl - $xorigin)*sin($rot*0.001)]]
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "guide_from_local: $guide $xl $yl $xg $yg" $info(vcolor)
+	}		
+	return "$xg $yg"
+}
+
+
+#
+# DFPS_Manger_gmark takes an x-y position in one of the guide sensor magnified 
+# iamges and makes a cross on that spot.
+#
+proc DFPS_Manager_gmark {guide x y} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set ext 20
+	set width $info(icx424_row)
+	set height $info(icx424_col)
+	set y [expr $height-$y+$config(mouse_offset_y)]
+	set x [expr $x+$config(mouse_offset_x)]
+	lwdaq_image_manipulate dfps_guide_$guide none -clear 1
+	lwdaq_graph "[expr $x - $ext] $y [expr $x + $ext] $y" \
+		dfps_guide_$guide -entire 1 \
+		-x_min 0 -x_max $width \
+		-y_min 0 -y_max $height -color 2
+	lwdaq_graph "$x [expr $y - $ext] $x [expr $y + $ext]" \
+		dfps_guide_$guide -entire 1 \
+		-x_min 0 -x_max $width \
+		-y_min 0 -y_max $height -color 2
+	lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+		-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+	set xg [format %.3f [expr 0.0074*$x]]
+	set yg [format %.3f [expr 0.0074*$y]]
+	set local [DFPS_Manager_local_from_guide $guide $xg $yg]
+	scan $local %f%f xl yl
+	if {$config(report)} {
+		LWDAQ_print $info(text) "Local: $xl $yl"
+	}
+	return "$xl $yl"
+}
+
+#
+# DFPS_Manager_mag_guide creates a magnified view of one of the guide sensor
+# images. We pass it the guide sensor index.
+#
+proc DFPS_Manager_mag_guide {guide} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {[lsearch $info(guide_sensors) $guide] < 0} {
+		LWDAQ_print $info(text) "ERROR: No guide sensor number \"$guide\"."
+		return ""
+	}
+	
+	set w $info(window).mag_$guide
+	if {[winfo exists $w]} {
+		raise $w
+	} else {
+		toplevel $w
+		wm title $w "Guide $guide, DFPS Manager $info(version)"
+		image create photo dfps_guide_mag_$guide
+		label $w.img -image dfps_guide_mag_$guide
+		pack $w.img -side top
+		bind $w.img <Double-Button-1> \
+			[list LWDAQ_post "DFPS_Manager_gmark $guide %x %y"]
+	}
+	
+	lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+		-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+
+	return $w
+}
+
+#
 # DFPS_Manager_open creates the DFPS Manager window.
 #
 proc DFPS_Manager_open {} {
@@ -2744,10 +2870,11 @@ proc DFPS_Manager_open {} {
 	pack $f -side top -fill x
 	
 	foreach guide $info(guide_sensors) {
-		image create photo "dfps_manager_$guide"
-		label $f.$guide -image "dfps_manager_$guide"
-		pack $f.$guide -side left -expand yes
-		lwdaq_draw dfps_manager_$guide dfps_manager_$guide \
+		image create photo "dfps_guide_$guide"
+		label $f.l$guide -image "dfps_guide_$guide"
+		bind $f.l$guide <Double-Button-1> [list LWDAQ_post "DFPS_Manager_mag_guide $guide"]
+		pack $f.l$guide -side left -expand yes
+		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 			-intensify $config(intensify) -zoom $config(guide_zoom)
 	}
 	
@@ -2778,10 +2905,10 @@ proc DFPS_Manager_open {} {
 	pack $f -side top -fill x
 	
 	foreach side {left right} {
-		image create photo "dfps_manager_$side"
-		label $f.$side -image "dfps_manager_$side"
+		image create photo "dfps_fvc_$side"
+		label $f.$side -image "dfps_fvc_$side"
 		pack $f.$side -side left -expand yes
-		lwdaq_draw dfps_manager_$side dfps_manager_$side \
+		lwdaq_draw dfps_fvc_$side dfps_fvc_$side \
 			-intensify $config(intensify) -zoom $config(fvc_zoom)	
 	}
 	
