@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.10"
+	LWDAQ_tool_init "DFPS_Manager" "2.11"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -2793,7 +2793,8 @@ proc DFPS_Manager_open {} {
 
 DFPS_Manager_init
 DFPS_Manager_open
-	
+DFPS_Manager_watchdog
+
 return ""
 
 ----------Begin Help----------

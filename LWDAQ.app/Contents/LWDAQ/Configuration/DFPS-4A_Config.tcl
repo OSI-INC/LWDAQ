@@ -11,4 +11,3 @@ set LWDAQ_Info(server_address_filter) "127.0.0.1"
 set LWDAQ_Info(server_listening_port) "1090"
 set LWDAQ_Info(server_mode) "receive"
 LWDAQ_server_start
-DFPS_Manager_watchdog
