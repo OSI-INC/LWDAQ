@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.11"
+	LWDAQ_tool_init "DFPS_Manager" "2.12"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -190,7 +190,7 @@ proc DFPS_Manager_init {} {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
 	set config(gain) "10000"
-	set config(displacement) "1.0 0"
+	set config(displacement) "0.0 0.0"
 	
 	# Window settings.
 	set info(label_color) "brown"
@@ -202,12 +202,13 @@ proc DFPS_Manager_init {} {
 	set config(mouse_offset_y) "2"
 	
 	# Image dimensions.
-	set info(guide_width) "3848"
-	set info(guide_height) "5180"
-	set info(bcam_width) "5180"
-	set info(bcam_height) "3848"
+	set info(guide_width_um) "3848"
+	set info(guide_height_um) "5180"
+	set info(bcam_width_um) "5180"
+	set info(bcam_height_um) "3848"
 	set info(icx424_col) "700"
 	set info(icx424_row) "520"
+	set info(icx424_pix_um) "7.4"
 
 	# Utility panel parameters.
 	set config(utils_ctrl) "FFFF"
@@ -623,7 +624,7 @@ proc DFPS_Manager_transmit {commands} {
 		
 	# Print the commands to the text window.
 	if {[winfo exists $info(utils_text)] && $config(verbose)} {
-		LWDAQ_print $info(utils_text) "Transmit: $commands" $info(vcolor)
+		LWDAQ_print $info(utils_text) "transmit $commands" $info(vcolor)
 	}
 
 	# Open a socket to the command transmitter's LWDAQ server, select the
@@ -717,7 +718,9 @@ proc DFPS_Manager_move {mast upleft upright} {
 	set id [lindex $config(controllers) [expr $mast-1]]
 	set result [DFPS_Manager_voltage_set $id $upleft $upright]
 	if {![LWDAQ_is_error_result $result] && $config(verbose)} {
-		LWDAQ_print $info(text) "Move: $result" $info(vcolor)
+		scan $result %d%f%f id upleft upright
+		LWDAQ_print $info(text) "move id=0x$id\
+			upleft=$upleft upright=$upright" $info(vcolor)
 	}
 
 	return "$result"
@@ -771,7 +774,7 @@ proc DFPS_Manager_move_all {} {
 	upvar #0 DFPS_Manager_info info
 	
 	set info(utils_state) "MoveAll"	
-	set move_report "MoveAll: "
+	set move_report "move_all "
 	foreach m $info(positioner_masts) {
 		scan $info(target_$m) %f%f xt yt
 		scan $config(displacement) %f%f xd yd
@@ -824,8 +827,7 @@ proc DFPS_Manager_spots {{leds ""}} {
 	set iconfig(analysis_threshold) $config(analysis_threshold)
 	
 	# Acquire from both FVCs.
-	foreach Side {Left Right} {
-		set side [string tolower $Side]
+	foreach side {left right} {
 		set iconfig(daq_driver_socket) [lindex $config(fvc_$side) 0]
 		set iconfig(daq_mux_socket) [lindex $config(fvc_$side) 1]
 		set result [LWDAQ_acquire BCAM]
@@ -834,9 +836,9 @@ proc DFPS_Manager_spots {{leds ""}} {
 			return "$result"
 		} else {
 			if {$config(verbose)} {
-				LWDAQ_print -nonewline $info(text) "$Side\: "  $info(vcolor)
+				LWDAQ_print -nonewline $info(text) "spots side=$side "  $info(vcolor)
 				foreach {x y n m e t} [lrange $result 1 end] {
-					LWDAQ_print -nonewline $info(text) "$x $y "  $info(vcolor)
+					LWDAQ_print -nonewline $info(text) "x=$x y=$y "  $info(vcolor)
 				}
 				LWDAQ_print $info(text) ""
 			}
@@ -941,7 +943,7 @@ proc DFPS_Manager_sources_global {spots} {
 		set sg "$x_g $y_g $z_g"
 		append sources "$sg "
 		if {$config(verbose)} {
-			LWDAQ_print $info(text) "Global: $sg" $info(vcolor)
+			LWDAQ_print $info(text) "sources_global $sg" $info(vcolor)
 		}
 	}
 
@@ -951,7 +953,12 @@ proc DFPS_Manager_sources_global {spots} {
 #
 # DFPS_Manager_local_from_global takes a list global points and transforms them into
 # local coordinates using the local coordinate pose. The list must be a string of
-# x, y, z values separated by spaces.
+# x, y, z values separated by spaces. The DFPS global coordinate system is defined by
+# three half-inch steel balls sitting on the base plate in front of the fiducial stage.
+# The DFPS local coordinate system is defined by its fiducial plate. The fiducial plate
+# defines a frame coordinate system with its front, lower-left corner as the frame coordinate
+# origin, the bottom front edge as the frame coordinate x-axis, and the y-axis perpendiculare to the fiducial stage. The local coordinates are at x=local_coord_offset, y=local_coord_offset
+# in frame coordinates. In the DFPS-4A, local_coord_offset = 65 mm.
 #
 proc DFPS_Manager_local_from_global {points} {
 	upvar #0 DFPS_Manager_config config
@@ -983,16 +990,15 @@ proc DFPS_Manager_global_from_local {points} {
 }
 
 #
-# DFPS_Manager_mast_measure measures the location of one or more masts. The
-# position of the mast is the optical center of its guide fiber. The routine
-# takes a list of mast numbers as input, or measures all masts by default. It
-# returns the positions of the masts in local coordinates. The routine first
-# measures the position of the masts in global coordinates, then uses the local
-# coordinate pose to transform into local coordinates. We assume the local
-# coordinate pose is correct. The routine catches errors in its data acquisition
-# and calculations.
+# DFPS_Manager_mast_measure returns the local coordinates of a mast. We take the
+# optical centroid of the mast's guide fiber to define the mast position. The
+# routine takes a mast number as input. It returns the x, y, and z coordinates
+# of the guide fiber in local coordinates. The routine first measures the
+# position of the masts in global coordinates, then uses the local coordinate
+# pose to transform into local coordinates. We assume the local coordinate pose
+# is correct.
 #
-proc DFPS_Manager_mast_measure {{masts ""}} {
+proc DFPS_Manager_mast_measure {mast} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -1002,33 +1008,36 @@ proc DFPS_Manager_mast_measure {{masts ""}} {
 	
 	set info(state) "Measure"	
 
-	if {$masts == ""} {set masts [string trim "$info(positioner_masts)"]}
-	set leds ""
-	foreach m $masts {lappend leds [lindex $config(guide_leds) [expr $m-1]]}
+	if {[lsearch $info(positioner_masts) $mast] < 0} {
+		set result "ERROR: No mast \"$mast\" in mast_measure."
+		LWDAQ_print $info(text) $result
+		set info(state) "Idle"
+		return $result
+	}
 	
-	set spots [DFPS_Manager_spots $leds]
+	set led [lindex $config(guide_leds) [expr $mast-1]]
+	
+	set spots [DFPS_Manager_spots $led]
 	if {[LWDAQ_is_error_result $spots]} {
 		set info(state) "Idle"
 		return $spots
 	}
-	set masts_global [DFPS_Manager_sources_global $spots]
-	set masts_local [DFPS_Manager_local_from_global $masts_global]
+	set mast_global [DFPS_Manager_sources_global $spots]
+	set mast_local [DFPS_Manager_local_from_global $mast_global]
 	
-	foreach {x y z} $masts_local {
-		set m [lindex $masts 0]
-		set info(mast_$m) "[format %.3f $x] [format %.3f $y]"
-		scan $info(target_$m) %f%f xt yt
-		set xo [format %.3f [expr $x - $xt]]
-		set yo [format %.3f [expr $y - $yt]]
-		set info(offset_$m) "$xo $yo"
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "Offset $m\: $info(offset_$m)" $info(vcolor)
-		}
-		set masts [lrange $masts 1 end]
+	scan $mast_local %f%f%f x y z
+	set info(mast_$mast) "[format %.3f $x] [format %.3f $y]"
+	scan $info(target_$mast) %f%f xt yt
+	set xo [format %.3f [expr $x - $xt]]
+	set yo [format %.3f [expr $y - $yt]]
+	set info(offset_$mast) "$xo $yo"
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "mast_measure x=$x y=$y z=$z\
+			xo=$xo yo=$yo" $info(vcolor)
 	}
-	
+		
 	set info(state) "Idle"	
-	return $masts_local
+	return $mast_local
 }
 
 #
@@ -1114,17 +1123,17 @@ proc DFPS_Manager_fvcalib_disagreement {{params ""} {show "1"}} {
 			incr count
 			
 			if {$show} {
-				set y [expr $info(bcam_height) - $y_th]
+				set y [expr $info(bcam_height_um) - $y_th]
 				set x $x_th
 				set w $config(cross_size)
 				lwdaq_graph "[expr $x - $w] $y [expr $x + $w] $y" \
 					$info(fvcalib_$side) -entire 1 \
-					-x_min 0 -x_max $info(bcam_width) \
-					-y_min 0 -y_max $info(bcam_height) -color 2
+					-x_min 0 -x_max $info(bcam_width_um) \
+					-y_min 0 -y_max $info(bcam_height_um) -color 2
 				lwdaq_graph "$x [expr $y - $w] $x [expr $y + $w]" \
 					$info(fvcalib_$side) -entire 1 \
-					-x_min 0 -x_max $info(bcam_width) \
-					-y_min 0 -y_max $info(bcam_height) -color 2
+					-x_min 0 -x_max $info(bcam_width_um) \
+					-y_min 0 -y_max $info(bcam_height_um) -color 2
 			}
 		}
 	}
@@ -1279,9 +1288,9 @@ proc DFPS_Manager_fvcalib_read {{fn ""}} {
 			LWDAQ_read_image_file $ifn $info(fvcalib_$side)
 			set iconfig(analysis_num_spots) "$info(num_sources) $config(bcam_sort)"
 			set iconfig(analysis_threshold) $config(analysis_threshold)
-			set info(bcam_width) [expr $iinfo(daq_image_width) \
+			set info(bcam_width_um) [expr $iinfo(daq_image_width) \
 				* $iinfo(analysis_pixel_size_um)]
-			set info(bcam_height) [expr $iinfo(daq_image_height) \
+			set info(bcam_height_um) [expr $iinfo(daq_image_height) \
 				* $iinfo(analysis_pixel_size_um)]
 			set result [LWDAQ_analysis_BCAM $info(fvcalib_$side)]
 			if {![LWDAQ_is_error_result $result]} {
@@ -1382,9 +1391,9 @@ proc DFPS_Manager_fvcalib_fit {} {
 	set info(fvcalib) "Fitting"
 	
 	if {$config(verbose)} {
-		LWDAQ_print $info(fvcalib_text) "\nFitting camera parameters with settings\
-			fit_show = $config(fit_show),\
-			fit_details = $config(fit_details)." purple
+		LWDAQ_print $info(fvcalib_text) "\nFitting camera parameters with\
+			fit_show=$config(fit_show),\
+			fit_details=$config(fit_details)." purple
 	}
 	set start_time [clock milliseconds]
 	set scaling "$config(fit_scaling) $config(fit_scaling)"
@@ -1421,7 +1430,7 @@ proc DFPS_Manager_fvcalib_fit {} {
 	if {$config(verbose)} {
 		LWDAQ_print $info(fvcalib_text) "Fit converged in\
 			[format %.2f [expr 0.001*([clock milliseconds]-$start_time)]] s\
-			taking [lindex $end_params 17] steps\
+			and [lindex $end_params 17] steps,\
 			final error [format %.1f [lindex $end_params 16]] um." purple
 	}
 
@@ -2003,7 +2012,7 @@ proc DFPS_Manager_watchdog {} {
 			set info(mast_control_time) [clock seconds]
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) \
-					"Adjusting masts. (Time [clock seconds])" $info(vcolor)
+					"mast_control_time [clock seconds]" $info(vcolor)
 			}
 			set control_report "[clock seconds] "
 			DFPS_Manager_mast_measure_all
@@ -2039,8 +2048,7 @@ proc DFPS_Manager_watchdog {} {
 			set info(fiducial_survey_time) [clock seconds]
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) \
-					"Surveying fiducials and recalculating local coordinate pose.\
-						(Time [clock seconds])" $info(vcolor)
+					"fiducial_survey_time [clock seconds]" $info(vcolor)
 			}
 			DFPS_Manager_fsurvey
 		}
@@ -2054,7 +2062,7 @@ proc DFPS_Manager_watchdog {} {
 		set sock [lindex $LWDAQ_server_commands 0 1]
 		set LWDAQ_server_commands [lrange $LWDAQ_server_commands 1 end]
 		if {$config(verbose)} {
-			LWDAQ_print $info(text) "Server: $cmd $sock" $info(vcolor)
+			LWDAQ_print $info(text) "server_command $cmd $sock" $info(vcolor)
 		}
 		
 		if {[string match "LWDAQ_server_info" $cmd]} {
@@ -2064,7 +2072,7 @@ proc DFPS_Manager_watchdog {} {
 		if {[catch {
 			set result [uplevel #0 $cmd]
 			if {$config(verbose)} {
-				LWDAQ_print $info(text) "Result: $result" $info(vcolor)
+				LWDAQ_print $info(text) "server_result $result" $info(vcolor)
 			}
 		} error_result]} {
 			set result "ERROR: $error_result"
@@ -2191,12 +2199,12 @@ proc DFPS_Manager_fsurvey {} {
 
 	if {$config(verbose)} {
 		LWDAQ_print $t \
-			"Converged in [lindex $end_params 7] steps,\
-			final error [format %.1f [expr 1000*[lindex $end_params 6]]] um." \
+			"fsurvey steps=[lindex $end_params 7]\
+				error_um=[format %.1f [expr 1000*[lindex $end_params 6]]]" \
 			$info(vcolor)
 	}
 	if {$config(report)} {
-		LWDAQ_print $t "Coordinates: $info(local_coord)"
+		LWDAQ_print $t "$info(local_coord)"
 	}
 	
 	set info(utils_state) "Idle"
@@ -2232,8 +2240,7 @@ proc DFPS_Manager_dfcalib {} {
 	set led [lindex $config(guide_leds) [expr $m - 1]]
 	if {$config(verbose)} {
 		LWDAQ_print $info(mcalib_text) \
-			"Calibrating detector $d in mast $m\
-			using source $config(mcalib_led)." $info(vcolor)
+			"dfcalib detector=$d mast=$m source=$config(mcalib_led)." $info(vcolor)
 	}
 	
 	set spots [DFPS_Manager_spots $led]
@@ -2246,7 +2253,7 @@ proc DFPS_Manager_dfcalib {} {
 	set mast_global [DFPS_Manager_sources_global $spots]
 	set mast_local [DFPS_Manager_local_from_global $mast_global]
 	if {$config(verbose)} {
-		LWDAQ_print $info(mcalib_text) "Mast_Local: $mast_local." $info(vcolor)
+		LWDAQ_print $info(mcalib_text) "dfcalib mast_local=$mast_local." $info(vcolor)
 	}
 	
 	set info(mcalib_state) "Detector"
@@ -2268,7 +2275,8 @@ proc DFPS_Manager_dfcalib {} {
 	set detector_global [DFPS_Manager_sources_global $spots]
 	set detector_local [DFPS_Manager_local_from_global $detector_global]
 	if {$config(verbose)} {
-		LWDAQ_print $info(mcalib_text) "Detector_Local: $detector_local" $info(vcolor)
+		LWDAQ_print $info(mcalib_text) \
+			"dfcalib detector_local=$detector_local" $info(vcolor)
 	}
 	
 	scan $detector_local %f%f%f xd yd zd
@@ -2300,22 +2308,23 @@ proc DFPS_Manager_mranges {{masts ""}} {
 	if {$masts == ""} {set masts $info(positioner_masts)}
 	
 	set i 0
-	foreach {n e} "$info(dac_min) $info(dac_min)\
+	foreach {upleft upright} "$info(dac_min) $info(dac_min)\
 			$info(dac_max) $info(dac_min)\
 			$info(dac_max) $info(dac_max)\
 			$info(dac_min) $info(dac_max)" {
-		set c [lindex $info(mrange_corners) $i]
-		set config(upleft) $n
-		set config(upright) $e
-		set info(mcalib_state) "Move$c"	
+		set corner [lindex $info(mrange_corners) $i]
+		set config(upleft) $upleft
+		set config(upright) $upright
+		set info(mcalib_state) "Move$corner"	
 		if {$config(verbose)} {
-			LWDAQ_print $info(mcalib_text) "Corner: $c $n $e" $info(vcolor)
+			LWDAQ_print $info(mcalib_text) "mranges corner=$corner\
+				upleft=$upleft upright=$upright" $info(vcolor)
 		}
 		DFPS_Manager_voltage_set $info(wildcard_id) $config(upleft) $config(upright)
 		set st $config(mcalib_settling_ms)
 		set info(mcalib_state) "Settle"	
 		if {$config(verbose)} {
-			LWDAQ_print $info(mcalib_text) "Settling: $st" $info(vcolor)
+			LWDAQ_print $info(mcalib_text) "mranges settling_ms=$st" $info(vcolor)
 		}
 		LWDAQ_wait_ms $st
 		foreach m $masts {
@@ -2327,9 +2336,9 @@ proc DFPS_Manager_mranges {{masts ""}} {
 				return $ml
 			}
 			if {$config(verbose)} {
-				LWDAQ_print $info(mcalib_text) "Mast: $m $ml" $info(vcolor)
+				LWDAQ_print $info(mcalib_text) "mranges mast=$m $ml" $info(vcolor)
 			}
-			set m_$m\_$c [lrange $ml 0 1]
+			set m_$m\_$corner [lrange $ml 0 1]
 		}		
 		incr i
 	}
@@ -2338,7 +2347,6 @@ proc DFPS_Manager_mranges {{masts ""}} {
 	set config(upleft) $info(dac_zero)
 	set config(upright) $info(dac_zero)
 	DFPS_Manager_voltage_set $info(wildcard_id) $config(upleft) $config(upright)
-	
 	
 	set info(mcalib_state) "Calculate"	
 	LWDAQ_update
@@ -2354,7 +2362,8 @@ proc DFPS_Manager_mranges {{masts ""}} {
 				($x-$x_prev)*($x-$x_prev) + \
 				($y-$y_prev)*($y-$y_prev))]]
 			if {$config(verbose)} {
-				LWDAQ_print $info(mcalib_text) "$m $c $x $y $side" $info(vcolor)
+				LWDAQ_print $info(mcalib_text) "mranges mast=$m \
+					corner=$c x=$x y=$y side=$side" $info(vcolor)
 			}
 			set x_sum [expr $x_sum + $x]
 			set y_sum [expr $y_sum + $y]
@@ -2372,12 +2381,13 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		set y_left [lindex [set m_$m\_left] 1]
 		set y_right [lindex [set m_$m\_right] 1]
 		set rot_y [format %.3f [expr atan(($y_right-$y_left)/$side/sqrt(2))]]
-		if {$config(verbose)} {
-			LWDAQ_print $info(mcalib_text) \
-			"	Mast_$m $x_ave $y_ave $side $rot_x $rot_y" $info(vcolor)
-		}
 		set rot [format %.3f [expr ($rot_x + $rot_y)/2.0]]
 		set info(mrange_$m) "$x_ave $y_ave $side $rot"
+		if {$config(verbose)} {
+			LWDAQ_print $info(mcalib_text) \
+			"mast=$m x_ave=$x_ave y_ave=$y_ave side=$side\
+				rot_x=$rot_x rot_y=$rot_y rot=$rot" $info(vcolor)
+		}
 	}
 	
 	foreach m $masts {
@@ -2632,7 +2642,7 @@ proc DFPS_Manager_acquire_guides {} {
 			return $result
 		}
 		if {$config(verbose)} {
-			LWDAQ_print $info(text) $result $info(vcolor)
+			LWDAQ_print $info(text) "acquire_guides $result" $info(vcolor)
 		}
 	}
 	set info(state) "Idle"
@@ -2640,14 +2650,14 @@ proc DFPS_Manager_acquire_guides {} {
 }
 
 #
-# DFPS_Manager_mast_measure_all measures the positions of all masts one by one, sets their
-# positions, and returns their positions.
+# DFPS_Manager_mast_measure_all measures the positions of all masts one by one
+# and returns their x-y positions in local coordinates. It also reports these
+# positions if the report flag is set.
 #
 proc DFPS_Manager_mast_measure_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set info(state) "Measure"
 	set positions [list]
 	foreach m $info(positioner_masts) {
 		set mp [DFPS_Manager_mast_measure $m]
@@ -2656,17 +2666,15 @@ proc DFPS_Manager_mast_measure_all {} {
 			return $mp
 		}
 		scan $mp %f%f%f x y z
-		set info(mast_$m) "[format %.3f $x] [format %.3f $y]"
 		lappend positions $x $y
 	}
+	
 	if {$config(report)} {
-		LWDAQ_print -nonewline $info(text) "Masts: "
 		foreach p $positions {
 			LWDAQ_print -nonewline $info(text) "[format %.3f $p] "
 		}
 		LWDAQ_print $info(text) ""
 	}
-	set info(state) "Idle"
 	
 	return $positions
 }
@@ -2708,115 +2716,170 @@ proc DFPS_Manager_reset_masts {} {
 }
 
 #
-# DFPS_Manager_local_from_guide takes a guide sensor number and an x and y coordinate
-# in a guide sensor image, and returns the local coordinates of the image point.
+# DFPS_Manger_gmark takes an x-y position in one of the guide sensor images and marks
+# the spot in the image overlay, both in the normal guide sensor displays and in any
+# magnified display that might exist. We display in the magnified window first, so that
+# we keep the marking lines one pixel wide, then display in the standard window.
 #
-proc DFPS_Manager_local_from_guide {guide xg yg} {
+proc DFPS_Manager_gmark {guide x_g y_g} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set ext $info(guide_height_um)
+	set width [expr 0.001*$info(guide_width_um)]
+	set height [expr 0.001*$info(guide_height_um)]
+	lwdaq_image_manipulate dfps_guide_$guide none -clear 1
+	lwdaq_graph "[expr $x_g - $ext] $y_g [expr $x_g + $ext] $y_g" \
+		dfps_guide_$guide -entire 1 \
+		-x_min 0 -x_max $width \
+		-y_min 0 -y_max $height -color 2
+	lwdaq_graph "$x_g [expr $y_g - $ext] $x_g [expr $y_g + $ext]" \
+		dfps_guide_$guide -entire 1 \
+		-x_min 0 -x_max $width \
+		-y_min 0 -y_max $height -color 2
+	if {[winfo exists $info(window).mag_$guide]} {
+		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+	}
+	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
+		-intensify $config(intensify) -zoom $config(guide_zoom)
+	return ""
+}
+
+#
+# DFPS_Manager_local_from_guide takes a guide sensor number and an x and y
+# coordinate in a guide sensor image, and returns the local coordinates of the
+# image point. The guide coordinate system has its origin at the center of the
+# center of the lower-left pixel in the guide image. The x-axis is to the right,
+# the y-axis is upwards. Each guide sensor has stored for it a string of numbers
+# giving the local coordinates of the sensor origin and the rotation of the
+# guide x-axis anti-clockwise positive with respect to the local coordinate
+# x-axis in milliradians. We can view these coordinate definitions in the
+# Calibration Constants window, which we can open from the Utilities Panel with
+# the View Calibration button. The local coordinate system is at the approximate
+# center of the fiducial plate. Its origin is at x=local_coord_offset mm and
+# y=local_coord_offset mm in the framed coordinate system. In the DFPS-4A, this
+# offset is 65 mm. The frame coordinate system is at the front, lower-left
+# corner of the fiducial plate, with its x-axis running along the front edge and
+# the y-axis perpendicular to the fiducial stage.
+#
+proc DFPS_Manager_local_from_guide {guide x_g y_g} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
-		return "ERROR: No guide sensor number \"$guide\"."
+		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in local_from_guide."
+		return "0 0"
 	}
 	
 	scan $info(guide_$guide) %f%f%f xorigin yorigin rot
-	set xl [format %.3f [expr $xorigin + $xg*cos($rot*0.001) - $yg*sin($rot*0.001)]]
-	set yl [format %.3f [expr $yorigin + $yg*cos($rot*0.001) + $xg*sin($rot*0.001)]]
+	set x_l [format %.3f [expr $xorigin + $x_g*cos($rot*0.001) - $y_g*sin($rot*0.001)]]
+	set y_l [format %.3f [expr $yorigin + $y_g*cos($rot*0.001) + $x_g*sin($rot*0.001)]]
 	
 	if {$config(verbose)} {
-		LWDAQ_print $info(text) "local_from_guide: $guide $xg $yg $xl $yl" $info(vcolor)
+		LWDAQ_print $info(text) "local_from_guide guide=$guide x_g=$x_g y_g=$y_g\
+			x_l=$x_l y_l=$y_l" $info(vcolor)
 	}
-	return "$xl $yl"
+	if {$config(report)} {
+		LWDAQ_print $info(text) "$x_g $y_g $x_l $y_l" 
+	}
+	DFPS_Manager_gmark $guide $x_g $y_g	
+	
+	return "$x_l $y_l"
 }
 
 #
 # DFPS_Manager_guide_from_local takes a local coordinate position and transforms it into
-# the coordinates of one of the guide sensors.
+# the coordinates of one of the guide sensors. See comments on the local_from_global routine
+# for more details of the coordinate systems.
 #
-proc DFPS_Manager_guide_from_local {guide xl yl} {
+proc DFPS_Manager_guide_from_local {guide x_l y_l} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
-		return "ERROR: No guide sensor number \"$guide\"."
+		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in guide_from_local."
+		return "0 0"
 	}
 	
 	scan $info(guide_$guide) %f%f%f xorigin yorigin rot
-	set xg [format %.3f [expr \
-		($xl - $xorigin)*cos($rot*0.001) + ($yl - $yorigin)*sin($rot*0.001)]]
-	set yg [format %.3f [expr \
-		($yl - $yorigin)*cos($rot*0.001) - ($xl - $xorigin)*sin($rot*0.001)]]
+	set x_g [format %.3f [expr \
+		($x_l - $xorigin)*cos($rot*0.001) + ($y_l - $yorigin)*sin($rot*0.001)]]
+	set y_g [format %.3f [expr \
+		($y_l - $yorigin)*cos($rot*0.001) - ($x_l - $xorigin)*sin($rot*0.001)]]
 	if {$config(verbose)} {
-		LWDAQ_print $info(text) "guide_from_local: $guide $xl $yl $xg $yg" $info(vcolor)
+		LWDAQ_print $info(text) "guide_from_local guide=$guide x_l=$x_l y_l=$y_l\
+			x_g=$x_g y_g=$y_g" $info(vcolor)
 	}		
-	return "$xg $yg"
-}
-
-
-#
-# DFPS_Manger_gmark takes an x-y position in one of the guide sensor magnified 
-# iamges and makes a cross on that spot.
-#
-proc DFPS_Manager_gmark {guide x y} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	set ext 20
-	set width $info(icx424_row)
-	set height $info(icx424_col)
-	set y [expr $height-$y+$config(mouse_offset_y)]
-	set x [expr $x+$config(mouse_offset_x)]
-	lwdaq_image_manipulate dfps_guide_$guide none -clear 1
-	lwdaq_graph "[expr $x - $ext] $y [expr $x + $ext] $y" \
-		dfps_guide_$guide -entire 1 \
-		-x_min 0 -x_max $width \
-		-y_min 0 -y_max $height -color 2
-	lwdaq_graph "$x [expr $y - $ext] $x [expr $y + $ext]" \
-		dfps_guide_$guide -entire 1 \
-		-x_min 0 -x_max $width \
-		-y_min 0 -y_max $height -color 2
-	lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-		-intensify $config(intensify) -zoom $config(guide_mag_zoom)
-	set xg [format %.3f [expr 0.0074*$x]]
-	set yg [format %.3f [expr 0.0074*$y]]
-	set local [DFPS_Manager_local_from_guide $guide $xg $yg]
-	scan $local %f%f xl yl
 	if {$config(report)} {
-		LWDAQ_print $info(text) "Local: $xl $yl"
+		LWDAQ_print $info(text) "$x_l $y_l $x_g $y_g" 
 	}
-	return "$xl $yl"
+	DFPS_Manager_gmark $x_g $y_g	
+
+	return "$x_g $y_g"
 }
 
 #
-# DFPS_Manager_mag_guide creates a magnified view of one of the guide sensor
-# images. We pass it the guide sensor index.
+# DFPS_Manager_guide_click handles mouse clicks on guide sensor images. It takes
+# a guide sensor number, an x and y coordinate, and a command. The mag_g command
+# tells the routine to open a new magnified view of a guide sensor. The mark_g
+# and mark_gm commands tell the routine to mark a guide sensor view, based upon
+# the x-y coordinates of a mouse click in the normal guide sensor display or the
+# magnified guide sensor display. The actual marking, which will be a cross of 
+# some sort, will be done in the gmark routine, which will in turn be called by
+# local_from_guide, which we call from this routine.
 #
-proc DFPS_Manager_mag_guide {guide} {
+proc DFPS_Manager_guide_click {guide x y cmd} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
-		LWDAQ_print $info(text) "ERROR: No guide sensor number \"$guide\"."
+		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in mag_guide."
 		return ""
 	}
 	
-	set w $info(window).mag_$guide
-	if {[winfo exists $w]} {
-		raise $w
-	} else {
-		toplevel $w
-		wm title $w "Guide $guide, DFPS Manager $info(version)"
-		image create photo dfps_guide_mag_$guide
-		label $w.img -image dfps_guide_mag_$guide
-		pack $w.img -side top
-		bind $w.img <Double-Button-1> \
-			[list LWDAQ_post "DFPS_Manager_gmark $guide %x %y"]
-	}
+	if {$cmd == "mag_g"} {
+		set w $info(window).mag_$guide
+		if {[winfo exists $w]} {
+			raise $w
+		} else {
+			toplevel $w
+			wm title $w "Guide $guide, DFPS Manager $info(version)"
+			image create photo dfps_guide_mag_$guide
+			label $w.img -image dfps_guide_mag_$guide
+			pack $w.img -side top
+			bind $w.img <Button-1> \
+				[list LWDAQ_post "DFPS_Manager_guide_click $guide %x %y mark_gm"]
+		}
 	
-	lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-		-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+	}	
 
-	return $w
+	if {($cmd == "mark_gm") || ($cmd == "mark_g")} {
+		switch $cmd {
+			"mark_gm" {set zoom $config(guide_mag_zoom)}
+			"mark_g"  {set zoom $config(guide_zoom)}
+			default {set zoom 1}
+		}
+		if {$zoom < 1.0} {
+			set pix [expr round(1.0/$zoom)*$info(icx424_pix_um)]
+		} else {
+			set pix [expr round($zoom)*$info(icx424_pix_um)]
+		}
+		set y_g [format %.3f [expr 0.001*( \
+			$info(guide_height_um)-$pix*($y+$config(mouse_offset_y)))]]
+		set x_g [format %.3f [expr 0.001*( \
+			$pix*($x+$config(mouse_offset_x)))]]
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) \
+				"guide_click guide=$guide x=$x y=$y cmd=$cmd\
+					zoom=$zoom pix=[format %.3f $pix]" $info(vcolor)
+		}
+		set local [DFPS_Manager_local_from_guide $guide $x_g $y_g]
+	}
+		
+	return ""
 }
 
 #
@@ -2872,7 +2935,8 @@ proc DFPS_Manager_open {} {
 	foreach guide $info(guide_sensors) {
 		image create photo "dfps_guide_$guide"
 		label $f.l$guide -image "dfps_guide_$guide"
-		bind $f.l$guide <Double-Button-1> [list LWDAQ_post "DFPS_Manager_mag_guide $guide"]
+		bind $f.l$guide <Double-Button-1> [list LWDAQ_post \
+			"DFPS_Manager_guide_click $guide 0 0 mag_g"]
 		pack $f.l$guide -side left -expand yes
 		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 			-intensify $config(intensify) -zoom $config(guide_zoom)

@@ -642,26 +642,32 @@ of the image within the <i>analysis bounds</i>, not across the entire image.</p>
 
 <p>The -zoom option scales the image as we draw it in the Tk photo. This scaling
 is in addition to the scaling called for by the global <i>gui_display_zoom</i>
-parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. If the Tk
-photo is initially smaller than the size required by the zoomed image, the Tk
-photo will expand to accommodate the zoomed image. But if the Tk photo is
-initially larger than required, the Tk photo will not contract to the smaller
-size of the zoomed image. The product of the zoom value and the global
-<i>gui_display_zoom</i> can take any value between 0.1 and 10. But the effective
-value of the scaling factor is dicated by the requirements of sub-sampling. If
-the scaling factor is greater than 1, we round it to the nearest integer,
-<i>e</i>, and draw each image pixel on the screen as a block of
-<i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we round its inverse to
-the nearest integer, <i>c</i>. We draw only one pixel out of every <i>c</i>
-pixels in the Tk photo. If the scaling factor is 0.3, we draw every third pixel.
-If 0.4, we draw every third pixel if your computer rounds 1/0.4 to 3, or every
-second pixel if your computer rounds 1/0.4 to 2. With scaling factor 0.0, we
-draw every tenth pixel.</p>
+parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. The Tk
+photo will expand or contract to match the size of the zoomed image. The product
+of the zoom value and the global <i>gui_display_zoom</i> can take any value
+between 0.1 and 10. But the effective value of the scaling factor is dicated by
+the requirements of sub-sampling. If the scaling factor is greater than 1, we
+round it to the nearest integer, <i>e</i>, and draw each image pixel on the
+screen as a block of <i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we
+round its inverse to the nearest integer, <i>c</i>. We draw only one pixel out
+of every <i>c</i> pixels in the Tk photo. If the scaling factor is 0.3, we draw
+every third pixel. If 0.4, we draw every third pixel if your computer rounds
+1/0.4 to 3, or every second pixel if your computer rounds 1/0.4 to 2. With
+scaling factor 0.0, we draw every tenth pixel. Prior to drawing, the image
+overlay may contain lines that show the results of analysis or mark features in
+the image. These lines are likely to be only one pixel wide. If we are
+sub-sampling the image, all such markings will be partially erased. When drawing
+with a scaling factor less than 0.5, <i>lwdaq_draw</i> spreads out each pixel in
+the overlay so that, when subsampled, the integrity of the overlay markings is
+preserved. After the draw, the overlay markings remain spread, which means that
+subsequent drawing of the same image with a larger scaling factor will appear
+with thicker overlay lines.</p>
 
 <p>With -clear set to 1, lwdaq_draw clears the overlay in the lwdaq image before
 drawing in the Tk photo. The overlay may contain a graph or oscilloscope
 display, or analysis indicator lines. If you don't want these to be displayed,
-set -clear to 1. But note that whatever was in the overlay will be lost.</p>
+set -clear to 1. Whatever was in the overlay will be erased from the overlay
+before drawing.</p>
 
 <p>By default, -show_bounds is 1, and the routine draws a blue rectangle to show
 the the image analysis boundaries, which are used by image analysis routines
