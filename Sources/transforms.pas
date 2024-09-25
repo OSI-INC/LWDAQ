@@ -451,7 +451,7 @@ end;
 }
 procedure draw_ccd_line(ip:image_ptr_type;line:ij_line_type;shade:integer);
 begin
-	draw_image_line(ip,line,intensity_pixel_type(shade));
+	draw_image_line(ip,line,shade);
 end;
 
 {
@@ -554,7 +554,8 @@ end;
 }
 procedure display_real_graph(ip:image_ptr_type;
 	var graph:xy_graph_type;
-	color:integer;x_min,x_max,y_min,y_max,x_div,y_div:real);
+	color:integer;
+	x_min,x_max,y_min,y_max,x_div,y_div:real);
 
 const
 	min_divs=2;
