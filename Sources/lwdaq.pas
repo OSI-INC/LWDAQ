@@ -5464,6 +5464,7 @@ var
 	num_points:integer=0;
 	point_num:integer=0;
 	color:integer=0;
+	shade:integer=0;
 	clear:boolean=false;
 	entire:boolean=false;
 	fill:boolean=false;
@@ -5561,7 +5562,8 @@ begin
 
 	if glitch>0 then glitch_filter_y(gxy,glitch);
 
-	color:=byte_shift*(width-1)+overlay_color(color);	
+	color:=byte_shift*(width-1)+overlay_color(color);
+	shade:=byte_shift*(width-1)+color;	
 	
 	if ac_couple then begin
 		average:=average_y_xy_graph(gxy);
@@ -5569,14 +5571,14 @@ begin
 			display_real_graph(ip,gxy,color,
 				x_min,x_max,y_min+average,y_max+average,x_div,y_div)
 		else
-			draw_real_graph(ip,gxy,color,
+			draw_real_graph(ip,gxy,shade,
 				x_min,x_max,y_min+average,y_max+average);
 	end else 
 		if not in_image then
 			display_real_graph(ip,gxy,color,
 				x_min,x_max,y_min,y_max,x_div,y_div)
 		else
-			draw_real_graph(ip,gxy,color,
+			draw_real_graph(ip,gxy,shade,
 				x_min,x_max,y_min,y_max);
 
 	if entire then ip^.analysis_bounds:=saved_bounds;

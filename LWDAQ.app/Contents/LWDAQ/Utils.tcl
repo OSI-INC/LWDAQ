@@ -1828,7 +1828,7 @@ proc LWDAQ_proc_description {{proc_name "LWDAQ_*"} {file_name ""} {keep_breaks 0
 				set d [string map {"# " ""} $d]
 			}
 		}
-		lappend description $d
+		lappend description [string trim $d]
 		close $f
 	}
 	if {[llength $description] > 1} {
@@ -1860,7 +1860,7 @@ proc LWDAQ_proc_declaration {{proc_name "LWDAQ_*"} {file_name ""} } {
 				set d [string replace $line $d end]
 			}
 		}
-		lappend declaration $d
+		lappend declaration [string trim $d]
 		close $f
 	}
 	if {[llength $declaration] > 1} {
@@ -1897,7 +1897,7 @@ proc LWDAQ_proc_definition {{proc_name "LWDAQ_*"} {file_name ""} } {
 				}
 			}
 		}
-		lappend definition $d
+		lappend definition [string trim $d]
 		close $f
 	}
 	if {[llength $definition] > 1} {
@@ -1943,7 +1943,7 @@ proc LWDAQ_script_description {{file_name ""} {keep_breaks 0} } {
 	}
 	close $f
 	set description [string map {"# " ""} $description]
-	return $description
+	return [string trim $description]
 }
 
 #
@@ -1961,10 +1961,14 @@ proc LWDAQ_list_commands { {pattern *} } {
 }
 
 #
-# help prints help on all matching routines to the console. It returns an empty string.
+# help prints help on LWDAQ routines to the console. If we pass a pattern with
+# wildcards into help, the routine selects only routines that match the pattern.
+# If the option is "definition", the routine returns the actual script that
+# defines the procedure in addition to the comments at the top. 
 #
 proc help { {pattern ""} {option "none"}} {
 	global LWDAQ_Info
+	
 	if {$pattern == ""} {
 		puts "Try LWDAQ_list_commands to get a list of LWDAQ commands."
 		puts "Try \"help\" or \"man\" followed by a procedure name containing wild cards."
@@ -1972,13 +1976,16 @@ proc help { {pattern ""} {option "none"}} {
 		puts "Try typing a routine name to get a list of parameters it requires."
 		return
 	}
-	foreach f $LWDAQ_Info(scripts) {
+
+	foreach f $LWDAQ_Info(scripts)  {
 		set names [LWDAQ_proc_list $pattern $f]
 		if {[llength $names] > 0} {
 			puts ""
 			puts "From [file tail $f]: "
 			puts ""
 			foreach n $names {
+				puts [LWDAQ_proc_declaration $n $f]
+				puts
 				puts [LWDAQ_proc_description $n $f 1]
 				puts ""
 				if {$option == "definition"} {
@@ -1988,6 +1995,7 @@ proc help { {pattern ""} {option "none"}} {
 			}
 		}
 	}
+	
 	return ""
 }
 
@@ -2440,5 +2448,29 @@ proc LWDAQ_command_reference { {file_name ""} } {
 	
 	LWDAQ_html_contents 3 3 $file_name
 	
+	return ""
+}
+
+#
+# LWDAQ_tool_reference generates an HTML manual page for the routines defined in
+# a LWDAQ tool script. We name the tool script and the routine does the rest.
+# The routine creates the tool reference in the LWDAQ directory, and names it
+# Tool.html. If we don't specify a a file, the routine will open a file browser.
+# 
+#
+proc LWDAQ_tool_reference {{script ""}} {
+	global LWDAQ_Info
+	
+	if {$script == ""} {set script [LWDAQ_get_file_name]}
+	if {$script == ""} {return ""}
+	set f [open [file join $LWDAQ_Info(program_dir) "Tool.html"] w]
+	set script_list [LWDAQ_proc_list * $script]
+	set script_list [lsort -dictionary -index 0 $script_list]
+	foreach {s} $script_list {
+		puts $f "<small><pre>[LWDAQ_proc_declaration $s $script]</pre></small>"
+		puts $f "<p>[LWDAQ_proc_description $s $script]</p>"
+		puts $f ""
+	}
+	close $f
 	return ""
 }

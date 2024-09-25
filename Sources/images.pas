@@ -137,9 +137,10 @@ procedure dispose_named_images(key:string);
 procedure draw_image(ip:image_ptr_type);
 procedure draw_rggb_image(ip:image_ptr_type);
 procedure draw_gbrg_image(ip:image_ptr_type);
-procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;shade:intensity_pixel_type);
-procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;color:integer);
+procedure draw_image_xy_line(ip:image_ptr_type;line:xy_line_type;shade:integer);
+procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;shade:integer);
 procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;color:integer);
+procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;color:integer);
 procedure draw_overlay_pixel(ip:image_ptr_type;pixel:ij_point_type;color:integer);
 procedure draw_overlay_rectangle(ip:image_ptr_type;rect:ij_rectangle_type;
 	color:integer);
@@ -751,14 +752,13 @@ begin
 end;
 
 {
-	draw_overlay_xy_line draws a line in two-dimensional integer space onto the
-	overlay of the specified image. The routine draws the line in the specified
-	color, and clips it to the analysis bounds. The routine takes a line with
-	real-valued coordinates so as to avoid rounding errors in the start and end
-	of the line it draws. The "color" parameter specifies not only the color
-	of the line but also its width. Byte zero is the color, byte one is the
-	width minus one. We reserve bytes two and three for future use.
-}
+	draw_overlay_xy_line draws a line in two-dimensional real-valued space onto
+	the overlay of the specified image. The routine draws the line in the
+	specified color, and clips it to the analysis bounds. The routine takes a
+	line with real-valued coordinates so as to avoid rounding errors in the
+	start and end of the line it draws. The "color" parameter specifies not only
+	the color of the line but also its width. Byte zero is the color, byte one
+	is the width minus one. We reserve bytes two and three for future use. }
 procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;
 	color:integer);
 	
@@ -770,7 +770,6 @@ var
 	i,j,a,b,ii,jj:integer;
 	p,q,step:xy_point_type;
 	outside:boolean;
-	pixel:integer;
 
 begin
 	if not valid_image_ptr(ip) then exit;
@@ -791,7 +790,7 @@ begin
 	step:=xy_scale(xy_difference(q,p),1/(num_steps+1));
 
 	width:=((color div byte_shift) and byte_mask)+1;
-	pixel:=color and byte_mask;
+	color:=color and byte_mask;
 	
 	if width<=1 then begin
 		for step_num:=0 to num_steps do begin
@@ -810,7 +809,7 @@ begin
 					with ip^.analysis_bounds do begin
 						if (ii>=left) and (ii<=right) 
 								and (jj>=top) and (jj<=bottom) then
-							set_ov(ip,jj,ii,pixel);
+							set_ov(ip,jj,ii,color);
 					end;
 				end;
 		end;
@@ -837,50 +836,85 @@ begin
 end;
 
 {
-	draw_image_line draws a line in two-dimensional integer space into the
-	intensity array of the specified image. The routine draws the line with the
-	specified intensity and clips it to the analysis bounds.
+	draw_image_xy_line draws a line in two-dimensional real-valued space into
+	the intensity array of the specified image. The shade controls the grayscale
+	intensity of the line as well as its width. Byte zero is the shade, byte one
+	is the width minus one. We reserve bytes two and three for future use. 
 }
-procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;
-	shade:intensity_pixel_type);
-	
+procedure draw_image_xy_line(ip:image_ptr_type;line:xy_line_type;shade:integer);
+
 const
-	rough_step_size=0.8;{pixels}
+	rough_step_size=0.5;{pixels}
 	
 var
-	num_steps,step_num:integer;
+	num_steps,step_num,width:integer;
+	i,j,a,b,ii,jj:integer;
 	p,q,step:xy_point_type;
-	s:ij_point_type;
 	outside:boolean;
 
 begin
 	if not valid_image_ptr(ip) then exit;
 	if not valid_analysis_bounds(ip) then exit;
-	ij_clip_line(line,outside,ip^.analysis_bounds);
+	
+	xy_clip_line(line,outside,ip^.analysis_bounds);
 	if outside then exit;
 	
 	with line,ip^ do begin
-		set_px(ip,a.j,a.i,shade);
-		set_px(ip,b.j,b.i,shade);
-		p.x:=a.i;
-		p.y:=a.j;
-		q.x:=b.i;
-		q.y:=b.j;
-		s:=a;
+		p.x:=a.x;
+		p.y:=a.y;
+		q.x:=b.x;
+		q.y:=b.y;
 	end;
 	
 	if xy_separation(p,q)<rough_step_size then num_steps:=0
 	else num_steps:=round(xy_separation(p,q)/rough_step_size);
 	step:=xy_scale(xy_difference(q,p),1/(num_steps+1));
 
-	for step_num:=1 to num_steps do begin
-		p:=xy_sum(p,step);
-		if p.x-s.i>0.5 then inc(s.i)
-		else if p.x-s.i<-0.5 then dec(s.i);
-		if p.y-s.j>0.5 then inc(s.j)
-		else if p.y-s.j<-0.5 then dec(s.j);
-		set_px(ip,s.j,s.i,shade);
+	width:=((shade div byte_shift) and byte_mask)+1;
+	shade:=shade and byte_mask;
+	
+	if width<=1 then begin
+		for step_num:=0 to num_steps do begin
+			p:=xy_sum(p,step);
+				set_px(ip,round(p.y),round(p.x),shade);
+		end;
+	end else begin
+		a:=-((width-1) div 2);
+		b:=a+width-1;
+		for step_num:=0 to num_steps do begin
+			p:=xy_sum(p,step);
+			for i:=a to b do
+				for j:=a to b do begin
+					ii:=round(p.x+i);
+					jj:=round(p.y+j);
+					with ip^.analysis_bounds do begin
+						if (ii>=left) and (ii<=right) 
+								and (jj>=top) and (jj<=bottom) then
+							set_px(ip,jj,ii,shade);
+					end;
+				end;
+		end;
 	end;
+end;
+
+{
+	draw_image_line draws a line in two-dimensional integer space into the
+	intensity array of the specified image. The "shade" controls not only the
+	grascale intensity of the line, but also its width. Byte zero is the
+	grayscale intensity, byte one is the width minus one. We reserve bytes two
+	and three for future use.
+}
+procedure draw_image_line(ip:image_ptr_type;line:ij_line_type;shade:integer);
+
+var 
+	lxy:xy_line_type;
+	
+begin
+	lxy.a.x:=line.a.i;
+	lxy.a.y:=line.a.j;
+	lxy.b.x:=line.b.i;
+	lxy.b.y:=line.b.j;
+	draw_image_xy_line(ip,lxy,shade);
 end;
 
 {
