@@ -187,7 +187,7 @@ proc DFPS_Manager_init {} {
 	set info(fiducial_survey_time) "0"
 	set info(mast_control_time) "0"
 	set config(fiducial_survey_period) "1000"
-	set config(mast_control_period) "10"
+	set config(mast_control_period) "60"
 	set config(enable_mast_control) "0"
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
@@ -1052,20 +1052,21 @@ proc DFPS_Manager_mast_get_all {} {
 }
 
 #
-# DFPS_Manager_mast_set sets the target position of a mast's guide fiber. We specify
-# the target position in local x-y coordinats. We do not get to sepcify the local
-# z-coordinate. The routine re-calculates the mast offsets. It does not make any 
-# effort to change the actuator control voltages, but instead relies upon the control
-# system to move the mast to the correct position.
+# DFPS_Manager_mast_set sets the target position of a mast's guide fiber. We
+# specify the target position in local x-y coordinats with a string containing
+# both coordinates. We do not get to sepcify the local z-coordinate. The routine
+# re-calculates the mast offsets. It does not make any effort to change the
+# actuator control voltages, but instead relies upon the control system to move
+# the mast to the correct position.
 #
-proc DFPS_Manager_mast_set {mast xt yt} {
+proc DFPS_Manager_mast_set {mast target} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
 	if {![winfo exists $info(window)]} {return ""}
 	
 	set info(state) "Set"	
-
+	scan $target %f%f xt yt
 	if {[catch {
 		if {[lsearch $info(positioner_masts) $mast] < 0} {
 			error "ERROR: Invalid mast number \"$mast\" in mast_set."
@@ -1073,11 +1074,11 @@ proc DFPS_Manager_mast_set {mast xt yt} {
 		if {![string is double -strict $xt]} {
 			error "ERROR: Invalid x-coordinate \"$xt\" in mast_set."
 		}
-		if {![string is double -strict $y]} {
+		if {![string is double -strict $yt]} {
 			error "ERROR: Invalid y-coordinate \"$yt\" in mast_set."
 		}
 	} error_result]} {
-		LWDAQ_print $info(text) $result
+		LWDAQ_print $info(text) $error_result
 		set info(state) "Idle"
 		return $result
 	}
@@ -1094,7 +1095,7 @@ proc DFPS_Manager_mast_set {mast xt yt} {
 	}
 		
 	set info(state) "Idle"	
-	return $mast_local
+	return "$xt $yt $xo $yo"
 }
 
 #
@@ -1249,7 +1250,6 @@ proc DFPS_Manager_guide_get_ascii {guide} {
 
 	set contents [DFPS_Manager_guide_get $guide]
 	binary scan $contents cu* ascii
-	LWDAQ_print $info(text) [llength $ascii]
 
 	if {$config(verbose)} {
 		set bytes [string length $ascii]
@@ -2909,11 +2909,20 @@ proc DFPS_Manager_utils {} {
 }
 
 #
-# DFPS_Manager_watchdog watches the system commands list for incoming commands.
-# It manages the position of fibers by comparing measured positions to target
-# positions and adjusting control voltages to minimize disagreement. It monitors
-# fiducials and adjusts the fiducial frame pose in fiber view camera
-# coordinates.
+# DFPS_Manager_watchdog watches the system commands list for incoming commands,
+# manages periodic survey of the fiducial fibers, and manages the mast position
+# controller. It posts itself repeatedly to the LWDAQ event queue. Each time it
+# runs, it checks the fiducial survey timer, the mast control timer, and the
+# server command list. A fiducial survey causes the fiber view cameras to
+# measure the fiducial positions, followed by adjustment of the local coordinate
+# pose in the global DFPS coordinates. This pose allows us to convert fiber view
+# camera measurements of mast positions into local coordinates. The mast
+# controller measures mast positions, calculates their offsets from their target
+# positions, and adjusts the actuator drive voltages so as to move the mast
+# closer to its target position. We can enable and disable the mast controller,
+# as well as set the controller sample period, with the configure_mast_control
+# routine. The system server takes commands from the server socket, executes
+# them, and returns the command result string over the same socket.
 #
 proc DFPS_Manager_watchdog {} {
 	upvar #0 DFPS_Manager_config config
@@ -2924,6 +2933,11 @@ proc DFPS_Manager_watchdog {} {
 	# Abort if the DFPS Manager window no longer exists.
 	if {![winfo exists $info(window)]} {return ""}
 	
+	# Abort if LWDAQ reset is asserted, we return. In order to restart the
+	# watchdog, we must either run this routine again, or run it from the
+	# manager's reset routin, which we can call with the Reset button.
+	if {$LWDAQ_Info(reset)} {return ""}
+	
 	# Trim the manager text window to a maximum number of lines.
 	if {[$info(text) index end] > 1.2 * $LWDAQ_Info(num_lines_keep)} {
 		$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
@@ -2931,6 +2945,23 @@ proc DFPS_Manager_watchdog {} {
 	
 	# Default value for result string.
 	set result ""
+	
+	# At intervals, survey the fiducial fibers an adjust frame
+	# coordinate pose. The fiducial period is in units of
+	# mast_control_period.
+	if {$config(enable_mast_control)} {
+		if {[clock seconds] - $info(fiducial_survey_time) \
+				>= $config(fiducial_survey_period)} {
+			set info(fiducial_survey_time) [clock seconds]
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) \
+					"fiducial_survey_time [clock seconds]" $info(vcolor)
+			}
+			DFPS_Manager_fsurvey
+		}
+	} {
+		set info(fiducial_survey_time) "0"
+	}
 	
 	# If mast control is enabled, at intervals, adjust mast positions. We
 	# measure the mast positions, look at the offsets from their target
@@ -2970,23 +3001,6 @@ proc DFPS_Manager_watchdog {} {
 		set info(mast_control_time) "0"
 	}
 	
-	# At intervals, survey the fiducial fibers an adjust frame
-	# coordinate pose. The fiducial period is in units of
-	# mast_control_period.
-	if {$config(enable_mast_control)} {
-		if {[clock seconds] - $info(fiducial_survey_time) \
-				>= $config(fiducial_survey_period)} {
-			set info(fiducial_survey_time) [clock seconds]
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) \
-					"fiducial_survey_time [clock seconds]" $info(vcolor)
-			}
-			DFPS_Manager_fsurvey
-		}
-	} {
-		set info(fiducial_survey_time) "0"
-	}
-	
 	# Handle incoming server commands.
 	if {[llength $LWDAQ_server_commands] > 0} {
 		set cmd [lindex $LWDAQ_server_commands 0 0]
@@ -3010,23 +3024,21 @@ proc DFPS_Manager_watchdog {} {
 			set result "ERROR: $error_result"
 		}		
 		
-		if {$result != ""} {
-			if {![winfo exists $info(window)]} {return ""}
-			if {[catch {puts $sock $result} sock_error]} {
+		if {![winfo exists $info(window)]} {return ""}
+		if {[catch {puts $sock $result} sock_error]} {
+			LWDAQ_print -nonewline $t "$sock\: " blue
+			LWDAQ_print $t "ERROR: $sock_error"
+			LWDAQ_socket_close $sock
+			LWDAQ_print -nonewline $t "$sock\: " blue
+			LWDAQ_print $t "Closed after fatal socket error."
+			LWDAQ_print $info(text) "ERROR: $sock_error"
+		} {
+			if {[string length $result] > 50} {
 				LWDAQ_print -nonewline $t "$sock\: " blue
-				LWDAQ_print $t "ERROR: $sock_error"
-				LWDAQ_socket_close $sock
-				LWDAQ_print -nonewline $t "$sock\: " blue
-				LWDAQ_print $t "Closed after fatal socket error."
-				LWDAQ_print $info(text) "ERROR: $sock_error"
+				LWDAQ_print $t "Wrote \"[string range $result 0 49]\...\""
 			} {
-				if {[string length $result] > 50} {
-					LWDAQ_print -nonewline $t "$sock\: " blue
-					LWDAQ_print $t "Wrote \"[string range $result 0 49]\...\""
-				} {
-					LWDAQ_print -nonewline $t "$sock\: " blue
-					LWDAQ_print $t "Wrote \"$result\""
-				}
+				LWDAQ_print -nonewline $t "$sock\: " blue
+				LWDAQ_print $t "Wrote \"$result\""
 			}
 		}
 	}
@@ -3038,12 +3050,32 @@ proc DFPS_Manager_watchdog {} {
 }
 
 #
-# DFPS_Manager_reset_masts surveys the fiducials to obtain a new local
-# coordinate pose, sets the mast target positions to the centers of the mast
-# ranges, zeros the control voltages on all controllers, re-measures the mast
-# positions, and shows all fiducial and guide sources.
+# DFPS_Manager_configure_mast_control starts or stops the mast controller and
+# adjusts the mast control period. We pass 0 or 1 for enable to disable or
+# enable the controller respectively. We pass a real-valued period in seconds.
+# The controller will measure mast positions with this period, and adjust
+# actuator voltages after its measurements.
 #
-proc DFPS_Manager_reset_masts {} {
+proc DFPS_Manager_configure_mast_control {enable period} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set config(enable_mast_control) $enable
+	set config(mast_control_period) $period
+	
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "configure_mast_control enable=$enable period=$period"
+	}
+	return ""
+}
+
+#
+# DFPS_Manager_reset surveys the fiducials to obtain a new local coordinate
+# pose, sets the mast target positions to the centers of the mast ranges, zeros
+# the control voltages on all controllers, re-measures the mast positions, and
+# shows all fiducial and guide sources.
+#
+proc DFPS_Manager_reset {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -3066,6 +3098,9 @@ proc DFPS_Manager_reset_masts {} {
 
 	LWDAQ_print $info(text) "Showing all sources..."
 	DFPS_Manager_spots
+	
+	LWDAQ_print $info(text) "Starting watchdog..."
+	DFPS_Manager_watchdog
 
 	LWDAQ_print $info(text) "Positioner Reset Complete" purple
 	set info(state) "Idle"
@@ -3152,7 +3187,7 @@ proc DFPS_Manager_open {} {
 	
 	foreach {a b} {"Masts" mast_get_all \
 		"Show" show_spots \
-		"Reset" reset_masts \
+		"Reset" reset \
 		"Guides" guide_acquire_all \
 		"Utilities" utils} {
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
