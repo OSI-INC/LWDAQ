@@ -2456,7 +2456,10 @@ proc LWDAQ_command_reference { {file_name ""} } {
 # a LWDAQ tool script. We name the tool script and the routine does the rest.
 # The routine creates the tool reference in the LWDAQ directory, and names it
 # Tool.html. If we don't specify a a file, the routine will open a file browser.
-# 
+# The routine writes and h2-title to the file, then for each routine, we get an
+# h3-level title, a declaration showing the parameters that we must pass into
+# the procedure, and the description of the procedure extracted from the
+# comments above. 
 #
 proc LWDAQ_tool_reference {{script ""}} {
 	global LWDAQ_Info
@@ -2464,9 +2467,11 @@ proc LWDAQ_tool_reference {{script ""}} {
 	if {$script == ""} {set script [LWDAQ_get_file_name]}
 	if {$script == ""} {return ""}
 	set f [open [file join $LWDAQ_Info(program_dir) "Tool.html"] w]
+	puts $f "<h2>Command Reference</h2>"
 	set script_list [LWDAQ_proc_list * $script]
 	set script_list [lsort -dictionary -index 0 $script_list]
 	foreach {s} $script_list {
+		puts $f "<h3>$s</h3>"
 		puts $f "<small><pre>[LWDAQ_proc_declaration $s $script]</pre></small>"
 		puts $f "<p>[LWDAQ_proc_description $s $script]</p>"
 		puts $f ""
