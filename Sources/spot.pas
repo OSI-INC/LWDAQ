@@ -171,8 +171,8 @@ end;
 	(5,5) in microns. The top left corner of pixel (0,0) is the orgin of image
 	coordinates. The spot sensitivity is in microns per threshold count
 	calculated at the specified threshold. The routine takes as input a
-	spot_type and alters x and y to represent the centroid location. If something
-	goes wrong with the calculation, we set x and y to -1.
+	spot_type and alters x and y to represent the centroid location. If
+	something goes wrong with the calculation, we set x and y to -1.
 }
 procedure spot_centroid(ip:image_ptr_type;var spot:spot_type);
 

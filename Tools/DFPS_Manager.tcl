@@ -50,7 +50,7 @@ proc DFPS_Manager_init {} {
 	set info(detector_fibers) "1 2"	
 
 	# Data acquisition parameters for the DFPS-4A.
-	set config(ip_addr) "192.168.1.30"
+	set config(ip_addr) "71.174.73.186"
 	# Breadboard OSI Local: 192.168.1.10
 	# DFPS-4A OSI Local: 192.168.1.30
 	# DFPS-4A OSI Global: 71.174.73.186
@@ -64,11 +64,11 @@ proc DFPS_Manager_init {} {
 	set config(expose_s) "0.1"
 	set config(sort_code) "8"
 	set config(transceiver) "1 0"
-	set config(controllers) "6912 1834 C323 1845"
+	set config(controllers) "0x6912 0x1834 0xC323 0x1845"
 	set config(source_type) "9"
 	set config(camera_element) "2"
 	set config(source_pwr) "2"
-	set info(wildcard_id) "FFFF"
+	set info(wildcard_id) "0xFFFF"
 	set info(dac_zero) "32000"
 	set info(dac_max) "65535"
 	set info(dac_min) "0"
@@ -211,7 +211,7 @@ proc DFPS_Manager_init {} {
 	set info(icx424_pix_um) "7.4"
 
 	# Utility panel parameters.
-	set config(utils_ctrl) "FFFF"
+	set config(utils_id) "0xFFFF"
 	set config(utils_cmd) "8"	
 	set info(utils_state) "Idle"
 	set info(utils_text) "none"
@@ -294,7 +294,6 @@ proc DFPS_Manager_init {} {
 	
 	# Fiducial Rotation Calibration (FRot) settings.
 	set info(frot_state) "Idle"
-	set info(frot_measurements) [list]
 	set info(frot_orientations) "0 90 180 270"
 	set info(frot_0) \
 "-30.0 +105.0 -90.0 0.0 +105 -90.0 -30.0 +75.0 -90.0 0.0 +75.0 -90.0"
@@ -570,20 +569,20 @@ proc DFPS_Manager_examine_calibration {} {
 
 #
 # DFPS_Manager_id_bytes returns a list of two bytes as decimal numbers that
-# represent the identifier of the controller. Thus FF10 returns as "255 16".
+# represent the identifier of the controller. Thus 0xFF10 returns as "255 16".
+# The identifier we pass into the routine must be a four-digit hexadecimal
+# value with the prefix "0x".
 #
 proc DFPS_Manager_id_bytes {id_hex} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	set id [string trim $id_hex]
-	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
+	if {[regexp {0x([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
 		return "[expr 0x$b1] [expr 0x$b2]"
-	} elseif {$id == "*"} {
-		return "255 255"
 	} else {
 		LWDAQ_print $info(text) "ERROR: Bad device identifier \"$id\",\
-			defaulting to null identifier."
+			defaulting to 0x0000."
 		return "0 0"
 	}
 }
@@ -662,15 +661,37 @@ proc DFPS_Manager_transmit {commands} {
 }
 
 #
-# DFPS_Manager_voltage_set takes the upleft and upright control values and
-# instructs the named positioner to set its converters accordingly. The control
-# values must be unsigned integers between 0 and 65535. If the values exceed
-# this range, they will be clipped to the range. The return string consits of
-# the controller id and the DAC values that were applied, clipped if clipped.
+# DFPS_Manager_controller_set sets the north, south, east, and west electrode
+# voltages of one or all controllers. It will set the voltages on one controller
+# if we pass it a hexadecimal identifier other than the hexadecimal wildcard
+# identifier, or if we pass it a decimal integer specifying a particular mast.
+# From a mast index, we can obtain the mast's controller identifier using the
+# global controllers list. In order to distinguish between integer mast numbers
+# and hexadecimal controller identifiers, we must pass the identifiers with a
+# "0x" prefis. The control values themselves must be unsigned integers between 0
+# and 65535. If the values exceed this range, they will be clipped to the range.
+# The return string consits of the controller id and the DAC values that were
+# actually applied after any clipping.
 #
-proc DFPS_Manager_voltage_set {id upleft upright} {
+proc DFPS_Manager_controller_set {id upleft upright} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
+	
+	if {![winfo exists $info(window)]} {
+		return ""
+	}
+	
+	if {![regexp {0x[0-9a-fA-F]{4}} $id]} {
+		if {[string is integer -strict $id]} {
+			set index [lsearch $info(positioner_masts) $id]
+			if {$index >= 0} {
+				set id [lindex $config(controllers) [expr $id-1]]
+			} else {
+				LWDAQ_print $info(text) "ERROR: Invalid mast \"$id\" in controller_set."
+				return "0 0 0"
+			}
+		}
+	}
 
 	if {$upleft > $info(dac_max)} {
 		set upleft $info(dac_max)
@@ -695,42 +716,23 @@ proc DFPS_Manager_voltage_set {id upleft upright} {
 		3 [expr $e / 256] [expr $e % 256]\
 		4 [expr $w / 256] [expr $w % 256]"
 	set commands [DFPS_Manager_transmit $commands]
-	if {[LWDAQ_is_error_result $commands]} {
-		return $commands
-	} else {
-		return "$id $upleft $upright"
+	if {[LWDAQ_is_error_result $commands]} {return $commands} 
+	
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "controller_set id=$id\
+			upleft=$upleft upright=$upright" $info(vcolor)
 	}
+	return "$id $upleft $upright"
 }
 		
 #
-# DFPS_Manager_move sets the drive voltages of a mast's actuators to the
-# specified values. We give the mast index. In a system with four masts, the
-# index will be 1-4.
+# DFPS_Manager_controller_set_all sets the drive voltages of all controllers to
+# the values specified in the upleft and upright configuration parameters. the
+# routine does this by transmitting the control voltages with the controller
+# wildcard identifier. It also sets the individual mast controller voltage
+# values to the global upleft and upright value to reflect the change.
 #
-proc DFPS_Manager_move {mast upleft upright} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	if {![winfo exists $info(window)]} {
-		return ""
-	}
-	
-	set id [lindex $config(controllers) [expr $mast-1]]
-	set result [DFPS_Manager_voltage_set $id $upleft $upright]
-	if {![LWDAQ_is_error_result $result] && $config(verbose)} {
-		scan $result %d%f%f id upleft upright
-		LWDAQ_print $info(text) "move id=0x$id\
-			upleft=$upleft upright=$upright" $info(vcolor)
-	}
-
-	return "$result"
-}
-
-#
-# DFPS_Manager_set_all sets the drive voltages of all actuators to the values 
-# specified in the upleft and upright configuration parameters.
-#
-proc DFPS_Manager_set_all {} {
+proc DFPS_Manager_controller_set_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
@@ -738,7 +740,7 @@ proc DFPS_Manager_set_all {} {
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$config(upleft) $config(upright)"
 	}
-	DFPS_Manager_voltage_set $info(wildcard_id) $config(upleft) $config(upright)
+	DFPS_Manager_controller_set $info(wildcard_id) $config(upleft) $config(upright)
 	if {[winfo exists $info(utils_text)]} {
 		LWDAQ_print $info(utils_text) "Voltages: $config(upleft) $config(upright)"
 	}
@@ -747,10 +749,12 @@ proc DFPS_Manager_set_all {} {
 }
 
 #
-# DFPS_Manager_zero_all sets the drive voltages of all mast actuators to their 
-# zero values.
+# DFPS_Manager_controller_zero_all sets the drive voltages of all mast actuators
+# to their zero values. The routine does this by transmitting the control
+# voltages with the controller wildcard identifier. It also sets the individual
+# mast controller voltage values to the dac_zero value to reflect the change.
 #
-proc DFPS_Manager_zero_all {} {
+proc DFPS_Manager_controller_zero_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -758,7 +762,7 @@ proc DFPS_Manager_zero_all {} {
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
-	DFPS_Manager_voltage_set $info(wildcard_id) $info(dac_zero) $info(dac_zero)
+	DFPS_Manager_controller_set $info(wildcard_id) $info(dac_zero) $info(dac_zero)
 	if {[winfo exists $info(utils_text)]} {
 		LWDAQ_print $info(utils_text) "Voltages: $info(dac_zero) $info(dac_zero)"
 	}
@@ -767,9 +771,9 @@ proc DFPS_Manager_zero_all {} {
 }
 
 #
-# DFPS_Manager_move_all adds a displacement to the mast target positions.
+# DFPS_Manager_displace_all adds a displacement to the mast target positions.
 #
-proc DFPS_Manager_move_all {} {
+proc DFPS_Manager_displace_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -884,12 +888,12 @@ proc DFPS_Manager_show_spots {} {
 #
 # DFPS_Manager_sources_global calculates source positions in global coordinates
 # from a set of left and right camera image positions. Each image is a "spot"
-# with a centroid position measured in microns from the center of the image
-# sensor's top-left pixel. We pass it a list containing the coordinates of the
-# spots in the forma "x1l y1l x1r y1r... xnl ynl xnr ynr" where "n" is the
-# number of sources, "l" specifies the left camera, and "r" specifies the right
-# camera. The routine returns a list of source positions in "x1 y1 z1 ... xn yn
-# zn" in global coordinates. The routine checks to see if the spot positions are
+# with a centroid position measured in microns from the top-left corner of the
+# top-left pixel. We pass it a list containing the coordinates of the spots in
+# the forma "x1l y1l x1r y1r... xnl ynl xnr ynr" where "n" is the number of
+# sources, "l" specifies the left camera, and "r" specifies the right camera.
+# The routine returns a list of source positions in "x1 y1 z1 ... xn yn zn" in
+# global coordinates. The routine checks to see if the spot positions are
 # invalid, which is marked by coordinates "-1 -1 -1 -1", and if so, it returns
 # for the source position the global coordinate origin.
 #
@@ -951,14 +955,17 @@ proc DFPS_Manager_sources_global {spots} {
 }
 
 #
-# DFPS_Manager_local_from_global takes a list global points and transforms them into
-# local coordinates using the local coordinate pose. The list must be a string of
-# x, y, z values separated by spaces. The DFPS global coordinate system is defined by
-# three half-inch steel balls sitting on the base plate in front of the fiducial stage.
-# The DFPS local coordinate system is defined by its fiducial plate. The fiducial plate
-# defines a frame coordinate system with its front, lower-left corner as the frame coordinate
-# origin, the bottom front edge as the frame coordinate x-axis, and the y-axis perpendiculare to the fiducial stage. The local coordinates are at x=local_coord_offset, y=local_coord_offset
-# in frame coordinates. In the DFPS-4A, local_coord_offset = 65 mm.
+# DFPS_Manager_local_from_global takes a list global points and transforms them
+# into local coordinates using the local coordinate pose. The list must be a
+# string of x, y, z values separated by spaces. The DFPS global coordinate
+# system is defined by three half-inch steel balls sitting on the base plate in
+# front of the fiducial stage. The DFPS local coordinate system is defined by
+# its fiducial plate. The fiducial plate defines a frame coordinate system with
+# its front, lower-left corner as the frame coordinate origin, the bottom front
+# edge as the frame coordinate x-axis, and the y-axis perpendiculare to the
+# fiducial stage. The local coordinates are at x=local_coord_offset,
+# y=local_coord_offset in frame coordinates. In the DFPS-4A, local_coord_offset
+# = 65 mm.
 #
 proc DFPS_Manager_local_from_global {points} {
 	upvar #0 DFPS_Manager_config config
@@ -990,7 +997,7 @@ proc DFPS_Manager_global_from_local {points} {
 }
 
 #
-# DFPS_Manager_mast_measure returns the local coordinates of a mast. We take the
+# DFPS_Manager_mast_get returns the local coordinates of a mast. We take the
 # optical centroid of the mast's guide fiber to define the mast position. The
 # routine takes a mast number as input. It returns the x, y, and z coordinates
 # of the guide fiber in local coordinates. The routine first measures the
@@ -998,18 +1005,16 @@ proc DFPS_Manager_global_from_local {points} {
 # pose to transform into local coordinates. We assume the local coordinate pose
 # is correct.
 #
-proc DFPS_Manager_mast_measure {mast} {
+proc DFPS_Manager_mast_get {mast} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
-	if {![winfo exists $info(window)]} {
-		return ""
-	}
+	if {![winfo exists $info(window)]} {return ""}
 	
-	set info(state) "Measure"	
+	set info(state) "Get"	
 
 	if {[lsearch $info(positioner_masts) $mast] < 0} {
-		set result "ERROR: No mast \"$mast\" in mast_measure."
+		set result "ERROR: No mast \"$mast\" in mast_get."
 		LWDAQ_print $info(text) $result
 		set info(state) "Idle"
 		return $result
@@ -1032,8 +1037,54 @@ proc DFPS_Manager_mast_measure {mast} {
 	set yo [format %.3f [expr $y - $yt]]
 	set info(offset_$mast) "$xo $yo"
 	if {$config(verbose)} {
-		LWDAQ_print $info(text) "mast_measure x=$x y=$y z=$z\
+		LWDAQ_print $info(text) "mast_get x=$x y=$y z=$z\
 			xo=$xo yo=$yo" $info(vcolor)
+	}
+		
+	set info(state) "Idle"	
+	return $mast_local
+}
+
+#
+# DFPS_Manager_mast_set sets the target position of a mast's guide fiber. We specify
+# the target position in local x-y coordinats. We do not get to sepcify the local
+# z-coordinate. The routine re-calculates the mast offsets. It does not make any 
+# effort to change the actuator control voltages, but instead relies upon the control
+# system to move the mast to the correct position.
+#
+proc DFPS_Manager_mast_set {mast xt yt} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+	
+	if {![winfo exists $info(window)]} {return ""}
+	
+	set info(state) "Set"	
+
+	if {[catch {
+		if {[lsearch $info(positioner_masts) $mast] < 0} {
+			error "ERROR: Invalid mast number \"$mast\" in mast_set."
+		}
+		if {![string is double -strict $xt]} {
+			error "ERROR: Invalid x-coordinate \"$xt\" in mast_set."
+		}
+		if {![string is double -strict $y]} {
+			error "ERROR: Invalid y-coordinate \"$yt\" in mast_set."
+		}
+	} error_result]} {
+		LWDAQ_print $info(text) $result
+		set info(state) "Idle"
+		return $result
+	}
+	
+	set xt [format %.3f $xt]
+	set yt [format %.3f $yt]
+	set info(target_$mast) "$xt $yt"
+	scan $info(mast_$mast) %f%f xm ym
+	set xo [format %.3f [expr $xm - $xt]]
+	set yo [format %.3f [expr $ym - $yt]]
+	set info(offset_$mast) "$xo $yo"
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "mast_set xt=$xt yt=$yt xo=$xo yo=$yo" $info(vcolor)
 	}
 		
 	set info(state) "Idle"	
@@ -1518,11 +1569,13 @@ proc DFPS_Manager_fvcalib {} {
 # array with the name dfps_guide_n, where n is the guide sensor number. It
 # returns a string of information about the image, as obtained from the Camera
 # Instrument. If the string is an error message, it will begin with "ERROR:".
-# Otherwise it will contain the word "Guide_n" where n is the guide number,
-# followed by the left, top, right, and bottom analysis boundaries, the average,
-# stdev, maximum, and minimum intensity, and finally the number or rows and the
-# number of columns. Multiply the number of rows by the number of columns to get
-# the image size in bytes.
+# Otherwise it will contain seven numbers. These are the average, stdev,
+# maximum, and minimum intensity in the image in units of eight-bit counts,
+# followed by the number of rows and the number of columns, and finally the
+# pixel size in microns. Multiply the number of rows by the number of columns to
+# get the image size in bytes. Multiply the number of rows by the pixel size
+# to get the height of the image in microns. Multiply the number of columns by the
+# pixel size to get the width.
 #
 proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	upvar #0 DFPS_Manager_config config
@@ -1538,19 +1591,27 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 		iconfig(daq_device_element)
 	set iconfig(daq_exposure_seconds) $exposure_s
 	set camera [LWDAQ_acquire Camera]
-	if {![LWDAQ_is_error_result $camera]} {
-		lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_guide_$guide
-		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-			-intensify $config(intensify) -zoom $config(guide_zoom)
-		if {[winfo exists $info(window).mag_$guide]} {
-			lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-				-intensify $config(intensify) -zoom $config(guide_mag_zoom)
-		}
-		set camera "Guide_$guide [lrange $camera 1 end]"
-	} else {
+	if {[LWDAQ_is_error_result $camera]} {
 		LWDAQ_print $info(text) $camera
+		return $camera
 	}
-	return $camera
+	
+	lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_guide_$guide
+	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
+		-intensify $config(intensify) -zoom $config(guide_zoom)
+	if {[winfo exists $info(window).mag_$guide]} {
+		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+	}
+	
+	set ave [lindex $camera 5]
+	set stdev [lindex $camera 6]
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "guide_acquire guide=$guide\
+			ave=$ave stdev=$stdev" $info(vcolor)
+	}
+	
+	return $camera "[lrange 5 end] $info(ixc424_pix_um)"
 }
 
 #
@@ -2015,7 +2076,7 @@ proc DFPS_Manager_watchdog {} {
 					"mast_control_time [clock seconds]" $info(vcolor)
 			}
 			set control_report "[clock seconds] "
-			DFPS_Manager_mast_measure_all
+			DFPS_Manager_mast_get_all
 			foreach m $info(positioner_masts) {
 				scan $info(voltage_$m) %d%d upleft upright
 				scan $info(offset_$m) %f%f xo yo
@@ -2023,7 +2084,7 @@ proc DFPS_Manager_watchdog {} {
 				set uro [format %.3f [expr $yo/sqrt(2)+$xo/sqrt(2)]]
 				set upleft [format %.0f [expr $upleft - $config(gain)*$ulo]]
 				set upright [format %.0f [expr $upright - $config(gain)*$uro]]
-				set result [DFPS_Manager_move $m $upleft $upright]
+				set result [DFPS_Manager_controller_set $m $upleft $upright]
 				set info(voltage_$m) "[lrange $result 1 2]"
 				append control_report \
 					"[format %.3f $xo] [format %.3f $yo] $info(voltage_$m) "
@@ -2320,7 +2381,7 @@ proc DFPS_Manager_mranges {{masts ""}} {
 			LWDAQ_print $info(mcalib_text) "mranges corner=$corner\
 				upleft=$upleft upright=$upright" $info(vcolor)
 		}
-		DFPS_Manager_voltage_set $info(wildcard_id) $config(upleft) $config(upright)
+		DFPS_Manager_controller_set $info(wildcard_id) $config(upleft) $config(upright)
 		set st $config(mcalib_settling_ms)
 		set info(mcalib_state) "Settle"	
 		if {$config(verbose)} {
@@ -2329,7 +2390,7 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		LWDAQ_wait_ms $st
 		foreach m $masts {
 			set info(mcalib_state) "Measure_$m"	
-			set ml [DFPS_Manager_mast_measure $m]
+			set ml [DFPS_Manager_mast_get $m]
 			if {[LWDAQ_is_error_result $ml]} {
 				LWDAQ_print $info(mcalib_text) $ml
 				set info(mcalib_state) "Idle"
@@ -2346,7 +2407,7 @@ proc DFPS_Manager_mranges {{masts ""}} {
 	set info(mcalib_state) "Zero"	
 	set config(upleft) $info(dac_zero)
 	set config(upright) $info(dac_zero)
-	DFPS_Manager_voltage_set $info(wildcard_id) $config(upleft) $config(upright)
+	DFPS_Manager_controller_set $info(wildcard_id) $config(upleft) $config(upright)
 	
 	set info(mcalib_state) "Calculate"	
 	LWDAQ_update
@@ -2447,14 +2508,14 @@ proc DFPS_Manager_mcalib {} {
 
 #
 # DFPS_Manager_utils_transmit sends the command in the utils_cmd parameter
-# to controller utils_ctrl.
+# to controller utils_id.
 #
 proc DFPS_Manager_utils_transmit {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
 	set info(utils_state) "Transmit"
-	set commands "[DFPS_Manager_id_bytes $config(utils_ctrl)] $config(utils_cmd)"
+	set commands "[DFPS_Manager_id_bytes $config(utils_id)] $config(utils_cmd)"
 	LWDAQ_print $info(utils_text) "Transmit: $commands"
 	set result [DFPS_Manager_transmit $commands]
 	if {[LWDAQ_is_error_result $result]} {
@@ -2555,7 +2616,7 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach {a b} {"ZeroAll" zero_all "SetAll" set_all} {
+	foreach {a b} {"Zero All" controller_zero_all "Set All" controller_set_all} {
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
@@ -2569,7 +2630,7 @@ proc DFPS_Manager_utils {} {
 
 	foreach a {controllers} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
-		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 20
+		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 26
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
@@ -2580,13 +2641,13 @@ proc DFPS_Manager_utils {} {
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	set lw 15
-	set ew 12
+	set lw 18
+	set ew 14
 	
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Mast Offsets:" -fg $info(label_color) -width $lw
+	label $f.title -text "Mast Offsets (x, y):" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(offset_$m) -width $ew
@@ -2596,7 +2657,7 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Drive Voltages:" -fg $info(label_color) -width $lw
+	label $f.title -text "Drive Voltages (x, y):" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(voltage_$m) -width $ew
@@ -2606,7 +2667,7 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 	
-	button $f.move -text "MoveAll" -command "LWDAQ_post DFPS_Manager_move_all"
+	button $f.move -text "Displace" -command "LWDAQ_post DFPS_Manager_displace_all"
 	entry $f.disp -textvariable DFPS_Manager_config(displacement) -width 12
 	pack $f.move $f.disp -side left -expand yes
 
@@ -2615,7 +2676,7 @@ proc DFPS_Manager_utils {} {
 	pack $f.transmit -side left -expand yes
 	
 	label $f.lid -text "Controller:" -fg $info(label_color)
-	entry $f.id -textvariable DFPS_Manager_config(utils_ctrl) -width 10
+	entry $f.id -textvariable DFPS_Manager_config(utils_id) -width 10
 	label $f.lcommands -text "Commands:" -fg $info(label_color)
 	entry $f.commands -textvariable DFPS_Manager_config(utils_cmd) -width 50
 	pack $f.lid $f.id $f.lcommands $f.commands -side left -expand yes
@@ -2641,8 +2702,8 @@ proc DFPS_Manager_acquire_guides {} {
 			set info(state) "Idle"
 			return $result
 		}
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "acquire_guides $result" $info(vcolor)
+		if {$config(report)} {
+			LWDAQ_print $info(text) $result
 		}
 	}
 	set info(state) "Idle"
@@ -2650,17 +2711,17 @@ proc DFPS_Manager_acquire_guides {} {
 }
 
 #
-# DFPS_Manager_mast_measure_all measures the positions of all masts one by one
+# DFPS_Manager_mast_get_all measures the positions of all masts one by one
 # and returns their x-y positions in local coordinates. It also reports these
 # positions if the report flag is set.
 #
-proc DFPS_Manager_mast_measure_all {} {
+proc DFPS_Manager_mast_get_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	set positions [list]
 	foreach m $info(positioner_masts) {
-		set mp [DFPS_Manager_mast_measure $m]
+		set mp [DFPS_Manager_mast_get $m]
 		if {[LWDAQ_is_error_result $mp]} {
 			set info(state) "Idle"
 			return $mp
@@ -2693,7 +2754,7 @@ proc DFPS_Manager_reset_masts {} {
 	
 	LWDAQ_print $info(text) "\nPositioner Reset Start" purple
 	LWDAQ_print $info(text) "Zeroing actuator voltages..."
-	DFPS_Manager_zero_all
+	DFPS_Manager_controller_zero_all
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
@@ -2704,7 +2765,7 @@ proc DFPS_Manager_reset_masts {} {
 		set info(target_$m) [lrange $info(mrange_$m) 0 1]
 	}
 	LWDAQ_print $info(text) "Measuring mast positions..."
-	DFPS_Manager_mast_measure_all
+	DFPS_Manager_mast_get_all
 
 	LWDAQ_print $info(text) "Showing all sources..."
 	DFPS_Manager_spots
@@ -2749,8 +2810,8 @@ proc DFPS_Manager_gmark {guide x_g y_g} {
 #
 # DFPS_Manager_local_from_guide takes a guide sensor number and an x and y
 # coordinate in a guide sensor image, and returns the local coordinates of the
-# image point. The guide coordinate system has its origin at the center of the
-# center of the lower-left pixel in the guide image. The x-axis is to the right,
+# image point. The guide coordinate system has its origin at the bottom-left
+# corner of the lower-left pixel in the guide image. The x-axis is to the right,
 # the y-axis is upwards. Each guide sensor has stored for it a string of numbers
 # giving the local coordinates of the sensor origin and the rotation of the
 # guide x-axis anti-clockwise positive with respect to the local coordinate
@@ -2899,7 +2960,7 @@ proc DFPS_Manager_open {} {
 	label $f.state -textvariable DFPS_Manager_info(state) -width 20 -fg blue
 	pack $f.state -side left -expand yes
 	
-	foreach {a b} {"Masts" mast_measure_all \
+	foreach {a b} {"Masts" mast_get_all \
 		"Show" show_spots \
 		"Reset" reset_masts \
 		"Guides" acquire_guides \
@@ -2948,7 +3009,7 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Mast Positions:" -fg $info(label_color) -width $lw
+	label $f.title -text "Mast Positions (x, y):" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(mast_$m) -width $ew
@@ -2958,7 +3019,7 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Mast Targets:" -fg $info(label_color) -width $lw
+	label $f.title -text "Mast Targets (x, y):" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(target_$m) -width $ew
