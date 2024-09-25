@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.12"
+	LWDAQ_tool_init "DFPS_Manager" "2.13"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -921,7 +921,7 @@ proc DFPS_Manager_sources_global {spots} {
 		set y_G [format %.3f [expr $y + 0.5*$dy]]
 		set z_G [format %.3f [expr $z + 0.5*$dz]]
 		set sG "$x_G $y_G $z_G"
-		append sources "$sg "
+		append sources "$sG "
 		if {$config(verbose)} {
 			LWDAQ_print $info(text) "sources_global $sG" $info(vcolor)
 		}
@@ -2921,6 +2921,9 @@ proc DFPS_Manager_watchdog {} {
 	global LWDAQ_server_commands LWDAQ_Info
 	set t .serverwindow.text
 	
+	# Abort if the DFPS Manager window no longer exists.
+	if {![winfo exists $info(window)]} {return ""}
+	
 	# Trim the manager text window to a maximum number of lines.
 	if {[$info(text) index end] > 1.2 * $LWDAQ_Info(num_lines_keep)} {
 		$info(text) delete 1.0 "end [expr 0 - $LWDAQ_Info(num_lines_keep)] lines"
@@ -2955,6 +2958,7 @@ proc DFPS_Manager_watchdog {} {
 				append control_report \
 					"[format %.3f $xo] [format %.3f $yo] $info(voltage_$m) "
 			}
+			if {![winfo exists $info(window)]} {return ""}
 			if {[winfo exists $info(utils_text)] && $config(report)} {
 				LWDAQ_print $info(utils_text) $control_report
 			} 
@@ -2998,6 +3002,7 @@ proc DFPS_Manager_watchdog {} {
 		
 		if {[catch {
 			set result [uplevel #0 $cmd]
+			if {![winfo exists $info(window)]} {return ""}
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) "server_result $result" $info(vcolor)
 			}
@@ -3006,6 +3011,7 @@ proc DFPS_Manager_watchdog {} {
 		}		
 		
 		if {$result != ""} {
+			if {![winfo exists $info(window)]} {return ""}
 			if {[catch {puts $sock $result} sock_error]} {
 				LWDAQ_print -nonewline $t "$sock\: " blue
 				LWDAQ_print $t "ERROR: $sock_error"
@@ -3025,7 +3031,9 @@ proc DFPS_Manager_watchdog {} {
 		}
 	}
 	
-	LWDAQ_post DFPS_Manager_watchdog
+	if {[winfo exists $info(window)]} {
+		LWDAQ_post DFPS_Manager_watchdog
+	}
 	return $result
 }
 
