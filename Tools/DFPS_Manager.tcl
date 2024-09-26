@@ -3255,8 +3255,8 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 				"guide_click guide=$guide x=$x y=$y cmd=$cmd\
 					zoom=$zoom pix=[format %.3f $pix]" $info(vcolor)
 		}
-		DFPS_Manager_guide_mark $guide "$x_g $y_g" "2"
-		set local [DFPS_Manager_local_from_guide $guide "$x_g $y_g"]
+		DFPS_Manager_guide_mark $guide $x_g $y_g "2"
+		set local [DFPS_Manager_local_from_guide $guide $x_g $y_g]
 	}
 		
 	return ""
