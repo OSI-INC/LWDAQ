@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.13"
+	LWDAQ_tool_init "DFPS_Manager" "2.14"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -51,7 +51,7 @@ proc DFPS_Manager_init {} {
 	set info(focal_ratio) "13.5"
 
 	# Data acquisition parameters for the DFPS-4A.
-	set config(ip_addr) "71.174.73.186"
+	set config(ip_addr) "192.168.1.30"
 	# Breadboard OSI Local: 192.168.1.10
 	# DFPS-4A OSI Local: 192.168.1.30
 	# DFPS-4A OSI Global: 71.174.73.186
