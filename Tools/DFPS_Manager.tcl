@@ -183,7 +183,7 @@ proc DFPS_Manager_init {} {
 	set info(rf_xmit_op) "82"
 	set info(checksum_preload) "1111111111111111"	
 	
-	# Mast control system.
+	# Watchdog, mast controller, and system server.
 	set info(fiducial_survey_time) "0"
 	set info(mast_control_time) "0"
 	set config(fiducial_survey_period) "1000"
@@ -194,6 +194,7 @@ proc DFPS_Manager_init {} {
 	}
 	set config(gain) "10000"
 	set config(displacement) "0.0 0.0"
+	set info(binary_result) "0"
 	
 	# Window settings.
 	set info(label_color) "brown"
@@ -1313,10 +1314,14 @@ proc DFPS_Manager_guide_acquire_all {} {
 }
 
 #
-# DFPS_Manager_guide_get returns the byte array contents of a guide image. The
-# image must be one we have acquired previously with guide_acquire. If we encounter
-# an error, the routine returns an array of zero-bytes of the correct size to 
-# satisfy a process that expects a full image.
+# DFPS_Manager_guide_get returns the contents of a guide image as a byte array.
+# The image must be one we have acquired previously with guide_acquire. If we
+# encounter an error, the routine returns an array of zero-bytes of the correct
+# size to satisfy a process that expects a full image of bytes. The routine sets
+# the global binary_result flag. If the guide_get was requested through the
+# system server, this flag will tell the system server that it should configure
+# the server socket for binary transfer, and send the byte array as a single
+# binary block with no end of line character.
 #
 proc DFPS_Manager_guide_get {guide} {
 	upvar #0 DFPS_Manager_config config
@@ -1339,6 +1344,7 @@ proc DFPS_Manager_guide_get {guide} {
 			"guide_get guide=$guide bytes=$bytes" $info(vcolor)
 	}
 	
+	set info(binary_result) "1"
 	return $contents
 }
 
@@ -3021,7 +3027,6 @@ proc DFPS_Manager_watchdog {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	global LWDAQ_server_commands LWDAQ_Info
-	set t .serverwindow.text
 	
 	# Abort if the DFPS Manager window no longer exists.
 	if {![winfo exists $info(window)]} {return ""}
@@ -3095,44 +3100,64 @@ proc DFPS_Manager_watchdog {} {
 	}
 	
 	# Handle incoming server commands.
-	if {[llength $LWDAQ_server_commands] > 0} {
+	if {[llength $LWDAQ_server_commands] > 0} {	
+		set max 20		
+		set t .serverwindow.text
+
 		set cmd [lindex $LWDAQ_server_commands 0 0]
 		set sock [lindex $LWDAQ_server_commands 0 1]
 		set LWDAQ_server_commands [lrange $LWDAQ_server_commands 1 end]
+		
 		if {$config(verbose)} {
-			LWDAQ_print $info(text) "server_command $cmd $sock" $info(vcolor)
+			set s [string range $cmd 0 $max]
+			if {[string length $result] > $max} {append s "..."}
+			LWDAQ_print $info(text) "server_command \"$s\"" $info(vcolor)
 		}
 		
 		if {[string match "LWDAQ_server_info" $cmd]} {
 			append cmd " $sock"
 		}
 		
+		set info(binary_result) "0"
 		if {[catch {
 			set result [uplevel #0 $cmd]
-			if {![winfo exists $info(window)]} {return ""}
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "server_result $result" $info(vcolor)
-			}
 		} error_result]} {
 			set result "ERROR: $error_result"
-		}		
+			set info(binary_result) "0"
+		}
+		if {![winfo exists $info(window)]} {
+			LWDAQ_socket_close $sock
+			return ""
+		}
 		
-		if {![winfo exists $info(window)]} {return ""}
-		if {[catch {puts $sock $result} sock_error]} {
+		if {$info(binary_result)} {
+			binary scan [string range $result 0 $max] H* s
+		} else {
+			set s [string range $result 0 $max]
+		}									
+		if {[string length $result] > $max} {append s "..."}
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "server_result $s" $info(vcolor)
+		}
+
+		if {[catch {
+			if {$info(binary_result)} {
+				fconfigure $sock -translation binary -buffering none
+				puts -nonewline $sock $result
+				fconfigure $sock -translation auto -buffering line
+			} else {
+				puts $sock $result
+			}
+		} sock_error]} {
 			LWDAQ_print -nonewline $t "$sock\: " blue
 			LWDAQ_print $t "ERROR: $sock_error"
 			LWDAQ_socket_close $sock
 			LWDAQ_print -nonewline $t "$sock\: " blue
 			LWDAQ_print $t "Closed after fatal socket error."
 			LWDAQ_print $info(text) "ERROR: $sock_error"
-		} {
-			if {[string length $result] > 50} {
-				LWDAQ_print -nonewline $t "$sock\: " blue
-				LWDAQ_print $t "Wrote \"[string range $result 0 49]\...\""
-			} {
-				LWDAQ_print -nonewline $t "$sock\: " blue
-				LWDAQ_print $t "Wrote \"$result\""
-			}
+		} else {
+			LWDAQ_print -nonewline $t "$sock\: " blue
+			LWDAQ_print $t "Wrote \"$s\""
 		}
 	}
 	
@@ -3263,7 +3288,8 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 }
 
 #
-# DFPS_Manager_open creates the DFPS Manager window.
+# DFPS_Manager_open creates the DFPS Manager window if it does not exist, brings it
+# to the front if it does exist.
 #
 proc DFPS_Manager_open {} {
 	upvar #0 DFPS_Manager_config config
