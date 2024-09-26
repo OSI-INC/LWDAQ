@@ -3356,7 +3356,7 @@ proc DFPS_Manager_open {} {
 			-intensify $config(intensify) -zoom $config(fvc_zoom)	
 	}
 	
-	set info(text) [LWDAQ_text_widget $w 80 30 1 1]
+	set info(text) [LWDAQ_text_widget $w 80 15 1 1]
 	LWDAQ_print $info(text) "Manager Text Output" purple
 
 	return $w
