@@ -134,7 +134,7 @@ proc DFPS_Manager_init {} {
 	set info(coord_right) [lwdaq bcam_coord_from_mount $info(mount_right)]
 	
 	# Local coordinate offset with respect to frame coordinates.
-	set info(local_coord_offset) "65.0"
+	set info(local_offset_mm) "65.0"
 
 	# Local coordinate pose in global coordinates.
 	set info(local_coord) "-13.0 90.0 -92.0 0.0 0.0 0.0"
@@ -931,45 +931,49 @@ proc DFPS_Manager_sources_global {spots} {
 }
 
 #
-# DFPS_Manager_local_from_global takes a list global points and transforms them
-# into local coordinates using the local coordinate pose. The list must be a
-# string of x, y, z values separated by spaces. The DFPS global coordinate
-# system is defined by three half-inch steel balls sitting on the base plate in
-# front of the fiducial stage. The DFPS local coordinate system is defined by
-# its fiducial plate. The fiducial plate defines a frame coordinate system with
-# its front, lower-left corner as the frame coordinate origin, the bottom front
-# edge as the frame coordinate x-axis, and the y-axis perpendiculare to the
-# fiducial stage. The local coordinates are at x = local_coord_offset, y =
-# local_coord_offset in frame coordinates. In the DFPS-4A, local_coord_offset is
-# 65 mm.
+# DFPS_Manager_local_from_global takes a point in global coordinates and
+# transforms it into local coordinates using the local coordinate pose. We pass
+# the global x, y, and z coordinates as separate parameter. The DFPS global
+# coordinate system is defined by three half-inch steel balls sitting on the
+# base plate in front of the fiducial stage. The DFPS local coordinate system is
+# defined by its fiducial plate. The fiducial plate defines a frame coordinate
+# system with its front, lower-left corner as the frame coordinate origin, the
+# bottom front edge as the frame coordinate x-axis, and the y-axis
+# perpendiculare to the fiducial stage. The local coordinates are at x =
+# local_offset_mm, y = local_offset_mm in frame coordinates. In the DFPS-4A,
+# local_offset_mm is 65 mm. The local coordinate pose consists of the origin of
+# local coordinates expressed as a point in global coordinates and three
+# rotations that allow us to obtain the local coordinates by rotating about the
+# global x, y, and z axes. We obtain the local coordinate pose using our
+# fiducial survey procedure. We have the positions of the fiducial fibers in
+# local coordinates from our fiducial rotation calibration. The fiducial survey
+# procedure measures the position of the fiducials in global coordinates using
+# the fiber view cameras and adjusts the pose so as to minimize the error
+# between the modeled fiducial positions and the measured fiducial positions. If
+# the transformation between local and global coordinates is to be accurate, we
+# must be sure to survey the fiducials at the start of each observing session.
 #
-proc DFPS_Manager_local_from_global {points} {
+proc DFPS_Manager_local_from_global {x_G y_G z_G} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set lp ""
-	foreach {x y z} $points {
-		append lp [lwdaq xyz_local_from_global_point "$x $y $z" $info(local_coord)]
-		append lp " "
-	}
-	return [string trim $lp]
+	set lp [lwdaq xyz_local_from_global_point "$x_G $y_G $z_G" $info(local_coord)]
+	return $lp
 }
 
 #
-# DFPS_Manager_global_from_local takes a list local points and transforms them into
-# global coordinates using the local coordinate pose. The list must be a string of
-# x, y, z values separated by spaces.
+# DFPS_Manager_global_from_local takes a point in local coordinates and
+# transforms it into global coordinates using the local coordinate pose. We past
+# the local x, y, and z coordinates of the point as separate parameters into the
+# routine. See local_from_global for more information about the local and global
+# coordinate systems.
 #
-proc DFPS_Manager_global_from_local {points} {
+proc DFPS_Manager_global_from_local {x_L y_L z_L} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set gp ""
-	foreach {x y z} $points {
-		append gp [lwdaq xyz_global_from_local_point "$x $y $z" $info(local_coord)]
-		append gp " "
-	}
-	return [string trim $gp]
+	set gp [lwdaq xyz_global_from_local_point "$x_L $y_L $z_L" $info(local_coord)]
+	return $gp
 }
 
 #
@@ -1004,7 +1008,8 @@ proc DFPS_Manager_mast_get {mast} {
 		return $spots
 	}
 	set mast_global [DFPS_Manager_sources_global $spots]
-	set mast_local [DFPS_Manager_local_from_global $mast_global]
+	scan $mast_global %f%f%f x_G y_G z_G
+	set mast_local [DFPS_Manager_local_from_global $x_G $y_G $z_G]
 	
 	scan $mast_local %f%f%f x y z
 	set info(mast_$mast) "[format %.3f $x] [format %.3f $y]"
@@ -1053,29 +1058,30 @@ proc DFPS_Manager_mast_get_all {} {
 
 #
 # DFPS_Manager_mast_set sets the target position of a mast's guide fiber. We
-# specify the target position in local x-y coordinats with a string containing
-# both coordinates. We do not get to sepcify the local z-coordinate. The routine
-# re-calculates the mast offsets. It does not make any effort to change the
-# actuator control voltages, but instead relies upon the control system to move
-# the mast to the correct position.
+# specify the target position with only x and y in local coordinates, because
+# there is no point in specifying a z-coordinate for a positioner that moves
+# only in x and y. The routine assignes the specified values to the target xy
+# string belonging to the specified mast and re-calculates the mast offsets. It
+# does not make any effort to change the actuator control voltages, but instead
+# relies upon the control system to move the mast to the correct position. It
+# returns the offsets from the new target, which it calculates from the x and y
+# coordinates of the most recent mast measurement.
 #
-proc DFPS_Manager_mast_set {mast target} {
+proc DFPS_Manager_mast_set {mast x_t y_t} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
 	if {![winfo exists $info(window)]} {return ""}
 	
-	set info(state) "Set"	
-	scan $target %f%f xt yt
 	if {[catch {
 		if {[lsearch $info(positioner_masts) $mast] < 0} {
-			error "ERROR: Invalid mast number \"$mast\" in mast_set."
+			error "ERROR: Invalid mast \"$mast\" in mast_set."
 		}
-		if {![string is double -strict $xt]} {
-			error "ERROR: Invalid x-coordinate \"$xt\" in mast_set."
+		if {![string is double -strict $x_t]} {
+			error "ERROR: Invalid x-coordinate \"$x_t\" in mast_set."
 		}
-		if {![string is double -strict $yt]} {
-			error "ERROR: Invalid y-coordinate \"$yt\" in mast_set."
+		if {![string is double -strict $y_t]} {
+			error "ERROR: Invalid y-coordinate \"$y_t\" in mast_set."
 		}
 	} error_result]} {
 		LWDAQ_print $info(text) $error_result
@@ -1083,29 +1089,30 @@ proc DFPS_Manager_mast_set {mast target} {
 		return $result
 	}
 	
-	set xt [format %.3f $xt]
-	set yt [format %.3f $yt]
-	set info(target_$mast) "$xt $yt"
-	scan $info(mast_$mast) %f%f xm ym
-	set xo [format %.3f [expr $xm - $xt]]
-	set yo [format %.3f [expr $ym - $yt]]
-	set info(offset_$mast) "$xo $yo"
+	set x_t [format %.3f $x_t]
+	set y_t [format %.3f $y_t]
+	set info(target_$mast) "$x_t $y_t"
+	scan $info(mast_$mast) %f%f x_m y_m
+	set x_o [format %.3f [expr $x_m - $x_t]]
+	set y_o [format %.3f [expr $y_m - $y_t]]
+	set info(offset_$mast) "$x_o $y_o"
 	if {$config(verbose)} {
-		LWDAQ_print $info(text) "mast_set xt=$xt yt=$yt xo=$xo yo=$yo" $info(vcolor)
+		LWDAQ_print $info(text) \
+			"mast_set x_t=$x_t y_t=$y_t x_o=$x_o y_o=$y_o" $info(vcolor)
 	}
 		
-	set info(state) "Idle"	
-	return "$xt $yt $xo $yo"
+	return "$x_o $y_o"
 }
 
 #
-# DFPS_Manager_displace_all adds a displacement to the mast target positions.
+# DFPS_Manager_displace_all adds a displacement to the mast target positions. The
+# masts will move only if the mast controller is active. We use this routine to
+# mesure the step response of the control system.
 #
 proc DFPS_Manager_displace_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
-	set info(utils_state) "MoveAll"	
 	set move_report "move_all "
 	foreach m $info(positioner_masts) {
 		scan $info(target_$m) %f%f xt yt
@@ -1119,11 +1126,108 @@ proc DFPS_Manager_displace_all {} {
 		set yo [format %.3f [expr $ym-$yt]]
 		set info(offset_$m) "$xo $yo"
 	}
+
 	if {[winfo exists $info(utils_text)]} {
 		LWDAQ_print $info(utils_text) $move_report
 	}
-	set info(utils_state) "Idle"
+
 	return ""
+}
+
+#
+# DFPS_Manager_detector_get returns the local coordinate of a detector fiber. We
+# specify the detector fiber with its mast and detector number. In the DFPS-4A
+# we have four masts numbered 1-4 and within each mast we have two detector
+# fibers numbered 1-2. The routine measures the position of the guide fiber in
+# the same mast, then adds the detector fiber's offset from the guide mast to
+# obtain the local coordinate of the detector fiber. 
+#
+proc DFPS_Manager_detector_get {mast detector} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {[catch {
+		if {[lsearch $info(positioner_masts) $mast] < 0} {
+			error "ERROR: Invalid mast \"$mast\" in detector_get."
+		}
+		if {[lsearch $info(detector_fibers) $detector] < 0} {
+			error "ERROR: Invalid detector \"$detector\" in detector_get."
+		}
+	} error_result]} {
+		LWDAQ_print $info(text) $error_result
+		set info(state) "Idle"
+		return $result
+	}
+
+	set mast_local [DFPS_Manager_mast_get $mast]
+	if {[LWDAQ_is_error_result $mast_local]} {
+		return $mast_local
+	}	
+	scan $mast_local %f%f%f x_m y_m z_m
+	scan $info(detector_$mast\_$detector) %f%f x_c y_c
+	set x_d [format %.3f [expr $x_m + $x_c]]
+	set y_d [format %.3f [expr $y_m + $y_c]]
+	
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) \
+			"detector_get mast=$mast detector=$detector\
+			x_d=$x_d y_d=$y_d x_c=$x_c y_c=$y_c" $info(vcolor)
+	}
+	
+	return "$x_d $y_d"
+}
+
+#
+# DFPS_Manager_detector_set attempts to drive a particular detector fiber to a
+# specified local x and y position in millimeters. We specify the detector with
+# its mast and fiber number. The routine calculates the mast position that would
+# put the detector fiber in the correct location, and sets the mast target
+# position accordinly. Thus the target position is not the detector fiber
+# position, but rather the mast position that should give rise to the desired
+# detector position. We obtain the mast target by subtracting the detector's
+# calibration offset from the detector target. Note that this routine does not
+# adjust the mast's actuator voltages. The routine assumes that the control
+# system will adjust the actuator voltages when it finds that the mast target
+# and measured positions no longer agree. The routine returns the initial offset
+# between the detector and target positions.
+#
+proc DFPS_Manager_detector_set {mast detector x_d y_d} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {[catch {
+		if {[lsearch $info(positioner_masts) $mast] < 0} {
+			error "ERROR: Invalid mast \"$mast\" in detector_set."
+		}
+		if {[lsearch $info(detector_fibers) $detector] < 0} {
+			error "ERROR: Invalid detector \"$detector\" in detector_set."
+		}
+		if {![string is double -strict $x_d]} {
+			error "ERROR: Invalid x-coordinate \"$x_d\" in detector_set."
+		}
+		if {![string is double -strict $y_d]} {
+			error "ERROR: Invalid y-coordinate \"$y_d\" in detector_set."
+		}
+	} error_result]} {
+		LWDAQ_print $info(text) $error_result
+		set info(state) "Idle"
+		return $result
+	}
+	
+	scan $info(detector_$mast\_$detector) %f%f x_c y_c
+	set x_m [format %.3f [expr $x_d - $x_c]]
+	set y_m [format %.3f [expr $y_d - $y_c]]
+	
+	set offset [DFPS_Manager_mast_set $mast $x_m $y_m]
+	scan $offset %f%f x_o y_o
+
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) \
+			"detector_get mast=$mast detector=$detector\
+			x_d=$x_d y_d=$y_d x_o=$x_o y_o=$y_o" $info(vcolor)
+	}
+	
+	return "$x_o $y_o"
 }
 
 #
@@ -1265,17 +1369,13 @@ proc DFPS_Manager_guide_get_ascii {guide} {
 # and marks the spot in the image overlay, both in the normal guide sensor
 # displays and in any magnified display that might exist. We display in the
 # magnified window first, so that we keep the marking lines one pixel wide, then
-# display in the standard window. The guide point is a string of two numbers
-# giving x and y. We also pass in a string specifying a color number, or the
-# color will default to blue.
+# display in the standard window. The guide point consists of the x and y
+# coordinate of the desired mark. We may also pass a color number if we want the
+# mark to be something other than the default color.
 #
-proc DFPS_Manager_guide_mark {guide guide_point {color "2"}} {
+proc DFPS_Manager_guide_mark {guide x_g y_g {color "2"}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
-	
-	# Get the guide coordinates from the guide point. We use suffix "g" for guide
-	# coordinates, as distinct from "G" for global coordinates.
-	scan $guide_point %f%f x_g y_g
 	
 	# We are going to make a cross that extends the width and height of the image.
 	set ext $info(guide_height_um)
@@ -1307,44 +1407,34 @@ proc DFPS_Manager_guide_mark {guide guide_point {color "2"}} {
 }
 
 #
-# DFPS_Manager_local_from_guide takes a guide sensor number and an x and y
-# coordinate in microns within a guide sensor image, and returns the local
-# coordinates of the image point. Guide coordinates are two-dimensional and
-# local coordinates are three-dimensional, so we convert a two-dimensional point
-# in a z-plane into a three-dimensional point by adding the z-coordinate of the
-# guide sensor as recorded in its calibration string. The guide coordinate
-# system has its origin at the bottom-left corner of the lower-left pixel in the
-# guide image. The x-axis is to the right, the y-axis is upwards. Each guide
-# sensor has a calibration string consisting of the x, y, and z coordinates of
-# its orign, and the rotation in milliradians of the x-axis anticlockwise with
-# respect to the local coordinate x-axis. We can view the guide sensor string in
-# the Calibration Constants window, which we can open from the Utilities Panel
-# with the View Calibration button. The local coordinate system is at the
-# approximate center of the fiducial plate. Its origin is at x =
-# local_coord_offset mm and y = local_coord_offset mm in the framed coordinate
-# system. In the DFPS-4A, this offset is 65 mm. The frame coordinate system is
-# at the front, lower-left corner of the fiducial plate, with its x-axis running
-# along the front edge and the y-axis perpendicular to the fiducial stage. We
-# pass into the routine an xy guide point as a string of two numbers in
-# millimeters. The routine returns the xyz local coordinate point as a string of
-# three numbers in millimeters.
+# DFPS_Manager_local_from_guide converts a point in a guide sensor to a point in
+# local coordinates. We specify the point in the guide sensor with the guide
+# sensor number, the guide x-coordinate in microns, and the guide y-coordinate
+# in microns. The guide point is two-dimensional, but our calibration of the
+# guide sensor provides us with the local z-coordinate of the sensor surface.
+# The calibration also provides the local x and y of the guide origin and the
+# anti-clockwise rotation in milliradians of the guide coordinate system with
+# respect to local. The guide coordinate system has its origin at the
+# bottom-left corner of the lower-left pixel in the guide image. The x-axis is
+# to the right, the y-axis is upwards. We can view the guide sensor calibrations
+# with the examine_calibration procudure. The local coordinate system is at the
+# approximate center of the fiducial plate. We calibrate the sensors and
+# fiducials in frame coordinates, then offset the frame coordinates by
+# local_offset_mm in both x and y to obtain local coordinates. The frame
+# coordinate system is at the front, lower-left corner of the fiducial plate,
+# with its x-axis running along the front edge and the y-axis perpendicular to
+# the fiducial stage. The routine returns x, y, and z coordinates of the
+# transformed local point in millimeters. 
 #
-proc DFPS_Manager_local_from_guide {guide guide_point} {
+proc DFPS_Manager_local_from_guide {guide x_g y_g} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
-	# Check the guide sensor number.
+	# Check the input parameters.
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
 		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in local_from_guide."
 		return "0 0"
 	}
-	
-	# Get the origin and rotation of the sensor from its calibration constants. Convert
-	# the guide point into two coordinates. Note that we are using suffix "g" for guide
-	# coordinates, while we use "G" for global coordinates.
-	scan $info(guide_$guide) %f%f%f%f x_o y_o z_o rot
-	set x_g [lindex $guide_point 0]
-	set y_g [lindex $guide_point 1]
 	if {![string is double -strict $x_g]} {
 		LWDAQ_print $info(text) "ERROR: Invalid x-value \"$x_g\" in guide_from_local."
 		return "0 0"
@@ -1357,6 +1447,7 @@ proc DFPS_Manager_local_from_guide {guide guide_point} {
 	# Transform to local coordinates. The guide sensor rotation is in milliradians, so
 	# we covert to radians. Local coordinates are in millimeters, so we conver from
 	# microns.
+	scan $info(guide_$guide) %f%f%f%f x_o y_o z_o rot
 	set x_L [format %.3f [expr $x_o \
 		+ 0.001*$x_g*cos($rot*0.001) - 0.001*$y_g*sin($rot*0.001)]]
 	set y_L [format %.3f [expr $y_o \
@@ -1383,10 +1474,11 @@ proc DFPS_Manager_local_from_guide {guide guide_point} {
 # is a two-dimensional plane, we take the three-dimensional local coordinate
 # point and project it onto the guide sensor in the z-direction. We pass the
 # local coordinates into the routine with a string of three numbers xyz in
-# millimeters. The routine returns the guide coordinate xy in microns as a
-# string of two numbers. 
+# millimeters. We pass the local coordinate point as three separate parameters
+# x, y, and z in millimeters. The routine returns the guide coordinate x and y
+# in microns.
 #
-proc DFPS_Manager_guide_from_local {guide local_point} {
+proc DFPS_Manager_guide_from_local {guide x_L y_L z_L} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -1399,9 +1491,6 @@ proc DFPS_Manager_guide_from_local {guide local_point} {
 	# Get the origin and rotation of the sensor from its calibration constants.
 	# Extract the three local coordinates from the local point string.
 	scan $info(guide_$guide) %f%f%f%f x_o y_o z_o rot
-	set x_L [lindex $local_point 0]
-	set y_L [lindex $local_point 1]
-	set z_L [lindex $local_point 2]
 	if {![string is double -strict $x_L]} {
 		LWDAQ_print $info(text) "ERROR: Invalid x-value \"$x_L\" in guide_from_local."
 		return "0 0"
@@ -1434,25 +1523,26 @@ proc DFPS_Manager_guide_from_local {guide local_point} {
 }
 
 #
-# DFPS_Manager_guide_put_square creates a white square in the guide sensor image
-# by over-writing real image pixels with the value 255. It takes as input a
-# guide sensor number, a local coordinate point, and a square width in microns.
-# It uses the guide sensor and fiducial plate calibrations to projet the star
-# image onto the guide sensor. The projection includes widening of the suare
-# caused by the guide sensor being offset in the z-direction from the specified
-# local point. We perform the defocus with the global focal_ratio parameter. The
-# square will have intensity "shade", which defaults to 200. The routine returns
-# the guide coordinates of the center of the square, and the square's width in
-# microns after application of defocus.
+# DFPS_Manager_guide_put_square creates a white square in a guide sensor image
+# by over-writing real image pixels. It takes as input a guide sensor number, a
+# local coordinate point as x, y, and z in millimeters, a square width in
+# microns, and an optional eight-bit grascale intensity. The routine uses the
+# guide sensor and fiducial plate calibrations to project the square image onto
+# the guide sensor. The projection includes widening that mimics defocus in a
+# telescope that would result from the guide sensor being offset in the
+# z-direction from the focal plane. We perform the defocus with the global
+# focal_ratio parameter. The square will have intensity "shade", which defaults
+# to a bright value. The routine returns the guide coordinates of the center of
+# the square, and the square's width in microns after application of defocus.
 #
-proc DFPS_Manager_guide_put_square {guide local_point width {shade "200"}} {
+proc DFPS_Manager_guide_put_square {guide x_L y_L z_L width {shade "200"}} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	# Get the guide coordinates. Get the difference in z-coordinate from the
 	# local point to the guide sensor. Determine the correct width for the
 	# square.
-	set guide_point [DFPS_Manager_guide_from_local $guide $local_point]
+	set guide_point [DFPS_Manager_guide_from_local $guide $x_L $y_L $z_L ]
 	scan $guide_point %f%f x_g y_g
 	set z_L [lindex $local_point 2]
 	set z_g [lindex [DFPS_Manager_local_from_guide $guide $guide_point] 2]
@@ -2100,8 +2190,8 @@ proc DFPS_Manager_gscalib_calculate {} {
 		set rot [lindex $info(gscalib_mask_0) [expr ($gs-1)*3+2]]
 		set gsxyz [lwdaq xyz_local_from_global_point "$x $y 0" $pose]
 		scan $gsxyz %f%f%f xx yy zz
-		set xx [expr $xx + 0.5*$info(gscalib_width) - $info(local_coord_offset)]
-		set yy [expr $yy + 0.5*$info(gscalib_height) - $info(local_coord_offset)]
+		set xx [expr $xx + 0.5*$info(gscalib_width) - $info(local_offset_mm)]
+		set yy [expr $yy + 0.5*$info(gscalib_height) - $info(local_offset_mm)]
 		set rr [expr 0 - $rot - $info(gscalib_rot_mrad)]
 		set zz [lindex $info(guide_$gs) 2]
 		set info(guide_$gs) "[format %.3f $xx] [format %.3f $yy] $zz [format %.3f $rr]"
@@ -2277,8 +2367,8 @@ proc DFPS_Manager_frot_calculate {} {
 			set dy [expr $y2-$y1]
 			set x [expr $m11*$dx + $m12*$dy]
 			set y [expr $m21*$dx + $m22*$dy]
-			set x [expr $x + 0.5*$info(frot_width) - $info(local_coord_offset)]
-			set y [expr $y + 0.5*$info(frot_height) - $info(local_coord_offset)]
+			set x [expr $x + 0.5*$info(frot_width) - $info(local_offset_mm)]
+			set y [expr $y + 0.5*$info(frot_height) - $info(local_offset_mm)]
 			LWDAQ_print -nonewline $info(frot_text) \
 				"[format %8.3f $x] [format %8.3f $y] "
 			set sum_x_$ff [expr [set sum_x_$ff] + $x]
@@ -2534,9 +2624,11 @@ proc DFPS_Manager_dfcalib {} {
 	}
 	
 	set mast_global [DFPS_Manager_sources_global $spots]
-	set mast_local [DFPS_Manager_local_from_global $mast_global]
+	scan $mast_global %f%f%f x_G y_G z_G
+	set mast_local [DFPS_Manager_local_from_global $x_G $y_G $z_G]
 	if {$config(verbose)} {
-		LWDAQ_print $info(mcalib_text) "dfcalib mast_local=$mast_local." $info(vcolor)
+		LWDAQ_print $info(mcalib_text) \
+			"dfcalib mast_local=$mast_local." $info(vcolor)
 	}
 	
 	set info(mcalib_state) "Detector"
@@ -2556,7 +2648,8 @@ proc DFPS_Manager_dfcalib {} {
 	}
 
 	set detector_global [DFPS_Manager_sources_global $spots]
-	set detector_local [DFPS_Manager_local_from_global $detector_global]
+	scan $detector_global %f%f%f x_G y_G z_G
+	set detector_local [DFPS_Manager_local_from_global $x_G $y_G $z_G]
 	if {$config(verbose)} {
 		LWDAQ_print $info(mcalib_text) \
 			"dfcalib detector_local=$detector_local" $info(vcolor)
@@ -2868,7 +2961,7 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Mast Offsets (x, y):" -fg $info(label_color) -width $lw
+	label $f.title -text "Mast Offsets:" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(offset_$m) -width $ew
@@ -2878,7 +2971,7 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Drive Voltages (x, y):" -fg $info(label_color) -width $lw
+	label $f.title -text "Drive Voltages:" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(voltage_$m) -width $ew
@@ -3056,7 +3149,7 @@ proc DFPS_Manager_watchdog {} {
 # The controller will measure mast positions with this period, and adjust
 # actuator voltages after its measurements.
 #
-proc DFPS_Manager_configure_mast_control {enable period} {
+proc DFPS_Manager_configure_mast_control {enable period_s} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
@@ -3064,7 +3157,8 @@ proc DFPS_Manager_configure_mast_control {enable period} {
 	set config(mast_control_period) $period
 	
 	if {$config(verbose)} {
-		LWDAQ_print $info(text) "configure_mast_control enable=$enable period=$period"
+		LWDAQ_print $info(text) \
+			"configure_mast_control enable=$enable period_s=$period_s" $info(vcolor)
 	}
 	return ""
 }
@@ -3234,7 +3328,7 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Mast Positions (x, y):" -fg $info(label_color) -width $lw
+	label $f.title -text "Mast Positions:" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(mast_$m) -width $ew
@@ -3244,7 +3338,7 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Mast Targets (x, y):" -fg $info(label_color) -width $lw
+	label $f.title -text "Mast Targets:" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
 		entry $f.e$m -textvariable DFPS_Manager_info(target_$m) -width $ew
