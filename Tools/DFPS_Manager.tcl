@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "2.13"
+	LWDAQ_tool_init "DFPS_Manager" "3.1"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -48,10 +48,11 @@ proc DFPS_Manager_init {} {
 	set info(guide_sensors) "1 2 3 4"
 	set info(positioner_masts) "1 2 3 4"
 	set info(detector_fibers) "1 2"	
+	set info(fiber_view_cameras) "left right"
 	set info(focal_ratio) "13.5"
 
 	# Data acquisition parameters for the DFPS-4A.
-	set config(ip_addr) "71.174.73.186"
+	set config(ip_addr) "192.168.1.30"
 	# Breadboard OSI Local: 192.168.1.10
 	# DFPS-4A OSI Local: 192.168.1.30
 	# DFPS-4A OSI Global: 71.174.73.186
@@ -183,7 +184,7 @@ proc DFPS_Manager_init {} {
 	set info(rf_xmit_op) "82"
 	set info(checksum_preload) "1111111111111111"	
 	
-	# Mast control system.
+	# Watchdog, mast controller, and system server.
 	set info(fiducial_survey_time) "0"
 	set info(mast_control_time) "0"
 	set config(fiducial_survey_period) "1000"
@@ -194,12 +195,14 @@ proc DFPS_Manager_init {} {
 	}
 	set config(gain) "10000"
 	set config(displacement) "0.0 0.0"
+	set info(binary_result) "0"
 	
 	# Window settings.
 	set info(label_color) "brown"
 	set config(guide_zoom) "0.3"
 	set config(guide_mag_zoom) "1.0"
 	set config(fvc_zoom) "0.5"
+	set config(fvc_mag_zoom) "2.0"
 	set config(intensify) "exact"	
 	set config(mouse_offset_x) "2"
 	set config(mouse_offset_y) "2"
@@ -350,7 +353,7 @@ proc DFPS_Manager_init {} {
 
 	# Create spaces to store FVC images as they come in from the BCAM
 	# Instrument.
-	foreach side {left right} {
+	foreach side $info(fiber_view_cameras) {
 		set info(image_$side) dfps_fvc_$side
 		lwdaq_image_create -name $info(image_$side) \
 			-width $info(icx424_col) -height $info(icx424_row)
@@ -365,7 +368,7 @@ proc DFPS_Manager_init {} {
 	}
 
 	# Create spaces to store FVC images read from disk.
-	foreach side {left right} {
+	foreach side $info(fiber_view_cameras) {
 		set info(fvcalib_$side) fvcalib_$side
 		lwdaq_image_create -name $info(fvcalib_$side) \
 			-width $info(icx424_col) -height $info(icx424_row)
@@ -425,7 +428,7 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 	foreach a {width height} {
 		puts $f "set DFPS_Manager_info(frot_$a) \"$info(frot_$a)\""
 	}
-	foreach a {left right} {
+	foreach a $info(fiber_view_cameras) {
 		puts $f "set DFPS_Manager_info(mount_$a) \"$info(mount_$a)\""
 		puts $f "set DFPS_Manager_info(cam_$a) \"$info(cam_$a)\""
 	}
@@ -476,7 +479,7 @@ proc DFPS_Manager_examine_calibration {} {
 	set se 20
 	set i 0
 	
-	foreach a {left right} {
+	foreach a $info(fiber_view_cameras) {
 		set f [frame $w.f[incr i]]
 		pack $f -side top -fill x
 		label $f.ml$a -text "mount_$a\:" -fg $info(label_color)
@@ -484,7 +487,7 @@ proc DFPS_Manager_examine_calibration {} {
 		pack $f.ml$a $f.me$a -side left -expand yes
 	}
 
-	foreach a {left right} {
+	foreach a $info(fiber_view_cameras) {
 		set f [frame $w.f[incr i]]
 		pack $f -side top -fill x
 		label $f.cl$a -text "cam_$a\:" -fg $info(label_color)
@@ -805,7 +808,7 @@ proc DFPS_Manager_spots {{leds ""}} {
 	set iconfig(analysis_threshold) $config(analysis_threshold)
 	
 	# Acquire from both FVCs.
-	foreach side {left right} {
+	foreach side $info(fiber_view_cameras) {
 		set iconfig(daq_driver_socket) [lindex $config(fvc_$side) 0]
 		set iconfig(daq_mux_socket) [lindex $config(fvc_$side) 1]
 		set result [LWDAQ_acquire BCAM]
@@ -834,7 +837,7 @@ proc DFPS_Manager_spots {{leds ""}} {
 	# Parse result string.
 	set spots ""
 	foreach led $leds {
-		foreach side {left right} {
+		foreach side $info(fiber_view_cameras) {
 			append spots "[lindex [set result_$side] 0] [lindex [set result_$side] 1] "
 			set result_$side [lrange [set result_$side] 6 end]
 		}
@@ -897,7 +900,7 @@ proc DFPS_Manager_sources_global {spots} {
 		# coordinates, then project the image position through the pivot point
 		# of the camera to obtain a bearing line. We transform the bearing line
 		# into global coordinates.
-		foreach side {left right} {
+		foreach side $info(fiber_view_cameras) {
 			set x [expr 0.001 * [set x_$side]]
 			set y [expr 0.001 * [set y_$side]]
 			set b [lwdaq bcam_source_bearing "$x $y" "$side $info(cam_$side)"]
@@ -977,15 +980,22 @@ proc DFPS_Manager_global_from_local {x_L y_L z_L} {
 }
 
 #
-# DFPS_Manager_mast_get returns the local coordinates of a mast. We take the
-# optical centroid of the mast's guide fiber to define the mast position. The
-# routine takes a mast number as input. It returns the x, y, and z coordinates
-# of the guide fiber in local coordinates. The routine first measures the
-# position of the masts in global coordinates, then uses the local coordinate
-# pose to transform into local coordinates. We assume the local coordinate pose
-# is correct.
+# DFPS_Manager_mast_measure measures the position of a mast and returns the
+# local x, y, and z coordinates of a mast. The position of the mast is defined
+# as the opitcal center of its guide fiber. We flash the mast's guide fiber once
+# for each fiber view camera and use the FVC calibration to obtain the global
+# coordinates of the the optical centroid of the fiber tip. We transform this
+# centroid into local coordinates using the local coordinate pose, which we have
+# obtained previously using the fiducial survey routine. The routine returns the
+# x, y, and z coordinates of the guide fiber in local coordinates, which is what
+# we take to be the mast position. The fiber control system uses this routine
+# monitor the position of all masts. There is no need for us to call this
+# routine to get the local x and y position of a mast when the controller is
+# running. We can use the mast_get routine to get the most recent measurement of
+# mast position, and in addition that routine returns the most recent
+# measurement of mast range.
 #
-proc DFPS_Manager_mast_get {mast} {
+proc DFPS_Manager_mast_measure {mast} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
@@ -994,7 +1004,7 @@ proc DFPS_Manager_mast_get {mast} {
 	set info(state) "Get"	
 
 	if {[lsearch $info(positioner_masts) $mast] < 0} {
-		set result "ERROR: No mast \"$mast\" in mast_get."
+		set result "ERROR: No mast \"$mast\" in mast_measure."
 		LWDAQ_print $info(text) $result
 		set info(state) "Idle"
 		return $result
@@ -1018,7 +1028,7 @@ proc DFPS_Manager_mast_get {mast} {
 	set yo [format %.3f [expr $y - $yt]]
 	set info(offset_$mast) "$xo $yo"
 	if {$config(verbose)} {
-		LWDAQ_print $info(text) "mast_get x=$x y=$y z=$z\
+		LWDAQ_print $info(text) "mast_measure x=$x y=$y z=$z\
 			xo=$xo yo=$yo" $info(vcolor)
 	}
 		
@@ -1027,17 +1037,17 @@ proc DFPS_Manager_mast_get {mast} {
 }
 
 #
-# DFPS_Manager_mast_get_all measures the positions of all masts one by one
+# DFPS_Manager_mast_measure_all measures the positions of all masts one by one
 # and returns their x-y positions in local coordinates. It also reports these
 # positions if the report flag is set.
 #
-proc DFPS_Manager_mast_get_all {} {
+proc DFPS_Manager_mast_measure_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
 	set positions [list]
 	foreach m $info(positioner_masts) {
-		set mp [DFPS_Manager_mast_get $m]
+		set mp [DFPS_Manager_mast_measure $m]
 		if {[LWDAQ_is_error_result $mp]} {
 			set info(state) "Idle"
 			return $mp
@@ -1135,12 +1145,55 @@ proc DFPS_Manager_displace_all {} {
 }
 
 #
-# DFPS_Manager_detector_get returns the local coordinate of a detector fiber. We
-# specify the detector fiber with its mast and detector number. In the DFPS-4A
-# we have four masts numbered 1-4 and within each mast we have two detector
-# fibers numbered 1-2. The routine measures the position of the guide fiber in
-# the same mast, then adds the detector fiber's offset from the guide mast to
-# obtain the local coordinate of the detector fiber. 
+# DFPS_Manager_mast_get returns the most recent measurement of a mast's local x
+# and y position as well as the most recent measurement of mast dynamic range.
+# The routine does not return the local z-coordinate of the mast. During DFPS
+# operation, we are assuming the guide sensors, guide fibers, and detector
+# fibers are all in the same local z-plane. In the return string, we have first
+# the local x and y coordinates in millimeters, then four numbers that describe
+# the mast's range of motion. This range we assume to be a square rotated by
+# forty-five degrees in a local coordinate z-plane. We give the local x and y
+# coordinates of the center of this square in millimeters. We give the side of
+# the square in millimeters. Last of all is a small rotation, given in
+# radians, by which the square is rotated anti-clockwise from its nominal
+# forty-five orientation. Use mast_get to obtain the mast position when the mast
+# controller is running, because the mast controller is already measuring the
+# mast position every control sample period.
+#
+proc DFPS_Manager_mast_get {mast} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {[catch {
+		if {[lsearch $info(positioner_masts) $mast] < 0} {
+			error "ERROR: Invalid mast \"$mast\" in mast_get."
+		}
+	} error_result]} {
+		LWDAQ_print $info(text) $error_result
+		set info(state) "Idle"
+		return $result
+	}
+
+	scan $info(mast_$mast) %f%f x_m y_m
+	scan $info(mrange_$mast) %f%f%f%f x_mr y_mr s_mr r_mr
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) \
+			"mast_get mast=$mast x_m=$x_m y_m=$y_m\
+				x_mr=$x_mr y_mr=$y_mr s_mr=$s_mr r_mr=$r_mr" $info(vcolor)
+	}
+	
+	return "$info(mast_$mast) $info(mrange_$mast)"
+}
+
+#
+# DFPS_Manager_detector_get returns the local x and y coordinate of a detector
+# fiber in millimeters, as deduced from the most recent measurement of its mast
+# position, as well as four numbers specifying the range of motion of the fiber.
+# It calls mast get to obtain the mast position and mast ranges, and we simply
+# add the detector fiber's offset calibration to the mast position and its range
+# center to obtain the same values for the detector. In the DFPS-4A we have four
+# masts numbered 1-4 and within each mast we have two detector fibers numbered
+# 1-2.
 #
 proc DFPS_Manager_detector_get {mast detector} {
 	upvar #0 DFPS_Manager_config config
@@ -1159,22 +1212,23 @@ proc DFPS_Manager_detector_get {mast detector} {
 		return $result
 	}
 
-	set mast_local [DFPS_Manager_mast_get $mast]
-	if {[LWDAQ_is_error_result $mast_local]} {
-		return $mast_local
-	}	
-	scan $mast_local %f%f%f x_m y_m z_m
+	set mast_info [DFPS_Manager_mast_get $mast]
+	if {[LWDAQ_is_error_result $mast_info]} {return $mast_info}	
+	
+	scan $mast_info %f%f%f%f%f%f x_m y_m x_mr y_mr s_mr r_mr
 	scan $info(detector_$mast\_$detector) %f%f x_c y_c
 	set x_d [format %.3f [expr $x_m + $x_c]]
 	set y_d [format %.3f [expr $y_m + $y_c]]
+	set x_dr [format %.3f [expr $x_mr + $x_c]]
+	set y_dr [format %.3f [expr $y_mr + $x_c]]
 	
 	if {$config(verbose)} {
 		LWDAQ_print $info(text) \
 			"detector_get mast=$mast detector=$detector\
-			x_d=$x_d y_d=$y_d x_c=$x_c y_c=$y_c" $info(vcolor)
+			x_d=$x_d y_d=$y_d x_dr=$x_dr y_dr=$y_dr s_mr=$s_mr r_mr=$r_mr" $info(vcolor)
 	}
 	
-	return "$x_d $y_d"
+	return "$x_d $y_d $x_dr $y_dr $s_mr $r_mr"
 }
 
 #
@@ -1275,7 +1329,7 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_guide_$guide
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 		-intensify $config(intensify) -zoom $config(guide_zoom)
-	if {[winfo exists $info(window).mag_$guide]} {
+	if {[winfo exists $info(window).mag_guide$guide]} {
 		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
 			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
 	}
@@ -1313,10 +1367,14 @@ proc DFPS_Manager_guide_acquire_all {} {
 }
 
 #
-# DFPS_Manager_guide_get returns the byte array contents of a guide image. The
-# image must be one we have acquired previously with guide_acquire. If we encounter
-# an error, the routine returns an array of zero-bytes of the correct size to 
-# satisfy a process that expects a full image.
+# DFPS_Manager_guide_get returns the contents of a guide image as a byte array.
+# The image must be one we have acquired previously with guide_acquire. If we
+# encounter an error, the routine returns an array of zero-bytes of the correct
+# size to satisfy a process that expects a full image of bytes. The routine sets
+# the global binary_result flag. If the guide_get was requested through the
+# system server, this flag will tell the system server that it should configure
+# the server socket for binary transfer, and send the byte array as a single
+# binary block with no end of line character.
 #
 proc DFPS_Manager_guide_get {guide} {
 	upvar #0 DFPS_Manager_config config
@@ -1339,6 +1397,7 @@ proc DFPS_Manager_guide_get {guide} {
 			"guide_get guide=$guide bytes=$bytes" $info(vcolor)
 	}
 	
+	set info(binary_result) "1"
 	return $contents
 }
 
@@ -1361,6 +1420,7 @@ proc DFPS_Manager_guide_get_ascii {guide} {
 			"guide_get_hex guide=$guide bytes=$bytes" $info(vcolor)
 	}
 	
+	set info(binary_result) "0"
 	return $ascii
 }
 
@@ -1395,7 +1455,7 @@ proc DFPS_Manager_guide_mark {guide x_g y_g {color "2"}} {
 		
 	# Draw the guide image with its updated overlay into the magnified photo
 	# first, if it exists, and then the standard photo.
-	if {[winfo exists $info(window).mag_$guide]} {
+	if {[winfo exists $info(window).mag_guide$guide]} {
 		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
 			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
 	}
@@ -1563,7 +1623,7 @@ proc DFPS_Manager_guide_put_square {guide x_L y_L z_L width {shade "200"}} {
 
 	# Draw the updated guide image into the magnified photo first, if it exists,
 	# and the standard photo.
-	if {[winfo exists $info(window).mag_$guide]} {
+	if {[winfo exists $info(window).mag_guide$guide]} {
 		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
 			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
 	}
@@ -1628,7 +1688,7 @@ proc DFPS_Manager_fvcalib_disagreement {{params ""} {show "1"}} {
 	
 	# Clear the overlay if showing.
 	if {$show} {
-		foreach side {left right} {
+		foreach side $info(fiber_view_cameras) {
 			lwdaq_image_manipulate $info(fvcalib_$side) none -clear 1
 		}
 	}	
@@ -1640,7 +1700,7 @@ proc DFPS_Manager_fvcalib_disagreement {{params ""} {show "1"}} {
 	# disagreement.
 	set sum_squares 0
 	set count 0
-	foreach side {left right} {
+	foreach side $info(fiber_view_cameras) {
 		set spots $info(spots_$side)
 		for {set a 1} {$a <= $info(num_sources)} {incr a} {
 			set sb [lwdaq xyz_local_from_global_point \
@@ -1677,7 +1737,7 @@ proc DFPS_Manager_fvcalib_disagreement {{params ""} {show "1"}} {
 	
 	# Draw the boxes and rectangles if showing.
 	if {$show} {
-		foreach side {left right} {
+		foreach side $info(fiber_view_cameras) {
 			lwdaq_draw $info(fvcalib_$side) fvcalib_$side \
 				-intensify $config(fvcalib_intensify) -zoom $config(fvcalib_zoom)
 		}
@@ -1725,7 +1785,7 @@ proc DFPS_Manager_fvcalib_check {} {
 	set sources ""
 	set sum_squares 0.0
 	for {set i 1} {$i <= 4} {incr i} {	
-		foreach side {left right} {
+		foreach side $info(fiber_view_cameras) {
 			set x [expr 0.001 * [lindex $info(spots_$side) [expr ($i-1)*2]]]
 			set y [expr 0.001 * [lindex $info(spots_$side) [expr ($i-1)*2+1]]]
 			set b [lwdaq bcam_source_bearing "$x $y" "$side $info(cam_$side)"]
@@ -1859,7 +1919,7 @@ proc DFPS_Manager_fvcalib_displace {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	foreach side {left right} {
+	foreach side $info(fiber_view_cameras) {
 		for {set i 0} {$i < [llength $info(cam_$side)]} {incr i} {
 			lset info(cam_$side) $i [format %.3f \
 				[expr [lindex $info(cam_$side) $i] \
@@ -1880,7 +1940,7 @@ proc DFPS_Manager_fvcalib_defaults {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	foreach side {left right} {
+	foreach side $info(fiber_view_cameras) {
 		set info(cam_$side) $info(cam_default)
 	}
 	DFPS_Manager_fvcalib_disagreement
@@ -2028,7 +2088,7 @@ proc DFPS_Manager_fvcalib {} {
 	set f [frame $w.images]
 	pack $f -side top -fill x
 
-	foreach a {left right} {
+	foreach a $info(fiber_view_cameras) {
 		image create photo "fvcalib_$a"
 		label $f.$a -image "fvcalib_$a"
 		pack $f.$a -side left -expand yes
@@ -2038,7 +2098,7 @@ proc DFPS_Manager_fvcalib {} {
 	LWDAQ_print $info(fvcalib_text) \
 		"Fiber View Camera CMM Calibration Text Output" purple
 	
-	foreach side {left right} {
+	foreach side $info(fiber_view_cameras) {
 		lwdaq_draw $info(fvcalib_$side) fvcalib_$side \
 			-intensify $config(fvcalib_intensify) -zoom $config(fvcalib_zoom)
 	}
@@ -2705,7 +2765,7 @@ proc DFPS_Manager_mranges {{masts ""}} {
 		LWDAQ_wait_ms $st
 		foreach m $masts {
 			set info(mcalib_state) "Measure_$m"	
-			set ml [DFPS_Manager_mast_get $m]
+			set ml [DFPS_Manager_mast_measure $m]
 			if {[LWDAQ_is_error_result $ml]} {
 				LWDAQ_print $info(mcalib_text) $ml
 				set info(mcalib_state) "Idle"
@@ -3021,7 +3081,6 @@ proc DFPS_Manager_watchdog {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	global LWDAQ_server_commands LWDAQ_Info
-	set t .serverwindow.text
 	
 	# Abort if the DFPS Manager window no longer exists.
 	if {![winfo exists $info(window)]} {return ""}
@@ -3069,7 +3128,7 @@ proc DFPS_Manager_watchdog {} {
 					"mast_control_time [clock seconds]" $info(vcolor)
 			}
 			set control_report "[clock seconds] "
-			DFPS_Manager_mast_get_all
+			DFPS_Manager_mast_measure_all
 			foreach m $info(positioner_masts) {
 				scan $info(voltage_$m) %d%d upleft upright
 				scan $info(offset_$m) %f%f xo yo
@@ -3095,44 +3154,61 @@ proc DFPS_Manager_watchdog {} {
 	}
 	
 	# Handle incoming server commands.
-	if {[llength $LWDAQ_server_commands] > 0} {
+	if {[llength $LWDAQ_server_commands] > 0} {	
+		set max 20		
+		set t .serverwindow.text
+
 		set cmd [lindex $LWDAQ_server_commands 0 0]
 		set sock [lindex $LWDAQ_server_commands 0 1]
 		set LWDAQ_server_commands [lrange $LWDAQ_server_commands 1 end]
+		
 		if {$config(verbose)} {
-			LWDAQ_print $info(text) "server_command $cmd $sock" $info(vcolor)
+			set s [string range $cmd 0 $max]
+			if {[string length $result] > $max} {append s "..."}
+			LWDAQ_print $info(text) "server_command \"$s\"" $info(vcolor)
 		}
 		
 		if {[string match "LWDAQ_server_info" $cmd]} {
 			append cmd " $sock"
 		}
 		
+		set info(binary_result) "0"
 		if {[catch {
 			set result [uplevel #0 $cmd]
-			if {![winfo exists $info(window)]} {return ""}
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "server_result $result" $info(vcolor)
-			}
 		} error_result]} {
 			set result "ERROR: $error_result"
-		}		
+			set info(binary_result) "0"
+		}
+		if {![winfo exists $info(window)]} {
+			LWDAQ_socket_close $sock
+			return ""
+		}
 		
-		if {![winfo exists $info(window)]} {return ""}
-		if {[catch {puts $sock $result} sock_error]} {
-			LWDAQ_print -nonewline $t "$sock\: " blue
-			LWDAQ_print $t "ERROR: $sock_error"
+		if {$info(binary_result)} {
+			binary scan [string range $result 0 $max] H* s
+		} else {
+			set s [string range $result 0 $max]
+		}									
+		if {[string length $result] > $max} {append s "..."}
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "server_result $s" $info(vcolor)
+		}
+
+		if {[catch {
+			if {$info(binary_result)} {
+				fconfigure $sock -translation binary -buffering none
+				puts -nonewline $sock $result
+				LWDAQ_socket_close $sock
+			} else {
+				puts $sock $result
+			}
+		} sock_error]} {
 			LWDAQ_socket_close $sock
 			LWDAQ_print -nonewline $t "$sock\: " blue
-			LWDAQ_print $t "Closed after fatal socket error."
-			LWDAQ_print $info(text) "ERROR: $sock_error"
-		} {
-			if {[string length $result] > 50} {
-				LWDAQ_print -nonewline $t "$sock\: " blue
-				LWDAQ_print $t "Wrote \"[string range $result 0 49]\...\""
-			} {
-				LWDAQ_print -nonewline $t "$sock\: " blue
-				LWDAQ_print $t "Wrote \"$result\""
-			}
+			LWDAQ_print $t "Result discarded."
+		} else {
+			LWDAQ_print -nonewline $t "$sock\: " blue
+			LWDAQ_print $t "Wrote \"$s\""
 		}
 	}
 	
@@ -3188,7 +3264,7 @@ proc DFPS_Manager_reset {} {
 		set info(target_$m) [lrange $info(mrange_$m) 0 1]
 	}
 	LWDAQ_print $info(text) "Measuring mast positions..."
-	DFPS_Manager_mast_get_all
+	DFPS_Manager_mast_measure_all
 
 	LWDAQ_print $info(text) "Showing all sources..."
 	DFPS_Manager_spots
@@ -3217,12 +3293,12 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 	upvar #0 DFPS_Manager_info info
 
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
-		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in mag_guide."
+		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in guide_click."
 		return ""
 	}
 	
 	if {$cmd == "mag_g"} {
-		set w $info(window).mag_$guide
+		set w $info(window).mag_guide$guide
 		if {[winfo exists $w]} {
 			raise $w
 		} else {
@@ -3263,7 +3339,43 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 }
 
 #
-# DFPS_Manager_open creates the DFPS Manager window.
+# DFPS_Manager_fvc_click handles mouse clicks on fiber view camera images. It
+# takes a camera side "left" or "right", an x and y coordinate, and a command.
+# The mag_fvc command tells the routine to open a new magnified view of a the
+# fiber view image.
+#
+proc DFPS_Manager_fvc_click {fvc x y cmd} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {[lsearch $info(fiber_view_cameras) $fvc] < 0} {
+		LWDAQ_print $info(text) "ERROR: No fiber view camera \"fvc\" in fvc_click."
+		return ""
+	}
+	
+	if {$cmd == "mag_fvc"} {
+		set w $info(window).mag_fvc$fvc
+		if {[winfo exists $w]} {
+			raise $w
+		} else {
+			toplevel $w
+			wm title $w "Fiber View Camera $fvc, DFPS Manager $info(version)"
+			image create photo dfps_fvc_mag_$fvc
+			label $w.img -image dfps_fvc_mag_$fvc
+			pack $w.img -side top
+		}
+	
+		lwdaq_draw dfps_fvc_$fvc dfps_fvc_mag_$fvc \
+			-intensify $config(intensify) -zoom $config(fvc_mag_zoom)
+	}	
+
+	return ""
+}
+
+
+#
+# DFPS_Manager_open creates the DFPS Manager window if it does not exist, brings it
+# to the front if it does exist.
 #
 proc DFPS_Manager_open {} {
 	upvar #0 DFPS_Manager_config config
@@ -3279,7 +3391,7 @@ proc DFPS_Manager_open {} {
 	label $f.state -textvariable DFPS_Manager_info(state) -width 20 -fg blue
 	pack $f.state -side left -expand yes
 	
-	foreach {a b} {"Masts" mast_get_all \
+	foreach {a b} {"Masts" mast_measure_all \
 		"Show" show_spots \
 		"Reset" reset \
 		"Guides" guide_acquire_all \
@@ -3348,9 +3460,11 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 	
-	foreach side {left right} {
+	foreach side $info(fiber_view_cameras) {
 		image create photo "dfps_fvc_$side"
 		label $f.$side -image "dfps_fvc_$side"
+		bind $f.$side <Double-Button-1> [list LWDAQ_post \
+			"DFPS_Manager_fvc_click $side 0 0 mag_fvc"]
 		pack $f.$side -side left -expand yes
 		lwdaq_draw dfps_fvc_$side dfps_fvc_$side \
 			-intensify $config(intensify) -zoom $config(fvc_zoom)	

@@ -1298,7 +1298,7 @@ proc LWDAQ_server_accept {sock addr port} {
 		LWDAQ_print $t "Refused connection request from $addr."
 		return ""
 	} {
-		fconfigure $sock -buffering line
+		fconfigure $sock -translation auto -buffering line
 		fileevent $sock readable [list LWDAQ_server_interpreter $sock]
 		lappend info(open_sockets) "$sock $addr $port basic server"
 		LWDAQ_print -nonewline $t "$sock\: " blue
