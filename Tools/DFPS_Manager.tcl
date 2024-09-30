@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "3.1"
+	LWDAQ_tool_init "DFPS_Manager" "3.2"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -1277,7 +1277,7 @@ proc DFPS_Manager_detector_set {mast detector x_d y_d} {
 
 	if {$config(verbose)} {
 		LWDAQ_print $info(text) \
-			"detector_get mast=$mast detector=$detector\
+			"detector_set mast=$mast detector=$detector\
 			x_d=$x_d y_d=$y_d x_o=$x_o y_o=$y_o" $info(vcolor)
 	}
 	
