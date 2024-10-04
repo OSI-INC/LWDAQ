@@ -60,7 +60,7 @@ proc SCT_Check_init {} {
 	set config(sample_rates) "64 128 256 512 1024 2048"
 	set config(frequencies_shared) "0.25 0.5 1.0 2.0 4 10\
 		20 40 100 200 400 1000"
-	set config(frequencies_wrt_sps) "0.13 0.15 0.17 0.19 0.21 0.23 0.25\
+	set config(frequencies_wrt_sps) "0.13 0.15 0.17 0.19 0.21 0.23\
 		0.27 0.29 0.31 0.33 0.35 0.37 0.39 0.41 0.43 0.45 0.49 0.55 0.57"
 	set config(min_num_clocks_2048) 32
 	set config(en_2048) 0
