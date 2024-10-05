@@ -53,20 +53,27 @@ proc DFPS_Manager_init {} {
 
 	# Data acquisition parameters for the DFPS-4A.
 	set config(ip_addr) "192.168.1.30"
-	# Breadboard OSI Local: 192.168.1.10
-	# DFPS-4A OSI Local: 192.168.1.30
-	# DFPS-4A OSI Global: 71.174.73.186
-	# DFPS-4A McDonald Local: 198.214.229
+	# C0625 OSI Local: 192.168.1.25
+	# C0625 OSI Global: 71.174.73.187
+	# C0630 OSI Local: 192.168.1.30
+	# C0630 OSI Global: 71.174.73.186
+	# C0630 McDonald Local: 198.214.229
 	set config(fvc_left) "5 0"
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
 	set config(fiducial_leds) "A5 A7 A6 A8"
+	# C0625: C9 D9 D10 C10
+	# C0630: A5 A7 A6 A8
 	set config(guide_leds) "D3 D4 D2 D1"
+	# C0625: C1 D2 C2 D1
+	# C0630: D3 D4 D2 D1
 	set config(flash_s) "0.004"
 	set config(expose_s) "0.1"
 	set config(sort_code) "8"
 	set config(transceiver) "1 0"
 	set config(controllers) "0x6912 0x1834 0xC323 0x1845"
+	# C0625: 0xB341 0xD729 0xE393 0x2712
+	# C0630: 0x6912 0x1834 0xC323 0x1845
 	set config(source_type) "9"
 	set config(camera_element) "2"
 	set config(source_pwr) "2"
@@ -103,31 +110,31 @@ proc DFPS_Manager_init {} {
 "12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172"
 # Nominal FVC:
 # 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
-# DFPS-4A Y71010:
+# C0630 Y71010:
 # 12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172
-# Breadboard Y71066:
+# C0625 Y71066:
 # 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
 	set info(cam_right) \
 "12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765"
 # Nominal: 
 # FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
-# DFPS-4A Y71003:
+# C0630 Y71003:
 # 12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765
-# Breadboard Y71080:
+# C0625 Y71080:
 # 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
 	
 	# Fiber view camera mount measurents.
 	set info(mount_left) \
 "80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868"
-# DFPS-4A: 
+# C0630: 
 # 80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868
-# Breadboard: 
+# C0625: 
 # 79.614 51.505 199.754 119.777 51.355 264.265 79.277 51.400 275.713
 	set info(mount_right) \
 "-104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948"
-# DFPS-4A: 
+# C0630: 
 # -104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948
-# Breadboard: 
+# C0625: 
 # -104.039 51.210 199.297 -108.680 51.004 275.110 -148.231 50.989 261.059
 	
 	# We obtain the pose of the mount coordinats by a fit to the mount measurements.
@@ -140,37 +147,37 @@ proc DFPS_Manager_init {} {
 	# Local coordinate pose in global coordinates.
 	set info(local_coord) "-13.0 90.0 -92.0 0.0 0.0 0.0"
 	# Nominal -13.0 90.0 -92.0 0 0 0
-	# DFPS-4A -12.904 89.042 -96.586 0.001 -0.001 0.000
+	# C0630 -12.904 89.042 -96.586 0.001 -0.001 0.000
 	
 	# Fiducial positions in local coordinates.
 	set info(fiducial_1) "-15.0 +15.0 2.8"
 	# Nominal: -15.0 +15.0 2.8
-	# DFPS-4A: -15.255 14.899 2.800
+	# C0630: -15.255 14.899 2.800
 	set info(fiducial_2) "+15.0 +15.0 2.8"
 	# Nominal: +15.0 +15.0 2.8
-	# DFPS-4A:  14.684 14.941 2.550
+	# C0630:  14.684 14.941 2.550
 	set info(fiducial_3) "-15.0 -15.0 2.8"
 	# Nominal: -15.0 -15.0 2.8
-	# DFPS-4A: -15.292 -15.074 2.238
+	# C0630: -15.292 -15.074 2.238
 	set info(fiducial_4) "+15.0 -15.0 2.8"
 	# Nominal: +15.0 -15.0 2.8
-	# DFPS-4A:  14.562 -15.076 2.726
+	# C0630:  14.562 -15.076 2.726
 	
 	# Guide sensor pose in local coordinates. We have the origin x, y, z followed by
 	# the rotation anti-clockwise in milliradians about the z-axis. We assume the guide
 	# sensor lies in a local coordinate z-plane.
 	set info(guide_1) "-24.4 19.9 2.7 0.0"
 	# Nominal: -24.4 19.9 2.7 0.0
-	# DFPS-4A: -24.572 19.714 2.7 5.188
+	# C0630: -24.572 19.714 2.7 5.188
 	set info(guide_2) "-24.4 19.9 2.7 0.0"
 	# Nominal: -24.4 19.9 2.7 0.0
-	# DFPS-4A: 20.310 19.685 2.7 3.932
+	# C0630: 20.310 19.685 2.7 3.932
 	set info(guide_3) "-24.4 -25.1 2.7 0.0"
 	# Nominal: -24.4 -25.1 2.7 0.0
-	# DFPS-4A: -24.651 -25.258 2.7 0.987
+	# C0630: -24.651 -25.258 2.7 0.987
 	set info(guide_4) "20.6 -25.1 2.7 0.0"
 	# Nominal: 20.6 -25.1 2.7 0.0
-	# DFPS-4A: 20.391 -25.227 2.7 9.697
+	# C0630: 20.391 -25.227 2.7 9.697
 	
 	# Default control values for the upleft and upright.
 	set config(upleft) $info(dac_zero) 
@@ -268,25 +275,25 @@ proc DFPS_Manager_init {} {
 "24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597"
 # Nominal: 
 # 24.4 68.2 0 69.4 68.2 0 24.4 23.2 0 69.4 23.2 0
-# DFPS-4A: 
+# C0630: 
 # 24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597 
 	set info(gscalib_mask_90) \
 "29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000"
 # Nominal: 
 # 28.9 23.9 0 28.9 68.9 0 73.9 23.9 0 73.9 68.9 0
-# DFPS-4A: 
+# C0630: 
 # 29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000 
 	set info(gscalib_mask_180) \
 "73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665"
 # Nominal: 
 # 73.2 28.4 0 28.2 28.4 0 73.2 73.4 0 28.2 73.4 0
-# DFPS-4A: 
+# C0630: 
 # 73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665 
 	set info(gscalib_mask_270) \
 "68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795"
 # Nominal: 
 # 68.7 72.7 0 68.7 27.7 0 23.7 72.7 0 23.7 27.7 0
-# DFPS-4A: 
+# C0630: 
 # 68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795 
 	set info(gscalib_rot_mrad) "-0.10"
 	# Nominal: 0.00
