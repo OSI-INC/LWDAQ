@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "3.2"
+	LWDAQ_tool_init "DFPS_Manager" "3.3"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -108,20 +108,14 @@ proc DFPS_Manager_init {} {
 	set info(cam_default) "12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000" 
 	set info(cam_left) \
 "12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172"
-# Nominal FVC:
-# 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
-# C0630 Y71010:
-# 12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172
-# C0625 Y71066:
-# 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
+# Nominal: 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
+# C0630 Y71010: 12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172
+# C0625 Y71066: 12.675 39.312 1.000 -14.424 -3.267 2.000 18.777 2.173
 	set info(cam_right) \
 "12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765"
-# Nominal: 
-# FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
-# C0630 Y71003:
-# 12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765
-# C0625 Y71080:
-# 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
+# Nominal: 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
+# C0630 Y71003: 12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765
+# C0625 Y71080: 12.675 39.312 1.000 -6.766 3.157 2.000 19.020 2.003
 	
 	# Fiber view camera mount measurents.
 	set info(mount_left) \
@@ -2638,10 +2632,19 @@ proc DFPS_Manager_fsurvey {} {
 	set info(local_coord) [string trim $pl]
 
 	if {$config(verbose)} {
-		LWDAQ_print $t \
-			"fsurvey steps=[lindex $end_params 7]\
-				error_um=[format %.1f [expr 1000*[lindex $end_params 6]]]" \
+		LWDAQ_print $t "fsurvey steps=[lindex $end_params 7]\
+			error_um=[format %.1f [expr 1000*[lindex $end_params 6]]]" \
 			$info(vcolor)
+		foreach {x y z} $info(fiducial_sources) {
+			incr count
+			set ffg [lwdaq xyz_global_from_local_point \
+				$info(fiducial_$count) $info(local_coord)]
+			scan $ffg %f%f%f xx yy zz
+			set x_err [format %.1f [expr 1000.0*($xx-$x)]]
+			set y_err [format %.1f [expr 1000.0*($yy-$y)]]
+			set z_err [format %.1f [expr 1000.0*($zz-$z)]]
+			LWDAQ_print $t "fiducial_$count x_err=$x_err y_err=$y_err z_err=$z_err (um)" $info(vcolor)
+		}
 	}
 	if {$config(report)} {
 		LWDAQ_print $t "$info(local_coord)"
