@@ -52,12 +52,12 @@ proc DFPS_Manager_init {} {
 	set info(focal_ratio) "13.5"
 
 	# Data acquisition parameters for the DFPS-4A.
-	set config(ip_addr) "192.168.1.30"
+	set config(ip_addr) "198.214.229.251"
 	# C0625 OSI Local: 192.168.1.25
 	# C0625 OSI Global: 71.174.73.187
 	# C0630 OSI Local: 192.168.1.30
 	# C0630 OSI Global: 71.174.73.186
-	# C0630 McDonald Local: 198.214.229
+	# C0630 McDonald Local: 198.214.229.251
 	set config(fvc_left) "5 0"
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
