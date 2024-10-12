@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "3.3"
+	LWDAQ_tool_init "DFPS_Manager" "3.4"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -1354,16 +1354,120 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 proc DFPS_Manager_guide_acquire_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
+	global LWDAQ_Info LWDAQ_Driver
+	upvar #0 LWDAQ_info_Camera iinfo
+	upvar #0 LWDAQ_config_Camera iconfig
 
-	foreach g $info(guide_sensors) {
-		set result [DFPS_Manager_guide_acquire $g $config(expose_s)]
-		if {[LWDAQ_is_error_result $result]} {
-			return $result
+	set info(state) "Acquire_All"
+
+	# Determine the number of bytes in the image we will acquire.
+	set image_size [expr $iinfo(daq_image_width) * $iinfo(daq_image_height)]
+
+	# If we encounter any errors in the data acquisition process, we will
+	# abort data acquisition, but we will not stop the operation of the 
+	# data acquisition program. That's why we enclose the data acquisition
+	# steps in a Tcl "catch" command.
+	if {[catch {
+		
+		# Open a socket to the LWDAQ driver.
+		set sock [LWDAQ_socket_open $config(ip_addr)]
+		LWDAQ_login $sock $iinfo(daq_password)
+		LWDAQ_set_device_type $sock $iconfig(daq_device_type)
+		
+		# Clear both image sensors on this readout board.
+		foreach dsock {6 7} {
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "guide_acquire_all\
+					clearing dsock=$dsock" $info(vcolor)
+			}
+			LWDAQ_set_driver_mux $sock $dsock 0
+			LWDAQ_execute_job $sock $LWDAQ_Driver(move_job)
+			LWDAQ_transmit_command_hex $sock 0098
+			LWDAQ_transmit_command_hex $sock 00B8
+			LWDAQ_transmit_command_hex $sock 0098
 		}
-		if {$config(report)} {
-			LWDAQ_print $info(text) $result
+
+		# Expose all image areas.
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "guide_acquire_all\
+				exposing expose_s=$config(expose_s)" $info(vcolor)
 		}
+		LWDAQ_delay_seconds $sock $config(expose_s)
+	
+		# Transfer the image out of the image area and into the transfer columns
+		# by applying read pulse to V2 and V3. We keep V1 lo to maintain pixel
+		# charge separation in the vertical transfer columns. Drive V2 hi, V1
+		# and V3 lo so as to collect all pixel charges under the V2 clock.
+		foreach dsock {6 7} {
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "guide_acquire_all\
+					transferring dsock=$dsock" $info(vcolor)
+			}
+			LWDAQ_transmit_command_hex $sock 0099
+			LWDAQ_transmit_command_hex $sock 0098
+			LWDAQ_transmit_command_hex $sock 0088
+		}
+		
+		# Transfer the image to driver memory with the read job.
+		foreach guide $info(guide_sensors) {
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "guide_acquire_all\
+					reading guide=$guide" $info(vcolor)
+			}
+			scan $config(guide_daq_$guide) %d%d%d dsock msock del
+			LWDAQ_set_driver_mux $sock $dsock $msock
+			LWDAQ_set_device_element $sock $del
+			LWDAQ_set_data_addr $sock 0
+			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
+			set contents_$guide [LWDAQ_ram_read $sock 0 $image_size]
+		}
+		
+		# Send the device to sleep, read the image out of the
+		# driver, and close the socket.
+		foreach dsock {6 7} {
+			LWDAQ_set_driver_mux $sock $dsock 0
+			LWDAQ_sleep $sock
+		}
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) "guide_acquire_all\
+				acquisition complete" $info(vcolor)
+		}
+
+		foreach guide $info(guide_sensors) {
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "guide_acquire_all\
+					displaying guide=$guide" $info(vcolor)
+			}
+			lwdaq_image_create \
+				-width $iinfo(daq_image_width) \
+				-height $iinfo(daq_image_height) \
+				-left $iinfo(daq_image_left) \
+				-right $iinfo(daq_image_right) \
+				-top $iinfo(daq_image_top) \
+				-bottom $iinfo(daq_image_bottom) \
+				-data [set contents_$guide] \
+				-name dfps_guide_$guide
+			foreach m $info(guide_manipulations) {
+				lwdaq_image_manipulate dfps_guide_$guide $m -replace 1
+			}
+			lwdaq_image_manipulate dfps_guide_$guide none -clear 1
+			lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
+				-intensify $config(intensify) -zoom $config(guide_zoom)
+			if {[winfo exists $info(window).mag_guide$guide]} {
+				lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+					-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+			}
+		}
+		
+		LWDAQ_socket_close $sock
+	} error_result]} { 
+		if {[info exists sock]} {LWDAQ_socket_close $sock}
+		LWDAQ_print $info(text) "ERROR: $error_result"
+		return "ERROR: $error_result"
+		set info(state) "Idle"
 	}
+		
+	set info(state) "Idle"
 	return ""
 }
 
