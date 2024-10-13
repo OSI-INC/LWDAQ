@@ -68,7 +68,7 @@ proc DFPS_Manager_init {} {
 	# C0625: C1 D2 C2 D1
 	# C0630: D3 D4 D2 D1
 	set config(flash_s) "0.004"
-	set config(expose_s) "0.1"
+	set config(expose_s) "1.0"
 	set config(sort_code) "8"
 	set config(transceiver) "1 0"
 	set config(controllers) "0x6912 0x1834 0xC323 0x1845"
@@ -81,10 +81,6 @@ proc DFPS_Manager_init {} {
 	set info(dac_zero) "32000"
 	set info(dac_max) "65535"
 	set info(dac_min) "0"
-	set info(image_sensor) "ICX424"
-	LWDAQ_set_image_sensor $info(image_sensor) BCAM
-	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
-	LWDAQ_set_image_sensor $info(image_sensor) Camera
 	set config(analysis_threshold) "10 #"
 	set config(guide_daq_1) "7 0 2"
 	set config(guide_daq_2) "6 0 1"
@@ -190,32 +186,44 @@ proc DFPS_Manager_init {} {
 	set info(mast_control_time) "0"
 	set config(fiducial_survey_period) "1000"
 	set config(mast_control_period) "60"
-	set config(enable_mast_control) "0"
+	set config(mast_control) "0"
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
 	set config(gain) "10000"
 	set config(displacement) "0.0 0.0"
+	set config(guide_auto) "0"
+	set config(guide_auto_period) "5"
+	set info(guide_auto_time) "0"
 	set info(binary_result) "0"
 	
 	# Window settings.
 	set info(label_color) "brown"
-	set config(guide_zoom) "0.3"
-	set config(guide_mag_zoom) "1.0"
+	set config(guide_zoom) "1.0"
+	set config(guide_mag_zoom) "2.0"
+	set config(guide_intensify) "exact"
 	set config(fvc_zoom) "0.5"
-	set config(fvc_mag_zoom) "2.0"
-	set config(intensify) "exact"	
+	set config(fvc_mag_zoom) "1.0"
+	set config(fvc_intensify) "exact"	
 	set config(mouse_offset_x) "2"
 	set config(mouse_offset_y) "2"
 	
 	# Image dimensions.
-	set info(guide_width_um) "3848"
-	set info(guide_height_um) "5180"
+	set info(fvc_sensor) "ICX424"
+	LWDAQ_set_image_sensor $info(fvc_sensor) BCAM
+	LWDAQ_set_image_sensor $info(fvc_sensor) Rasnik
 	set info(bcam_width_um) "5180"
 	set info(bcam_height_um) "3848"
 	set info(icx424_col) "700"
 	set info(icx424_row) "520"
 	set info(icx424_pix_um) "7.4"
+	set info(guide_sensor) "ICX424Q"
+	LWDAQ_set_image_sensor $info(guide_sensor) Camera
+	set info(guide_width_um) "3848"
+	set info(guide_height_um) "5180"
+	set info(icx424q_col) "350"
+	set info(icx424q_row) "260"
+	set info(icx424q_pix_um) "14.8"
 
 	# Utility panel parameters.
 	set config(utils_id) "0xFFFF"
@@ -365,7 +373,7 @@ proc DFPS_Manager_init {} {
 	foreach guide $info(guide_sensors) {
 		set info(image_$guide) dfps_guide_$guide
 		lwdaq_image_create -name $info(image_$guide) \
-			-width $info(icx424_row) -height $info(icx424_col)
+			-width $info(icx424q_row) -height $info(icx424q_col)
 	}
 
 	# Create spaces to store FVC images read from disk.
@@ -830,7 +838,7 @@ proc DFPS_Manager_spots {{leds ""}} {
 			lwdaq_image_manipulate $info(image_$side) \
 				transfer_overlay $iconfig(memory_name)
 			lwdaq_draw $info(image_$side) dfps_fvc_$side \
-				-intensify $config(intensify) -zoom $config(fvc_zoom)
+				-intensify $config(fvc_intensify) -zoom $config(fvc_zoom)
 		}
 		
 	}
@@ -1312,9 +1320,10 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	
 	set info(state) "Acquire"
 
+	LWDAQ_set_image_sensor $info(guide_sensor) Camera
 	set iconfig(analysis_manipulation) $info(guide_manipulations)
 	set iconfig(daq_ip_addr) $config(ip_addr)
-	set iconfig(intensify) $config(intensify) 
+	set iconfig(intensify) $config(guide_intensify) 
 	scan $config(guide_daq_$guide) %d%d%d \
 		iconfig(daq_driver_socket) \
 		iconfig(daq_mux_socket) \
@@ -1329,21 +1338,23 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_guide_$guide
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-		-intensify $config(intensify) -zoom $config(guide_zoom)
+		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
 	if {[winfo exists $info(window).mag_guide$guide]} {
 		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+			-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
 	}
 	
 	set ave [lindex $camera 5]
 	set stdev [lindex $camera 6]
+	set max [lindex $camera 7]
+	set min [lindex $camera 8]
 	if {$config(verbose)} {
 		LWDAQ_print $info(text) "guide_acquire guide=$guide\
-			ave=$ave stdev=$stdev" $info(vcolor)
+			ave=$ave stdev=$stdev max=$max min=$min" $info(vcolor)
 	}
 	
 	set info(state) "Idle"
-	return "[lrange $camera 5 end] $info(icx424_pix_um)"
+	return "[lrange $camera 5 end] $info(icx424q_pix_um)"
 }
 
 #
@@ -1354,32 +1365,45 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 proc DFPS_Manager_guide_acquire_all {} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
+
+	foreach g $info(guide_sensors) {
+		set result [DFPS_Manager_guide_acquire $g $config(expose_s)]
+		if {[LWDAQ_is_error_result $result]} {
+			return $result
+		}
+		if {$config(report)} {
+			LWDAQ_print $info(text) $result
+		}
+	}
+	return ""
+}
+
+#
+# DFPS_Manager_guide_acquire_auto captures images from all guide sensors and
+# displays them in the manager window. It uses the default guide exposure time
+# exposure_s. It exposes sensors 1 and 2 simultaneously, then reads them out, 
+# which is possible because they are on separate readout boards. It then does
+# the same for sensors 3 and 4.
+#
+proc DFPS_Manager_guide_acquire_auto {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
 	global LWDAQ_Info LWDAQ_Driver
 	upvar #0 LWDAQ_info_Camera iinfo
 	upvar #0 LWDAQ_config_Camera iconfig
 
-	set info(state) "Acquire_All"
+	set info(state) "Guide_Auto"
 
-	# Determine the number of bytes in the image we will acquire.
+	LWDAQ_set_image_sensor $info(guide_sensor) Camera
 	set image_size [expr $iinfo(daq_image_width) * $iinfo(daq_image_height)]
 
-	# If we encounter any errors in the data acquisition process, we will
-	# abort data acquisition, but we will not stop the operation of the 
-	# data acquisition program. That's why we enclose the data acquisition
-	# steps in a Tcl "catch" command.
 	if {[catch {
 		
-		# Open a socket to the LWDAQ driver.
 		set sock [LWDAQ_socket_open $config(ip_addr)]
 		LWDAQ_login $sock $iinfo(daq_password)
 		LWDAQ_set_device_type $sock $iconfig(daq_device_type)
 		
-		# Clear both image sensors on this readout board.
 		foreach dsock {6 7} {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_acquire_all\
-					clearing dsock=$dsock" $info(vcolor)
-			}
 			LWDAQ_set_driver_mux $sock $dsock 0
 			LWDAQ_execute_job $sock $LWDAQ_Driver(move_job)
 			LWDAQ_transmit_command_hex $sock 0098
@@ -1387,78 +1411,70 @@ proc DFPS_Manager_guide_acquire_all {} {
 			LWDAQ_transmit_command_hex $sock 0098
 		}
 
-		# Expose all image areas.
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "guide_acquire_all\
-				exposing expose_s=$config(expose_s)" $info(vcolor)
-		}
 		LWDAQ_delay_seconds $sock $config(expose_s)
 	
-		# Transfer the image out of the image area and into the transfer columns
-		# by applying read pulse to V2 and V3. We keep V1 lo to maintain pixel
-		# charge separation in the vertical transfer columns. Drive V2 hi, V1
-		# and V3 lo so as to collect all pixel charges under the V2 clock.
 		foreach dsock {6 7} {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_acquire_all\
-					transferring dsock=$dsock" $info(vcolor)
-			}
 			LWDAQ_transmit_command_hex $sock 0099
 			LWDAQ_transmit_command_hex $sock 0098
 			LWDAQ_transmit_command_hex $sock 0088
 		}
 		
-		# Transfer the image to driver memory with the read job.
-		foreach guide $info(guide_sensors) {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_acquire_all\
-					reading guide=$guide" $info(vcolor)
-			}
+		LWDAQ_set_data_addr $sock 0
+		foreach guide {1 2} {
 			scan $config(guide_daq_$guide) %d%d%d dsock msock del
 			LWDAQ_set_driver_mux $sock $dsock $msock
 			LWDAQ_set_device_element $sock $del
-			LWDAQ_set_data_addr $sock 0
 			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
-			set contents_$guide [LWDAQ_ram_read $sock 0 $image_size]
+		}
+
+		set addr 0
+		foreach guide {1 2} {
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "guide_acquire_auto\
+					downloading from driver guide=$guide" $info(vcolor)
+			}
+			set contents_$guide [LWDAQ_ram_read $sock $addr $image_size]
+			set addr [expr $addr + $image_size]
 		}
 		
-		# Send the device to sleep, read the image out of the
-		# driver, and close the socket.
+		foreach dsock {6 7} {
+			LWDAQ_set_driver_mux $sock $dsock 0
+			LWDAQ_execute_job $sock $LWDAQ_Driver(move_job)
+			LWDAQ_transmit_command_hex $sock 0098
+			LWDAQ_transmit_command_hex $sock 00B8
+			LWDAQ_transmit_command_hex $sock 0098
+		}
+
+		LWDAQ_delay_seconds $sock $config(expose_s)
+	
+		foreach dsock {6 7} {
+			LWDAQ_transmit_command_hex $sock 0099
+			LWDAQ_transmit_command_hex $sock 0098
+			LWDAQ_transmit_command_hex $sock 0088
+		}
+		
+		LWDAQ_set_data_addr $sock 0
+		foreach guide {3 4} {
+			scan $config(guide_daq_$guide) %d%d%d dsock msock del
+			LWDAQ_set_driver_mux $sock $dsock $msock
+			LWDAQ_set_device_element $sock $del
+			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
+		}
+
+		set addr 0
+		foreach guide {3 4} {
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "guide_acquire_auto\
+					downloading from driver guide=$guide" $info(vcolor)
+			}
+			set contents_$guide [LWDAQ_ram_read $sock $addr $image_size]
+			set addr [expr $addr + $image_size]
+		}
+		
 		foreach dsock {6 7} {
 			LWDAQ_set_driver_mux $sock $dsock 0
 			LWDAQ_sleep $sock
 		}
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) "guide_acquire_all\
-				acquisition complete" $info(vcolor)
-		}
-
-		foreach guide $info(guide_sensors) {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_acquire_all\
-					displaying guide=$guide" $info(vcolor)
-			}
-			lwdaq_image_create \
-				-width $iinfo(daq_image_width) \
-				-height $iinfo(daq_image_height) \
-				-left $iinfo(daq_image_left) \
-				-right $iinfo(daq_image_right) \
-				-top $iinfo(daq_image_top) \
-				-bottom $iinfo(daq_image_bottom) \
-				-data [set contents_$guide] \
-				-name dfps_guide_$guide
-			foreach m $info(guide_manipulations) {
-				lwdaq_image_manipulate dfps_guide_$guide $m -replace 1
-			}
-			lwdaq_image_manipulate dfps_guide_$guide none -clear 1
-			lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-				-intensify $config(intensify) -zoom $config(guide_zoom)
-			if {[winfo exists $info(window).mag_guide$guide]} {
-				lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-					-intensify $config(intensify) -zoom $config(guide_mag_zoom)
-			}
-		}
-		
 		LWDAQ_socket_close $sock
 	} error_result]} { 
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
@@ -1467,6 +1483,45 @@ proc DFPS_Manager_guide_acquire_all {} {
 		set info(state) "Idle"
 	}
 		
+	set result "[clock seconds] "
+	foreach guide $info(guide_sensors) {
+		lwdaq_image_create \
+			-width $iinfo(daq_image_width) \
+			-height $iinfo(daq_image_height) \
+			-left $iinfo(daq_image_left) \
+			-right $iinfo(daq_image_right) \
+			-top $iinfo(daq_image_top) \
+			-bottom $iinfo(daq_image_bottom) \
+			-data [set contents_$guide] \
+			-name dfps_guide_$guide
+		foreach m $info(guide_manipulations) {
+			lwdaq_image_manipulate dfps_guide_$guide $m -replace 1
+		}
+		lwdaq_image_manipulate dfps_guide_$guide none -clear 1
+		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
+			-intensify $config(guide_intensify) -zoom $config(guide_zoom)
+		if {[winfo exists $info(window).mag_guide$guide]} {
+			lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+				-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
+		}
+		set camera [lwdaq_image_characteristics dfps_guide_$guide]
+		set ave [lindex $camera 4]
+		set stdev [lindex $camera 5]
+		set max [lindex $camera 6]
+		set min [lindex $camera 7]
+		append result "$ave $max $min "
+		if {$config(verbose)} {
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) "guide_acquire_auto guide=$guide\
+					ave=$ave stdev=$stdev max=$max min=$min" $info(vcolor)
+			}
+		}
+	}
+	
+	if {$config(report)} {
+		LWDAQ_print $info(text) [string trim $result]
+	}
+
 	set info(state) "Idle"
 	return ""
 }
@@ -1491,7 +1546,7 @@ proc DFPS_Manager_guide_get {guide} {
 		LWDAQ_print $info(text) "ERROR: Invalid guide \"$guide\" in guide_acquire,\
 			returning blank image."
 		lwdaq_image_create -name guide_blank \
-			-width $info(icx424_row) -height $info(icx424_col)
+			-width $info(icx424q_row) -height $info(icx424q_col)
 		set contents [lwdaq_image_contents guide_blank]
 		lwdaq_image_destroy guide_blank
 	}
@@ -1562,10 +1617,10 @@ proc DFPS_Manager_guide_mark {guide x_g y_g {color "2"}} {
 	# first, if it exists, and then the standard photo.
 	if {[winfo exists $info(window).mag_guide$guide]} {
 		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+			-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
 	}
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-		-intensify $config(intensify) -zoom $config(guide_zoom)
+		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
 		
 	# An empty string return means nothing went wrong.
 	return ""
@@ -1712,7 +1767,7 @@ proc DFPS_Manager_guide_put_square {guide x_L y_L z_L width {shade "200"}} {
 	set z_L [lindex $local_point 2]
 	set z_g [lindex [DFPS_Manager_local_from_guide $guide $guide_point] 2]
 	set width_um [format %.1f [expr $width*(1 + abs($z_L-$z_g)/$info(focal_ratio))]]
-	set width_px [format %.2f [expr $width_um/$info(icx424_pix_um)]]
+	set width_px [format %.2f [expr $width_um/$info(icx424q_pix_um)]]
 	# Clear the image overlay, but otherwise do not affect the image.
 	lwdaq_graph "[expr $x_g - 0.5*$width_px] $y_g [expr $x_g + 0.5*$width_px] $y_g" \
 		dfps_guide_$guide -entire 1 -in_image 1 -color $shade -width $width_px \
@@ -1730,10 +1785,10 @@ proc DFPS_Manager_guide_put_square {guide x_L y_L z_L width {shade "200"}} {
 	# and the standard photo.
 	if {[winfo exists $info(window).mag_guide$guide]} {
 		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+			-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
 	}
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-		-intensify $config(intensify) -zoom $config(guide_zoom)
+		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
 		
 	# Return the guide coordinates and the defocused width.
 	return "$x_g $y_g $width"
@@ -3215,7 +3270,7 @@ proc DFPS_Manager_watchdog {} {
 	# At intervals, survey the fiducial fibers an adjust frame
 	# coordinate pose. The fiducial period is in units of
 	# mast_control_period.
-	if {$config(enable_mast_control)} {
+	if {$config(mast_control)} {
 		if {[clock seconds] - $info(fiducial_survey_time) \
 				>= $config(fiducial_survey_period)} {
 			set info(fiducial_survey_time) [clock seconds]
@@ -3233,7 +3288,7 @@ proc DFPS_Manager_watchdog {} {
 	# measure the mast positions, look at the offsets from their target
 	# positions, and adjust their control voltages so as to move the mast
 	# towards the target.
-	if {$config(enable_mast_control)} {
+	if {$config(mast_control)} {
 		if {[clock seconds] - $info(mast_control_time) \
 				>= $config(mast_control_period)} {
 			set info(mast_control_time) [clock seconds]
@@ -3265,6 +3320,21 @@ proc DFPS_Manager_watchdog {} {
 		}
 	} {
 		set info(mast_control_time) "0"
+	}
+	
+	# If guide auto is enabled, at intervals, get new guide images.
+	if {$config(guide_auto)} {
+		if {[clock seconds] - $info(guide_auto_time) \
+				>= $config(guide_auto_period)} {
+			set info(guide_auto_time) [clock seconds]
+			if {$config(verbose)} {
+				LWDAQ_print $info(text) \
+					"guide_auto_time [clock seconds]" $info(vcolor)
+			}
+			DFPS_Manager_guide_acquire_auto
+		}
+	} {
+		set info(guide_auto_time) "0"
 	}
 	
 	# Handle incoming server commands.
@@ -3343,7 +3413,7 @@ proc DFPS_Manager_configure_mast_control {enable period_s} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set config(enable_mast_control) $enable
+	set config(mast_control) $enable
 	set config(mast_control_period) $period
 	
 	if {$config(verbose)} {
@@ -3426,15 +3496,15 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 		}
 	
 		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+			-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
 	}	
 
 	if {($cmd == "click_gm")} {
 		set zoom $config(guide_mag_zoom)
 		if {$zoom < 1.0} {
-			set pix [expr round(1.0/$zoom)*$info(icx424_pix_um)]
+			set pix [expr $info(icx424q_pix_um)*round(1.0/$zoom)]
 		} else {
-			set pix [expr round($zoom)*$info(icx424_pix_um)]
+			set pix [expr $info(icx424q_pix_um)/round($zoom)]
 		}
 		set y_g [format %.1f [expr \
 			$info(guide_height_um)-$pix*($y-$config(mouse_offset_y))]]
@@ -3480,7 +3550,7 @@ proc DFPS_Manager_fvc_click {fvc x y cmd} {
 		}
 	
 		lwdaq_draw dfps_fvc_$fvc dfps_fvc_mag_$fvc \
-			-intensify $config(intensify) -zoom $config(fvc_mag_zoom)
+			-intensify $config(fvc_intensify) -zoom $config(fvc_mag_zoom)
 	}	
 
 	return ""
@@ -3522,7 +3592,7 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach a {Enable_Mast_Control Report Verbose} {
+	foreach a {Mast_Control Guide_Auto Report Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
 		pack $f.$b -side left -expand yes
@@ -3531,7 +3601,7 @@ proc DFPS_Manager_open {} {
 	foreach a {ip_addr flash_s expose_s} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
-			-width [string length $config($a)]
+			-width [expr [string length $config($a)] + 2]
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
@@ -3545,7 +3615,7 @@ proc DFPS_Manager_open {} {
 			"DFPS_Manager_guide_click $guide 0 0 mag_g"]
 		pack $f.l$guide -side left -expand yes
 		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-			-intensify $config(intensify) -zoom $config(guide_zoom)
+			-intensify $config(guide_intensify) -zoom $config(guide_zoom)
 	}
 	
 	set lw 15
@@ -3581,7 +3651,7 @@ proc DFPS_Manager_open {} {
 			"DFPS_Manager_fvc_click $side 0 0 mag_fvc"]
 		pack $f.$side -side left -expand yes
 		lwdaq_draw dfps_fvc_$side dfps_fvc_$side \
-			-intensify $config(intensify) -zoom $config(fvc_zoom)	
+			-intensify $config(fvc_intensify) -zoom $config(fvc_zoom)	
 	}
 	
 	set info(text) [LWDAQ_text_widget $w 80 15 1 1]
