@@ -186,13 +186,13 @@ proc DFPS_Manager_init {} {
 	set info(mast_control_time) "0"
 	set config(fiducial_survey_period) "1000"
 	set config(mast_control_period) "60"
-	set config(mast_control) "0"
+	set config(mast_control) "OFF"
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
 	set config(gain) "10000"
 	set config(displacement) "0.0 0.0"
-	set config(guide_auto) "0"
+	set config(guide_auto) "OFF"
 	set config(guide_auto_period) "5"
 	set info(guide_auto_time) "0"
 	set info(binary_result) "0"
@@ -1336,13 +1336,11 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 		return $camera
 	}
 	
+	lwdaq_image_manipulate $iconfig(memory_name) transfer_overlay dfps_guide_$guide
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_guide_$guide
+	lwdaq_image_manipulate dfps_guide_$guide transfer_overlay $iconfig(memory_name)
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
-	if {[winfo exists $info(window).mag_guide$guide]} {
-		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-			-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
-	}
 	
 	set ave [lindex $camera 5]
 	set stdev [lindex $camera 6]
@@ -1455,8 +1453,8 @@ proc DFPS_Manager_guide_auto {guides} {
 	} error_result]} { 
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		LWDAQ_print $info(text) "ERROR: $error_result"
-		return "ERROR: $error_result"
 		set info(state) "Idle"
+		return "ERROR: $error_result"
 	}
 		
 	set result "[clock seconds] "
@@ -1469,23 +1467,21 @@ proc DFPS_Manager_guide_auto {guides} {
 			-top $iinfo(daq_image_top) \
 			-bottom $iinfo(daq_image_bottom) \
 			-data [set contents_$guide] \
-			-name dfps_guide_$guide
+			-name dfps_temp
 		foreach m $info(guide_manipulations) {
-			lwdaq_image_manipulate dfps_guide_$guide $m -replace 1
+			lwdaq_image_manipulate dfps_temp $m -replace 1
 		}
-		lwdaq_image_manipulate dfps_guide_$guide none -clear 1
+		lwdaq_image_manipulate dfps_temp transfer_overlay dfps_guide_$guide
+		lwdaq_image_manipulate dfps_temp copy -name dfps_guide_$guide
+		lwdaq_image_manipulate dfps_guide_$guide transfer_overlay dfps_temp
 		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 			-intensify $config(guide_intensify) -zoom $config(guide_zoom)
-		if {[winfo exists $info(window).mag_guide$guide]} {
-			lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-				-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
-		}
 		set camera [lwdaq_image_characteristics dfps_guide_$guide]
 		set ave [lindex $camera 4]
 		set stdev [lindex $camera 5]
 		set max [lindex $camera 6]
 		set min [lindex $camera 7]
-		append result "$ave $max $min "
+		append result "$guide $ave $max $min "
 		if {$config(verbose)} {
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) "guide_auto guide=$guide\
@@ -1589,12 +1585,7 @@ proc DFPS_Manager_guide_mark {guide x_g y_g {color "2"}} {
 		-x_min 0 -x_max $info(guide_width_um) \
 		-y_min 0 -y_max $info(guide_height_um) -color $color
 		
-	# Draw the guide image with its updated overlay into the magnified photo
-	# first, if it exists, and then the standard photo.
-	if {[winfo exists $info(window).mag_guide$guide]} {
-		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-			-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
-	}
+	# Draw the guide image with its updated overlay.
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
 		
@@ -1759,10 +1750,6 @@ proc DFPS_Manager_guide_put_square {guide x_L y_L z_L width {shade "200"}} {
 
 	# Draw the updated guide image into the magnified photo first, if it exists,
 	# and the standard photo.
-	if {[winfo exists $info(window).mag_guide$guide]} {
-		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-			-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
-	}
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
 		
@@ -3246,7 +3233,7 @@ proc DFPS_Manager_watchdog {} {
 	# At intervals, survey the fiducial fibers an adjust frame
 	# coordinate pose. The fiducial period is in units of
 	# mast_control_period.
-	if {$config(mast_control)} {
+	if {$config(mast_control) != "OFF"} {
 		if {[clock seconds] - $info(fiducial_survey_time) \
 				>= $config(fiducial_survey_period)} {
 			set info(fiducial_survey_time) [clock seconds]
@@ -3264,7 +3251,7 @@ proc DFPS_Manager_watchdog {} {
 	# measure the mast positions, look at the offsets from their target
 	# positions, and adjust their control voltages so as to move the mast
 	# towards the target.
-	if {$config(mast_control)} {
+	if {$config(mast_control) != "OFF"} {
 		if {[clock seconds] - $info(mast_control_time) \
 				>= $config(mast_control_period)} {
 			set info(mast_control_time) [clock seconds]
@@ -3274,7 +3261,7 @@ proc DFPS_Manager_watchdog {} {
 			}
 			set control_report "[clock seconds] "
 			DFPS_Manager_mast_measure_all
-			foreach m $info(positioner_masts) {
+			foreach m $config(mast_control) {
 				scan $info(voltage_$m) %d%d upleft upright
 				scan $info(offset_$m) %f%f xo yo
 				set ulo [format %.3f [expr $yo/sqrt(2)-$xo/sqrt(2)]]
@@ -3299,16 +3286,14 @@ proc DFPS_Manager_watchdog {} {
 	}
 	
 	# If guide auto is enabled, at intervals, get new guide images.
-	if {$config(guide_auto) != "0"} {
+	if {$config(guide_auto) != "OFF"} {
 		if {[clock seconds] - $info(guide_auto_time) >= $config(guide_auto_period)} {
 			set info(guide_auto_time) [clock seconds]
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) \
 					"guide_auto_time [clock seconds]" $info(vcolor)
 			}
-			foreach guide $config(guide_auto) {
-				DFPS_Manager_guide_acquire $guide $config(expose_s)
-			}
+			DFPS_Manager_guide_auto $config(guide_auto)
 		}
 	} {
 		set info(guide_auto_time) "0"
@@ -3441,13 +3426,7 @@ proc DFPS_Manager_reset {} {
 
 #
 # DFPS_Manager_guide_click handles mouse clicks on guide sensor images. It takes
-# a guide sensor number, an x and y coordinate, and a command. The mag_g command
-# tells the routine to open a new magnified view of a guide sensor. The mark_g
-# and mark_gm commands tell the routine to mark a guide sensor view, based upon
-# the x-y coordinates of a mouse click in the normal guide sensor display or the
-# magnified guide sensor display. The actual marking, which will be a cross of
-# some sort, will be done in the guide_mark routine, which will in turn be
-# called by local_from_guide, which we call from this routine.
+# a guide sensor number, an x and y coordinate, and a command. .
 #
 proc DFPS_Manager_guide_click {guide x y cmd} {
 	upvar #0 DFPS_Manager_config config
@@ -3458,26 +3437,8 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 		return ""
 	}
 	
-	if {$cmd == "mag_g"} {
-		set w $info(window).mag_guide$guide
-		if {[winfo exists $w]} {
-			raise $w
-		} else {
-			toplevel $w
-			wm title $w "Guide $guide, DFPS Manager $info(version)"
-			image create photo dfps_guide_mag_$guide
-			label $w.img -image dfps_guide_mag_$guide
-			pack $w.img -side top
-			bind $w.img <Button-1> \
-				[list LWDAQ_post "DFPS_Manager_guide_click $guide %x %y click_gm"]
-		}
-	
-		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
-			-intensify $config(guide_intensify) -zoom $config(guide_mag_zoom)
-	}	
-
-	if {($cmd == "click_gm")} {
-		set zoom $config(guide_mag_zoom)
+	if {($cmd == "guide_mark")} {
+		set zoom $config(guide_zoom)
 		if {$zoom < 1.0} {
 			set pix [expr $info(icx424q_pix_um)*round(1.0/$zoom)]
 		} else {
@@ -3533,7 +3494,6 @@ proc DFPS_Manager_fvc_click {fvc x y cmd} {
 	return ""
 }
 
-
 #
 # DFPS_Manager_open creates the DFPS Manager window if it does not exist, brings it
 # to the front if it does exist.
@@ -3569,27 +3529,37 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach a {Mast_Control Report Verbose} {
-		set b [string tolower $a]
-		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
-		pack $f.$b -side left -expand yes
-	}
-
-	foreach a {ip_addr flash_s expose_s guide_auto} {
+	label $f.lmc -text "mast_control:" -fg $info(label_color)
+	tk_optionMenu $f.mmc DFPS_Manager_config(mast_control) \
+		"OFF" "1" "2" "3" "4" "1 2 3 4"
+	pack $f.lmc $f.mmc -side left -expand yes
+	
+	label $f.lgauto -text "guide_auto:" -fg $info(label_color)
+	tk_optionMenu $f.mgauto DFPS_Manager_config(guide_auto) \
+		"OFF" "1" "2" "3" "4" "1 2" "3 4"
+	pack $f.lgauto $f.mgauto -side left -expand yes
+	
+	foreach a {ip_addr flash_s expose_s} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 2]
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
+	foreach a {Report Verbose} {
+		set b [string tolower $a]
+		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
+		pack $f.$b -side left -expand yes
+	}
+
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 	
 	foreach guide $info(guide_sensors) {
 		image create photo "dfps_guide_$guide"
 		label $f.l$guide -image "dfps_guide_$guide"
-		bind $f.l$guide <Double-Button-1> [list LWDAQ_post \
-			"DFPS_Manager_guide_click $guide 0 0 mag_g"]
+		bind $f.l$guide <Button-1> [list LWDAQ_post \
+			"DFPS_Manager_guide_click $guide %x %y guide_mark"]
 		pack $f.l$guide -side left -expand yes
 		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 			-intensify $config(guide_intensify) -zoom $config(guide_zoom)
