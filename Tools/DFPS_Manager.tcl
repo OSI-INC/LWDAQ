@@ -1352,6 +1352,9 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 		LWDAQ_print $info(text) "guide_acquire guide=$guide\
 			ave=$ave stdev=$stdev max=$max min=$min" $info(vcolor)
 	}
+	if {$config(report)} {
+		LWDAQ_print $info(text) "[clock seconds] $guide $ave $max $min"
+	}
 	
 	set info(state) "Idle"
 	return "[lrange $camera 5 end] $info(icx424q_pix_um)"
@@ -1379,18 +1382,25 @@ proc DFPS_Manager_guide_acquire_all {} {
 }
 
 #
-# DFPS_Manager_guide_acquire_auto captures images from all guide sensors and
-# displays them in the manager window. It uses the default guide exposure time
-# exposure_s. It exposes sensors 1 and 2 simultaneously, then reads them out, 
-# which is possible because they are on separate readout boards. It then does
-# the same for sensors 3 and 4.
+# DFPS_Manager_guide_auto captures images from a list of guide sensors,
+# attempting to do so in parallel, which will work if the list contains only
+# sensors that are all connected to different readout boards, or boards that
+# support simultaneous exposure. It uses the default guide exposure time
+# exposure_s.
 #
-proc DFPS_Manager_guide_acquire_auto {} {
+proc DFPS_Manager_guide_auto {guides} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	global LWDAQ_Info LWDAQ_Driver
 	upvar #0 LWDAQ_info_Camera iinfo
 	upvar #0 LWDAQ_config_Camera iconfig
+
+	foreach guide $guides {
+		if {[lsearch $info(guide_sensors) $guide] < 0} {
+			LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in guide_auto."
+			return ""
+		}	
+	}
 
 	set info(state) "Guide_Auto"
 
@@ -1420,7 +1430,7 @@ proc DFPS_Manager_guide_acquire_auto {} {
 		}
 		
 		LWDAQ_set_data_addr $sock 0
-		foreach guide {1 2} {
+		foreach guide $guides {
 			scan $config(guide_daq_$guide) %d%d%d dsock msock del
 			LWDAQ_set_driver_mux $sock $dsock $msock
 			LWDAQ_set_device_element $sock $del
@@ -1428,43 +1438,9 @@ proc DFPS_Manager_guide_acquire_auto {} {
 		}
 
 		set addr 0
-		foreach guide {1 2} {
+		foreach guide $guides {
 			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_acquire_auto\
-					downloading from driver guide=$guide" $info(vcolor)
-			}
-			set contents_$guide [LWDAQ_ram_read $sock $addr $image_size]
-			set addr [expr $addr + $image_size]
-		}
-		
-		foreach dsock {6 7} {
-			LWDAQ_set_driver_mux $sock $dsock 0
-			LWDAQ_execute_job $sock $LWDAQ_Driver(move_job)
-			LWDAQ_transmit_command_hex $sock 0098
-			LWDAQ_transmit_command_hex $sock 00B8
-			LWDAQ_transmit_command_hex $sock 0098
-		}
-
-		LWDAQ_delay_seconds $sock $config(expose_s)
-	
-		foreach dsock {6 7} {
-			LWDAQ_transmit_command_hex $sock 0099
-			LWDAQ_transmit_command_hex $sock 0098
-			LWDAQ_transmit_command_hex $sock 0088
-		}
-		
-		LWDAQ_set_data_addr $sock 0
-		foreach guide {3 4} {
-			scan $config(guide_daq_$guide) %d%d%d dsock msock del
-			LWDAQ_set_driver_mux $sock $dsock $msock
-			LWDAQ_set_device_element $sock $del
-			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
-		}
-
-		set addr 0
-		foreach guide {3 4} {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_acquire_auto\
+				LWDAQ_print $info(text) "guide_auto\
 					downloading from driver guide=$guide" $info(vcolor)
 			}
 			set contents_$guide [LWDAQ_ram_read $sock $addr $image_size]
@@ -1484,7 +1460,7 @@ proc DFPS_Manager_guide_acquire_auto {} {
 	}
 		
 	set result "[clock seconds] "
-	foreach guide $info(guide_sensors) {
+	foreach guide $guides {
 		lwdaq_image_create \
 			-width $iinfo(daq_image_width) \
 			-height $iinfo(daq_image_height) \
@@ -1512,7 +1488,7 @@ proc DFPS_Manager_guide_acquire_auto {} {
 		append result "$ave $max $min "
 		if {$config(verbose)} {
 			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_acquire_auto guide=$guide\
+				LWDAQ_print $info(text) "guide_auto guide=$guide\
 					ave=$ave stdev=$stdev max=$max min=$min" $info(vcolor)
 			}
 		}
@@ -3323,15 +3299,16 @@ proc DFPS_Manager_watchdog {} {
 	}
 	
 	# If guide auto is enabled, at intervals, get new guide images.
-	if {$config(guide_auto)} {
-		if {[clock seconds] - $info(guide_auto_time) \
-				>= $config(guide_auto_period)} {
+	if {$config(guide_auto) != "0"} {
+		if {[clock seconds] - $info(guide_auto_time) >= $config(guide_auto_period)} {
 			set info(guide_auto_time) [clock seconds]
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) \
 					"guide_auto_time [clock seconds]" $info(vcolor)
 			}
-			DFPS_Manager_guide_acquire_auto
+			foreach guide $config(guide_auto) {
+				DFPS_Manager_guide_acquire $guide $config(expose_s)
+			}
 		}
 	} {
 		set info(guide_auto_time) "0"
@@ -3592,13 +3569,13 @@ proc DFPS_Manager_open {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach a {Mast_Control Guide_Auto Report Verbose} {
+	foreach a {Mast_Control Report Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {ip_addr flash_s expose_s} {
+	foreach a {ip_addr flash_s expose_s guide_auto} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 2]
