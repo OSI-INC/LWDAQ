@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "3.4"
+	LWDAQ_tool_init "DFPS_Manager" "3.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -50,6 +50,21 @@ proc DFPS_Manager_init {} {
 	set info(detector_fibers) "1 2"	
 	set info(fiber_view_cameras) "left right"
 	set info(focal_ratio) "13.5"
+	
+	# Telescope calibration. The x and y are in millimeters. The scale is in
+	# arcseconds per millimeter. The rotation is in milliradians. The telescope
+	# pointing right ascension (RA) is in decimal hours. The declination (DEC)
+	# is in decimal degrees.
+	set info(plate_x) "0.0"
+	set info(plate_y) "0.0"
+	set info(plate_scale) "7.2"
+	set info(plate_rot) "0.0"
+	set config(RA) "0.000000"
+	set config(DEC) "0.000000"
+	set info(arcsec_per_degree) "3600"
+	set info(radians_per_degree) "0.017453293"
+	set info(deg_per_hr_equator) "15.0"
+	set info(pi) "3.141592654"
 
 	# Data acquisition parameters for the DFPS-4A.
 	set config(ip_addr) "198.214.229.251"
@@ -68,7 +83,7 @@ proc DFPS_Manager_init {} {
 	# C0625: C1 D2 C2 D1
 	# C0630: D3 D4 D2 D1
 	set config(flash_s) "0.004"
-	set config(expose_s) "1.0"
+	set config(guide_expose_s) "1.0"
 	set config(sort_code) "8"
 	set config(transceiver) "1 0"
 	set config(controllers) "0x6912 0x1834 0xC323 0x1845"
@@ -90,10 +105,15 @@ proc DFPS_Manager_init {} {
 	
 	# Acquisition and analysis results.
 	set info(fiducial_sources) ""
+	set config(detector_set) "2"
 	foreach m $info(positioner_masts) {
 		set info(mast_$m) "0.000 0.000"
+		set info(detector_$m) "$config(RA)   $config(DEC)"
 		set info(target_$m) "0.000 0.000"
 		set info(offset_$m) "0.000 0.000"
+	}
+	foreach guide $info(guide_sensors) {
+		set info(mark_$guide) "$config(RA)   $config(DEC)"
 	}
 	
 	# Calibration file. By default, we store calibration constants in the
@@ -422,6 +442,9 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 	}
 	
 	set f [open $config(calib_file) w]
+	foreach a {x y scale rot} {
+		puts $f "set DFPS_Manager_info(plate_$a) \"$info(plate_$a)\""
+	}
 	foreach or $info(gscalib_orientations) {
 		puts $f "set DFPS_Manager_info(gscalib_mask_$or) \"$info(gscalib_mask_$or)\""
 	}
@@ -488,6 +511,13 @@ proc DFPS_Manager_examine_calibration {} {
 	set se 20
 	set i 0
 	
+	set f [frame $w.f[incr i]]
+	foreach a {x y scale rot} {
+		pack $f -side top -fill x
+		label $f.ml$a -text "plate_$a\:" -fg $info(label_color) -width $sl
+		entry $f.me$a -textvariable DFPS_Manager_info(plate_$a) -width $se
+		pack $f.ml$a $f.me$a -side left -expand yes
+	}
 	foreach a $info(fiber_view_cameras) {
 		set f [frame $w.f[incr i]]
 		pack $f -side top -fill x
@@ -989,6 +1019,54 @@ proc DFPS_Manager_global_from_local {x_L y_L z_L} {
 }
 
 #
+# DFPS_Manager_sky_from_local takes a point in local coordinates and transforms
+# it into sky coordinates using the telescope calibration and the current 
+# telescope pointing declination and right ascension.
+#
+proc DFPS_Manager_sky_from_local {x_L y_L} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set local_coord "-$info(plate_x) -$info(plate_y) 0.0\
+		0.0 0.0 [expr $info(pi)-$info(plate_rot)*0.001]"
+	set sp [lwdaq xyz_global_from_local_point "$x_L $y_L 0.0" $local_coord]
+	set east_s [lindex $sp 0]
+	set north_s [lindex $sp 1]
+	
+	set dec [expr $north_s * $info(plate_scale) / $info(arcsec_per_degree)]
+	set dec [expr $config(DEC) + $dec]
+
+	set ra [expr $east_s * $info(plate_scale) / $info(arcsec_per_degree) \
+		/ $info(deg_per_hr_equator) \
+		/ cos($dec*$info(radians_per_degree))]
+	set ra [expr $config(RA) + $ra]
+	return "[format %.6f $ra] [format %.6f $dec]"
+}
+
+#
+# DFPS_Manager_local_from_sky takes a point in sky coordinates and transforms
+# it into local coordinates using the telescope calibration and the current 
+# telescope pointing declination and right ascension. The sky coordinates are
+# in right ascension, decimal hours, and declination, decimal degrees.
+#
+proc DFPS_Manager_local_from_sky {ra dec} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	set dec [expr $dec - $config(DEC)]
+	set north_s [expr $dec * $info(arcsec_per_degree) / $info(plate_scale)]
+	set ra [expr $ra - $config(RA)]
+	set east_s [expr $ra * $info(deg_per_hr_equator) \
+		* cos($dec*$info(radians_per_degree)) \
+		* $info(arcsec_per_degree) \
+		/ $info(plate_scale)]
+	set local_coord "-$info(plate_x) -$info(plate_y) 0.0\
+		0.0 0.0 [expr $info(pi)-$info(plate_rot)*0.001]"
+	set lp [lwdaq xyz_local_from_global_point "$east_s $north_s 0.0" $local_coord]
+	return [lrange $lp 0 1]
+}
+
+#
 # DFPS_Manager_mast_measure measures the position of a mast and returns the
 # local x, y, and z coordinates of a mast. The position of the mast is defined
 # as the opitcal center of its guide fiber. We flash the mast's guide fiber once
@@ -1040,6 +1118,11 @@ proc DFPS_Manager_mast_measure {mast} {
 		LWDAQ_print $info(text) "mast_measure x=$x y=$y z=$z\
 			xo=$xo yo=$yo" $info(vcolor)
 	}
+	set local [DFPS_Manager_detector_get $mast $config(detector_set)]
+	scan $local %f%f%f x y z
+	set sky [DFPS_Manager_sky_from_local $x $y]
+	scan $sky %f%f ra dec
+	set info(detector_$mast) "$ra   $dec"
 		
 	set info(state) "Idle"	
 	return $mast_local
@@ -1368,7 +1451,7 @@ proc DFPS_Manager_guide_acquire_all {} {
 	upvar #0 DFPS_Manager_info info
 
 	foreach g $info(guide_sensors) {
-		set result [DFPS_Manager_guide_acquire $g $config(expose_s)]
+		set result [DFPS_Manager_guide_acquire $g $config(guide_expose_s)]
 		if {[LWDAQ_is_error_result $result]} {
 			return $result
 		}
@@ -1419,7 +1502,7 @@ proc DFPS_Manager_guide_auto {guides} {
 			LWDAQ_transmit_command_hex $sock 0098
 		}
 
-		LWDAQ_delay_seconds $sock $config(expose_s)
+		LWDAQ_delay_seconds $sock $config(guide_expose_s)
 	
 		foreach dsock {6 7} {
 			LWDAQ_transmit_command_hex $sock 0099
@@ -3153,6 +3236,26 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
+	label $f.title -text "Mast Positions:" -fg $info(label_color) -width $lw
+	pack $f.title -side left -expand yes
+	foreach m $info(positioner_masts) {
+		entry $f.e$m -textvariable DFPS_Manager_info(mast_$m) -width $ew
+		pack $f.e$m -side left -expand yes
+	}
+
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+
+	label $f.title -text "Mast Targets:" -fg $info(label_color) -width $lw
+	pack $f.title -side left -expand yes
+	foreach m $info(positioner_masts) {
+		entry $f.e$m -textvariable DFPS_Manager_info(target_$m) -width $ew
+		pack $f.e$m -side left -expand yes
+	}
+
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+
 	label $f.title -text "Mast Offsets:" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
@@ -3260,8 +3363,9 @@ proc DFPS_Manager_watchdog {} {
 					"mast_control_time [clock seconds]" $info(vcolor)
 			}
 			set control_report "[clock seconds] "
-			DFPS_Manager_mast_measure_all
+			
 			foreach m $config(mast_control) {
+				DFPS_Manager_mast_measure $m
 				scan $info(voltage_$m) %d%d upleft upright
 				scan $info(offset_$m) %f%f xo yo
 				set ulo [format %.3f [expr $yo/sqrt(2)-$xo/sqrt(2)]]
@@ -3366,21 +3470,21 @@ proc DFPS_Manager_watchdog {} {
 
 #
 # DFPS_Manager_configure_mast_control starts or stops the mast controller and
-# adjusts the mast control period. We pass 0 or 1 for enable to disable or
-# enable the controller respectively. We pass a real-valued period in seconds.
-# The controller will measure mast positions with this period, and adjust
-# actuator voltages after its measurements.
+# adjusts the mast control period. We pass OFF or a list of masts to disable or
+# enable controllers. We pass a real-valued period in seconds. The controller
+# will measure mast positions with this period, and adjust actuator voltages
+# after its measurements.
 #
-proc DFPS_Manager_configure_mast_control {enable period_s} {
+proc DFPS_Manager_configure_mast_control {control period_s} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set config(mast_control) $enable
+	set config(mast_control) $control
 	set config(mast_control_period) $period
 	
 	if {$config(verbose)} {
 		LWDAQ_print $info(text) \
-			"configure_mast_control enable=$enable period_s=$period_s" $info(vcolor)
+			"configure_mast_control control=$control period_s=$period_s" $info(vcolor)
 	}
 	return ""
 }
@@ -3455,6 +3559,10 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 		}
 		DFPS_Manager_guide_mark $guide $x_g $y_g "2"
 		set local [DFPS_Manager_local_from_guide $guide $x_g $y_g]
+		scan $local %f%f x_L y_L
+		set sky [DFPS_Manager_sky_from_local $x_L $y_L]
+		scan $sky %f%f ra dec
+		set info(mark_$guide) "$ra   $dec"
 	}
 		
 	return ""
@@ -3526,6 +3634,12 @@ proc DFPS_Manager_open {} {
 	button $f.help -text "Help" -command "LWDAQ_tool_help DFPS_Manager"
 	pack $f.help -side left -expand yes
 	
+	foreach a {Report Verbose} {
+		set b [string tolower $a]
+		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
+		pack $f.$b -side left -expand yes
+	}
+
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
@@ -3539,19 +3653,13 @@ proc DFPS_Manager_open {} {
 		"OFF" "1" "2" "3" "4" "1 2" "3 4"
 	pack $f.lgauto $f.mgauto -side left -expand yes
 	
-	foreach a {ip_addr flash_s expose_s} {
+	foreach a {ip_addr guide_expose_s RA DEC} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 2]
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
-	foreach a {Report Verbose} {
-		set b [string tolower $a]
-		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
-		pack $f.$b -side left -expand yes
-	}
-
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 	
@@ -3565,29 +3673,6 @@ proc DFPS_Manager_open {} {
 			-intensify $config(guide_intensify) -zoom $config(guide_zoom)
 	}
 	
-	set lw 15
-	set ew 12
-	
-	set f [frame $w.f[incr i]]
-	pack $f -side top -fill x
-
-	label $f.title -text "Mast Positions:" -fg $info(label_color) -width $lw
-	pack $f.title -side left -expand yes
-	foreach m $info(positioner_masts) {
-		entry $f.e$m -textvariable DFPS_Manager_info(mast_$m) -width $ew
-		pack $f.e$m -side left -expand yes
-	}
-
-	set f [frame $w.f[incr i]]
-	pack $f -side top -fill x
-
-	label $f.title -text "Mast Targets:" -fg $info(label_color) -width $lw
-	pack $f.title -side left -expand yes
-	foreach m $info(positioner_masts) {
-		entry $f.e$m -textvariable DFPS_Manager_info(target_$m) -width $ew
-		pack $f.e$m -side left -expand yes
-	}
-
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 	
@@ -3599,6 +3684,29 @@ proc DFPS_Manager_open {} {
 		pack $f.$side -side left -expand yes
 		lwdaq_draw dfps_fvc_$side dfps_fvc_$side \
 			-intensify $config(fvc_intensify) -zoom $config(fvc_zoom)	
+	}
+	
+	set ff [frame $f.offsets]
+	pack $ff -side top -fill x
+
+	set lw 18
+	set ew 24
+	
+	foreach m $info(positioner_masts) {
+		set fff [frame $ff.m$m]
+		pack $fff -side top -fill x
+		label $fff.title -text "Detector Fiber $m:" -fg $info(label_color) -width $lw
+		pack $fff.title -side left -expand yes
+		entry $fff.e$m -textvariable DFPS_Manager_info(detector_$m) -width $ew
+		pack $fff.e$m -side left -expand yes
+	}
+	foreach g $info(guide_sensors) {
+		set fff [frame $ff.g$g]
+		pack $fff -side top -fill x
+		label $fff.title -text "Guide Mark $g:" -fg $info(label_color) -width $lw
+		pack $fff.title -side left -expand yes
+		entry $fff.e$g -textvariable DFPS_Manager_info(mark_$g) -width $ew
+		pack $fff.e$g -side left -expand yes
 	}
 	
 	set info(text) [LWDAQ_text_widget $w 80 15 1 1]
