@@ -53,18 +53,18 @@ proc DFPS_Manager_init {} {
 	
 	# Telescope calibration. The x and y are in millimeters. The scale is in
 	# arcseconds per millimeter. The rotation is in milliradians. The telescope
-	# pointing right ascension (RA) is in decimal hours. The declination (DEC)
+	# pointing right ascension time (RAH) is in decimal hours. The declination (DEC)
 	# is in decimal degrees.
 	set info(plate_x) "0.0"
 	set info(plate_y) "0.0"
 	set info(plate_scale) "7.2"
 	set info(plate_rot) "0.0"
-	set config(RA) "0.000000"
+	set config(RAH) "0.000000"
 	set config(DEC) "0.000000"
 	set info(arcsec_per_degree) "3600"
-	set info(radians_per_degree) "0.017453293"
-	set info(deg_per_hr_equator) "15.0"
 	set info(pi) "3.141592654"
+	set info(radians_per_degree) [expr $info(pi)/180.0]
+	set info(deg_per_hr_equator) "15.0"
 
 	# Data acquisition parameters for the DFPS-4A.
 	set config(ip_addr) "198.214.229.251"
@@ -108,12 +108,12 @@ proc DFPS_Manager_init {} {
 	set config(detector_set) "2"
 	foreach m $info(positioner_masts) {
 		set info(mast_$m) "0.000 0.000"
-		set info(detector_$m) "$config(RA)   $config(DEC)"
+		set info(detector_$m) "$config(RAH)   $config(DEC)"
 		set info(target_$m) "0.000 0.000"
 		set info(offset_$m) "0.000 0.000"
 	}
 	foreach guide $info(guide_sensors) {
-		set info(mark_$guide) "$config(RA)   $config(DEC)"
+		set info(mark_$guide) "$config(RAH)   $config(DEC)"
 	}
 	
 	# Calibration file. By default, we store calibration constants in the
@@ -1027,20 +1027,29 @@ proc DFPS_Manager_sky_from_local {x_L y_L} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set local_coord "-$info(plate_x) -$info(plate_y) 0.0\
-		0.0 0.0 [expr $info(pi)-$info(plate_rot)*0.001]"
-	set sp [lwdaq xyz_global_from_local_point "$x_L $y_L 0.0" $local_coord]
-	set east_s [lindex $sp 0]
-	set north_s [lindex $sp 1]
-	
+	set a [expr $info(plate_rot)*0.001]
+	set east_s  [expr -($x_L-$info(plate_x))*cos($a) - ($y_L-$info(plate_y))*sin($a)]
+	set north_s [expr +($x_L-$info(plate_x))*sin($a) - ($y_L-$info(plate_y))*cos($a)]
+
 	set dec [expr $north_s * $info(plate_scale) / $info(arcsec_per_degree)]
 	set dec [expr $config(DEC) + $dec]
 
 	set ra [expr $east_s * $info(plate_scale) / $info(arcsec_per_degree) \
 		/ $info(deg_per_hr_equator) \
 		/ cos($dec*$info(radians_per_degree))]
-	set ra [expr $config(RA) + $ra]
-	return "[format %.6f $ra] [format %.6f $dec]"
+	set ra [expr $config(RAH) + $ra]
+
+	set ra [format %.6f $ra] 
+	set dec [format %.6f $dec]
+
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "sky_from_local\
+			east_s=[format %.3f $east_s]\
+			north_s=[format %.3f $north_s]\
+			ra=$ra dec=$dec" $info(vcolor)
+	}
+
+	return "$ra $dec"
 }
 
 #
@@ -1053,17 +1062,29 @@ proc DFPS_Manager_local_from_sky {ra dec} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set dec [expr $dec - $config(DEC)]
-	set north_s [expr $dec * $info(arcsec_per_degree) / $info(plate_scale)]
-	set ra [expr $ra - $config(RA)]
+	set ra [expr $ra - $config(RAH)]
 	set east_s [expr $ra * $info(deg_per_hr_equator) \
 		* cos($dec*$info(radians_per_degree)) \
 		* $info(arcsec_per_degree) \
 		/ $info(plate_scale)]
-	set local_coord "-$info(plate_x) -$info(plate_y) 0.0\
-		0.0 0.0 [expr $info(pi)-$info(plate_rot)*0.001]"
-	set lp [lwdaq xyz_local_from_global_point "$east_s $north_s 0.0" $local_coord]
-	return [lrange $lp 0 1]
+	set dec [expr $dec - $config(DEC)]
+	set north_s [expr $dec * $info(arcsec_per_degree) / $info(plate_scale)]
+
+	set a [expr $info(plate_rot)*0.001]
+	set x_L [expr (-$east_s*cos($a) + $north_s*sin($a)) + $info(plate_x)]
+	set y_L [expr (-$east_s*sin($a) - $north_s*cos($a)) + $info(plate_y)]
+	
+	set x_L [format %.3f $x_L] 
+	set y_L [format %.3f $y_L]
+	
+	if {$config(verbose)} {
+		LWDAQ_print $info(text) "local_from_sky\
+			east_s=[format %.3f $east_s]\
+			north_s=[format %.3f $north_s]\
+			x_L=$x_L y_L=$y_L" $info(vcolor)
+	}
+
+	return "$x_L $y_L"
 }
 
 #
@@ -1122,7 +1143,7 @@ proc DFPS_Manager_mast_measure {mast} {
 	scan $local %f%f%f x y z
 	set sky [DFPS_Manager_sky_from_local $x $y]
 	scan $sky %f%f ra dec
-	set info(detector_$mast) "$ra   $dec"
+	set info(detector_$mast) "[format %.6f $ra]   [format %.6f $dec]"
 		
 	set info(state) "Idle"	
 	return $mast_local
@@ -1505,6 +1526,7 @@ proc DFPS_Manager_guide_auto {guides} {
 		LWDAQ_delay_seconds $sock $config(guide_expose_s)
 	
 		foreach dsock {6 7} {
+			LWDAQ_set_driver_mux $sock $dsock 0
 			LWDAQ_transmit_command_hex $sock 0099
 			LWDAQ_transmit_command_hex $sock 0098
 			LWDAQ_transmit_command_hex $sock 0088
@@ -3562,7 +3584,8 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 		scan $local %f%f x_L y_L
 		set sky [DFPS_Manager_sky_from_local $x_L $y_L]
 		scan $sky %f%f ra dec
-		set info(mark_$guide) "$ra   $dec"
+		set info(mark_$guide) "[format %.6f $ra]   [format %.6f $dec]"
+		LWDAQ_print $info(text) "$guide $x_L $y_L $ra $dec" green
 	}
 		
 	return ""
@@ -3653,7 +3676,7 @@ proc DFPS_Manager_open {} {
 		"OFF" "1" "2" "3" "4" "1 2" "3 4"
 	pack $f.lgauto $f.mgauto -side left -expand yes
 	
-	foreach a {ip_addr guide_expose_s RA DEC} {
+	foreach a {ip_addr guide_expose_s RAH DEC} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 2]
