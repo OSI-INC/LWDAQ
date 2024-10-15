@@ -3483,7 +3483,8 @@ proc DFPS_Manager_watchdog {} {
 					set config(RAH) $rah
 					set config(DEC) $dec
 					if {$config(verbose)} {
-						LWDAQ_print $info(text) "rahdec_url $rah $dec" $info(vcolor)
+						LWDAQ_print $info(text) \
+							"rahdec_url \"$rah\" \"$dec\"" $info(vcolor)
 					}
 				} else {
 					set rahdec [string range [string replace \n " "] 0 20]
