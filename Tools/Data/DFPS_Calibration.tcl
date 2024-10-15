@@ -1,5 +1,5 @@
-set DFPS_Manager_info(plate_x) "0.0"
-set DFPS_Manager_info(plate_y) "0.0"
+set DFPS_Manager_info(scope_x) "0.0"
+set DFPS_Manager_info(scope_y) "0.0"
 set DFPS_Manager_info(plate_scale) "7.31"
 set DFPS_Manager_info(plate_rot) "22.0"
 set DFPS_Manager_info(gscalib_mask_0) "24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597 "

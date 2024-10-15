@@ -51,17 +51,25 @@ proc DFPS_Manager_init {} {
 	set info(fiber_view_cameras) "left right"
 	set info(focal_ratio) "13.5"
 	
-	# Telescope calibration. The plate_x and plate_y are in millimeters, and give
-	# the local coordinates of a reference star. The RAH and DEC give the  The scale is in
-	# arcseconds per millimeter. The rotation is in milliradians. The telescope
-	# pointing right ascension (RAH) is in decimal hours, while the declination
-	# (DEC) is in decimal degrees.
-	set info(plate_x) "0.0"
-	set info(plate_y) "0.0"
+	# Telescope calibration. The scope_x and scope_y are in millimeters, and
+	# give the local coordinates of the center of the telescope's field of view.
+	# The star_x and star_y give the local coordinates of a a reference star. The s_rah and
+	# s_dec give the telescope pointing direction. The guide_rah and
+	# g_dec give a guide star's location in the sky. The scale is in
+	# arcseconds per millimeter. The rotation is in milliradians. The right
+	# ascension (rah) is in decimal hours. The declination (dec) is in decimal
+	# degrees.
+	set info(scope_x) "0.0"
+	set info(scope_y) "0.0"
+	set info(star_x) "0.0"
+	set info(star_y) "0.0"
 	set info(plate_scale) "7.31"
 	set info(plate_rot) "22.0"
-	set config(RAH) "0.000000"
-	set config(DEC) "0.000000"
+	set config(reckoning) "SCOPE"
+	set config(g_rah) "0.000000"
+	set config(g_dec) "0.000000"
+	set config(s_rah) "0.000000"
+	set config(s_dec) "0.000000"
 	set info(arcsec_per_degree) "3600"
 	set info(pi) "3.141592654"
 	set info(radians_per_degree) [expr $info(pi)/180.0]
@@ -84,7 +92,7 @@ proc DFPS_Manager_init {} {
 	# C0625: C1 D2 C2 D1
 	# C0630: D3 D4 D2 D1
 	set config(flash_s) "0.004"
-	set config(guide_expose_s) "1.0"
+	set config(g_expose_s) "1.0"
 	set config(sort_code) "8"
 	set config(transceiver) "1 0"
 	set config(controllers) "0x6912 0x1834 0xC323 0x1845"
@@ -109,12 +117,9 @@ proc DFPS_Manager_init {} {
 	set config(detector_set) "2"
 	foreach m $info(positioner_masts) {
 		set info(mast_$m) "0.000 0.000"
-		set info(detector_$m) "$config(RAH)   $config(DEC)"
+		set info(detector_$m) "$config(s_rah)   $config(s_dec)"
 		set info(target_$m) "0.000 0.000"
 		set info(offset_$m) "0.000 0.000"
-	}
-	foreach guide $info(guide_sensors) {
-		set info(mark_$guide) "$config(RAH)   $config(DEC)"
 	}
 	
 	# Calibration file. By default, we store calibration constants in the
@@ -217,8 +222,8 @@ proc DFPS_Manager_init {} {
 	set config(guide_auto_period) "5"
 	set info(guide_auto_time) "0"
 	set info(binary_result) "0"
-	set config(rahdec_url) "http://198.214.229.56:22401/register"
-	set config(rahdec_pattern) {"RA_HOUR": ([0-9\.]*),.*?"DEC_DEGREE": ([0-9\.]*)}
+	set config(scope_url) "http://198.214.229.56:22401/register"
+	set config(scope_pattern) {"RA_HOUR": ([^,]*),.*?"DEC_DEGREE": ([^,]*)}
 	
 	# Window settings.
 	set info(label_color) "brown"
@@ -445,8 +450,11 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 	}
 	
 	set f [open $config(calib_file) w]
-	foreach a {x y scale rot} {
+	foreach a {scale rot} {
 		puts $f "set DFPS_Manager_info(plate_$a) \"$info(plate_$a)\""
+	}
+	foreach a {x y} {
+		puts $f "set DFPS_Manager_info(scope_$a) \"$info(scope_$a)\""
 	}
 	foreach or $info(gscalib_orientations) {
 		puts $f "set DFPS_Manager_info(gscalib_mask_$or) \"$info(gscalib_mask_$or)\""
@@ -515,10 +523,10 @@ proc DFPS_Manager_examine_calibration {} {
 	set i 0
 	
 	set f [frame $w.f[incr i]]
-	foreach a {x y scale rot} {
+	foreach a {plate_scale plate_rot scope_x scope_y} {
 		pack $f -side top -fill x
-		label $f.ml$a -text "plate_$a\:" -fg $info(label_color) -width $sl
-		entry $f.me$a -textvariable DFPS_Manager_info(plate_$a) -width $se
+		label $f.ml$a -text "$a\:" -fg $info(label_color) -width $sl
+		entry $f.me$a -textvariable DFPS_Manager_info($a) -width $se
 		pack $f.ml$a $f.me$a -side left -expand yes
 	}
 	foreach a $info(fiber_view_cameras) {
@@ -1041,30 +1049,43 @@ proc DFPS_Manager_sky_from_local {args} {
 	scan $params %f%f x_L y_L
 	
 	set a [expr $info(plate_rot)*0.001]
-	set east_s  [expr -$x_L*cos($a) + $y_L*sin($a)]
-	set north_s [expr -$x_L*sin($a) - $y_L*cos($a)]
+	if {$config(reckoning) == "GUIDE"} {
+		set plate_x $info(star_x)
+		set plate_y $info(star_y)
+	} {
+		set plate_x $info(scope_x)
+		set plate_y $info(scope_y)
+	}
+	set east_s  [expr -($x_L-$plate_x)*cos($a) - ($y_L-$plate_y)*sin($a)]
+	set north_s [expr +($x_L-$plate_x)*sin($a) - ($y_L-$plate_y)*cos($a)]
 
-	set dec [expr ($north_s + $info(plate_y)) \
-		* $info(plate_scale) / $info(arcsec_per_degree)]
-	set dec [expr $dec + $config(DEC)]
+	set dec [expr $north_s * $info(plate_scale) / $info(arcsec_per_degree)]
+	if {$config(reckoning) == "GUIDE"} {
+		set dec [expr $dec + $config(g_dec)]
+	} {
+		set dec [expr $dec + $config(s_dec)]
+	}
 
-	set ra [expr ($east_s + $info(plate_x)) \
-		* $info(plate_scale) / $info(arcsec_per_degree) \
+	set rah [expr $east_s * $info(plate_scale) / $info(arcsec_per_degree) \
 		/ $info(deg_per_hr_equator) \
 		/ cos($dec*$info(radians_per_degree))]
-	set ra [expr $ra + $config(RAH)]
-
-	set ra [format %.6f $ra] 
+	if {$config(reckoning) == "GUIDE"} {
+		set rah [expr $rah + $config(g_rah)]
+	} {
+		set rah [expr $rah + $config(s_rah)]
+	}
+	
+	set rah [format %.6f $rah] 
 	set dec [format %.6f $dec]
 
 	if {$config(verbose)} {
 		LWDAQ_print $info(text) "sky_from_local\
 			east_s=[format %.3f $east_s]\
 			north_s=[format %.3f $north_s]\
-			ra=$ra dec=$dec" $info(vcolor)
+			rah=$rah dec=$dec" $info(vcolor)
 	}
 
-	return "$ra $dec"
+	return "$rah $dec"
 }
 
 #
@@ -1079,21 +1100,29 @@ proc DFPS_Manager_local_from_sky {args} {
 	upvar #0 DFPS_Manager_info info
 
 	set params [join $args]
-	scan $params %f%f ra dec
+	scan $params %f%f rah dec
 	
-	set ra [expr $ra - $config(RAH)]
-	set east_s [expr $ra * $info(deg_per_hr_equator) \
+	if {$config(reckoning) == "GUIDE"} {
+		set rah [expr $rah - $config(g_rah)]
+		set dec [expr $dec - $config(g_dec)]
+		set plate_x $info(star_x)
+		set plate_y $info(star_y)
+	} {
+		set rah [expr $rah - $config(s_rah)]
+		set dec [expr $dec - $config(s_dec)]
+		set plate_x $info(scope_x)
+		set plate_y $info(scope_y)
+	}
+
+	set east_s [expr $rah * $info(deg_per_hr_equator) \
 		* cos($dec*$info(radians_per_degree)) \
 		* $info(arcsec_per_degree) \
 		/ $info(plate_scale)]
-	set east_s [expr $east_s - $info(plate_x)]
-	set dec [expr $dec - $config(DEC)]
 	set north_s [expr $dec * $info(arcsec_per_degree) / $info(plate_scale)]
-	set north_s [expr $north_s - $info(plate_y)]
 
 	set a [expr $info(plate_rot)*0.001]
-	set x_L [expr (-$east_s*cos($a) - $north_s*sin($a))]
-	set y_L [expr (+$east_s*sin($a) - $north_s*cos($a))]
+	set x_L [expr (-$east_s*cos($a) + $north_s*sin($a)) + $plate_x]
+	set y_L [expr (-$east_s*sin($a) - $north_s*cos($a)) + $plate_y]
 	
 	set x_L [format %.3f $x_L] 
 	set y_L [format %.3f $y_L]
@@ -1493,7 +1522,7 @@ proc DFPS_Manager_guide_acquire_all {} {
 	upvar #0 DFPS_Manager_info info
 
 	foreach g $info(guide_sensors) {
-		set result [DFPS_Manager_guide_acquire $g $config(guide_expose_s)]
+		set result [DFPS_Manager_guide_acquire $g $config(g_expose_s)]
 		if {[LWDAQ_is_error_result $result]} {
 			return $result
 		}
@@ -1544,7 +1573,7 @@ proc DFPS_Manager_guide_auto {guides} {
 			LWDAQ_transmit_command_hex $sock 0098
 		}
 
-		LWDAQ_delay_seconds $sock $config(guide_expose_s)
+		LWDAQ_delay_seconds $sock $config(g_expose_s)
 	
 		foreach dsock {6 7} {
 			LWDAQ_set_driver_mux $sock $dsock 0
@@ -3414,9 +3443,10 @@ proc DFPS_Manager_utils {} {
 # disable the mast controller, as well as set the controller sample period, with
 # the configure_mast_control routine. When we have guide_auto set to a list of
 # guide sensor, we read out these guide sensors every guide_auto_period seconds.
-# We also, check rahdec_url to see if it is a valid url, and if so, we download
-# from it and parse the result with a regular expression rahdec_pattern that
-# provides two substrings. One substring must be RAH, the other DEC. 
+# We also, check scope_url to see if it is a valid url, and if so, we download
+# from it and parse the result with a regular expression scope_pattern that
+# provides two substrings. One substring must be s_rah, the other s_dec.
+# 
 #
 proc DFPS_Manager_watchdog {} {
 	upvar #0 DFPS_Manager_config config
@@ -3504,18 +3534,18 @@ proc DFPS_Manager_watchdog {} {
 					"guide_auto_time [clock seconds]" $info(vcolor)
 			}
 			DFPS_Manager_guide_auto $config(guide_auto)
-			if {[regexp {http://} $config(rahdec_url) match]} {
-				set rahdec [LWDAQ_url_download $config(rahdec_url)]
-				if {[regexp $config(rahdec_pattern) $rahdec match rah dec]} {
-					set config(RAH) $rah
-					set config(DEC) $dec
+			if {[regexp {http://} $config(scope_url) match]} {
+				set scope [LWDAQ_url_download $config(scope_url)]
+				if {[regexp $config(scope_pattern) $scope match rah dec]} {
+					set config(s_rah) $rah
+					set config(s_dec) $dec
 					if {$config(verbose)} {
 						LWDAQ_print $info(text) \
-							"rahdec_url \"$rah\" \"$dec\"" $info(vcolor)
+							"scope_url \"$rah\" \"$dec\"" $info(vcolor)
+						LWDAQ_print $info(text) $scope
 					}
 				} else {
-					set rahdec [string range [string replace \n " "] 0 20]
-					LWDAQ_print $info(text) "ERROR: Invalid position \"$rahdec\'"
+					set scope [string range [string replace $scope \n " "] 0 50]
 				}
 			}			
 		}
@@ -3681,10 +3711,35 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 		set local [DFPS_Manager_local_from_guide $guide $x_g $y_g]
 		scan $local %f%f x_L y_L
 		set sky [DFPS_Manager_sky_from_local $x_L $y_L]
-		scan $sky %f%f ra dec
-		set info(mark_$guide) "[format %.6f $ra]   [format %.6f $dec]"
-		LWDAQ_print $info(text) "$guide [format $.3f $x_L]\
-			[format %.3f $y_L] $ra $dec" green
+		scan $sky %f%f rah dec
+		LWDAQ_print $info(text) "$guide [format %.3f $x_L]\
+			[format %.3f $y_L] [format %.6f $rah] [format %.6f $dec]" green
+	}
+
+	if {($cmd == "guide_star")} {
+		set zoom $config(guide_zoom)
+		if {$zoom < 1.0} {
+			set pix [expr $info(icx424q_pix_um)*round(1.0/$zoom)]
+		} else {
+			set pix [expr $info(icx424q_pix_um)/round($zoom)]
+		}
+		set y_g [format %.1f [expr \
+			$info(guide_height_um)-$pix*($y-$config(mouse_offset_y))]]
+		set x_g [format %.1f [expr \
+			$pix*($x-$config(mouse_offset_x))]]
+		if {$config(verbose)} {
+			LWDAQ_print $info(text) \
+				"guide_click guide=$guide x=$x y=$y cmd=$cmd\
+					zoom=$zoom pix=[format %.3f $pix]" $info(vcolor)
+		}
+		DFPS_Manager_guide_mark $guide $x_g $y_g "1"
+		set local [DFPS_Manager_local_from_guide $guide $x_g $y_g]
+		scan $local %f%f x_L y_L
+		set info(star_x) $x_L
+		set info(star_y) $y_L
+		set config(reckoning) "GUIDE"
+		LWDAQ_print $info(text) "$guide [format %.3f $x_L]\
+			[format %.3f $y_L] GUIDE_SET" green
 	}
 		
 	return ""
@@ -3776,10 +3831,14 @@ proc DFPS_Manager_open {} {
 		"OFF" "1" "2" "3" "4" "1 2" "3 4"
 	pack $f.lgauto $f.mgauto -side left -expand yes
 	
-	foreach a {guide_expose_s RAH DEC} {
+	label $f.lreckon -text "reckoning:" -fg $info(label_color)
+	tk_optionMenu $f.mreckon DFPS_Manager_config(reckoning) "GUIDE" "SCOPE"
+	pack $f.lreckon $f.mreckon -side left -expand yes
+
+	foreach a {g_expose_s g_rah g_dec s_rah s_dec} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
-			-width [expr [string length $config($a)] + 2]
+			-width [expr [string length $config($a)] + 1]
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
@@ -3791,6 +3850,8 @@ proc DFPS_Manager_open {} {
 		label $f.l$guide -image "dfps_guide_$guide"
 		bind $f.l$guide <Button-1> [list LWDAQ_post \
 			"DFPS_Manager_guide_click $guide %x %y guide_mark"]
+		bind $f.l$guide <Double-Button-1> [list LWDAQ_post \
+			"DFPS_Manager_guide_click $guide %x %y guide_star"]
 		pack $f.l$guide -side left -expand yes
 		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
 			-intensify $config(guide_intensify) -zoom $config(guide_zoom)
@@ -3818,19 +3879,12 @@ proc DFPS_Manager_open {} {
 	foreach m $info(positioner_masts) {
 		set fff [frame $ff.m$m]
 		pack $fff -side top -fill x
-		label $fff.title -text "Detector Fiber $m:" -fg $info(label_color) -width $lw
+		label $fff.title -text "Detector $m:" -fg $info(label_color) -width $lw
 		pack $fff.title -side left -expand yes
 		entry $fff.e$m -textvariable DFPS_Manager_info(detector_$m) -width $ew
 		pack $fff.e$m -side left -expand yes
 	}
-	foreach g $info(guide_sensors) {
-		set fff [frame $ff.g$g]
-		pack $fff -side top -fill x
-		label $fff.title -text "Guide Mark $g:" -fg $info(label_color) -width $lw
-		pack $fff.title -side left -expand yes
-		entry $fff.e$g -textvariable DFPS_Manager_info(mark_$g) -width $ew
-		pack $fff.e$g -side left -expand yes
-	}
+	
 	
 	set info(text) [LWDAQ_text_widget $w 80 15 1 1]
 	LWDAQ_print $info(text) "Manager Text Output" purple
