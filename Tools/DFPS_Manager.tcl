@@ -51,12 +51,13 @@ proc DFPS_Manager_init {} {
 	set info(fiber_view_cameras) "left right"
 	set info(focal_ratio) "13.5"
 	
-	# Telescope calibration. The x and y are in millimeters. The scale is in
+	# Telescope calibration. The plate_x and plate_y are in millimeters, and give
+	# the local coordinates of a reference star. The RAH and DEC give the  The scale is in
 	# arcseconds per millimeter. The rotation is in milliradians. The telescope
-	# pointing right ascension time (RAH) is in decimal hours. The declination (DEC)
-	# is in decimal degrees.
-	set info(plate_east) "0.0"
-	set info(plate_north) "0.0"
+	# pointing right ascension (RAH) is in decimal hours, while the declination
+	# (DEC) is in decimal degrees.
+	set info(plate_x) "0.0"
+	set info(plate_y) "0.0"
 	set info(plate_scale) "7.31"
 	set info(plate_rot) "22.0"
 	set config(RAH) "0.000000"
@@ -444,7 +445,7 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 	}
 	
 	set f [open $config(calib_file) w]
-	foreach a {east north scale rot} {
+	foreach a {x y scale rot} {
 		puts $f "set DFPS_Manager_info(plate_$a) \"$info(plate_$a)\""
 	}
 	foreach or $info(gscalib_orientations) {
@@ -514,7 +515,7 @@ proc DFPS_Manager_examine_calibration {} {
 	set i 0
 	
 	set f [frame $w.f[incr i]]
-	foreach a {east north scale rot} {
+	foreach a {x y scale rot} {
 		pack $f -side top -fill x
 		label $f.ml$a -text "plate_$a\:" -fg $info(label_color) -width $sl
 		entry $f.me$a -textvariable DFPS_Manager_info(plate_$a) -width $se
@@ -1043,11 +1044,11 @@ proc DFPS_Manager_sky_from_local {args} {
 	set east_s  [expr -$x_L*cos($a) + $y_L*sin($a)]
 	set north_s [expr -$x_L*sin($a) - $y_L*cos($a)]
 
-	set dec [expr ($north_s + $info(plate_north)) \
+	set dec [expr ($north_s + $info(plate_y)) \
 		* $info(plate_scale) / $info(arcsec_per_degree)]
 	set dec [expr $dec + $config(DEC)]
 
-	set ra [expr ($east_s + $info(plate_east)) \
+	set ra [expr ($east_s + $info(plate_x)) \
 		* $info(plate_scale) / $info(arcsec_per_degree) \
 		/ $info(deg_per_hr_equator) \
 		/ cos($dec*$info(radians_per_degree))]
@@ -1085,10 +1086,10 @@ proc DFPS_Manager_local_from_sky {args} {
 		* cos($dec*$info(radians_per_degree)) \
 		* $info(arcsec_per_degree) \
 		/ $info(plate_scale)]
-	set east_s [expr $east_s - $info(plate_east)]
+	set east_s [expr $east_s - $info(plate_x)]
 	set dec [expr $dec - $config(DEC)]
 	set north_s [expr $dec * $info(arcsec_per_degree) / $info(plate_scale)]
-	set north_s [expr $north_s - $info(plate_north)]
+	set north_s [expr $north_s - $info(plate_y)]
 
 	set a [expr $info(plate_rot)*0.001]
 	set x_L [expr (-$east_s*cos($a) - $north_s*sin($a))]
@@ -3290,7 +3291,7 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach a {fiducial_leds guide_leds} {
+	foreach a {ip_addr fiducial_leds guide_leds} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 16
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -3766,7 +3767,8 @@ proc DFPS_Manager_open {} {
 
 	label $f.lmc -text "mast_control:" -fg $info(label_color)
 	tk_optionMenu $f.mmc DFPS_Manager_config(mast_control) \
-		"OFF" "1" "2" "3" "4" "1 2 3 4"
+		"OFF" "1" "2" "3" "4" "1 2" "1 3" "1 4" "2 3" "2 4" \
+		"3 4" "1 2 3" "1 2 4" "1 3 4" "2 3 4" "1 2 3 4"
 	pack $f.lmc $f.mmc -side left -expand yes
 	
 	label $f.lgauto -text "guide_auto:" -fg $info(label_color)
@@ -3774,7 +3776,7 @@ proc DFPS_Manager_open {} {
 		"OFF" "1" "2" "3" "4" "1 2" "3 4"
 	pack $f.lgauto $f.mgauto -side left -expand yes
 	
-	foreach a {ip_addr guide_expose_s RAH DEC} {
+	foreach a {guide_expose_s RAH DEC} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
 			-width [expr [string length $config($a)] + 2]
