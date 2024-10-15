@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "3.5"
+	LWDAQ_tool_init "DFPS_Manager" "3.6"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -55,10 +55,10 @@ proc DFPS_Manager_init {} {
 	# arcseconds per millimeter. The rotation is in milliradians. The telescope
 	# pointing right ascension time (RAH) is in decimal hours. The declination (DEC)
 	# is in decimal degrees.
-	set info(plate_x) "0.0"
-	set info(plate_y) "0.0"
-	set info(plate_scale) "7.2"
-	set info(plate_rot) "0.0"
+	set info(plate_east) "0.0"
+	set info(plate_north) "0.0"
+	set info(plate_scale) "7.31"
+	set info(plate_rot) "22.0"
 	set config(RAH) "0.000000"
 	set config(DEC) "0.000000"
 	set info(arcsec_per_degree) "3600"
@@ -444,7 +444,7 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 	}
 	
 	set f [open $config(calib_file) w]
-	foreach a {x y scale rot} {
+	foreach a {east north scale rot} {
 		puts $f "set DFPS_Manager_info(plate_$a) \"$info(plate_$a)\""
 	}
 	foreach or $info(gscalib_orientations) {
@@ -514,7 +514,7 @@ proc DFPS_Manager_examine_calibration {} {
 	set i 0
 	
 	set f [frame $w.f[incr i]]
-	foreach a {x y scale rot} {
+	foreach a {east north scale rot} {
 		pack $f -side top -fill x
 		label $f.ml$a -text "plate_$a\:" -fg $info(label_color) -width $sl
 		entry $f.me$a -textvariable DFPS_Manager_info(plate_$a) -width $se
@@ -977,7 +977,7 @@ proc DFPS_Manager_sources_global {spots} {
 #
 # DFPS_Manager_local_from_global takes a point in global coordinates and
 # transforms it into local coordinates using the local coordinate pose. We pass
-# the global x, y, and z coordinates as separate parameter. The DFPS global
+# the global x, y, and z coordinates in one or more strings. The DFPS global
 # coordinate system is defined by three half-inch steel balls sitting on the
 # base plate in front of the fiducial stage. The DFPS local coordinate system is
 # defined by its fiducial plate. The fiducial plate defines a frame coordinate
@@ -997,9 +997,12 @@ proc DFPS_Manager_sources_global {spots} {
 # the transformation between local and global coordinates is to be accurate, we
 # must be sure to survey the fiducials at the start of each observing session.
 #
-proc DFPS_Manager_local_from_global {x_G y_G z_G} {
+proc DFPS_Manager_local_from_global {args} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
+
+	set params [join $args]
+	scan $params %f%f%f x_G y_G z_G
 
 	set lp [lwdaq xyz_local_from_global_point "$x_G $y_G $z_G" $info(local_coord)]
 	return $lp
@@ -1012,34 +1015,43 @@ proc DFPS_Manager_local_from_global {x_G y_G z_G} {
 # routine. See local_from_global for more information about the local and global
 # coordinate systems.
 #
-proc DFPS_Manager_global_from_local {x_L y_L z_L} {
+proc DFPS_Manager_global_from_local {args} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
+	set params [join $args]
+	scan $params %f%f%f x_L y_L z_L
+	
 	set gp [lwdaq xyz_global_from_local_point "$x_L $y_L $z_L" $info(local_coord)]
 	return $gp
 }
 
 #
 # DFPS_Manager_sky_from_local takes a point in local coordinates and transforms
-# it into sky coordinates using the telescope calibration and the current 
-# telescope pointing declination and right ascension.
+# it into sky coordinates using the telescope calibration and the current
+# telescope pointing declination and right ascension. We can pass the local x and
+# y in a single string or two strings.
 #
-proc DFPS_Manager_sky_from_local {x_L y_L} {
+proc DFPS_Manager_sky_from_local {args} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
+	set params [join $args]
+	scan $params %f%f x_L y_L
+	
 	set a [expr $info(plate_rot)*0.001]
-	set east_s  [expr -($x_L-$info(plate_x))*cos($a) - ($y_L-$info(plate_y))*sin($a)]
-	set north_s [expr +($x_L-$info(plate_x))*sin($a) - ($y_L-$info(plate_y))*cos($a)]
+	set east_s  [expr -$x_L*cos($a) + $y_L*sin($a)]
+	set north_s [expr -$x_L*sin($a) - $y_L*cos($a)]
 
-	set dec [expr $north_s * $info(plate_scale) / $info(arcsec_per_degree)]
-	set dec [expr $config(DEC) + $dec]
+	set dec [expr ($north_s + $info(plate_north)) \
+		* $info(plate_scale) / $info(arcsec_per_degree)]
+	set dec [expr $dec + $config(DEC)]
 
-	set ra [expr $east_s * $info(plate_scale) / $info(arcsec_per_degree) \
+	set ra [expr ($east_s + $info(plate_east)) \
+		* $info(plate_scale) / $info(arcsec_per_degree) \
 		/ $info(deg_per_hr_equator) \
 		/ cos($dec*$info(radians_per_degree))]
-	set ra [expr $config(RAH) + $ra]
+	set ra [expr $ra + $config(RAH)]
 
 	set ra [format %.6f $ra] 
 	set dec [format %.6f $dec]
@@ -1058,23 +1070,29 @@ proc DFPS_Manager_sky_from_local {x_L y_L} {
 # DFPS_Manager_local_from_sky takes a point in sky coordinates and transforms
 # it into local coordinates using the telescope calibration and the current 
 # telescope pointing declination and right ascension. The sky coordinates are
-# in right ascension, decimal hours, and declination, decimal degrees.
+# in right ascension, decimal hours, and declination, decimal degrees. We can
+# pass the two in a single string of two strings.
 #
-proc DFPS_Manager_local_from_sky {ra dec} {
+proc DFPS_Manager_local_from_sky {args} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
+	set params [join $args]
+	scan $params %f%f ra dec
+	
 	set ra [expr $ra - $config(RAH)]
 	set east_s [expr $ra * $info(deg_per_hr_equator) \
 		* cos($dec*$info(radians_per_degree)) \
 		* $info(arcsec_per_degree) \
 		/ $info(plate_scale)]
+	set east_s [expr $east_s - $info(plate_east)]
 	set dec [expr $dec - $config(DEC)]
 	set north_s [expr $dec * $info(arcsec_per_degree) / $info(plate_scale)]
+	set north_s [expr $north_s - $info(plate_north)]
 
 	set a [expr $info(plate_rot)*0.001]
-	set x_L [expr (-$east_s*cos($a) + $north_s*sin($a)) + $info(plate_x)]
-	set y_L [expr (-$east_s*sin($a) - $north_s*cos($a)) + $info(plate_y)]
+	set x_L [expr (-$east_s*cos($a) - $north_s*sin($a))]
+	set y_L [expr (+$east_s*sin($a) - $north_s*cos($a))]
 	
 	set x_L [format %.3f $x_L] 
 	set y_L [format %.3f $y_L]
@@ -1720,10 +1738,14 @@ proc DFPS_Manager_guide_mark {guide x_g y_g {color "2"}} {
 # the fiducial stage. The routine returns x, y, and z coordinates of the
 # transformed local point in millimeters. 
 #
-proc DFPS_Manager_local_from_guide {guide x_g y_g} {
+proc DFPS_Manager_local_from_guide {args} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
+	# Extract the guide number and sensor coordinates from the argument string.
+	set params [join $args]
+	scan $params %d%f%f guide x_g y_g
+
 	# Check the input parameters.
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
 		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in local_from_guide."
@@ -1768,14 +1790,18 @@ proc DFPS_Manager_local_from_guide {guide x_g y_g} {
 # is a two-dimensional plane, we take the three-dimensional local coordinate
 # point and project it onto the guide sensor in the z-direction. We pass the
 # local coordinates into the routine with a string of three numbers xyz in
-# millimeters. We pass the local coordinate point as three separate parameters
-# x, y, and z in millimeters. The routine returns the guide coordinate x and y
-# in microns.
+# millimeters. We provide the guide number and local coordinates x, y, and z in
+# millimeters, either in one string or seprate strings. The routine returns the
+# guide coordinate x and y in microns.
 #
-proc DFPS_Manager_guide_from_local {guide x_L y_L z_L} {
+proc DFPS_Manager_guide_from_local {args} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
+	# Extract the guide number and sensor coordinates from the argument string.
+	set params [join $args]
+	scan $params %d%f%f%f guide x_L y_L z_L
+
 	# Check the guide sensor number.
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
 		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in guide_from_local."
@@ -3656,7 +3682,8 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 		set sky [DFPS_Manager_sky_from_local $x_L $y_L]
 		scan $sky %f%f ra dec
 		set info(mark_$guide) "[format %.6f $ra]   [format %.6f $dec]"
-		LWDAQ_print $info(text) "$guide $x_L $y_L $ra $dec" green
+		LWDAQ_print $info(text) "$guide [format $.3f $x_L]\
+			[format %.3f $y_L] $ra $dec" green
 	}
 		
 	return ""
