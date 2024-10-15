@@ -216,6 +216,8 @@ proc DFPS_Manager_init {} {
 	set config(guide_auto_period) "5"
 	set info(guide_auto_time) "0"
 	set info(binary_result) "0"
+	set config(rahdec_url) "http://198.214.229.56:22401/register"
+	set config(rahdec_pattern) {"RA_HOUR": ([0-9\.]*),.*?"DEC_DEGREE": ([0-9\.]*)}
 	
 	# Window settings.
 	set info(label_color) "brown"
@@ -3140,6 +3142,56 @@ proc DFPS_Manager_utils_transmit {} {
 }
 
 #
+# DFPS_Manager_sky_table
+#
+proc DFPS_Manager_sky_table {} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	LWDAQ_print $info(utils_text) "Object Positions (object, RAH, DEC):"
+	set guides [list]
+	foreach g $info(guide_sensors) {
+		set local [DFPS_Manager_local_from_guide \
+			$g [expr $info(guide_width_um)/2.0] [expr $info(guide_height_um)/2.0]]
+		scan $local %f%f x y
+		set sky [DFPS_Manager_sky_from_local $x $y]
+		lappend guides "Guide_$g $sky"
+	}
+	set detectors [list]
+	foreach m $info(positioner_masts) {
+		set local [DFPS_Manager_detector_get $m $config(detector_set)]
+		scan $local %f%f x y
+		set sky [DFPS_Manager_sky_from_local $x $y]
+		lappend detectors "Detector_$m $sky"
+	}
+	
+	foreach g $guides {
+		LWDAQ_print $info(utils_text) $g
+	}
+	foreach m $detectors {
+		LWDAQ_print $info(utils_text) $m
+	}
+		
+	LWDAQ_print $info(utils_text) "\nTranslation Vectors (object, object, RAH, DEC):"
+	set vectors [list]
+	foreach g $guides {
+		scan $g %s%f%f gn grah gdec
+		foreach m $detectors {
+			scan $m %s%f%f dn drah ddec
+			set rahdiff [format %.6f [expr $drah-$grah]]
+			set decdiff [format %.6f [expr $ddec-$gdec]]
+			lappend vectors "$gn $dn $rahdiff $decdiff"
+		}
+	}
+	
+	foreach v $vectors {
+		LWDAQ_print $info(utils_text) $v	
+	}
+	
+	return ""
+}
+
+#
 # DFPS_Manager_utils opens the Utilities Panel, where we have various options for
 # calibrating the DFPS optical components, transmitting commands to fiber controllers,
 # and opening LWDAQ instruments.
@@ -3190,7 +3242,8 @@ proc DFPS_Manager_utils {} {
 			"Guide Sensor Calib" gscalib \
 			"Fiducial Fiber Calib" frot \
 			"Mast and Detector Calib" mcalib \
-			"Fiber View Camera Calib" fvcalib} {
+			"Fiber View Camera Calib" fvcalib \
+			"Sky Table" sky_table} {
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
 		pack $f.$b -side left -expand 1
 	}
@@ -3320,19 +3373,23 @@ proc DFPS_Manager_utils {} {
 
 #
 # DFPS_Manager_watchdog watches the system commands list for incoming commands,
-# manages periodic survey of the fiducial fibers, and manages the mast position
-# controller. It posts itself repeatedly to the LWDAQ event queue. Each time it
-# runs, it checks the fiducial survey timer, the mast control timer, and the
-# server command list. A fiducial survey causes the fiber view cameras to
-# measure the fiducial positions, followed by adjustment of the local coordinate
-# pose in the global DFPS coordinates. This pose allows us to convert fiber view
-# camera measurements of mast positions into local coordinates. The mast
-# controller measures mast positions, calculates their offsets from their target
-# positions, and adjusts the actuator drive voltages so as to move the mast
-# closer to its target position. We can enable and disable the mast controller,
-# as well as set the controller sample period, with the configure_mast_control
-# routine. The system server takes commands from the server socket, executes
-# them, and returns the command result string over the same socket.
+# manages periodic survey of the fiducial fibers, manages the mast position
+# controller, and manages periodic reading of guide sensors and updating of the
+# telescope position from a url. It posts itself repeatedly to the LWDAQ event
+# queue. Each time it runs, it checks the fiducial survey timer, the mast
+# control timer, and the server command list. A fiducial survey causes the fiber
+# view cameras to measure the fiducial positions, followed by adjustment of the
+# local coordinate pose in the global DFPS coordinates. This pose allows us to
+# convert fiber view camera measurements of mast positions into local
+# coordinates. The mast controller measures mast positions, calculates their
+# offsets from their target positions, and adjusts the actuator drive voltages
+# so as to move the mast closer to its target position. We can enable and
+# disable the mast controller, as well as set the controller sample period, with
+# the configure_mast_control routine. When we have guide_auto set to a list of
+# guide sensor, we read out these guide sensors every guide_auto_period seconds.
+# We also, check rahdec_url to see if it is a valid url, and if so, we download
+# from it and parse the result with a regular expression rahdec_pattern that
+# provides two substrings. One substring must be RAH, the other DEC. 
 #
 proc DFPS_Manager_watchdog {} {
 	upvar #0 DFPS_Manager_config config
@@ -3420,6 +3477,19 @@ proc DFPS_Manager_watchdog {} {
 					"guide_auto_time [clock seconds]" $info(vcolor)
 			}
 			DFPS_Manager_guide_auto $config(guide_auto)
+			if {[regexp {http://} $config(rahdec_url) match]} {
+				set rahdec [LWDAQ_url_download $config(rahdec_url)]
+				if {[regexp $config(rahdec_pattern) $rahdec match rah dec]} {
+					set config(RAH) $rah
+					set config(DEC) $dec
+					if {$config(verbose)} {
+						LWDAQ_print $info(text) "rahdec_url $rah $dec" $info(vcolor)
+					}
+				} else {
+					set rahdec [string range [string replace \n " "] 0 20]
+					LWDAQ_print $info(text) "ERROR: Invalid position \"$rahdec\'"
+				}
+			}			
 		}
 	} {
 		set info(guide_auto_time) "0"
