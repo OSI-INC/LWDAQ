@@ -138,7 +138,7 @@ proc DFPS_Manager_init {} {
 # Nominal: 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
 # C0630 Y71003: 12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765
 # C0625 Y71080: 12.675 39.312 1.000 -6.766 3.157 2.000 19.020 2.003
-	
+
 	# Fiber view camera mount measurents.
 	set info(mount_left) \
 "80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868"
@@ -3498,7 +3498,7 @@ proc DFPS_Manager_watchdog {} {
 				LWDAQ_print $info(text) \
 					"mast_control_time [clock seconds]" $info(vcolor)
 			}
-			set control_report "[clock seconds] "
+			set control_report "[clock seconds] $config(s_rah) $config(s_dec) "
 			
 			foreach m $config(mast_control) {
 				DFPS_Manager_mast_measure $m
@@ -3514,8 +3514,8 @@ proc DFPS_Manager_watchdog {} {
 					"[format %.3f $xo] [format %.3f $yo] $info(voltage_$m) "
 			}
 			if {![winfo exists $info(window)]} {return ""}
-			if {[winfo exists $info(utils_text)] && $config(report)} {
-				LWDAQ_print $info(utils_text) $control_report
+			if {$config(report)} {
+				LWDAQ_print $info(text) $control_report
 			} 
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) $control_report $info(vcolor)
@@ -3542,7 +3542,6 @@ proc DFPS_Manager_watchdog {} {
 					if {$config(verbose)} {
 						LWDAQ_print $info(text) \
 							"scope_url \"$rah\" \"$dec\"" $info(vcolor)
-						LWDAQ_print $info(text) $scope
 					}
 				} else {
 					set scope [string range [string replace $scope \n " "] 0 50]
