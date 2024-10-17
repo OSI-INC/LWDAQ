@@ -117,7 +117,7 @@ proc DFPS_Manager_init {} {
 	set config(detector_set) "2"
 	foreach m $info(positioner_masts) {
 		set info(mast_$m) "0.000 0.000"
-		set info(detector_$m) "$config(s_rah)   $config(s_dec)"
+		set info(detector_$m) "$config(s_rah)  $config(s_dec)"
 		set info(target_$m) "0.000 0.000"
 		set info(offset_$m) "0.000 0.000"
 	}
@@ -223,7 +223,8 @@ proc DFPS_Manager_init {} {
 	set info(guide_auto_time) "0"
 	set info(binary_result) "0"
 	set config(scope_url) "http://198.214.229.56:22401/register"
-	set config(scope_pattern) {"RA_HOUR": ([^,]*),.*?"DEC_DEGREE": ([^,]*)}
+	set info(scope_pattern) {"RA_HOUR": ([^,]*),.*?"DEC_DEGREE": ([^,]*)}
+	set config(spiral_control) "Idle"
 	
 	# Window settings.
 	set info(label_color) "brown"
@@ -512,7 +513,7 @@ proc DFPS_Manager_examine_calibration {} {
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Calibration Constants, DFPS Manager $info(version)"
-	} {
+	} else {
 		raise $w
 		return ""
 	}
@@ -826,6 +827,61 @@ proc DFPS_Manager_controller_zero_all {} {
 }
 
 #
+# DFPS_Manager_controller_spiral executes one step in an outward spiral of one
+# or more fibers. The first argument is a list of controller identifiers,
+# "step" is the size of the control voltage step, in units of sixteen-bit DAC
+# counts, "remaining" tells the routine how many more steps remain
+# in the spiral before it's complete. The "path" is a list of previous upleft
+# and upright voltages. The routine shows mast positions and recalculates
+# detector fiber positions as it goes. The routine stops calling itself when it
+# completes the final step, or when we set spiral_control to "Stop".
+#
+proc DFPS_Manager_controller_spiral  {controllers step remaining path} {
+	upvar #0 DFPS_Manager_config config
+	upvar #0 DFPS_Manager_info info
+
+	if {$config(spiral_control) == "Stop"} {
+		set config(spiral_control) "Idle"
+		return ""
+	} else {
+		set config(spiral_control) "Spiral"
+	}
+	
+	
+	
+	if {[llength $path] == 0} {
+		set point "0 0"
+	} elseif {[llength $path] == 1} {
+		set point "1 0"
+	} else {
+		scan [lindex $path end] %d%d ii jj
+		scan [lindex $path end-1] %d%d iii jjj
+		set di [expr $ii - $iii]
+		set dj [expr $jj - $jjj]
+		set rsi [expr $dj]
+		set rsj [expr 0 - $di]
+		set ri [expr $ii + $rsi]
+		set rj [expr $jj + $rsj]
+		set point "$ri $rj"
+		if {[lsearch $path $point] >= 0} {
+			set point "[expr $ii + $di] [expr $jj + $dj]"
+		}
+	}
+	
+	lappend path $point
+	scan $point %d%d i j
+	LWDAQ_print $info(text) "[format %.2f [expr $i*$step]]\
+		[format %.2f [expr $j*$step]]"
+
+	set remaining [expr $remaining - 1]
+	if {$remaining > 0} {
+		LWDAQ_post [list DFPS_Manager_controller_spiral \
+			$controllers $step $remaining $path]
+	}
+	return ""
+}
+
+#
 # DFPS_Manager_spots captures an image of the sources whose light sources are
 # listed in the leds argument. If we pass an empty string for the elements, the
 # routine combines the fiducial and guide elements to obtain a list of all
@@ -1052,7 +1108,7 @@ proc DFPS_Manager_sky_from_local {args} {
 	if {$config(reckoning) == "GUIDE"} {
 		set plate_x $info(star_x)
 		set plate_y $info(star_y)
-	} {
+	} else {
 		set plate_x $info(scope_x)
 		set plate_y $info(scope_y)
 	}
@@ -1062,7 +1118,7 @@ proc DFPS_Manager_sky_from_local {args} {
 	set dec [expr $north_s * $info(plate_scale) / $info(arcsec_per_degree)]
 	if {$config(reckoning) == "GUIDE"} {
 		set dec [expr $dec + $config(g_dec)]
-	} {
+	} else {
 		set dec [expr $dec + $config(s_dec)]
 	}
 
@@ -1071,7 +1127,7 @@ proc DFPS_Manager_sky_from_local {args} {
 		/ cos($dec*$info(radians_per_degree))]
 	if {$config(reckoning) == "GUIDE"} {
 		set rah [expr $rah + $config(g_rah)]
-	} {
+	} else {
 		set rah [expr $rah + $config(s_rah)]
 	}
 	
@@ -1107,7 +1163,7 @@ proc DFPS_Manager_local_from_sky {args} {
 		set dec [expr $dec - $config(g_dec)]
 		set plate_x $info(star_x)
 		set plate_y $info(star_y)
-	} {
+	} else {
 		set rah [expr $rah - $config(s_rah)]
 		set dec [expr $dec - $config(s_dec)]
 		set plate_x $info(scope_x)
@@ -2131,7 +2187,7 @@ proc DFPS_Manager_fvcalib_read {{fn ""}} {
 	if {$fn == ""} {
 		set info(fvcalib) "Idle"
 		return ""
-	} {
+	} else {
 		set img_dir [file dirname $fn]
 	}
 	
@@ -2331,7 +2387,7 @@ proc DFPS_Manager_fvcalib {} {
 		toplevel $w
 		wm title $w "Fiber View Camera Coordinate Measurement Machine Calibrator,\
 			DFPS Manager $info(version)"
-	} {
+	} else {
 		raise $w
 	}
 	
@@ -2561,7 +2617,7 @@ proc DFPS_Manager_gscalib {} {
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Guide Sensor Rasnik Calibration, DFPS Manager $info(version)"
-	} {
+	} else {
 		raise $w
 		return ""
 	}
@@ -2772,7 +2828,7 @@ proc DFPS_Manager_frot {} {
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Fiducial Calibration, DFPS Manager $info(version)"
-	} {
+	} else {
 		raise $w
 		return ""
 	}
@@ -3260,7 +3316,7 @@ proc DFPS_Manager_utils {} {
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Utilities Panel, DFPS Manager $info(version)"
-	} {
+	} else {
 		raise $w
 		return ""
 	}
@@ -3482,7 +3538,7 @@ proc DFPS_Manager_watchdog {} {
 			}
 			DFPS_Manager_fsurvey
 		}
-	} {
+	} else {
 		set info(fiducial_survey_time) "0"
 	}
 	
@@ -3521,7 +3577,7 @@ proc DFPS_Manager_watchdog {} {
 				LWDAQ_print $info(text) $control_report $info(vcolor)
 			}
 		}
-	} {
+	} else {
 		set info(mast_control_time) "0"
 	}
 	
@@ -3548,7 +3604,7 @@ proc DFPS_Manager_watchdog {} {
 				}
 			}			
 		}
-	} {
+	} else {
 		set info(guide_auto_time) "0"
 	}
 	
