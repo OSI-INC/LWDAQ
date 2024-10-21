@@ -52,7 +52,7 @@ proc Videoplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Videoplayer" "5"
+	LWDAQ_tool_init "Videoplayer" "6"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -1021,10 +1021,13 @@ proc Videoplayer_reencode {{vfn ""}} {
 		set time_control "-ss $start -t [format %.3f [expr $end - $start]]"
 	}
 	
-	# Determine re-encoded video dimensions.
+	# Determine re-encoded video dimensions. We have to make sure these dimensions are
+	# divisible by two or else H264 will abort.
 	set w [expr round($config(video_width)*$config(display_scale))]
+	if {$w % 2 == 1} {incr w}
 	set h [expr round($config(video_height)*$config(display_scale))]
-
+	if {$h % 2 == 1} {incr h}
+	
 	# Combine dimensions and rotation into one video filter.
 	switch $config(display_rotation) {
 		"0" {
