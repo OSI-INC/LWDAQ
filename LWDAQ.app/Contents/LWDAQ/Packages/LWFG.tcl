@@ -10,34 +10,37 @@
 # value 10.0.0.37, and from there we use the Configurator Tool to configure the
 # relay for our use. 
 #
-# Load the LWFG routine into your LWDAQ process with the "package require"
-# command. The routines the package uses are to be found in the LWDAQ Driver.tcl
-# file, from which the code that performs the communication with the function
-# generator may be copied.
+# Load the LWFG routines into your LWDAQ process with the "package require"
+# command. The package itself calls routines from LWDAQ Driver.tcl to
+# communicate with the function generator. This communication uses the LWDAQ
+# messaging protocol.
+#
+
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation; either version 2 of the License, or (at your option) any later
 # version.
-
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 # details.
-
+#
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 
-# Version 1.1 [01-FEB-24] First version, in use in the SCT Checkt tool.
-# Version 1.2 [20-MAR-24] Clip waveform DAC values to 0..255.
-# Version 1.3 [28-MAR-24] Fix reset value of triangle wave: now zero volts.
-# Version 1.4 [13-JUN-24] Update time constants to suite A3050B.
-# Version 1.5 [25-JUN-24] Add sinusoidal sweep routine.
+# V1.1 [01-FEB-24] First version, in use in the SCT Checkt tool.
+# V1.2 [20-MAR-24] Clip waveform DAC values to 0..255.
+# V1.3 [28-MAR-24] Fix reset value of triangle wave: now zero volts.
+# V1.4 [13-JUN-24] Update time constants to suite A3050B.
+# V1.5 [25-JUN-24] Add sinusoidal sweep routine.
+# V1.6 [01-NOV-24] New FG memory map.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide LWFG 1.5
+package provide LWFG 1.6
 
 # Clear the global EDF array if it already exists.
 if {[info exists LWFG]} {unset LWFG}
@@ -47,15 +50,17 @@ set LWFG(data_portal) "63"
 
 # Data addresses for channel one.
 set LWFG(ch1_ram) "0x0000"
-set LWFG(ch1_rc) "0x8000"
-set LWFG(ch1_div) "0x8002"
-set LWFG(ch1_len) "0x800A"
+set LWFG(ch1_div) "0x8000"
+set LWFG(ch1_len) "0x8004"
+set LWFG(ch1_rc)  "0x8006"
+set LWFG(ch1_att) "0x8007"
 
 # Data addresses for channel two.
-set LWFG(ch2_ram) "0x4000"
-set LWFG(ch2_rc) "0x8001"
-set LWFG(ch2_div) "0x8006"
-set LWFG(ch2_len) "0x800C"
+set LWFG(ch2_ram) "0x0010"
+set LWFG(ch2_div) "0x8010"
+set LWFG(ch2_len) "0x8014"
+set LWFG(ch2_rc)  "0x8016"
+set LWFG(ch2_att) "0x8017"
 
 # Shared characteristics of the channels.
 set LWFG(max_pts) "8192"
@@ -78,7 +83,8 @@ set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1
 		2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
 		2.8e5 0x48 1.0e6 0x81 2.2e6 0x82 5.4e6 0x84 1.1e7 0x88"
 		
-# The ideal filter has a time constant that is some fraction of the waveform period.
+# The ideal filter for sine and triangle waves has a time constant that is some
+# fraction of the waveform period.
 set LWFG(rc_fraction) "0.01"
 
 #

@@ -26,7 +26,7 @@ proc Startup_Manager_init {} {
 	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Startup_Manager" 1.6
+	LWDAQ_tool_init "Startup_Manager" "1.7"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -378,6 +378,14 @@ proc Startup_Manager_execute {} {
 			set info(control) "Idle"
 			return ""
 		}
+	}
+	
+	# Check that the step list is not empty.
+	set info(steps) [string trim $info(steps)]
+	if {$info(steps) == ""} {
+		LWDAQ_print $info(text) "ERROR: Startup script is empty or not yet loaded."
+		set info(control) "Idle"
+		return ""
 	}
 	
 	# Obtain the step type from the script. We take some trouble to remove the 
