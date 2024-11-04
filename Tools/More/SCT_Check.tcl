@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "1.7"
+	LWDAQ_tool_init "SCT_Check" "1.8"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -148,6 +148,7 @@ proc SCT_Check_on {} {
 				set result [lrange $result 1 end] 
 			}
 			LWDAQ_print $info(text) "rc = [format %3.f [expr 0.001*[lindex $result 0]]] us"
+			LWDAQ_print $info(text) "att = [lindex $result 1]"
 			set actual [expr $LWFG(clock_hz)*$num_cycles/$num_pts/$divisor]
 			LWDAQ_print $info(text) "actual = [format %.3f $actual] Hz"
 			LWDAQ_print $info(text) "requested = [format %.3f $config(waveform_frequency)] Hz"
@@ -172,6 +173,7 @@ proc SCT_Check_on {} {
 				set result [lrange $result 1 end] 
 			}
 			LWDAQ_print $info(text) "rc = [format %3.f [expr 0.001*[lindex $result 0]]] us"
+			LWDAQ_print $info(text) "att = [lindex $result 1]"
 		}
 	}
 	
