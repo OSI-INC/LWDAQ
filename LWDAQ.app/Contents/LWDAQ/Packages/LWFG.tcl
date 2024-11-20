@@ -89,7 +89,7 @@ set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1
 set LWFG(rc_fraction) "0.01"
 
 # The attenuator consists of a series resistor and four selectable dividing resistors.
-set LWFG(att_options) "1.0 0x00 0.306 0x01 0.154 0x02 0.106 0x04 0.087 0x08"
+set LWFG(att_options) "1.04 0x00 0.320 0x01 0.116 0x03 0.0588 0x07 0.0360 0x0F"
 
 #
 # LWDAQ_off sets the output of the function generator at address IP, channel number
@@ -288,7 +288,7 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	
 	# Return enough information about the waveform for us to assess accuracy.
 	return "$dac_lo $dac_hi $divisor $num_pts $num_cycles\
-		[format %.0f $rc] [format %.3f $attenuition]"
+		[format %.0f $rc] [format %.4f $attenuition]"
 }
 
 #
@@ -398,7 +398,7 @@ proc LWFG_sweep_sine {ip ch_num f_lo f_hi v_lo v_hi t_len log} {
 	
 	# Return enough information about the waveform for us to assess accuracy.
 	return "$dac_lo $dac_hi $divisor $num_pts 1\
-		[format %.0f $rc] [format %.3f $attenuition]"
+		[format %.0f $rc] [format %.4f $attenuition]"
 }
 
 
