@@ -10,34 +10,38 @@
 # value 10.0.0.37, and from there we use the Configurator Tool to configure the
 # relay for our use. 
 #
-# Load the LWFG routine into your LWDAQ process with the "package require"
-# command. The routines the package uses are to be found in the LWDAQ Driver.tcl
-# file, from which the code that performs the communication with the function
-# generator may be copied.
+# Load the LWFG routines into your LWDAQ process with the "package require"
+# command. The package itself calls routines from LWDAQ Driver.tcl to
+# communicate with the function generator. This communication uses the LWDAQ
+# messaging protocol.
+#
+
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation; either version 2 of the License, or (at your option) any later
 # version.
-
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 # details.
-
+#
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, write to the Free Software Foundation, Inc., 59 Temple
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 
-# Version 1.1 [01-FEB-24] First version, in use in the SCT Checkt tool.
-# Version 1.2 [20-MAR-24] Clip waveform DAC values to 0..255.
-# Version 1.3 [28-MAR-24] Fix reset value of triangle wave: now zero volts.
-# Version 1.4 [13-JUN-24] Update time constants to suite A3050B.
-# Version 1.5 [25-JUN-24] Add sinusoidal sweep routine.
+# V1.1 [01-FEB-24] First version, in use in the SCT Checkt tool.
+# V1.2 [20-MAR-24] Clip waveform DAC values to 0..255.
+# V1.3 [28-MAR-24] Fix reset value of triangle wave: now zero volts.
+# V1.4 [13-JUN-24] Update time constants to suite A3050B.
+# V1.5 [25-JUN-24] Add sinusoidal sweep routine.
+# V1.6 [01-NOV-24] New FG memory map.
+# V1.7 [04-NOV-24] Implement automatic attenuation selection.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide LWFG 1.5
+package provide LWFG 1.7
 
 # Clear the global EDF array if it already exists.
 if {[info exists LWFG]} {unset LWFG}
@@ -47,15 +51,17 @@ set LWFG(data_portal) "63"
 
 # Data addresses for channel one.
 set LWFG(ch1_ram) "0x0000"
-set LWFG(ch1_rc) "0x8000"
-set LWFG(ch1_div) "0x8002"
-set LWFG(ch1_len) "0x800A"
+set LWFG(ch1_div) "0x8000"
+set LWFG(ch1_len) "0x8004"
+set LWFG(ch1_rc)  "0x8006"
+set LWFG(ch1_att) "0x8007"
 
 # Data addresses for channel two.
 set LWFG(ch2_ram) "0x4000"
-set LWFG(ch2_rc) "0x8001"
-set LWFG(ch2_div) "0x8006"
-set LWFG(ch2_len) "0x800C"
+set LWFG(ch2_div) "0x8010"
+set LWFG(ch2_len) "0x8014"
+set LWFG(ch2_rc)  "0x8016"
+set LWFG(ch2_att) "0x8017"
 
 # Shared characteristics of the channels.
 set LWFG(max_pts) "8192"
@@ -78,8 +84,12 @@ set LWFG(rc_options) "1.3e1 0x01 5.1e1 0x11 1.1e2 0x21 2.7e2 0x14 5.6e2 0x18 1.1
 		2.4e3 0x22 5.9e3 0x24 1.2e4 0x28 2.6e4 0x41 5.5e4 0x42 1.4e5 0x44 \
 		2.8e5 0x48 1.0e6 0x81 2.2e6 0x82 5.4e6 0x84 1.1e7 0x88"
 		
-# The ideal filter has a time constant that is some fraction of the waveform period.
+# The ideal filter for sine and triangle waves has a time constant that is some
+# fraction of the waveform period.
 set LWFG(rc_fraction) "0.01"
+
+# The attenuator consists of a series resistor and four selectable dividing resistors.
+set LWFG(att_options) "1.04 0x00 0.320 0x01 0.116 0x03 0.0588 0x07 0.0360 0x0F"
 
 #
 # LWDAQ_off sets the output of the function generator at address IP, channel number
@@ -132,6 +142,21 @@ proc LWFG_off {ip ch_num} {
 #
 proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	global LWFG
+	
+	# Determine if we should use an attenuator setting. 
+	set attenuator [lindex $LWFG(att_options) 1]
+	set attenuition [lindex $LWFG(att_options) 0]
+	foreach {a c} $LWFG(att_options) {
+		if {($v_lo/$a <=  $LWFG(ch_v_hi)) && ($v_lo/$a >= $LWFG(ch_v_lo)) \
+		&& ($v_hi/$a <=  $LWFG(ch_v_hi)) && ($v_hi/$a >= $LWFG(ch_v_lo))} {
+			set attenuator $c
+			set attenuition $a
+		}
+	}
+	
+	# Adjust the v_lo and v_hi to suite the attenuition.
+	set v_lo [expr $v_lo / $attenuition]
+	set v_hi [expr $v_hi / $attenuition]
 
 	# Determine the lower and upper DAC values for our lower and upper waveform
 	# voltages.
@@ -239,6 +264,10 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_rc)
 		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format c [expr $filter]]
 		
+		# Set the attenuator configuration register.
+		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_att)
+		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format c [expr $attenuator]]
+		
 		# Set the clock divisor.
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_div)
 		LWDAQ_stream_write $sock $LWFG(data_portal) [binary format I [expr $divisor - 1]]
@@ -258,7 +287,8 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	}
 	
 	# Return enough information about the waveform for us to assess accuracy.
-	return "$dac_lo $dac_hi $divisor $num_pts $num_cycles [format %.0f $rc]"
+	return "$dac_lo $dac_hi $divisor $num_pts $num_cycles\
+		[format %.0f $rc] [format %.4f $attenuition]"
 }
 
 #
@@ -269,6 +299,21 @@ proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 #
 proc LWFG_sweep_sine {ip ch_num f_lo f_hi v_lo v_hi t_len log} {
 	global LWFG
+
+	# Determine if we should use an attenuator setting. 
+	set attenuator [lindex $LWFG(att_options) 1]
+	set attenuition [lindex $LWFG(att_options) 0]
+	foreach {a c} $LWFG(att_options) {
+		if {($v_lo/$a <=  $LWFG(ch_v_hi)) && ($v_lo/$a >= $LWFG(ch_v_lo)) \
+		&& ($v_hi/$a <=  $LWFG(ch_v_hi)) && ($v_hi/$a >= $LWFG(ch_v_lo))} {
+			set attenuator $c
+			set attenuition $a
+		}
+	}
+	
+	# Adjust the v_lo and v_hi to suite the attenuition.
+	set v_lo [expr $v_lo / $attenuition]
+	set v_hi [expr $v_hi / $attenuition]
 
 	# Determine the lower and upper DAC values for our lower and upper waveform
 	# voltages.
@@ -334,6 +379,9 @@ proc LWFG_sweep_sine {ip ch_num f_lo f_hi v_lo v_hi t_len log} {
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_rc)
 		LWDAQ_stream_write $sock $LWFG(data_portal) \
 			[binary format c [expr $filter]]
+		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_att)
+		LWDAQ_stream_write $sock $LWFG(data_portal) \
+			[binary format c [expr $attenuator]]
 		LWDAQ_set_data_addr $sock $LWFG(ch$ch_num\_div)
 		LWDAQ_stream_write $sock $LWFG(data_portal) \
 			[binary format I [expr $divisor - 1]]
@@ -349,7 +397,8 @@ proc LWFG_sweep_sine {ip ch_num f_lo f_hi v_lo v_hi t_len log} {
 	}
 	
 	# Return enough information about the waveform for us to assess accuracy.
-	return "$dac_lo $dac_hi $divisor $num_pts 1 [format %.0f $rc]"
+	return "$dac_lo $dac_hi $divisor $num_pts 1\
+		[format %.0f $rc] [format %.4f $attenuition]"
 }
 
 
