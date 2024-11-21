@@ -3,19 +3,18 @@ Routines for Image Handling
 Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
 Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place - Suite 330, Boston, MA  02111-1307, USA.
 }
 unit images;
 
@@ -1143,12 +1142,12 @@ begin
 end;
 
 {
-	draw_image draws the specified image in the drawing space. If there
-	is not enough room in the drawing space, draw_image allocates more
-	space. To determine the colors in the drawing space from the colors in
-	the image pixels, draw_image composes a color look-up table. To determine
-	overlay colors from the colors in the image overlay, draw_image composes
-	another look-up table.
+	draw_image draws the specified image in the drawing space. If there is not
+	enough room in the drawing space, draw_image allocates more space. To
+	determine the colors in the drawing space from the colors in the image
+	pixels, draw_image composes a color look-up table. To determine overlay
+	colors from the colors in the image overlay, draw_image composes another
+	look-up table.
 }
 procedure draw_image(ip:image_ptr_type);
 
@@ -1413,11 +1412,11 @@ end;
 	over them like this:
 	
 	GB
-	RB
+	RG
 	
 	The routine performs intensification of color, and scales the red and blue
-	with respect to the green using the global variables rggb_blue_scale
-	and rggb_red_scale.
+	with respect to the green using the global variables rggb_blue_scale and
+	rggb_red_scale.
 }
 procedure draw_gbrg_image(ip:image_ptr_type);
 
@@ -1583,8 +1582,8 @@ begin
 end;
 
 {
-	write_image_list appends a list of images with names matching the 
-	key string to a string.
+	write_image_list appends a list of images with names matching the key string
+	to a string.
 }
 procedure write_image_list(var f:string;key:string;verbose:boolean);
 
