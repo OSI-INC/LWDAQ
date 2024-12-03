@@ -4,7 +4,7 @@
 # the LWDAQ software.
 
 # Mount point for remote disk.
-RMT="/Users/kevan/BND-SFTP.localized"
+RMT="/Users/kevan/OSI-SFTP.localized"
 
 # Determine operating system. Default is Unknown. 
 OS=Unknown
@@ -118,18 +118,17 @@ mv $MASTER_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
 mv $MASTER_DIR/GIT $GIT_DIR
 
 # Copy documents to website.
-DOCS="../Active/BNDHEP/Electronics/LWDAQ"
+DOCS="../Active/OSI/Software/LWDAQ"
 if [ -d "$DOCS" ]
 then 
 	echo "FOUND: Local document folder."
-	RMTDOCS="$RMT/Electronics/LWDAQ"
+	RMTDOCS="$RMT/Software/LWDAQ"
 	if [ -d "$RMTDOCS" ] 
 	then
 		echo "FOUND: Remote document folder."
 		echo "Deleting documents in remote folder..."
 		rm $RMTDOCS/Manual.html
 		rm $RMTDOCS/Commands.html
-		rm $RMTDOCS/Acquisifier.html
 		echo "Uploading Manual.html..."
 		cp $DOCS/Manual.html $RMTDOCS/Manual.html
 		echo "Generating new Commands.html"
@@ -139,38 +138,12 @@ then
 		rm $GENERATOR_SCRIPT
 		echo "Uploading Commands.html..."
 		cp $LWDAQ_DIR/Commands.html $RMTDOCS/Commands.html
-		rm $LWDAQ_DIR/Commands.html
-		echo "Uploading Acquisifier.html..."
-		cp $DOCS/Acquisifier.html $RMTDOCS/Acquisifier.html
+		mv $LWDAQ_DIR/Commands.html $DOCS/Commands.html
 	else
 		echo "NOT FOUND: Remote document folder."
 	fi
 else
 	echo "NOT FOUND: Local document folder."
-fi
-
-# Copy source code to website.
-if [ -d "LWDAQ/Sources" ]
-then
-	echo "WORKING DIRECTORY: `pwd`"
-	echo "FOUND: Local source code directory."
-	RMTSRCS="$RMT/Software/Sources"
-	if [ -d "$RMTSRCS" ]
-	then
-		echo "FOUND: Remote source code directory."
-		echo "Deleting remote source files..."
-		rm $RMTSRCS/*.*
-		echo "Uploading Pascal sources..."
-		cp  LWDAQ/Sources/*.pas $RMTSRCS
-		echo "Uploading core TclTk scripts..."
-		cp  LWDAQ/LWDAQ.app/Contents/LWDAQ/*.tcl $RMTSRCS
-		echo "Uploading instrument TclTk scripts..."
-		cp  LWDAQ/LWDAQ.app/Contents/LWDAQ/Instruments/*.tcl $RMTSRCS
-	else
-		echo "NOT FOUND: Remote source code directory."
-	fi
-else
-	echo "NOT FOUND: Local source code directory."
 fi
 
 # Copy new distribution archive to the remote repository.
