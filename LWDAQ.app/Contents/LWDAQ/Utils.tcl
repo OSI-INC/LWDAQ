@@ -501,7 +501,8 @@ proc LWDAQ_socket_read {sock size} {
 	
 	# We can also read to a newline character from a blocking socket, and for this
 	# we configure the socket for line buffering and character translation. Our
-	# assumption is that we will be reading a line of text.
+	# assumption is that we will be reading a line of text. We recommend using 
+	# blocking sockets only for diagnostic purposes.
 	if {$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
 		fconfigure $sock -buffering line -translation auto
 		set data [gets $sock]
