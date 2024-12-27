@@ -332,7 +332,11 @@ proc LWDAQ_socket_read_partial {sock size data_name vwait_var_name} {
  	set status [fconfigure $sock -error]
 	if {$status != ""} {set vwait_var "socket error, $status"}
 	if {![string match "Reading*" $vwait_var]} {return}
-	set new_data [read $sock [expr $size - [string length $data]]]
+	if {$size > 0} {
+		set new_data [read $sock [expr $size - [string length $data]]]
+	} {
+		set new_data [read $sock]
+	}
 	if {[string length $new_data] > 0} {
 		append data $new_data
 	}
@@ -388,18 +392,27 @@ proc LWDAQ_socket_read {sock size} {
 		fconfigure $sock -buffering full -translation binary
 	} 
 
-	# When we work with a non-blocking socket, which is our default, we define a
-	# unique global variable that we use in conjunction with vwait to direct a
-	# data-reading loop that continues reading until all the required data has
-	# arrived, or until the global variable is set to an error string. A
-	# "readable" file-event for the socket sets the global variable, thus
-	# notifying the data-reading loop that it should read all available data
-	# from the socket. This "readable" file-event does not read the data itself,
-	# and in this sense our use of the "readable" event is unconventional. Most
-	# asynchronous socket-handling in Tcl uses the "readable" event to itself to
-	# read the data. But we use the "readable" event only to set a global
-	# variable. As a result, we retain control over the asynchronous read, and
-	# we can preserve the integrity of our event loop.
+	# Non-blocking sockets are our default and preferred style of socket. As we
+	# read from them, we are able to update windows, respond to mouse events,
+	# and accept a command to abort the read. Our objective is to read "size"
+	# bytes from the socket, but we do not want to attempt the read until at
+	# least one byte of data is available in the socket. Any time there is data
+	# available in the socket, we will read all the data from the socket, or as
+	# much as we need to complete "size" bytes of data, whichever is less. When
+	# data is available in the socket, the Tcl event loop generates a "readable"
+	# file event for the socket. We associate with this event our partial-read
+	# routine, which append the new data to our accumulating block of "size"
+	# bytes. When we have all the bytes we want, we dissociate our partial-read
+	# routine from the socket's "readable" event, and return the data. Error
+	# handling takes place in the read loop, where we reset a timeout delay
+	# every time we see more data arrive, and in the partial read routine, where
+	# we check the status of the socket before reading. If the peer closes the
+	# socket, this generates a "readable" event, but the socket status will be
+	# an error message. The error messages will be recorded in a global, unique
+	# vwait variable. We use the LWDAQ vwait_var_name routine to generate this
+	# variable name, because all such variables are automatically displayed in
+	# our System Monitor panel, which allows us to watch the progress of the
+	# unblocking socket read.
 	if {!$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
 		set vwait_var_name [LWDAQ_vwait_var_name]
 		set data_name $sock\_data
@@ -431,33 +444,34 @@ proc LWDAQ_socket_read {sock size} {
 		}
 	}
 
-	# When we work with a non-blocking socket and we have a non-integer
-	# size, we read until we read a newline character.
+	# When we work with a non-blocking socket and we have a non-integer size, we
+	# configure the socket so that it buffers incoming data until it receives a
+	# newline characters. Once a newline arrives, the socket becomes readable.
+	# We associate our partial-read routine with this anticipated readable
+	# event, and tell it to complete a data array of length zero bytes, which is
+	# our code for "read all the data available". The line is assumed to be a line
+	# of text, so we strip white spaces from the beginning and end of the string
+	# before returning it to caller.
 	if {!$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
+		fconfigure $sock -buffering line -translation auto
 		set vwait_var_name [LWDAQ_vwait_var_name]
+		set data_name $sock\_data
 		upvar #0 $vwait_var_name vwait_var
+		upvar #0 $data_name data
 		set vwait_var "Reading line from $sock"
-		fileevent $sock readable [list set $vwait_var_name \
-			"Reading line from $sock"]
 		set data ""
+		fileevent $sock readable \
+			[list LWDAQ_socket_read_partial $sock 0 $data_name $vwait_var_name]
 		set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
 			[list set $vwait_var_name \
 			"Timeout reading line from $sock"]]
-		while {![regexp {\n} $data]} {
-			fileevent $sock readable [list set $vwait_var_name \
-				"Reading character from $sock"]
+		while {[string length $data] < $size} {
 			LWDAQ_vwait $vwait_var_name
-			set status [fconfigure $sock -error]
-			if {$status != ""} {set vwait_var "socket error, $status"}
 			if {![string match "Reading*" $vwait_var]} {break}
-			set char [read $sock 1]
-			if {[string length $char] > 0} {
-				append data $char
-				after cancel $cmd_id
-				set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
-					[list set $vwait_var_name \
+			after cancel $cmd_id
+			set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
+				[list set $vwait_var_name \
 					"Timeout reading line from $sock"]]
-			}
 		}
 		set data [string trim $data]
 		fileevent $sock readable {}
@@ -468,6 +482,7 @@ proc LWDAQ_socket_read {sock size} {
 			LWDAQ_socket_close $sock
 			error "$vwait_var_copy"
 		}
+		fconfigure $sock -buffering full -translation binary
 	}
 
 	return $data
