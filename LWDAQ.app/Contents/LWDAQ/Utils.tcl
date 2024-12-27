@@ -323,6 +323,22 @@ proc LWDAQ_socket_flush {sock} {
 	return ""
 }
 
+proc LWDAQ_socket_read_partial {sock size data_name vwait_var_name} {
+	global LWDAQ_Info
+	upvar #0 $data_name data
+	upvar #0 $vwait_var_name vwait_var
+
+ 	set vwait_var "Reading [expr $size - [string length $data]] of $size bytes from $sock"
+ 	set status [fconfigure $sock -error]
+	if {$status != ""} {set vwait_var "socket error, $status"}
+	if {![string match "Reading*" $vwait_var]} {return}
+	set new_data [read $sock [expr $size - [string length $data]]]
+	if {[string length $new_data] > 0} {
+		append data $new_data
+	}
+	return [string length $new_data]
+}
+
 #
 # LWDAQ_socket_read reads $size bytes from the input buffer of $sock. If the
 # global LWDAQA_Info(blocking_sockets) variable is 1, the read takes place in
@@ -386,29 +402,24 @@ proc LWDAQ_socket_read {sock size} {
 	# we can preserve the integrity of our event loop.
 	if {!$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
 		set vwait_var_name [LWDAQ_vwait_var_name]
+		set data_name $sock\_data
 		upvar #0 $vwait_var_name vwait_var
+		upvar #0 $data_name data
 		set vwait_var "Reading $size bytes from $sock"
-		fileevent $sock readable [list set $vwait_var_name \
-			"Reading $size bytes from $sock"]
 		set data ""
+		fileevent $sock readable \
+			[list LWDAQ_socket_read_partial $sock $size $data_name $vwait_var_name]
 		set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
 			[list set $vwait_var_name \
 			"Timeout reading $size bytes from $sock"]]
 		while {[string length $data] < $size} {
-			fileevent $sock readable [list set $vwait_var_name \
-				"Reading [expr $size - [string length $data]] of $size bytes from $sock"]
 			LWDAQ_vwait $vwait_var_name
-			set status [fconfigure $sock -error]
-			if {$status != ""} {set vwait_var "socket error, $status"}
 			if {![string match "Reading*" $vwait_var]} {break}
-			set new_data [read $sock [expr $size - [string length $data]]]
-			if {[string length $new_data] > 0} {
-				append data $new_data
-				after cancel $cmd_id
-				set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
-					[list set $vwait_var_name \
-					"Timeout reading $size bytes from $sock"]]
-			}
+			after cancel $cmd_id
+			set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
+				[list set $vwait_var_name \
+					"Timeout reading final [string length $data]\
+					of $size bytes from $sock"]]
 		}
 		fileevent $sock readable {}
 		after cancel $cmd_id
