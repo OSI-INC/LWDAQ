@@ -323,37 +323,55 @@ proc LWDAQ_socket_flush {sock} {
 	return ""
 }
 
+#
+# LWDAQ_socket_read_partial is designed to be called by a readable file event
+# during a non-blocking read operation. We pass it the total size of the data
+# block we want to assemble, the name of a unique global data buffer, and the
+# name of a unique global vwait status message. If the size is "line", rather
+# than an integer, we read all available bytes. Otherwise we try to read as many
+# bytes as we need to complete "size" bytes, knowing how many bytes we have so
+# far accumulated in the data buffer. The routine first checks the status of the
+# socket, because the socket may have generated a "readable" event because the
+# peer closed the socket. In the event of an error, the routine sets the status
+# message with an error description and returns without reading the socket.
+# Otherwise, it reads and appends the data it reads to the data buffer. It
+# returns and empty string to indicate no error.
+#
 proc LWDAQ_socket_read_partial {sock size data_name vwait_var_name} {
 	global LWDAQ_Info
 	upvar #0 $data_name data
 	upvar #0 $vwait_var_name vwait_var
 
- 	set vwait_var "Reading [expr $size - [string length $data]] of $size bytes from $sock"
  	set status [fconfigure $sock -error]
 	if {$status != ""} {set vwait_var "socket error, $status"}
-	if {![string match "Reading*" $vwait_var]} {return}
-	if {$size > 0} {
+	if {![string match "Reading*" $vwait_var]} {return ""}
+	
+	if {[string is integer $size]} {
+ 		set vwait_var "Reading [expr $size - [string length $data]]\
+ 			of $size bytes from $sock"
 		set new_data [read $sock [expr $size - [string length $data]]]
 	} {
-		set new_data [read $sock]
+ 		set vwait_var "Reading characters from $sock"
+		set new_data [read $sock 1]
 	}
 	if {[string length $new_data] > 0} {
 		append data $new_data
 	}
-	return [string length $new_data]
+	return ""
 }
 
 #
 # LWDAQ_socket_read reads $size bytes from the input buffer of $sock. If the
-# global LWDAQA_Info(blocking_sockets) variable is 1, the read takes place in
-# one entire data block. While the data arrives, the LWDAQ program freezes. If
-# the same variable is 0, the this procedure reads the data in fragments,
-# allowing the program to respond to menu and window events between fragments.
-# The routine collects all the necessary fragments together and returns them.
-# Use this routine with sockets opened by the LWDAQ_socket_open command. If the
-# size parameter is not an integer, but instead the word "line", we read
-# characters from the socket until we get a newline character, or until a
-# timeout occurs.
+# blocking_sockets flag is set, LWDAQ will freeze while the read takes place.
+# But if this same flag is cleared, LWDAQ will read the data as it arrives, and
+# while it is waiting, it will respond to menu and window events. The routine
+# collects all the necessary fragments together and returns them. Use this
+# routine with sockets opened by the LWDAQ_socket_open command. If the size
+# parameter is not an integer, but instead the word "line", we read characters
+# from the socket until we get a newline character. In all cases, if the peer
+# closes the socket, or some other interruption occurs, the routine generates a
+# Tcl error and returns an informative error message. During non-blocking
+# reads, this routine uses LWDAQ_socket_read_partial.
 #
 proc LWDAQ_socket_read {sock size} {
 	global LWDAQ_Info
@@ -372,25 +390,6 @@ proc LWDAQ_socket_read {sock size} {
 	# We flush the socket to make sure we send any data that might provoke the
 	# return of our data.
 	LWDAQ_socket_flush $sock
-
-	# If we are working with a blocking socket, we read the data from the socket
-	# in one block. If the block we get back from the read command is the wrong
-	# size, we close the socket and report an error.
-	if {$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
-		set data [read $sock $size]
-		if {[string length $data] != $size} {
-			LWDAQ_socket_close $sock
-			error "failed to read from socket"
-		}	
-	} 
-	
-	# If we are working with a blocking socket, but the size is not an integer,
-	# we use line buffering, and read the socket until we get an end of line.
-	if {$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
-		fconfigure $sock -buffering line -translation auto
-		set data [gets $sock]
-		fconfigure $sock -buffering full -translation binary
-	} 
 
 	# Non-blocking sockets are our default and preferred style of socket. As we
 	# read from them, we are able to update windows, respond to mouse events,
@@ -414,6 +413,7 @@ proc LWDAQ_socket_read {sock size} {
 	# our System Monitor panel, which allows us to watch the progress of the
 	# unblocking socket read.
 	if {!$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
+		fconfigure $sock -buffering full -translation binary
 		set vwait_var_name [LWDAQ_vwait_var_name]
 		set data_name $sock\_data
 		upvar #0 $vwait_var_name vwait_var
@@ -431,8 +431,8 @@ proc LWDAQ_socket_read {sock size} {
 			after cancel $cmd_id
 			set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
 				[list set $vwait_var_name \
-					"Timeout reading final [string length $data]\
-					of $size bytes from $sock"]]
+					"Timeout reading [expr $size - [string length $data]]\
+ 					of $size bytes from $sock"]]
 		}
 		fileevent $sock readable {}
 		after cancel $cmd_id
@@ -444,16 +444,17 @@ proc LWDAQ_socket_read {sock size} {
 		}
 	}
 
-	# When we work with a non-blocking socket and we have a non-integer size, we
-	# configure the socket so that it buffers incoming data until it receives a
-	# newline characters. Once a newline arrives, the socket becomes readable.
-	# We associate our partial-read routine with this anticipated readable
-	# event, and tell it to complete a data array of length zero bytes, which is
-	# our code for "read all the data available". The line is assumed to be a line
-	# of text, so we strip white spaces from the beginning and end of the string
-	# before returning it to caller.
+	# When we work with a non-blocking socket and we have a non-integer size,
+	# our approach is almost identical to our binary read, except we read one
+	# character at a time until we encounter a newline. We configure our
+	# partial-read routine for the single-character reading by passing a
+	# non-integer string for the size argument. This non-blocking line read is
+	# intended for text strings no more than one or two hundred characters long,
+	# so we are not concerned about the inefficiency of reading one character at
+	# a time, nor of repeatedly checking to see if our string contains a newline
+	# character.
 	if {!$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
-		fconfigure $sock -buffering line -translation auto
+		fconfigure $sock -buffering full -translation binary
 		set vwait_var_name [LWDAQ_vwait_var_name]
 		set data_name $sock\_data
 		upvar #0 $vwait_var_name vwait_var
@@ -461,11 +462,11 @@ proc LWDAQ_socket_read {sock size} {
 		set vwait_var "Reading line from $sock"
 		set data ""
 		fileevent $sock readable \
-			[list LWDAQ_socket_read_partial $sock 0 $data_name $vwait_var_name]
+			[list LWDAQ_socket_read_partial $sock $size $data_name $vwait_var_name]
 		set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
 			[list set $vwait_var_name \
 			"Timeout reading line from $sock"]]
-		while {[string length $data] < $size} {
+		while {![regexp {\n} $data]} {
 			LWDAQ_vwait $vwait_var_name
 			if {![string match "Reading*" $vwait_var]} {break}
 			after cancel $cmd_id
@@ -482,8 +483,30 @@ proc LWDAQ_socket_read {sock size} {
 			LWDAQ_socket_close $sock
 			error "$vwait_var_copy"
 		}
-		fconfigure $sock -buffering full -translation binary
 	}
+
+	# We use blocking sockets only for diagnostic purposes. A blocking socket
+	# that encounters any sort of network interruption, such as unplugging the
+	# peer's ethernet cable, will freeze our application until the connection
+	# is restored. Here we read an integer number of binary bytes from a blocking
+	# socket.
+	if {$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
+		fconfigure $sock -buffering full -translation binary
+		set data [read $sock $size]
+		if {[string length $data] != $size} {
+			LWDAQ_socket_close $sock
+			error "failed to read from socket"
+		}	
+	} 
+	
+	# We can also read to a newline character from a blocking socket, and for this
+	# we configure the socket for line buffering and character translation. Our
+	# assumption is that we will be reading a line of text.
+	if {$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
+		fconfigure $sock -buffering line -translation auto
+		set data [gets $sock]
+		fconfigure $sock -buffering full -translation binary
+	} 
 
 	return $data
 } 
