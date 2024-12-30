@@ -54,7 +54,7 @@ uses
 
 const
 	package_name = 'lwdaq';
-	version_num = '10.6';
+	version_num = '10.7';
 
 {
 	The following variables we use to implement the utils gui routines for
