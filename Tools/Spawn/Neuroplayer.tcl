@@ -19,7 +19,7 @@
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-# details.
+# details. 
 # 
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see <https://www.gnu.org/licenses/>.
@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "171"
+	LWDAQ_tool_init "Neuroplayer" "172"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -5192,7 +5192,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 							"A$info(export_start_s)\_$id\.$ext"]
 					}
 					LWDAQ_print $t "Exporting activity of channel\
-						$id at $sps SPS to $afn."
+						$id at $config(tracker_sample_rate) SPS to $afn."
 					if {[file exists $afn]} {
 						LWDAQ_print $t \
 							"WARNING: Deleting existing [file tail $afn]."
