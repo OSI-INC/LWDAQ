@@ -4491,7 +4491,7 @@ represented by the data image. The purpose of the <i>slices</i> option is to
 permit us to play through a recording with eight-second intervals and yet obtain
 tracker measurements with a sample period that is some integer fraction of the
 interval period. The unit of activity is coil center units per slice interval.
-If we have break the interval into eight slices and specify coil positions in
+If we break the interval into eight slices and specify coil positions in
 centimeters, the activity will be centimeters per eighth of a second.</p>
 
 <p>The -background option allows us to specify background power levels for all

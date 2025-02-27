@@ -1889,29 +1889,38 @@ proc LWDAQ_proc_description {{proc_name "LWDAQ_*"} {file_name ""} {keep_breaks 0
 }
 
 #
-# LWDAQ_proc_declaration returns a list of procedure declarations that
-# match proc_name from the script file specified by file_name. The script
-# must indicate a procedure declaration by quoting the procedure name after
-# "proc " on a new line.
+# LWDAQ_proc_declaration returns a list of procedure declarations that match
+# proc_name from the script file specified by file_name. The script must
+# indicate a procedure declaration by quoting the procedure name after "proc "
+# on a new line. The routine is tolerant of long lists of procedure arguments
+# that are wrapped with backslashes onto the next line.
 #
 proc LWDAQ_proc_declaration {{proc_name "LWDAQ_*"} {file_name ""} } {
 	if {$file_name == ""} {
 		set file_name [LWDAQ_get_file_name]
 		if {$file_name == ""} {return}
 	}
+	
 	set proc_list [LWDAQ_proc_list $proc_name $file_name]
+
+	set f [open $file_name r]
+	set contents [read $f]
+	close $f
+	set contents [regsub -all {\\\n} $contents " "]
+	set contents [regsub -all {[\t ][\t ]+} $contents " "]
+	set lines [split $contents "\n"]
+
 	set declaration ""
 	foreach p $proc_list {
-		set f [open $file_name r]
 		set d ""
-		while {[gets $f line] >= 0} {
+		foreach line $lines {
 			if {[string match "proc $proc_name *" $line]} {
 				set d [string last "\{" $line]
 				set d [string replace $line $d end]
+				break
 			}
 		}
 		lappend declaration [string trim $d]
-		close $f
 	}
 	if {[llength $declaration] > 1} {
 		return $declaration
@@ -2519,7 +2528,7 @@ proc LWDAQ_tool_reference {{script ""}} {
 	set script_list [LWDAQ_proc_list * $script]
 	set script_list [lsort -dictionary -index 0 $script_list]
 	foreach {s} $script_list {
-		puts $f "<h3>$s</h3>"
+		puts $f "<h3 id=\"$s\">$s</h3>"
 		puts $f "<small><pre>[LWDAQ_proc_declaration $s $script]</pre></small>"
 		puts $f "<p>[LWDAQ_proc_description $s $script]</p>"
 		puts $f ""

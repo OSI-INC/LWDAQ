@@ -1492,16 +1492,16 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 #
 # Neuroplayer_band_power is for use in processor scripts as a means of detecting
 # events in a signal. The routine selects the frequency components in
-# $info(spectrum) that lie between band_lo and band_hi Hertz (inclusive), adds the
-# power of all components in this band, and returns the total. If show is set, the
-# routine plots the filtered signal on the screen by taking the inverse transform
-# of the selected frequency components. If replace is set, the routine calculates
-# the inverse transform of the filtered signal, making it available to the calling
-# routine in the info(values) variable. Note that the routine does not change,
-# info(signal), which contains the reconstructed signal values and their timestamps,
-# nor the spectrum of the signal. Only the info(values) string is replaced. By default, 
-# the routine does not plot nor does it perform the inverse transform, both of which 
-# take time and slow down processing. The show parameter, if not zero, is used to 
+# info(spectrum) that lie between band_lo and band_hi Hertz (inclusive), adds
+# the power of all components in this band, and returns the total. If show is
+# set, the routine plots the filtered signal on the screen by taking the inverse
+# transform of the selected frequency components. If replace is set, the routine
+# calculates the inverse transform of the filtered signal, making it available
+# to the calling routine in the info(values) variable. Note that the routine
+# does not change info(signal), which contains the reconstructed signal values
+# and their timestamps, nor the spectrum of the signal. By default, the routine
+# does not plot nor does it perform the inverse transform, both of which take
+# time and slow down processing. The show parameter, if not zero, is used to
 # scale the signal for display.
 #
 proc Neuroplayer_band_power {band_lo band_hi {show 0} {replace 0}} {
@@ -8902,3 +8902,4 @@ return ""
 http://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
 
 ----------End Help----------
+
