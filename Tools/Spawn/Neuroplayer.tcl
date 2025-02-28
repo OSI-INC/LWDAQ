@@ -4541,7 +4541,7 @@ proc Neuroexporter_open {} {
 	
 	label $f.lformat -text "File:" -anchor w -fg $info(label_color)
 	pack $f.lformat -side left -expand yes
-	foreach a "TXT BIN EDF" {
+	foreach a "TXT BIN EDF NDF" {
 		set b [string tolower $a]
 		radiobutton $f.$b -variable Neuroplayer_config(export_format) \
 			-text $a -value $a
@@ -4957,20 +4957,41 @@ proc Neuroexporter_txt_save {w} {
 }
 
 #
-# Neuroexporter_ndf_sequence generates a sequence by which samples will be
-# collected from the export buffer so as to create a data stream in the same
-# format as an NDF file.
-#
-proc Neuroexporter_ndf_sequence {} {
-	return "0"
-}
-
-#
-# Neuroexporter_ndf_combine uses the export sequence to combine the signals in
-# the export buffer and make an NDF data block containing all the signals and a
-# valid sequence of clock messages.
+# Neuroexporter_ndf_combines the signals in the export buffer to make an NDF
+# data block containing all the signals and clock messages.
 #
 proc Neuroexporter_ndf_combine {} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+
+	set t $info(export_text)
+	set tsf "32768"
+	set interval_length [expr round($config(play_interval) * $tsf)]
+	set step "8"
+	set num_channels [llength $info(export_buffer)]
+	for {set i 0} {$i < $num_channels} {incr i} {
+		set length_$i [llength [lindex $info(export_buffer) $i]]
+		set period_$i [expr $interval_length / [set length_$i]]
+		set index_$i 0
+	}
+	set ts $info(export_timestamp)
+	set info(export_timestamp) [expr $ts + $interval_length]
+	set data ""
+	while {$ts < $info(export_timestamp)} {
+		if {$ts % 256 == "0"} {
+			append data "[expr ($ts % 0x010000) / 0x100] "
+		}
+		for {set i 0} {$i < $num_channels} {incr i} {
+			if {$ts % [set period_$i] == "0"} {
+				append data "[lindex $info(export_buffer) $i [set index_$i]] "
+				incr index_$i
+			}
+		}		
+		set ts [expr $ts + $step]
+	}
+	set info(export_timestamp) [expr $info(export_timestamp) % 0x01000000]
+	LWDAQ_print $t $info(export_timestamp) green
+	LWDAQ_print $t [string range $data 0 100]
 	return ""
 }
 
@@ -5097,7 +5118,6 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		# Reset the NDF export timestamp and set the combining sequence for the
 		# timestamps and channels.
 		set info(export_timestamp) "0"
-		set info(export_sequence) [Neuroexporter_ndf_sequence]
 		
 		# Start the exporter. Calculate Unix start time, the requested duration,
 		# and the ideal end time. The duration can be a mathematical expression,
@@ -5687,9 +5707,6 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						set info(export_buffer) [list]		
 					} 
 					lappend info(export_buffer) $info(values)
-					LWDAQ_print $t "$info(channel_num) $config(play_time)\
-						$first_channel $last_channel [llength $info(values)]\
-						[llength $info(export_buffer)] [file tail $sfn]"
 					if {$last_channel} {
 						set data [Neuroexporter_ndf_combine]
 						LWDAQ_ndf_data_append $sfn $data
