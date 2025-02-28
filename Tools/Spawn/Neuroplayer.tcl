@@ -609,6 +609,9 @@ proc Neuroplayer_init {} {
 	set info(export_size_s) "0"
 	set config(export_reps) "1"
 	set config(export_activity_max) "10000"
+	set info(export_timestamp) "0"
+	set info(export_buffer) [list]
+	set info(export_sequence) [list]
 #
 # Video playback parameters. We define executable names for ffmpeg.
 #
@@ -4773,9 +4776,9 @@ proc Neuroexporter_edf_rewrite {} {
 }
 
 #
-# Neurotracker_edf_setup is used by the exporter to set the various titles and names
-# that the EDF export file header provides for describing signals and defining their
-# ranges. 
+# Neurotracker_edf_setup is used by the exporter to set the various titles and
+# names that the EDF export file header provides for describing signals and
+# defining their ranges. 
 #
 proc Neuroexporter_edf_setup {} {
 	upvar #0 Neuroplayer_info info
@@ -4954,6 +4957,24 @@ proc Neuroexporter_txt_save {w} {
 }
 
 #
+# Neuroexporter_ndf_sequence generates a sequence by which samples will be
+# collected from the export buffer so as to create a data stream in the same
+# format as an NDF file.
+#
+proc Neuroexporter_ndf_sequence {} {
+	return "0"
+}
+
+#
+# Neuroexporter_ndf_combine uses the export sequence to combine the signals in
+# the export buffer and make an NDF data block containing all the signals and a
+# valid sequence of clock messages.
+#
+proc Neuroexporter_ndf_combine {} {
+	return ""
+}
+
+#
 # Neuroexporter_export manages the exporting of recorded signals to files,
 # tracker signals to files, and the creation of simultaneous video to
 # concatinated video files that match the export intervals. It takes one of the
@@ -4964,8 +4985,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 	
-	# Decide where to write messages. If the Exporter panel is not open, we write
-	# messages to the Neuroplayer text window.
+	# Decide where to write messages. If the Exporter panel is not open, we
+	# write messages to the Neuroplayer text window.
 	if {[winfo exists $info(export_text)]} {
 		set t $info(export_text)
 	} {
@@ -5021,12 +5042,21 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}
 
 		# Check options.
-		if {$config(export_centroid) || $config(export_powers)} {
-			if {$config(export_format) == "EDF"} {
-				LWDAQ_print $t "ERROR: Cannot store centroid or powers in EDF."
-				return ""
-			}
+		if {($config(export_centroid) || $config(export_powers)) \
+			&& (($config(export_format) == "EDF") || ($config(export_format) == "NDF"))} {
+			LWDAQ_print $t "ERROR: Cannot store centroid or powers\
+				in $config(export_format) format."
+			return ""
 		}	
+		if {!$config(export_combine) && ($config(export_format) == "NDF")} {
+			LWDAQ_print $t "ERROR: You must combine all selected channels for\
+				$config(export_format) format."
+			return ""
+		}	
+		if {$config(export_combine)} {
+			set sfn [file join $config(export_dir) \
+				"E$info(export_start_s).$ext"]
+		}
 		if {[catch {expr $config(export_duration)}]} {
 			LWDAQ_print $t "ERROR: Invalid duration expression\
 				\"$config(export_duration)\"."
@@ -5063,7 +5093,12 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		set info(export_concat_pid) "0"
 		set info(export_vfl) [list]
 		set info(export_backup) "0"
-
+		
+		# Reset the NDF export timestamp and set the combining sequence for the
+		# timestamps and channels.
+		set info(export_timestamp) "0"
+		set info(export_sequence) [Neuroexporter_ndf_sequence]
+		
 		# Start the exporter. Calculate Unix start time, the requested duration,
 		# and the ideal end time. The duration can be a mathematical expression,
 		# such as 24*60*60 for the number of seconds in a day. The ideal end
@@ -5246,6 +5281,17 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				}
 			}
 		
+			# If we are exporting to one NDF file, create the header now.
+			if {$config(export_combine) && ($config(export_format) == "NDF")} {
+				if {$config(export_signal)} {
+					LWDAQ_print $t "Creating NDF file [file tail $sfn]."
+					LWDAQ_ndf_create $sfn $config(ndf_metadata_size)
+					set metadata [LWDAQ_ndf_string_read $config(play_file)]
+					append metadata "<c>Created by Neuroexporter $info(version).</c>\n"
+					LWDAQ_ndf_string_write $sfn $metadata
+				}
+			}
+
 			# Enable position calculation if required, and close the tracker window
 			# if its open. 
 			if {$config(export_activity) \
@@ -5490,11 +5536,11 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						-i [file nativename $vfn] \
 						-c:v copy $nvfn >> $info(video_export_log)
 						
-					# We now have a file Extracted_V$vt\.mp4. We want to change
-					# the name to V$vt\.mp4 in the scratch directory. But we may
+					# We now have a file Extracted_V$vt.mp4. We want to change
+					# the name to V$vt.mp4 in the scratch directory. But we may
 					# have created V$vt\.mp4 with a previous extraction, and
 					# just now extracted our boundary segment from this file. So
-					# we delete V$vt.\mp4 if it exists, and only then do we
+					# we delete V$vt.mp4 if it exists, and only then do we
 					# rename our boundary segment to a proper timestamp video
 					# name.
 					set vfn V$vt\.mp4
@@ -5581,12 +5627,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		# interval, and the next file's time stamp is after the export end time.
 		if {$interval_start_s < $info(export_end_s)} {
 		
-			# Write the signal to disk. This is the reconstructed signal we
-			# receive from a transmitter. Each sample is a sixteen-bit unsigned
-			# integer and we save these in a manner suitable for each export
-			# format. If we are combining multiple channels into one file, we
-			# will write the same data to the combined file. Our export file
-			# will contain consecutive same-size blocks of data from the
+			# Write the signal to disk, or in the case of NDF export, write the
+			# signal to a buffer. The signal has been reconstructed and possibly
+			# processed. Raw samples are sixteen-bit unsigned integers.
+			# Processed samples might be real-valued, but they must still lie in
+			# the range 0..65535. We save these in a manner suitable for each
+			# export format. If we are combining multiple channels into one
+			# file, we will write the same data to the combined file. Our export
+			# file or buffer will receive consecutive blocks of data from the
 			# exported channels.
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
@@ -5596,32 +5644,55 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					set sfn [file join $config(export_dir) \
 						"E$info(export_start_s)\_$info(channel_num)\.$ext"]
 				}
+				set first_channel \
+					[string match "$info(channel_num):*" \
+						[lindex $config(channel_selector) 0]]
+				set last_channel \
+					[string match "$info(channel_num):*" \
+						[lindex $config(channel_selector) end]]
+						
 				if {$config(export_format) == "TXT"} {
 					set f [open $sfn a]
 					foreach value $info(values) {
 						puts $f $value
 					}
 					close $f
+					
 				} elseif {$config(export_format) == "BIN"} {
 					set export_bytes ""
 					foreach value $info(values) {
-					  append export_bytes [binary format S $value]
+					  append export_bytes [binary format S [expr round($value)]]
 					}
 					set f [open $sfn a]
 					fconfigure $f -translation binary
 					puts -nonewline $f $export_bytes
 					close $f
+					
 				} elseif {$config(export_format) == "EDF"} {
-					if {[file exists $sfn]} {
-						if {!$config(export_combine) || \
-								[string match "$info(channel_num):*" \
-									[lindex $config(channel_selector) 0]]} {
-							EDF_num_records_incr $sfn
-						} 
-						EDF_append $sfn $info(values)
-					} else {
+					if {![file exists $sfn]} {
 						LWDAQ_print $t "ERROR: File \"$sfn\" no longer exists."
 						return ""
+					}
+					if {!$config(export_combine) || $first_channel} {
+						EDF_num_records_incr $sfn
+					} 
+					EDF_append $sfn $info(values)
+					
+				} elseif {$config(export_format) == "NDF"} {
+					if {![file exists $sfn]} {
+						LWDAQ_print $t "ERROR: File \"$sfn\" no longer exists."
+						return ""
+					}
+					if {$first_channel} {
+						set info(export_buffer) [list]		
+					} 
+					lappend info(export_buffer) $info(values)
+					LWDAQ_print $t "$info(channel_num) $config(play_time)\
+						$first_channel $last_channel [llength $info(values)]\
+						[llength $info(export_buffer)] [file tail $sfn]"
+					if {$last_channel} {
+						set data [Neuroexporter_ndf_combine]
+						LWDAQ_ndf_data_append $sfn $data
 					}
 				}
 			}
