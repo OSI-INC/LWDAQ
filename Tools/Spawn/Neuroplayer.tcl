@@ -397,7 +397,7 @@ proc Neuroplayer_init {} {
 #
 	set config(slow_play) 0
 	set config(slow_play_ms) 1000
-	set config(fast_play_ms) $LWDAQ_Info(queue_ms)
+	set info(fast_play_ms) $LWDAQ_Info(queue_ms)
 #
 # By default, the player moves from one file to the next automatically, or
 # waits for data to be added to a file if there is no other later file. But
@@ -6984,7 +6984,7 @@ proc Neuroplayer_play {{command ""}} {
 	if {$config(slow_play)} {
 		set LWDAQ_Info(queue_ms) $config(slow_play_ms)
 	} {
-		set LWDAQ_Info(queue_ms) $config(fast_play_ms)
+		set LWDAQ_Info(queue_ms) $info(fast_play_ms)
 	}
 
 	# Consider various ways in which we will do nothing and return.
