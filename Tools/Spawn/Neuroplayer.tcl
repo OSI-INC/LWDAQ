@@ -1796,7 +1796,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set frequency [lindex $fl 0]
 		foreach f $fl {
 			if {![string is integer -strict $f]} {
-				Neuroplayer_print "ERROR: Invalid frequency \"$f\" in default frequency list."
+				Neuroplayer_print "ERROR: Invalid frequency \"$f\" in default list."
 				return "0 0"	
 			}
 			if {$num_received < [expr $config(extra_fraction) \
@@ -1807,7 +1807,12 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	}
 	if {$num_received > [expr $config(extra_fraction) \
 			* $frequency * $info(play_interval_copy)]} {
-		set info(status_$id) "Extra"
+		if {$info(status_$id) != "Extra"} {
+			Neuroplayer_print \
+				"WARNING: Extra samples on channel $id\
+				at $config(play_time) s in [file tail $config(play_file)]."
+			set info(status_$id) "Extra"
+		}
 	} elseif {$num_received < [expr $config(min_reception) \
 			* $frequency * $info(play_interval_copy)]} {
 		set info(status_$id) "Loss"

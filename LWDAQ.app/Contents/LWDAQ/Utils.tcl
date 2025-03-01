@@ -33,7 +33,7 @@ proc LWDAQ_utils_init {} {
 	upvar #0 LWDAQ_Info info
 	set info(quit) 0
 	set info(queue_run) 0
-	set info(queue_ms) 10
+	set info(queue_ms) 20
 	set info(queue_events) [list]
 	set info(current_event) "Stopped"
 	
