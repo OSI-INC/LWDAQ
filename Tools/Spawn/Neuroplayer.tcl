@@ -2554,14 +2554,14 @@ proc Neuroplayer_overview_newndf {step} {
 	set ov_config(status) "Searching"
 	LWDAQ_update
 
-	# We obtain a list of all NDF files in the play_dir directory tree. If
-	# can't find the current file in the directory tree, we abort.
-	set fl [LWDAQ_find_files $config(play_dir) *.ndf]
+	# We obtain a list of all NDF files in the playback directory tree. If can't
+	# find the current file in the directory tree, we abort.
+	set fl [LWDAQ_find_files $config(play_dir) "*.ndf"]
 	set fl [LWDAQ_sort_files $fl]
 	set index [lsearch $fl $ov_config(fn)]
 	if {$index < 0} {
-		Neuroplayer_print "ERROR: In Overview, cannot find\
-			\"[file tail $ov_config(fn)]\" in playback directory tree."
+		Neuroplayer_print "ERROR: Overview cannot find\
+			$ov_config(fn_tail) in playback directory tree."
 		set ov_config(status) "Idle"
 		return ""
 	}
@@ -2570,15 +2570,16 @@ proc Neuroplayer_overview_newndf {step} {
 	# switch to this file.
 	set file_name [lindex $fl [expr $index + $step]]
 	if {$file_name == ""} {
-		Neuroplayer_print "ERROR: Overview cannot step $step from\
-			\"[file tail $ov_config(fn)]\" in Player Directory Tree."
+		Neuroplayer_print "ERROR: Overview failed to step=$step,\
+			no such NDF file in playback directory tree."
 		set ov_config(status) "Idle"
 		return ""	
 	}
 	set ov_config(fn) $file_name
 	set ov_config(fn_tail) [file tail $ov_config(fn)]
 	
-	# Try to determine the start time of the new archive.
+	# Try to determine the start time of the new archive using a UNIX timestamp
+	# extracted from the file tail. Otherwise, set the archive time to zero.
 	if {![regexp {([0-9]{10})\.ndf} [file tail $ov_config(fn)] match atime]} {
 		set atime 0
 	}
@@ -4462,6 +4463,30 @@ proc Neurotracker_clear {} {
 }
 
 #
+# Neuroplayer_clock_update updates the playback datetime, and if necessary
+# updates the archive start datetime as well. In order to determine the starte
+# dateeimt, the routine looks for a UNIX timestamp just before the NDF file
+# extension, and uses this time stamp as the archive start time.
+#
+proc Neuroplayer_clock_update {} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+
+	set pfn [file tail $config(play_file)]
+	if {$pfn != $info(clock_archive_name)} {
+		set info(clock_archive_name) $pfn
+		if {![regexp {([0-9]{10})\.ndf} $pfn match atime]} {
+			set atime 0
+		}
+		set info(start_datetime) [Neuroplayer_clock_convert $atime]
+	}
+	set info(play_datetime) [Neuroplayer_clock_convert \
+		[expr [Neuroplayer_clock_convert $info(start_datetime)] \
+			+ round($config(play_time)) ] ]
+	return ""
+}
+
+#
 # Neuroplayer_clock opens the Clock Panel, or raises it to the top for viewing
 # if it already exists.
 #
@@ -4720,10 +4745,9 @@ proc Neuroplayer_autofill {} {
 		}		
 	}
 	if {$autofill == ""} {
-		set report "Autofill found no active channels,\
-			setting channel select to \"*\".\
-			Play one interval and try again."
-		LWDAQ_print $info(export_text) $report
+		set report "WARNING: No channels with status \"Okay\" to select,\
+			play on and try again."
+		if {[winfo exists $info(export_text)]} {LWDAQ_print $info(export_text) $report}
 		Neuroplayer_print $report
 		set config(channel_selector) "*"
 	} else {
@@ -4954,7 +4978,7 @@ proc Neuroexporter_txt_save {w} {
 
 #
 # Neuroexporter_ndf_combines the signals in the export buffer to make an NDF
-# data block containing all the signals and clock messages.
+# data block containing all signals with clock messages.
 #
 proc Neuroexporter_ndf_combine {} {
 	upvar #0 Neuroplayer_info info
@@ -5203,24 +5227,19 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						
 				if {$config(export_signal)} {
 					if {$config(export_combine)} {
-						if {$config(export_format) != "NDF"} {
-							set sfn [file join $config(export_dir) \
-								"E$info(export_start_s).$ext"]
-						} {
-							set sfn [file join $config(export_dir) \
-								"M$info(export_start_s).$ext"]
-						}
+						set sfn [file join $config(export_dir) \
+							"E$info(export_start_s).$ext"]
 					} {
 						set sfn [file join $config(export_dir) \
 							"E$info(export_start_s)\_$id\.$ext"]
 					}
-					LWDAQ_print $t "Exporting signal of channel\
-						$id at $sps SPS to [file tail $sfn]."
 					if {[file exists $sfn]} {
 						LWDAQ_print $t \
 							"WARNING: Deleting existing [file tail $sfn]."
 						file delete $sfn
 					}
+					LWDAQ_print $t "Exporting signal of channel\
+						$id at $sps SPS to [file tail $sfn]."
 					if {!$config(export_combine) && ($config(export_format) == "EDF")} {
 						LWDAQ_print $t "Creating EDF file [file tail $sfn]."
 						EDF_create $sfn $config(play_interval) \
@@ -5339,7 +5358,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					append metadata "<glitch>$config(glitch_threshold)</glitch>\n"
 					if {$config(enable_processing)} {
 						append metadata "<processor>[file tail \
-							$config(processor_script)]</processor>"
+							$info(processor_script)]</processor>"
 					} {
 						append metadata "<processor>NONE</processor>"
 					}
@@ -5693,13 +5712,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			# exported channels.
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
-					if {$config(export_format) != "NDF"} {
-						set sfn [file join $config(export_dir) \
-							"E$info(export_start_s).$ext"]
-					} {
-						set sfn [file join $config(export_dir) \
-							"M$info(export_start_s).$ext"]
-					}
+					set sfn [file join $config(export_dir) \
+						"E$info(export_start_s).$ext"]
 				} {
 					set sfn [file join $config(export_dir) \
 						"E$info(export_start_s)\_$info(channel_num)\.$ext"]
@@ -6113,28 +6127,6 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}		
 	}
 
-	return ""
-}
-
-#
-# Neuroplayer_clock_update always updates the playback datetime, and if necessary 
-# updates the archive start datetime.
-#
-proc Neuroplayer_clock_update {} {
-	upvar #0 Neuroplayer_info info
-	upvar #0 Neuroplayer_config config
-
-	set pfn [file tail $config(play_file)]
-	if {$pfn != $info(clock_archive_name)} {
-		set info(clock_archive_name) $pfn
-		if {![regexp {([0-9]{10})\.ndf} $pfn match atime]} {
-			set atime 0
-		}
-		set info(start_datetime) [Neuroplayer_clock_convert $atime]
-	}
-	set info(play_datetime) [Neuroplayer_clock_convert \
-		[expr [Neuroplayer_clock_convert $info(start_datetime)] \
-			+ round($config(play_time)) ] ]
 	return ""
 }
 
@@ -7069,15 +7061,14 @@ proc Neuroplayer_play {{command ""}} {
 		set info(play_control) "Repeat"
 	}
 
-	# If First or Last we find the first or last file in the playback directory tree.
-	# We update the exporter start time.
-	if {($info(play_control) == "First") \
-		|| ($info(play_control) == "Last")} {
+	# If First or Last we find the first or last NDF file in the playback
+	# directory tree. We set the play time to zero and refresh the voltage and
+	# amplitude plots.
+	if {($info(play_control) == "First") || ($info(play_control) == "Last")} {
 		set play_list [LWDAQ_find_files $config(play_dir) *.ndf]
 		set play_list [LWDAQ_sort_files $play_list]
 		if {[llength $play_list] < 1} {
-			Neuroplayer_print "ERROR: There are no NDF files in the\
-				playback directory tree."
+			Neuroplayer_print "ERROR: No NDF files in playback directory tree."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
 			return ""
@@ -7204,28 +7195,29 @@ proc Neuroplayer_play {{command ""}} {
 			[expr $config(play_time) - 2.0 * $info(play_interval_copy)]]
 
 		# If we are going back before the start of this archive, we try to find
-		# an previous archive. We get a list of all NDF files in the play_dir
-		# directory tree.
+		# an earlier archive, and to do this we make a list of all NDF files in the
+		# directory tree, sort them alphabetically, and see if we can find our play
+		# file and one earlier file in the sorted list.  
 		if {$config(play_time) < 0.0} {
-			set fl [LWDAQ_find_files $config(play_dir) *.ndf]
+			set p [string index [file tail $config(play_file)] 0]
+			set fl [LWDAQ_find_files $config(play_dir) "*.ndf"]
 			set fl [LWDAQ_sort_files $fl]
 			set i [lsearch $fl $config(play_file)]
 			if {$i < 0} {
-				Neuroplayer_print "ERROR: Cannot move to previous file,\
-					\"$info(play_file_tail)\" not in playback directory tree."
+				Neuroplayer_print "ERROR: Cannot find current play file\
+					\"[file tail $config(play_file)]\" in playback directory tree."
 				LWDAQ_set_bg $info(play_control_label) white
 				set info(play_control) "Idle"
 				return ""
 			}
 			set file_name [lindex $fl [expr $i - 1]]
 			if {$file_name != ""} {
-				Neuroplayer_print "Playback switching to previous file \"$file_name\"."
+				Neuroplayer_print "Playback switching to $file_name."
 				set config(play_file) $file_name
 				set info(play_file_tail) [file tail $file_name]
 				set config(play_time) $info(max_play_time)
 			} {
-				Neuroplayer_print "ERROR: No previous file in\
-					playback directory tree."
+				Neuroplayer_print "ERROR: No earlier file in playback directory tree."
 				set config(play_time) 0.0
 				LWDAQ_set_bg $info(play_control_label) white
 				set info(play_control) "Idle"
@@ -7416,25 +7408,32 @@ proc Neuroplayer_play {{command ""}} {
 			return ""
 		}
 		
-		# We obtain a list of all NDF files in the play_dir directory tree. If
-		# can't find the current file in the directory tree, we abort.
-		set fl [LWDAQ_find_files $config(play_dir) *.ndf]
+		# We obtain a list of all ndf files in the playback directory tree and
+		# sort them in alphabetical order. We try to find the current file in
+		# this list, and a file after it. If we find a later file, we will use
+		# it for playback. Otherwise we will wait until such a file appears.
+		set fl [LWDAQ_find_files $config(play_dir) "*.ndf"]
 		set fl [LWDAQ_sort_files $fl]
 		set i [lsearch $fl $config(play_file)]
 		if {$i < 0} {
-			Neuroplayer_print "ERROR: Cannot continue to a later file,\
-				\"$info(play_file_tail)\" not in playback directory tree."
+			Neuroplayer_print "ERROR: Cannot find current play file\
+				\"[file tail $config(play_file)]\" in playback directory tree."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
 			return ""
 		}
 		
-		# We see if there is a later file in the directory tree. If so, we switch to
-		# the later file. Otherwise, we wait for a new file or new data, by calling
-		# the Neuroplayer play routine again and turning the control label yellow.
+		# We see if there is a later file in the directory tree. If so, we
+		# switch to the later file. Otherwise, we wait for a new file or new
+		# data, by calling the Neuroplayer play routine again and turning the
+		# control label yellow. We attempt to update the archive start time with
+		# our clock update routine, but this will work only if the file we are
+		# switching to is named with a ten-digit UNIX timestamp just before the
+		# extension. If the file does not have the timestamp, the new start time
+		# will be zero.
 		set file_name [lindex $fl [expr $i + 1]]
 		if {$file_name != ""} {
-			Neuroplayer_print "Playback switching to next file $file_name."
+			Neuroplayer_print "Playback switching to $file_name."
 			set config(play_file) $file_name
 			set info(play_file_tail) [file tail $file_name]
 			set config(play_time) 0.0
@@ -7452,14 +7451,14 @@ proc Neuroplayer_play {{command ""}} {
 			LWDAQ_post Neuroplayer_play
 			return ""
 		} {
-			# This is the case where we have $num_clocks but need
-			# $play_num_clocks and we have no later file to switch to. This case
-			# arises during live play-back, when the player is trying to read
-			# more data out of the file that is being written to by the
-			# recorder. The screen will show you when the Player is waiting. By
-			# checking the state of the play_control_label, we make sure that we
-			# issue the following print statement only once. While the Player is
-			# waiting, the label remains yellow.
+			# This is the case where we don't yet have $play_num_clocks and we
+			# have no later file to switch to. This case arises during live
+			# play-back, when the player is trying to read more data out of the
+			# file that is being written to by the recorder. The screen will
+			# show you when the Player is waiting. By checking the state of the
+			# play_control_label, we make sure that we issue the following print
+			# statement only once. While the Player is waiting, the label
+			# remains yellow.
 			if {[winfo exists $info(window)]} {
 				if {[$info(play_control_label) cget -bg] != "yellow"} {
 					Neuroplayer_print "Have $num_clocks clocks, need $play_num_clocks.\
@@ -7988,9 +7987,11 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 	# a list of NDFs in the playback directory tree, so as to identify
 	# the next or preceeding file.
 	if {[lsearch "Next_NDF Current_NDF Previous_NDF" $event] >= 0} {
-		# We obtain a list of all NDF files in the play_dir directory tree. If
-		# can't find the current file in the directory tree, we abort.
-		set fl [LWDAQ_find_files $config(play_dir) *.ndf]
+		# We obtain a list of all NDF files in the play_dir directory tree. We
+		# sort ehe list in increasing order, find the play file in the list and
+		# select either the next, current, or previous file as our next play
+		# file.
+		set fl [LWDAQ_find_files $config(play_dir) "*.ndf"]
 		set fl [LWDAQ_sort_files $fl]
 		set index [lsearch $fl $config(play_file)]
 		if {$index < 0} {
@@ -8006,7 +8007,7 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 		if {$event == "Previous_NDF"} {set file_name [lindex $fl [expr $index - 1]]}
 		if {$event == "Current_NDF"} {set file_name [lindex $fl [expr $index]]}
 		if {$file_name == ""} {
-			set error_message "ERROR: No matching file in playback directory tree."
+			set error_message "ERROR: Cannot find \"$event\" in playback directory tree."
 			Neuroplayer_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white		
 			return $error_message
@@ -8074,7 +8075,7 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 	if {([string match -nocase *.ndf [lindex $event 0]]) \
 			&& ([string is double [lindex $event 1]])} {
 
-		# Try to find the event NDF file in the playback directory tree.
+		# Try to find the event file in the playback directory tree.
 		set fl [LWDAQ_find_files $config(play_dir) *.ndf]
 		set pft [lindex $event 0]
 		set index [lsearch $fl "*[lindex $event 0]"]
@@ -8098,10 +8099,9 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 		set config(play_time) [Neuroplayer_play_time_format \
 		  [expr [lindex $event 1] + $config(jump_offset)]]
 
-	# If the event contains an absolute time, as an integer number of seconds 
-	# since 1970, we find the archive with start time closest before the absolute
-	# time, and see if we can jump to the correct absolute time within this
-	# archive.
+	# If the event contains an absolute time, in the form of a UNIX timestamp,
+	# we find the archive with start time closest before the absolute time, and
+	# see if we can jump to the correct absolute time within this archive.
 	} elseif {([regexp {^[0-9]{10}$} [lindex $event 0] datetime]) \
 			&& ([string is double [lindex $event 1]])} {
 			
@@ -8112,11 +8112,8 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 		set offset [expr fmod([lindex $event 1],1.0)]
 		set datetime [expr round($datetime + [lindex $event 1] - $offset)]
 		
-		# We focus on files with names in the form *xxxxxxxxxx.ndf, where the 
-		# ten x's are the digits of the archive's start time and the * is a 
-		# prefix, which is by default "M". We find the one that starts soonest 
-		# before our target time.
-		set fl [LWDAQ_find_files $config(play_dir) *??????????.ndf]
+		# Make a list of all NDF files in the directory tree and sort them.
+		set fl [LWDAQ_find_files $config(play_dir) *.ndf]
 		set fl [LWDAQ_sort_files $fl]
 		set pf ""
 		set atime 0
@@ -8129,9 +8126,9 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 			}
 		}
 		if {$pf == ""} {
-			set error_message "ERROR: Cannot find\
+			set error_message "ERROR: Cannot find time\
 				\"[Neuroplayer_clock_convert $datetime]\"\
-				in $config(play_dir)."
+				in playback directory tree."
 			Neuroplayer_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white	
 			return $error_message

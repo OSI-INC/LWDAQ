@@ -1403,22 +1403,30 @@ proc LWDAQ_put_file_name {{name ""}} {
 
 #
 # LWDAQ_find_files takes a directory and a glob matching pattern to produce a
-# list of all matching files in the directory and its sub-directories. It
-# assembles the list by calling itself recursively. The routine is not sensitive
-# to case in the matching pattern. The list is not sorted. 
+# list of all matching files in the directory and its sub-directories. The match
+# is case-insensitive, but the complete file name, including its extension, must
+# match the patter. Thus AFileName.txt will not be matched with FileName.txt,
+# although it will match with *Name.txt and ?FileName.*. The routine assembles
+# its match list by calling itself recursively. The fact that the routine must
+# support recursive calls dictates that the final list is not sorted. If we were
+# to sort the list, we would be sorting in every recursive call to the routine,
+# which makes the routine inefficient. Follow your call to this routine with a
+# list sort to obtain an ordered list.
 #
 proc LWDAQ_find_files {directory pattern} {
 	set ffl [list]
 	set dfl [glob -nocomplain [file join $directory *]]
 	foreach fn $dfl {
-		if {[string match -nocase *$pattern $fn]} {
-			lappend ffl $fn
-		}
 		if {[file isdirectory $fn]} {
 			foreach fn [LWDAQ_find_files $fn $pattern] {
 				lappend ffl $fn
 			}
+		} else {
+			if {[string match -nocase $pattern [file tail $fn]]} {
+				lappend ffl $fn
+			}
 		}
+		LWDAQ_support
 	}
 	return $ffl
 }
