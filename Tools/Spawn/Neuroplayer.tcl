@@ -1,6 +1,6 @@
 # Neuroplayer.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2007-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # The Neuroplayer records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
@@ -480,6 +480,7 @@ proc Neuroplayer_init {} {
 	set info(play_interval_copy) 1.0
 	set info(clocks_per_second) 128
 	set info(ticks_per_clock) 256
+	set info(tick_frequency) [expr $info(clocks_per_second) * $info(ticks_per_clock)]
 	set info(max_message_value) 65535
 	set info(value_range) [expr $info(max_message_value) + 1]
 	set info(clock_cycle_period) \
@@ -1806,12 +1807,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	}
 	if {$num_received > [expr $config(extra_fraction) \
 			* $frequency * $info(play_interval_copy)]} {
-		if {$info(status_$id) != "Extra"} {
-			Neuroplayer_print \
-				"WARNING: Extra samples on channel $id\
-				at $config(play_time) s in [file tail $config(play_file)]."
-			set info(status_$id) "Extra"
-		}
+		set info(status_$id) "Extra"
 	} elseif {$num_received < [expr $config(min_reception) \
 			* $frequency * $info(play_interval_copy)]} {
 		set info(status_$id) "Loss"
@@ -4964,35 +4960,57 @@ proc Neuroexporter_ndf_combine {} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 
-	set t $info(export_text)
-	set tsf "32768"
-	set interval_length [expr round($config(play_interval) * $tsf)]
-	set step "8"
+	set debug 0
+	
+	set interval_length [expr round($config(play_interval) * $info(tick_frequency))]
+	set step $info(ticks_per_clock)
 	set num_channels [llength $info(export_buffer)]
+	
 	for {set i 0} {$i < $num_channels} {incr i} {
 		set length_$i [llength [lindex $info(export_buffer) $i]]
 		set period_$i [expr $interval_length / [set length_$i]]
+		if {[set period_$i] < $step} {set step [set period_$i]}
 		set index_$i 0
+		set key [lindex $config(channel_selector) $i]
+		set key [split $key ":"]
+		set id_$i [lindex $key 0]
 	}
+	
+	if {$debug} {
+		LWDAQ_print -nonewline $info(export_text) "$info(export_timestamp) " green
+	}
+	
 	set ts $info(export_timestamp)
 	set info(export_timestamp) [expr $ts + $interval_length]
+	
 	set data ""
 	while {$ts < $info(export_timestamp)} {
-		if {$ts % 256 == "0"} {
-			append data "[expr ($ts % 0x010000) / 0x100] "
+		if {$ts % $info(ticks_per_clock) == "0"} {
+			append data [binary format cSc "0" \
+				[expr ($ts % 0x01000000) / 0x100] [expr 0xF0] ]
 		}
 		for {set i 0} {$i < $num_channels} {incr i} {
 			if {$ts % [set period_$i] == "0"} {
-				append data "[lindex $info(export_buffer) $i [set index_$i]] "
+				append data [binary format cSc [set id_$i] \
+					[lindex $info(export_buffer) $i [set index_$i]] \
+					[expr ($ts % 0x100)]]
 				incr index_$i
 			}
 		}		
 		set ts [expr $ts + $step]
 	}
+	
 	set info(export_timestamp) [expr $info(export_timestamp) % 0x01000000]
-	LWDAQ_print $t $info(export_timestamp) green
-	LWDAQ_print $t [string range $data 0 100]
-	return ""
+	
+	if {$debug} {
+		for {set i 0} {$i < 10} {incr i} {
+			binary scan [string range $data [expr $i*4] [expr $i*4+3]] cuSucu id value ts
+			LWDAQ_print -nonewline $info(export_text) "$id-$value-$ts "
+		}
+		LWDAQ_print $info(export_text)
+	}
+	
+	return $data
 }
 
 #
@@ -5074,10 +5092,6 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				$config(export_format) format."
 			return ""
 		}	
-		if {$config(export_combine)} {
-			set sfn [file join $config(export_dir) \
-				"E$info(export_start_s).$ext"]
-		}
 		if {[catch {expr $config(export_duration)}]} {
 			LWDAQ_print $t "ERROR: Invalid duration expression\
 				\"$config(export_duration)\"."
@@ -5189,8 +5203,13 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						
 				if {$config(export_signal)} {
 					if {$config(export_combine)} {
-						set sfn [file join $config(export_dir) \
-							"E$info(export_start_s).$ext"]
+						if {$config(export_format) != "NDF"} {
+							set sfn [file join $config(export_dir) \
+								"E$info(export_start_s).$ext"]
+						} {
+							set sfn [file join $config(export_dir) \
+								"M$info(export_start_s).$ext"]
+						}
 					} {
 						set sfn [file join $config(export_dir) \
 							"E$info(export_start_s)\_$id\.$ext"]
@@ -5307,7 +5326,23 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					LWDAQ_print $t "Creating NDF file [file tail $sfn]."
 					LWDAQ_ndf_create $sfn $config(ndf_metadata_size)
 					set metadata [LWDAQ_ndf_string_read $config(play_file)]
-					append metadata "<c>Created by Neuroexporter $info(version).</c>\n"
+					set comments [LWDAQ_xml_get_list $metadata "c"]
+					set metadata ""
+					foreach c $comments {append metadata "<c>$c</c>\n"}
+					global LWDAQ_Info
+					append metadata "<c>Exported: [clock format [clock seconds]\
+						-format $info(datetime_format)].\
+						\nExporter: Neuroplayer $info(version),\
+						LWDAQ_$LWDAQ_Info(program_patchlevel).\
+						\nPlatform: $LWDAQ_Info(os).</c>\n"
+					append metadata "<payload>0</payload>\n"
+					append metadata "<glitch>$config(glitch_threshold)</glitch>\n"
+					if {$config(enable_processing)} {
+						append metadata "<processor>[file tail \
+							$config(processor_script)]</processor>
+					} {
+						append metadata "<processor>NONE</processor>
+					}
 					LWDAQ_ndf_string_write $sfn $metadata
 				}
 			}
@@ -5658,8 +5693,13 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			# exported channels.
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
-					set sfn [file join $config(export_dir) \
-						"E$info(export_start_s).$ext"]
+					if {$config(export_format) != "NDF"} {
+						set sfn [file join $config(export_dir) \
+							"E$info(export_start_s).$ext"]
+					} {
+						set sfn [file join $config(export_dir) \
+							"M$info(export_start_s).$ext"]
+					}
 				} {
 					set sfn [file join $config(export_dir) \
 						"E$info(export_start_s)\_$info(channel_num)\.$ext"]

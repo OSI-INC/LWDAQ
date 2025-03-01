@@ -1129,16 +1129,13 @@ proc LWDAQ_ndf_data_read {file_name start_addr num_bytes} {
 
 #
 # LWDAQ_xml_get_list takes an xml string and extracts the list of records from
-# the database that matches a specified tag you specify. If an xml string
-# contains one thousand entries delimited by <donor>...</donor>, the routine
-# returns a TCL list of the contents of all the <donor> entries when you pass it
-# the xml string and the tag "donor". You don't pass it the brackets on either
-# side of the tag, even though these brackets always appear in the xml string.
-# Each element in the list the routine returns will be the contents of a single
-# record, with its start and end tags removed. You can now apply this same
-# routine to each element in this list sequentially, to extract fields from each
-# record, and you can apply LWDAQ_xml_get to these fields to look at sub-fields
-# and so on.
+# the database that matches the specified tag. If an xml string contains one
+# thousand entries delimited by <donor>...</donor>, the routine returns a TCL
+# list of the contents of all the <donor> entries when we pass it the xml string
+# and "donor". Each element in the list the routine returns will be the contents
+# of a single record, with its start and end tags removed. You can now apply
+# this same routine to each element in this list sequentially, to extract fields
+# from each record.
 #
 proc LWDAQ_xml_get_list {xml tag} {
 	set result [list]
@@ -1156,15 +1153,6 @@ proc LWDAQ_xml_get_list {xml tag} {
 		lappend result $field
 	}
 	return $result
-}
-
-#
-# LWDAQ_xml_get calls LWDAQ_xml_get_list and returns the contents of the first
-# list entry in the result. We use this routine to extract the value of a field
-# in an xml record.
-#
-proc LWDAQ_xml_get {xml tag} {
-	return [lindex [LWDAQ_xml_get_list $xml $tag] 0]
 }
 
 #
