@@ -5339,9 +5339,9 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					append metadata "<glitch>$config(glitch_threshold)</glitch>\n"
 					if {$config(enable_processing)} {
 						append metadata "<processor>[file tail \
-							$config(processor_script)]</processor>
+							$config(processor_script)]</processor>"
 					} {
-						append metadata "<processor>NONE</processor>
+						append metadata "<processor>NONE</processor>"
 					}
 					LWDAQ_ndf_string_write $sfn $metadata
 				}
