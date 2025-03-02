@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "1.8"
+	LWDAQ_tool_init "SCT_Check" "2.0"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -45,7 +45,7 @@ proc SCT_Check_init {} {
 	set config(waveform_frequency) "10"
 	set config(sweep_flo) "1"
 	set config(sweep_fhi) "1000"
-	set config(sweep_duration) "2"
+	set config(sweep_time) "2"
 
 	set config(min_num_clocks) "64"
 	set config(max_num_clocks) "512"
@@ -123,7 +123,7 @@ proc SCT_Check_set_frequencies {{print 0}} {
 	return ""
 }
 
-proc SCT_Check_on {} {
+proc SCT_Check_waveform_on {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	global LWFG
@@ -156,14 +156,14 @@ proc SCT_Check_on {} {
 	} else {
 		LWDAQ_print $info(text) "Channel $config(gen_ch), sweep,\
 			$config(sweep_flo) to $config(sweep_fhi) Hz,\
-			$config(sweep_duration) s,\
+			$config(sweep_time) s,\
 			$config(waveform_amplitude) V amplitude,\
 			$config(waveform_offset) V offset." purple
 		set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
 		set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
 		set result [LWFG_sweep_sine $config(gen_ip) $config(gen_ch) \
 			$config(sweep_flo) $config(sweep_fhi) $v_lo $v_hi \
-			$config(sweep_duration) 1]
+			$config(sweep_time) 1]
 		if {[LWDAQ_is_error_result $result]} {
 			LWDAQ_print $info(text) $result
 		} elseif {$config(verbose)} {
@@ -180,7 +180,7 @@ proc SCT_Check_on {} {
 	return ""
 }
 
-proc SCT_Check_off {} {
+proc SCT_Check_waveform_off {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 
@@ -257,28 +257,30 @@ proc SCT_Check_detect {} {
 	return ""
 }
 
-proc SCT_Check_sweep {{index "-1"}} {
+proc SCT_Check_measure {{index "-1"}} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	upvar #0 LWDAQ_config_Receiver iconfig
 	upvar #0 LWDAQ_info_Receiver iinfo
 
 	if {$index < 0} {
-		if {$info(control) == "Sweep"} {return "0"}
-		set info(control) "Sweep"
+		if {$info(control) == "Measure"} {return "0"}
+		set info(control) "Measure"
 		set info(start_time) [clock seconds]
 		set info(data) [list]
-		LWDAQ_post [list SCT_Check_sweep "0"]
+		LWDAQ_post [list SCT_Check_measure "0"]
 		return ""
 	}
 	
 	if {$index >= 0} {
 		if {$info(control) == "Stop"} {
-			LWDAQ_print $info(text) "Sweep aborted."
+			LWDAQ_print $info(text) "Measurement aborted."
 			set info(control) "Idle"
-			SCT_Check_off
+			SCT_Check_waveform_off
 			return ""
 		}
+		
+		set $config(waveform_type) "sine"
 
 		set frequency [lindex $config(frequencies) $index]
 		set num_clocks [expr round(2.0*$iinfo(clock_frequency)/$frequency)]
@@ -290,7 +292,7 @@ proc SCT_Check_sweep {{index "-1"}} {
 		}
 		set iconfig(daq_num_clocks) $num_clocks
 		set config(waveform_frequency) $frequency
-		SCT_Check_on
+		SCT_Check_waveform_on
 		LWDAQ_wait_ms [expr round(1000.0*$config(settle)/$frequency)]
 
 		LWDAQ_reset_Receiver
@@ -312,18 +314,18 @@ proc SCT_Check_sweep {{index "-1"}} {
 		LWDAQ_print $info(text) "$output_line"
 		lappend info(data) "$output_line"
 		
-		# Call the sweep routine with the next frequency, or if we are done,
-		# write data to output file.
+		# Call the measurement routine with the next frequency, or if we are
+		# done, write data to output file.
 		incr index
 		if {$index < [llength $config(frequencies)]} {
-			LWDAQ_post [list SCT_Check_sweep $index]
+			LWDAQ_post [list SCT_Check_measure $index]
 			return ""
 		} else {
-			LWDAQ_print $info(text) "Sweep Complete,\
+			LWDAQ_print $info(text) "Measurement Complete,\
 				[llength $config(frequencies)] frequencies\
 				in [expr [clock seconds] - $info(start_time)] s." purple
 			set iconfig(daq_num_clocks) 128
-			SCT_Check_off
+			SCT_Check_waveform_off
 			set info(control) "Idle"
 			return ""
 		}
@@ -374,7 +376,7 @@ proc SCT_Check_open {} {
 	label $f.control -textvariable SCT_Check_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 		
-	foreach a {On Off Sweep Stop Print Battery} {
+	foreach a {Measure Stop Print Waveform_On Waveform_Off } {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post SCT_Check_$b"
 		pack $f.$b -side left -expand yes
@@ -397,18 +399,28 @@ proc SCT_Check_open {} {
 
 	set f [frame $w.configure]
 	pack $f -side top -fill x
-	
-	foreach a {Type Frequency Amplitude Offset} {
-		set b [string tolower $a]
-		label $f.l$a -text "$a\:" -fg $config(label_color)
-		entry $f.e$a -textvariable SCT_Check_config(waveform_$b) -width 6
-		pack $f.l$a $f.e$a -side left -expand yes
+
+	foreach {a b c} {"Waveform" waveform_type 10 \
+		"Channel" gen_ch 3 \
+		"Frequency (Hz)" waveform_frequency 10 \
+		"Amplitude (Vpp)" waveform_amplitude 10 \
+		"Offset (V)" waveform_offset 10 } {
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width $c
+		pack $f.l$b $f.e$b -side left -expand yes
 	}
 		
-	label $f.lgch -text "Channel:" -fg $config(label_color)
-	entry $f.egch -textvariable SCT_Check_config(gen_ch) -width 3
-	pack $f.lgch $f.egch -side left -expand yes
+	set f [frame $w.misc]
+	pack $f -side top -fill x
 
+	foreach {a b} {"Sweep_Lo (Hz)" sweep_flo \
+		"Sweep_Hi (Hz)" sweep_fhi \
+		"Sweep_Time (s)" sweep_time} {
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width 6
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+		
 	label $f.lgip -text "FGIP:" -fg $config(label_color)
 	entry $f.egip -textvariable SCT_Check_config(gen_ip) -width 16
 	pack $f.lgip $f.egip -side left -expand yes
@@ -417,29 +429,6 @@ proc SCT_Check_open {} {
 	entry $f.erip -textvariable LWDAQ_config_Receiver(daq_ip_addr) -width 16
 	pack $f.lrip $f.erip -side left -expand yes
 	
-	set f [frame $w.batch]
-	pack $f -side top -fill x
-
-	foreach a {Version Batch} {
-		set b [string tolower $a]
-		label $f.l$b -text "$a\:" -fg $config(label_color)
-		entry $f.e$b -textvariable SCT_Check_config($b) -width 4
-		pack $f.l$b $f.e$b -side left -expand yes
-	}
-	
-	foreach a {Signals} {
-		set b [string tolower $a]
-		label $f.l$b -text "$a\:" -fg $config(label_color)
-		entry $f.e$b -textvariable SCT_Check_config($b) -width 50
-		pack $f.l$b $f.e$b -side left -expand yes
-	}
-		
-	foreach a {Detect} {
-		set b [string tolower $a]
-		button $f.$b -text "$a" -command "LWDAQ_post SCT_Check_$b"
-		pack $f.$b -side left -expand yes
-	}
-
 	foreach a {Glitch} {
 		set b [string tolower $a]
 		label $f.l$b -text "$a\:" -fg $config(label_color)
@@ -447,12 +436,35 @@ proc SCT_Check_open {} {
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 		
+	set f [frame $w.batch]
+	pack $f -side top -fill x
+
+	foreach a {Signals} {
+		set b [string tolower $a]
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width 100
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+		
+	foreach a {Detect Battery} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command "LWDAQ_post SCT_Check_$b"
+		pack $f.$b -side left -expand yes
+	}
+
 	set f [frame $w.frequencies]
 	pack $f -side top -fill x
 
 	label $f.lf -text "Frequenies:" -fg $config(label_color)
 	entry $f.ef -textvariable SCT_Check_config(frequencies) -width 100
 	pack $f.lf $f.ef -side left -expand yes
+	
+	foreach a {Version Batch} {
+		set b [string tolower $a]
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width 4
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
 	
 	set f [frame $w.sps]
 	pack $f -side top -fill x
@@ -497,9 +509,9 @@ LWDAQ, to download telemetry signals from the receiver.
 Type: The waveform type, by default a sinusoid, can be "sine", "square",
 "triangle", or "sweep". If "sine", "square", or "triangle", we will get a
 waveform of fixed frequency, amplitude, and offset. If "sweep", we will get a
-logarithmic, sinusoidal sweep. The sweep will start at sweep_flo and end at
-sweep_fhi. It will take sweep_duration seconds. Its amplitude and offset will be
-the same as for any other waveform.
+logarithmic, sinusoidal sweep. The sweep will start at sweep_lo and end at
+sweep_hi in Hertz. It will take sweep_time seconds. Its amplitude and offset
+will be the same as for any other waveform.
 
 Frequency: The waveform frequency, anything from 1 mHz to 1 MHz.
 
