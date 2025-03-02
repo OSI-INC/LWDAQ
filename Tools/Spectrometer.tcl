@@ -1,6 +1,6 @@
 # Spectrometer.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2006-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2006-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # Plots results from the RFPM Instrument.
 #
@@ -47,6 +47,8 @@
 # Version 28: Add increment button.
 #
 # Version 29: Add active and inactive line width parameters.
+#
+# Version 30: Replace tk_optionMenu with menubutton and menu commands.
 
 proc Spectrometer_init {} {
 	upvar #0 Spectrometer_info info
@@ -421,9 +423,10 @@ proc Spectrometer_open {} {
 	pack $f.ccursor -side left -expand 1
 
 	label $f.mtl -text "Measurement:"
-	tk_optionMenu $f.mtm Spectrometer_config(measurement_type) none
+	menubutton $f.mtm -menu $f.mtm.m -textvariable Spectrometer_config(measurement_type)
+	menu $f.mtm.m 
 	foreach gn $info(measurement_names) {
-		$f.mtm.menu add command -label $gn \
+		$f.mtm.m add command -label $gn \
 			-command "set Spectrometer_config(measurement_type) $gn"
 	}
 	set config(measurement_type) [lindex $info(measurement_names) 0]

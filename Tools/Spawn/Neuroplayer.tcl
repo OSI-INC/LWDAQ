@@ -2696,15 +2696,15 @@ proc Neuroclassifier_open {} {
 	frame $w.controls2
 	pack $w.controls2 -side top -fill x
 	set f $w.controls2
-	label $f.yml -text "y:"
-	set info(classifier_y_menu) [tk_optionMenu $f.ym \
-		Neuroplayer_config(classifier_y_metric) "none"]
-	pack $f.yml $f.ym -side left -expand yes
-	label $f.xml -text "x:"
-	set info(classifier_x_menu) [tk_optionMenu $f.xm \
-		Neuroplayer_config(classifier_x_metric) "none"]
-	pack $f.xml $f.xm -side left -expand yes
-
+	
+	foreach a {x y} {
+		label $f.$a\ml -text "$a\:"
+		menubutton $f.$a\m -menu $f.$a\m.m -textvariable \
+			Neuroplayer_config(classifier_$a\_metric)
+		set info(classifier_$a\_menu) [menu $f.$a\m.m]
+		pack $f.$a\ml $f.$a\m -side left -expand yes
+	}
+	
 	checkbutton $f.handler -text "Handler" \
 		-variable Neuroplayer_config(enable_handler)
 	pack $f.handler -side left -expand yes
@@ -3007,7 +3007,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 
 #
 # Neuroclassifier_metric_display sets up the x-y plot menus so they each contain
-# all the metrics in the classifier_metrics list, and makes a checkbutton for each 
+# all the metrics in the classifier_metrics list. It makes a checkbutton for each 
 # metric to enable or disable the metric for classification.
 #
 proc Neuroclassifier_metric_display {} {
@@ -4198,22 +4198,39 @@ proc Neurotracker_open {} {
 		entry $f.e$a -textvariable Neuroplayer_config(tracker_$a) -width 4
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
+
 	label $f.lsps -text "sample_rate"
-	tk_optionMenu $f.msps Neuroplayer_config(tracker_sample_rate) \
-		1 2 4 8 16 32 64
+	menubutton $f.msps -menu $f.msps.m \
+		-textvariable Neuroplayer_config(tracker_sample_rate)
+	menu $f.msps.m
+	foreach x {1 2 4 8 16 32 64} {
+		$f.msps.m add command -label "$x" -command \
+			[list set Neuroplayer_config(tracker_sample_rate) $x]
+	}
 	$f.msps configure -width 3
 	pack $f.lsps $f.msps -side left -expand yes
+
 	label $f.ldiv -text "filter_divisor"
-	tk_optionMenu $f.mdiv \
-		Neuroplayer_config(tracker_filter_divisor) \
-		1 8 16 32 64 128 256 512
+	menubutton $f.mdiv -menu $f.mdiv.m \
+		-textvariable Neuroplayer_config(tracker_filter_divisor)
+	menu $f.mdiv.m
+	foreach x {1 8 16 32 64 128 256 512} {
+		$f.mdiv.m add command -label "$x" -command \
+			[list set Neuroplayer_config(tracker_filter_divisor) $x]
+	}
 	$f.mdiv configure -width 3
 	pack $f.ldiv $f.mdiv -side left -expand yes
-	label $f.lp -text "persistence"
-	tk_optionMenu $f.mp \
-		Neuroplayer_config(tracker_persistence) \
-		None Path Mark
+
+	label $f.lp -text "persistence"	
+	menubutton $f.mp -menu $f.mp.m \
+		-textvariable Neuroplayer_config(tracker_persistence)
+	menu $f.mp.m
+	foreach x {"None" "Path" "Mark"} {
+		$f.mp.m add command -label "$x" -command \
+			[list set Neuroplayer_config(tracker_persistence) $x]
+	}
 	pack $f.lp $f.mp -side left -expand yes
+
 	checkbutton $f.tsc -text "Coils" \
 		-variable Neuroplayer_config(tracker_show_coils)
 	pack $f.tsc -side left -expand yes
@@ -8829,11 +8846,16 @@ proc Neuroplayer_open {} {
 	}
 
 	label $f.lrs -text "Interval (s):" -fg $info(label_color)
-	tk_optionMenu $f.mrs Neuroplayer_config(play_interval) \
-		0.0625 0.125 0.25 0.5 1.0 2.0 4.0 8.0 16.0 32.0
+	menubutton $f.mrs -menu $f.mrs.m -textvariable Neuroplayer_config(play_interval)
+	menu $f.mrs.m
+	foreach x {0.0625 0.125 0.25 0.5 1.0 2.0 4.0 8.0 16.0 32.0} {
+		$f.mrs.m add command -label $x -command \
+			[list set Neuroplayer_config(play_interval) $x]
+	}
+	pack $f.lrs $f.mrs -side left -expand yes
 	label $f.li -text "Time (s):" -fg $info(label_color)
 	entry $f.ei -textvariable Neuroplayer_config(play_time) -width 8
-	pack $f.lrs $f.mrs $f.li $f.ei -side left -expand yes
+	pack $f.li $f.ei -side left -expand yes
 	label $f.le -text "Length (s):" -fg $info(label_color)
 	label $f.ee -textvariable Neuroplayer_info(play_end_time) -width 8 \
 		-bg $info(variable_bg) -anchor w

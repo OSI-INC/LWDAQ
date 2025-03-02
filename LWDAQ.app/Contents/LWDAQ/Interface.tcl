@@ -1239,7 +1239,12 @@ proc LWDAQ_server_open {} {
 		pack $f.l$i $f.e$i -side left
 	}
 	label $f.lmode -text "mode" -width 10
-	tk_optionMenu $f.emode LWDAQ_Info(server_mode) execute post echo receive
+	menubutton $f.emode -menu $f.emode.m -textvariable LWDAQ_Info(server_mode)
+	menu $f.emode.m
+	foreach x {"execute" "post" "echo" "receive"} {
+		$f.emode.m add command -label "$x" -command \
+			[list set LWDAQ_Info(server_mode) $x]
+	}
 	pack $f.lmode $f.emode -side left
 
 	LWDAQ_text_widget $w 80 20
