@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "2.0"
+	LWDAQ_tool_init "SCT_Check" "2.1"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -492,26 +492,46 @@ return ""
 
 ----------Begin Help----------
 
-The Subcutaneous Transmitter (SCT) Check tool uses a data receiver and a
+The Subcutaneous Transmitter (SCT) Check tool uses a telemetry receiver and a
 function generator to measure the frequency response and battery voltages of
 SCTs during and after assembly and encapsulation. We use the tool to produce
 rapid frequency sweeps that allow us to see the approximate frequency response
-of a transmitter prior to encapsulation, or when we are checking the
-transmitters taking part in our accelerated aging tests. We use the tool to
-produce plots of gain versus frequency after encapsulation. The function
-generator must be one of our LWDAQ instruments, such as the Function Generator
-(A3050). The receiver must be one of our LWDAQ telemetry receivers, such as the
-Octal Data Receiver (A3027E), Animal Location Tracker, (ALT), or Telemetry
-Control Box (TCB). The tool uses the LWFG package, included with LWDAQ, to
-configure the function generator. It uses the Receiver Instrument, included with
-LWDAQ, to download telemetry signals from the receiver.
+of a transmitter prior to encapsulation or during accelerated aging. We use the
+Measure button to produce plots of gain versus frequency for permanent and
+detailed records of the frequency response. The function generator is the
+Function Generator (A3050) or other compatible PoE generator. The receiver must
+be one of our LWDAQ telemetry receivers, such as the Octal Data Receiver
+(A3027E), Animal Location Tracker, (ALT), or Telemetry Control Box (TCB). The
+tool uses the LWFG package, included with LWDAQ, to configure the function
+generator. It uses the Receiver Instrument, included with LWDAQ, to download
+telemetry signals from the receiver.
 
-Type: The waveform type, by default a sinusoid, can be "sine", "square",
+Measure: Start a detailed measurement of frequency response. We will go through
+all the frequencies defined for the measurement, starting with the lowest frequency. We
+assert this frequency and measure the amplitude of the response from all transmitters
+listed in the signals string. We move to the next frequency, and so on, recording 
+the amplitudes of all signals as we go.
+
+Stop: Abort a sweep.
+
+Print: Print the results of a sweep to the text window.
+
+Waveform_On: Turn on the waveform specified by the Waveform entry boxes. We now see
+a repeating waveform produced by the function generator, perhaps even a repeating frequency sweep, on our function
+generator, and we can see what this looks like in the Receiver window.
+
+Waveform_Off: Turn off the waveform, the function generator output goes to zero.
+
+Receiver: Open the Receiver Instrument. 
+
+Waveform: The waveform type, by default a sinusoid, can be "sine", "square",
 "triangle", or "sweep". If "sine", "square", or "triangle", we will get a
 waveform of fixed frequency, amplitude, and offset. If "sweep", we will get a
 logarithmic, sinusoidal sweep. The sweep will start at sweep_lo and end at
 sweep_hi in Hertz. It will take sweep_time seconds. Its amplitude and offset
 will be the same as for any other waveform.
+
+Channel: The function generator channel we want to produce our waveform.
 
 Frequency: The waveform frequency, anything from 1 mHz to 1 MHz.
 
@@ -521,6 +541,14 @@ peak amplitude. Can be anything from 0 to 10 V.
 Offset: The offset of the waveform average from zero. Subject to a signal range
 of -10 V to +10 V, the offset can be anything from -10 V to + 10 V.
 
+Sweep_Lo: The low frequency we generate when the waveform type is "sweep", in
+Hertz.
+
+Sweep_Hi: The high frequency we generate when the waveform type is "sweep", in
+Hertz.
+
+Sweep_Time: The duration of a "sweep" type waveform, in seconds.
+
 FGIP: The function generator IP address.
 
 RXIP: The data receiver IP address. If we are using an ODR, we must also specify
@@ -528,8 +556,10 @@ the driver socket into which we have plugged the ODR. By default we use socket
 one (1). We can specify another socket by opening the Receiver Instrument with
 the Receiver button and setting daq_driver_socket to our chosen value.
 
-Version: The SCT assembly version, a letter. The A3048S2 would be "S", the
-A3049Q4 would be "Q".
+Version: The SCT assembly version. The A3048S2 would be "S", the A3049Q4 would
+be "Q". We could also write "A3Z" if we wanted, but if we write "A3", the "3"
+will blend with the batch number, which is an integer, thus blending the two
+numbers.
 
 Batch: The SCT assembly batch number, which is the first part of its serial
 number. Transmitter Q216.109 has batch number 216, and will share this batch
@@ -555,12 +585,12 @@ each sample rate enabled by the sample rate checkboxes. We print the frequencies
 to the screen so that we can cut and paste them into a spreadsheet.
 
 Sample Rates: A series of checkboxes that turn on detailed measurement around
-the corner frequency of SCT filters with various sample rates. When we check
-the 256 box, we add to our sweep the frequencies that will give us a good plot
-of the SCT's low-pass filter near its corner frequency of 80 Hz. Check multiple
+the corner frequency of SCT filters with various sample rates. When we check the
+256 box, we add to our sweep the frequencies that will give us a good plot of
+the SCT's low-pass filter near its corner frequency of 80 Hz. Check multiple
 boxes to measure in detail around multiple corner frequencies.
 
-Copyright (C) 2024, Kevan Hashemi, Open Source Instruments Inc.
+Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
 ----------End Help----------
 
