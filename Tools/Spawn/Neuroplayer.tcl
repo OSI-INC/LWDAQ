@@ -4999,6 +4999,39 @@ proc Neuroexporter_txt_save {w} {
 }
 
 #
+# Neuroexporter_ndf_create makes a new export NDF file. It reads the comments from
+# the current play file and includes them in the new file's metadata. It adds a
+# record of the export to the metadata.
+#
+proc Neuroexporter_ndf_create {sfn} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+	global LWDAQ_Info
+
+	LWDAQ_ndf_create $sfn $config(ndf_metadata_size)
+	set metadata [LWDAQ_ndf_string_read $config(play_file)]
+	set comments [LWDAQ_xml_get_list $metadata "c"]
+	set metadata ""
+	foreach c $comments {append metadata "<c>$c</c>\n"}
+	append metadata "<c>Exported: [clock format [clock seconds]\
+		-format $info(datetime_format)].\
+		\nExporter: Neuroplayer $info(version),\
+		LWDAQ_$LWDAQ_Info(program_patchlevel).\
+		\nPlatform: $LWDAQ_Info(os).</c>\n"
+	append metadata "<payload>0</payload>\n"
+	append metadata "<glitch>$config(glitch_threshold)</glitch>\n"
+	if {$config(enable_processing)} {
+		append metadata "<processor>[file tail \
+			$config(processor_file)]</processor>"
+	} {
+		append metadata "<processor>NONE</processor>"
+	}
+	LWDAQ_ndf_string_write $sfn $metadata
+	
+	return $sfn
+}
+
+#
 # Neuroexporter_ndf_combines the signals in the export buffer to make an NDF
 # data block containing all signals with clock messages.
 #
@@ -5365,26 +5398,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			if {$config(export_combine) && ($config(export_format) == "NDF")} {
 				if {$config(export_signal)} {
 					LWDAQ_print $t "Creating NDF file [file tail $sfn]."
-					LWDAQ_ndf_create $sfn $config(ndf_metadata_size)
-					set metadata [LWDAQ_ndf_string_read $config(play_file)]
-					set comments [LWDAQ_xml_get_list $metadata "c"]
-					set metadata ""
-					foreach c $comments {append metadata "<c>$c</c>\n"}
-					global LWDAQ_Info
-					append metadata "<c>Exported: [clock format [clock seconds]\
-						-format $info(datetime_format)].\
-						\nExporter: Neuroplayer $info(version),\
-						LWDAQ_$LWDAQ_Info(program_patchlevel).\
-						\nPlatform: $LWDAQ_Info(os).</c>\n"
-					append metadata "<payload>0</payload>\n"
-					append metadata "<glitch>$config(glitch_threshold)</glitch>\n"
-					if {$config(enable_processing)} {
-						append metadata "<processor>[file tail \
-							$info(processor_script)]</processor>"
-					} {
-						append metadata "<processor>NONE</processor>"
-					}
-					LWDAQ_ndf_string_write $sfn $metadata
+					Neuroexporter_ndf_create $sfn
 				}
 			}
 

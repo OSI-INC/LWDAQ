@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "2.1"
+	LWDAQ_tool_init "SCT_Check" "2.2"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -40,6 +40,7 @@ proc SCT_Check_init {} {
 	set config(gen_ch) "1"
 
 	set config(waveform_type) "sine"
+	set config(waveform_types) "sine triangle square sweep"
 	set config(waveform_amplitude) "3"
 	set config(waveform_offset) "0"
 	set config(waveform_frequency) "10"
@@ -388,6 +389,12 @@ proc SCT_Check_open {} {
 		pack $f.$b -side left -expand yes
 	}
 	
+	foreach a {Spectrometer} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command "LWDAQ_run_tool $a"
+		pack $f.$b -side left -expand yes
+	}
+	
 	foreach a {Help Configure} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_tool_$b SCT_Check"
@@ -399,9 +406,18 @@ proc SCT_Check_open {} {
 
 	set f [frame $w.configure]
 	pack $f -side top -fill x
+	
+	label $f.wfl -text "Waveform:" -fg $config(label_color)
+	menubutton $f.wfm -menu $f.wfm.m -width 8 \
+		-textvariable SCT_Check_config(waveform_type)
+	set m [menu $f.wfm.m]
+	foreach wt $config(waveform_types) {
+		$m add command -label $wt -command \
+			[list set SCT_Check_config(waveform_type) $wt]
+	}
+	pack $f.wfl $f.wfm -side left -expand yes
 
-	foreach {a b c} {"Waveform" waveform_type 10 \
-		"Channel" gen_ch 3 \
+	foreach {a b c} {"Channel" gen_ch 3 \
 		"Frequency (Hz)" waveform_frequency 10 \
 		"Amplitude (Vpp)" waveform_amplitude 10 \
 		"Offset (V)" waveform_offset 10 } {
@@ -523,6 +539,8 @@ generator, and we can see what this looks like in the Receiver window.
 Waveform_Off: Turn off the waveform, the function generator output goes to zero.
 
 Receiver: Open the Receiver Instrument. 
+
+Spectrometer: Open the Spectrometer Tool.
 
 Waveform: The waveform type, by default a sinusoid, can be "sine", "square",
 "triangle", or "sweep". If "sine", "square", or "triangle", we will get a
