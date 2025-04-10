@@ -427,7 +427,7 @@ proc Spectrometer_open {} {
 	label $f.mtl -text "Measurement:"
 	menubutton $f.mtm -menu $f.mtm.m \
 		-textvariable Spectrometer_config(measurement_type) \
-		-relief groove -indicatoron 1
+		-relief raised -indicatoron 1
 	menu $f.mtm.m 
 	foreach gn $info(measurement_names) {
 		$f.mtm.m add command -label $gn \

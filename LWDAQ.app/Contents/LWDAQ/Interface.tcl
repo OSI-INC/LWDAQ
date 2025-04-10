@@ -1240,7 +1240,7 @@ proc LWDAQ_server_open {} {
 	}
 	label $f.lmode -text "mode" -width 10
 	menubutton $f.emode -menu $f.emode.m -textvariable LWDAQ_Info(server_mode) \
-		-relief groove -indicatoron 1
+		-relief raised -indicatoron 1
 	menu $f.emode.m
 	foreach x {"execute" "post" "echo" "receive"} {
 		$f.emode.m add command -label "$x" -command \

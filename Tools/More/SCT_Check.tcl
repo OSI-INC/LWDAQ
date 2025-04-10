@@ -409,7 +409,7 @@ proc SCT_Check_open {} {
 	
 	label $f.wfl -text "Waveform:" -fg $config(label_color)
 	menubutton $f.wfm -menu $f.wfm.m \
-		-width 8 -relief groove -indicatoron 1 \
+		-width 8 -relief raised -indicatoron 1 \
 		-textvariable SCT_Check_config(waveform_type)
 	set m [menu $f.wfm.m]
 	foreach wt $config(waveform_types) {

@@ -2701,7 +2701,7 @@ proc Neuroclassifier_open {} {
 		label $f.$a\ml -text "$a\:"
 		menubutton $f.$a\m -menu $f.$a\m.m -textvariable \
 			Neuroplayer_config(classifier_$a\_metric) \
-			-relief groove -indicatoron 1
+			-relief raised -indicatoron 1
 		set info(classifier_$a\_menu) [menu $f.$a\m.m]
 		pack $f.$a\ml $f.$a\m -side left -expand yes
 	}
@@ -4203,7 +4203,7 @@ proc Neurotracker_open {} {
 	label $f.lsps -text "sample_rate"
 	menubutton $f.msps -menu $f.msps.m \
 		-textvariable Neuroplayer_config(tracker_sample_rate) \
-		-relief groove -indicatoron 1		
+		-relief raised -indicatoron 1		
 	menu $f.msps.m
 	foreach x {1 2 4 8 16 32 64} {
 		$f.msps.m add command -label "$x" -command \
@@ -4215,7 +4215,7 @@ proc Neurotracker_open {} {
 	label $f.ldiv -text "filter_divisor"
 	menubutton $f.mdiv -menu $f.mdiv.m \
 		-textvariable Neuroplayer_config(tracker_filter_divisor) \
-		-relief groove -indicatoron 1
+		-relief raised -indicatoron 1
 	menu $f.mdiv.m
 	foreach x {1 8 16 32 64 128 256 512} {
 		$f.mdiv.m add command -label "$x" -command \
@@ -4227,7 +4227,7 @@ proc Neurotracker_open {} {
 	label $f.lp -text "persistence"	
 	menubutton $f.mp -menu $f.mp.m \
 		-textvariable Neuroplayer_config(tracker_persistence) \
-		-relief groove -indicatoron 1
+		-relief raised -indicatoron 1
 	menu $f.mp.m
 	foreach x {"None" "Path" "Mark"} {
 		$f.mp.m add command -label "$x" -command \
@@ -8865,7 +8865,7 @@ proc Neuroplayer_open {} {
 
 	label $f.lrs -text "Interval (s):" -fg $info(label_color)
 	menubutton $f.mrs -menu $f.mrs.m -textvariable Neuroplayer_config(play_interval) \
-		-relief groove -indicatoron 1
+		-relief raised -indicatoron 1
 	menu $f.mrs.m
 	foreach x {0.0625 0.125 0.25 0.5 1.0 2.0 4.0 8.0 16.0 32.0} {
 		$f.mrs.m add command -label $x -command \
