@@ -49,6 +49,8 @@
 # Version 29: Add active and inactive line width parameters.
 #
 # Version 30: Replace tk_optionMenu with menubutton and menu commands.
+#
+# Version 31: Improve menubuttons on Windows.
 
 proc Spectrometer_init {} {
 	upvar #0 Spectrometer_info info
@@ -423,7 +425,9 @@ proc Spectrometer_open {} {
 	pack $f.ccursor -side left -expand 1
 
 	label $f.mtl -text "Measurement:"
-	menubutton $f.mtm -menu $f.mtm.m -textvariable Spectrometer_config(measurement_type)
+	menubutton $f.mtm -menu $f.mtm.m \
+		-textvariable Spectrometer_config(measurement_type) \
+		-relief groove -indicatoron 1
 	menu $f.mtm.m 
 	foreach gn $info(measurement_names) {
 		$f.mtm.m add command -label $gn \

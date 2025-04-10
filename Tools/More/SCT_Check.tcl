@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "2.2"
+	LWDAQ_tool_init "SCT_Check" "2.3"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -408,7 +408,8 @@ proc SCT_Check_open {} {
 	pack $f -side top -fill x
 	
 	label $f.wfl -text "Waveform:" -fg $config(label_color)
-	menubutton $f.wfm -menu $f.wfm.m -width 8 \
+	menubutton $f.wfm -menu $f.wfm.m \
+		-width 8 -relief groove -indicatoron 1 \
 		-textvariable SCT_Check_config(waveform_type)
 	set m [menu $f.wfm.m]
 	foreach wt $config(waveform_types) {

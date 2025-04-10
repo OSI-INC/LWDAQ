@@ -2573,7 +2573,9 @@ proc Videoarchiver_draw_list {} {
 
 		label $ff.rotl -text "Rot:" -fg brown -justify right
 		pack $ff.rotl -side left -expand 0
-		menubutton $ff.rotm -menu $ff.rotm.m -textvariable Videoarchiver_info(cam$n\_rot)
+		menubutton $ff.rotm -menu $ff.rotm.m \
+			-textvariable Videoarchiver_info(cam$n\_rot) \
+			-relief groove -indicatoron 1
 		set m [menu $ff.rotm.m]
 		$m delete 0 end
 		foreach rotation $info(rotation_options) {
@@ -2584,7 +2586,9 @@ proc Videoarchiver_draw_list {} {
 	
 		label $ff.satl -text "Sat:" -fg brown -justify right
 		pack $ff.satl -side left -expand 0
-		menubutton $ff.satm -menu $ff.satm.m -textvariable Videoarchiver_info(cam$n\_sat)
+		menubutton $ff.satm -menu $ff.satm.m \
+			-textvariable Videoarchiver_info(cam$n\_sat) \
+			-relief groove -indicatoron 1
 		set m [menu $ff.satm.m]
 		$m delete 0 end
 		for {set sat 0.0} {$sat <= 1.0} {set sat [format %.1f [expr $sat + 0.1]]} {
@@ -2595,7 +2599,9 @@ proc Videoarchiver_draw_list {} {
 
 		label $ff.ecl -text "Exp:" -fg brown -justify right
 		pack $ff.ecl -side left -expand 0
-		menubutton $ff.ecm -menu $ff.ecm.m -textvariable Videoarchiver_info(cam$n\_ec)
+		menubutton $ff.ecm -menu $ff.ecm.m \
+			-textvariable Videoarchiver_info(cam$n\_ec) \
+			-relief groove -indicatoron 1
 		set m [menu $ff.ecm.m]
 		$m delete 0 end
 		for {set ec 0.0} {$ec <= 1.0} {set ec [format %.1f [expr $ec + 0.1]]} {
@@ -2606,7 +2612,9 @@ proc Videoarchiver_draw_list {} {
 
 		label $ff.wl -text "Wht:" -padx $padx -fg brown -justify right
 		pack $ff.wl -side left -expand 0
-		menubutton $ff.wm -menu $ff.wm.m -textvariable Videoarchiver_info(cam$n\_white)
+		menubutton $ff.wm -menu $ff.wm.m \
+			-textvariable Videoarchiver_info(cam$n\_white) \
+			-relief groove -indicatoron 1
 		set m [menu $ff.wm.m]
 		$m delete 0 end
 		foreach a $info(lamp_dac_values) {
@@ -2617,7 +2625,9 @@ proc Videoarchiver_draw_list {} {
 		
 		label $ff.irl -text "IR:" -padx $padx -fg brown -justify right
 		pack $ff.irl -side left -expand 0
-		menubutton $ff.irm -menu $ff.irm.m -textvariable Videoarchiver_info(cam$n\_infrared)
+		menubutton $ff.irm -menu $ff.irm.m \
+			-textvariable Videoarchiver_info(cam$n\_infrared) \
+			-relief groove -indicatoron 1
 		set m [menu $ff.irm.m]
 		$m delete 0 end
 		foreach a $info(lamp_dac_values) {
@@ -2973,7 +2983,9 @@ proc Videoarchiver_scheduler {} {
 
 		label $f.lmin -text "Minute:" -fg brown -justify right
 		pack $f.lmin -side left -expand 0
-		menubutton $f.mmin -menu $f.mmin.m -textvariable Videoarchiver_info($a\_min)
+		menubutton $f.mmin -menu $f.mmin.m \
+			-textvariable Videoarchiver_info($a\_min) \
+			-relief groove -indicatoron 1
 		set m [menu $f.mmin.m]
 		$m delete 0 end
 		foreach value {* 0 5 10 15 20 25 30 35 40 45 50 55} {
@@ -2984,7 +2996,9 @@ proc Videoarchiver_scheduler {} {
 
 		label $f.lhr -text "Hour:" -fg brown -justify right
 		pack $f.lhr -side left -expand 0
-		menubutton $f.mhr -menu $f.mhr.m -textvariable Videoarchiver_info($a\_hr)
+		menubutton $f.mhr -menu $f.mhr.m \
+			-textvariable Videoarchiver_info($a\_hr) \
+			-relief groove -indicatoron 1
 		set m [menu $f.mhr.m]
 		$m delete 0 end
 		foreach value {* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23} {
@@ -2995,7 +3009,9 @@ proc Videoarchiver_scheduler {} {
 
 		label $f.ldymo -text "Day of Month:" -fg brown -justify right
 		pack $f.ldymo -side left -expand 0
-		menubutton $f.mdymo -menu $f.mdymo.m -textvariable Videoarchiver_info($a\_dymo)
+		menubutton $f.mdymo -menu $f.mdymo.m \
+			-textvariable Videoarchiver_info($a\_dymo) \
+			-relief groove -indicatoron 1
 		set m [menu $f.mdymo.m]
 		$m delete 0 end
 		foreach value {* 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 \
@@ -3007,7 +3023,9 @@ proc Videoarchiver_scheduler {} {
 
 		label $f.lmo -text "Month:" -fg brown -justify right
 		pack $f.lmo -side left -expand 0
-		menubutton $f.mmo -menu $f.mmo.m -textvariable Videoarchiver_info($a\_mo)
+		menubutton $f.mmo -menu $f.mmo.m \
+			-textvariable Videoarchiver_info($a\_mo) \
+			-relief groove -indicatoron 1
 		set m [menu $f.mmo.m]
 		$m delete 0 end
 		foreach value {* 0 1 2 3 4 5 6 7 8 9 10 11 12} {
@@ -3018,7 +3036,9 @@ proc Videoarchiver_scheduler {} {
 
 		label $f.ldywk -text "Day of Week:" -fg brown -justify right
 		pack $f.ldywk -side left -expand 0
-		menubutton $f.mdywk -menu $f.mdywk.m -textvariable Videoarchiver_info($a\_dywk)
+		menubutton $f.mdywk -menu $f.mdywk.m \
+			-textvariable Videoarchiver_info($a\_dywk) \
+			-relief groove -indicatoron 1
 		set m [menu $f.mdywk.m]
 		$m delete 0 end
 		$m add command -label "*" -command [list set Videoarchiver_info($a\_dywk) "*"]
@@ -3032,7 +3052,9 @@ proc Videoarchiver_scheduler {} {
 
 		label $f.lint -text "Intensity:" -fg brown -justify right
 		pack $f.lint -side left -expand 0
-		menubutton $f.mint -menu $f.mint.m -textvariable Videoarchiver_info($a\_int)
+		menubutton $f.mint -menu $f.mint.m \
+			-textvariable Videoarchiver_info($a\_int) \
+			-relief groove -indicatoron 1
 		set m [menu $f.mint.m]
 		$m delete 0 end
 		foreach value {0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15} {
