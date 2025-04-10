@@ -4,7 +4,7 @@
 # the LWDAQ software.
 
 # Mount point for remote disk.
-RMT="/Users/kevan/OSI-SFTP.localized"
+RMT="/Users/kevan/OSI-AWS.localized"
 
 # Determine operating system. Default is Unknown. 
 OS=Unknown
