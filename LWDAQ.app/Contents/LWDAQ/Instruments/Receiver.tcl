@@ -98,6 +98,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(clock_id) "0"
 	set info(show_errors) "0"
 	set info(show_messages) "0"
+	set info(show_aux_messages) "0"
 	set info(min_id) "0"
 	set info(max_id) "255"
 	set info(activity_rows) "32"
@@ -287,11 +288,11 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			set raw_data [lwdaq_receiver $image_name \
 				"-payload $config(payload_length) print 0 $info(show_messages)"]
 			LWDAQ_print $info(text) $raw_data
-			if {[llength $info(aux_messages)] > 0} {
-				LWDAQ_print $info(text) "Auxiliary Messages:"
-				foreach m $info(aux_messages) {
-					LWDAQ_print $info(text) $m
-				}
+		}
+		if {$info(show_aux_messages) > 0} {
+			LWDAQ_print $info(text) "Auxiliary Messages:"
+			foreach m $info(aux_messages) {
+				LWDAQ_print $info(text) $m
 			}
 		}
 		
