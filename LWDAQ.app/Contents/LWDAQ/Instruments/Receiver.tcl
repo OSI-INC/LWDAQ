@@ -442,7 +442,7 @@ proc LWDAQ_reset_Receiver {} {
 					set info(receiver_type) "A3042"
 					set config(payload_length) 2
 					set info(daq_avail_cntr) 1
-					set channel_select_available 1
+					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 1
 					set info(max_block_reads) "50"
