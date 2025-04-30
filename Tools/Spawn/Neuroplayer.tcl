@@ -2023,10 +2023,17 @@ proc Neuroplayer_spectrum {{values ""}} {
 }
 
 #
-# Neuroplayer_overview displays an overview of a file's contents. This
-# routine sets up the overview window and calles a plot routine to sample
-# the archvie and plot the results. An Export button provides a way to
-# export the graph data to disk for plotting in other programs.
+# Neuroplayer_overview displays an overview of a file's contents. If no overview
+# window exists, the Overview create one. If an overview window exists, the
+# Overview take over that window and plots the current arive. The plot respects
+# the settings asserted for the value versus time plot in the main Neuroplayer
+# window. These same settings are available in the overview window itself. The
+# Overview plots the channels specficied in the channel select string. When
+# first opened, the overview extends across the entire archive, but we can
+# select an interval of the file for the overview as well. Previous and Next NDF
+# buttons allow us to look at the next NDF file in the playback directory tree.
+# An Exerpt button causes the Overview to extract the inteval of the original
+# NDF archive and write it to disk as a new, shorter NDF archive. 
 #
 proc Neuroplayer_overview {{fn ""} } {
 	upvar #0 Neuroplayer_info info
@@ -2214,11 +2221,11 @@ proc Neuroplayer_overview {{fn ""} } {
 }
 
 #
-# Neuroplayer_overview_jump jumps to the point in the overview archive that
-# lies under the coordinates (x,y) in the overview graph. We call it after a
-# mouse double-click in the graph. We round the jump-to time to the nearest
-# second so that accompanying synchronous video will have a key frame to show at
-# the start of the interval.
+# Neuroplayer_overview_jump jumps to the point in the overview archive that lies
+# under the coordinates (x,y) in the overview graph. We call it after a mouse
+# double-click in the graph. We round the jump-to time to the nearest second so
+# that accompanying synchronous video will have a key frame to show at the start
+# of the interval.
 #
 proc Neuroplayer_overview_jump {x y} {
 	upvar #0 Neuroplayer_info info
@@ -2247,7 +2254,7 @@ proc Neuroplayer_overview_jump {x y} {
 
 #
 # Neuroplayer_overview_cursor draws a vertical line over the plot to show the
-# start of the current playback interval, assuming the file displayed is the 
+# start of the current playback interval, assuming the file displayed is the
 # current play file.
 #
 proc Neuroplayer_overview_cursor {} {
@@ -2378,12 +2385,11 @@ proc Neuroplayer_overview_plot {} {
 	}
 	close $f
 	
-	# Go through the list of messages, calculating the time of each message
-	# by interpolating between the times of existing clock messages. We assume
-	# that less than one clock cycle period (that's 512 s) passes between clock 
-	# messages so that we can keep time by looking at the clock message values.
+	# Go through the list of messages, calculating the time of each message by
+	# interpolating between the times of existing clock messages. We assume that
+	# less than one clock cycle period of 512 s passes between clock messages so
+	# that we can keep time by looking at the clock message values.
 	set ov_config(status) "Analyzing"
-	LWDAQ_update
 	set offset_time -1
 	set lo_time $ov_config(t_min)
 	set time_step 0
@@ -2391,6 +2397,7 @@ proc Neuroplayer_overview_plot {} {
 	set clock_cycles 0
 	set previous_clock 0
 	for {set sample_num 0} {$sample_num < [llength $samples]} {incr sample_num} {
+		LWDAQ_support
 		scan [lindex $samples $sample_num] %u%u id value
 		if {$id == 0} {
 			if {$value < $previous_clock} {incr clock_cycles}
