@@ -1,6 +1,6 @@
 # Neurorecorder.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2007-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2025 Kevan Hashemi, Open Source Instruments Inc.
 
 # The Neurorecorder records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:

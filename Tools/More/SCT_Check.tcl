@@ -1,6 +1,6 @@
 # SCT Check, a LWDAQ Tool.
 #
-# Copyright (C) 2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2024-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # SCT Check measures the frequency response of subcutaneous transmitters (SCTs).
 # It operates a LWDAQ Function Generator (A3050) to deliver increasing

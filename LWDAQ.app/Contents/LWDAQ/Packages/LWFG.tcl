@@ -1,6 +1,6 @@
 # Long-Wire Function Generator Package
 # 
-# (C) 2023-2024, Kevan Hashemi, Open Source Instruments Inc.
+# (C) 2023-2025, Kevan Hashemi, Open Source Instruments Inc.
 #
 # Routines that interact with Long-Wire Data Acquisition Function Generators
 # (LWFGs). These are devices are TCPIP servers that we control using LWDAQ

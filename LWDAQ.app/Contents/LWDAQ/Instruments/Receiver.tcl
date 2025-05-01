@@ -1,6 +1,6 @@
 # Receiver Instrument, Long-Wire Data Acquisition Software (LWDAQ)
 #
-# Copyright (C) 2006-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2006-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
