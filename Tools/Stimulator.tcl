@@ -224,7 +224,7 @@ proc Stimulator_transmit {id commands} {
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		LWDAQ_transmit_command_hex $sock $config(rf_off_op)
-		LWDAQ_delay_seconds $sock $sd
+		if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
 		set counter 0
 		foreach c $commands {
 			LWDAQ_transmit_command_hex $sock "[format %02X $c]$config(rf_xmit_op)"

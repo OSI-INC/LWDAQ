@@ -40,19 +40,19 @@ proc LWDAQ_init_Camera {} {
 	set info(window) [string tolower .$info(name)]
 	set info(text) $info(window).text
 	set info(photo) [string tolower $info(name)\_photo]
-	set info(counter) 0 
-	set info(zoom) 1
-	set info(daq_extended) 0
-	set info(file_use_daq_bounds) 0
-	set info(daq_anti_blooming) 1
-	set info(daq_fast_move) 0
-	set info(daq_image_width) 700
-	set info(daq_image_height) 520
-	set info(daq_image_left) 24
-	set info(daq_image_right) 682
-	set info(daq_image_top) 14
-	set info(daq_image_bottom) 506
-	set info(daq_wake_ms) 0
+	set info(counter) "0" 
+	set info(zoom) "1"
+	set info(daq_extended) "0"
+	set info(file_use_daq_bounds) "0"
+	set info(daq_anti_blooming) "1"
+	set info(daq_fast_move) "0"
+	set info(daq_image_width) "700"
+	set info(daq_image_height) "520"
+	set info(daq_image_left) "24"
+	set info(daq_image_right) "682"
+	set info(daq_image_top) "14"
+	set info(daq_image_bottom) "506"
+	set info(daq_wake_ms) "0"
 	set info(daq_password) "no_password"
 	set info(delete_old_images) 1
 	set info(verbose_description) \
@@ -67,17 +67,17 @@ proc LWDAQ_init_Camera {} {
 	# LWDAQ_open_Instrument procedure
 	set config(image_source) "daq"
 	set config(file_name) ./Images/$info(name)\*
-	set config(memory_name) lwdaq_image_1
-	set config(daq_ip_addr) 10.0.0.37
-	set config(daq_device_type) 6
-	set config(daq_driver_socket) 1
-	set config(daq_mux_socket) 1
-	set config(daq_device_element) 2
-	set config(daq_exposure_seconds) 0.04
+	set config(memory_name) "lwdaq_image_1"
+	set config(daq_ip_addr) "10.0.0.37"
+	set config(daq_device_type) "6"
+	set config(daq_driver_socket) "1"
+	set config(daq_mux_socket) "1"
+	set config(daq_device_element) "2"
+	set config(daq_exposure_seconds) "0.04"
 	set config(intensify) "rggb"
-	set config(analysis_enable) 1
+	set config(analysis_enable) "1"
 	set config(analysis_manipulation) "none"
-	set config(verbose_result) 0
+	set config(verbose_result) "0"
 	
 	return ""
 }

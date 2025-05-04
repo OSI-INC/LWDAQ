@@ -1,7 +1,7 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 #
 # Copyright (C) 2009-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 # 
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -76,7 +76,7 @@ proc LWDAQ_init_Dosimeter {} {
 	set config(image_source) "daq"
 	set config(file_name) ./Images/$info(name)\*
 	set config(memory_name) $info(name)\_0
-	set config(daq_ip_addr) "129.64.37.90"
+	set config(daq_ip_addr) "10.0.0.37"
 	set config(daq_driver_socket) 5
 	set config(daq_mux_socket) 1
 	set config(daq_device_element) 2
