@@ -30,34 +30,43 @@ package provide CGMT 0.1
 # Clear the global CGMT array if it already exists.
 if {[info exists CGMT]} {unset CGMT}
 
-# Fill the html entity array. We use this array to convert html entities into
-# unicode characters.
-array set CGMT_html_entities {
-    &mu; "μ"
-    &plusmn; "±"
-    &div; "÷"
-    &amp; "&"
-    &nbsp; " "
-    &Omega; "Ω"
-    &beta; "ß"
-    &pi; "π"
-    &lt; "<"
-    &gt; ">"
-    &le; "≤"
-    &ge; "≥"
-    &asymp; "≈"
-    &infin; "∞"
-    &times; "×"
-    &deg; "°"
-    &minus; "−"
-    <i> ""
-    </i> ""
-    <b> ""
-    </b> ""
+# A list of html entities and the unicode characters we want to replace them
+# with.
+set CGMT(html_entities) {
+	&mu; "μ"
+	&plusmn; "±"
+	&div; "÷"
+	&amp; "&"
+	&nbsp; " "
+	&Omega; "Ω"
+	&beta; "ß"
+	&pi; "π"
+	&lt; "<"
+	&gt; ">"
+	&le; "≤"
+	&ge; "≥"
+	&asymp; "≈"
+	&infin; "∞"
+	&times; "×"
+	&deg; "°"
+	&minus; "−"
 }
 
+# A list of tags we want to remove
+set CGMT(html_tags) {i b}
+
 #
+# CGMT_read_url fetch the source html code at a url and return as a single text
+# string.
+
+proc CGMT_read_url {url} {
+	set page [LWDAQ_url_download $url]
+	return $page
+}
+ 
 #
+# CGMT_read_file reads an html file from a file and return as a single text
+# string.
 #
 proc CGMT_read_file {{fn ""}} {
 	if {$fn == ""} {
@@ -73,29 +82,125 @@ proc CGMT_read_file {{fn ""}} {
 }
 
 #
+# CGMT_extract_paragraphs extract all the paragraphs marked by p tags and returns
+# them as a list with the p-tags removed.
 #
+proc CGMT_extract_paragraphs {chunk} {
+	set result [list]
+	set index 0
+	while {[regexp -indices -start $index {<p[^>]*>} $chunk start_tag opt]} {
+		set p_start [expr [lindex $start_tag 1] + 1]
+		if {[regexp -indices -start $index {</p>} $chunk end_tag]} {
+			set p_end [expr [lindex $end_tag 0] - 1]
+			set p_next [expr [lindex $end_tag 1] + 1]
+		} else {
+			set p_end [string length $chunk]
+			set p_next [expr [string length $chunk] + 1]
+		}
+		
+		set field [string range $chunk $p_start $p_end]
+		set index $p_next
+		lappend result $field
+	}
+	return $result
+}
+
 #
-proc CGMT_convert_entities {text} {
-	global CGMT_html_entities
-    foreach {entity char} [array get CGMT_html_entities] {
-        regsub -all $entity $text $char text
+# CGMT_convert_entities converts html entities to unicode characters and returns
+# the converted chunk.
+#
+proc CGMT_convert_entities {chunk} {
+	global CGMT
+    foreach {entity char} $CGMT(html_entities) {
+        regsub -all $entity $chunk $char chunk
     }
-    return $text
+    return $chunk
 }
 
 #
+# CGMT_remove_tags removes the html markup tags we won't be using from our
+# a chunk of text and returnes the cleaned chunk.
 #
-#
-proc CGMT_convert_anchors {text} {
-	regsub -all {<a href="([^"]+)"[^>]*>([^<]+)</a>} $text {[\2](\1)} text
-	return $text
+proc CGMT_remove_tags {chunk} {
+	global CGMT
+    foreach {tag} $CGMT(html_tags) {
+        regsub -all <$tag>|</$tag> $chunk "" chunk
+    }
+    return $chunk
 }
 
 #
+# CGMT_resolve_relative_url takes a relative url and resolves it into an
+# absolute url using a supplied base url. This routine was provided by ChatGPT
+# and works perfectly.
 #
-#
-proc CGMT_extract_paragraphs {text} {
-	set paragraphs [LWDAQ_xml_get_list $text "p"]
-	return $paragraphs
+proc CGMT_resolve_relative_url {base_url relative_url} {
+
+    # Extract the path part from the base URL
+    regexp {^(https?://[^/]+)(/.*)$} $base_url -> domain base_path
+
+    # Convert base path to a list for manipulation
+    set base_parts [split $base_path "/"]
+
+    # Remove the last element if it's empty (trailing slash)
+    if {[lindex $base_parts end] eq ""} {
+        set base_parts [lrange $base_parts 0 end-1]
+    }
+
+    # Process relative navigation
+    foreach part [split $relative_url "/"] {
+        switch -- $part {
+            ".." {
+                # Go up one directory
+                set base_parts [lrange $base_parts 0 end-1]
+            }
+            "." {
+                # Stay in the current directory, do nothing
+            }
+            default {
+                # Go into a sub-directory or file
+                lappend base_parts $part
+            }
+        }
+    }
+
+    # Reconstruct the absolute URL
+    return "$domain[join $base_parts "/"]"
 }
+
+#
+# CGMT_resolve_urls resolves all the relative urls in a chunk into absolute urls
+# using the base url we pass in as the basis for resolution. It constructs a new
+# chunk with the absolute urls. It calls CGMT_resolve_relative_url on each
+# relative url it finds.
+#
+proc CGMT_resolve_urls {base chunk} {
+	global t
+	set index 0
+	set new_chunk ""
+	while {[regexp -indices -start $index \
+			{<a href="([^"]+)"[^>]*>} \
+			$chunk anchor url]} {
+		append new_chunk [string range $chunk $index [expr [lindex $anchor 0] - 1]]
+		set url [string range $chunk [lindex $url 0] [lindex $url 1]]
+		if {![regexp {https?} $url match]} {
+			set url [CGMT_resolve_relative_url $base $url]
+		}
+		append new_chunk "<a href=\"$url\">"
+		set index [expr [lindex $anchor 1] + 1]
+	}
+	append new_chunk [string range $chunk $index end]
+	return $new_chunk
+}
+
+#
+# CGMT_convert_urls finds all the anchors in a chunk and converts from html to
+# markup format, where the title of the anchor is in brackets and the url is in
+# parentheses immediately afterwards.
+#
+proc CGMT_convert_urls {chunk} {
+	regsub -all {<a href="([^"]+)"[^>]*>([^<]+)</a>} $chunk {[\2](\1)} chunk
+	return $chunk
+}
+
 
