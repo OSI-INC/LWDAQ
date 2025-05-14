@@ -58,7 +58,7 @@ set CGMT(html_tags) {i b}
 #
 # CGMT_read_url fetch the source html code at a url and return as a single text
 # string.
-
+#
 proc CGMT_read_url {url} {
 	set page [LWDAQ_url_download $url]
 	return $page
@@ -82,27 +82,69 @@ proc CGMT_read_file {{fn ""}} {
 }
 
 #
-# CGMT_extract_paragraphs extract all the paragraphs marked by p tags and returns
-# them as a list with the p-tags removed.
+# CGMT_convert_lists looks through an html pages and turns lists into paragraphs. We open
+# the paragraph with an open-p tag and end it with a close-p tag. We represent the list 
+# with dashes for bullets and line breaks to separate list entries.
 #
-proc CGMT_extract_paragraphs {chunk} {
-	set result [list]
+proc CGMT_convert_lists {page} {
+	global t
+	global CGMT
+	
 	set index 0
-	while {[regexp -indices -start $index {<p[^>]*>} $chunk start_tag opt]} {
+	set new_page ""
+	while {[regexp -indices -start $index {<ol>(.*?)</ol>} $page match body]} {
+		append new_page [string range $page $index [expr [lindex $match 0] - 1]]
+		append new_page "<p>"
+		set body [string range $page {*}$body]
+		regsub -all {<li>} $body "- " body 
+		regsub -all {</li>} $body "" body 
+		append new_page $body
+		append new_page "</p>"
+		set index [expr [lindex $match 1] + 1]
+		LWDAQ_print $t $match green 
+	}
+	append new_page [string range $page $index end]
+	set page $new_page
+
+	set index 0
+	set new_page ""
+	while {[regexp -indices -start $index {<ul>(.*?)</ul>} $page match body]} {
+		append new_page [string range $page $index [expr [lindex $match 0] - 1]]
+		append new_page "<p>"
+		set body [string range $page {*}$body]
+		regsub -all {<li>} $body "- " body 
+		regsub -all {</li>} $body "" body 
+		append new_page $body
+		append new_page "</p>"
+		set index [expr [lindex $match 1] + 1]
+		LWDAQ_print $t $match green 
+	}
+	append new_page [string range $page $index end]
+
+	return $new_page
+}
+
+#
+# CGMT_extract_chunks takes an html page and breaks it up in to a list of chunks, each
+# chunk being marked by p-tags. It returns a list of chunks with the p-tags removed.
+#
+proc CGMT_extract_chunks {page} {
+	set chunks [list]
+	set index 0
+	while {[regexp -indices -start $index {<p[^>]*>} $page start_tag opt]} {
 		set p_start [expr [lindex $start_tag 1] + 1]
-		if {[regexp -indices -start $index {</p>} $chunk end_tag]} {
+		if {[regexp -indices -start $index {</p>} $page end_tag]} {
 			set p_end [expr [lindex $end_tag 0] - 1]
 			set p_next [expr [lindex $end_tag 1] + 1]
 		} else {
-			set p_end [string length $chunk]
-			set p_next [expr [string length $chunk] + 1]
+			set p_end [string length $page]
+			set p_next [expr [string length $page] + 1]
 		}
-		
-		set field [string range $chunk $p_start $p_end]
+		set field [string range $page $p_start $p_end]
 		set index $p_next
-		lappend result $field
+		lappend chunks $field
 	}
-	return $result
+	return $chunks
 }
 
 #
@@ -118,13 +160,13 @@ proc CGMT_convert_entities {chunk} {
 }
 
 #
-# CGMT_remove_tags removes the html markup tags we won't be using from our
-# a chunk of text and returnes the cleaned chunk.
+# CGMT_remove_tags removes the html markup tags we won't be using from our a
+# chunk of text and returnes the cleaned chunk.
 #
 proc CGMT_remove_tags {chunk} {
 	global CGMT
     foreach {tag} $CGMT(html_tags) {
-        regsub -all <$tag>|</$tag> $chunk "" chunk
+        regsub -all "<$tag>|</$tag>" $chunk "" chunk
     }
     return $chunk
 }
@@ -175,19 +217,16 @@ proc CGMT_resolve_relative_url {base_url relative_url} {
 # relative url it finds.
 #
 proc CGMT_resolve_urls {base chunk} {
-	global t
 	set index 0
 	set new_chunk ""
-	while {[regexp -indices -start $index \
-			{<a href="([^"]+)"[^>]*>} \
-			$chunk anchor url]} {
-		append new_chunk [string range $chunk $index [expr [lindex $anchor 0] - 1]]
-		set url [string range $chunk [lindex $url 0] [lindex $url 1]]
+	while {[regexp -indices -start $index {<a href="([^"]+)"[^>]*>} $chunk a url]} {
+		append new_chunk [string range $chunk $index [expr [lindex $a 0] - 1]]
+		set url [string range $chunk {*}$url]
 		if {![regexp {https?} $url match]} {
 			set url [CGMT_resolve_relative_url $base $url]
 		}
 		append new_chunk "<a href=\"$url\">"
-		set index [expr [lindex $anchor 1] + 1]
+		set index [expr [lindex $a 1] + 1]
 	}
 	append new_chunk [string range $chunk $index end]
 	return $new_chunk
@@ -203,4 +242,32 @@ proc CGMT_convert_urls {chunk} {
 	return $chunk
 }
 
+#
+# A complete chunk extractin process that reports to a text widget or stdout and
+# writes chunks to a file.
+#
+proc CGMT {{t "stdout"}} {
+	set url "http://opensourceinstruments.host/Electronics/A3017/SCT.html"
+	set base "https://www.opensourceinstruments.com/Electronics/A3017"
+	LWDAQ_print $t "Requesting $url..."
+	set html [CGMT_read_url $url]
+	LWDAQ_print $t "Downloaded [string length $html] bytes."
+	set html [CGMT_convert_lists $html]
+	set chunks [CGMT_extract_chunks $html]
+	LWDAQ_print $t "Extracted [llength $chunks] chunks."
+	set converted_chunks [list]
+	foreach chunk $chunks {
+		set chunk [CGMT_convert_entities $chunk]
+		set chunk [CGMT_resolve_urls $base $chunk]
+		set chunk [CGMT_convert_urls $chunk]
+		set chunk [CGMT_remove_tags $chunk]
+		lappend converted_chunks $chunk
+	}
+	set f [open ~/Desktop/converted.txt w]
+	foreach chunk $converted_chunks {
+		puts $f "$chunk\n"
+	}
+	close $f
+	LWDAQ_print $t "Done"
+}
 
