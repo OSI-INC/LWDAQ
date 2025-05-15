@@ -27,12 +27,12 @@
 # Load this package or routines into LWDAQ with "package require EDF".
 package provide CGMT 0.1
 
-# Clear the global CGMT array if it already exists.
-if {[info exists CGMT]} {unset CGMT}
+# Clear the global CGMT_info array if it already exists.
+if {[info exists CGMT_info]} {unset CGMT_info}
 
 # A list of html entities and the unicode characters we want to replace them
 # with.
-set CGMT(html_entities) {
+set CGMT_info(replace_entities) {
 	&mu; "μ"
 	&plusmn; "±"
 	&div; "÷"
@@ -52,8 +52,14 @@ set CGMT(html_entities) {
 	&minus; "−"
 }
 
+# Text output, defaults to stdout.
+set CGMT_info(t) "stdout"
+
 # A list of tags we want to remove
-set CGMT(html_tags) {i b}
+set CGMT_info(remove_tags) {i b}
+
+# The chunk delimiting tags.
+set CGMT_info(chunk_tags) {p table ul ol h2 h3}
 
 #
 # CGMT_read_url fetch the source html code at a url and return as a single text
@@ -82,67 +88,92 @@ proc CGMT_read_file {{fn ""}} {
 }
 
 #
-# CGMT_convert_lists looks through an html pages and turns lists into paragraphs. We open
-# the paragraph with an open-p tag and end it with a close-p tag. We represent the list 
-# with dashes for bullets and line breaks to separate list entries.
+# CGMT_convert_list takes the body of a list chunk and converts it to markup
+# format with dashes for bullets and one list entry on each line. It returns the
+# converted chunk body.
 #
-proc CGMT_convert_lists {page} {
-	global t
-	global CGMT
+proc CGMT_convert_list {chunk} {
+	global CGMT_info
 	
-	set index 0
-	set new_page ""
-	while {[regexp -indices -start $index {<ol>(.*?)</ol>} $page match body]} {
-		append new_page [string range $page $index [expr [lindex $match 0] - 1]]
-		append new_page "<p>"
-		set body [string range $page {*}$body]
-		regsub -all {<li>} $body "- " body 
-		regsub -all {</li>} $body "" body 
-		append new_page $body
-		append new_page "</p>"
-		set index [expr [lindex $match 1] + 1]
-		LWDAQ_print $t $match green 
-	}
-	append new_page [string range $page $index end]
-	set page $new_page
-
-	set index 0
-	set new_page ""
-	while {[regexp -indices -start $index {<ul>(.*?)</ul>} $page match body]} {
-		append new_page [string range $page $index [expr [lindex $match 0] - 1]]
-		append new_page "<p>"
-		set body [string range $page {*}$body]
-		regsub -all {<li>} $body "- " body 
-		regsub -all {</li>} $body "" body 
-		append new_page $body
-		append new_page "</p>"
-		set index [expr [lindex $match 1] + 1]
-		LWDAQ_print $t $match green 
-	}
-	append new_page [string range $page $index end]
-
-	return $new_page
+	regsub -all {[\t ]*<li>} $chunk "- " chunk 
+	regsub -all {</li>} $chunk "" chunk
+	return $chunk
 }
 
 #
-# CGMT_extract_chunks takes an html page and breaks it up in to a list of chunks, each
-# chunk being marked by p-tags. It returns a list of chunks with the p-tags removed.
+# CGMT_catalog_chunks takes an html page and makes a list of chunks descriptors.
+# Each descriptor consists of a start and end index for the content of the chunk
+# and the chunk type. The indices point to the first and last characters within
+# the chunk, not including whatever delimiters we used to find the chunk. In the
+# case of a paragraph chunk, for example, the indices point to the first and
+# last character of the body of the paragraph, between the <p> and </p> tags,
+# but not including the tags themselves. The chunk type is the same as the html
+# tag we use to find tagged chunks, but is some other name in the case of
+# specialized chunks like "date", "figure", and "caption".
 #
-proc CGMT_extract_chunks {page} {
-	set chunks [list]
-	set index 0
-	while {[regexp -indices -start $index {<p[^>]*>} $page start_tag opt]} {
-		set p_start [expr [lindex $start_tag 1] + 1]
-		if {[regexp -indices -start $index {</p>} $page end_tag]} {
-			set p_end [expr [lindex $end_tag 0] - 1]
-			set p_next [expr [lindex $end_tag 1] + 1]
-		} else {
-			set p_end [string length $page]
-			set p_next [expr [string length $page] + 1]
+proc CGMT_catalog_chunks {page} {
+	global CGMT_info
+
+	set catalog [list]
+	foreach {tag} $CGMT_info(chunk_tags) {
+		set index 0
+		set start_pattern <$tag\[^>\]*>
+		set end_pattern </$tag>
+		while {[regexp -indices -start $index $start_pattern $page i_open]} {
+			set i_body_first [expr [lindex $i_open 1] + 1] 
+			if {[regexp -indices -start $i_body_first $end_pattern $page i_close]} {
+				set i_body_end [expr [lindex $i_close 0] - 1]
+				set index [expr [lindex $i_close 1] + 1]
+			} else {
+				set i_body_end [string length $page]
+				set index [expr $i_body_end + 1]
+			}
+			set chunk "$i_body_first $i_body_end $tag"
+			lappend catalog $chunk
 		}
-		set field [string range $page $p_start $p_end]
-		set index $p_next
-		lappend chunks $field
+	}
+	
+	
+	set catalog [lsort -increasing -integer -index 0 $catalog]
+	
+	foreach chunk $catalog {
+		switch [lindex $chunk 2] {
+			"p" {set color orange}
+			"ul" {set color green}
+			"ol" {set color green}
+			"h2" {set color blue}
+			"h3" {set color brown}
+			"table" {set color cyan}
+			"figure" {set color pink}
+			"date" {set color darkgreen}
+			"caption" {set color darkred}
+			default {set color black}
+		}
+		LWDAQ_print $CGMT_info(t) $chunk $color	
+	}
+	
+	return $catalog
+}
+
+proc CGMT_extract_chunks {page catalog base_url} {
+	global CGMT_info
+	set chunks [list]
+	foreach desc $catalog {
+		scan $desc %d%d%s i_start i_end name
+		set chunk [string range $page $i_start $i_end]
+
+		set chunk [CGMT_convert_entities $chunk]
+		set chunk [CGMT_resolve_urls $base_url $chunk]
+		set chunk [CGMT_convert_urls $chunk]
+		
+		switch $name {
+			"ol" {set chunk [CGMT_convert_list $chunk]}
+			"ul" {set chunk [CGMT_convert_list $chunk]}
+			"h2" {set chunk "Chapter: $chunk"}
+			"h3" {set chunk "Section: $chunk"}
+		}
+		
+		lappend chunks $chunk
 	}
 	return $chunks
 }
@@ -152,8 +183,8 @@ proc CGMT_extract_chunks {page} {
 # the converted chunk.
 #
 proc CGMT_convert_entities {chunk} {
-	global CGMT
-    foreach {entity char} $CGMT(html_entities) {
+	global CGMT_info
+    foreach {entity char} $CGMT_info(replace_entities) {
         regsub -all $entity $chunk $char chunk
     }
     return $chunk
@@ -164,8 +195,8 @@ proc CGMT_convert_entities {chunk} {
 # chunk of text and returnes the cleaned chunk.
 #
 proc CGMT_remove_tags {chunk} {
-	global CGMT
-    foreach {tag} $CGMT(html_tags) {
+	global CGMT_info
+    foreach {tag} $CGMT_info(remove_tags) {
         regsub -all "<$tag>|</$tag>" $chunk "" chunk
     }
     return $chunk
@@ -246,28 +277,21 @@ proc CGMT_convert_urls {chunk} {
 # A complete chunk extractin process that reports to a text widget or stdout and
 # writes chunks to a file.
 #
-proc CGMT {{t "stdout"}} {
+proc CGMT_run {} {
+	global CGMT_info
 	set url "http://opensourceinstruments.host/Electronics/A3017/SCT.html"
-	set base "https://www.opensourceinstruments.com/Electronics/A3017"
-	LWDAQ_print $t "Requesting $url..."
-	set html [CGMT_read_url $url]
-	LWDAQ_print $t "Downloaded [string length $html] bytes."
-	set html [CGMT_convert_lists $html]
-	set chunks [CGMT_extract_chunks $html]
-	LWDAQ_print $t "Extracted [llength $chunks] chunks."
-	set converted_chunks [list]
-	foreach chunk $chunks {
-		set chunk [CGMT_convert_entities $chunk]
-		set chunk [CGMT_resolve_urls $base $chunk]
-		set chunk [CGMT_convert_urls $chunk]
-		set chunk [CGMT_remove_tags $chunk]
-		lappend converted_chunks $chunk
-	}
+	set base_url "https://www.opensourceinstruments.com/Electronics/A3017"
+	LWDAQ_print $CGMT_info(t) "Requesting $url\."
+	set page [CGMT_read_url $url]
+	LWDAQ_print $CGMT_info(t) "Downloaded [string length $page] bytes."
+	set catalog [CGMT_catalog_chunks $page]
+	set chunks [CGMT_extract_chunks $page $catalog $base_url]
+	LWDAQ_print $CGMT_info(t) "Extracted [llength $chunks] chunks."
 	set f [open ~/Desktop/converted.txt w]
-	foreach chunk $converted_chunks {
+	foreach chunk $chunks {
 		puts $f "$chunk\n"
 	}
 	close $f
-	LWDAQ_print $t "Done"
+	LWDAQ_print $CGMT_info(t) "Done"
 }
 
