@@ -1135,7 +1135,8 @@ proc LWDAQ_ndf_data_read {file_name start_addr num_bytes} {
 # and "donor". Each element in the list the routine returns will be the contents
 # of a single record, with its start and end tags removed. You can now apply
 # this same routine to each element in this list sequentially, to extract fields
-# from each record.
+# from each record. The routine does not support nested tagging. It will not
+# interpret <donor>Jack<donor>John</donor></donor> correctly.
 #
 proc LWDAQ_xml_get_list {xml tag} {
 	set result [list]
