@@ -30,6 +30,9 @@ package provide CGMT 0.1
 # Clear the global CGMT_info array if it already exists.
 if {[info exists CGMT_info]} {unset CGMT_info}
 
+# A verbose flag for diagnostics.
+set CGMT_info(verbose) 0
+
 # A list of html entities and the unicode characters we want to replace them
 # with.
 set CGMT_info(entities_to_convert) {
@@ -65,7 +68,7 @@ set CGMT_info(tags_to_convert) {
 }
 
 # The chunk delimiting tags.
-set CGMT_info(chunk_tags) {p table ul ol h2 h3}
+set CGMT_info(chunk_tags) {p center ul ol h2 h3}
 
 #
 # CGMT_read_url fetch the source html code at a url and return as a single text
@@ -94,33 +97,42 @@ proc CGMT_read_file {{fn ""}} {
 }
 
 #
-# CGMT_read_tag looks in a chunk for the first field delimited by the specified tag.
-# It returns the start and end indices of the field, not including the tags.
+# CGMT_locate_field goes to the index'th character in a page and searches
+# forward for the first occurance of the named tage opening, looks further for
+# the same tag to close. The routine returns the locations of four characters in
+# the page. These are the begin and end characters of the body of the field, and
+# the begin and end characters of the entire field including the tags. If an
+# opening tag exits, but no end tage, the routine returns the entire remainder of
+# the page as the contents of the field.
 #
-proc CGMT_locate_field {chunk tag} {
-	set result "0 0"
-	if {[regexp -indices <$tag\(| \[^>\]*\)> $chunk match]} {
-		set i_start [string first "<$tag>" $xml $index]
-		set i_end [string first "</$tag>" $xml $index]
-		if {$i_start < 0} {break}
-		if {$i_end < 0} {break}
-		set field \
-			[string range $xml \
-				[expr $i_start + [string length "<$tag>"]] \
-				[expr $i_end - 1]]
-		set index [expr $i_end + [string length "</$tag>"]]
-		lappend result $field
+proc CGMT_locate_field {page index tag} {
+	global CGMT_info
+	
+	if {[regexp -indices -start $index "<$tag\(| \[^>\]*\)>" $page i_open]} {
+		set i_body_begin [expr [lindex $i_open 1] + 1] 
+		set i_field_begin [lindex $i_open 0]
+		if {[regexp -indices -start $i_body_begin "</$tag>" $page i_close]} {
+			set i_body_end [expr [lindex $i_close 0] - 1]
+			set i_field_end [lindex $i_close 1]
+		} else {
+			set i_body_end [string length $page]
+			set i_field_end $i_body_end
+		}
+	} else {
+		set i_field_begin [string length $page]
+		set i_field_end $i_field_begin
+		set i_body_begin $i_field_begin
+		set i_body_end $i_field_begin
 	}
-	return $result
+	return "$i_body_begin $i_body_end $i_field_begin $i_field_end"
 }
 
-
 #
-# CGMT_convert_list takes the body of a list chunk and converts it to markup
+# CGMT_extract_list takes the body of a list chunk and converts it to markup
 # format with dashes for bullets and one list entry on each line. It returns the
 # converted chunk body.
 #
-proc CGMT_convert_list {chunk} {
+proc CGMT_extract_list {chunk} {
 	global CGMT_info
 	
 	regsub -all {[\t ]*<li>} $chunk "- " chunk 
@@ -129,21 +141,97 @@ proc CGMT_convert_list {chunk} {
 }
 
 #
-# CGMT_convert_table takes the body of a table chunk and converts it to markup
-# format. The routine looks for headings in the first table row, and if it finds them, it will 
-# use these to identify every cell in each row of its output.
+# CGMT_extract_caption looks for a table or figure caption beginning with
+# bold "Figure:" or "Table:". It extracts the text of the caption and returns
+# with Figure or Table.
 #
-proc CGMT_convert_table {chunk} {
+proc CGMT_extract_caption {chunk} {
 	global CGMT_info
 	
-	regsub -all {\s*<th>} $chunk "" chunk
-	regsub -all {</th>\s*} $chunk " " chunk
-	regsub -all {\s*<td>} $chunk "" chunk
-	regsub -all {</td>\s*} $chunk " " chunk
-	regsub -all {\s*<tr>[\n\t ]*} $chunk "" chunk 
-	regsub -all {</tr>\s*} $chunk "\n" chunk
+	set caption ""
+	if {[regexp {<small><b>(Figure|Table):</b>(.+?)</small>} $chunk -> type caption]} {
+		return "$type: [string trim $caption]"
+	} else {
+		return ""
+	}
+}
+
+#
+# CGMT_extract_figures looks for img tags and creates an image reference to go with
+# a figure caption, one for each image.
+#
+proc CGMT_extract_figures {chunk} {
+	global CGMT_info
 	
-	return $chunk
+	if {[regexp {\[Image\]\(([^)]*)\)} $chunk img url]} {
+		return $img
+	} else {
+		return ""
+	}
+}
+
+#
+# CGMT_extract_table takes the body of a table chunk and converts it to markup
+# format. The routine looks for a first row that contains heading cells. It
+# reads the headings and makes a list. If there are no headings, its heading
+# list will be empty. In subsequent rows, if it sees another list of headings,
+# the previous list will be overwritten. In any row consisting of data cells the
+# routine will prefix the contents of the n'th cell with the n'th heading. After
+# extracting the table, we look for a table caption and extract it to append
+# to our table chunk. We extract the caption using the separate caption
+# extract routine.
+#
+proc CGMT_extract_table {chunk} {
+	global CGMT_info
+	
+	set headings [list]
+	set table ""
+	set i 0
+	while {$i < [string length $chunk]} {
+		set indices [CGMT_locate_field $chunk $i "tr"]
+		scan $indices %d%d%d%d cells_begin cells_end row_begin row_end
+		if {$row_end <= $row_begin} {break}
+		
+		set ii $cells_begin
+		set cell_index 0
+		while {$ii < $cells_end} {
+			LWDAQ_support
+			set indices [CGMT_locate_field $chunk $ii "th"]
+			scan $indices %d%d%d%d heading_begin heading_end cell_begin cell_end
+			if {$cell_end <= $cells_end} {
+				set heading [string range $chunk $heading_begin $heading_end]
+				regsub "\n" $heading " " heading
+				regsub "<br>" $heading " " heading
+				if {$cell_index == 0} {
+					set headings [list $heading]
+				} else {
+					lappend headings $heading
+				}
+				incr cell_index
+				set ii [expr $cell_end + 1]
+				continue
+			} 
+
+			set indices [CGMT_locate_field $chunk $ii "td"]
+			scan $indices %d%d%d%d data_begin data_end cell_begin cell_end
+			if {$cell_end <= $cells_end} {
+				set data [string range $chunk $data_begin $data_end]
+				regsub "\n" $data " " data
+				regsub "<br>" $data " " data
+				append table "\"[lindex $headings $cell_index]\": $data "
+				incr cell_index
+				set ii [expr $cell_end + 1]
+				continue
+			} 
+			
+			set ii $cells_end
+		}
+		
+		append table "\n"
+		set i [expr $row_end + 1]
+	}
+	
+	return [string trim $table]
 }
 
 #
@@ -162,7 +250,6 @@ proc CGMT_extract_date {chunk} {
 	return $chunk
 }
 
-
 #
 # CGMT_catalog_chunks takes an html page and makes a list of chunks descriptors.
 # Each descriptor consists of a start and end index for the content of the chunk
@@ -180,19 +267,14 @@ proc CGMT_catalog_chunks {page} {
 	set catalog [list]
 	foreach {tag} $CGMT_info(chunk_tags) {
 		set index 0
-		set start_pattern "<$tag\(| \[^>\]*\)\>"
-		set end_pattern </$tag>
-		while {[regexp -indices -start $index $start_pattern $page i_open]} {
-			set i_body_first [expr [lindex $i_open 1] + 1] 
-			if {[regexp -indices -start $i_body_first $end_pattern $page i_close]} {
-				set i_body_end [expr [lindex $i_close 0] - 1]
-				set index [expr [lindex $i_close 1] + 1]
-			} else {
-				set i_body_end [string length $page]
-				set index [expr $i_body_end + 1]
+		while {$index < [string length $page]} {
+			set indices [CGMT_locate_field $page $index $tag]
+			scan $indices %d%d%d%d i_body_begin i_body_end i_field_begin i_field_end
+			if {$i_body_end > $i_body_begin} {
+				set chunk "$i_body_begin $i_body_end $tag"
+				lappend catalog $chunk
 			}
-			set chunk "$i_body_first $i_body_end $tag"
-			lappend catalog $chunk
+			set index [expr $i_field_end + 1]
 		}
 	}
 	
@@ -206,22 +288,24 @@ proc CGMT_catalog_chunks {page} {
 
 	set catalog [lsort -increasing -integer -index 0 $catalog]
 	
-	foreach chunk $catalog {
-		switch [lindex $chunk 2] {
-			"p" {set color orange}
-			"ul" {set color green}
-			"ol" {set color green}
-			"h2" {set color blue}
-			"h3" {set color brown}
-			"table" {set color cyan}
-			"figure" {set color pink}
-			"date" {set color darkgreen}
-			"caption" {set color darkred}
-			default {set color black}
+	if {$CGMT_info(verbose)} {
+		foreach chunk $catalog {
+			switch [lindex $chunk 2] {
+				"p" {set color orange}
+				"ul" {set color green}
+				"ol" {set color green}
+				"h2" {set color blue}
+				"h3" {set color brown}
+				"center" {set color cyan}
+				"figure" {set color pink}
+				"date" {set color darkgreen}
+				"caption" {set color darkred}
+				default {set color black}
+			}
+			LWDAQ_print $CGMT_info(t) $chunk $color	
 		}
-		LWDAQ_print $CGMT_info(t) $chunk $color	
 	}
-	
+		
 	return $catalog
 }
 
@@ -261,19 +345,36 @@ proc CGMT_extract_chunks {page catalog} {
 	set section "NONE"
 	set step "NONE"
 	set chunks [list]
-	foreach desc $catalog {
-		scan $desc %d%d%s i_start i_end name
+	foreach chunk_id $catalog {
+		scan $chunk_id %d%d%s i_start i_end name
 		set chunk [string trim [string range $page $i_start $i_end]]
 
 		switch -- $name {
 			"ol" {
-				set chunk [CGMT_convert_list $chunk]
+				set chunk [CGMT_extract_list $chunk]
 			}
 			"ul" {
-				set chunk [CGMT_convert_list $chunk]
+				set chunk [CGMT_extract_list $chunk]
 			}
-			"table" {
-				set chunk [CGMT_convert_table $chunk]
+			"center" {
+				set caption [CGMT_extract_caption $chunk]
+				if {[regexp {^Table} $caption]} {
+					set table [CGMT_extract_table $chunk]
+					if {[string length $table] > 0} {
+						set chunk "$caption\n\n$table"
+					} else {
+						set chunk "$caption"
+					}
+				} elseif {[regexp {^Figure} $caption]} {
+					set figures [CGMT_extract_figures $chunk]
+					if {[string length $figures] > 0} {
+						set chunk "$caption\n$figures"
+					} else {
+						set chunk "$caption"
+					}
+				} else {
+					set chunk "$caption"
+				}
 			}
 			"h2" {
 				set chapter $chunk
@@ -289,7 +390,7 @@ proc CGMT_extract_chunks {page catalog} {
 				continue
 			}
 			default {
-				if {[regexp {^<b>([^:]+):</b>} $chunk match bold]} {
+				if {[regexp {^<b>([^:]+):</b>} $chunk -> bold]} {
 					set step $bold
 				}
 			}
@@ -297,25 +398,38 @@ proc CGMT_extract_chunks {page catalog} {
 		
 		set chunk [CGMT_convert_tags $chunk]
 		set chunk [CGMT_remove_dates $chunk]
+		set chunk [string trim $chunk]
+		if {([string length $chunk] == 0) && $CGMT_info(verbose)} {
+			LWDAQ_print $CGMT_info(t) "Empty chunk, $chunk_id" brown
+			continue
+		}
 		
 		switch -- $name {
 			"ol" -
 			"ul" -
-			"table" {
-				lset chunks end "[lindex $chunks end]\n\n$chunk"
+			"center" {
+				if {[llength $chunks] > 0} {
+					lset chunks end "[lindex $chunks end]\n\n$chunk"
+				} else {
+					lappend chunks $chunk
+				}
 			}
 			default {
-				if {$date != "NONE"} {
-					set chunk "Date: $date\n\n$chunk"
-				}
-				if {$step != "NONE"} {
-					set chunk "Step: $step\n$chunk"
+				set heading ""
+				if {$chapter != "NONE"} {
+					append heading "Chapter: $chapter\n"
 				}
 				if {$section != "NONE"} {
-					set chunk "Section: $section\n$chunk"
+					set heading "Section: $section\n"
 				}
-				if {$chapter != "NONE"} {
-					set chunk "Chapter: $chapter\n$chunk"
+				if {$step != "NONE"} {
+					append heading "Step: $step\n"
+				}
+				if {$date != "NONE"} {
+					append heading "Date: $date\n"
+				}
+				if {[string length $heading] > 0} {
+					set chunk "$heading\n$chunk"
 				}
 				lappend chunks $chunk
 				set step "NONE"
@@ -384,20 +498,38 @@ proc CGMT_resolve_relative_url {base_url relative_url} {
 # CGMT_resolve_urls resolves all the relative urls in a page into absolute urls
 # using the base url we pass in as the basis for resolution. It constructs a new
 # page with the absolute urls. It calls CGMT_resolve_relative_url on each
-# relative url it finds.
+# relative url it finds. The routine looks for urls in anchor tags <a> and in
+# image tags <img>.
 #
 proc CGMT_resolve_urls {page base_url} {
-	set index 0
+	global CGMT_info
+
 	set new_page ""
-	while {[regexp -indices -start $index {<a href="([^"]+)"[^>]*>} $page a url]} {
-		append new_page [string range $page $index [expr [lindex $a 0] - 1]]
+
+	set index 0
+	while {[regexp -indices -start $index {<a +href="([^"]+)"[^>]*>} $page tag url]} {
+		append new_page [string range $page $index [expr [lindex $tag 0] - 1]]
 		set url [string range $page {*}$url]
 		if {![regexp {https?} $url match]} {
 			set url [CGMT_resolve_relative_url $base_url $url]
 		}
 		append new_page "<a href=\"$url\">"
-		set index [expr [lindex $a 1] + 1]
+		set index [expr [lindex $tag 1] + 1]
 	}
+
+	set index 0
+	set page $new_page
+	set new_page ""
+	while {[regexp -indices -start $index {<img +src="([^"]+)"[^>]*>} $page tag url]} {
+		append new_page [string range $page $index [expr [lindex $tag 0] - 1]]
+		set url [string range $page {*}$url]
+		if {![regexp {https?} $url match]} {
+			set url [CGMT_resolve_relative_url $base_url $url]
+		}
+		append new_page "<img src=\"$url\">"
+		set index [expr [lindex $tag 1] + 1]
+	}
+
 	append new_page [string range $page $index end]
 	return $new_page
 }
@@ -408,7 +540,8 @@ proc CGMT_resolve_urls {page base_url} {
 # parentheses immediately afterwards.
 #
 proc CGMT_convert_urls {page} {
-	regsub -all {<a href="([^"]+)"[^>]*>([^<]+)</a>} $page {[\2](\1)} page
+	regsub -all {<a +href="([^"]+)"[^>]*>([^<]+)</a>} $page {[\2](\1)} page
+	regsub -all {<img +src="([^"]+)"[^>]*>} $page {[Image](\1)} page
 	return $page
 }
 
@@ -418,7 +551,7 @@ proc CGMT_convert_urls {page} {
 # chunk.
 #
 proc CGMT_chapter_url {chunk base_url} {
-	if {[regexp {^Chapter: ([^\n]*)} $chunk match title]} {
+	if {[regexp {^Chapter: ([^\n]*)} $chunk -> title]} {
 		regsub {^Chapter: ([^\n]*)} $chunk "" chunk
 		set chapter "Chapter: \[$title\]\($base_url\#$title\)"
 		set chunk "$chapter$chunk"
@@ -428,44 +561,68 @@ proc CGMT_chapter_url {chunk base_url} {
 
 #
 # CGMT_convert_entities converts html entities in a page to unicode characters
-# and returns the converted page.
+# and returns the converted page. We also replace tabs with double-spaces.
 #
 proc CGMT_convert_entities {page} {
 	global CGMT_info
     foreach {entity char} $CGMT_info(entities_to_convert) {
         regsub -all $entity $page $char page
     }
+    regsub -all {\t} $page "  " page
     return $page
 }
 
 #
-# A complete chunk extractin process that reports to a text widget or stdout and
-# writes chunks to a file.
+# CGMT_html_chunks downloads an html page and chunks it for OpenAI, returning
+# a list of chunks.
 #
-proc CGMT_run {} {
+proc CGMT_html_chunks {url base_url} {
 	global CGMT_info
-	set url "http://opensourceinstruments.host/Electronics/A3017/SCT.html"
-	set base_url "https://www.opensourceinstruments.com/Electronics/A3017/SCT.html"
-	LWDAQ_print $CGMT_info(t) "Requesting $url\..."
+	set t $CGMT_info(t)
+	
 	set page [CGMT_read_url $url]
-	LWDAQ_print $CGMT_info(t) "Downloaded [string length $page] bytes."
-	LWDAQ_print $CGMT_info(t) "Resolving urls, base $base_url..."
+	LWDAQ_print $t "Downloaded [string length $page] bytes from $url\."
+	
+	LWDAQ_print $t "Resolving urls wrt $base_url..."
 	set page [CGMT_resolve_urls $page $base_url]
-	LWDAQ_print $CGMT_info(t) "Converting urls..."
+	
+	LWDAQ_print $t "Converting urls to markdown..."
 	set page [CGMT_convert_urls $page]
-	LWDAQ_print $CGMT_info(t) "Converting html entities..."
+	
+	LWDAQ_print $t "Converting html entities to unicode..."
 	set page [CGMT_convert_entities $page]
-	LWDAQ_print $CGMT_info(t) "Cataloging chunks, chapters, and dates..."
+	
+	LWDAQ_print $t "Cataloging chunks, chapters, and dates..."
 	set catalog [CGMT_catalog_chunks $page]
-	LWDAQ_print $CGMT_info(t) "Cataloged length [llength $catalog]."
+	LWDAQ_print $t "Catalog contains [llength $catalog] chunks."
+	
+	LWDAQ_print $t "Extracting and consolidating chunks from source page..."
 	set chunks [CGMT_extract_chunks $page $catalog]
-	LWDAQ_print $CGMT_info(t) "Extracted [llength $chunks] chunks."
-	set f [open ~/Desktop/converted.txt w]
-	foreach chunk $chunks {
-		set chunk [CGMT_chapter_url $chunk $base_url]
-		puts $f "$chunk\n"
-	}
-	close $f
-	LWDAQ_print $CGMT_info(t) "Done"
+	LWDAQ_print $t "Extracted [llength $chunks] chunks."
+	
+	return $chunks
+}
+
+#
+# CGMT_submit_chunk submits a chunk, with the help of an access key, to the OpenAI
+# embedding end point and retrieves its embed vector in a json record.
+#
+proc CGMT_submit_chunk {chunk api_key} {
+	global CGMT_info
+	set t $CGMT_info(t)
+
+    set chunk [string map {\\ \\\\} $chunk]
+    set chunk [string map {\" \\\"} $chunk]
+    set chunk [string map {\n \\n} $chunk]
+    regsub -all {\s+} $chunk " " chunk
+	set json_body " \{\n \
+		\"model\": \"text-embedding-ada-002\",\n \
+		\"input\": \"$chunk\"\n \}"
+	set cmd [list curl -s -X POST https://api.openai.com/v1/embeddings \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $api_key" \
+		-d $json_body]
+	set result [eval exec $cmd]
+	return $result
 }
 
