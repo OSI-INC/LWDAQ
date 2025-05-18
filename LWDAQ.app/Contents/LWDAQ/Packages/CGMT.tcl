@@ -82,6 +82,7 @@ proc CGMT_init {} {
 #	
 	set info(hash_len) "12"
 	set info(t) "stdout"
+	set info(num_chunks) "4"
 #
 # Return an empty string to show now error.
 #
@@ -703,11 +704,16 @@ proc CGMT_embed_chunk {chunk api_key} {
 	set json_body " \{\n \
 		\"model\": \"text-embedding-ada-002\",\n \
 		\"input\": \"$chunk\"\n \}"
-	set cmd [list curl -s -X POST https://api.openai.com/v1/embeddings \
+	set cmd [list curl -sS -X POST https://api.openai.com/v1/embeddings \
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $api_key" \
 		-d $json_body]
-	set result [eval exec $cmd]
+	if {[catch {
+		set result [eval exec $cmd]
+	} error_result]} {
+		LWDAQ_print $t "ERROR: $error_result"
+		return ""
+	}
 	return $result
 }
 
@@ -757,6 +763,8 @@ proc CGMT_vector_from_embed {embed} {
 	if {[regexp {"embedding": \[([^\]]*)} $embed match vector]} {
 		regsub -all {,} $vector " " vector
 		regsub -all {[\n\t ]+} $vector " " vector
+	} else {
+		set vector "0"
 	}
 	return [string trim $vector]
 }
@@ -787,6 +795,45 @@ proc CGMT_compare_vectors {embed1 embed2} {
 		set dot_product [expr $dot_product + $x1*$x2]
 	}
 	return [format %.4f $dot_product]
+}
+
+#
+# CGMT_get_answer submits a list of chunks and a question to the chat completion
+# end point and returns the answer it obtains.
+#
+proc CGMT_get_answer {question chunks api_key} {
+	upvar #0 CGMT_info info
+	set t $info(t)
+
+ 	set json_body "\{\n \
+		\"model\": \"gpt-4\",\n \
+		\"messages\": \[\n   \
+		\{ \"role\": \"system\", \"content\": \"You are a helpful assistant.\" \},\n"
+	foreach chunk $chunks {
+		set chunk [string map {\\ \\\\} $chunk]
+		set chunk [string map {\" \\\"} $chunk]
+		set chunk [string map {\n \\n} $chunk]
+		regsub -all {\s+} $chunk " " chunk
+		append json_body "    \{ \"role\": \"user\", \"content\": \"$chunk\" \},\n"
+	}
+	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
+	append json_body "  \], \n  \"temperature\": 0.0 \n\}"
+	set cmd [list curl -sS -X POST https://api.openai.com/v1/chat/completions \
+	  -H "Content-Type: application/json" \
+	  -H "Authorization: Bearer $api_key" \
+	  -d $json_body]  
+	if {[catch {
+		set result [eval exec $cmd]
+	} error_result]} {
+		LWDAQ_print $t "ERROR: $error_result"
+		return ""
+	}
+	if {[regexp {"content": *"([^"]*)"} $result match answer]} {
+    	set answer [string map {\\n \n} $answer]
+	} else {
+		set answer "ERROR: Cannot find answer in result from completion point."
+	}
+	return $answer
 }
 
 #
