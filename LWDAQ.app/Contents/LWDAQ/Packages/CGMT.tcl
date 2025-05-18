@@ -679,7 +679,7 @@ proc CGMT_store_chunks {chunks dir} {
 		set f [open $cfn w]
 		puts -nonewline $f $chunk
 		close $f
-		LWDAQ_print $t "$count\: Stored chunk $hash\."
+		LWDAQ_print $t "$count\: $cfn"
 		LWDAQ_support
 	}
 	LWDAQ_print $t "Stored $count chunks."
@@ -694,6 +694,8 @@ proc CGMT_embed_chunk {chunk api_key} {
 	upvar #0 CGMT_info info
 	set t $info(t)
 
+	LWDAQ_print $t "Embedding chunk length [string length $chunk]."
+	LWDAQ_update
     set chunk [string map {\\ \\\\} $chunk]
     set chunk [string map {\" \\\"} $chunk]
     set chunk [string map {\n \\n} $chunk]
@@ -715,16 +717,15 @@ proc CGMT_embed_chunk {chunk api_key} {
 # and stores the embed vector in the same directory with the same name, but
 # extension json.
 #
-proc CGMT_store_embeds {dir api_key} {
+proc CGMT_store_embeds {chunk_dir embed_dir api_key} {
 	upvar #0 CGMT_info info
 	set t $info(t)
 	
-	set cfl [glob [file join $dir *.txt]]
+	set cfl [glob [file join $chunk_dir *.txt]]
 	LWDAQ_print $t "Found [llength $cfl] chunks found on disk."
 	set count 0
 	foreach cfn $cfl {
 		incr count
-		set efn [file join $dir [file root [file tail $cfn]].json]
 		set f [open $cfn r]
 		set chunk [read $f]
 		close $f
@@ -734,16 +735,59 @@ proc CGMT_store_embeds {dir api_key} {
 			LWDAQ_print $t $chunk blue
 			break
 		}
+		set efn [file join $embed_dir [file root [file tail $cfn]].json]
 		set f [open $efn w]
 		puts -nonewline $f $embed
 		close $f
-		LWDAQ_print $t "$count\: Embed [file tail $efn]."
+		LWDAQ_print $t "$count\: $efn."
 		LWDAQ_update
 	}
 	LWDAQ_print $t "Embedded $count chunks."
 	return $count
 }
 
+#
+# CGMT_vector_from_json takes an embedding json string and extracts its embed
+# vector as a Tcl list.
+#
+proc CGMT_vector_from_embed {embed} {
+	upvar #0 CGMT_info info
+	set t $info(t)
+	
+	if {[regexp {"embedding": \[([^\]]*)} $embed match vector]} {
+		regsub -all {,} $vector " " vector
+		regsub -all {[\n\t ]+} $vector " " vector
+	}
+	return [string trim $vector]
+}
+
+#
+# CGMT_compare_vectors takes two embed json strings, extracts their embed vectors
+# and calculates the cosine of the angle between the two vectors. We assume that the
+# two vectors are normalized prior to passing into the routine. That is: their length
+# is one. Thus the dot product gives us the cosine immediately.
+#
+proc CGMT_compare_vectors {embed1 embed2} {
+	upvar #0 CGMT_info info
+	set t $info(t)
+
+	set vector1 [CGMT_vector_from_embed $embed1]
+	set vector2 [CGMT_vector_from_embed $embed2]
+
+	set len1 [llength $vector1]
+	set len2 [llength $vector2]
+	if {$len1 != $len2} {
+		error "vectors of different sizes, $len1 and $len2"
+	}
+
+	set dot_product 0
+	for {set i 0} {$i < $len1} {incr i} {
+		set x1 [lindex $vector1 $i]
+		set x2 [lindex $vector2 $i]
+		set dot_product [expr $dot_product + $x1*$x2]
+	}
+	return [format %.4f $dot_product]
+}
 
 #
 # Run the initialization routine.
