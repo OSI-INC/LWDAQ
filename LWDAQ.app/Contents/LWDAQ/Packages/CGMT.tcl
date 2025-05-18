@@ -27,54 +27,74 @@
 # Load this package or routines into LWDAQ with "package require EDF".
 package provide CGMT 0.1
 
-# Clear the global CGMT_info array if it already exists.
-if {[info exists CGMT_info]} {unset CGMT_info}
-
+proc CGMT_init {} {
+#
+# We use a global array named after the package to store its configuration. When
+# we execute the initialization, we clear any existing copy of the array. We
+# will be referring to the array as "info" in this routine, but its global name
+# is "CGMT_info".
+#
+	upvar #0 CGMT_info info
+	if {[info exists info]} {unset info}
+#
 # A verbose flag for diagnostics.
-set CGMT_info(verbose) 0
-
+#
+	set info(verbose) 0
+#
 # A list of html entities and the unicode characters we want to replace them
 # with.
-set CGMT_info(entities_to_convert) {
-	&mu; "μ"
-	&plusmn; "±"
-	&div; "÷"
-	&amp; "&"
-	&nbsp; " "
-	&Omega; "Ω"
-	&beta; "ß"
-	&pi; "π"
-	&lt; "<"
-	&gt; ">"
-	&le; "≤"
-	&ge; "≥"
-	&asymp; "≈"
-	&infin; "∞"
-	&times; "×"
-	&deg; "°"
-	&minus; "−"
-}
-
-# Text output, defaults to stdout.
-set CGMT_info(t) "stdout"
-
+#
+	set info(entities_to_convert) {
+		&mu; "μ"
+		&plusmn; "±"
+		&div; "÷"
+		&amp; "&"
+		&nbsp; " "
+		&Omega; "Ω"
+		&beta; "ß"
+		&pi; "π"
+		&lt; "<"
+		&gt; ">"
+		&le; "≤"
+		&ge; "≥"
+		&asymp; "≈"
+		&infin; "∞"
+		&times; "×"
+		&deg; "°"
+		&minus; "−"
+	}
+#
 # A list of tags we want to remove
-set CGMT_info(tags_to_convert) {
-	i ""
-	/i ""
-	b ""
-	/b ""
-	br " "
-}
-
+#
+	set info(tags_to_convert) {
+		i ""
+		/i ""
+		b ""
+		/b ""
+		br " "
+	}
+#
 # The chunk delimiting tags.
-set CGMT_info(chunk_tags) {p center ul ol h2 h3}
+#
+	set info(chunk_tags) {p center ul ol h2 h3}
+#
+# Input-output parameters.
+#	
+	set info(hash_len) "12"
+	set info(t) "stdout"
+#
+# Return an empty string to show now error.
+#
+	return ""
+}
 
 #
-# CGMT_read_url fetch the source html code at a url and return as a single text
-# string.
+# CGMT_read_url fetches the source html code at a url and return as a single
+# text string.
 #
 proc CGMT_read_url {url} {
+	upvar #0 CGMT_info info
+
 	set page [LWDAQ_url_download $url]
 	return $page
 }
@@ -84,6 +104,8 @@ proc CGMT_read_url {url} {
 # string.
 #
 proc CGMT_read_file {{fn ""}} {
+	upvar #0 CGMT_info info
+
 	if {$fn == ""} {
 		set fn [LWDAQ_get_file_name]
 	}
@@ -106,7 +128,7 @@ proc CGMT_read_file {{fn ""}} {
 # the page as the contents of the field.
 #
 proc CGMT_locate_field {page index tag} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 	
 	if {[regexp -indices -start $index "<$tag\(| \[^>\]*\)>" $page i_open]} {
 		set i_body_begin [expr [lindex $i_open 1] + 1] 
@@ -133,7 +155,7 @@ proc CGMT_locate_field {page index tag} {
 # converted chunk body.
 #
 proc CGMT_extract_list {chunk} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 	
 	regsub -all {[\t ]*<li>} $chunk "- " chunk 
 	regsub -all {</li>} $chunk "" chunk
@@ -146,7 +168,7 @@ proc CGMT_extract_list {chunk} {
 # with Figure or Table.
 #
 proc CGMT_extract_caption {chunk} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 	
 	set caption ""
 	if {[regexp {<small><b>(Figure|Table):</b>(.+?)</small>} $chunk -> type caption]} {
@@ -161,7 +183,7 @@ proc CGMT_extract_caption {chunk} {
 # a figure caption, one for each image.
 #
 proc CGMT_extract_figures {chunk} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 	
 	if {[regexp {\[Image\]\(([^)]*)\)} $chunk img url]} {
 		return $img
@@ -182,7 +204,7 @@ proc CGMT_extract_figures {chunk} {
 # extract routine.
 #
 proc CGMT_extract_table {chunk} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 	
 	set headings [list]
 	set table ""
@@ -239,7 +261,7 @@ proc CGMT_extract_table {chunk} {
 # title.
 #
 proc CGMT_extract_date {chunk} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 	
 	if {[regexp {[0-9]{2}-[A-Z]{3}-[0-9]{2}} $chunk date]} {
 		set chunk "$date"
@@ -262,10 +284,10 @@ proc CGMT_extract_date {chunk} {
 # specialized chunks like "date", "figure", and "caption".
 #
 proc CGMT_catalog_chunks {page} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 
 	set catalog [list]
-	foreach {tag} $CGMT_info(chunk_tags) {
+	foreach {tag} $info(chunk_tags) {
 		set index 0
 		while {$index < [string length $page]} {
 			set indices [CGMT_locate_field $page $index $tag]
@@ -288,7 +310,7 @@ proc CGMT_catalog_chunks {page} {
 
 	set catalog [lsort -increasing -integer -index 0 $catalog]
 	
-	if {$CGMT_info(verbose)} {
+	if {$info(verbose)} {
 		foreach chunk $catalog {
 			switch [lindex $chunk 2] {
 				"p" {set color orange}
@@ -302,7 +324,7 @@ proc CGMT_catalog_chunks {page} {
 				"caption" {set color darkred}
 				default {set color black}
 			}
-			LWDAQ_print $CGMT_info(t) $chunk $color	
+			LWDAQ_print $info(t) $chunk $color	
 		}
 	}
 		
@@ -314,8 +336,8 @@ proc CGMT_catalog_chunks {page} {
 # of text and returnes the cleaned chunk.
 #
 proc CGMT_convert_tags {chunk} {
-	global CGMT_info
-    foreach {tag replace} $CGMT_info(tags_to_convert) {
+	upvar #0 CGMT_info info
+    foreach {tag replace} $info(tags_to_convert) {
         regsub -all "<$tag>" $chunk $replace chunk
     }
     return $chunk
@@ -326,7 +348,7 @@ proc CGMT_convert_tags {chunk} {
 # cleaned chunk.
 #
 proc CGMT_remove_dates {chunk} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 	regsub -all {\[[0-9]{2}-[A-Z]{3}-[0-9]{2}\][ ]*} $chunk "" chunk
     return $chunk
 }
@@ -338,7 +360,7 @@ proc CGMT_remove_dates {chunk} {
 # chunk the current chapter, section, and date.
 #
 proc CGMT_extract_chunks {page catalog} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 	
 	set date "NONE"
 	set chapter "NONE"
@@ -399,8 +421,10 @@ proc CGMT_extract_chunks {page catalog} {
 		set chunk [CGMT_convert_tags $chunk]
 		set chunk [CGMT_remove_dates $chunk]
 		set chunk [string trim $chunk]
-		if {([string length $chunk] == 0) && $CGMT_info(verbose)} {
-			LWDAQ_print $CGMT_info(t) "Empty chunk, $chunk_id" brown
+		if {([string length $chunk] == 0)} {
+			if {$info(verbose)} {
+				LWDAQ_print $info(t) "Empty chunk, $chunk_id" brown
+			}
 			continue
 		}
 		
@@ -447,7 +471,7 @@ proc CGMT_extract_chunks {page catalog} {
 # use the document url for internal links.
 #
 proc CGMT_resolve_relative_url {base_url relative_url} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 
     # Extract the path part from the base URL
     regexp {^(https?://[^/]+)(/.*)$} $base_url -> domain base_path
@@ -469,22 +493,20 @@ proc CGMT_resolve_relative_url {base_url relative_url} {
      	set document ""
      }
 
-   # Process relative navigation
+   # Process relative navigation. For ".." we go up one directory. For "." we stay
+   # in the same directory. For a hash sign followed by anything we create an
+   # internal link. By default, we go into a subdirectory or file.
     foreach part [split $relative_url "/"] {
         switch -glob -- $part {
             ".." {
-                # Go up one directory
                 set base_parts [lrange $base_parts 0 end-1]
             }
             "." {
-                # Stay in the current directory, do nothing
             }
             "\#*" {
-            	# This is an internal link marked by hash symbol.
             	lappend base_parts "$document$part"
            }
             default {
-                # Go into a sub-directory or file
                 lappend base_parts $part
             }
         }
@@ -502,7 +524,7 @@ proc CGMT_resolve_relative_url {base_url relative_url} {
 # image tags <img>.
 #
 proc CGMT_resolve_urls {page base_url} {
-	global CGMT_info
+	upvar #0 CGMT_info info
 
 	set new_page ""
 
@@ -540,23 +562,30 @@ proc CGMT_resolve_urls {page base_url} {
 # parentheses immediately afterwards.
 #
 proc CGMT_convert_urls {page} {
+	upvar #0 CGMT_info info
 	regsub -all {<a +href="([^"]+)"[^>]*>([^<]+)</a>} $page {[\2](\1)} page
 	regsub -all {<img +src="([^"]+)"[^>]*>} $page {[Image](\1)} page
 	return $page
 }
 
 #
-# CGMT_chapter_url converts the "Chapter: Title" at the top of a chunk into
-# a markdown anchor with absolute link to the chapter. It returns the modified
-# chunk.
+# CGMT_chapter_urls converts the "Chapter: Title" at the top of every chunk in a
+# chunk list into a markdown anchor with absolute link to the chapter. It
+# returns the modified chunks in a new list.
 #
-proc CGMT_chapter_url {chunk base_url} {
-	if {[regexp {^Chapter: ([^\n]*)} $chunk -> title]} {
-		regsub {^Chapter: ([^\n]*)} $chunk "" chunk
-		set chapter "Chapter: \[$title\]\($base_url\#$title\)"
-		set chunk "$chapter$chunk"
+proc CGMT_chapter_urls {chunks base_url} {
+	upvar #0 CGMT_info info
+	set new_chunks [list]
+	foreach chunk $chunks {
+		if {[regexp {^Chapter: ([^\n]*)} $chunk -> title]} {
+			regsub {^Chapter: ([^\n]*)} $chunk "" chunk
+			set chapter "Chapter: \[$title\]\($base_url\#$title\)"
+			lappend new_chunks "$chapter$chunk"
+		} else {
+			lappend new_chunks $chunk
+		}
 	}
-	return $chunk
+	return $new_chunks
 }
 
 #
@@ -564,8 +593,8 @@ proc CGMT_chapter_url {chunk base_url} {
 # and returns the converted page. We also replace tabs with double-spaces.
 #
 proc CGMT_convert_entities {page} {
-	global CGMT_info
-    foreach {entity char} $CGMT_info(entities_to_convert) {
+	upvar #0 CGMT_info info
+    foreach {entity char} $info(entities_to_convert) {
         regsub -all $entity $page $char page
     }
     regsub -all {\t} $page "  " page
@@ -577,8 +606,8 @@ proc CGMT_convert_entities {page} {
 # a list of chunks.
 #
 proc CGMT_html_chunks {url base_url} {
-	global CGMT_info
-	set t $CGMT_info(t)
+	upvar #0 CGMT_info info
+	set t $info(t)
 	
 	set page [CGMT_read_url $url]
 	LWDAQ_print $t "Downloaded [string length $page] bytes from $url\."
@@ -596,9 +625,13 @@ proc CGMT_html_chunks {url base_url} {
 	set catalog [CGMT_catalog_chunks $page]
 	LWDAQ_print $t "Catalog contains [llength $catalog] chunks."
 	
-	LWDAQ_print $t "Extracting and consolidating chunks from source page..."
+	LWDAQ_print $t "Extracting and combining chunks from source page..."
 	set chunks [CGMT_extract_chunks $page $catalog]
 	LWDAQ_print $t "Extracted [llength $chunks] chunks."
+	
+	LWDAQ_print $t "Inserting chapter urls..."
+	set chunks [CGMT_chapter_urls $chunks $base_url]
+	LWDAQ_print $t "Chunk list complete with [llength $chunks] chunks."
 	
 	return $chunks
 }
@@ -608,8 +641,8 @@ proc CGMT_html_chunks {url base_url} {
 # embedding end point and retrieves its embed vector in a json record.
 #
 proc CGMT_submit_chunk {chunk api_key} {
-	global CGMT_info
-	set t $CGMT_info(t)
+	upvar #0 CGMT_info info
+	set t $info(t)
 
     set chunk [string map {\\ \\\\} $chunk]
     set chunk [string map {\" \\\"} $chunk]
@@ -625,4 +658,95 @@ proc CGMT_submit_chunk {chunk api_key} {
 	set result [eval exec $cmd]
 	return $result
 }
+
+#
+# CGMT_embed_chunks stores chunks to disk. It takes each chunk in the list and
+# uses its contents to obtain a unique hash name for the chunk. It stores the
+# chunk to disk in the specified directory with the name hash.txt.
+#
+proc CGMT_store_chunks {chunks dir} {
+	upvar #0 CGMT_info info
+	set t $info(t)
+
+	LWDAQ_print $t "Storing [llength $chunks] to $dir\..."
+	set count 0
+	foreach chunk $chunks {
+		incr count
+		set cmd [list echo -n $chunk | openssl dgst -sha1]
+		set hash [eval exec $cmd]
+		set hash [string range $hash 1 $info(hash_len)]
+		set cfn [file join $dir $hash\.txt]
+		set f [open $cfn w]
+		puts -nonewline $f $chunk
+		close $f
+		LWDAQ_print $t "$count\: Stored chunk $hash\."
+		LWDAQ_support
+	}
+	LWDAQ_print $t "Stored $count chunks."
+	return $count
+}
+
+#
+# CGMT_embed_chunk submits a chunk, with the help of an access key, to the
+# embedding end point and retrieves its embed vector in a json record.
+#
+proc CGMT_embed_chunk {chunk api_key} {
+	upvar #0 CGMT_info info
+	set t $info(t)
+
+    set chunk [string map {\\ \\\\} $chunk]
+    set chunk [string map {\" \\\"} $chunk]
+    set chunk [string map {\n \\n} $chunk]
+    regsub -all {\s+} $chunk " " chunk
+	set json_body " \{\n \
+		\"model\": \"text-embedding-ada-002\",\n \
+		\"input\": \"$chunk\"\n \}"
+	set cmd [list curl -s -X POST https://api.openai.com/v1/embeddings \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $api_key" \
+		-d $json_body]
+	set result [eval exec $cmd]
+	return $result
+}
+
+#
+# CGMT_store_embeds reads all chunks in a directory, which we assume are all
+# files with extention txt, reads them, submits them to the embedding end point,
+# and stores the embed vector in the same directory with the same name, but
+# extension json.
+#
+proc CGMT_store_embeds {dir api_key} {
+	upvar #0 CGMT_info info
+	set t $info(t)
+	
+	set cfl [glob [file join $dir *.txt]]
+	LWDAQ_print $t "Found [llength $cfl] chunks found on disk."
+	set count 0
+	foreach cfn $cfl {
+		incr count
+		set efn [file join $dir [file root [file tail $cfn]].json]
+		set f [open $cfn r]
+		set chunk [read $f]
+		close $f
+		set embed [CGMT_embed_chunk $chunk $api_key]
+		if {[regexp -nocase "error" $embed]} {
+			LWDAQ_print $t "ERROR: $embed"
+			LWDAQ_print $t $chunk blue
+			break
+		}
+		set f [open $efn w]
+		puts -nonewline $f $embed
+		close $f
+		LWDAQ_print $t "$count\: Embed [file tail $efn]."
+		LWDAQ_update
+	}
+	LWDAQ_print $t "Embedded $count chunks."
+	return $count
+}
+
+
+#
+# Run the initialization routine.
+#
+CGMT_init
 
