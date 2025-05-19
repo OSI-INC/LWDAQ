@@ -1,11 +1,11 @@
-# Chunk Generator and Management Tools Package
+# Retrieval-Assisted Generation Package
 # 
 # (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 #
-# Routines that translate HTML documents into lists of document chunks suitable
-# for large language models to transform into embed vectors, submit chunks to
-# embedding end point, and return answers from the chat completions endpoint.
-#
+# A Tcl package of routines that translate HTML documents into document chunks
+# suitable for retrieval-assisted generation (RAG) of query answers by large
+# language models (LLMs). The package relies upon "curl" and "openssl" being
+# available at the operating system command line.
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -23,18 +23,19 @@
 #
 
 # V0.1 [12-MAY-25] Create document and assign name.
+# V1.1 [18-MAY-25] Core functionality working: retrieval-augmented generation.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide CGMT 0.1
+package provide RAG 1.1
 
-proc CGMT_init {} {
+proc RAG_init {} {
 #
 # We use a global array named after the package to store its configuration. When
 # we execute the initialization, we clear any existing copy of the array. We
 # will be referring to the array as "info" in this routine, but its global name
-# is "CGMT_info".
+# is "RAG_info".
 #
-	upvar #0 CGMT_info info
+	upvar #0 RAG_info info
 	if {[info exists info]} {unset info}
 #
 # A verbose flag for diagnostics.
@@ -81,8 +82,16 @@ proc CGMT_init {} {
 # Input-output parameters.
 #	
 	set info(hash_len) "12"
-	set info(t) "stdout"
 	set info(num_chunks) "4"
+#
+# Check existence of dependent utilities.
+#
+	if {[catch {exec curl -sS -V} error_result]} {
+		error "Utility \"curl\" not available in operating system shell."
+	}
+	if {[catch {exec openssl} error_result]} {
+		error "Utility \"openssl\" not available in operating system shell."
+	}
 #
 # Return an empty string to show now error.
 #
@@ -90,22 +99,36 @@ proc CGMT_init {} {
 }
 
 #
-# CGMT_read_url fetches the source html code at a url and return as a single
+# RAG_print prints a line of text to a text widget or standard output or a file.
+# The default definition of this procedure is given below, it just writes to
+# standard output. The management process that uses the RAG package can
+# re-define the procedure to direct text output wherever it likes, or to ignore
+# text output. It takes one mandatory parameters, the string to be printed, and
+# one optional parameter, a print color. The RAG routines will append "ERROR: "
+# to error messages and "WARNING: " to warning messages. They will use colors
+# other than black for diagnostic messages.
+#
+proc RAG_print {s {color "black"}} {
+	puts $s
+}
+
+#
+# RAG_read_url fetches the source html code at a url and return as a single
 # text string.
 #
-proc CGMT_read_url {url} {
-	upvar #0 CGMT_info info
+proc RAG_read_url {url} {
+	upvar #0 RAG_info info
 
 	set page [LWDAQ_url_download $url]
 	return $page
 }
  
 #
-# CGMT_read_file reads an html file from a file and return as a single text
+# RAG_read_file reads an html file from a file and return as a single text
 # string.
 #
-proc CGMT_read_file {{fn ""}} {
-	upvar #0 CGMT_info info
+proc RAG_read_file {{fn ""}} {
+	upvar #0 RAG_info info
 
 	if {$fn == ""} {
 		set fn [LWDAQ_get_file_name]
@@ -120,7 +143,7 @@ proc CGMT_read_file {{fn ""}} {
 }
 
 #
-# CGMT_locate_field goes to the index'th character in a page and searches
+# RAG_locate_field goes to the index'th character in a page and searches
 # forward for the first occurance of the named tage opening, looks further for
 # the same tag to close. The routine returns the locations of four characters in
 # the page. These are the begin and end characters of the body of the field, and
@@ -128,8 +151,8 @@ proc CGMT_read_file {{fn ""}} {
 # opening tag exits, but no end tage, the routine returns the entire remainder of
 # the page as the contents of the field.
 #
-proc CGMT_locate_field {page index tag} {
-	upvar #0 CGMT_info info
+proc RAG_locate_field {page index tag} {
+	upvar #0 RAG_info info
 	
 	if {[regexp -indices -start $index "<$tag\(| \[^>\]*\)>" $page i_open]} {
 		set i_body_begin [expr [lindex $i_open 1] + 1] 
@@ -151,12 +174,12 @@ proc CGMT_locate_field {page index tag} {
 }
 
 #
-# CGMT_extract_list takes the body of a list chunk and converts it to markup
+# RAG_extract_list takes the body of a list chunk and converts it to markup
 # format with dashes for bullets and one list entry on each line. It returns the
 # converted chunk body.
 #
-proc CGMT_extract_list {chunk} {
-	upvar #0 CGMT_info info
+proc RAG_extract_list {chunk} {
+	upvar #0 RAG_info info
 	
 	regsub -all {[\t ]*<li>} $chunk "- " chunk 
 	regsub -all {</li>} $chunk "" chunk
@@ -164,12 +187,12 @@ proc CGMT_extract_list {chunk} {
 }
 
 #
-# CGMT_extract_caption looks for a table or figure caption beginning with
+# RAG_extract_caption looks for a table or figure caption beginning with
 # bold "Figure:" or "Table:". It extracts the text of the caption and returns
 # with Figure or Table.
 #
-proc CGMT_extract_caption {chunk} {
-	upvar #0 CGMT_info info
+proc RAG_extract_caption {chunk} {
+	upvar #0 RAG_info info
 	
 	set caption ""
 	if {[regexp {<small><b>(Figure|Table):</b>(.+?)</small>} $chunk -> type caption]} {
@@ -180,11 +203,11 @@ proc CGMT_extract_caption {chunk} {
 }
 
 #
-# CGMT_extract_figures looks for img tags and creates an image reference to go with
+# RAG_extract_figures looks for img tags and creates an image reference to go with
 # a figure caption, one for each image.
 #
-proc CGMT_extract_figures {chunk} {
-	upvar #0 CGMT_info info
+proc RAG_extract_figures {chunk} {
+	upvar #0 RAG_info info
 	
 	if {[regexp {\[Image\]\(([^)]*)\)} $chunk img url]} {
 		return $img
@@ -194,7 +217,7 @@ proc CGMT_extract_figures {chunk} {
 }
 
 #
-# CGMT_extract_table takes the body of a table chunk and converts it to markup
+# RAG_extract_table takes the body of a table chunk and converts it to markup
 # format. The routine looks for a first row that contains heading cells. It
 # reads the headings and makes a list. If there are no headings, its heading
 # list will be empty. In subsequent rows, if it sees another list of headings,
@@ -204,14 +227,14 @@ proc CGMT_extract_figures {chunk} {
 # to our table chunk. We extract the caption using the separate caption
 # extract routine.
 #
-proc CGMT_extract_table {chunk} {
-	upvar #0 CGMT_info info
+proc RAG_extract_table {chunk} {
+	upvar #0 RAG_info info
 	
 	set headings [list]
 	set table ""
 	set i 0
 	while {$i < [string length $chunk]} {
-		set indices [CGMT_locate_field $chunk $i "tr"]
+		set indices [RAG_locate_field $chunk $i "tr"]
 		scan $indices %d%d%d%d cells_begin cells_end row_begin row_end
 		if {$row_end <= $row_begin} {break}
 		
@@ -219,7 +242,7 @@ proc CGMT_extract_table {chunk} {
 		set cell_index 0
 		while {$ii < $cells_end} {
 			LWDAQ_support
-			set indices [CGMT_locate_field $chunk $ii "th"]
+			set indices [RAG_locate_field $chunk $ii "th"]
 			scan $indices %d%d%d%d heading_begin heading_end cell_begin cell_end
 			if {$cell_end <= $cells_end} {
 				set heading [string range $chunk $heading_begin $heading_end]
@@ -235,7 +258,7 @@ proc CGMT_extract_table {chunk} {
 				continue
 			} 
 
-			set indices [CGMT_locate_field $chunk $ii "td"]
+			set indices [RAG_locate_field $chunk $ii "td"]
 			scan $indices %d%d%d%d data_begin data_end cell_begin cell_end
 			if {$cell_end <= $cells_end} {
 				set data [string range $chunk $data_begin $data_end]
@@ -258,11 +281,11 @@ proc CGMT_extract_table {chunk} {
 }
 
 #
-# CGMT_extract_date takes the body of a date chunk and converts it to a text
+# RAG_extract_date takes the body of a date chunk and converts it to a text
 # title.
 #
-proc CGMT_extract_date {chunk} {
-	upvar #0 CGMT_info info
+proc RAG_extract_date {chunk} {
+	upvar #0 RAG_info info
 	
 	if {[regexp {[0-9]{2}-[A-Z]{3}-[0-9]{2}} $chunk date]} {
 		set chunk "$date"
@@ -274,7 +297,7 @@ proc CGMT_extract_date {chunk} {
 }
 
 #
-# CGMT_catalog_chunks takes an html page and makes a list of chunks descriptors.
+# RAG_catalog_chunks takes an html page and makes a list of chunks descriptors.
 # Each descriptor consists of a start and end index for the content of the chunk
 # and the chunk type. The indices point to the first and last characters within
 # the chunk, not including whatever delimiters we used to find the chunk. In the
@@ -284,14 +307,14 @@ proc CGMT_extract_date {chunk} {
 # tag we use to find tagged chunks, but is some other name in the case of
 # specialized chunks like "date", "figure", and "caption".
 #
-proc CGMT_catalog_chunks {page} {
-	upvar #0 CGMT_info info
+proc RAG_catalog_chunks {page} {
+	upvar #0 RAG_info info
 
 	set catalog [list]
 	foreach {tag} $info(chunk_tags) {
 		set index 0
 		while {$index < [string length $page]} {
-			set indices [CGMT_locate_field $page $index $tag]
+			set indices [RAG_locate_field $page $index $tag]
 			scan $indices %d%d%d%d i_body_begin i_body_end i_field_begin i_field_end
 			if {$i_body_end > $i_body_begin} {
 				set chunk "$i_body_begin $i_body_end $tag"
@@ -311,33 +334,31 @@ proc CGMT_catalog_chunks {page} {
 
 	set catalog [lsort -increasing -integer -index 0 $catalog]
 	
-	if {$info(verbose)} {
-		foreach chunk $catalog {
-			switch [lindex $chunk 2] {
-				"p" {set color orange}
-				"ul" {set color green}
-				"ol" {set color green}
-				"h2" {set color blue}
-				"h3" {set color brown}
-				"center" {set color cyan}
-				"figure" {set color pink}
-				"date" {set color darkgreen}
-				"caption" {set color darkred}
-				default {set color black}
-			}
-			LWDAQ_print $info(t) $chunk $color	
+	foreach chunk $catalog {
+		switch [lindex $chunk 2] {
+			"p" {set color orange}
+			"ul" {set color green}
+			"ol" {set color green}
+			"h2" {set color blue}
+			"h3" {set color brown}
+			"center" {set color cyan}
+			"figure" {set color pink}
+			"date" {set color darkgreen}
+			"caption" {set color darkred}
+			default {set color black}
 		}
+		RAG_print $chunk $color	
 	}
 		
 	return $catalog
 }
 
 #
-# CGMT_convert_tags removes the html markup tags we won't be using from a chunk
+# RAG_convert_tags removes the html markup tags we won't be using from a chunk
 # of text and returnes the cleaned chunk.
 #
-proc CGMT_convert_tags {chunk} {
-	upvar #0 CGMT_info info
+proc RAG_convert_tags {chunk} {
+	upvar #0 RAG_info info
     foreach {tag replace} $info(tags_to_convert) {
         regsub -all "<$tag>" $chunk $replace chunk
     }
@@ -345,23 +366,23 @@ proc CGMT_convert_tags {chunk} {
 }
 
 #
-# CGMT_remove_dates removes our date stamps from a chunk and returnes the
+# RAG_remove_dates removes our date stamps from a chunk and returnes the
 # cleaned chunk.
 #
-proc CGMT_remove_dates {chunk} {
-	upvar #0 CGMT_info info
+proc RAG_remove_dates {chunk} {
+	upvar #0 RAG_info info
 	regsub -all {\[[0-9]{2}-[A-Z]{3}-[0-9]{2}\][ ]*} $chunk "" chunk
     return $chunk
 }
 
 #
-# CGMT_extract_chunks goes through a page extracting the body text of each chunk.
+# RAG_extract_chunks goes through a page extracting the body text of each chunk.
 # It converts list chunks to markdown lists. It keeps track of the chapter, section
 # and date as provided by the sequence of chunks. It adds to the start of each 
 # chunk the current chapter, section, and date.
 #
-proc CGMT_extract_chunks {page catalog} {
-	upvar #0 CGMT_info info
+proc RAG_extract_chunks {page catalog} {
+	upvar #0 RAG_info info
 	
 	set date "NONE"
 	set chapter "NONE"
@@ -374,22 +395,22 @@ proc CGMT_extract_chunks {page catalog} {
 
 		switch -- $name {
 			"ol" {
-				set chunk [CGMT_extract_list $chunk]
+				set chunk [RAG_extract_list $chunk]
 			}
 			"ul" {
-				set chunk [CGMT_extract_list $chunk]
+				set chunk [RAG_extract_list $chunk]
 			}
 			"center" {
-				set caption [CGMT_extract_caption $chunk]
+				set caption [RAG_extract_caption $chunk]
 				if {[regexp {^Table} $caption]} {
-					set table [CGMT_extract_table $chunk]
+					set table [RAG_extract_table $chunk]
 					if {[string length $table] > 0} {
 						set chunk "$caption\n\n$table"
 					} else {
 						set chunk "$caption"
 					}
 				} elseif {[regexp {^Figure} $caption]} {
-					set figures [CGMT_extract_figures $chunk]
+					set figures [RAG_extract_figures $chunk]
 					if {[string length $figures] > 0} {
 						set chunk "$caption\n$figures"
 					} else {
@@ -409,7 +430,7 @@ proc CGMT_extract_chunks {page catalog} {
 				continue
 			}
 			"date" {
-				set date [CGMT_extract_date $chunk]
+				set date [RAG_extract_date $chunk]
 				continue
 			}
 			default {
@@ -419,13 +440,11 @@ proc CGMT_extract_chunks {page catalog} {
 			}
 		}
 		
-		set chunk [CGMT_convert_tags $chunk]
-		set chunk [CGMT_remove_dates $chunk]
+		set chunk [RAG_convert_tags $chunk]
+		set chunk [RAG_remove_dates $chunk]
 		set chunk [string trim $chunk]
 		if {([string length $chunk] == 0)} {
-			if {$info(verbose)} {
-				LWDAQ_print $info(t) "Empty chunk, $chunk_id" brown
-			}
+			RAG_print "Empty chunk, $chunk_id" brown
 			continue
 		}
 		
@@ -465,14 +484,14 @@ proc CGMT_extract_chunks {page catalog} {
 }
 
 #
-# CGMT_resolve_relative_url takes a relative url and resolves it into an
+# RAG_resolve_relative_url takes a relative url and resolves it into an
 # absolute url using a supplied base url. The framework of this code was
 # provided by ChatGPT. We enhanced to support internal document links. The
 # Base url can be a document with extenion php or html and the routine will
 # use the document url for internal links.
 #
-proc CGMT_resolve_relative_url {base_url relative_url} {
-	upvar #0 CGMT_info info
+proc RAG_resolve_relative_url {base_url relative_url} {
+	upvar #0 RAG_info info
 
     # Extract the path part from the base URL
     regexp {^(https?://[^/]+)(/.*)$} $base_url -> domain base_path
@@ -518,14 +537,14 @@ proc CGMT_resolve_relative_url {base_url relative_url} {
 }
 
 #
-# CGMT_resolve_urls resolves all the relative urls in a page into absolute urls
+# RAG_resolve_urls resolves all the relative urls in a page into absolute urls
 # using the base url we pass in as the basis for resolution. It constructs a new
-# page with the absolute urls. It calls CGMT_resolve_relative_url on each
+# page with the absolute urls. It calls RAG_resolve_relative_url on each
 # relative url it finds. The routine looks for urls in anchor tags <a> and in
 # image tags <img>.
 #
-proc CGMT_resolve_urls {page base_url} {
-	upvar #0 CGMT_info info
+proc RAG_resolve_urls {page base_url} {
+	upvar #0 RAG_info info
 
 	set new_page ""
 
@@ -534,7 +553,7 @@ proc CGMT_resolve_urls {page base_url} {
 		append new_page [string range $page $index [expr [lindex $tag 0] - 1]]
 		set url [string range $page {*}$url]
 		if {![regexp {https?} $url match]} {
-			set url [CGMT_resolve_relative_url $base_url $url]
+			set url [RAG_resolve_relative_url $base_url $url]
 		}
 		append new_page "<a href=\"$url\">"
 		set index [expr [lindex $tag 1] + 1]
@@ -547,7 +566,7 @@ proc CGMT_resolve_urls {page base_url} {
 		append new_page [string range $page $index [expr [lindex $tag 0] - 1]]
 		set url [string range $page {*}$url]
 		if {![regexp {https?} $url match]} {
-			set url [CGMT_resolve_relative_url $base_url $url]
+			set url [RAG_resolve_relative_url $base_url $url]
 		}
 		append new_page "<img src=\"$url\">"
 		set index [expr [lindex $tag 1] + 1]
@@ -558,24 +577,24 @@ proc CGMT_resolve_urls {page base_url} {
 }
 
 #
-# CGMT_convert_urls finds all the anchors in a page and converts from html to
+# RAG_convert_urls finds all the anchors in a page and converts from html to
 # markup format, where the title of the anchor is in brackets and the url is in
 # parentheses immediately afterwards.
 #
-proc CGMT_convert_urls {page} {
-	upvar #0 CGMT_info info
+proc RAG_convert_urls {page} {
+	upvar #0 RAG_info info
 	regsub -all {<a +href="([^"]+)"[^>]*>([^<]+)</a>} $page {[\2](\1)} page
 	regsub -all {<img +src="([^"]+)"[^>]*>} $page {[Image](\1)} page
 	return $page
 }
 
 #
-# CGMT_chapter_urls converts the "Chapter: Title" at the top of every chunk in a
+# RAG_chapter_urls converts the "Chapter: Title" at the top of every chunk in a
 # chunk list into a markdown anchor with absolute link to the chapter. It
 # returns the modified chunks in a new list.
 #
-proc CGMT_chapter_urls {chunks base_url} {
-	upvar #0 CGMT_info info
+proc RAG_chapter_urls {chunks base_url} {
+	upvar #0 RAG_info info
 	set new_chunks [list]
 	foreach chunk $chunks {
 		if {[regexp {^Chapter: ([^\n]*)} $chunk -> title]} {
@@ -590,11 +609,11 @@ proc CGMT_chapter_urls {chunks base_url} {
 }
 
 #
-# CGMT_convert_entities converts html entities in a page to unicode characters
+# RAG_convert_entities converts html entities in a page to unicode characters
 # and returns the converted page. We also replace tabs with double-spaces.
 #
-proc CGMT_convert_entities {page} {
-	upvar #0 CGMT_info info
+proc RAG_convert_entities {page} {
+	upvar #0 RAG_info info
     foreach {entity char} $info(entities_to_convert) {
         regsub -all $entity $page $char page
     }
@@ -603,48 +622,46 @@ proc CGMT_convert_entities {page} {
 }
 
 #
-# CGMT_html_chunks downloads an html page and chunks it for OpenAI, returning
+# RAG_html_chunks downloads an html page and chunks it for OpenAI, returning
 # a list of chunks.
 #
-proc CGMT_html_chunks {url base_url} {
-	upvar #0 CGMT_info info
-	set t $info(t)
+proc RAG_html_chunks {url base_url} {
+	upvar #0 RAG_info info
+		
+	set page [RAG_read_url $url]
+	RAG_print "Downloaded [string length $page] bytes from $url\." 
 	
-	set page [CGMT_read_url $url]
-	LWDAQ_print $t "Downloaded [string length $page] bytes from $url\."
+	RAG_print "Resolving urls wrt $base_url..." 
+	set page [RAG_resolve_urls $page $base_url]
 	
-	LWDAQ_print $t "Resolving urls wrt $base_url..."
-	set page [CGMT_resolve_urls $page $base_url]
+	RAG_print "Converting urls to markdown..." 
+	set page [RAG_convert_urls $page]
 	
-	LWDAQ_print $t "Converting urls to markdown..."
-	set page [CGMT_convert_urls $page]
+	RAG_print "Converting html entities to unicode..." 
+	set page [RAG_convert_entities $page]
 	
-	LWDAQ_print $t "Converting html entities to unicode..."
-	set page [CGMT_convert_entities $page]
+	RAG_print "Cataloging chunks, chapters, and dates..." 
+	set catalog [RAG_catalog_chunks $page]
+	RAG_print "Catalog contains [llength $catalog] chunks." 
 	
-	LWDAQ_print $t "Cataloging chunks, chapters, and dates..."
-	set catalog [CGMT_catalog_chunks $page]
-	LWDAQ_print $t "Catalog contains [llength $catalog] chunks."
+	RAG_print "Extracting and combining chunks from source page..." 
+	set chunks [RAG_extract_chunks $page $catalog]
+	RAG_print "Extracted [llength $chunks] chunks." 
 	
-	LWDAQ_print $t "Extracting and combining chunks from source page..."
-	set chunks [CGMT_extract_chunks $page $catalog]
-	LWDAQ_print $t "Extracted [llength $chunks] chunks."
-	
-	LWDAQ_print $t "Inserting chapter urls..."
-	set chunks [CGMT_chapter_urls $chunks $base_url]
-	LWDAQ_print $t "Chunk list complete with [llength $chunks] chunks."
+	RAG_print "Inserting chapter urls..." 
+	set chunks [RAG_chapter_urls $chunks $base_url]
+	RAG_print "Chunk list complete with [llength $chunks] chunks." 
 	
 	return $chunks
 }
 
 #
-# CGMT_submit_chunk submits a chunk, with the help of an access key, to the OpenAI
+# RAG_submit_chunk submits a chunk, with the help of an access key, to the OpenAI
 # embedding end point and retrieves its embed vector in a json record.
 #
-proc CGMT_submit_chunk {chunk api_key} {
-	upvar #0 CGMT_info info
-	set t $info(t)
-
+proc RAG_submit_chunk {chunk api_key} {
+	upvar #0 RAG_info info
+	
     set chunk [string map {\\ \\\\} $chunk]
     set chunk [string map {\" \\\"} $chunk]
     set chunk [string map {\n \\n} $chunk]
@@ -661,15 +678,14 @@ proc CGMT_submit_chunk {chunk api_key} {
 }
 
 #
-# CGMT_embed_chunks stores chunks to disk. It takes each chunk in the list and
+# RAG_embed_chunks stores chunks to disk. It takes each chunk in the list and
 # uses its contents to obtain a unique hash name for the chunk. It stores the
 # chunk to disk in the specified directory with the name hash.txt.
 #
-proc CGMT_store_chunks {chunks dir} {
-	upvar #0 CGMT_info info
-	set t $info(t)
-
-	LWDAQ_print $t "Storing [llength $chunks] to $dir\..."
+proc RAG_store_chunks {chunks dir} {
+	upvar #0 RAG_info info
+	
+	RAG_print "Storing [llength $chunks] to $dir\..." 
 	set count 0
 	foreach chunk $chunks {
 		incr count
@@ -680,22 +696,21 @@ proc CGMT_store_chunks {chunks dir} {
 		set f [open $cfn w]
 		puts -nonewline $f $chunk
 		close $f
-		LWDAQ_print $t "$count\: $cfn"
+		RAG_print "$count\: $cfn" 
 		LWDAQ_support
 	}
-	LWDAQ_print $t "Stored $count chunks."
+	RAG_print "Stored $count chunks." 
 	return $count
 }
 
 #
-# CGMT_embed_chunk submits a chunk, with the help of an access key, to the
+# RAG_embed_chunk submits a chunk, with the help of an access key, to the
 # embedding end point and retrieves its embed vector in a json record.
 #
-proc CGMT_embed_chunk {chunk api_key} {
-	upvar #0 CGMT_info info
-	set t $info(t)
-
-	LWDAQ_print $t "Embedding chunk length [string length $chunk]."
+proc RAG_embed_chunk {chunk api_key} {
+	upvar #0 RAG_info info
+	
+	RAG_print "Embedding chunk length [string length $chunk]."
 	LWDAQ_update
     set chunk [string map {\\ \\\\} $chunk]
     set chunk [string map {\" \\\"} $chunk]
@@ -711,55 +726,53 @@ proc CGMT_embed_chunk {chunk api_key} {
 	if {[catch {
 		set result [eval exec $cmd]
 	} error_result]} {
-		LWDAQ_print $t "ERROR: $error_result"
+		RAG_print "ERROR: $error_result"
 		return ""
 	}
 	return $result
 }
 
 #
-# CGMT_store_embeds reads all chunks in a directory, which we assume are all
+# RAG_store_embeds reads all chunks in a directory, which we assume are all
 # files with extention txt, reads them, submits them to the embedding end point,
 # and stores the embed vector in the same directory with the same name, but
 # extension json.
 #
-proc CGMT_store_embeds {chunk_dir embed_dir api_key} {
-	upvar #0 CGMT_info info
-	set t $info(t)
-	
+proc RAG_store_embeds {chunk_dir embed_dir api_key} {
+	upvar #0 RAG_info info
+		
 	set cfl [glob [file join $chunk_dir *.txt]]
-	LWDAQ_print $t "Found [llength $cfl] chunks found on disk."
+	RAG_print "Found [llength $cfl] chunks found on disk."
 	set count 0
 	foreach cfn $cfl {
 		incr count
 		set f [open $cfn r]
 		set chunk [read $f]
 		close $f
-		set embed [CGMT_embed_chunk $chunk $api_key]
+		set embed [RAG_embed_chunk $chunk $api_key]
 		if {[regexp -nocase "error" $embed]} {
-			LWDAQ_print $t "ERROR: $embed"
-			LWDAQ_print $t $chunk blue
+			RAG_print "ERROR: $embed"
+			RAG_print $chunk blue
 			break
 		}
 		set efn [file join $embed_dir [file root [file tail $cfn]].json]
 		set f [open $efn w]
 		puts -nonewline $f $embed
 		close $f
-		LWDAQ_print $t "$count\: $efn."
+		RAG_print "$count\: $efn."
 		LWDAQ_update
 	}
-	LWDAQ_print $t "Embedded $count chunks."
+	RAG_print "Embedded $count chunks."
 	return $count
 }
 
 #
-# CGMT_vector_from_json takes an embedding json string and extracts its embed
+# RAG_vector_from_json takes an embedding json string and extracts its embed
 # vector as a Tcl list.
 #
-proc CGMT_vector_from_embed {embed} {
-	upvar #0 CGMT_info info
-	set t $info(t)
-	
+proc RAG_vector_from_embed {embed} {
+	upvar #0 RAG_info info
+		
 	if {[regexp {"embedding": \[([^\]]*)} $embed match vector]} {
 		regsub -all {,} $vector " " vector
 		regsub -all {[\n\t ]+} $vector " " vector
@@ -770,17 +783,16 @@ proc CGMT_vector_from_embed {embed} {
 }
 
 #
-# CGMT_compare_vectors takes two embed json strings, extracts their embed vectors
+# RAG_compare_vectors takes two embed json strings, extracts their embed vectors
 # and calculates the cosine of the angle between the two vectors. We assume that the
 # two vectors are normalized prior to passing into the routine. That is: their length
 # is one. Thus the dot product gives us the cosine immediately.
 #
-proc CGMT_compare_vectors {embed1 embed2} {
-	upvar #0 CGMT_info info
-	set t $info(t)
-
-	set vector1 [CGMT_vector_from_embed $embed1]
-	set vector2 [CGMT_vector_from_embed $embed2]
+proc RAG_compare_vectors {embed1 embed2} {
+	upvar #0 RAG_info info
+	
+	set vector1 [RAG_vector_from_embed $embed1]
+	set vector2 [RAG_vector_from_embed $embed2]
 
 	set len1 [llength $vector1]
 	set len2 [llength $vector2]
@@ -798,17 +810,19 @@ proc CGMT_compare_vectors {embed1 embed2} {
 }
 
 #
-# CGMT_get_answer submits a list of chunks and a question to the chat completion
-# end point and returns the answer it obtains.
+# RAG_get_answer submits a list of chunks and a question to the chat completion
+# end point and returns the answer it obtains. It takes as in put four mandatory
+# parameters: the question, the list of reference chunks, a description of the
+# attitude with which the end point is supposed to answer the question, and a
+# key that grants access to the generator.
 #
-proc CGMT_get_answer {question chunks api_key} {
-	upvar #0 CGMT_info info
-	set t $info(t)
-
+proc RAG_get_answer {question chunks assistant api_key} {
+	upvar #0 RAG_info info
+	
  	set json_body "\{\n \
 		\"model\": \"gpt-4\",\n \
 		\"messages\": \[\n   \
-		\{ \"role\": \"system\", \"content\": \"You are a helpful assistant.\" \},\n"
+		\{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
 	foreach chunk $chunks {
 		set chunk [string map {\\ \\\\} $chunk]
 		set chunk [string map {\" \\\"} $chunk]
@@ -818,26 +832,27 @@ proc CGMT_get_answer {question chunks api_key} {
 	}
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
 	append json_body "  \], \n  \"temperature\": 0.0 \n\}"
+	
 	set cmd [list curl -sS -X POST https://api.openai.com/v1/chat/completions \
 	  -H "Content-Type: application/json" \
 	  -H "Authorization: Bearer $api_key" \
-	  -d $json_body]  
+	  -d $json_body] 
 	if {[catch {
 		set result [eval exec $cmd]
 	} error_result]} {
-		LWDAQ_print $t "ERROR: $error_result"
-		return ""
+		return "ERROR: $error_result"
 	}
 	if {[regexp {"content": *"([^"]*)"} $result match answer]} {
     	set answer [string map {\\n \n} $answer]
 	} else {
-		set answer "ERROR: Cannot find answer in result from completion point."
+		return "ERROR: Cannot find answer in result from completion point."
 	}
+	
 	return $answer
 }
 
 #
 # Run the initialization routine.
 #
-CGMT_init
+RAG_init
 
