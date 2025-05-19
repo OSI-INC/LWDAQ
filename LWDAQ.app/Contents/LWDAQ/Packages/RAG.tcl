@@ -106,42 +106,25 @@ proc RAG_init {} {
 # text output. It takes one mandatory parameters, the string to be printed, and
 # one optional parameter, a print color. The RAG routines will append "ERROR: "
 # to error messages and "WARNING: " to warning messages. They will use colors
-# other than black for diagnostic messages.
+# other than black for diagnostic messages. Our assumption is that the RAG_print
+# routine provided by a higher-level tool will include an update routine that
+# allows the graphical user interface, if it exists, to respond to user input.
 #
 proc RAG_print {s {color "black"}} {
 	puts $s
 }
 
 #
-# RAG_read_url fetches the source html code at a url and return as a single
+# RAG_read_url fetches the source html code at a url and returns it as a single
 # text string.
 #
 proc RAG_read_url {url} {
 	upvar #0 RAG_info info
 
-	set page [LWDAQ_url_download $url]
+	set page [exec curl -sS $url]
 	return $page
 }
  
-#
-# RAG_read_file reads an html file from a file and return as a single text
-# string.
-#
-proc RAG_read_file {{fn ""}} {
-	upvar #0 RAG_info info
-
-	if {$fn == ""} {
-		set fn [LWDAQ_get_file_name]
-	}
-	if {![file exists $fn]} {
-		return ""
-	}
-	set f [open $fn]
-	set contents [read $f]
-	close $f
-	return $contents
-}
-
 #
 # RAG_locate_field goes to the index'th character in a page and searches
 # forward for the first occurance of the named tage opening, looks further for
@@ -487,7 +470,7 @@ proc RAG_extract_chunks {page catalog} {
 # RAG_resolve_relative_url takes a relative url and resolves it into an
 # absolute url using a supplied base url. The framework of this code was
 # provided by ChatGPT. We enhanced to support internal document links. The
-# Base url can be a document with extenion php or html and the routine will
+# base url can be a document with extenion php or html and the routine will
 # use the document url for internal links.
 #
 proc RAG_resolve_relative_url {base_url relative_url} {
@@ -622,17 +605,18 @@ proc RAG_convert_entities {page} {
 }
 
 #
-# RAG_html_chunks downloads an html page and chunks it for OpenAI, returning
-# a list of chunks.
+# RAG_html_chunks downloads an html page from a url and chunks it for OpenAI,
+# returning a list of chunks.
 #
-proc RAG_html_chunks {url base_url} {
+proc RAG_html_chunks {url} {
 	upvar #0 RAG_info info
 		
+	RAG_print "Downloading from $url..." 
 	set page [RAG_read_url $url]
 	RAG_print "Downloaded [string length $page] bytes from $url\." 
 	
-	RAG_print "Resolving urls wrt $base_url..." 
-	set page [RAG_resolve_urls $page $base_url]
+	RAG_print "Resolving urls wrt $url..." 
+	set page [RAG_resolve_urls $page $url]
 	
 	RAG_print "Converting urls to markdown..." 
 	set page [RAG_convert_urls $page]
@@ -649,8 +633,8 @@ proc RAG_html_chunks {url base_url} {
 	RAG_print "Extracted [llength $chunks] chunks." 
 	
 	RAG_print "Inserting chapter urls..." 
-	set chunks [RAG_chapter_urls $chunks $base_url]
-	RAG_print "Chunk list complete with [llength $chunks] chunks." 
+	set chunks [RAG_chapter_urls $chunks $url]
+	RAG_print "Chunk list complete." 
 	
 	return $chunks
 }
@@ -685,7 +669,7 @@ proc RAG_submit_chunk {chunk api_key} {
 proc RAG_store_chunks {chunks dir} {
 	upvar #0 RAG_info info
 	
-	RAG_print "Storing [llength $chunks] to $dir\..." 
+	RAG_print "Storing chunks to $dir\..." 
 	set count 0
 	foreach chunk $chunks {
 		incr count
@@ -696,8 +680,7 @@ proc RAG_store_chunks {chunks dir} {
 		set f [open $cfn w]
 		puts -nonewline $f $chunk
 		close $f
-		RAG_print "$count\: $cfn" 
-		LWDAQ_support
+		RAG_print "$count\: $cfn" green
 	}
 	RAG_print "Stored $count chunks." 
 	return $count
@@ -710,8 +693,7 @@ proc RAG_store_chunks {chunks dir} {
 proc RAG_embed_chunk {chunk api_key} {
 	upvar #0 RAG_info info
 	
-	RAG_print "Embedding chunk length [string length $chunk]."
-	LWDAQ_update
+	RAG_print "Embedding chunk length [string length $chunk]." brown
     set chunk [string map {\\ \\\\} $chunk]
     set chunk [string map {\" \\\"} $chunk]
     set chunk [string map {\n \\n} $chunk]
@@ -738,11 +720,11 @@ proc RAG_embed_chunk {chunk api_key} {
 # and stores the embed vector in the same directory with the same name, but
 # extension json.
 #
-proc RAG_store_embeds {chunk_dir embed_dir api_key} {
+proc RAG_fetch_embeds {chunk_dir embed_dir api_key} {
 	upvar #0 RAG_info info
 		
 	set cfl [glob [file join $chunk_dir *.txt]]
-	RAG_print "Found [llength $cfl] chunks found on disk."
+	RAG_print "Found [llength $cfl] chunks on disk."
 	set count 0
 	foreach cfn $cfl {
 		incr count
@@ -759,8 +741,7 @@ proc RAG_store_embeds {chunk_dir embed_dir api_key} {
 		set f [open $efn w]
 		puts -nonewline $f $embed
 		close $f
-		RAG_print "$count\: $efn."
-		LWDAQ_update
+		RAG_print "$count\: $efn." orange
 	}
 	RAG_print "Embedded $count chunks."
 	return $count
@@ -797,7 +778,8 @@ proc RAG_compare_vectors {embed1 embed2} {
 	set len1 [llength $vector1]
 	set len2 [llength $vector2]
 	if {$len1 != $len2} {
-		error "vectors of different sizes, $len1 and $len2"
+		RAG_print "ERROR: Vectors of different sizes, $len1 and $len2"
+		return "0.0"
 	}
 
 	set dot_product 0
@@ -833,15 +815,26 @@ proc RAG_get_answer {question chunks assistant api_key} {
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
 	append json_body "  \], \n  \"temperature\": 0.0 \n\}"
 	
-	set cmd [list curl -sS -X POST https://api.openai.com/v1/chat/completions \
+	set cmd [list | curl -sS -X POST https://api.openai.com/v1/chat/completions \
 	  -H "Content-Type: application/json" \
 	  -H "Authorization: Bearer $api_key" \
 	  -d $json_body] 
-	if {[catch {
-		set result [eval exec $cmd]
-	} error_result]} {
-		return "ERROR: $error_result"
-	}
+	  
+	set ch [open $cmd]
+	set chpid [pid $ch]
+	fconfigure $ch -blocking 0 -buffering line
+	set result ""
+	while {1} {
+		set line [gets $ch]
+		if {[eof $ch]} {
+			break
+		} elseif {$line eq ""} {
+			LWDAQ_update
+			continue
+		} else {
+			append result "$line\n"
+		}
+	}		  
 	if {[regexp {"content": *"([^"]*)"} $result match answer]} {
     	set answer [string map {\\n \n} $answer]
 	} else {
