@@ -444,6 +444,9 @@ proc RAG_extract_chunks {page catalog} {
 					lappend chunks $chunk
 				}
 			}
+			"center" {
+				lappend chunks $chunk
+			}
 			default {
 				switch -- $prev_name {
 					"equation" {
@@ -872,7 +875,6 @@ proc RAG_get_answer {question chunks assistant api_key} {
 			LWDAQ_update
 			continue
 		} else {
-			RAG_print "$line" brown
 			append result "$line\n"
 		}
 	}		  
