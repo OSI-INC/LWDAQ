@@ -26,7 +26,7 @@
 # V1.1 [18-MAY-25] Core functionality working: retrieval-augmented generation.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide RAG 1.1
+package provide RAG 1.2
 
 proc RAG_init {} {
 #
@@ -325,7 +325,6 @@ proc RAG_catalog_chunks {page} {
 			"h3" {set color brown}
 			"center" {set color cyan}
 			"equation" {set color cyan}
-			"figure" {set color pink}
 			"date" {set color darkgreen}
 			"caption" {set color darkred}
 			default {set color black}
@@ -438,8 +437,7 @@ proc RAG_extract_chunks {page catalog} {
 		switch -- $name {
 			"ol" -
 			"ul" -
-			"equation" -
-			"center" {
+			"equation" {
 				if {[llength $chunks] > 0} {
 					lset chunks end "[lindex $chunks end]\n\n$chunk"
 				} else {
@@ -448,8 +446,7 @@ proc RAG_extract_chunks {page catalog} {
 			}
 			default {
 				switch -- $prev_name {
-					"equation" -
-					"center" {
+					"equation" {
 						lset chunks end "[lindex $chunks end]\n\n$chunk"
 					}
 				}
@@ -727,35 +724,64 @@ proc RAG_embed_chunk {chunk api_key} {
 }
 
 #
-# RAG_store_embeds reads all chunks in a directory, which we assume are all
-# files with extention txt, reads them, submits them to the embedding end point,
-# and stores the embed vector in the same directory with the same name, but
-# extension json.
+# RAG_store_embeds makes a list of all chunks in a chunk directory, which we
+# assume are the files with extention txt, and another list of all the
+# embeddings in an embed directory, which we assume are files with extension
+# json, and checks to see if an embed exists for each chunk. If no embed exists,
+# the routine reads the chunk, submits the chunk to the embedding end point,
+# fetches the embedding, and stores the embedding to disk with the same file
+# name root as the chunk. At the end, the routine purges any embeds that have
+# no matching chunk remaining.
 #
 proc RAG_fetch_embeds {chunk_dir embed_dir api_key} {
 	upvar #0 RAG_info info
 		
 	set cfl [glob [file join $chunk_dir *.txt]]
 	RAG_print "Found [llength $cfl] chunks on disk."
+	set efl [glob [file join $embed_dir *.json]]
+	RAG_print "Found [llength $efl] embeds on disk."
+	set new_count 0
+	set old_count 0
 	set count 0
 	foreach cfn $cfl {
 		incr count
-		set f [open $cfn r]
-		set chunk [read $f]
-		close $f
-		set embed [RAG_embed_chunk $chunk $api_key]
-		if {[regexp -nocase "error" $embed]} {
-			RAG_print "ERROR: $embed"
-			RAG_print $chunk blue
-			break
-		}
-		set efn [file join $embed_dir [file root [file tail $cfn]].json]
-		set f [open $efn w]
-		puts -nonewline $f $embed
-		close $f
-		RAG_print "$count\: $efn." orange
+		set root [file root [file tail $cfn]]
+		if {![regexp $root $efl]} {
+			set f [open $cfn r]
+			set chunk [read $f]
+			close $f
+			set embed [RAG_embed_chunk $chunk $api_key]
+			if {[regexp -nocase "error" $embed]} {
+				RAG_print "ERROR: $embed"
+				break
+			}
+			set efn [file join $embed_dir $root\.json]
+			set f [open $efn w]
+			puts -nonewline $f $embed
+			close $f
+			incr new_count
+			RAG_print "$count\: [file tail $cfn] fetched new embed." orange
+		} else {
+			incr old_count
+			RAG_print "$count\: [file tail $cfn] embed exists." orange
+		} 
+		LWDAQ_update
 	}
-	RAG_print "Embedded $count chunks."
+	RAG_print "Checked $count chunks,\
+		found $old_count embeds,\
+		fetched $new_count embeds."
+		
+	set efl [glob [file join $embed_dir *.json]]
+	set count 0
+	foreach efn $efl {
+		set root [file root [file tail $efn]]
+		if {![regexp $root $cfl]} {
+			file delete $efn
+			incr count
+		}
+	}
+	RAG_print "Purged $count expired embeds from disk."
+	
 	return $count
 }
 
@@ -808,7 +834,9 @@ proc RAG_compare_vectors {embed1 embed2} {
 # end point and returns the answer it obtains. It takes as in put four mandatory
 # parameters: the question, the list of reference chunks, a description of the
 # attitude with which the end point is supposed to answer the question, and a
-# key that grants access to the generator.
+# key that grants access to the generator. It returns the entire result from
+# the end point, as a json record, and leaves it to the calling procedure to
+# extract the answer.
 #
 proc RAG_get_answer {question chunks assistant api_key} {
 	upvar #0 RAG_info info
@@ -844,16 +872,11 @@ proc RAG_get_answer {question chunks assistant api_key} {
 			LWDAQ_update
 			continue
 		} else {
+			RAG_print "$line" brown
 			append result "$line\n"
 		}
 	}		  
-	if {[regexp {"content": *"([^"]*)"} $result match answer]} {
-    	set answer [string map {\\n \n} $answer]
-	} else {
-		return "ERROR: Cannot find answer in result from completion point."
-	}
-	
-	return $answer
+	return $result
 }
 
 #

@@ -22,12 +22,14 @@ proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	LWDAQ_tool_init "RAG_Manager" "1.1"
+	LWDAQ_tool_init "RAG_Manager" "1.2"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require RAG
 
 	set info(control) "Idle"
+	set info(chat) [list]
+	set info(result) ""
 	
 	set config(verbose) "0"
 	set config(source_url) "https://www.opensourceinstruments.com/Electronics/A3017/SCT.html"
@@ -35,13 +37,11 @@ proc RAG_Manager_init {} {
 	set config(chunk_dir) "~/Active/RAG/Chunks"
 	set config(embed_dir) "~/Active/RAG/Embeds"
 	set config(question) "What is the smallest telemetry sensor OSI makes?"
-	set config(assistant) "You are a technical assistant.\
-		You can and should retrieve information from provided documentation\
-		and perform mathematical calculations when variables are given.\
-		If the user supplies a value for a variable in a retrieved equation,\
-		perform the calculation and return the numeric result with units.\
-		When possible, provide links to source material.\
-		When documents conflict, prefer newer information over older."
+	set config(assistant) "You are a helpful assistant.\
+		You can perform mathematical calculations.\
+		Return numeric result with units.\
+		Provide links to source material.\
+		Prefer newer information over older."
 	set config(num_chunks) "6"
 
 	if {[file exists $info(settings_file_name)]} {
@@ -51,6 +51,34 @@ proc RAG_Manager_init {} {
 	return ""	
 }
 
+proc RAG_Manager_configure {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	LWDAQ_tool_configure RAG_Manager 2
+	return ""
+}
+
+proc RAG_Manager_delete {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "Delete"
+	RAG_print "\nDeleting Chunks" purple
+	set cfl [glob -nocomplain [file join $config(chunk_dir) *.txt]]
+	RAG_print "Found [llength $cfl] chunks."
+	set count 0
+	foreach cfn $cfl {
+		file delete $cfn
+		incr count
+		LWDAQ_support
+	}
+	RAG_print "Deleted $count chunks."
+	RAG_print "Done" purple
+	set info(control) "Idle"
+	return "$count"
+}
 
 proc RAG_Manager_generate {} {
 	upvar #0 RAG_Manager_config config
@@ -92,6 +120,7 @@ proc RAG_Manager_submit {} {
 	RAG_print "Found [llength $efl] embeds on disk."
 
 	RAG_print "Embedding the question..."
+	lappend info(chat) $config(question)
 	set q_embed [RAG_embed_chunk $config(question) $api_key]
 	
 	RAG_print "Comparing question to all chunks..."
@@ -123,8 +152,16 @@ proc RAG_Manager_submit {} {
 		RAG_print $chunk green
 	}
 	RAG_print "Submitting best chunks $config(num_chunks) to OpenAI..."
-	set answer [RAG_get_answer $config(question) $data $config(assistant) $api_key]
+	set info(result) [RAG_get_answer $config(question) $data $config(assistant) $api_key]
 	
+	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) match answer]} {
+    	set answer [string map {\\n \n} $answer]
+	} else {
+		set answer "Failed to extract answer from result."
+		RAG_print "ERROR: Cannot find answer content in result string."
+	}
+ 	lappend info(chat) $answer
+
 	RAG_print "Done" purple
 	set info(control) "Idle"
 
@@ -134,6 +171,32 @@ proc RAG_Manager_submit {} {
 	
 	return $answer
 }
+
+proc RAG_Manager_history {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "History"
+	RAG_print "\nPrinting Chat History" purple
+	foreach statement $info(chat) {
+		RAG_print "-----------------------------------------------------" 
+		RAG_print $statement
+	}	
+	RAG_print "-----------------------------------------------------" 
+
+	if {$config(verbose)} {
+		RAG_print "------ Full Text of Previous Question Result --------" 
+		RAG_print $info(result)
+		RAG_print "-----------------------------------------------------" 
+	}
+
+	RAG_print "Done" purple
+	
+	set info(control) "Idle"
+	return [string length $info(chat)]
+}
+
 
 #
 # RAG_Manager_open opens the tool window and creates the graphical user interface.
@@ -151,7 +214,7 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Generate Submit} {
+	foreach a {Delete Generate Submit History} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -159,17 +222,24 @@ proc RAG_Manager_open {} {
 	
 	checkbutton $f.verbose -text "Verbose" -variable RAG_Manager_config(verbose)
 	pack $f.verbose -side left -expand yes
+	
+	label $f.lnum -text "num_chunks:" -fg green
+	entry $f.enum -textvariable RAG_Manager_config(num_chunks) -width 3
+	pack $f.lnum $f.enum -side left -expand yes
 
+	button $f.config -text "Configure" -command "RAG_Manager_configure"
+	pack $f.config -side left -expand yes
+	
 	foreach a {Question Assistant Source_URL} {
 		set b [string tolower $a]
 		set f [frame $w.$b]
 		pack $f -side top
 		label $f.l$b -text "$a\:" -fg green
-		entry $f.e$b -textvariable RAG_Manager_config($b) -width 80
+		entry $f.e$b -textvariable RAG_Manager_config($b) -width 140
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 			
-	set info(text) [LWDAQ_text_widget $w 90 20]
+	set info(text) [LWDAQ_text_widget $w 140 40]
 	LWDAQ_print $info(text) "$info(name) Version $info(version)" purple
 	
 	return $w	
