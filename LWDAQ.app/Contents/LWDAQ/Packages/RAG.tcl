@@ -77,12 +77,11 @@ proc RAG_init {} {
 #
 # The chunk delimiting tags.
 #
-	set info(chunk_tags) {p center ul ol h2 h3}
+	set info(chunk_tags) {p center equation ul ol h2 h3}
 #
 # Input-output parameters.
 #	
 	set info(hash_len) "12"
-	set info(num_chunks) "4"
 #
 # Check existence of dependent utilities.
 #
@@ -325,6 +324,7 @@ proc RAG_catalog_chunks {page} {
 			"h2" {set color blue}
 			"h3" {set color brown}
 			"center" {set color cyan}
+			"equation" {set color cyan}
 			"figure" {set color pink}
 			"date" {set color darkgreen}
 			"caption" {set color darkred}
@@ -371,6 +371,7 @@ proc RAG_extract_chunks {page catalog} {
 	set chapter "NONE"
 	set section "NONE"
 	set step "NONE"
+	set prev_name "none"
 	set chunks [list]
 	foreach chunk_id $catalog {
 		scan $chunk_id %d%d%s i_start i_end name
@@ -403,6 +404,9 @@ proc RAG_extract_chunks {page catalog} {
 					set chunk "$caption"
 				}
 			}
+			"equation" {
+				
+			}
 			"h2" {
 				set chapter $chunk
 				set section "NONE"
@@ -434,6 +438,7 @@ proc RAG_extract_chunks {page catalog} {
 		switch -- $name {
 			"ol" -
 			"ul" -
+			"equation" -
 			"center" {
 				if {[llength $chunks] > 0} {
 					lset chunks end "[lindex $chunks end]\n\n$chunk"
@@ -442,6 +447,12 @@ proc RAG_extract_chunks {page catalog} {
 				}
 			}
 			default {
+				switch -- $prev_name {
+					"equation" -
+					"center" {
+						lset chunks end "[lindex $chunks end]\n\n$chunk"
+					}
+				}
 				set heading ""
 				if {$chapter != "NONE"} {
 					append heading "Chapter: $chapter\n"
@@ -462,6 +473,7 @@ proc RAG_extract_chunks {page catalog} {
 				set step "NONE"
 			}
 		}
+		set prev_name $name
 	}
 	return $chunks
 }

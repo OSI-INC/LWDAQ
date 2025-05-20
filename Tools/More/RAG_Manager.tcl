@@ -35,9 +35,14 @@ proc RAG_Manager_init {} {
 	set config(chunk_dir) "~/Active/RAG/Chunks"
 	set config(embed_dir) "~/Active/RAG/Embeds"
 	set config(question) "What is the smallest telemetry sensor OSI makes?"
-	set config(assistant) "You are a helpful assistant.\
-		Provide links to source material.\
-		Prefer newer information over older."
+	set config(assistant) "You are a technical assistant.\
+		You can and should retrieve information from provided documentation\
+		and perform mathematical calculations when variables are given.\
+		If the user supplies a value for a variable in a retrieved equation,\
+		perform the calculation and return the numeric result with units.\
+		When possible, provide links to source material.\
+		When documents conflict, prefer newer information over older."
+	set config(num_chunks) "6"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -105,8 +110,8 @@ proc RAG_Manager_submit {} {
 	RAG_print "Chunks relevant to \"$config(question)\"" brown
 	set index 0
 	set data [list]
-	set max_index [expr $RAG_info(num_chunks) - 1]
-	foreach comparison [lrange $comparisons 0 $max_index] {
+	set index 0
+	foreach comparison [lrange $comparisons 0 [expr $config(num_chunks) - 1]] {
 		incr index
 		RAG_print "-----------------------------------------------------" brown
 		RAG_print "$index\: Similarity [lindex $comparison 0]:" brown
@@ -117,7 +122,7 @@ proc RAG_Manager_submit {} {
 		lappend data $chunk
 		RAG_print $chunk green
 	}
-	RAG_print "Submitting best chunks to OpenAI..."
+	RAG_print "Submitting best chunks $config(num_chunks) to OpenAI..."
 	set answer [RAG_get_answer $config(question) $data $config(assistant) $api_key]
 	
 	RAG_print "Done" purple
