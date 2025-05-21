@@ -31,6 +31,22 @@ proc RAG_Manager_init {} {
 	set info(chat) [list]
 	set info(result) ""
 	
+	set config(high_rel_model) "gpt-4"
+	set config(mid_rel_model) "gpt-3.5-turbo"
+	set config(low_rel_model) "gpt-3.5-turbo"
+	
+	set config(high_rel_tokens) "3000"
+	set config(mid_rel_tokens) "1000"
+	set config(low_rel_tokens) "500"
+	set config(high_rel_thr) "0.80"
+	set config(low_rel_thr) "0.75"
+	
+	set info(high_rel_message) ""
+	set info(mid_rel_message) "Our documentation does not appear to provide\
+		a clear answer to this question. Here's the best we can do:\n\n"
+	set info(low_rel_message) "This question does not appear to be related\
+		to our products. Here's what we found anyway:\n\n"
+
 	set config(verbose) "0"
 	set config(source_url) "https://www.opensourceinstruments.com/Electronics/A3017/SCT.html"
 	set config(key_file) "~/Active/Admin/Keys/OpenAI_API.txt"
@@ -42,7 +58,6 @@ proc RAG_Manager_init {} {
 		Return numeric result with units.\
 		Provide links to source material.\
 		Prefer newer information over older."
-	set config(num_chunks) "6"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -120,6 +135,7 @@ proc RAG_Manager_submit {} {
 	RAG_print "Found [llength $efl] embeds on disk."
 
 	RAG_print "Embedding the question..."
+	set config(question) [string trim $config(question)]
 	lappend info(chat) $config(question)
 	set q_embed [RAG_embed_chunk $config(question) $api_key]
 	
@@ -136,26 +152,54 @@ proc RAG_Manager_submit {} {
 	RAG_print "Sorting chunks by decreasing relevance..."
 	set comparisons [lsort -decreasing -real -index 0 $comparisons]
 	
-	RAG_print "Chunks relevant to \"$config(question)\"" brown
+	set relevance [lindex $comparisons 0 0]
+	if {$relevance >= $config(high_rel_thr)} {
+		set model $config(high_rel_model)
+		set num $config(high_rel_tokens)
+		set msg $info(high_rel_message)
+		RAG_print "High-relevance question, relevance=$relevance,\
+			use $model, submit $num tokens." 
+	} elseif {$relevance >= $config(low_rel_thr)} {
+		set model $config(mid_rel_model)
+		set num $config(mid_rel_tokens)
+		set msg $info(mid_rel_message)
+		RAG_print "Mid-relevance question, relevance=$relevance,\
+		 	use $model, submit $num tokens." 
+	} else {
+		set model $config(low_rel_model)
+		set num $config(low_rel_tokens)
+		set msg $info(low_rel_message)
+		RAG_print "Low-relevance question, relevance=$relevance,\
+		 	use $model, submit $num tokens." 
+	}
+	
+	RAG_print "Chunks selected to support \"$config(question)\"" brown
 	set index 0
 	set data [list]
-	set index 0
-	foreach comparison [lrange $comparisons 0 [expr $config(num_chunks) - 1]] {
-		incr index
+	set count 0
+	set tokens 0
+	foreach comparison $comparisons {
+		incr count
 		RAG_print "-----------------------------------------------------" brown
-		RAG_print "$index\: Similarity [lindex $comparison 0]:" brown
+		RAG_print "$count\: Similarity [lindex $comparison 0]:" brown
 		set cfn [file join $config(chunk_dir) [lindex $comparison 1]\.txt]
 		set f [open $cfn r]
 		set chunk [read $f]
 		close $f
 		lappend data $chunk
 		RAG_print $chunk green
+		set tokens [expr $tokens + ([string length $chunk]/4)]
+		if {$tokens > $num} {break}
 	}
-	RAG_print "Submitting best chunks $config(num_chunks) to OpenAI..."
-	set info(result) [RAG_get_answer $config(question) $data $config(assistant) $api_key]
+	
+	RAG_print "Submitting best $count chunks to OpenAI, total of $tokens tokens."
+	set info(result) [RAG_get_answer $config(question)\
+		$data $config(assistant) $api_key $model]
 	
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) match answer]} {
     	set answer [string map {\\n \n} $answer]
+    	append msg $answer
+    	set answer $msg
 	} else {
 		set answer "Failed to extract answer from result."
 		RAG_print "ERROR: Cannot find answer content in result string."
@@ -223,9 +267,11 @@ proc RAG_Manager_open {} {
 	checkbutton $f.verbose -text "Verbose" -variable RAG_Manager_config(verbose)
 	pack $f.verbose -side left -expand yes
 	
-	label $f.lnum -text "num_chunks:" -fg green
-	entry $f.enum -textvariable RAG_Manager_config(num_chunks) -width 3
-	pack $f.lnum $f.enum -side left -expand yes
+	foreach a {high_rel_tokens high_rel_thr} {
+		label $f.l$a -text "$a\:" -fg green
+		entry $f.e$a -textvariable RAG_Manager_config($a) -width 6
+		pack $f.l$a $f.e$a -side left -expand yes
+	}
 
 	button $f.config -text "Configure" -command "RAG_Manager_configure"
 	pack $f.config -side left -expand yes

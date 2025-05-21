@@ -82,6 +82,7 @@ proc RAG_init {} {
 # Input-output parameters.
 #	
 	set info(hash_len) "12"
+	set info(default_gpt_model) "gpt-4"
 #
 # Check existence of dependent utilities.
 #
@@ -443,9 +444,6 @@ proc RAG_extract_chunks {page catalog} {
 				} else {
 					lappend chunks $chunk
 				}
-			}
-			"center" {
-				lappend chunks $chunk
 			}
 			default {
 				switch -- $prev_name {
@@ -833,28 +831,42 @@ proc RAG_compare_vectors {embed1 embed2} {
 }
 
 #
+# RAG_json_format takes a string and formats double quotes, newlines,
+# backslashes, and multiple white spaces for a json string.
+#
+proc RAG_json_format {s} {
+	set s [string map {\\ \\\\} $s]
+	set s [string map {\" \\\"} $s]
+	set s [string map {\n \\n} $s]
+	regsub -all {\s+} $s " " s
+	return $s
+}
+
+#
 # RAG_get_answer submits a list of chunks and a question to the chat completion
 # end point and returns the answer it obtains. It takes as in put four mandatory
 # parameters: the question, the list of reference chunks, a description of the
 # attitude with which the end point is supposed to answer the question, and a
-# key that grants access to the generator. It returns the entire result from
-# the end point, as a json record, and leaves it to the calling procedure to
-# extract the answer.
+# key that grants access to the generator. It returns the entire result from the
+# end point, as a json record, and leaves it to the calling procedure to extract
+# the answer. A fifth optional input is the gpt model. If we don't specify, we
+# fall back on the default model specified in default_gpt_model.
 #
-proc RAG_get_answer {question chunks assistant api_key} {
+proc RAG_get_answer {question chunks assistant api_key {model ""}} {
 	upvar #0 RAG_info info
 	
+	if {$model == ""} {set model $info(default_gpt_model)}
+	
+	set assistant [RAG_json_format $assistant]
  	set json_body "\{\n \
-		\"model\": \"gpt-4\",\n \
+		\"model\": \"$model\",\n \
 		\"messages\": \[\n   \
 		\{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
 	foreach chunk $chunks {
-		set chunk [string map {\\ \\\\} $chunk]
-		set chunk [string map {\" \\\"} $chunk]
-		set chunk [string map {\n \\n} $chunk]
-		regsub -all {\s+} $chunk " " chunk
+		set chunk [RAG_json_format $chunk]
 		append json_body "    \{ \"role\": \"user\", \"content\": \"$chunk\" \},\n"
 	}
+	set question [RAG_json_format $question]
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
 	append json_body "  \], \n  \"temperature\": 0.0 \n\}"
 	
