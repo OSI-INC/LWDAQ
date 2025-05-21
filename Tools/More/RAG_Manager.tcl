@@ -22,17 +22,18 @@ proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	LWDAQ_tool_init "RAG_Manager" "1.2"
+	LWDAQ_tool_init "RAG_Manager" "1.3"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require RAG
-
+	RAG_init
+	
 	set info(control) "Idle"
 	set info(chat) [list]
 	set info(result) ""
 	
 	set config(high_rel_model) "gpt-4"
-	set config(mid_rel_model) "gpt-3.5-turbo"
+	set config(mid_rel_modelk) "gpt-3.5-turbo"
 	set config(low_rel_model) "gpt-3.5-turbo"
 	
 	set config(high_rel_tokens) "3000"

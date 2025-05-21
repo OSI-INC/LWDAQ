@@ -26,7 +26,7 @@
 # V1.1 [18-MAY-25] Core functionality working: retrieval-augmented generation.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide RAG 1.2
+package provide RAG 1.3
 
 proc RAG_init {} {
 #
@@ -892,9 +892,3 @@ proc RAG_get_answer {question chunks assistant api_key {model ""}} {
 	}		  
 	return $result
 }
-
-#
-# Run the initialization routine.
-#
-RAG_init
-
