@@ -170,7 +170,6 @@ proc TTY_execute {} {
 	flush stdout
 }
 
-
 #
 # TTY_clear is used when you want to get rid of all of the text in the command
 # line, while your cursor is not at the end of the text line. It does so by
@@ -333,7 +332,6 @@ proc TTY_delete {} {
 proc TTY_backspace {} {
 	puts -nonewline "\x08"
 }
-
 
 #
 # TTY_right decrements the cursor value, by removeting the entire command
