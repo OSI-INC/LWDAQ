@@ -73,11 +73,13 @@ proc RAG_init {} {
 		b ""
 		/b ""
 		br " "
+		small ""
+		/small ""
 	}
 #
 # The chunk delimiting tags.
 #
-	set info(chunk_tags) {p center equation ul ol h2 h3}
+	set info(chunk_tags) {p center pre equation ul ol h2 h3}
 #
 # Input-output parameters.
 #	
@@ -319,16 +321,16 @@ proc RAG_catalog_chunks {page} {
 	
 	foreach chunk $catalog {
 		switch [lindex $chunk 2] {
-			"p" {set color orange}
+			"p" {set color gray}
 			"ul" {set color green}
 			"ol" {set color green}
-			"h2" {set color blue}
-			"h3" {set color brown}
-			"center" {set color cyan}
-			"equation" {set color cyan}
-			"date" {set color darkgreen}
-			"caption" {set color darkred}
-			default {set color black}
+			"h2" {set color darkpurple}
+			"h3" {set color darkpurple}
+			"center" {set color brown}
+			"equation" {set color brown}
+			"pre" {set color brown}
+			"date" {set color darkpurple}
+			default {set color red}
 		}
 		RAG_print $chunk $color	
 	}
@@ -407,6 +409,9 @@ proc RAG_extract_chunks {page catalog} {
 			"equation" {
 				
 			}
+			"pre" {
+			
+			}
 			"h2" {
 				set chapter $chunk
 				set section "NONE"
@@ -438,7 +443,8 @@ proc RAG_extract_chunks {page catalog} {
 		switch -- $name {
 			"ol" -
 			"ul" -
-			"equation" {
+			"equation" -
+			"pre" {
 				if {[llength $chunks] > 0} {
 					lset chunks end "[lindex $chunks end]\n\n$chunk"
 				} else {
@@ -446,28 +452,27 @@ proc RAG_extract_chunks {page catalog} {
 				}
 			}
 			default {
-				switch -- $prev_name {
-					"equation" {
-						lset chunks end "[lindex $chunks end]\n\n$chunk"
+				if {$prev_name != "equation"} {
+					set heading ""
+					if {$chapter != "NONE"} {
+						append heading "Chapter: $chapter\n"
 					}
+					if {$section != "NONE"} {
+						set heading "Section: $section\n"
+					}
+					if {$step != "NONE"} {
+						append heading "Step: $step\n"
+					}
+					if {$date != "NONE"} {
+						append heading "Date: $date\n"
+					}
+					if {[string length $heading] > 0} {
+						set chunk "$heading\n$chunk"
+					}
+					lappend chunks $chunk
+				} else {
+					lset chunks end "[lindex $chunks end]\n\n$chunk"
 				}
-				set heading ""
-				if {$chapter != "NONE"} {
-					append heading "Chapter: $chapter\n"
-				}
-				if {$section != "NONE"} {
-					set heading "Section: $section\n"
-				}
-				if {$step != "NONE"} {
-					append heading "Step: $step\n"
-				}
-				if {$date != "NONE"} {
-					append heading "Date: $date\n"
-				}
-				if {[string length $heading] > 0} {
-					set chunk "$heading\n$chunk"
-				}
-				lappend chunks $chunk
 				set step "NONE"
 			}
 		}
@@ -737,9 +742,9 @@ proc RAG_embed_chunk {chunk api_key} {
 proc RAG_fetch_embeds {chunk_dir embed_dir api_key} {
 	upvar #0 RAG_info info
 		
-	set cfl [glob [file join $chunk_dir *.txt]]
+	set cfl [glob -nocomplain [file join $chunk_dir *.txt]]
 	RAG_print "Found [llength $cfl] chunks on disk."
-	set efl [glob [file join $embed_dir *.json]]
+	set efl [glob -nocomplain [file join $embed_dir *.json]]
 	RAG_print "Found [llength $efl] embeds on disk."
 	set new_count 0
 	set old_count 0

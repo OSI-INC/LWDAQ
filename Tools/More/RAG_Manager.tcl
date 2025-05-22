@@ -132,7 +132,7 @@ proc RAG_Manager_submit {} {
 	RAG_print "Read API key."
 
 	RAG_print "Getting embed file list..."
-	set efl [glob [file join $config(embed_dir) *.json]]
+	set efl [glob -nocomplain [file join $config(embed_dir) *.json]]
 	RAG_print "Found [llength $efl] embeds on disk."
 
 	RAG_print "Embedding the question..."
@@ -198,7 +198,10 @@ proc RAG_Manager_submit {} {
 		$data $config(assistant) $api_key $model]
 	
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) match answer]} {
-    	set answer [string map {\\n \n} $answer]
+		regsub -all {\\n} $answer "\n" answer    ;# \n → newline
+		regsub -all {\\t} $answer "\t" answer    ;# \t → tab
+		regsub -all {\\r} $answer "\r" answer    ;# \r → carriage return
+		regsub -all {\\\"} $answer "\"" answer   ;# \" → "
     	append msg $answer
     	set answer $msg
 	} else {
