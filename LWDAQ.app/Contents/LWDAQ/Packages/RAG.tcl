@@ -88,10 +88,10 @@ proc RAG_init {} {
 #
 # Check existence of dependent utilities.
 #
-	if {[catch {exec curl -sS -V} error_result]} {
+	if {[catch {exec [auto_execok curl] -sS -V} error_result]} {
 		error "Utility \"curl\" not available in operating system shell."
 	}
-	if {[catch {exec openssl} error_result]} {
+	if {[catch {exec [auto_execok openssl]} error_result]} {
 		error "Utility \"openssl\" not available in operating system shell."
 	}
 #
