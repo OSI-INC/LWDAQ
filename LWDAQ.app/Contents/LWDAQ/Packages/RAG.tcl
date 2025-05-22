@@ -694,8 +694,14 @@ proc RAG_store_chunks {chunks dir} {
 	foreach chunk $chunks {
 		incr count
 		set cmd [list echo -n $chunk | openssl dgst -sha1]
-		set hash [eval exec $cmd]
-		set hash [string range $hash 1 $info(hash_len)]
+		set result [eval exec $cmd]
+		if {[regexp {[a-f0-9]{40}} $result hash]} {
+			set hash [string range $hash 1 $info(hash_len)]
+		} else {
+			RAG_print "ERROR: Cannot find hash string in openssl result."
+			RAG_print "RESULT: $result"
+			break
+		}
 		set cfn [file join $dir $hash\.txt]
 		set f [open $cfn w]
 		puts -nonewline $f $chunk
