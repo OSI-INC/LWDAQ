@@ -22,7 +22,7 @@ proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	LWDAQ_tool_init "RAG_Manager" "1.3"
+	LWDAQ_tool_init "RAG_Manager" "1.4"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require RAG
@@ -31,6 +31,8 @@ proc RAG_Manager_init {} {
 	set info(control) "Idle"
 	set info(chat) [list]
 	set info(result) ""
+	set info(text) "stdout"
+	
 	
 	set config(high_rel_model) "gpt-4"
 	set config(mid_rel_modelk) "gpt-3.5-turbo"
@@ -143,6 +145,7 @@ proc RAG_Manager_submit {} {
 	RAG_print "Comparing question to all chunks..."
 	set comparisons [list]
 	foreach efn $efl {
+		LWDAQ_support
 		set f [open $efn r]
 		set c_embed [read $f]
 		close $f
@@ -159,7 +162,7 @@ proc RAG_Manager_submit {} {
 		set num $config(high_rel_tokens)
 		set msg $info(high_rel_message)
 		RAG_print "High-relevance question, relevance=$relevance,\
-			use $model, submit $num tokens." 
+			use $model, submit $num\+ tokens." 
 	} elseif {$relevance >= $config(low_rel_thr)} {
 		set model $config(mid_rel_model)
 		set num $config(mid_rel_tokens)
@@ -198,11 +201,21 @@ proc RAG_Manager_submit {} {
 		$data $config(assistant) $api_key $model]
 	
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) match answer]} {
-		regsub -all {\\n} $answer "\n" answer    ;# \n → newline
-		regsub -all {\\t} $answer "\t" answer    ;# \t → tab
-		regsub -all {\\r} $answer "\r" answer    ;# \r → carriage return
-		regsub -all {\\\"} $answer "\"" answer   ;# \" → "
-    	append msg $answer
+		# Convert backslash-n-backslash-r to newline, backslash-r to newline,
+		# backslash-n to newline, backlash-t to tab, backslash-double-quote to
+		# double-quote, single newline with no preceding whitespace to
+		# double-space-newline. 
+		regsub -all {\\r\\n} $answer "\n" answer
+		regsub -all {\\r} $answer "\n" answer
+		regsub -all {\\n} $answer "\n" answer
+		regsub -all {\\t} $answer "\t" answer   
+		regsub -all {\\\"} $answer "\"" answer
+		regsub -all {^([^\n]+)\n(?!\s)} $answer "\1  \n" answer 
+
+		# Convert solitary asterisk to backslash-asterisk.
+		regsub -all {(\d) \* (\d)} $answer {\1 \\* \2} answer
+		
+	   	append msg $answer
     	set answer $msg
 	} else {
 		set answer "Failed to extract answer from result."

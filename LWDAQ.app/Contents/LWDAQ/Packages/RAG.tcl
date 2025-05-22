@@ -522,6 +522,7 @@ proc RAG_resolve_relative_url {base_url relative_url} {
             "." {
             }
             "\#*" {
+            	
             	lappend base_parts "$document$part"
            }
             default {
@@ -539,7 +540,8 @@ proc RAG_resolve_relative_url {base_url relative_url} {
 # using the base url we pass in as the basis for resolution. It constructs a new
 # page with the absolute urls. It calls RAG_resolve_relative_url on each
 # relative url it finds. The routine looks for urls in anchor tags <a> and in
-# image tags <img>.
+# image tags <img>. In the final resolved url, we replace space characters with
+# the HTML escape sequence "%20".
 #
 proc RAG_resolve_urls {page base_url} {
 	upvar #0 RAG_info info
@@ -563,9 +565,11 @@ proc RAG_resolve_urls {page base_url} {
 	while {[regexp -indices -start $index {<img +src="([^"]+)"[^>]*>} $page tag url]} {
 		append new_page [string range $page $index [expr [lindex $tag 0] - 1]]
 		set url [string range $page {*}$url]
+		set url [string trim $url]
 		if {![regexp {https?} $url match]} {
 			set url [RAG_resolve_relative_url $base_url $url]
 		}
+		regsub { } $url {%20} url
 		append new_page "<img src=\"$url\">"
 		set index [expr [lindex $tag 1] + 1]
 	}
@@ -597,6 +601,7 @@ proc RAG_chapter_urls {chunks base_url} {
 	foreach chunk $chunks {
 		if {[regexp {^Chapter: ([^\n]*)} $chunk -> title]} {
 			regsub {^Chapter: ([^\n]*)} $chunk "" chunk
+			regsub { } $title {%20} title
 			set chapter "Chapter: \[$title\]\($base_url\#$title\)"
 			lappend new_chunks "$chapter$chunk"
 		} else {
@@ -620,8 +625,8 @@ proc RAG_convert_entities {page} {
 }
 
 #
-# RAG_html_chunks downloads an html page from a url and chunks it for OpenAI,
-# returning a list of chunks.
+# RAG_html_chunks downloads an html page from a url, splits it into chunks of text, and
+# returns a list of chunks.
 #
 proc RAG_html_chunks {url} {
 	upvar #0 RAG_info info
@@ -749,6 +754,7 @@ proc RAG_fetch_embeds {chunk_dir embed_dir api_key} {
 	set new_count 0
 	set old_count 0
 	set count 0
+	RAG_print "Creating embeds for new paragraphs..."
 	foreach cfn $cfl {
 		incr count
 		set root [file root [file tail $cfn]]
