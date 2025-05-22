@@ -83,7 +83,7 @@ proc RAG_Manager_delete {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Delete"
-	RAG_print "\nDeleting Chunks" purple
+	RAG_print "\nDeleting Chunks [RAG_time]" purple
 	set cfl [glob -nocomplain [file join $config(chunk_dir) *.txt]]
 	RAG_print "Found [llength $cfl] chunks."
 	set count 0
@@ -104,7 +104,7 @@ proc RAG_Manager_generate {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Generate"
-	RAG_print "\nGenerate Chunks and Embed Vectors" purple
+	RAG_print "\nGenerate Chunks and Embed Vectors [RAG_time]" purple
 	set chunks [RAG_html_chunks $config(source_url)]
 	RAG_store_chunks $chunks $config(chunk_dir)
 	RAG_print "Reading key file $config(key_file)..."
@@ -125,7 +125,7 @@ proc RAG_Manager_submit {{question ""}} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Submit"
-	RAG_print "\nSubmitting Question to Completion End Point" purple
+	RAG_print "\nSubmitting Question to Completion End Point [RAG_time]" purple
 	
 	if {$question != ""} {set config(question) $question}
 	RAG_print "Question: $config(question)"
@@ -184,7 +184,7 @@ proc RAG_Manager_submit {{question ""}} {
 	set index 0
 	set data [list]
 	set count 0
-	set tokens 0
+	set tokens [expr [string length $question] / 4]
 	foreach comparison $comparisons {
 		incr count
 		RAG_print "-----------------------------------------------------" brown
@@ -199,7 +199,8 @@ proc RAG_Manager_submit {{question ""}} {
 		if {$tokens > $num} {break}
 	}
 	
-	RAG_print "Submitting best $count chunks to OpenAI, total of $tokens tokens."
+	RAG_print "Submitting question and $count chunks to OpenAI,\
+		$tokens tokens, at [RAG_time]."
 	set info(result) [RAG_get_answer $config(question)\
 		$data $config(assistant) $api_key $model]
 	

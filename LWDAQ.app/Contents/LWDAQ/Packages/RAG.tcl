@@ -117,6 +117,13 @@ proc RAG_print {s {color "black"}} {
 }
 
 #
+# RAG_time provides a timestamp for log messages.
+#
+proc RAG_time {} {
+	return [clock format [clock seconds]]
+}
+
+#
 # RAG_read_url fetches the source html code at a url and returns it as a single
 # text string.
 #
