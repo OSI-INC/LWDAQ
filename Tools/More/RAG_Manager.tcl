@@ -118,7 +118,7 @@ proc RAG_Manager_generate {} {
 }
 
 
-proc RAG_Manager_submit {} {
+proc RAG_Manager_submit {{question ""}} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	global RAG_info
@@ -126,6 +126,9 @@ proc RAG_Manager_submit {} {
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Submit"
 	RAG_print "\nSubmitting Question to Completion End Point" purple
+	
+	if {$question != ""} {set config(question) $question}
+	RAG_print "Question: $config(question)"
 	
 	RAG_print "Reading api key $config(key_file)\."
 	set f [open $config(key_file) r]
