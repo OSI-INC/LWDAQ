@@ -35,7 +35,7 @@ proc RAG_Manager_init {} {
 	
 	
 	set config(high_rel_model) "gpt-4"
-	set config(mid_rel_modelk) "gpt-3.5-turbo"
+	set config(mid_rel_model) "gpt-3.5-turbo"
 	set config(low_rel_model) "gpt-3.5-turbo"
 	
 	set config(high_rel_tokens) "3000"
@@ -128,6 +128,8 @@ proc RAG_Manager_submit {{question ""}} {
 	RAG_print "\nSubmitting Question to Completion End Point [RAG_time]" purple
 	
 	if {$question != ""} {set config(question) $question}
+	set config(question) [string trim $config(question)]
+	lappend $info(chat) $config(question)
 	RAG_print "Question: $config(question)"
 	
 	RAG_print "Reading api key $config(key_file)\."
@@ -141,8 +143,6 @@ proc RAG_Manager_submit {{question ""}} {
 	RAG_print "Found [llength $efl] embeds on disk."
 
 	RAG_print "Embedding the question..."
-	set config(question) [string trim $config(question)]
-	lappend info(chat) $config(question)
 	set q_embed [RAG_embed_chunk $config(question) $api_key]
 	
 	RAG_print "Comparing question to all chunks..."
@@ -159,6 +159,7 @@ proc RAG_Manager_submit {{question ""}} {
 	RAG_print "Sorting chunks by decreasing relevance..."
 	set comparisons [lsort -decreasing -real -index 0 $comparisons]
 	
+	RAG_print "Choosing answer model and submit data size..."
 	set relevance [lindex $comparisons 0 0]
 	if {$relevance >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
@@ -203,22 +204,24 @@ proc RAG_Manager_submit {{question ""}} {
 		$tokens tokens, at [RAG_time]."
 	set info(result) [RAG_get_answer $config(question)\
 		$data $config(assistant) $api_key $model]
+	RAG_print "Received response consisting of [string length $info(result)] characters."
 	
+	# Try to extract the answer from the returned json record. If we succeed,
+	# then format the answer for Markdown. We convert backslash-n-backslash-r to
+	# newline, backslash-r to newline, backslash-n to newline, backlash-t to
+	# tab, backslash-double-quote to double-quote, single newline with no
+	# preceding whitespace to double-space-newline. We replace solitary
+	# asterisks with multiplication symbols. If we can't extract the answer then
+	# report an error.
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) match answer]} {
-		# Convert backslash-n-backslash-r to newline, backslash-r to newline,
-		# backslash-n to newline, backlash-t to tab, backslash-double-quote to
-		# double-quote, single newline with no preceding whitespace to
-		# double-space-newline. 
-		regsub -all {\\r\\n} $answer "\n" answer
-		regsub -all {\\r} $answer "\n" answer
-		regsub -all {\\n} $answer "\n" answer
-		regsub -all {\\t} $answer "\t" answer   
-		regsub -all {\\\"} $answer "\"" answer
-		regsub -all {^([^\n]+)\n(?!\s)} $answer "\1  \n" answer 
-
-		# Convert solitary asterisk to backslash-asterisk.
-		regsub -all {(\d) \* (\d)} $answer {\1 \\* \2} answer
-		
+		set num [regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer]
+		RAG_print "Replaced $num backslash-r and backslash-n sequences with newlines."
+		set num [regsub -all {\\\"} $answer "\"" answer]
+		RAG_print "Replaced $num backslash-backslash with backslash."
+		set num [regsub -all {\s+\*\s+} $answer { × } answer]
+		RAG_print "Replaced $num solitary asterisks with ×."
+		set num [regsub -all {([^\n]+)\n(?!\n)} $answer "\\1  \n" answer]
+		RAG_print "Added spaces to the end of $num lines."
 	   	append msg $answer
     	set answer $msg
 	} else {
@@ -227,7 +230,7 @@ proc RAG_Manager_submit {{question ""}} {
 	}
  	lappend info(chat) $answer
 
-	RAG_print "Done" purple
+	RAG_print "Done with Submission [RAG_time]" purple
 	set info(control) "Idle"
 
 	RAG_print "\nAnswer to \"$config(question)\":" purple
@@ -317,7 +320,7 @@ RAG_Manager_init
 proc RAG_print {s {color "black"}} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
-	
+
 	if {$config(verbose) || ($color == "black") || ($color == "purple") \
 		|| [regexp {^ERROR: } $s] || [regexp {^WARNING: } $s]} {
 		LWDAQ_print $info(text) $s $color

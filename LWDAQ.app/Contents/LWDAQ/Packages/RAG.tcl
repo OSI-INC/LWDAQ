@@ -309,8 +309,8 @@ proc RAG_catalog_chunks {page} {
 			set indices [RAG_locate_field $page $index $tag]
 			scan $indices %d%d%d%d i_body_begin i_body_end i_field_begin i_field_end
 			if {$i_body_end > $i_body_begin} {
-				set chunk "$i_body_begin $i_body_end $tag"
-				lappend catalog $chunk
+				set descriptor "$i_body_begin $i_body_end $tag"
+				lappend catalog $descriptor
 			}
 			set index [expr $i_field_end + 1]
 		}
@@ -319,15 +319,15 @@ proc RAG_catalog_chunks {page} {
 	set index 0
 	set pattern {<p>\[[0-9]{2}-[A-Z]{3}-[0-9]{2}\]}
 	while {[regexp -indices -start $index $pattern $page i_p]} {
-		set chunk "$i_p date"
-		lappend catalog $chunk
+		set descriptor "$i_p date"
+		lappend catalog $descriptor
 		set index [expr [lindex $i_p 1] + 1]
 	}
 
 	set catalog [lsort -increasing -integer -index 0 $catalog]
 	
-	foreach chunk $catalog {
-		switch [lindex $chunk 2] {
+	foreach descriptor $catalog {
+		switch [lindex $descriptor 2] {
 			"p" {set color gray}
 			"ul" {set color green}
 			"ol" {set color green}
@@ -339,7 +339,7 @@ proc RAG_catalog_chunks {page} {
 			"date" {set color darkpurple}
 			default {set color red}
 		}
-		RAG_print $chunk $color	
+		RAG_print $descriptor $color	
 	}
 		
 	return $catalog
