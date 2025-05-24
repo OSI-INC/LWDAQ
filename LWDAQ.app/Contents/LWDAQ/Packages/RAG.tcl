@@ -26,7 +26,7 @@
 # V1.1 [18-MAY-25] Core functionality working: retrieval-augmented generation.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide RAG 1.3
+package provide RAG 1.4
 
 proc RAG_init {} {
 #
@@ -85,6 +85,7 @@ proc RAG_init {} {
 #	
 	set info(hash_len) "12"
 	set info(default_gpt_model) "gpt-4"
+	set info(dict_entry_len) "10"
 #
 # Check existence of dependent utilities.
 #
@@ -749,7 +750,7 @@ proc RAG_embed_chunk {chunk api_key} {
 }
 
 #
-# RAG_store_embeds makes a list of all chunks in a chunk directory, which we
+# RAG_fetch_embeds makes a list of all chunks in a chunk directory, which we
 # assume are the files with extention txt, and another list of all the
 # embeddings in an embed directory, which we assume are files with extension
 # json, and checks to see if an embed exists for each chunk. If no embed exists,
@@ -853,6 +854,60 @@ proc RAG_compare_vectors {embed1 embed2} {
 		set dot_product [expr $dot_product + $x1*$x2]
 	}
 	return [format %.4f $dot_product]
+}
+
+#
+# RAG_make_dictionary goes through all the embed vectors in the embed directory
+# and for each makes a text file in the dictionary directory that contains a
+# list of similar chunks. This list consists of pairs of similarities and chunk
+# names. 
+# RAG_make_dictionary ~/Active/RAG/Embeds ~/Active/RAG/Dictionary/
+proc RAG_make_dictionary {embed_dir dict_dir} {
+	upvar #0 RAG_info info
+		
+	set efl [glob -nocomplain [file join $embed_dir *.json]]
+	RAG_print "Found [llength $efl] embeds on disk."
+	
+	RAG_print "Reading [llength $efl] embeds from disk..."
+	set embeds [list]
+	foreach efn $efl {
+		LWDAQ_support
+		set f [open $efn r]
+		set embed [read $f]
+		close $f
+		set vector [RAG_vector_from_embed $embed]
+		lappend embeds [list [file root [file tail $efn]] $vector]
+	}
+
+	RAG_print "Creating dictionary..."
+	set count 0
+	foreach e1 $embeds {
+		incr count
+		set name1 [lindex $e1 0]
+		set vector1 [lindex $e1 1]
+		set len [llength $vector1]
+		set comparisons [list]
+		foreach e2 $embeds {
+			set name2 [lindex $e2 0]
+			set vector2 [lindex $e2 1]
+			set dot_product 0
+			for {set i 0} {$i < $len} {incr i} {
+				set x1 [lindex $vector1 $i]
+				set x2 [lindex $vector2 $i]
+				set dot_product [expr $dot_product + $x1*$x2]
+			}
+			set similarity [format %.4f $dot_product]
+			lappend comparisons "$similarity $name2"
+		}
+		set comparisons [lsort -decreasing -real -index 0 $comparisons]
+		set comparisons [lrange $comparisons 1 $info(dict_entry_len)]
+		set dfn [file join $dict_dir $name1\.txt]
+		set f [open $dfn w]
+		puts -nonewline $f $comparisons
+		close $f
+		RAG_print "$count: [lindex $e1 0] [lrange $comparisons 0 2]" orange
+		LWDAQ_update
+	}
 }
 
 #

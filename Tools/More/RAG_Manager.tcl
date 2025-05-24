@@ -22,7 +22,7 @@ proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	LWDAQ_tool_init "RAG_Manager" "1.5"
+	LWDAQ_tool_init "RAG_Manager" "1.7"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require RAG
@@ -43,6 +43,7 @@ proc RAG_Manager_init {} {
 	set config(low_rel_tokens) "0"
 	set config(high_rel_thr) "0.80"
 	set config(low_rel_thr) "0.75"
+	
 	set config(high_rel_assistant) {You are a helpful technical assistant. You can perform mathematical calculations and return numeric results with appropriate units. You are also able to summarize, explain, and answer questions about scientific and engineering documentation.
 
 You are provided with excerpts from documentation that may include text, figures, and links. When answering the user's question:
@@ -56,20 +57,23 @@ You are provided with excerpts from documentation that may include text, figures
 - Provide hyperlinks to original documentation sources when available.
 - Prefer newer information over older when content appears to be versioned or time-sensitive.
 - Respond using Markdown formatting. Use headers, bold text, lists, tables, code blocks, and inline image embeds as appropriate.}
+
 	set config(mid_rel_assistant) {You are a helpful technical assistant. You can perform mathematical calculations and return numeric results with appropriate units. You are also able to summarize, explain, and answer questions about scientific and engineering documentation.}
+	
 	set config(low_rel_assistant) {You are a helpful assistant}
 	
 	set info(high_rel_message) ""
-	set info(mid_rel_message) "This question does not appear to be related\
-		to our products. Here's what we found anyway:\n\n"
+	set info(mid_rel_message) ""
 	set info(low_rel_message) "This question does not appear to be related\
 		to our products. Here's what we found anyway:\n\n"
 
 	set config(verbose) "0"
+	set config(no_submit) "0"
 	set config(source_url) "https://www.opensourceinstruments.com/Electronics/A3017/SCT.html"
 	set config(key_file) "~/Active/Admin/Keys/OpenAI_API.txt"
 	set config(chunk_dir) "~/Active/RAG/Chunks"
 	set config(embed_dir) "~/Active/RAG/Embeds"
+	set config(dict_dir) "~/Active/RAG/Dictionary"
 	set config(question) "What is the smallest telemetry sensor OSI makes?"
 
 	if {[file exists $info(settings_file_name)]} {
@@ -163,7 +167,7 @@ proc RAG_Manager_submit {{question ""}} {
 		set c_embed [read $f]
 		close $f
 		set comparison [RAG_compare_vectors $q_embed $c_embed]
-		lappend comparisons " $comparison [file root [file tail $efn]]"
+		lappend comparisons "$comparison [file root [file tail $efn]]"
 	}
 	
 	RAG_print "Sorting chunks by decreasing relevance..."
@@ -194,6 +198,28 @@ proc RAG_Manager_submit {{question ""}} {
 		 	use $model, submit $num tokens." 
 	}
 	
+	if {0} {
+		RAG_print "Finding related chunks..."
+		set new_list [list]
+		foreach c [lrange $comparisons 0 20] {
+			if {[lsearch -index 1 $new_list [lindex $c 1]] < 0} {
+				lappend new_list $c
+			}
+			set dfn [file join $config(dict_dir) [lindex $c 1]\.txt]
+			set f [open $dfn r]
+			set dict [read $f]
+			close $f
+			foreach cc [lrange $dict 0 1] {
+				set name [lindex $cc 1]
+				set rel [lindex $cc 0]
+				if {[lsearch -index 1 $new_list $name] < 0} {
+					lappend new_list "$rel\_R $name"
+				}
+			}
+		}
+		set comparisons $new_list
+	}
+	
 	RAG_print "Chunks selected to support \"$config(question)\"" brown
 	set index 0
 	set data [list]
@@ -212,6 +238,12 @@ proc RAG_Manager_submit {{question ""}} {
 		lappend data $chunk
 		RAG_print $chunk green
 		set tokens [expr $tokens + ([string length $chunk]/4)]
+	}
+	
+	if {$config(no_submit)} {
+		set answer "Submit is disabled, so no answer will be obtained."
+		RAG_print "Submit disabled, stopping before submission, [RAG_time]."
+		return $answer
 	}
 	
 	RAG_print "Submitting question and $count chunks to OpenAI,\
@@ -304,6 +336,9 @@ proc RAG_Manager_open {} {
 	
 	checkbutton $f.verbose -text "Verbose" -variable RAG_Manager_config(verbose)
 	pack $f.verbose -side left -expand yes
+
+	checkbutton $f.ns -text "No Submit" -variable RAG_Manager_config(no_submit)
+	pack $f.ns -side left -expand yes
 	
 	foreach a {high_rel_tokens high_rel_thr} {
 		label $f.l$a -text "$a\:" -fg green
