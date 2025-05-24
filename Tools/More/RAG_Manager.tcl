@@ -22,7 +22,7 @@ proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	LWDAQ_tool_init "RAG_Manager" "1.4"
+	LWDAQ_tool_init "RAG_Manager" "1.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require RAG
@@ -40,13 +40,30 @@ proc RAG_Manager_init {} {
 	
 	set config(high_rel_tokens) "3000"
 	set config(mid_rel_tokens) "1000"
-	set config(low_rel_tokens) "500"
+	set config(low_rel_tokens) "0"
 	set config(high_rel_thr) "0.80"
 	set config(low_rel_thr) "0.75"
+	set config(high_rel_assistant) {You are a helpful technical assistant.
+		You can perform mathematical calculations
+		and return numeric results with appropriate units.
+		You are also able to summarize and explain scientific and engineering content.
+		You are provided with excerpts from documentation
+		that may include text, figures, and links.
+		When answering the user's question:
+		- Use the most relevant and recent information available in the provided context.
+		- If the user's question asks for a figure, graph, or image
+		and a matching figure is present in the excerpts,
+		include using Markdown image formatting: ![Figure Caption](image_url)
+		- Do not say "you cannot search the web" or "you cannot find images"
+		if a relevant figure is already present in the provided content.
+		- Provide hyperlinks to the original source material when available.}
+	set config(mid_rel_assistant) {You are a helpful assistant.
+		You can perform calculations and return answers in correct units.}
+	set config(low_rel_assistant) {You are a helpful assistant.}
 	
 	set info(high_rel_message) ""
-	set info(mid_rel_message) "Our documentation does not appear to provide\
-		a clear answer to this question. Here's the best we can do:\n\n"
+	set info(mid_rel_message) "This question does not appear to be related\
+		to our products. Here's what we found anyway:\n\n"
 	set info(low_rel_message) "This question does not appear to be related\
 		to our products. Here's what we found anyway:\n\n"
 
@@ -56,11 +73,6 @@ proc RAG_Manager_init {} {
 	set config(chunk_dir) "~/Active/RAG/Chunks"
 	set config(embed_dir) "~/Active/RAG/Embeds"
 	set config(question) "What is the smallest telemetry sensor OSI makes?"
-	set config(assistant) "You are a helpful assistant.\
-		You can perform mathematical calculations.\
-		Return numeric result with units.\
-		Provide links to source material.\
-		Prefer newer information over older."
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -163,18 +175,21 @@ proc RAG_Manager_submit {{question ""}} {
 	set relevance [lindex $comparisons 0 0]
 	if {$relevance >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
+		set assistant $config(high_rel_assistant)
 		set num $config(high_rel_tokens)
 		set msg $info(high_rel_message)
 		RAG_print "High-relevance question, relevance=$relevance,\
 			use $model, submit $num\+ tokens." 
 	} elseif {$relevance >= $config(low_rel_thr)} {
 		set model $config(mid_rel_model)
+		set assistant $config(mid_rel_assistant)
 		set num $config(mid_rel_tokens)
 		set msg $info(mid_rel_message)
 		RAG_print "Mid-relevance question, relevance=$relevance,\
 		 	use $model, submit $num tokens." 
 	} else {
 		set model $config(low_rel_model)
+		set assistant $config(low_rel_assistant)
 		set num $config(low_rel_tokens)
 		set msg $info(low_rel_message)
 		RAG_print "Low-relevance question, relevance=$relevance,\
@@ -186,7 +201,9 @@ proc RAG_Manager_submit {{question ""}} {
 	set data [list]
 	set count 0
 	set tokens [expr [string length $question] / 4]
+	set tokens [expr [string length $assistant] / 4]
 	foreach comparison $comparisons {
+		if {$tokens > $num} {break}
 		incr count
 		RAG_print "-----------------------------------------------------" brown
 		RAG_print "$count\: Similarity [lindex $comparison 0]:" brown
@@ -197,13 +214,12 @@ proc RAG_Manager_submit {{question ""}} {
 		lappend data $chunk
 		RAG_print $chunk green
 		set tokens [expr $tokens + ([string length $chunk]/4)]
-		if {$tokens > $num} {break}
 	}
 	
 	RAG_print "Submitting question and $count chunks to OpenAI,\
 		$tokens tokens, at [RAG_time]."
 	set info(result) [RAG_get_answer $config(question)\
-		$data $config(assistant) $api_key $model]
+		$data $assistant $api_key $model]
 	RAG_print "Received response consisting of [string length $info(result)] characters."
 	
 	# Try to extract the answer from the returned json record. If we succeed,
@@ -300,7 +316,7 @@ proc RAG_Manager_open {} {
 	button $f.config -text "Configure" -command "RAG_Manager_configure"
 	pack $f.config -side left -expand yes
 	
-	foreach a {Question Assistant Source_URL} {
+	foreach a {Question Source_URL} {
 		set b [string tolower $a]
 		set f [frame $w.$b]
 		pack $f -side top
