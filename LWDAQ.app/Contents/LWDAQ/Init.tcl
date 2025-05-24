@@ -308,7 +308,8 @@ set LWDAQ_Info(loading_settings_scripts) 0
 # Run the configuration script, if it exists.
 if {$LWDAQ_Info(configuration_file) != ""} {
 	if {[catch {source $LWDAQ_Info(configuration_file)} error_message]} {
-		puts "ERROR: $error_message in configuration file \"$LWDAQ_Info(configuration_file)\"."
+		puts "ERROR: $error_message in configuration file\
+			\"$LWDAQ_Info(configuration_file)\"."
 		incr num_errors
 	}
 }
@@ -319,8 +320,11 @@ if {[regexp { } $LWDAQ_Info(program_dir)]} {
 	incr num_errors
 }
 
-# Report number of errors if greater than zero.
+# If we are operating in no-gui mode, exit so that we don't freeze any process
+# that has called LWDAQ to do some job. Otherwise, report the number of errors
+# to the console.
 if {$num_errors > 0} {
+	if {!$LWDAQ_Info(gui_enabled)} {exit}
 	puts "Initialization concluded with $num_errors errors."
 }
 
