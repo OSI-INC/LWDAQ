@@ -43,23 +43,19 @@ proc RAG_Manager_init {} {
 	set config(low_rel_tokens) "0"
 	set config(high_rel_thr) "0.80"
 	set config(low_rel_thr) "0.75"
-	set config(high_rel_assistant) {You are a helpful technical assistant.
-		You can perform mathematical calculations
-		and return numeric results with appropriate units.
-		You are also able to summarize and explain scientific and engineering content.
-		You are provided with excerpts from documentation
-		that may include text, figures, and links.
-		When answering the user's question:
-		- Use the most relevant and recent information available in the provided context.
-		- If the user's question asks for a figure, graph, or image
-		and a matching figure is present in the excerpts,
-		include using Markdown image formatting: ![Figure Caption](image_url)
-		- Do not say "you cannot search the web" or "you cannot find images"
-		if a relevant figure is already present in the provided content.
-		- Provide hyperlinks to the original source material when available.}
-	set config(mid_rel_assistant) {You are a helpful assistant.
-		You can perform calculations and return answers in correct units.}
-	set config(low_rel_assistant) {You are a helpful assistant.}
+	set config(high_rel_assistant) {You are a helpful technical assistant. You can perform mathematical calculations and return numeric results with appropriate units. You are also able to summarize, explain, and answer questions about scientific and engineering documentation.
+
+You are provided with excerpts from documentation that may include text, figures, and links. When answering the user's question:
+
+- Use the most relevant and recent information available in the provided content.
+- If the user's question asks for a figure, graph, or image (e.g., "show me a figure of X vs Y"), and a matching figure is present in the excerpts, include it in your response using Markdown image formatting:  
+  `![Figure Caption](image_url)`  
+  This ensures the image will be rendered inline in the chat interface.
+- Do not say "you cannot search the web" or "you cannot find images" if a relevant figure is already present in the provided content.
+- Perform mathematical calculations when needed and return numeric results with appropriate units.
+- Provide hyperlinks to original documentation sources when available.
+- Prefer newer information over older when content appears to be versioned or time-sensitive.
+- Respond using Markdown formatting. Use headers, bold text, lists, tables, code blocks, and inline image embeds as appropriate.}
 	
 	set info(high_rel_message) ""
 	set info(mid_rel_message) "This question does not appear to be related\
