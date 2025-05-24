@@ -56,6 +56,8 @@ You are provided with excerpts from documentation that may include text, figures
 - Provide hyperlinks to original documentation sources when available.
 - Prefer newer information over older when content appears to be versioned or time-sensitive.
 - Respond using Markdown formatting. Use headers, bold text, lists, tables, code blocks, and inline image embeds as appropriate.}
+	set config(mid_rel_assistant) {You are a helpful technical assistant. You can perform mathematical calculations and return numeric results with appropriate units. You are also able to summarize, explain, and answer questions about scientific and engineering documentation.}
+	set config(low_rel_assistant) {You are a helpful assistant}
 	
 	set info(high_rel_message) ""
 	set info(mid_rel_message) "This question does not appear to be related\
