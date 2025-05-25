@@ -86,6 +86,7 @@ proc RAG_init {} {
 	set info(hash_len) "12"
 	set info(default_gpt_model) "gpt-4"
 	set info(dict_entry_len) "10"
+	set info(token_size) "4"
 #
 # Check existence of dependent utilities.
 #
@@ -202,11 +203,19 @@ proc RAG_extract_caption {chunk} {
 proc RAG_extract_figures {chunk} {
 	upvar #0 RAG_info info
 	
-	if {[regexp {\[Image\]\(([^)]*)\)} $chunk img url]} {
-		return $img
-	} else {
-		return ""
+	set i 0
+	set images ""
+	while {$i < [string length $chunk]} {
+		if {[regexp -indices -start $i {\[Figure\]\(([^)]*)\)} $chunk img url]} {
+			set i [lindex $img 1]
+			incr i
+			set img [string range $chunk {*}$img]
+			append images "!$img  \n"
+		} else {
+			break
+		}
 	}
+	return [string trim $images]
 }
 
 #
@@ -372,7 +381,10 @@ proc RAG_remove_dates {chunk} {
 # RAG_extract_chunks goes through a page extracting the body text of each chunk.
 # It converts list chunks to markdown lists. It keeps track of the chapter, section
 # and date as provided by the sequence of chunks. It adds to the start of each 
-# chunk the current chapter, section, and date.
+# chunk the current chapter, section, and date. The extractor combines centered
+# tables, all lists, and the contents of "pre" tags with the previous chunk, whatever
+# that may have been, and adds no additional metadata. It combines centered figures
+# and all equations with the subsequent chunk.
 #
 proc RAG_extract_chunks {page catalog} {
 	upvar #0 RAG_info info
@@ -399,17 +411,19 @@ proc RAG_extract_chunks {page catalog} {
 				if {[regexp {^Table} $caption]} {
 					set table [RAG_extract_table $chunk]
 					if {[string length $table] > 0} {
-						set chunk "$caption\n\n$table"
+						set chunk "$caption  \n$table"
 					} else {
 						set chunk "$caption"
 					}
+					set name "table"
 				} elseif {[regexp {^Figure} $caption]} {
 					set figures [RAG_extract_figures $chunk]
 					if {[string length $figures] > 0} {
-						set chunk "$caption\n$figures"
+						set chunk "$caption  \n$figures"
 					} else {
 						set chunk "$caption"
 					}
+					set name "figure"
 				} else {
 					set chunk "$caption"
 				}
@@ -451,7 +465,7 @@ proc RAG_extract_chunks {page catalog} {
 		switch -- $name {
 			"ol" -
 			"ul" -
-			"equation" -
+			"table" -
 			"pre" {
 				if {[llength $chunks] > 0} {
 					lset chunks end "[lindex $chunks end]\n\n$chunk"
@@ -460,26 +474,30 @@ proc RAG_extract_chunks {page catalog} {
 				}
 			}
 			default {
-				if {$prev_name != "equation"} {
-					set heading ""
-					if {$chapter != "NONE"} {
-						append heading "Chapter: $chapter\n"
+				switch -- $prev_name {
+					"equation" -
+					"figure" {
+						lset chunks end "[lindex $chunks end]\n\n$chunk"
 					}
-					if {$section != "NONE"} {
-						set heading "Section: $section\n"
+					default {
+						set heading ""
+						if {$chapter != "NONE"} {
+							append heading "Chapter: $chapter\n"
+						}
+						if {$section != "NONE"} {
+							set heading "Section: $section\n"
+						}
+						if {$step != "NONE"} {
+							append heading "Step: $step\n"
+						}
+						if {$date != "NONE"} {
+							append heading "Date: $date\n"
+						}
+						if {[string length $heading] > 0} {
+							set chunk "$heading\n$chunk"
+						}
+						lappend chunks $chunk
 					}
-					if {$step != "NONE"} {
-						append heading "Step: $step\n"
-					}
-					if {$date != "NONE"} {
-						append heading "Date: $date\n"
-					}
-					if {[string length $heading] > 0} {
-						set chunk "$heading\n$chunk"
-					}
-					lappend chunks $chunk
-				} else {
-					lset chunks end "[lindex $chunks end]\n\n$chunk"
 				}
 				set step "NONE"
 			}
@@ -595,7 +613,7 @@ proc RAG_resolve_urls {page base_url} {
 proc RAG_convert_urls {page} {
 	upvar #0 RAG_info info
 	regsub -all {<a +href="([^"]+)"[^>]*>([^<]+)</a>} $page {[\2](\1)} page
-	regsub -all {<img +src="([^"]+)"[^>]*>} $page {[Image](\1)} page
+	regsub -all {<img +src="([^"]+)"[^>]*>} $page {[Figure](\1)} page
 	return $page
 }
 
@@ -728,7 +746,8 @@ proc RAG_store_chunks {chunks dir} {
 proc RAG_embed_chunk {chunk api_key} {
 	upvar #0 RAG_info info
 	
-	RAG_print "Embedding chunk length [string length $chunk]." brown
+	set tokens [expr [string length $chunk] / $info(token_size)]
+	RAG_print "Embedding chunk length $tokens tokens." brown
     set chunk [string map {\\ \\\\} $chunk]
     set chunk [string map {\" \\\"} $chunk]
     set chunk [string map {\n \\n} $chunk]
@@ -861,14 +880,13 @@ proc RAG_compare_vectors {embed1 embed2} {
 # and for each makes a text file in the dictionary directory that contains a
 # list of similar chunks. This list consists of pairs of similarities and chunk
 # names. 
-# RAG_make_dictionary ~/Active/RAG/Embeds ~/Active/RAG/Dictionary/
+# 
 proc RAG_make_dictionary {embed_dir dict_dir} {
 	upvar #0 RAG_info info
 		
+	RAG_print "Starting dictionary generation at [RAG_time]."
+
 	set efl [glob -nocomplain [file join $embed_dir *.json]]
-	RAG_print "Found [llength $efl] embeds on disk."
-	
-	RAG_print "Reading [llength $efl] embeds from disk..."
 	set embeds [list]
 	foreach efn $efl {
 		LWDAQ_support
@@ -878,8 +896,8 @@ proc RAG_make_dictionary {embed_dir dict_dir} {
 		set vector [RAG_vector_from_embed $embed]
 		lappend embeds [list [file root [file tail $efn]] $vector]
 	}
+	RAG_print "Read [llength $efl] embeds from disk into memory."
 
-	RAG_print "Creating dictionary..."
 	set count 0
 	foreach e1 $embeds {
 		incr count
@@ -908,6 +926,9 @@ proc RAG_make_dictionary {embed_dir dict_dir} {
 		RAG_print "$count: [lindex $e1 0] [lrange $comparisons 0 2]" orange
 		LWDAQ_update
 	}
+
+	RAG_print "Done with dictionary generation at [RAG_time]."
+	return ""
 }
 
 #
