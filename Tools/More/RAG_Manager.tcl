@@ -126,7 +126,7 @@ proc RAG_Manager_delete {} {
 		LWDAQ_support
 	}
 	RAG_print "Deleted $count chunks."
-	RAG_print "Done" purple
+	RAG_print "Deletion Complete [RAG_time]" purple
 	set info(control) "Idle"
 	return "$count"
 }
@@ -160,7 +160,7 @@ proc RAG_Manager_generate {} {
 		RAG_make_dictionary $config(embed_dir) $config(dict_dir)
 	}
 	
-	RAG_print "Generation complete [RAG_time]." purple
+	RAG_print "Generation Complete [RAG_time]." purple
 	set info(control) "Idle"
 	return "[llength $chunks]"
 }
@@ -282,6 +282,7 @@ proc RAG_Manager_retrieve {} {
 	return [llength $data]
 }
 
+
 proc RAG_Manager_submit {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
@@ -361,7 +362,7 @@ proc RAG_Manager_submit {} {
 	}
  	lappend info(chat) $answer
 
-	RAG_print "Done with Submission [RAG_time]" purple
+	RAG_print "Submission Complete [RAG_time]" purple
 	set info(control) "Idle"
 
 	RAG_print "\nAnswer to \"$question\":" purple
@@ -396,7 +397,6 @@ proc RAG_Manager_history {} {
 	set info(control) "Idle"
 	return [expr [string length $info(chat)] / $RAG_info(token_size)]
 }
-
 
 #
 # RAG_Manager_open opens the tool window and creates the graphical user interface.

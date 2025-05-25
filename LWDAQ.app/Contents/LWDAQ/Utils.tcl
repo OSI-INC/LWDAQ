@@ -2393,7 +2393,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 	while {[gets $template_file line] >= 0} {
 		set line [string map "LWDAQ_Version_Here $LWDAQ_Info(program_patchlevel)" $line]
 	
-		if {$line == "Script_Descriptions"} {
+		if {$line == "LWDAQ_Scripts"} {
 			foreach f $LWDAQ_Info(scripts) {
 				set description [LWDAQ_script_description $f]
 				if {$description == ""} {continue}
@@ -2406,9 +2406,9 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			continue
 		}
 		
-		if {$line == "Script_Commands"} {
+		if {$line == "LWDAQ_Commands"} {
 			puts $ref_file ""
-			puts $ref_file "<h2>Script Commands</h2>"
+			puts $ref_file "<h2>LWDAQ Commands</h2>"
 			puts $ref_file ""
 			set script_list [list]
 			foreach f $LWDAQ_Info(scripts) {
@@ -2432,7 +2432,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			continue
 		}
 	
-		if {$line == "Library_Commands"} {
+		if {$line == "lwdaq_Commands"} {
 			set fn [file join $LWDAQ_Info(sources_dir) lwdaq.pas]
 			puts $fn
 			LWDAQ_update
@@ -2441,7 +2441,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			close $f
 			
 			puts $ref_file ""
-			puts $ref_file "<h2>Library Commands</h2>"
+			puts $ref_file "<h2>lwdaq Commands</h2>"
 			puts $ref_file ""
 			set lwdaq_names [lsort -dictionary [info commands lwdaq_*]]
 			foreach n $lwdaq_names {
@@ -2461,7 +2461,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			continue
 		}
 		
-		if {$line == "Library_Routines"} {
+		if {$line == "lwdaq_Routines"} {
 			set fn [file join $LWDAQ_Info(sources_dir) lwdaq.pas] 
 			puts $fn
 			LWDAQ_update
@@ -2470,7 +2470,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			close $f
 
 			puts $ref_file ""
-			puts $ref_file "<h2>Library Routines</h2>"
+			puts $ref_file "<h2>lwdaq Routines</h2>"
 			puts $ref_file ""
 
 			set r "\{(\[^\\\}\]+)\}\[\\r\\t\\n \]*function lwdaq\[^_\]"
