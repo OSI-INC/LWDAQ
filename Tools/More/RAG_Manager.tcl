@@ -87,12 +87,15 @@ text, figures, and links. When answering the user's question:
 You are a helpful technical assistant.
 You can perform mathematical calculations
 and return numeric results with appropriate units.
-You are also able to summarize, explain, and answer questions
+You are able to summarize, explain, and answer questions
 about scientific and engineering documentation.
 	}
 	
 	set info(low_rel_assistant) {
 You are a helpful assistant.
+If you are not certain of the anwer to a question,
+state that you do not know the answer,
+and do not supply any answer.
 	}
 	
 	if {[file exists $info(settings_file_name)]} {
