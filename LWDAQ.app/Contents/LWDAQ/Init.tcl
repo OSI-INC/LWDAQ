@@ -100,9 +100,18 @@ set LWDAQ_Info(terminal_connected) "0"
 set LWDAQ_Info(configuration_file) ""
 set LWDAQ_Info(argv) ""
 
+# Decide whether or not we should enable LWDAQ's graphical user interface (GUI).
+# If LWDAQ is running in the "wish" shell, which is the TclTk shell, we turn on
+# the GUI. But if LWDAQ is running in "tclsh", the Tcl-only shell, we turn off
+# the GUI
+set LWDAQ_Info(gui_enabled) \
+	[string match -nocase "*wish*" \
+		[file tail [info nameofexecutable]]]
+
 # Go through the list of arguments passed to this script, and set the
 # configuration file name and deteremine if we should commandeer the launching
-# terminal's standard input and output for use as a Tcl console. 
+# terminal's standard input and output for use as a Tcl console. If we are
+# running without a GUI, any error causes us to print an error message and exit.
 foreach a $argv {
 	switch -glob -- $a {
 		"" {
@@ -147,6 +156,7 @@ foreach a $argv {
 					set LWDAQ_Info(configuration_file) $mfn
 				} else {
 					puts "ERROR: No such option or file \"$a\"."
+					if {!$LWDAQ_Info(gui_enabled)} {exit}
 					incr num_errors
 				}
 			} {
@@ -155,14 +165,6 @@ foreach a $argv {
 		}
 	}
 }
-
-# Decide whether or not we should enable LWDAQ's graphical user interface (GUI).
-# If LWDAQ is running in the "wish" shell, which is the TclTk shell, we turn on
-# the GUI. But if LWDAQ is running in "tclsh", the Tcl-only shell, we turn off
-# the GUI
-set LWDAQ_Info(gui_enabled) \
-	[string match -nocase "*wish*" \
-		[file tail [info nameofexecutable]]]
 
 # If the GUI is disabled, create a dummy TK window procedure. The winfo
 # procedure returns zero always to indicate that windows don't exist.
@@ -269,6 +271,7 @@ if {[catch {
 	}
 } error_message]} {
 	puts "ERROR: In initialization, $error_message"
+	if {!$LWDAQ_Info(gui_enabled)} {exit}
 	incr num_errors
 }
 
@@ -299,6 +302,7 @@ set LWDAQ_Info(loading_settings_scripts) 1
 foreach s $LWDAQ_Info(settings_scripts) {
 	if {[catch {source $s} error_message]} {
 		puts "ERROR: $error_message in startup script \"[file tail $s]\"."
+		if {!$LWDAQ_Info(gui_enabled)} {exit}
 		incr num_errors
 	}
 	incr LWDAQ_Info(num_settings_scripts_loaded)
@@ -310,6 +314,7 @@ if {$LWDAQ_Info(configuration_file) != ""} {
 	if {[catch {source $LWDAQ_Info(configuration_file)} error_message]} {
 		puts "ERROR: $error_message in configuration file\
 			\"$LWDAQ_Info(configuration_file)\"."
+		if {!$LWDAQ_Info(gui_enabled)} {exit}
 		incr num_errors
 	}
 }
@@ -317,6 +322,7 @@ if {$LWDAQ_Info(configuration_file) != ""} {
 # Check to see if there are spaces in the LWDAQ program directory.
 if {[regexp { } $LWDAQ_Info(program_dir)]} {
 	puts "ERROR: Installation directory \"$LWDAQ_Info(program_dir)\" contains spaces."
+	if {!$LWDAQ_Info(gui_enabled)} {exit}
 	incr num_errors
 }
 
@@ -324,7 +330,6 @@ if {[regexp { } $LWDAQ_Info(program_dir)]} {
 # that has called LWDAQ to do some job. Otherwise, report the number of errors
 # to the console.
 if {$num_errors > 0} {
-	if {!$LWDAQ_Info(gui_enabled)} {exit}
 	puts "Initialization concluded with $num_errors errors."
 }
 
