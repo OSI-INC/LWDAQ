@@ -85,26 +85,14 @@ text, figures, and links. When answering the user's question:
 
 	set info(mid_rel_assistant) {
 You are a helpful technical assistant.
-You can perform mathematical calculations
-and return numeric results with appropriate units.
-You are able to summarize, explain, and answer questions
-about scientific and engineering documentation.
-If a question asks for a specific fact (such as a name, date, number, or source) 
-and you are not certain of the correct answer based on the provided context or well-known, verifiable information, clearly state that you do not know. 
-Do not guess. Do not fabricate names or facts. 
-It is better to say "I don't know" than to give incorrect information.
+If you are not certain of the answer to a question,
+say you do not know the answer.
 	}
 	
 	set info(low_rel_assistant) {
 You are a helpful technical assistant.
-You can perform mathematical calculations
-and return numeric results with appropriate units.
-You are able to summarize, explain, and answer questions
-about scientific and engineering documentation.
-If a question asks for a specific fact (such as a name, date, number, or source) 
-and you are not certain of the correct answer based on the provided context or well-known, verifiable information, clearly state that you do not know. 
-Do not guess. Do not fabricate names or facts. 
-It is better to say "I don't know" than to give incorrect information.
+If you are not certain of the answer to a question,
+say you do not know the answer.
 	}
 	
 	if {[file exists $info(settings_file_name)]} {
@@ -114,11 +102,78 @@ It is better to say "I don't know" than to give incorrect information.
 	return ""	
 }
 
+
+#
+# RAG_Manager_apply reads the contents of a text window and executes them
+# as a Tcl script at the global scope. We can use this routine to reconfigure
+# long string parameters such as our assistant instructions. Within the 
+# scripts we can refer to the RAG Manager configuration and information arrays
+# as "config" and "info".
+#
+proc RAG_Manager_apply {w} {
+
+	set commands {
+		upvar #0 RAG_Manager_info info
+		upvar #0 RAG_Manager_config config	
+		
+	}
+	append commands [string trim [$w.text get 1.0 end]]
+	if {[catch {eval $commands} error_result]} {
+		RAG_print "ERROR: $error_result"
+	}
+	
+	return ""
+}
+
+#
+# RAG_Manager_assistant opens a text window and prints out the declarations
+# of the three assistant instructions. We can edit and then apply with an Apply
+# button.
+#
+proc RAG_Manager_assistant {} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	# If the assistant viewing panel exists, destroy it. We are going to make a
+	# new one.
+	set w $info(window)\.assistant
+	if {[winfo exists $w]} {destroy $w}
+	
+	# Create a new top-level text window that is a child of the main tool
+	# window. Bind the Command-a key to save the metadata.
+	toplevel $w
+	wm title $w "Assistant Instructions, RAG_Manager $info(version)"
+	LWDAQ_text_widget $w 60 20
+	LWDAQ_enable_text_undo $w.text
+	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
+	
+	# Create the Applpy button.
+	frame $w.f
+	pack $w.f -side top
+	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
+	pack $w.f.apply -side left
+	
+	# Print the assistant instructions in the window.
+	foreach level {high mid low} {
+		LWDAQ_print $w.text "	set info($level\_rel_assistant)\
+			\{$info($level\_rel_assistant)\}\n"
+	}
+	
+	return ""
+}
+
+
 proc RAG_Manager_configure {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
-	LWDAQ_tool_configure RAG_Manager 2
+	set f [LWDAQ_tool_configure RAG_Manager 3]
+	
+	button $f.assistant -text "Edit Assistant Instructions" -command {
+		RAG_Manager_assistant
+	}
+	pack $f.assistant -side top -expand 1
+	
 	return ""
 }
 
