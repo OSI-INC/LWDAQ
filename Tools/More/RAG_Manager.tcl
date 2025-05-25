@@ -92,10 +92,9 @@ about scientific and engineering documentation.
 	}
 	
 	set info(low_rel_assistant) {
-You are a helpful assistant.
-If you are not certain of the anwer to a question,
-state that you do not know the answer,
-and do not supply any answer.
+You are a helpful assistant. 
+If a question asks for a specific fact (such as a name, date, number, or source) 
+and you are not certain of the correct answer based on the provided context or well-known, verifiable information, clearly state that you do not know. Do not guess. Do not fabricate names or facts. It is better to say "I don't know" than to give incorrect information.
 	}
 	
 	if {[file exists $info(settings_file_name)]} {
