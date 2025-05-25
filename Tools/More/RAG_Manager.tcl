@@ -160,7 +160,7 @@ proc RAG_Manager_generate {} {
 		RAG_make_dictionary $config(embed_dir) $config(dict_dir)
 	}
 	
-	RAG_print "Done" purple
+	RAG_print "Generation complete [RAG_time]." purple
 	set info(control) "Idle"
 	return "[llength $chunks]"
 }
