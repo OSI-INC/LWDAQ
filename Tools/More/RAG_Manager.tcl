@@ -441,9 +441,10 @@ proc RAG_Manager_retrieve {} {
 # backslash-r to newline, backslash-n to newline, backlash-t to tab,
 # backslash-double-quote to double-quote, single newline with no preceding
 # whitespace to double-space-newline. We replace solitary asterisks with
-# multiplication symbols. If we can't extract the answer then we try to extract
-# an error message and report the error. If we can't extract an error message,
-# we return a failure error message of our own.
+# multiplication symbols and we add two spaces to the end of any line with three
+# backticks, so that we get a blank line after code samples. If we can't extract
+# the answer then we try to extract an error message and report the error. If we
+# can't extract an error message, we return a failure error message of our own.
 #
 proc RAG_Manager_submit {} {
 	upvar #0 RAG_Manager_config config
@@ -510,6 +511,7 @@ proc RAG_Manager_submit {} {
 		RAG_print "Replaced $num solitary asterisks with ×." brown
 		set num [regsub -all {([^\n]+)\n(?!\n)} $answer "\\1  \n" answer]
 		RAG_print "Added spaces to the end of $num lines." brown
+		set num [regsub -all {```} $answer {```  } answer]
 	} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $info(result) match message]} {
 		set answer "ERROR: $message"
 	} else {
