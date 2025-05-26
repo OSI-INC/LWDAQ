@@ -595,7 +595,7 @@ proc RAG_resolve_urls {page base_url} {
 		if {![regexp {https?} $url match]} {
 			set url [RAG_resolve_relative_url $base_url $url]
 		}
-		regsub { } $url {%20} url
+		regsub -all { } $url {%20} url
 		append new_page "<a href=\"$url\">"
 		set index [expr [lindex $tag 1] + 1]
 	}

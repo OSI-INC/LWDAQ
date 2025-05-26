@@ -374,9 +374,7 @@ proc RAG_Manager_retrieve {} {
 			foreach cc [lrange $dict 0 1] {
 				set rel [lindex $cc 0]
 				set name [lindex $cc 1]
-				if {[lsearch -index 1 $new_list $name] < 0} {
-					lappend new_list $cc
-				}
+				if {[lsearch -index 1 $new_list $name] < 0} {lappend new_list $cc}
 			}
 		}
 		set comparisons $new_list
@@ -406,7 +404,18 @@ proc RAG_Manager_retrieve {} {
 		incr count
 		RAG_print "-----------------------------------------------------" brown
 		RAG_print "$count\: Relevance [lindex $comparison 0]:" brown
-		set cfn [file join $config(chunk_dir) [lindex $comparison 1]\.txt]
+		set embed [lindex $comparison 1]
+		set cfn [file join $config(chunk_dir) $embed\.txt]
+		if {![file exists $cfn]} {
+			if {$count == 1} {
+				RAG_print "ERROR: Most relevant chunk missing, [file tail $cfn]."
+				incr count -1
+				break
+			} else {
+				RAG_print "WARNING: No chunk exists for embed $embed."
+				continue
+			}
+		}
 		set f [open $cfn r]
 		set chunk [read $f]
 		close $f
