@@ -511,7 +511,7 @@ proc RAG_Manager_submit {} {
 		RAG_print "Replaced $num solitary asterisks with ×." brown
 		set num [regsub -all {([^\n]+)\n(?!\n)} $answer "\\1  \n" answer]
 		RAG_print "Added spaces to the end of $num lines." brown
-		set num [regsub -all {```\n} $answer "```\n\n" answer]
+		set num [regsub -all {```\n} $answer "\n```\n" answer]
 	} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $info(result) match message]} {
 		set answer "ERROR: $message"
 	} else {
