@@ -384,7 +384,10 @@ proc RAG_remove_dates {chunk} {
 # chunk the current chapter, section, and date. The extractor combines centered
 # tables, all lists, and the contents of "pre" tags with the previous chunk, whatever
 # that may have been, and adds no additional metadata. It combines centered figures
-# and all equations with the subsequent chunk.
+# and all equations with the subsequent chunk. By the time the page arrives at this
+# chunking routine, all URLs should have been converted to Markdown. If there are 
+# any anchor or img tags left, something has gone wrong. We reject the chunk and
+# count it.
 #
 proc RAG_extract_chunks {page catalog} {
 	upvar #0 RAG_info info
@@ -394,10 +397,18 @@ proc RAG_extract_chunks {page catalog} {
 	set section "NONE"
 	set step "NONE"
 	set prev_name "none"
+	set rejected 0
 	set chunks [list]
 	foreach chunk_id $catalog {
 		scan $chunk_id %d%d%s i_start i_end name
 		set chunk [string trim [string range $page $i_start $i_end]]
+		
+		if {[regexp {<a href=} $chunk] \
+			|| [regexp {</ul>} $chunk] \
+			|| [regexp {</li>} $chunk]} {
+			incr rejected
+			continue
+		}
 
 		switch -- $name {
 			"ol" {
@@ -503,6 +514,9 @@ proc RAG_extract_chunks {page catalog} {
 			}
 		}
 		set prev_name $name
+	}
+	if {$rejected > 0} {
+		RAG_print "Rejected $rejected chunks with residual anchor and image tags."
 	}
 	return $chunks
 }
@@ -719,9 +733,14 @@ proc RAG_store_chunks {chunks dir} {
 	RAG_print "Storing chunks to $dir\..." 
 	set count 0
 	foreach chunk $chunks {
-		incr count
 		set cmd [list echo -n $chunk | openssl dgst -sha1]
-		set result [eval exec $cmd]
+		if {[catch {
+			set result [eval exec $cmd]
+		} error_result]} {
+			RAG_print "ERROR: $error_result"
+			RAG_print $chunk green
+			continue
+		}
 		if {[regexp {[a-f0-9]{40}} $result hash]} {
 			set hash [string range $hash 1 $info(hash_len)]
 		} else {
@@ -733,6 +752,7 @@ proc RAG_store_chunks {chunks dir} {
 		set f [open $cfn w]
 		puts -nonewline $f $chunk
 		close $f
+		incr count
 		RAG_print "$count\: $cfn" green
 	}
 	RAG_print "Stored $count chunks." 

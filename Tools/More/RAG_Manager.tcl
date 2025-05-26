@@ -30,7 +30,6 @@ proc RAG_Manager_init {} {
 	
 	set config(verbose) "0"
 	set config(dictionary) "0"
-	set config(source_url) "https://www.opensourceinstruments.com/Electronics/A3017/SCT.html"
 	set config(key_file) "~/Active/Admin/Keys/OpenAI_API.txt"
 	set config(chunk_dir) "~/Active/RAG/Chunks"
 	set config(embed_dir) "~/Active/RAG/Embeds"
@@ -56,6 +55,12 @@ proc RAG_Manager_init {} {
 	set config(low_rel_thr) "0.75"
 	
 	set config(max_question_tokens) "300"
+
+	set info(sources) {
+		https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
+		https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
+		https://www.opensourceinstruments.com/About/about.php
+	}
 	
 	set info(high_rel_assistant) {
 You are a helpful technical assistant.
@@ -81,7 +86,7 @@ text, figures, and links. When answering the user's question:
     versioned or time-sensitive.
   - Respond using Markdown formatting. Use headers, bold text, lists, tables, 
     code blocks, and inline image embeds as appropriate.
-}
+    }
 
 	set info(mid_rel_assistant) {
 You are a helpful technical assistant.
@@ -143,7 +148,7 @@ proc RAG_Manager_assistant {} {
 	# window. Bind the Command-a key to save the metadata.
 	toplevel $w
 	wm title $w "Assistant Instructions, RAG_Manager $info(version)"
-	LWDAQ_text_widget $w 60 20
+	LWDAQ_text_widget $w 80 40
 	LWDAQ_enable_text_undo $w.text
 	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
 	
@@ -153,30 +158,72 @@ proc RAG_Manager_assistant {} {
 	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
 	pack $w.f.apply -side left
 	
-	# Print the assistant instructions in the window.
+	# Print the assistant instructions for all relevance levels.
 	foreach level {high mid low} {
-		LWDAQ_print $w.text "	set info($level\_rel_assistant)\
-			\{$info($level\_rel_assistant)\}\n"
+		LWDAQ_print $w.text "set info($level\_rel_assistant) \{" blue
+		LWDAQ_print $w.text "[string trim $info($level\_rel_assistant)]"
+		LWDAQ_print $w.text "\}\n" blue
 	}
 	
 	return ""
 }
 
+#
+# RAG_Manager_sources opens a text window and prints out the source list.
+# We can edit and then apply with an Apply button.
+#
+proc RAG_Manager_sources {} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	# If the source viewing panel exists, destroy it. We are going to make a
+	# new one.
+	set w $info(window)\.sources
+	if {[winfo exists $w]} {destroy $w}
+	
+	# Create a new top-level text window that is a child of the main tool
+	# window. Bind the Command-a key to save the metadata.
+	toplevel $w
+	wm title $w "Source Documents, RAG_Manager $info(version)"
+	LWDAQ_text_widget $w 70 10
+	LWDAQ_enable_text_undo $w.text
+	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
+	
+	# Create the Applpy button.
+	frame $w.f
+	pack $w.f -side top
+	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
+	pack $w.f.apply -side left
+	
+	# Print the sources list in the window.
+	LWDAQ_print $w.text "set info(sources) \{" blue
+	LWDAQ_print $w.text "[string trim $info(sources)]"
+	LWDAQ_print $w.text "\}\n" blue
+	
+	return ""
+}
 
+#
+# RAG_Manager_configure opens the tool configuration window, which allows us to
+# edit the configuration parameters. These do not include multi-line parameters
+# such as the source URL list or the assistant instructions. These multi-line
+# parameters are accessed through their own buttons and windows.
+#
 proc RAG_Manager_configure {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
-	set f [LWDAQ_tool_configure RAG_Manager 3]
-	
-	button $f.assistant -text "Edit Assistant Instructions" -command {
-		RAG_Manager_assistant
-	}
-	pack $f.assistant -side top -expand 1
-	
+	set f [LWDAQ_tool_configure RAG_Manager 3]	
 	return ""
 }
 
+#
+# RAG_Manager_delete deletes all chunks from the chunk directory. It does not delete
+# embeddings in the embed directory. Nor does it delete dictionary entries from the
+# dict directory. Embeddings are culled during generation. Dictionary entries are 
+# never culled by these routines. There is no need to cull them: they are lists of
+# most similiar chunks derived from an active list of embeds.
+#
 proc RAG_Manager_delete {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
@@ -198,6 +245,15 @@ proc RAG_Manager_delete {} {
 	return "$count"
 }
 
+#
+# RAG_Manager_generate downloads and chunks all URL resources named in the
+# sources list. It submits all chunks for embedding, although the RAG package
+# routines will obtain new embeds only for new chunks. In order to embed the
+# chunks, this routine must read a valid API key from disk. If dictionary
+# retrieval is enabled, the routine generates dictionary entries as well.
+# Chunking is fast, but dictionary generation is slow. Be prepared to wait
+# several minutes for a dictionary of one thousand chunks to complete.
+#
 proc RAG_Manager_generate {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
@@ -206,7 +262,10 @@ proc RAG_Manager_generate {} {
 	set info(control) "Generate"
 	RAG_print "\nGenerate Chunks and Embed Vectors [RAG_time]" purple
 	
-	set chunks [RAG_html_chunks $config(source_url)]
+	set chunks [list]
+	foreach url [string trim $info(sources)] {
+		set chunks [concat $chunks [RAG_html_chunks $url]]
+	}
 	RAG_store_chunks $chunks $config(chunk_dir)
 
 	RAG_print "Reading api key $config(key_file)\." brown
@@ -232,7 +291,20 @@ proc RAG_Manager_generate {} {
 	return "[llength $chunks]"
 }
 
-
+#
+# RAG_Manager_retrieve obtains the embedding vector for the current question and
+# compares this vector to all the vectors in the embed directory, thus making a
+# list of chunks and their relevance to the question. It sorts this list so as
+# to put the most relevant chunks in front. If we are using dictionary-enhanced
+# retrieval, the routine fetches one or more secondary chunks to accompany each
+# primary chunk, these secondary chunks being those most similar to a primary
+# chunk. Using the front chunk, the routine judges the relevance of the question
+# to the source materials. It copies zero or more chunks into a retrieved chunk
+# list until the total number of tokens in the chunks is equal to or greater
+# than the token limit for the question's level of relevance. It returns the
+# list of chunks retrieved. In order to embed the question, this routine must
+# read a valid API key from disk.
+#
 proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
@@ -330,7 +402,7 @@ proc RAG_Manager_retrieve {} {
 	set count 0
 	set tokens 0
 	foreach comparison $comparisons {
-		if {$tokens > $num} {break}
+		if {$tokens >= $num} {break}
 		incr count
 		RAG_print "-----------------------------------------------------" brown
 		RAG_print "$count\: Relevance [lindex $comparison 0]:" brown
@@ -349,7 +421,21 @@ proc RAG_Manager_retrieve {} {
 	return [llength $data]
 }
 
-
+#
+# RAG_Manager_submit combines the question and the assistant instructions with
+# the retrieved data, all of which are stored in elements of the info array, and
+# passes them to the RAG package for submission to the completion end point. In
+# order to submit the question, this routine must read a valid API key from
+# disk. Once we receive a response from the completion end point, we try to
+# extract an answer from the response json record. If we succeed, then format
+# the answer for Markdown. We convert backslash-n-backslash-r to newline,
+# backslash-r to newline, backslash-n to newline, backlash-t to tab,
+# backslash-double-quote to double-quote, single newline with no preceding
+# whitespace to double-space-newline. We replace solitary asterisks with
+# multiplication symbols. If we can't extract the answer then we try to extract
+# an error message and report the error. If we can't extract an error message,
+# we return a failure error message of our own.
+#
 proc RAG_Manager_submit {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
@@ -404,15 +490,8 @@ proc RAG_Manager_submit {} {
 	set info(result) [RAG_get_answer $question\
 		$info(data) $assistant $api_key $model]
 	set len [expr [string length $info(result)]/$RAG_info(token_size)]
-	RAG_print "Received response of $len tokens."
+	RAG_print "Received $len tokens, extracting answer and formatting for Markdown."
 		
-	# Try to extract the answer from the returned json record. If we succeed,
-	# then format the answer for Markdown. We convert backslash-n-backslash-r to
-	# newline, backslash-r to newline, backslash-n to newline, backlash-t to
-	# tab, backslash-double-quote to double-quote, single newline with no
-	# preceding whitespace to double-space-newline. We replace solitary
-	# asterisks with multiplication symbols. If we can't extract the answer then
-	# report an error.
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) match answer]} {
 		set num [regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer]
 		RAG_print "Replaced $num \\r and \\n sequences with newlines." brown
@@ -439,6 +518,12 @@ proc RAG_Manager_submit {} {
 	return $answer
 }
 
+#
+# RAG_Manager_history prints the history of questions and answers since this
+# instance of the RAG Manager started. If the verbose flag is set, the routine
+# also adds the complete json record returned from the end point in response to
+# the most recent question submission.
+#
 proc RAG_Manager_history {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
@@ -481,7 +566,7 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Delete Generate Retrieve Submit History} {
+	foreach a {Delete Sources Generate Retrieve Assistant Submit History} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -493,16 +578,12 @@ proc RAG_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {high_rel_tokens high_rel_thr} {
-		label $f.l$a -text "$a\:" -fg green
-		entry $f.e$a -textvariable RAG_Manager_config($a) -width 6
-		pack $f.l$a $f.e$a -side left -expand yes
-	}
-
 	button $f.config -text "Configure" -command "RAG_Manager_configure"
 	pack $f.config -side left -expand yes
+	button $f.help -text "Help" -command "LWDAQ_tool_help RAG_Manager"
+	pack $f.help -side left -expand yes
 	
-	foreach a {Question Source_URL} {
+	foreach a {Question} {
 		set b [string tolower $a]
 		set f [frame $w.$b]
 		pack $f -side top
@@ -536,6 +617,7 @@ return ""
 
 ----------Begin Help----------
 
+No manual for this code yet exists. The comments in the code are the only documentation.
 
 Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
