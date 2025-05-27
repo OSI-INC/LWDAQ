@@ -22,7 +22,7 @@ proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	LWDAQ_tool_init "RAG_Manager" "1.7"
+	LWDAQ_tool_init "RAG_Manager" "1.8"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require RAG
@@ -60,6 +60,7 @@ proc RAG_Manager_init {} {
 		https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
 		https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 		https://www.opensourceinstruments.com/About/about.php
+		https://www.bndhep.net/Devices/BCAM/User_Manual.html
 	}
 	
 	set info(high_rel_assistant) {

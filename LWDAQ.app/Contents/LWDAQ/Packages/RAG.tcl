@@ -26,7 +26,7 @@
 # V1.1 [18-MAY-25] Core functionality working: retrieval-augmented generation.
 
 # Load this package or routines into LWDAQ with "package require EDF".
-package provide RAG 1.4
+package provide RAG 1.5
 
 proc RAG_init {} {
 #
