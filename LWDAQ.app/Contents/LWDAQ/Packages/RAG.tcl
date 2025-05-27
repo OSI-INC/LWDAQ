@@ -751,6 +751,7 @@ proc RAG_store_chunks {chunks dir} {
 		close $f
 		incr count
 		RAG_print "$count\: $cfn" green
+		LWDAQ_support
 	}
 	RAG_print "Stored $count chunks." 
 	return $count
