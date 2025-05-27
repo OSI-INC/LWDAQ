@@ -22,7 +22,7 @@ proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	LWDAQ_tool_init "RAG_Manager" "1.8"
+	LWDAQ_tool_init "RAG_Manager" "1.9"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require RAG
@@ -38,7 +38,7 @@ proc RAG_Manager_init {} {
 		transmitter with 160-Hz bandwidth and a CR927 battery."
 
 	set info(control) "Idle"
-	set info(chat) [list]
+	set info(chat) ""
 	set info(result) ""
 	set info(text) "stdout"
 	set info(data) ""
@@ -55,6 +55,9 @@ proc RAG_Manager_init {} {
 	set config(low_rel_thr) "0.75"
 	
 	set config(max_question_tokens) "300"
+	set config(chunk_title) "### Documentation Chunk\n\n"
+	set config(chat_title) "### Previous Q&A\n\n"
+	set config(chat_submit) "0"
 
 	set info(sources) {
 		https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
@@ -93,12 +96,14 @@ text, figures, and links. When answering the user's question:
 You are a helpful technical assistant.
 If you are not certain of the answer to a question,
 say you do not know the answer.
+Respond using Markdown formatting. 
 	}
 	
 	set info(low_rel_assistant) {
 You are a helpful technical assistant.
 If you are not certain of the answer to a question,
 say you do not know the answer.
+Respond using Markdown formatting. 
 	}
 	
 	if {[file exists $info(settings_file_name)]} {
@@ -321,7 +326,6 @@ proc RAG_Manager_retrieve {} {
 	set info(control) "Retrieve"
 	RAG_print "\nRetrieve Question-Related Data Chunks [RAG_time]" purple
 	
-	lappend $info(chat) $question
 	RAG_print "Question: $config(question)"
 	
 	RAG_print "Reading api key $config(key_file)\." brown
@@ -362,6 +366,7 @@ proc RAG_Manager_retrieve {} {
 	set comparisons [list]
 	set len [llength $q_vector]
 	foreach embed $embeds {
+		LWDAQ_support
 		set e_name [lindex $embed 0]
 		set e_vector [lindex $embed 1]
 		set dot_product 0
@@ -419,9 +424,9 @@ proc RAG_Manager_retrieve {} {
 	
 	RAG_print "List of chunks retrieved to support question." brown
 	set index 0
-	set data [list]
 	set count 0
 	set tokens 0
+	set data [list]
 	foreach comparison $comparisons {
 		if {$tokens >= $num} {break}
 		incr count
@@ -442,11 +447,21 @@ proc RAG_Manager_retrieve {} {
 		set f [open $cfn r]
 		set chunk [read $f]
 		close $f
-		lappend data $chunk
+		lappend data "$config(chunk_title)$chunk"
 		RAG_print $chunk green
 		set tokens [expr $tokens + ([string length $chunk]/$RAG_info(token_size))]
 	}
+
+	if {$config(chat_submit)} {
+		RAG_print "-----------------------------------------------------" brown
+		RAG_print "Adding chat history to document chunks:" brown
+		RAG_print $info(chat) green	
+		lappend data "config(chat_title)$info(chat)"
+		set tokens [expr $tokens + ([string length $info(chat)]/$RAG_info(token_size))]	
+	}
 	
+	RAG_print "-----------------------------------------------------" brown
+
 	set info(data) $data
 	set info(control) "Idle"
 	RAG_print "Retrieval complete, $count chunks, $tokens tokens [RAG_time]." purple
@@ -481,38 +496,39 @@ proc RAG_Manager_submit {} {
 		return ""
 	}
 	if {[string length $question]/$RAG_info(token_size) > $config(max_question_tokens)} {
-		RAG_print "ERROR: Question is larger than $config(max_question_tokens)."
-		return ""
+		set answer "ERROR: Question is longer than\
+			[expr $config(max_question_tokens)*$RAG_info(token_size)] characters."
+		return $answer
 	}
 	
 	set info(control) "Submit"
-	RAG_print "\nSubmit Question and Retrieved Data to End Point [RAG_time]" purple
+	RAG_print "\nSubmit Question and Data to Completion End Point [RAG_time]" purple
 	RAG_print "Choosing answer model and assistant instructions..."
 	set r $info(relevance)
 	if {$r >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
 		set assistant [string trim $info(high_rel_assistant)]
 		RAG_print "High-relevance question, relevance=$r,\
-			use $model and detailed instruction." 
+			use $model and high-relevance instructions." 
 	} elseif {$r >= $config(low_rel_thr)} {
 		set model $config(mid_rel_model)
 		set assistant [string trim $info(mid_rel_assistant)]
 		RAG_print "Mid-relevance question, relevance=$r,\
-		 	use $model and clear instruction." 
+		 	use $model and mid-relevance instructions." 
 	} else {
 		set model $config(low_rel_model)
 		set assistant [string trim $info(low_rel_assistant)]
 		RAG_print "Low-relevance question, relevance=$r,\
-		 	use $model and brief instruction." 
+		 	use $model and low-relevance instructions." 
 	}
 	RAG_print "Assistant instructions being submitted with this question:" brown
 	RAG_print "$assistant" green
 
 	RAG_print "Reading api key $config(key_file)\." brown
 	if {![file exists $config(key_file)]} {
-		RAG_print "ERROR: Cannot find key file $config(key_file)."
+		set answer "ERROR: Cannot find key file $config(key_file)."
 		set info(control) "Idle"
-		return ""
+		return $answer
 	}
 	set f [open $config(key_file) r]
 	set api_key [read $f]
@@ -520,6 +536,7 @@ proc RAG_Manager_submit {} {
 	RAG_print "Read API key." brown
 	
 	RAG_print "Submitting question with [llength $info(data)] chunks..."
+	append info(chat) "Question: [string trim $question]\n"
 	set info(result) [RAG_get_answer $question\
 		$info(data) $assistant $api_key $model]
 	set len [expr [string length $info(result)]/$RAG_info(token_size)]
@@ -539,7 +556,7 @@ proc RAG_Manager_submit {} {
 	} else {
 		set answer "ERROR: Could not find answer or error message in result."
 	}
- 	lappend info(chat) $answer
+ 	append info(chat) "Answer: [string trim $answer]\n\n"
 
 	RAG_print "Submission Complete [RAG_time]" purple
 	set info(control) "Idle"
@@ -564,21 +581,13 @@ proc RAG_Manager_history {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "History"
-	RAG_print "\nPrinting Chat History" purple
-	foreach statement $info(chat) {
-		RAG_print "-----------------------------------------------------" 
-		RAG_print $statement
-	}	
-	RAG_print "-----------------------------------------------------" 
-
+	RAG_print "\n------------- Chat History -------------------------" purple
+	RAG_print [string trim $info(chat)]
 	if {$config(verbose)} {
-		RAG_print "------ Full Text of Previous Question Result --------" 
+		RAG_print "------ Full Text of Previous Question Result --------" purple
 		RAG_print $info(result)
-		RAG_print "-----------------------------------------------------" 
 	}
-
-	RAG_print "Done" purple
-	
+	RAG_print "-----------------------------------------------------" purple
 	set info(control) "Idle"
 	return [expr [string length $info(chat)] / $RAG_info(token_size)]
 }

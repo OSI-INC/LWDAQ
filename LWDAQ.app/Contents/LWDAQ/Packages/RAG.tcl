@@ -22,10 +22,7 @@
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 
-# V0.1 [12-MAY-25] Create document and assign name.
-# V1.1 [18-MAY-25] Core functionality working: retrieval-augmented generation.
-
-# Load this package or routines into LWDAQ with "package require EDF".
+# Load this package or routines into LWDAQ with "package require RAG".
 package provide RAG 1.5
 
 proc RAG_init {} {
@@ -968,7 +965,7 @@ proc RAG_get_answer {question chunks assistant api_key {model ""}} {
 	  -H "Content-Type: application/json" \
 	  -H "Authorization: Bearer $api_key" \
 	  -d $json_body] 
-	  
+
 	set ch [open $cmd]
 	set chpid [pid $ch]
 	fconfigure $ch -blocking 0 -buffering line
