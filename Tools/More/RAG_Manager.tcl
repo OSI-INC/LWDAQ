@@ -334,26 +334,62 @@ proc RAG_Manager_retrieve {} {
 	close $f 
 	RAG_print "Read API key." brown
 
-	RAG_print "Obtaining question embedding vector from embed end point..."
+	RAG_print "Obtaining question embed vector from embedding end point..."
+	set start_time [clock milliseconds]
 	set q_embed [RAG_embed_chunk $config(question) $api_key]
+	set q_vector [RAG_vector_from_embed $q_embed]
+	RAG_print "Question embed obtained in\
+		[expr [clock milliseconds] - $start_time] ms,\
+		 reading embed library from disk..."
 	
-	RAG_print "Getting list of all embed files on disk..."
+	set start_time [clock milliseconds]
 	set efl [glob -nocomplain [file join $config(embed_dir) *.json]]
-	RAG_print "Found [llength $efl] embeds in $config(embed_dir)."
-
-	RAG_print "Comparing question to all chunks using embeds on disk..."
-	set comparisons [list]
+	set embeds [list]
 	foreach efn $efl {
 		LWDAQ_support
 		set f [open $efn r]
-		set c_embed [read $f]
+		set embed [read $f]
 		close $f
-		set comparison [RAG_compare_vectors $q_embed $c_embed]
-		lappend comparisons "$comparison [file root [file tail $efn]]"
+		set vector [RAG_vector_from_embed $embed]
+		lappend embeds [list [file root [file tail $efn]] $vector]
 	}
-	
-	RAG_print "Sorting chunks by decreasing relevance to question..."
+
+	RAG_print "Read [llength $efl] embeds in\
+		[expr [clock milliseconds] - $start_time] ms,\
+		comparing question to embed library..."
+	set start_time [clock milliseconds]
+	set comparisons [list]
+	set len [llength $q_vector]
+	foreach embed $embeds {
+		set e_name [lindex $embed 0]
+		set e_vector [lindex $embed 1]
+		set dot_product 0
+		for {set i 0} {$i < $len} {incr i} {
+			set x1 [lindex $q_vector $i]
+			set x2 [lindex $e_vector $i]
+			set dot_product [expr $dot_product + $x1*$x2]
+		}
+		set relevance [format %.4f $dot_product]
+		lappend comparisons "$relevance $e_name"
+	}
+	RAG_print "Comparison complete in\
+		[expr [clock milliseconds] - $start_time] ms,\
+		sorting chunks by relevance..."
+	set start_time [clock milliseconds]
 	set comparisons [lsort -decreasing -real -index 0 $comparisons]
+	set info(relevance) [lindex $comparisons 0 0]
+
+	set r $info(relevance)
+	if {$r >= $config(high_rel_thr)} {
+		set num $config(high_rel_tokens)
+		RAG_print "High-relevance question, relevance=$r, retrieve $num\+ tokens." 
+	} elseif {$r >= $config(low_rel_thr)} {
+		set num $config(mid_rel_tokens)
+		RAG_print "Mid-relevance question, relevance=$r, retrieve $num\+ tokens." 
+	} else {
+		set num $config(low_rel_tokens)
+		RAG_print "Low-relevance question, relevance=$r, retrieve $num\+ tokens." 
+	}
 	
 	if {$config(dictionary)} {
 		RAG_print "Using dictionary to retrieve related chunks..."
@@ -380,21 +416,7 @@ proc RAG_Manager_retrieve {} {
 		set comparisons $new_list
 	}
 	
-	RAG_print "Determining relevance and choosing retrieval size..."
-	set info(relevance) [lindex $comparisons 0 0]
-	set r $info(relevance)
-	if {$r >= $config(high_rel_thr)} {
-		set num $config(high_rel_tokens)
-		RAG_print "High-relevance question, relevance=$r, retrieve $num\+ tokens." 
-	} elseif {$r >= $config(low_rel_thr)} {
-		set num $config(mid_rel_tokens)
-		RAG_print "Mid-relevance question, relevance=$r, retrieve $num\+ tokens." 
-	} else {
-		set num $config(low_rel_tokens)
-		RAG_print "Low-relevance question, relevance=$r, retrieve $num\+ tokens." 
-	}
-	
-	RAG_print "List of chunks retrieved to support the question." brown
+	RAG_print "List of chunks retrieved to support question." brown
 	set index 0
 	set data [list]
 	set count 0
@@ -511,7 +533,6 @@ proc RAG_Manager_submit {} {
 		RAG_print "Replaced $num solitary asterisks with ×." brown
 		set num [regsub -all {([^\n]+)\n(?!\n)} $answer "\\1  \n" answer]
 		RAG_print "Added spaces to the end of $num lines." brown
-		set num [regsub -all {```\n} $answer "\n```\n" answer]
 	} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $info(result) match message]} {
 		set answer "ERROR: $message"
 	} else {

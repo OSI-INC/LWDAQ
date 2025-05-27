@@ -868,34 +868,6 @@ proc RAG_vector_from_embed {embed} {
 }
 
 #
-# RAG_compare_vectors takes two embed json strings, extracts their embed vectors
-# and calculates the cosine of the angle between the two vectors. We assume that the
-# two vectors are normalized prior to passing into the routine. That is: their length
-# is one. Thus the dot product gives us the cosine immediately.
-#
-proc RAG_compare_vectors {embed1 embed2} {
-	upvar #0 RAG_info info
-	
-	set vector1 [RAG_vector_from_embed $embed1]
-	set vector2 [RAG_vector_from_embed $embed2]
-
-	set len1 [llength $vector1]
-	set len2 [llength $vector2]
-	if {$len1 != $len2} {
-		RAG_print "ERROR: Vectors of different sizes, $len1 and $len2"
-		return "0.0"
-	}
-
-	set dot_product 0
-	for {set i 0} {$i < $len1} {incr i} {
-		set x1 [lindex $vector1 $i]
-		set x2 [lindex $vector2 $i]
-		set dot_product [expr $dot_product + $x1*$x2]
-	}
-	return [format %.4f $dot_product]
-}
-
-#
 # RAG_make_dictionary goes through all the embed vectors in the embed directory
 # and for each makes a text file in the dictionary directory that contains a
 # list of similar chunks. This list consists of pairs of similarities and chunk
@@ -906,6 +878,7 @@ proc RAG_make_dictionary {embed_dir dict_dir} {
 		
 	RAG_print "Starting dictionary generation at [RAG_time]."
 
+	RAG_print "Reading embeds from disk into memory..."
 	set efl [glob -nocomplain [file join $embed_dir *.json]]
 	set embeds [list]
 	foreach efn $efl {
