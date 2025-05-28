@@ -28,12 +28,11 @@ proc RAG_Manager_init {} {
 	LWDAQ_tool_init "RAG_Manager" "2.0"
 	if {[winfo exists $info(window)]} {return ""}
 #
-# Directory locations for key, chunks, embeds, and dictionary.
+# Directory locations for key, chunks, embeds.
 #
 	set config(key_file) "~/Active/Admin/Keys/OpenAI_API.txt"
 	set config(chunk_dir) "~/Active/RAG/Chunks"
 	set config(embed_dir) "~/Active/RAG/Embeds"
-	set config(dict_dir) "~/Active/RAG/Dictionary"
 #
 # The default question.
 #
@@ -48,6 +47,11 @@ proc RAG_Manager_init {} {
 	set info(text) "stdout"
 	set info(data) ""
 	set info(relevance) "0.0"
+#
+# Public control flags.
+#
+	set config(chat_submit) "0"
+	set config(verbose) "0"
 #
 # The source documents. Can be edited with a dedicated window and saved to
 # settings file.
@@ -78,19 +82,6 @@ https://www.bndhep.net/Devices/BCAM/User_Manual.html
 #	
 	set config(chunk_title) "### Documentation Chunk\n\n"
 	set config(chat_title) "### Previous Q&A\n\n"
-#
-# Flag that turns on inclusion of the chat in the question.
-#
-	set config(chat_submit) "0"
-#
-# Verbose flag for diagnostic text output.
-#
-	set config(verbose) "0"
-#
-# Dictionary flag turns on use of dictionary to add chunks relevant to the most
-# relevant chunks.
-#
-	set config(dictionary) "0"
 #
 # Completion assistant instructions for the three tiers of relevance. Can be
 # edited with a dedicated window and saved to settings file.
@@ -170,8 +161,8 @@ Respond using Markdown formatting.
 # Input-output parameters.
 #	
 	set info(hash_len) "12"
-	set info(dict_entry_len) "10"
 	set info(token_size) "4"
+	set info(embed_scale) "100000"
 #
 # Check existence of dependent utilities.
 #
@@ -852,10 +843,10 @@ proc RAG_Manager_store_chunks {chunks dir} {
 }
 
 #
-# RAG_Manager_embed_chunk submits a chunk, with the help of an access key, to
+# RAG_Manager_embed_from_chunk submits a chunk, with the help of an access key, to
 # the embedding end point and retrieves its embed vector in a json record.
 #
-proc RAG_Manager_embed_chunk {chunk api_key} {
+proc RAG_Manager_embed_from_chunk {chunk api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
@@ -879,6 +870,30 @@ proc RAG_Manager_embed_chunk {chunk api_key} {
 		return "ERROR: $error_result"
 	}
 	return $result
+}
+
+#
+# RAG_Manager_vector_from_embed takes an embedding json string and extracts its
+# embed vector as a Tcl list.
+#
+proc RAG_Manager_vector_from_embed {embed} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+		
+	if {[regexp {"embedding": \[([^\]]*)} $embed match vector]} {
+		regsub -all {,} $vector " " vector
+		regsub -all {[\n\t ]+} $vector " " vector
+	} else {
+		return "ERROR: Failed to extract vector from embed."
+	}
+
+	set new_vector ""
+	foreach x $vector {
+		lappend new_vector [expr round($info(embed_scale)*$x)]
+	}
+	set vector $new_vector
+
+	return [string trim $vector]
 }
 
 #
@@ -910,14 +925,19 @@ proc RAG_Manager_fetch_embeds {chunk_dir embed_dir api_key} {
 			set f [open $cfn r]
 			set chunk [read $f]
 			close $f
-			set embed [RAG_Manager_embed_chunk $chunk $api_key]
+			set embed [RAG_Manager_embed_from_chunk $chunk $api_key]
 			if {[LWDAQ_is_error_result $embed]} {
 				RAG_Manager_print "ERROR: $embed"
 				break
 			}
+			set vector [RAG_Manager_vector_from_embed $embed]
+			if {[LWDAQ_is_error_result $vector]} {
+				RAG_Manager_print "ERROR: $vector"
+				break
+			}
 			set efn [file join $embed_dir $root\.json]
 			set f [open $efn w]
-			puts -nonewline $f $embed
+			puts -nonewline $f $vector
 			close $f
 			incr new_count
 			RAG_Manager_print "$count\: [file tail $cfn] fetched new embed." orange
@@ -943,81 +963,6 @@ proc RAG_Manager_fetch_embeds {chunk_dir embed_dir api_key} {
 	RAG_Manager_print "Purged $count expired embeds from disk."
 	
 	return $count
-}
-
-#
-# RAG_Manager_vector_from_json takes an embedding json string and extracts its
-# embed vector as a Tcl list.
-#
-proc RAG_Manager_vector_from_embed {embed} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-		
-	if {[regexp {"embedding": \[([^\]]*)} $embed match vector]} {
-		regsub -all {,} $vector " " vector
-		regsub -all {[\n\t ]+} $vector " " vector
-	} else {
-		set vector "0"
-	}
-	return [string trim $vector]
-}
-
-#
-# RAG_make_dictionary goes through all the embed vectors in the embed directory
-# and for each makes a text file in the dictionary directory that contains a
-# list of similar chunks. This list consists of pairs of similarities and chunk
-# names. 
-# 
-proc RAG_make_dictionary {embed_dir dict_dir} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-		
-	RAG_Manager_print "Starting dictionary generation at [RAG_Manager_time]."
-
-	RAG_Manager_print "Reading embeds from disk into memory..."
-	set efl [glob -nocomplain [file join $embed_dir *.json]]
-	set embeds [list]
-	foreach efn $efl {
-		LWDAQ_support
-		set f [open $efn r]
-		set embed [read $f]
-		close $f
-		set vector [RAG_Manager_vector_from_embed $embed]
-		lappend embeds [list [file root [file tail $efn]] $vector]
-	}
-	RAG_Manager_print "Read [llength $efl] embeds from disk into memory."
-
-	set count 0
-	foreach e1 $embeds {
-		incr count
-		set name1 [lindex $e1 0]
-		set vector1 [lindex $e1 1]
-		set len [llength $vector1]
-		set comparisons [list]
-		foreach e2 $embeds {
-			set name2 [lindex $e2 0]
-			set vector2 [lindex $e2 1]
-			set dot_product 0
-			for {set i 0} {$i < $len} {incr i} {
-				set x1 [lindex $vector1 $i]
-				set x2 [lindex $vector2 $i]
-				set dot_product [expr $dot_product + $x1*$x2]
-			}
-			set similarity [format %.4f $dot_product]
-			lappend comparisons "$similarity $name2"
-		}
-		set comparisons [lsort -decreasing -real -index 0 $comparisons]
-		set comparisons [lrange $comparisons 1 $info(dict_entry_len)]
-		set dfn [file join $dict_dir $name1\.txt]
-		set f [open $dfn w]
-		puts -nonewline $f $comparisons
-		close $f
-		RAG_Manager_print "$count: [lindex $e1 0] [lrange $comparisons 0 2]" orange
-		LWDAQ_update
-	}
-
-	RAG_Manager_print "Done with dictionary generation at [RAG_Manager_time]."
-	return ""
 }
 
 #
@@ -1200,11 +1145,8 @@ proc RAG_Manager_configure {} {
 
 #
 # RAG_Manager_delete deletes all chunks from the chunk directory. It does not
-# delete embeddings in the embed directory. Nor does it delete dictionary
-# entries from the dict directory. Embeddings are culled during generation.
-# Dictionary entries are never culled by these routines. There is no need to
-# cull them: they are lists of most similiar chunks derived from an active list
-# of embeds.
+# delete embeddings in the embed directory. Unused embedding vectors are culled
+# during generation.
 #
 proc RAG_Manager_delete {} {
 	upvar #0 RAG_Manager_config config
@@ -1231,10 +1173,7 @@ proc RAG_Manager_delete {} {
 # RAG_Manager_generate downloads and chunks all URL resources named in the
 # sources list. It submits all chunks for embedding, although the RAG package
 # routines will obtain new embeds only for new chunks. In order to embed the
-# chunks, this routine must read a valid API key from disk. If dictionary
-# retrieval is enabled, the routine generates dictionary entries as well.
-# Chunking is fast, but dictionary generation is slow. Be prepared to wait
-# several minutes for a dictionary of one thousand chunks to complete.
+# chunks, this routine must read a valid API key from disk.
 #
 proc RAG_Manager_generate {} {
 	upvar #0 RAG_Manager_config config
@@ -1263,10 +1202,6 @@ proc RAG_Manager_generate {} {
 
 	RAG_Manager_print "Submitting all chunks for embedding..."	
 	RAG_Manager_fetch_embeds $config(chunk_dir) $config(embed_dir) $api_key
-	if {$config(dictionary)} {
-		RAG_Manager_print "Generating dictionary of related chunks..."	
-		RAG_make_dictionary $config(embed_dir) $config(dict_dir)
-	}
 	
 	RAG_Manager_print "Generation Complete [RAG_Manager_time]." purple
 	set info(control) "Idle"
@@ -1277,21 +1212,19 @@ proc RAG_Manager_generate {} {
 # RAG_Manager_retrieve obtains the embedding vector for the current question and
 # compares this vector to all the vectors in the embed directory, thus making a
 # list of chunks and their relevance to the question. It sorts this list so as
-# to put the most relevant chunks in front. If we are using dictionary-enhanced
-# retrieval, the routine fetches one or more secondary chunks to accompany each
-# primary chunk, these secondary chunks being those most similar to a primary
-# chunk. Using the front chunk, the routine judges the relevance of the question
-# to the source materials. It copies zero or more chunks into a retrieved chunk
-# list until the total number of tokens in the chunks is equal to or greater
-# than the token limit for the question's level of relevance. It returns the
-# list of chunks retrieved. In order to embed the question, this routine must
-# read a valid API key from disk.
+# to put the most relevant chunks in front. It copies zero or more chunks into a
+# retrieved chunk list until the total number of tokens in the chunks is equal
+# to or greater than the token limit for the question's level of relevance. In
+# the case of high-relevance questions, if it comes to a chunk with relevance
+# lower than the mid-relevance threshold, it stops adding chunks, so as to
+# avoid adding irrelevant information to the completion input, which makes the
+# completion faster. It returns the list of chunks retrieved. In order to embed
+# the question, this routine must read a valid API key from disk.
 #
 proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
-	global RAG_Manager_info
-
+	
 	if {$info(control) != "Idle"} {return ""}
 	set question [string trim $config(question)]
 	if {$question == ""} {
@@ -1317,43 +1250,32 @@ proc RAG_Manager_retrieve {} {
 
 	RAG_Manager_print "Obtaining question embedding vector..."
 	set start_time [clock milliseconds]
-	set q_embed [RAG_Manager_embed_chunk $config(question) $api_key]
+	set q_embed [RAG_Manager_embed_from_chunk $config(question) $api_key]
 	set q_vector [RAG_Manager_vector_from_embed $q_embed]
+	
 	RAG_Manager_print "Question embed obtained in\
 		[expr [clock milliseconds] - $start_time] ms,\
-		 reading embed library from disk..."
-	
-	set start_time [clock milliseconds]
+		comparing question to embed library..."
+	set comparisons [list]
 	set efl [glob -nocomplain [file join $config(embed_dir) *.json]]
-	set embeds [list]
+	set len [llength $q_vector]
 	foreach efn $efl {
 		LWDAQ_support
+		set e_name [file root [file tail $efn]]
 		set f [open $efn r]
-		set embed [read $f]
+		set e_vector [read $f]
 		close $f
-		set vector [RAG_Manager_vector_from_embed $embed]
-		lappend embeds [list [file root [file tail $efn]] $vector]
-	}
-
-	RAG_Manager_print "Read [llength $efl] embeds in\
-		[expr [clock milliseconds] - $start_time] ms,\
-		comparing question to embed library..."
-	set start_time [clock milliseconds]
-	set comparisons [list]
-	set len [llength $q_vector]
-	foreach embed $embeds {
-		LWDAQ_support
-		set e_name [lindex $embed 0]
-		set e_vector [lindex $embed 1]
 		set dot_product 0
 		for {set i 0} {$i < $len} {incr i} {
 			set x1 [lindex $q_vector $i]
 			set x2 [lindex $e_vector $i]
 			set dot_product [expr $dot_product + $x1*$x2]
 		}
-		set relevance [format %.4f $dot_product]
+		set relevance [format %.4f \
+			[expr 1.0*$dot_product/$info(embed_scale)/$info(embed_scale)]]
 		lappend comparisons "$relevance $e_name"
 	}
+	
 	RAG_Manager_print "Comparison complete in\
 		[expr [clock milliseconds] - $start_time] ms,\
 		sorting chunks by relevance..."
@@ -1361,41 +1283,19 @@ proc RAG_Manager_retrieve {} {
 	set comparisons [lsort -decreasing -real -index 0 $comparisons]
 	set info(relevance) [lindex $comparisons 0 0]
 
-	set r $info(relevance)
-	if {$r >= $config(high_rel_thr)} {
+	set relevance $info(relevance)
+	if {$relevance >= $config(high_rel_thr)} {
 		set num $config(high_rel_tokens)
-		RAG_Manager_print "High-relevance question, relevance=$r, retrieve $num\+ tokens." 
-	} elseif {$r >= $config(low_rel_thr)} {
+		RAG_Manager_print "High-relevance question, relevance=$relevance,\
+			retrieve $num\+ tokens." 
+	} elseif {$relevance >= $config(low_rel_thr)} {
 		set num $config(mid_rel_tokens)
-		RAG_Manager_print "Mid-relevance question, relevance=$r, retrieve $num\+ tokens." 
+		RAG_Manager_print "Mid-relevance question, relevance=$relevance,\
+			retrieve $num\+ tokens." 
 	} else {
 		set num $config(low_rel_tokens)
-		RAG_Manager_print "Low-relevance question, relevance=$r, retrieve $num\+ tokens." 
-	}
-	
-	if {$config(dictionary)} {
-		RAG_Manager_print "Using dictionary to retrieve related chunks..."
-		set new_list [list]
-		foreach c [lrange $comparisons 0 20] {
-			if {[lsearch -index 1 $new_list [lindex $c 1]] < 0} {
-				lappend new_list $c
-			}
-			set dfn [file join $config(dict_dir) [lindex $c 1]\.txt]
-			if {![file exists $dfn]} {
-				RAG_Manager_print "ERROR: Cannot find dictionary file [file tail $dfn]."
-				set info(control) "Idle"
-				return ""
-			}
-			set f [open $dfn r]
-			set dict [read $f]
-			close $f
-			foreach cc [lrange $dict 0 1] {
-				set rel [lindex $cc 0]
-				set name [lindex $cc 1]
-				if {[lsearch -index 1 $new_list $name] < 0} {lappend new_list $cc}
-			}
-		}
-		set comparisons $new_list
+		RAG_Manager_print "Low-relevance question, relevance=$relevance,\
+			retrieve $num\+ tokens." 
 	}
 	
 	RAG_Manager_print "List of chunks retrieved to support question." brown
@@ -1405,9 +1305,14 @@ proc RAG_Manager_retrieve {} {
 	set data [list]
 	foreach comparison $comparisons {
 		if {$tokens >= $num} {break}
+		set chunk_relevance [lindex $comparison 0]
+		if {($relevance >= $config(high_rel_thr)) \
+			&& ($chunk_relevance <= $config(low_rel_thr))} {
+			break
+		}
 		incr count
 		RAG_Manager_print "-----------------------------------------------------" brown
-		RAG_Manager_print "$count\: Relevance [lindex $comparison 0]:" brown
+		RAG_Manager_print "$count\: Relevance $chunk_relevance:" brown
 		set embed [lindex $comparison 1]
 		set cfn [file join $config(chunk_dir) $embed\.txt]
 		if {![file exists $cfn]} {
@@ -1425,7 +1330,7 @@ proc RAG_Manager_retrieve {} {
 		close $f
 		lappend data "$config(chunk_title)$chunk"
 		RAG_Manager_print $chunk green
-		set tokens [expr $tokens + ([string length $chunk]/$RAG_Manager_info(token_size))]
+		set tokens [expr $tokens + ([string length $chunk]/$info(token_size))]
 	}
 
 	if {$config(chat_submit)} {
@@ -1433,7 +1338,7 @@ proc RAG_Manager_retrieve {} {
 		RAG_Manager_print "Adding chat history to document chunks:" brown
 		RAG_Manager_print $info(chat) green	
 		lappend data "config(chat_title)$info(chat)"
-		set tokens [expr $tokens + ([string length $info(chat)]/$RAG_Manager_info(token_size))]	
+		set tokens [expr $tokens + ([string length $info(chat)]/$info(token_size))]	
 	}
 	
 	RAG_Manager_print "-----------------------------------------------------" brown
@@ -1463,18 +1368,17 @@ proc RAG_Manager_retrieve {} {
 proc RAG_Manager_submit {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
-	global RAG_Manager_info
-
+	
 	if {$info(control) != "Idle"} {return ""}
 	set question [string trim $config(question)]
 	if {$question == ""} {
 		RAG_Manager_print "ERROR: Empty question, abandoning submission."
 		return ""
 	}
-	if {[string length $question]/$RAG_Manager_info(token_size) \
+	if {[string length $question]/$info(token_size) \
 			> $config(max_question_tokens)} {
 		set answer "ERROR: Question is longer than\
-			[expr $config(max_question_tokens)*$RAG_Manager_info(token_size)] characters."
+			[expr $config(max_question_tokens)*$info(token_size)] characters."
 		return $answer
 	}
 	
@@ -1517,7 +1421,7 @@ proc RAG_Manager_submit {} {
 	append info(chat) "Question: [string trim $question]\n"
 	set info(result) [RAG_Manager_get_answer $question\
 		$info(data) $assistant $api_key $model]
-	set len [expr [string length $info(result)]/$RAG_Manager_info(token_size)]
+	set len [expr [string length $info(result)]/$info(token_size)]
 	RAG_Manager_print "Received $len tokens,\
 		extracting answer and formatting for Markdown."
 		
@@ -1556,8 +1460,7 @@ proc RAG_Manager_submit {} {
 proc RAG_Manager_history {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
-	global RAG_Manager_info
-
+	
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "History"
 	RAG_Manager_print "\n------------- Chat History -------------------------" purple
@@ -1568,7 +1471,23 @@ proc RAG_Manager_history {} {
 	}
 	RAG_Manager_print "-----------------------------------------------------" purple
 	set info(control) "Idle"
-	return [expr [string length $info(chat)] / $RAG_Manager_info(token_size)]
+	return [expr [string length $info(chat)] / $info(token_size)]
+}
+
+#
+# RAG_Manager_clear cleaers the chat history.
+#
+proc RAG_Manager_clear {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "Clear"
+	RAG_Manager_print "\nClear Chat History" purple
+	set info(chat) ""
+	RAG_Manager_print "Done" purple
+	set info(control) "Idle"
+	return ""
 }
 
 #
@@ -1587,13 +1506,13 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Sources Delete Generate Retrieve Assistant Submit History} {
+	foreach a {Sources Delete Generate Retrieve Assistant Submit History Clear} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
 	
-	foreach a {Verbose Dictionary} {
+	foreach a {Verbose Submit_Chat} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text "$a" -variable RAG_Manager_config($b)
 		pack $f.$b -side left -expand yes
@@ -1722,16 +1641,16 @@ high, mid, and low-relevance questions.
 
 Enter a question in the question entry box and press Retrieve. The RAG Manager
 will obtain the embedding vector of the question and compare it to every
-embedding vector in the embed directory. It sorts the embeds in order of
-decreasing relevance and starts taking the most relevant until it accumulates a
-number of tokens as specified by the RAG Manager token limits. The token limits
-are different for the three levels of question relevance. If the submit_chat
-flag is set, the manager adds the chat history to submission data. In the online
-chatbot implementation, we submit the previous two questions and answers to give
-continuity to the chat. Note that the question has not yet been submitted. We
-have separated the retrieval and submission so that we can examine the retrieved
-chunks without waiting for a submission to complete. With the verbose flag set,
-we get to see all the chunks and the chat history.
+embedding vector in the embed directory. It sorts the embedding vectors in order
+of decreasing relevance and starts taking the most relevant until it accumulates
+a number of tokens as specified by the RAG Manager token limits. The token
+limits are different for the three levels of question relevance. If the
+submit_chat flag is set, the manager adds the chat history to submission data.
+In the online chatbot implementation, we submit the previous two questions and
+answers to give continuity to the chat. Note that the question has not yet been
+submitted. We have separated the retrieval and submission so that we can examine
+the retrieved chunks without waiting for a submission to complete. With the
+verbose flag set, we get to see all the chunks and the chat history.
 
 Press Submit and the RAG Manager puts together the assistant instructions, the
 documentation chunks, and the question in one big json record, submits them to
