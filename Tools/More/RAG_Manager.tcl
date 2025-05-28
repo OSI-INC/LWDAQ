@@ -22,7 +22,7 @@ proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	LWDAQ_tool_init "RAG_Manager" "1.9"
+	LWDAQ_tool_init "RAG_Manager" "2.0"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require RAG
@@ -51,8 +51,8 @@ proc RAG_Manager_init {} {
 	set config(high_rel_tokens) "3000"
 	set config(mid_rel_tokens) "1000"
 	set config(low_rel_tokens) "0"
-	set config(high_rel_thr) "0.80"
-	set config(low_rel_thr) "0.75"
+	set config(high_rel_thr) "0.50"
+	set config(low_rel_thr) "0.30"
 	
 	set config(max_question_tokens) "300"
 	set config(chunk_title) "### Documentation Chunk\n\n"
@@ -603,7 +603,7 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Delete Sources Generate Retrieve Assistant Submit History} {
+	foreach a {Sources Delete Generate Retrieve Assistant Submit History} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -654,7 +654,130 @@ return ""
 
 ----------Begin Help----------
 
-No manual for this code yet exists. The comments in the code are the only documentation.
+The RAG Manager provides the routines we use at to support the OSI Chatbot. The
+acronym "RAG" stands for "Retrieval-Assisted Generation", where "generation" is
+the composing of an answer to a question by a large language model (LLM), and
+"retrieval-assistance" is gathering exerpts relevant to the question from our
+documentation. In the jargon of retrieval-assisted generation, these exerpts are
+called "chunks". The chat web interface is provided by a PHP process running on
+our server and some JavaScript running on the client web browser. When the user
+provides a new question, the server calls LWDAQ to collect relevant chunks,
+submit them to the LLM, and wait for an answer.
+
+The key to retrieval-assisted generation is the ability of the LLM to classify
+the content of an chunk with a point on a large-dimensional sphere. We use
+OpenAI's RAG service, and their classification is a point in a 1536-dimensional
+space. We submit an chunk to the OpenAI "embedding end point" and receive in
+response an "embedding vector", which consists of 1536 numbers representing the
+components of a unit vector in a 1536-dimensional space. Retrieval-assisted
+generation operates on the assumptioin that similarity of embedding vectors is
+an accurate measure of similarity of subject matter. That is: if the angle
+between two embedding vectors is small, the two chunks they were derived from
+will be discussing a similar topic. In particular: if the embedding vector of a
+question is close to the embedding vector of an chunk, that chunk is relevant to
+the question, and should be used as a basis for answering the question.
+
+We measure the proximity of two embedding vectors by taking their dot product.
+Because all embedding vectors are normalized before delivery, their dot product
+is equal to the cosine of the angle between them. Our measure of "relevance" for
+a chunk is the cosine of the angle between the chunk embedding vector and the
+question embedding vector. Two identical chunks have relevance 1.0. In principle
+a chunk could have relevance -1. In our experience, if the best chunk in our
+library has relevance 0.8 or greater, it is almost certainly a question about
+our products. If the relevance is between 0.75 and 0.80 is may be a question
+about our products, and if less than 0.75, it is almost certainly an irrelevant
+or general question that cannot be answered by our chatbot library.
+
+Before we generate a new chunk libary, we must provide the RAG Manager with a
+list of URLs from which it should download the documents out of which it will
+create the library. The RAG Manager window, which appears when you open the RAG
+manager from a graphical instance of LWDAQ, provides a Source button that allows
+you to define and apply a list of URLs. When the list is "applied" it is saved
+in the RAG Manager's internal array, but the URLs are not yet accessed.
+
+Once we have our list of URLs, we use the Delete button to delete the old
+library. All the chunks will be delete, but none of the embedding vectors. The
+chunks are stored in a chunk directory, the embedding vectors in an embed
+directory. Both these directories are defined in the configuration array of the
+tool.
+
+We press Generate. Here we don't mean "generate an answer", we mean "generate
+the chunk and embedding vector library". We apologise for the duplicate use of
+the word "generate". The RAG Manager uses the command-line "curl" utility to
+download all the HTML pages using their URLs. The "curl" utility supports both
+https and http. We test the RAG Manager on Linux and MacOS, both of which are
+UNIX variants with "curl" installed. We do not test the RAG Manager on Windows.
+The RAG Manager proceeds one URL at a time, dividing each page into chunks.
+Check "verbose" to see the notification and type of every chunk created. 
+
+The simplest chunk extraction is to isolate an HTML paragraph using p-tags. Our
+HTML documentation is all hand-typed and follows particular, strict patterns
+when it comes to tables, lists, figures, and chapter titles. We include dates at
+the beginning of chapters in a particular format to indicate when the chapter
+was last updated. Thus we are able to extract paragraphs, lists, captions, and
+code samples in a uniform and consistent mannger for our chunk library, with
+every chunk given a chapter name, a URL pointing to the chapter on-line, and
+often a last-modified data as well. We translate the chunks from HTML into
+Markdown. This translation includes all URLs. We resolve all relative URLs and
+internal document links to absolute URLs. The answer we get back from the
+completion end-point will also be in Markdown. The OpenAI LLM likes Markdown.
+
+Once all the chunks are generated, the RAG Manager calls "openssl" to provide a
+unique name for each chunk, and stores the chunks in the chunk directory with
+names of the form 6270ebd71f0b.txt.
+
+Now that the generation process has produced all the chunks of the library, it
+checks each chunk to see if it has an embedding vector in the embed directory.
+The embedding vector will be named like 6270ebd71f0b.json. If the embed exists,
+the chunk is ready to deploy. If the embedding vector does not exist, the
+generator submits the chunk to the OpenAI embedding end-point, obtains its
+embedding vector, and writes the vector to disk in the embed directory. To
+obtain the vector, we need an API Key, which is the means by which we identify
+ourselves to OpenAI and agree to pay for the embedding service. Embedding is
+inexpensive. At the time of writing, we are using the "text-embedding-3-small"
+model at a cost of $0.00002 per one thousand tokens, where a "token" is four
+characters. So one thousand chunks, each one thousand tokens long, will cost a
+total of two cents to embed.
+
+The last stage of generation is to eliminate embedding vectors for which there
+is no corresponding chunk. Now we have a complete library of chunks and
+embedding vectors ready for RAG.
+
+The RAG Manager provides instructions to the OpenAI "completion end-point",
+which is the server tha answers questions. In the RAG Manager window, press
+Assistant and you will be able to edit the instructions we will provide for
+high, mid, and low-relevance questions.
+
+Enter a question in the question entry box and press Retrieve. The RAG Manager
+will obtain the embedding vector of the question and compare it to every
+embedding vector in the embed directory. It sorts the embeds in order of
+decreasing relevance and starts taking the most relevant until it accumulates a
+number of tokens as specified by the RAG Manager token limits. The token limits
+are different for the three levels of question relevance. If the submit_chat
+flag is set, the manager adds the chat history to submission data. In the online
+chatbot implementation, we submit the previous two questions and answers to give
+continuity to the chat. Note that the question has not yet been submitted. We
+have separated the retrieval and submission so that we can examine the retrieved
+chunks without waiting for a submission to complete. With the verbose flag set,
+we get to see all the chunks and the chat history.
+
+Press Submit and the RAG Manager puts together the assistant instructions, the
+documentation chunks, and the question in one big json record, submits them to
+the OpenAI completion end-point as one big json record and waits for an answer.
+For high-relevance questions, we are currently using the "gpt-4" completion
+model, which costs $0.01 per thousand input tokens (assistant, chunk, question
+and chat) and $0.03 per thousand output tokens (the answer). For mid and
+low-relevance questions, we use the "gpt-3.5-turbo" model at a cost of $0.0005
+per thousand input tokens and $0.0015 per thousand output tokens. Our default is
+to send roughly 3400 input tokens for a high-relevance question, and we see
+about 200 tokens in response, so our average high-relevance answer costs us
+rouhly four cents.
+
+There is no particular reason why the lower-level RAG routines are in a separate
+RAG package loaded by the RAG Manager. We built the RAG system in stages, and
+this is how it ended up. We plan to transfer all the RAG package routines into
+the RAG Manager at some point, and eliminate the RAG package alltogether.
+
 
 Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 

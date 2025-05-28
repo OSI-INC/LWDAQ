@@ -23,7 +23,7 @@
 #
 
 # Load this package or routines into LWDAQ with "package require RAG".
-package provide RAG 1.5
+package provide RAG 2.0
 
 proc RAG_init {} {
 #
@@ -82,6 +82,7 @@ proc RAG_init {} {
 #	
 	set info(hash_len) "12"
 	set info(default_gpt_model) "gpt-4"
+	set info(embed_model) "text-embedding-3-small"
 	set info(dict_entry_len) "10"
 	set info(token_size) "4"
 #
@@ -771,7 +772,7 @@ proc RAG_embed_chunk {chunk api_key} {
     set chunk [string map {\n \\n} $chunk]
     regsub -all {\s+} $chunk " " chunk
 	set json_body " \{\n \
-		\"model\": \"text-embedding-ada-002\",\n \
+		\"model\": \"$info(embed_model)\",\n \
 		\"input\": \"$chunk\"\n \}"
 	set cmd [list curl -sS -X POST https://api.openai.com/v1/embeddings \
 		-H "Content-Type: application/json" \
@@ -781,7 +782,7 @@ proc RAG_embed_chunk {chunk api_key} {
 		set result [eval exec $cmd]
 	} error_result]} {
 		RAG_print "ERROR: $error_result"
-		return ""
+		return "$error_result"
 	}
 	return $result
 }
@@ -835,7 +836,7 @@ proc RAG_fetch_embeds {chunk_dir embed_dir api_key} {
 		found $old_count embeds,\
 		fetched $new_count embeds."
 		
-	set efl [glob [file join $embed_dir *.json]]
+	set efl [glob -nocomplain [file join $embed_dir *.json]]
 	set count 0
 	foreach efn $efl {
 		set root [file root [file tail $efn]]
