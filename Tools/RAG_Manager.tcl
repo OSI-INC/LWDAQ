@@ -31,8 +31,9 @@ proc RAG_Manager_init {} {
 # Directory locations for key, chunks, embeds.
 #
 	set config(key_file) "~/Active/Admin/Keys/OpenAI_API.txt"
-	set config(chunk_dir) "~/Active/RAG/Chunks"
-	set config(embed_dir) "~/Active/RAG/Embeds"
+	set config(content_dir) "~/Active/RAG/Content"
+	set config(match_dir) "~/Active/RAG/Match"
+	set config(embed_dir) "~/Active/RAG/Embed"
 #
 # The default question.
 #
@@ -52,6 +53,7 @@ proc RAG_Manager_init {} {
 #
 	set config(chat_submit) "0"
 	set config(verbose) "0"
+	set config(show_match) "0"
 #
 # The source documents. Can be edited with a dedicated window and saved to
 # settings file.
@@ -280,7 +282,7 @@ proc RAG_Manager_extract_caption {chunk} {
 	upvar #0 RAG_Manager_config config
 	
 	set caption ""
-	if {[regexp {<small><b>(Figure|Table):</b>(.+?)</small>} $chunk -> type caption]} {
+	if {[regexp {<b>(Figure|Table):</b>(.+?)</small>} $chunk -> type caption]} {
 		return "$type: [string trim $caption]"
 	} else {
 		return ""
@@ -431,22 +433,6 @@ proc RAG_Manager_catalog_chunks {page} {
 
 	set catalog [lsort -increasing -integer -index 0 $catalog]
 	
-	foreach descriptor $catalog {
-		switch [lindex $descriptor 2] {
-			"p" {set color gray}
-			"ul" {set color green}
-			"ol" {set color green}
-			"h2" {set color darkpurple}
-			"h3" {set color darkpurple}
-			"center" {set color brown}
-			"equation" {set color brown}
-			"pre" {set color brown}
-			"date" {set color darkpurple}
-			default {set color red}
-		}
-		RAG_Manager_print $descriptor $color	
-	}
-		
 	return $catalog
 }
 
@@ -477,16 +463,26 @@ proc RAG_Manager_remove_dates {chunk} {
 }
 
 #
-# RAG_Manager_extract_chunks goes through a page extracting the body text of
-# each chunk. It converts list chunks to markdown lists. It keeps track of the
-# chapter, section and date as provided by the sequence of chunks. It adds to
-# the start of each chunk the current chapter, section, and date. The extractor
-# combines centered tables, all lists, and the contents of "pre" tags with the
-# previous chunk, whatever that may have been, and adds no additional metadata.
-# It combines centered figures and all equations with the subsequent chunk. By
-# the time the page arrives at this chunking routine, all URLs should have been
-# converted to Markdown. If there are any anchor or img tags left, something has
-# gone wrong. We reject the chunk and count it.
+# RAG_Manager_extract_chunks goes through a page extracting chunks of text from
+# the provided page. By the time the page arrives at this chunking routine, all
+# URLs should have been converted to Markdown. If there are any anchor or img
+# tags left, something has gone wrong. We reject the chunk and count it. This
+# routine converts HTML lists to markdown lists. It keeps track of the chapter,
+# section and date using <h2>, <h3>, and our own [01-JAN-69] date entries
+# respectively. It extracts entire sections in <center> fields because these
+# consist only of figures and tables in our documents. Once it has a raw list of
+# chunks, it begins to process them by further extraction, such as extracting
+# figure captions and links. The extractor combines tables, all lists, and <pre>
+# fields with the previous chunk, whatever that may have been, and adds no
+# additional metadata. It combines figures and all equations with the subsequent
+# chunk, whatever that may be, and the subsequent chunk shares the metadata of
+# the equation chunk. The routine constructs a chunk list. Each chunk list entry
+# consists of two strings: a match string and a content string. The match string
+# contains text stripped of metadata or tables of numbers or web links. This is
+# the string we will use to generate the embedding vector for the chunk. The
+# content string contains chapter, section, and date headings, tabulated values
+# for tables, captions, links, and all other metadata. This is the string we
+# will submit as input to the completion endpoint. 
 #
 proc RAG_Manager_extract_chunks {page catalog} {
 	upvar #0 RAG_Manager_info info
@@ -496,139 +492,190 @@ proc RAG_Manager_extract_chunks {page catalog} {
 	set chapter "NONE"
 	set section "NONE"
 	set step "NONE"
-	set prev_name "none"
+	set prev_name "NONE"
 	set rejected 0
 	set chunks [list]
 	foreach chunk_id $catalog {
 		scan $chunk_id %d%d%s i_start i_end name
-		set chunk [string trim [string range $page $i_start $i_end]]
+		set content [string trim [string range $page $i_start $i_end]]
 		
-		if {[regexp {<a href=} $chunk] \
-			|| [regexp {</ul>} $chunk] \
-			|| [regexp {</li>} $chunk]} {
+		if {[regexp {<a href=} $content] \
+			|| [regexp {<img src=} $content] \
+			|| [regexp {<h3> src=} $content] \
+			|| [regexp {</ul> src=} $content] \
+			|| [regexp {</ol> src=} $content]} {
 			incr rejected
 			continue
 		}
-
+		
+		switch $name {
+			"p" {set color brown}
+			"ul" {set color magenta}
+			"ol" {set color magenta}
+			"h2" {set color blue}
+			"h3" {set color blue}
+			"center" {set color green}
+			"equation" {set color green}
+			"pre" {set color gray}
+			"date" {set color orange}
+			default {set color red}
+		}
+		RAG_Manager_print "[format %8.0f $i_start]\
+			[format %8.0f $i_end]\
+			[format %8s $name]\
+			[format %5.0f [string length $content]]\
+			[string trim [string range [regsub -all {\n} $content " "] 0 80]]..." $color	
+		
 		switch -- $name {
 			"ol" {
-				set chunk [RAG_Manager_extract_list $chunk]
+				set content [RAG_Manager_extract_list $content]
+				set match $content
 			}
 			"ul" {
-				set chunk [RAG_Manager_extract_list $chunk]
+				set content [RAG_Manager_extract_list $content]
+				set match $content
 			}
 			"center" {
-				set caption [RAG_Manager_extract_caption $chunk]
+				set caption [RAG_Manager_extract_caption $content]
 				if {[regexp {^Table} $caption]} {
-					set table [RAG_Manager_extract_table $chunk]
+					set table [RAG_Manager_extract_table $content]
 					if {[string length $table] > 0} {
-						set chunk "$caption  \n$table"
+						set content "$caption  \n$table"
+						set match "$caption"
 					} else {
-						set chunk "$caption"
+						set content "$caption"
+						set match "$caption"
 					}
 					set name "table"
 				} elseif {[regexp {^Figure} $caption]} {
-					set figures [RAG_Manager_extract_figures $chunk]
+					set figures [RAG_Manager_extract_figures $content]
 					if {[string length $figures] > 0} {
-						set chunk "$caption  \n$figures"
+						set content "$caption  \n$figures"
+						set match "$caption"
 					} else {
-						set chunk "$caption"
+						set content "$caption"
+						set match "$caption"
 					}
 					set name "figure"
 				} else {
-					set chunk "$caption"
+					set content "$caption"
+					set match "$caption"
+					set name "center"
 				}
 			}
 			"equation" {
-				
+				set match $content
 			}
 			"pre" {
-			
+				set match $content
 			}
 			"h2" {
-				set chapter $chunk
+				set chapter $content
 				set section "NONE"
 				continue
 			}
 			"h3" {
-				set section $chunk
+				set section $content
 				continue
 			}
 			"date" {
-				set date [RAG_Manager_extract_date $chunk]
+				set date [RAG_Manager_extract_date $content]
 				continue
 			}
 			default {
-				if {[regexp {^<b>([^:]+):</b>} $chunk -> bold]} {
+				set match $content
+				if {[regexp {^<b>([^:]+):</b>} $content -> bold]} {
 					set step $bold
 				}
 			}
 		}
 		
-		set chunk [RAG_Manager_convert_tags $chunk]
-		set chunk [RAG_Manager_remove_dates $chunk]
-		set chunk [string trim $chunk]
-		if {([string length $chunk] == 0)} {
-			RAG_Manager_print "Empty chunk, $chunk_id" brown
+		set content [RAG_Manager_convert_tags $content]
+		set content [RAG_Manager_remove_dates $content]
+		set content [string trim $content]
+		if {([string length $content] == 0)} {
+			RAG_Manager_print "Empty chunk content string, $chunk_id" brown
+			continue
+		}
+
+		set match [RAG_Manager_convert_tags $match]
+		set match [RAG_Manager_remove_dates $match]
+		regsub -all {[!]*\[([^\]]+)\]\([^)]+\)} $match {\1} match
+		set match [string trim $match]
+		if {([string length $match] == 0)} {
+			RAG_Manager_print "Empty chunk match string, $chunk_id" brown
 			continue
 		}
 		
 		switch -- $name {
 			"ol" -
 			"ul" -
-			"table" -
 			"pre" {
 				if {[llength $chunks] > 0} {
-					lset chunks end "[lindex $chunks end]\n\n$chunk"
+					lset chunks end 0 "[lindex $chunks end 0]\n\n$match"
+					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
 				} else {
-					lappend chunks $chunk
+					lappend chunks [list $match $content]
 				}
+			}
+			"equation" {
+				switch -- $prev_name {
+					"equation" {
+						set match "[lindex $chunks end 0]\n\n$match"
+						set content "[lindex $chunks end 1]\n\n$content"
+						lset chunks end [list $match $content]
+					}
+					default {
+						lappend chunks [list $match $content]
+					}
+				} 
 			}
 			default {
 				switch -- $prev_name {
-					"equation" -
-					"figure" {
-						lset chunks end "[lindex $chunks end]\n\n$chunk"
-					}
-					default {
-						set heading ""
-						if {$chapter != "NONE"} {
-							append heading "Chapter: $chapter\n"
-						}
-						if {$section != "NONE"} {
-							set heading "Section: $section\n"
-						}
-						if {$step != "NONE"} {
-							append heading "Step: $step\n"
-						}
-						if {$date != "NONE"} {
-							append heading "Date: $date\n"
-						}
-						if {[string length $heading] > 0} {
-							set chunk "$heading\n$chunk"
-						}
-						lappend chunks $chunk
+					"equation" {
+						set match "[lindex $chunks end 0]\n\n$match"
+						set content "[lindex $chunks end 1]\n\n$content"
+						set chunks [lreplace $chunks end end]
 					}
 				}
+				set heading ""
+				if {$chapter != "NONE"} {
+					append heading "Chapter: $chapter\n"
+				}
+				if {$section != "NONE"} {
+					set heading "Section: $section\n"
+				}
+				if {$step != "NONE"} {
+					append heading "Step: $step\n"
+				}
+				if {$date != "NONE"} {
+					append heading "Date: $date\n"
+				}
+				if {[string length $heading] > 0} {
+					set content "$heading\n$content"
+				}
+				lappend chunks [list $match $content]
 				set step "NONE"
 			}
 		}
 		set prev_name $name
 	}
+	
 	if {$rejected > 0} {
 		RAG_Manager_print "Rejected $rejected chunks with residual anchor and image tags."
 	}
+	
 	return $chunks
 }
 
 #
-# RAG_Manager_resolve_relative_url takes a relative url and resolves it into an
+# RAG_Manager_relative_url takes a relative url and resolves it into an
 # absolute url using a supplied base url. The framework of this code was
 # provided by ChatGPT. We enhanced to support internal document links. The base
 # url can be a document with extenion php or html and the routine will use the
 # document url for internal links.
 #
-proc RAG_Manager_resolve_relative_url {base_url relative_url} {
+proc RAG_Manager_relative_url {base_url relative_url} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
@@ -679,10 +726,10 @@ proc RAG_Manager_resolve_relative_url {base_url relative_url} {
 #
 # RAG_Manager_resolve_urls resolves all the relative urls in a page into
 # absolute urls using the base url we pass in as the basis for resolution. It
-# constructs a new page with the absolute urls. It calls
-# RAG_Manager_resolve_relative_url on each relative url it finds. The routine
-# looks for urls in anchor tags <a> and in image tags <img>. In the final
-# resolved url, we replace space characters with the HTML escape sequence "%20".
+# constructs a new page with the absolute urls. It applies the RAG Manager's
+# relative_url to each relative url it finds. The routine looks for urls in
+# anchor tags <a> and in image tags <img>. In the final resolved url, we replace
+# space characters with the HTML escape sequence "%20".
 #
 proc RAG_Manager_resolve_urls {page base_url} {
 	upvar #0 RAG_Manager_info info
@@ -694,12 +741,13 @@ proc RAG_Manager_resolve_urls {page base_url} {
 		append new_page [string range $page $index [expr [lindex $tag 0] - 1]]
 		set url [string range $page {*}$url]
 		if {![regexp {https?} $url match]} {
-			set url [RAG_Manager_resolve_relative_url $base_url $url]
+			set url [RAG_Manager_relative_url $base_url $url]
 		}
 		regsub -all { } $url {%20} url
 		append new_page "<a href=\"$url\">"
 		set index [expr [lindex $tag 1] + 1]
 	}
+	append new_page [string range $page $index end]
 
 	set index 0
 	set page $new_page
@@ -709,14 +757,14 @@ proc RAG_Manager_resolve_urls {page base_url} {
 		set url [string range $page {*}$url]
 		set url [string trim $url]
 		if {![regexp {https?} $url match]} {
-			set url [RAG_Manager_resolve_relative_url $base_url $url]
+			set url [RAG_Manager_relative_url $base_url $url]
 		}
 		regsub -all { } $url {%20} url
 		append new_page "<img src=\"$url\">"
 		set index [expr [lindex $tag 1] + 1]
 	}
-
 	append new_page [string range $page $index end]
+	
 	return $new_page
 }
 
@@ -727,6 +775,8 @@ proc RAG_Manager_resolve_urls {page base_url} {
 #
 proc RAG_Manager_convert_urls {page} {
 	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
 	regsub -all {<a +href="([^"]+)"[^>]*>([^<]+)</a>} $page {[\2](\1)} page
 	regsub -all {<img +src="([^"]+)"[^>]*>} $page {[Figure](\1)} page
 	return $page
@@ -734,21 +784,26 @@ proc RAG_Manager_convert_urls {page} {
 
 #
 # RAG_Manager_chapter_urls converts the "Chapter: Title" at the top of every
-# chunk in a chunk list into a markdown anchor with absolute link to the
-# chapter. It returns the modified chunks in a new list.
+# chunk content string into a markdown anchor with absolute link to the
+# chapter. It returns the modified chunk list. Note that this routine operates
+# only on the content strings, not the match strings, which should contain 
+# not chapeter, section, or date titles.
 #
 proc RAG_Manager_chapter_urls {chunks base_url} {
 	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
 	set new_chunks [list]
 	foreach chunk $chunks {
-		if {[regexp {^Chapter: ([^\n]*)} $chunk -> title]} {
-			regsub {^Chapter: ([^\n]*)} $chunk "" chunk
+		set match [lindex $chunk 0]
+		set content [lindex $chunk 1]
+		if {[regexp {^Chapter: ([^\n]*)} $content -> title]} {
+			regsub {^Chapter: ([^\n]*)} $content "" content
 			regsub -all { } $title {%20} link
 			set chapter "Chapter: \[$title\]\($base_url\#$link\)"
-			lappend new_chunks "$chapter$chunk"
-		} else {
-			lappend new_chunks $chunk
+			set content "$chapter$content"
 		}
+		lappend new_chunks [list $match $content]
 	}
 	return $new_chunks
 }
@@ -804,23 +859,31 @@ proc RAG_Manager_html_chunks {url} {
 }
 
 #
-# RAG_Manager_store_chunks stores chunks to disk. It takes each chunk in the
-# list and uses its contents to obtain a unique hash name for the chunk. It
-# stores the chunk to disk in the specified directory with the name hash.txt.
+# RAG_Manager_store_chunks stores the match and content strings of a chunk list
+# to disk. It stores the content strings in the contents_dir and the match
+# strings in the matches_dir. disk in the chunks directory. It takes each
+# content string and uses its contents to obtain a unique hash name for the
+# corresponding chunk. It stores the content string with as hash.txt in the
+# contents_dir and the match string as hash.txt in the match_dir. The routine
+# takes as input a chunk list, in which each chunk consists of a match string
+# and a content string.
 #
-proc RAG_Manager_store_chunks {chunks dir} {
+proc RAG_Manager_store_chunks {chunks} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	RAG_Manager_print "Storing chunks to $dir\..." 
+	RAG_Manager_print "Storing chunks in content and match directories..." 
 	set count 0
 	foreach chunk $chunks {
-		set cmd [list echo -n $chunk | openssl dgst -sha1]
+		set match [lindex $chunk 0]
+		set content [lindex $chunk 1]
+
+		set cmd [list echo -n $content | openssl dgst -sha1]
 		if {[catch {
 			set result [eval exec $cmd]
 		} error_result]} {
 			RAG_Manager_print "ERROR: $error_result"
-			RAG_Manager_print $chunk green
+			RAG_Manager_print $content green
 			continue
 		}
 		if {[regexp {[a-f0-9]{40}} $result hash]} {
@@ -830,35 +893,45 @@ proc RAG_Manager_store_chunks {chunks dir} {
 			RAG_Manager_print "RESULT: $result"
 			break
 		}
-		set cfn [file join $dir $hash\.txt]
-		set f [open $cfn w]
-		puts -nonewline $f $chunk
+		
+		set mfn [file join $config(match_dir) $hash\.txt]
+		set f [open $mfn w]
+		puts -nonewline $f $match
 		close $f
+
+		set cfn [file join $config(content_dir) $hash\.txt]
+		set f [open $cfn w]
+		puts -nonewline $f $content
+		close $f
+		
 		incr count
-		RAG_Manager_print "$count\: $cfn" green
+		RAG_Manager_print "$count\: [file tail $mfn] [file tail $cfn]" green
+		
 		LWDAQ_support
 	}
-	RAG_Manager_print "Stored $count chunks." 
+	RAG_Manager_print "Stored $count match and content strings." 
 	return $count
 }
 
 #
-# RAG_Manager_embed_from_chunk submits a chunk, with the help of an access key, to
-# the embedding end point and retrieves its embed vector in a json record.
+# RAG_Manager_embed_string submits a string, which could either be a chunk match
+# string or a question string, to the embedding endpoint. We use an access key
+# to connect to our endpoint. The endpoint returns an embedding vector in a json
+# record.
 #
-proc RAG_Manager_embed_from_chunk {chunk api_key} {
+proc RAG_Manager_embed_string {match api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	set tokens [expr [string length $chunk] / $info(token_size)]
+	set tokens [expr [string length $match] / $info(token_size)]
 	RAG_Manager_print "Embedding $tokens tokens with model $config(embed_model)." brown
-    set chunk [string map {\\ \\\\} $chunk]
-    set chunk [string map {\" \\\"} $chunk]
-    set chunk [string map {\n \\n} $chunk]
-    regsub -all {\s+} $chunk " " chunk
+    set match [string map {\\ \\\\} $match]
+    set match [string map {\" \\\"} $match]
+    set match [string map {\n \\n} $match]
+    regsub -all {\s+} $match " " match
 	set json_body " \{\n \
 		\"model\": \"$config(embed_model)\",\n \
-		\"input\": \"$chunk\"\n \}"
+		\"input\": \"$match\"\n \}"
 	set cmd [list curl -sS -X POST https://api.openai.com/v1/embeddings \
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $api_key" \
@@ -880,7 +953,7 @@ proc RAG_Manager_vector_from_embed {embed} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 		
-	if {[regexp {"embedding": \[([^\]]*)} $embed match vector]} {
+	if {[regexp {"embedding": \[([^\]]*)} $embed -> vector]} {
 		regsub -all {,} $vector " " vector
 		regsub -all {[\n\t ]+} $vector " " vector
 	} else {
@@ -897,35 +970,38 @@ proc RAG_Manager_vector_from_embed {embed} {
 }
 
 #
-# RAG_Manager_fetch_embeds makes a list of all chunks in a chunk directory,
-# which we assume are the files with extention txt, and another list of all the
-# embeddings in an embed directory, which we assume are files with extension
-# json, and checks to see if an embed exists for each chunk. If no embed exists,
-# the routine reads the chunk, submits the chunk to the embedding end point,
-# fetches the embedding, and stores the embedding to disk with the same file
-# name root as the chunk. At the end, the routine purges any embeds that have no
-# matching chunk remaining.
+# RAG_Manager_fetch_embeds makes a list of all match strings in a match
+# directory, which we assume are the files with extention txt, and another list
+# of all the embeddings in an embed directory, which we assume are also text
+# files with extension txt, and checks to see if an embed exists for each chunk.
+# If no embed exists, the routine reads the match string, submits the string to
+# the embedding end point, fetches the embedding vector, extracts the vector,
+# scales and rounds its components, and stores the compacted vector to disk as a
+# Tcl list in the embed directory with the same file name as the match string.
+# At the end, the routine purges any embeds that have no corresponding match
+# string remaining in the match directory. The only parameter we have to pass
+# into this routine is the api_key.
 #
-proc RAG_Manager_fetch_embeds {chunk_dir embed_dir api_key} {
+proc RAG_Manager_fetch_embeds {api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 		
-	set cfl [glob -nocomplain [file join $chunk_dir *.txt]]
-	RAG_Manager_print "Found [llength $cfl] chunks on disk."
-	set efl [glob -nocomplain [file join $embed_dir *.json]]
+	set mfl [glob -nocomplain [file join $config(match_dir) *.txt]]
+	RAG_Manager_print "Found [llength $mfl] chunks on disk."
+	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
 	RAG_Manager_print "Found [llength $efl] embeds on disk."
 	set new_count 0
 	set old_count 0
 	set count 0
 	RAG_Manager_print "Creating embeds for new paragraphs..."
-	foreach cfn $cfl {
+	foreach mfn $mfl {
 		incr count
-		set root [file root [file tail $cfn]]
+		set root [file root [file tail $mfn]]
 		if {![regexp $root $efl]} {
-			set f [open $cfn r]
-			set chunk [read $f]
+			set f [open $mfn r]
+			set match [read $f]
 			close $f
-			set embed [RAG_Manager_embed_from_chunk $chunk $api_key]
+			set embed [RAG_Manager_embed_string $match $api_key]
 			if {[LWDAQ_is_error_result $embed]} {
 				RAG_Manager_print "ERROR: $embed"
 				break
@@ -935,15 +1011,15 @@ proc RAG_Manager_fetch_embeds {chunk_dir embed_dir api_key} {
 				RAG_Manager_print "ERROR: $vector"
 				break
 			}
-			set efn [file join $embed_dir $root\.json]
+			set efn [file join $config(embed_dir) $root\.txt]
 			set f [open $efn w]
 			puts -nonewline $f $vector
 			close $f
 			incr new_count
-			RAG_Manager_print "$count\: [file tail $cfn] fetched new embed." orange
+			RAG_Manager_print "$count\: [file tail $mfn] fetched new embed." orange
 		} else {
 			incr old_count
-			RAG_Manager_print "$count\: [file tail $cfn] embed exists." orange
+			RAG_Manager_print "$count\: [file tail $mfn] embed exists." orange
 		} 
 		LWDAQ_update
 	}
@@ -951,11 +1027,11 @@ proc RAG_Manager_fetch_embeds {chunk_dir embed_dir api_key} {
 		found $old_count embeds,\
 		fetched $new_count embeds."
 		
-	set efl [glob -nocomplain [file join $embed_dir *.json]]
+	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
 	set count 0
 	foreach efn $efl {
 		set root [file root [file tail $efn]]
-		if {![regexp $root $cfl]} {
+		if {![regexp $root $mfl]} {
 			file delete $efn
 			incr count
 		}
@@ -1154,19 +1230,31 @@ proc RAG_Manager_delete {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Delete"
-	RAG_Manager_print "\nDeleting Chunks [RAG_Manager_time]" purple
-	set cfl [glob -nocomplain [file join $config(chunk_dir) *.txt]]
-	RAG_Manager_print "Found [llength $cfl] chunks."
+	RAG_Manager_print "\nDeleting Content and Match Strings [RAG_Manager_time]" purple
+
+	set cfl [glob -nocomplain [file join $config(content_dir) *.txt]]
+	RAG_Manager_print "Found [llength $cfl] content strings."
 	set count 0
 	foreach cfn $cfl {
 		file delete $cfn
 		incr count
 		LWDAQ_support
 	}
-	RAG_Manager_print "Deleted $count chunks."
+	RAG_Manager_print "Deleted $count content strings."
+
+	set mfl [glob -nocomplain [file join $config(match_dir) *.txt]]
+	RAG_Manager_print "Found [llength $cfl] match strings."
+	set count 0
+	foreach mfn $mfl {
+		file delete $mfn
+		incr count
+		LWDAQ_support
+	}
+	RAG_Manager_print "Deleted $count match strings."
+
 	RAG_Manager_print "Deletion Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
-	return "$count"
+	return ""
 }
 
 #
@@ -1187,7 +1275,7 @@ proc RAG_Manager_generate {} {
 	foreach url [string trim $config(sources)] {
 		set chunks [concat $chunks [RAG_Manager_html_chunks $url]]
 	}
-	RAG_Manager_store_chunks $chunks $config(chunk_dir)
+	RAG_Manager_store_chunks $chunks
 
 	RAG_Manager_print "Reading api key $config(key_file)\." brown
 	if {![file exists $config(key_file)]} {
@@ -1200,8 +1288,8 @@ proc RAG_Manager_generate {} {
 	close $f 
 	RAG_Manager_print "Read API key." brown
 
-	RAG_Manager_print "Submitting all chunks for embedding..."	
-	RAG_Manager_fetch_embeds $config(chunk_dir) $config(embed_dir) $api_key
+	RAG_Manager_print "Submitting all chunk match strings for embedding..."	
+	RAG_Manager_fetch_embeds $api_key
 	
 	RAG_Manager_print "Generation Complete [RAG_Manager_time]." purple
 	set info(control) "Idle"
@@ -1216,8 +1304,8 @@ proc RAG_Manager_generate {} {
 # retrieved chunk list until the total number of tokens in the chunks is equal
 # to or greater than the token limit for the question's level of relevance. In
 # the case of high-relevance questions, if it comes to a chunk with relevance
-# lower than the mid-relevance threshold, it stops adding chunks, so as to
-# avoid adding irrelevant information to the completion input, which makes the
+# lower than the mid-relevance threshold, it stops adding chunks, so as to avoid
+# adding irrelevant information to the completion input, which makes the
 # completion faster. It returns the list of chunks retrieved. In order to embed
 # the question, this routine must read a valid API key from disk.
 #
@@ -1250,14 +1338,14 @@ proc RAG_Manager_retrieve {} {
 
 	RAG_Manager_print "Obtaining question embedding vector..."
 	set start_time [clock milliseconds]
-	set q_embed [RAG_Manager_embed_from_chunk $config(question) $api_key]
+	set q_embed [RAG_Manager_embed_string $config(question) $api_key]
 	set q_vector [RAG_Manager_vector_from_embed $q_embed]
 	
 	RAG_Manager_print "Question embed obtained in\
 		[expr [clock milliseconds] - $start_time] ms,\
 		comparing question to embed library..."
 	set comparisons [list]
-	set efl [glob -nocomplain [file join $config(embed_dir) *.json]]
+	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
 	set len [llength $q_vector]
 	foreach efn $efl {
 		LWDAQ_support
@@ -1314,23 +1402,36 @@ proc RAG_Manager_retrieve {} {
 		RAG_Manager_print "-----------------------------------------------------" brown
 		RAG_Manager_print "$count\: Relevance $chunk_relevance:" brown
 		set embed [lindex $comparison 1]
-		set cfn [file join $config(chunk_dir) $embed\.txt]
+		set cfn [file join $config(content_dir) $embed\.txt]
 		if {![file exists $cfn]} {
 			if {$count == 1} {
-				RAG_Manager_print "ERROR: Most relevant chunk missing, [file tail $cfn]."
+				RAG_Manager_print "ERROR:\
+					Most relevant chunk content missing, [file tail $cfn]."
 				incr count -1
 				break
 			} else {
-				RAG_Manager_print "WARNING: No chunk exists for embed $embed."
+				RAG_Manager_print "WARNING: No chunk content exists for embed $embed."
 				continue
 			}
 		}
 		set f [open $cfn r]
-		set chunk [read $f]
+		set content [read $f]
 		close $f
-		lappend data "$config(chunk_title)$chunk"
-		RAG_Manager_print $chunk green
-		set tokens [expr $tokens + ([string length $chunk]/$info(token_size))]
+		lappend data "$config(chunk_title)$content"
+		RAG_Manager_print $content green
+		set tokens [expr $tokens + ([string length $content]/$info(token_size))]
+
+		if {$config(show_match)} {
+			set mfn [file join $config(match_dir) $embed\.txt]
+			if {![file exists $mfn]} {
+				RAG_Manager_print "WARNING: Cannot find match string for this chunk." blue
+			} else {
+				set f [open $mfn r]
+				set match [read $f]
+				close $f
+				RAG_Manager_print $match orange
+			}
+		}
 	}
 
 	if {$config(chat_submit)} {
@@ -1425,7 +1526,7 @@ proc RAG_Manager_submit {} {
 	RAG_Manager_print "Received $len tokens,\
 		extracting answer and formatting for Markdown."
 		
-	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) match answer]} {
+	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) -> answer]} {
 		set num [regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer]
 		RAG_Manager_print "Replaced $num \\r and \\n sequences with newlines." brown
 		set num [regsub -all {\\\"} $answer "\"" answer]
@@ -1434,7 +1535,7 @@ proc RAG_Manager_submit {} {
 		RAG_Manager_print "Replaced $num solitary asterisks with ×." brown
 		set num [regsub -all {([^\n]+)\n(?!\n)} $answer "\\1  \n" answer]
 		RAG_Manager_print "Added spaces to the end of $num lines." brown
-	} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $info(result) match message]} {
+	} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $info(result) -> message]} {
 		set answer "ERROR: $message"
 	} else {
 		set answer "ERROR: Could not find answer or error message in result."
@@ -1611,7 +1712,7 @@ every chunk given a chapter name, a URL pointing to the chapter on-line, and
 often a last-modified data as well. We translate the chunks from HTML into
 Markdown. This translation includes all URLs. We resolve all relative URLs and
 internal document links to absolute URLs. The answer we get back from the
-completion end-point will also be in Markdown. The OpenAI LLM likes Markdown.
+completion endpoint will also be in Markdown. The OpenAI LLM likes Markdown.
 
 Once all the chunks are generated, the RAG Manager calls "openssl" to provide a
 unique name for each chunk, and stores the chunks in the chunk directory with
@@ -1619,9 +1720,9 @@ names of the form 6270ebd71f0b.txt.
 
 Now that the generation process has produced all the chunks of the library, it
 checks each chunk to see if it has an embedding vector in the embed directory.
-The embedding vector will be named like 6270ebd71f0b.json. If the embed exists,
+The embedding vector will be named like 6270ebd71f0b.txt. If the embed exists,
 the chunk is ready to deploy. If the embedding vector does not exist, the
-generator submits the chunk to the OpenAI embedding end-point, obtains its
+generator submits the chunk to the OpenAI embedding endpoint, obtains its
 embedding vector, and writes the vector to disk in the embed directory. To
 obtain the vector, we need an API Key, which is the means by which we identify
 ourselves to OpenAI and agree to pay for the embedding service. Embedding is
@@ -1634,7 +1735,7 @@ The last stage of generation is to eliminate embedding vectors for which there
 is no corresponding chunk. Now we have a complete library of chunks and
 embedding vectors ready for RAG.
 
-The RAG Manager provides instructions to the OpenAI "completion end-point",
+The RAG Manager provides instructions to the OpenAI "completion endpoint",
 which is the server tha answers questions. In the RAG Manager window, press
 Assistant and you will be able to edit the instructions we will provide for
 high, mid, and low-relevance questions.
@@ -1654,7 +1755,7 @@ verbose flag set, we get to see all the chunks and the chat history.
 
 Press Submit and the RAG Manager puts together the assistant instructions, the
 documentation chunks, and the question in one big json record, submits them to
-the OpenAI completion end-point as one big json record and waits for an answer.
+the OpenAI completion endpoint as one big json record and waits for an answer.
 For high-relevance questions, we are currently using the "gpt-4" completion
 model, which costs $0.01 per thousand input tokens (assistant, chunk, question
 and chat) and $0.03 per thousand output tokens (the answer). For mid and

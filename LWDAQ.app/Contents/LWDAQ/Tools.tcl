@@ -315,7 +315,7 @@ proc LWDAQ_tool_save {name} {
 	upvar #0 $name\_info info
 	set f [open $info(settings_file_name) w]
 	foreach {name} [lsort -dictionary [array names config]] {
-		puts $f "set $info(name)\_config($name) \"$config($name)\""
+		puts $f "set $info(name)\_config($name) \{$config($name)\}"
 	}
 	close $f
 	return ""
