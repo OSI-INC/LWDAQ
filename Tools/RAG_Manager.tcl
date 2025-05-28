@@ -501,9 +501,9 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		
 		if {[regexp {<a href=} $content] \
 			|| [regexp {<img src=} $content] \
-			|| [regexp {<h3> src=} $content] \
-			|| [regexp {</ul> src=} $content] \
-			|| [regexp {</ol> src=} $content]} {
+			|| [regexp {<h3>} $content] \
+			|| [regexp {</ul>} $content] \
+			|| [regexp {</ol>} $content]} {
 			incr rejected
 			continue
 		}
