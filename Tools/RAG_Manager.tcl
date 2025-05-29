@@ -96,29 +96,45 @@ You are also able to summarize, explain, and answer questions
 about scientific and engineering documentation.
 You are provided with excerpts from documentation that may include
 text, figures, and links. When answering the user's question:
-  - If the user's question asks for a figure, graph, or image
+  - If the question asks for a figure, graph, or image
     and a matching figure is present in the excerpts,
     include it in your response using Markdown image formatting:  
     `![Figure Caption](image_url)`  
-    This ensures the image will be rendered inline in the chat interface.
   - Do not say "you cannot search the web" or "you cannot find images" if a 
     relevant figure is already present in the provided content.
   - Provide hyperlinks to original documentation sources when available.
-  - Prefer newer information over older when content appears to be 
-    versioned or time-sensitive.
+  - Prefer newer information over older.
   - Respond using Markdown formatting.
+- When responding with mathematical expressions, return equations using LaTeX syntax.
+  - Use `\(...\)` for inline math and `\[...\]` for display math.
+  - Ensure all `\left` and `\right` delimiters are correctly paired.
+  - Avoid placing line breaks or unnecessary whitespace inside LaTeX math environments.
+  - Do not escape backslashes in LaTeX expressions.
+  - Place display equations on their own lines using `\[...\]`.
     }
 	set config(mid_rel_assistant) {
 You are a helpful technical assistant.
 If you are not certain of the answer to a question,
 say you do not know the answer.
 Respond using Markdown formatting. 
+- When responding with mathematical expressions, return equations using LaTeX syntax.
+  - Use `\(...\)` for inline math and `\[...\]` for display math.
+  - Ensure all `\left` and `\right` delimiters are correctly paired.
+  - Avoid placing line breaks or unnecessary whitespace inside LaTeX math environments.
+  - Do not escape backslashes in LaTeX expressions.
+  - Place display equations on their own lines using `\[...\]`.
 	}
 	set config(low_rel_assistant) {
 You are a helpful technical assistant.
 If you are not certain of the answer to a question,
 say you do not know the answer.
 Respond using Markdown formatting. 
+- When responding with mathematical expressions, return equations using LaTeX syntax.
+  - Use `\(...\)` for inline math and `\[...\]` for display math.
+  - Ensure all `\left` and `\right` delimiters are correctly paired.
+  - Avoid placing line breaks or unnecessary whitespace inside LaTeX math environments.
+  - Do not escape backslashes in LaTeX expressions.
+  - Place display equations on their own lines using `\[...\]`.
 	}
 #
 # A list of html entities and the unicode characters we want to replace them
@@ -188,6 +204,7 @@ Respond using Markdown formatting.
 		&infin;     "∞"
 		&times;     "×"
 		&deg;       "°"
+		&middot;    "·"
 		&minus;     "−"
 		&radic;     "√"
 		&asymp;     "≈"
@@ -851,11 +868,15 @@ proc RAG_Manager_chapter_urls {chunks base_url} {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
 		if {[regexp {^Chapter: ([^\n]*)} $content -> title]} {
-			regsub {^Chapter: ([^\n]*)} $content "" content
 			regsub -all { } $title {%20} link
-			set chapter "Chapter: \[$title\]\($base_url\#$link\)"
-			set content "$chapter$content"
-		}
+			regsub {^Chapter: ([^\n]*)} $content \
+				"Chapter: \[$title\]\($base_url\#$link\)" content
+		} 
+		if {[regexp {\nSection: ([^\n]*)} $content -> title]} {
+			regsub -all { } $title {%20} link
+			regsub {\nSection: ([^\n]*)} $content \
+				"\nSection: \[$title\]\($base_url\#$link\)" content
+		} 
 		lappend new_chunks [list $match $content]
 	}
 	return $new_chunks
@@ -871,7 +892,7 @@ proc RAG_Manager_convert_entities {page} {
     foreach {entity char} $info(entities_to_convert) {
         regsub -all $entity $page $char page
     }
-    regsub -all {\t} $page "  " page
+    regsub -all {\t} $page {    } page
     return $page
 }
 
@@ -925,7 +946,8 @@ proc RAG_Manager_store_chunks {chunks} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	RAG_Manager_print "Storing chunks in content and match directories..." 
+	RAG_Manager_print "Storing [llength $chunks] chunks\
+		in content and match directories..." 
 	set count 0
 	foreach chunk $chunks {
 		set match [lindex $chunk 0]
@@ -958,7 +980,7 @@ proc RAG_Manager_store_chunks {chunks} {
 		close $f
 		
 		incr count
-		RAG_Manager_print "$count\: [file tail $mfn] [file tail $cfn]" green
+		RAG_Manager_print "$count\: [file tail $mfn]" green
 		
 		LWDAQ_support
 	}
@@ -1054,6 +1076,7 @@ proc RAG_Manager_fetch_embeds {api_key} {
 			set f [open $mfn r]
 			set match [read $f]
 			close $f
+			RAG_Manager_print "$count\: [file tail $mfn] fetching new embed." orange
 			set embed [RAG_Manager_embed_string $match $api_key]
 			if {[LWDAQ_is_error_result $embed]} {
 				RAG_Manager_print "ERROR: $embed"
@@ -1069,7 +1092,6 @@ proc RAG_Manager_fetch_embeds {api_key} {
 			puts -nonewline $f $vector
 			close $f
 			incr new_count
-			RAG_Manager_print "$count\: [file tail $mfn] fetched new embed." orange
 		} else {
 			incr old_count
 			RAG_Manager_print "$count\: [file tail $mfn] embed exists." orange
@@ -1203,7 +1225,7 @@ proc RAG_Manager_assistant {} {
 	# window. Bind the Command-a key to save the metadata.
 	toplevel $w
 	wm title $w "Assistant Instructions, RAG_Manager $info(version)"
-	LWDAQ_text_widget $w 80 40
+	LWDAQ_text_widget $w 100 40
 	LWDAQ_enable_text_undo $w.text
 	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
 	
@@ -1240,7 +1262,7 @@ proc RAG_Manager_sources {} {
 	# window. Bind the Command-a key to save the metadata.
 	toplevel $w
 	wm title $w "Source Documents, RAG_Manager $info(version)"
-	LWDAQ_text_widget $w 70 10
+	LWDAQ_text_widget $w 100 10
 	LWDAQ_enable_text_undo $w.text
 	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
 	
@@ -1870,6 +1892,16 @@ $0.0005 per thousand input tokens and $0.0015 per thousand output tokens. Our
 default is to send roughly 3400 input tokens for a high-relevance question, and
 we see about 200 tokens in response, so our average high-relevance answer costs
 us rouhly four cents.
+
+The answer we receive from the completion endpoint will take a form, tone, and
+level of detail controlled by our assistant instructions. We have chosen to ask
+the endpoint to give us answers in Markdown format, with equations in Latex. The
+LLM understands Markdown and Latex very well, having been trained on a largly
+Markdown and Latex body of documents. It is well able to produce both Markdown
+and Latex, but it does make frequent mistakes in generating Latex. These
+mistakes are to do with backlashes, newlines, and other escape sequences. We
+include in our answer-processing a sequence of steps to look out for and remove
+such errors.
 
 Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
