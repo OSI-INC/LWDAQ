@@ -125,23 +125,72 @@ Respond using Markdown formatting.
 # with.
 #
 	set info(entities_to_convert) {
-		&mu; "μ"
-		&plusmn; "±"
-		&div; "÷"
-		&amp; "&"
-		&nbsp; " "
-		&Omega; "Ω"
-		&beta; "ß"
-		&pi; "π"
-		&lt; "<"
-		&gt; ">"
-		&le; "≤"
-		&ge; "≥"
-		&asymp; "≈"
-		&infin; "∞"
-		&times; "×"
-		&deg; "°"
-		&minus; "−"
+		&Alpha;     "Α"
+		&alpha;     "α"
+		&Beta;      "Β"
+		&beta;      "β"
+		&Gamma;     "Γ"
+		&gamma;     "γ"
+		&Delta;     "Δ"
+		&delta;     "δ"
+		&Epsilon;   "Ε"
+		&epsilon;   "ε"
+		&Zeta;      "Ζ"
+		&zeta;      "ζ"
+		&Eta;       "Η"
+		&eta;       "η"
+		&Theta;     "Θ"
+		&theta;     "θ"
+		&Iota;      "Ι"
+		&iota;      "ι"
+		&Kappa;     "Κ"
+		&kappa;     "κ"
+		&Lambda;    "Λ"
+		&lambda;    "λ"
+		&Mu;        "Μ"
+		&mu;        "μ"
+		&Nu;        "Ν"
+		&nu;        "ν"
+		&Xi;        "Ξ"
+		&xi;        "ξ"
+		&Omicron;   "Ο"
+		&omicron;   "ο"
+		&Pi;        "Π"
+		&pi;        "π"
+		&Rho;       "Ρ"
+		&rho;       "ρ"
+		&Sigma;     "Σ"
+		&sigma;     "σ"
+		&sigmaf;    "ς"
+		&Tau;       "Τ"
+		&tau;       "τ"
+		&Upsilon;   "Υ"
+		&upsilon;   "υ"
+		&Phi;       "Φ"
+		&phi;       "φ"
+		&varphi;    "ϕ"
+		&Chi;       "Χ"
+		&chi;       "χ"
+		&Psi;       "Ψ"
+		&psi;       "ψ"
+		&Omega;     "Ω"
+		&omega;     "ω"
+		&plusmn;    "±"
+		&div;       "÷"
+		&amp;       "&"
+		&nbsp;      " "
+		&pi;        "π"
+		&lt;        "<"
+		&gt;        ">"
+		&le;        "≤"
+		&ge;        "≥"
+		&asymp;     "≈"
+		&infin;     "∞"
+		&times;     "×"
+		&deg;       "°"
+		&minus;     "−"
+		&radic;     "√"
+		&asymp;     "≈"
 	}
 #
 # A list of tags we want to remove
@@ -154,6 +203,10 @@ Respond using Markdown formatting.
 		br " "
 		small ""
 		/small ""
+		<sup> "^"
+		</sup> ""
+		<sub> "_"
+		</sub> ""
 	}
 #
 # The chunk delimiting tags.
@@ -643,7 +696,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 					append heading "Chapter: $chapter\n"
 				}
 				if {$section != "NONE"} {
-					set heading "Section: $section\n"
+					append heading "Section: $section\n"
 				}
 				if {$step != "NONE"} {
 					append heading "Step: $step\n"
@@ -1433,20 +1486,28 @@ proc RAG_Manager_retrieve {} {
 			}
 		}
 	}
+	RAG_Manager_print "-----------------------------------------------------" brown
 
 	if {$config(chat_submit)} {
+		RAG_Manager_print "Adding chat history to the chunk content list..."
 		RAG_Manager_print "-----------------------------------------------------" brown
-		RAG_Manager_print "Adding chat history to document chunks:" brown
-		RAG_Manager_print $info(chat) green	
+		set chat [string trim $info(chat)]
+		if {$chat != ""} {
+			RAG_Manager_print [string trim $info(chat)] green
+		} else {
+			RAG_Manager_print "Chat history is empty." green
+		}
+		
+		RAG_Manager_print "-----------------------------------------------------" brown
 		lappend data "config(chat_title)$info(chat)"
 		set tokens [expr $tokens + ([string length $info(chat)]/$info(token_size))]	
 	}
 	
-	RAG_Manager_print "-----------------------------------------------------" brown
 
 	set info(data) $data
 	set info(control) "Idle"
-	RAG_Manager_print "Retrieval complete, $count chunks, $tokens tokens [RAG_Manager_time]." purple
+	RAG_Manager_print "Retrieval complete, $count chunks,\
+		$tokens tokens [RAG_Manager_time]." purple
 	return [llength $data]
 }
 
@@ -1613,7 +1674,7 @@ proc RAG_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 	
-	foreach a {Verbose Submit_Chat} {
+	foreach a {Verbose Chat_Submit} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text "$a" -variable RAG_Manager_config($b)
 		pack $f.$b -side left -expand yes
@@ -1779,7 +1840,7 @@ the number of content tokens we will submit to the completion endpoint based
 upon the relevance of the question. Low-relevance questions get no documentation
 at all. The generator starts to readcontent strings from disk, starting with the
 most relevant chunk and proceeding through its sorted list. When the total
-number of tokens passes our limit, it stops adding content. If the submit_chat
+number of tokens passes our limit, it stops adding content. If the chat_submit
 flag is set, the manager adds the chat history to submission data as well. In
 the online chatbot implementation, we submit the previous two questions and
 answers to give continuity to the chat. 
