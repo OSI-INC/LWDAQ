@@ -203,10 +203,10 @@ Respond using Markdown formatting.
 		br " "
 		small ""
 		/small ""
-		<sup> "^"
-		</sup> ""
-		<sub> "_"
-		</sub> ""
+		sup "^"
+		/sup ""
+		sub "_"
+		/sub ""
 	}
 #
 # The chunk delimiting tags.
