@@ -105,36 +105,54 @@ text, figures, and links. When answering the user's question:
   - Provide hyperlinks to original documentation sources when available.
   - Prefer newer information over older.
   - Respond using Markdown formatting.
-- When responding with mathematical expressions, return equations using LaTeX syntax.
-  - Use `\(...\)` for inline math and `\[...\]` for display math.
-  - Ensure all `\left` and `\right` delimiters are correctly paired.
-  - Avoid placing line breaks or unnecessary whitespace inside LaTeX math environments.
-  - Do not escape backslashes in LaTeX expressions.
-  - Place display equations on their own lines using `\[...\]`.
+When writing mathematical expressions, use LaTeX formatting within Markdown.
+  - Always escape backslashes in LaTeX expressions to ensure correct rendering in Markdown.
+  - Use `\\(` and `\\)` for inline math expressions.
+  - Use `\\[` and `\\]` for display (block) math expressions.
+  - Escape all LaTeX commands with double backslashes, 
+    e.g., `\\frac`, `\\pi`, `\\sqrt`, `\\int`, `\\nabla`, etc.
+  - Do not break LaTeX commands across lines. Keep each command 
+    and its arguments on the same line to prevent rendering issues.
+  - Ensure all `\\left` and `\\right` delimiters are properly paired and complete.
+  - Do not insert Markdown-style line breaks (e.g., `\\n`) inside LaTeX math zones.
+  - Do not include inline math (`\\(...\\)`) inside headings or list markers; 
+    keep math in normal text or paragraphs.
     }
 	set config(mid_rel_assistant) {
 You are a helpful technical assistant.
 If you are not certain of the answer to a question,
 say you do not know the answer.
 Respond using Markdown formatting. 
-- When responding with mathematical expressions, return equations using LaTeX syntax.
-  - Use `\(...\)` for inline math and `\[...\]` for display math.
-  - Ensure all `\left` and `\right` delimiters are correctly paired.
-  - Avoid placing line breaks or unnecessary whitespace inside LaTeX math environments.
-  - Do not escape backslashes in LaTeX expressions.
-  - Place display equations on their own lines using `\[...\]`.
+When writing mathematical expressions, use LaTeX formatting within Markdown.
+  - Always escape backslashes in LaTeX expressions to ensure correct rendering in Markdown.
+  - Use `\\(` and `\\)` for inline math expressions.
+  - Use `\\[` and `\\]` for display (block) math expressions.
+  - Escape all LaTeX commands with double backslashes, 
+    e.g., `\\frac`, `\\pi`, `\\sqrt`, `\\int`, `\\nabla`, etc.
+  - Do not break LaTeX commands across lines. Keep each command 
+    and its arguments on the same line to prevent rendering issues.
+  - Ensure all `\\left` and `\\right` delimiters are properly paired and complete.
+  - Do not insert Markdown-style line breaks (e.g., `\\n`) inside LaTeX math zones.
+  - Do not include inline math (`\\(...\\)`) inside headings or list markers; 
+    keep math in normal text or paragraphs.
 	}
 	set config(low_rel_assistant) {
 You are a helpful technical assistant.
 If you are not certain of the answer to a question,
 say you do not know the answer.
 Respond using Markdown formatting. 
-- When responding with mathematical expressions, return equations using LaTeX syntax.
-  - Use `\(...\)` for inline math and `\[...\]` for display math.
-  - Ensure all `\left` and `\right` delimiters are correctly paired.
-  - Avoid placing line breaks or unnecessary whitespace inside LaTeX math environments.
-  - Do not escape backslashes in LaTeX expressions.
-  - Place display equations on their own lines using `\[...\]`.
+When writing mathematical expressions, use LaTeX formatting within Markdown.
+  - Always escape backslashes in LaTeX expressions to ensure correct rendering in Markdown.
+  - Use `\\(` and `\\)` for inline math expressions.
+  - Use `\\[` and `\\]` for display (block) math expressions.
+  - Escape all LaTeX commands with double backslashes, 
+    e.g., `\\frac`, `\\pi`, `\\sqrt`, `\\int`, `\\nabla`, etc.
+  - Do not break LaTeX commands across lines. Keep each command 
+    and its arguments on the same line to prevent rendering issues.
+  - Ensure all `\\left` and `\\right` delimiters are properly paired and complete.
+  - Do not insert Markdown-style line breaks (e.g., `\\n`) inside LaTeX math zones.
+  - Do not include inline math (`\\(...\\)`) inside headings or list markers; 
+    keep math in normal text or paragraphs.
 	}
 #
 # A list of html entities and the unicode characters we want to replace them
@@ -302,14 +320,14 @@ proc RAG_Manager_read_url {url} {
 # the same tag to close. The routine returns the locations of four characters in
 # the page. These are the begin and end characters of the body of the field, and
 # the begin and end characters of the entire field including the tags. If an
-# opening tag exits, but no end tage, the routine returns the entire remainder
+# opening tag exits, but no end tag, the routine returns the entire remainder
 # of the page as the contents of the field.
 #
 proc RAG_Manager_locate_field {page index tag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	if {[regexp -indices -start $index "<$tag\(| \[^>\]*\)>" $page i_open]} {
+	if {[regexp -indices -start $index "<$tag\[^>\]*?>" $page i_open]} {
 		set i_body_begin [expr [lindex $i_open 1] + 1] 
 		set i_field_begin [lindex $i_open 0]
 		if {[regexp -indices -start $i_body_begin "</$tag>" $page i_close]} {
@@ -854,10 +872,11 @@ proc RAG_Manager_convert_urls {page} {
 
 #
 # RAG_Manager_chapter_urls converts the "Chapter: Title" at the top of every
-# chunk content string into a markdown anchor with absolute link to the
-# chapter. It returns the modified chunk list. Note that this routine operates
-# only on the content strings, not the match strings, which should contain 
-# not chapeter, section, or date titles.
+# chunk content string into a markdown anchor with absolute link to the chapter.
+# If a second line with "Section: Title" exists, it inserts a link for that too.
+# It returns the modified chunk list. Note that this routine operates only on
+# the content strings, not the match strings, which should contain not chapeter,
+# section, or date titles.
 #
 proc RAG_Manager_chapter_urls {chunks base_url} {
 	upvar #0 RAG_Manager_info info
@@ -1534,6 +1553,22 @@ proc RAG_Manager_retrieve {} {
 }
 
 #
+# RAG_Manager_md_from_jsaon takes a json text string, as we might extract
+# from a message, content, or error field, and removes and replaces
+# json-specific escape sequences to create Markdown text.
+#
+proc RAG_Manager_md_from_json {content} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	regsub -all {\\r\\n|\\r|\\n} $content "\n" content
+	regsub -all {\\\"} $content "\"" content
+	regsub -all {\s+\*\s+} $content { × } content
+	regsub -all {([^\n]+)\n(?!\n)} $content "\\1  \n" content
+	return $content
+}
+
+#
 # RAG_Manager_submit combines the question and the assistant instructions with
 # the retrieved data, all of which are stored in elements of the info array, and
 # passes them to the RAG package for submission to the completion end point. In
@@ -1609,15 +1644,26 @@ proc RAG_Manager_submit {} {
 	RAG_Manager_print "Received $len tokens,\
 		extracting answer and formatting for Markdown."
 		
+		
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) -> answer]} {
-		set num [regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer]
-		RAG_Manager_print "Replaced $num \\r and \\n sequences with newlines." brown
-		set num [regsub -all {\\\"} $answer "\"" answer]
-		RAG_Manager_print "Replaced $num \\\\ with backslash." brown
-		set num [regsub -all {\s+\*\s+} $answer { × } answer]
-		RAG_Manager_print "Replaced $num solitary asterisks with ×." brown
-		set num [regsub -all {([^\n]+)\n(?!\n)} $answer "\\1  \n" answer]
-		RAG_Manager_print "Added spaces to the end of $num lines." brown
+#RAG_Manager_print "\n$answer" magenta
+		set math_pattern {(\\\\\[.*?\\\\\])|(\\\\\(.*?\\\\\))|(\$\$.*?\$\$)}
+		set new_answer ""
+		set scratch $answer
+		while {[regexp -indices -nocase $math_pattern $scratch idx]} {
+			lassign $idx start end
+			set prefix [string range $scratch 0 [expr $start - 1]]
+			set math [string range $scratch $start $end]
+			set scratch [string range $scratch [expr $end + 1] end]
+			set prefix [RAG_Manager_md_from_json $prefix]
+#RAG_Manager_print "\n$prefix" brown
+#RAG_Manager_print "\n$math" green
+			append new_answer $prefix
+			append new_answer $math
+		}
+		set scratch [RAG_Manager_md_from_json $scratch]
+		append new_answer $scratch
+		set answer $new_answer
 	} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $info(result) -> message]} {
 		set answer "ERROR: $message"
 	} else {
