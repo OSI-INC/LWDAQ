@@ -25,7 +25,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "2.0"
+	LWDAQ_tool_init "RAG_Manager" "2.1"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -1553,19 +1553,54 @@ proc RAG_Manager_retrieve {} {
 }
 
 #
-# RAG_Manager_md_from_jsaon takes a json text string, as we might extract
-# from a message, content, or error field, and removes and replaces
-# json-specific escape sequences to create Markdown text.
+# RAG_Manager_txt_from_json takes a raw json-formatted content string received
+# from the completion endpoint and formats it for display in our plain text
+# window. We want to see newlines in the right places. When the answer includes
+# Latex math, we want to see the exact characters of the Latex code, but the
+# endpoint often adds an excessive number of backslashes within the math string,
+# so we reduce anything more than two down to one backslash within the math
+# regions, including the delimiters on either end. It is this plain text version
+# of the answer that we will attach to our local chat history.
 #
-proc RAG_Manager_md_from_json {content} {
+proc RAG_Manager_txt_from_json {content} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
-	regsub -all {\\r\\n|\\r|\\n} $content "\n" content
-	regsub -all {\\\"} $content "\"" content
-	regsub -all {\s+\*\s+} $content { × } content
-	regsub -all {([^\n]+)\n(?!\n)} $content "\\1  \n" content
-	return $content
+	set p1 {(\\\\\[.*?\\\\\])}
+	set p2 {(\\\\\(.*?\\\\\))}
+	set p3 {(\$\$.*?\$\$)}
+	set new_content ""
+	set far "10000000"
+	set scratch $content
+	while {[string length $scratch] > 0} {
+		set start $far
+		set end $far
+		foreach n {1 2 3} {
+			if {[regexp -indices -nocase [set p$n] $scratch idx]} {
+				lassign [set idx] sidx eidx
+				if {$sidx < $start} {
+					set start $sidx
+					set end $eidx
+				}
+			}
+		}
+		set prefix [string range $scratch 0 [expr $start - 1]]
+		regsub -all {\\r\\n|\\r|\\n} $prefix "\n" prefix
+		regsub -all {\\\"} $prefix "\"" prefix
+		regsub -all {\s+\*\s+} $prefix { × } prefix
+		append new_content $prefix
+
+		set math [string range $scratch $start $end]
+		regsub -all {\\\\} $math "\\" math
+		regsub -all {\\\\} $math "\\" math
+		append new_content $math
+		
+		set scratch [string range $scratch [expr $end + 1] end]
+	}
+
+	set content [string trim $new_content]
+
+	return $new_content
 }
 
 #
@@ -1574,15 +1609,12 @@ proc RAG_Manager_md_from_json {content} {
 # passes them to the RAG package for submission to the completion end point. In
 # order to submit the question, this routine must read a valid API key from
 # disk. Once we receive a response from the completion end point, we try to
-# extract an answer from the response json record. If we succeed, then format
-# the answer for Markdown. We convert backslash-n-backslash-r to newline,
-# backslash-r to newline, backslash-n to newline, backlash-t to tab,
-# backslash-double-quote to double-quote, single newline with no preceding
-# whitespace to double-space-newline. We replace solitary asterisks with
-# multiplication symbols and we add two spaces to the end of any line with three
-# backticks, so that we get a blank line after code samples. If we can't extract
-# the answer then we try to extract an error message and report the error. If we
-# can't extract an error message, we return a failure error message of our own.
+# extract an answer from the response json record. If we succeed, we format it
+# for plain text display and print it out in the console or tool window. What we
+# pass back to the calling routine is the raw answer with no formatting. If we
+# can't extract the answer then we try to extract an error message and report
+# the error. If we can't extract an error message, we return a failure error
+# message of our own.
 #
 proc RAG_Manager_submit {} {
 	upvar #0 RAG_Manager_config config
@@ -1646,36 +1678,23 @@ proc RAG_Manager_submit {} {
 		
 		
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) -> answer]} {
-#RAG_Manager_print "\n$answer" magenta
-		set math_pattern {(\\\\\[.*?\\\\\])|(\\\\\(.*?\\\\\))|(\$\$.*?\$\$)}
-		set new_answer ""
-		set scratch $answer
-		while {[regexp -indices -nocase $math_pattern $scratch idx]} {
-			lassign $idx start end
-			set prefix [string range $scratch 0 [expr $start - 1]]
-			set math [string range $scratch $start $end]
-			set scratch [string range $scratch [expr $end + 1] end]
-			set prefix [RAG_Manager_md_from_json $prefix]
-#RAG_Manager_print "\n$prefix" brown
-#RAG_Manager_print "\n$math" green
-			append new_answer $prefix
-			append new_answer $math
-		}
-		set scratch [RAG_Manager_md_from_json $scratch]
-		append new_answer $scratch
-		set answer $new_answer
+		RAG_Manager_print "-----------------------------------------------------" brown
+		RAG_Manager_print "Raw answer content from completion endpoint:" brown
+		RAG_Manager_print $answer green
+		RAG_Manager_print "-----------------------------------------------------" brown
 	} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $info(result) -> message]} {
 		set answer "ERROR: $message"
 	} else {
 		set answer "ERROR: Could not find answer or error message in result."
 	}
- 	append info(chat) "Answer: [string trim $answer]\n\n"
 
 	RAG_Manager_print "Submission Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
 
 	RAG_Manager_print "\nAnswer to \"$question\":" purple
-	RAG_Manager_print $answer 
+	set answer_txt [RAG_Manager_txt_from_json $answer]
+	RAG_Manager_print $answer_txt 
+	append info(chat) "Answer: $answer_txt\n\n"
 	RAG_Manager_print "End of Answer" purple
 	
 	return $answer
