@@ -25,7 +25,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "2.1"
+	LWDAQ_tool_init "RAG_Manager" "2.2"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -89,6 +89,7 @@ https://www.bndhep.net/Devices/BCAM/User_Manual.html
 # edited with a dedicated window and saved to settings file.
 #
 	set config(high_rel_assistant) {
+	
 You are a helpful technical assistant.
 You can perform mathematical calculations and return
 numeric results with appropriate units.
@@ -105,54 +106,31 @@ text, figures, and links. When answering the user's question:
   - Provide hyperlinks to original documentation sources when available.
   - Prefer newer information over older.
   - Respond using Markdown formatting.
-When writing mathematical expressions, use LaTeX formatting within Markdown.
-  - Always escape backslashes in LaTeX expressions to ensure correct rendering in Markdown.
-  - Use `\\(` and `\\)` for inline math expressions.
-  - Use `\\[` and `\\]` for display (block) math expressions.
-  - Escape all LaTeX commands with double backslashes, 
-    e.g., `\\frac`, `\\pi`, `\\sqrt`, `\\int`, `\\nabla`, etc.
-  - Do not break LaTeX commands across lines. Keep each command 
-    and its arguments on the same line to prevent rendering issues.
-  - Ensure all `\\left` and `\\right` delimiters are properly paired and complete.
-  - Do not insert Markdown-style line breaks (e.g., `\\n`) inside LaTeX math zones.
-  - Do not include inline math (`\\(...\\)`) inside headings or list markers; 
-    keep math in normal text or paragraphs.
+  - When writing mathematical expressions, use LaTeX formatting within Markdown,
+    but never insert newline characters into LaTeX math zones.
+    
     }
 	set config(mid_rel_assistant) {
+	
 You are a helpful technical assistant.
 If you are not certain of the answer to a question,
 say you do not know the answer.
 Respond using Markdown formatting. 
-When writing mathematical expressions, use LaTeX formatting within Markdown.
-  - Always escape backslashes in LaTeX expressions to ensure correct rendering in Markdown.
-  - Use `\\(` and `\\)` for inline math expressions.
-  - Use `\\[` and `\\]` for display (block) math expressions.
-  - Escape all LaTeX commands with double backslashes, 
-    e.g., `\\frac`, `\\pi`, `\\sqrt`, `\\int`, `\\nabla`, etc.
-  - Do not break LaTeX commands across lines. Keep each command 
-    and its arguments on the same line to prevent rendering issues.
-  - Ensure all `\\left` and `\\right` delimiters are properly paired and complete.
-  - Do not insert Markdown-style line breaks (e.g., `\\n`) inside LaTeX math zones.
-  - Do not include inline math (`\\(...\\)`) inside headings or list markers; 
-    keep math in normal text or paragraphs.
+When writing mathematical expressions, 
+use LaTeX formatting within Markdown,
+but never insert newline characters into LaTeX expressions.
+
 	}
 	set config(low_rel_assistant) {
+	
 You are a helpful technical assistant.
 If you are not certain of the answer to a question,
 say you do not know the answer.
 Respond using Markdown formatting. 
-When writing mathematical expressions, use LaTeX formatting within Markdown.
-  - Always escape backslashes in LaTeX expressions to ensure correct rendering in Markdown.
-  - Use `\\(` and `\\)` for inline math expressions.
-  - Use `\\[` and `\\]` for display (block) math expressions.
-  - Escape all LaTeX commands with double backslashes, 
-    e.g., `\\frac`, `\\pi`, `\\sqrt`, `\\int`, `\\nabla`, etc.
-  - Do not break LaTeX commands across lines. Keep each command 
-    and its arguments on the same line to prevent rendering issues.
-  - Ensure all `\\left` and `\\right` delimiters are properly paired and complete.
-  - Do not insert Markdown-style line breaks (e.g., `\\n`) inside LaTeX math zones.
-  - Do not include inline math (`\\(...\\)`) inside headings or list markers; 
-    keep math in normal text or paragraphs.
+When writing mathematical expressions, 
+use LaTeX formatting within Markdown,
+but never insert newline characters into LaTeX expressions.
+
 	}
 #
 # A list of html entities and the unicode characters we want to replace them
@@ -242,6 +220,8 @@ When writing mathematical expressions, use LaTeX formatting within Markdown.
 		/sup ""
 		sub "_"
 		/sub ""
+		span ""
+		/span ""
 	}
 #
 # The chunk delimiting tags.
@@ -533,7 +513,7 @@ proc RAG_Manager_convert_tags {chunk} {
 	upvar #0 RAG_Manager_config config
 
     foreach {tag replace} $info(tags_to_convert) {
-        regsub -all "<$tag>" $chunk $replace chunk
+        regsub -all "<$tag\[^>\]*?>" $chunk $replace chunk
     }
     return $chunk
 }
@@ -1371,7 +1351,7 @@ proc RAG_Manager_generate {} {
 	}
 	RAG_Manager_store_chunks $chunks
 
-	RAG_Manager_print "Reading api key $config(key_file)\." brown
+	RAG_Manager_print "Reading api key $config(key_file)\..." brown
 	if {![file exists $config(key_file)]} {
 		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
 		set info(control) "Idle"
@@ -1380,7 +1360,6 @@ proc RAG_Manager_generate {} {
 	set f [open $config(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read API key." brown
 
 	RAG_Manager_print "Submitting all chunk match strings for embedding..."	
 	RAG_Manager_fetch_embeds $api_key
