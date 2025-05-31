@@ -1,7 +1,7 @@
 {
 	TCL/TK Command Line Implementations of Pascal Routines 
 	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-	Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -79,6 +79,15 @@ var
 }
 var
 	nearest_neighbor_library:matrix_type;
+	
+type
+	embed_type=record
+		name:string;
+		vector:packed array of integer;
+	end;
+
+var
+	embed_library:array of embed_type;
 
 {
 	lwdaq_tcl_eval evaluates a string in the Tcl interpreter and returns the
@@ -6083,6 +6092,117 @@ begin
 end;
 
 {
+<p>lwdaq_rag provides routines to support retrieval-assisted generation (RAG).
+In particular these routines are used by the RAG Manager tool to load a library
+of embedding vectors into memory, and subsequently to compare the embedding vector of a
+question to the vectors of the entire library.</p>
+}
+function lwdaq_rag(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
+
+const
+	empty_name='EMPTY';
+	
+var
+	option:string='';
+	arg_index:integer;
+	vp:pointer;	
+	command:string='';
+	name:string=empty_name;
+	vector:string='';
+	vec_len:integer=1536;
+	lib_len:integer=1000;
+	comp_len:integer=100;
+	result:string='';
+	i:integer=-1;
+	j:integer=-1;
+	gx:x_graph_type;
+
+begin
+	error_string:='';
+	gui_interp_ptr:=interp;
+	lwdaq_rag:=Tcl_Error;
+	lib_len:=length(embed_library);
+	vec_len:=length(embed_library[0].vector);
+
+	if (argc<2) or odd(argc) then begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Wrong number of arguments, must be "'
+			+'lwdaq_rag command ?option value?".');
+		exit;
+	end;
+
+	arg_index:=2;
+	while (arg_index<argc-1) do begin
+		option:=Tcl_ObjString(argv[arg_index]);
+		inc(arg_index);
+		vp:=argv[arg_index];
+		inc(arg_index);
+		if (option='-lib_len') then lib_len:=Tcl_ObjInteger(vp)	
+		else if (option='-comp_len') then comp_len:=Tcl_ObjInteger(vp)	
+		else if (option='-vec_len') then vec_len:=Tcl_ObjInteger(vp)
+		else if (option='-name') then name:=Tcl_ObjString(vp)	
+		else if (option='-vector') then vector:=Tcl_ObjString(vp)
+		else begin
+			Tcl_SetReturnString(interp,error_prefix
+				+'Bad option "'+option+'", must be one of '
+				+'"-lib_len -comp_len -vec_len -name -vector" in '
+				+'lwdaq_rag.');
+			exit;
+		end;
+	end;
+
+	command:=Tcl_ObjString(argv[1]);
+	if (command='init') then begin
+		setlength(embed_library,lib_len);
+		for i:=0 to lib_len-1 do begin
+			embed_library[i].name:=empty_name;
+			setlength(embed_library[i].vector,vec_len);
+		end;
+	end else if (command='add') then begin
+		gx:=read_x_graph(vector);
+		if length(gx)<>vec_len then begin
+			writestr(result,'Mismatched embed length, expected ',vec_len:1,
+				' received ',length(gx));
+			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag.');
+			exit;
+		end;
+		j:=0;
+		while (j<length(embed_library)) and (embed_library[j].name<>empty_name) do 
+			inc(j);
+		if j>=length(embed_library) then begin
+			writestr(result,'Embed library full with ',length(embed_library):1,' embeds');
+			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag.');
+			exit;
+		end;
+		for i:=0 to vec_len do
+			embed_library[j].vector[i]:=round(gx[i]);
+		embed_library[j].name:=name;
+	end else if (command='compare') then begin
+		writestr(result,command,' ',lib_len:1,' ',vec_len,' ',comp_len:1,' ',i:1,' ',j:1);
+	end else if (command='config') then begin
+		writestr(result,command,' ',lib_len:1,' ',vec_len,' ',comp_len:1,' ',i:1,' ',j:1);
+	end else if (command='dump') then begin
+		result:='';
+		for j:=0 to length(embed_library)-1 do begin
+			result:=result+embed_library[j].name;
+			for i:=0 to length(embed_library[j].vector)-1 do
+				result:=result+string_from_integer(embed_library[j].vector[i],1)+' ';
+			result:=result+eol;
+		end;
+	end else begin
+		Tcl_SetReturnString(interp,error_prefix
+			+'Bad command "'+command+'", must be one of '
+			+'"init add compare config dump" in lwdaq_rag.');
+		exit;
+	end;
+
+
+	Tcl_SetReturnString(interp,result);
+	if error_string<>'' then Tcl_SetReturnString(interp,error_string);
+	lwdaq_rag:=Tcl_OK;
+end;
+
+{
 <p>The <i>lwdaq</i> command acts as an entry point into our analysis libraries,
 making various math functions available at the TCL command line. You specify the
 routine we wish to call, and pass arguments to the routine in strings or byte
@@ -7598,6 +7718,8 @@ begin
 	gui_wait:=lwdaq_gui_wait;
 	gui_support:=lwdaq_gui_support;
 	debug_log:=lwdaq_debug_log;
+	setlength(nearest_neighbor_library,1,1);
+	setlength(embed_library,1);
 	
 	tcl_createobjcommand(interp,'lwdaq_config',lwdaq_config,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_image_create',lwdaq_image_create,0,nil);
@@ -7638,6 +7760,7 @@ begin
 	tcl_createobjcommand(interp,'lwdaq_metrics',lwdaq_metrics,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_bcam_calib',lwdaq_bcam_calib,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_simplex',lwdaq_simplex,0,nil);
+	tcl_createobjcommand(interp,'lwdaq_rag',lwdaq_rag,0,nil);
 	
 	lwdaq_init:=tcl_pkgprovide(interp,package_name,version_num);
 end;
