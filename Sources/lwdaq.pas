@@ -83,11 +83,42 @@ var
 type
 	embed_type=record
 		name:string;
+		relevance:real;
 		vector:packed array of integer;
 	end;
 
 var
 	embed_library:array of embed_type;
+	
+{
+	The embed library swap procedure used by lwdaq_rag to sort the embed
+	library. Must be a global procedure in order for us to point the quick sort
+	routine to the procedure.
+}
+procedure embed_swap(a,b:integer;p:pointer); 
+var e:embed_type;
+begin
+	e.name:=embed_library[a].name;
+	e.relevance:=embed_library[a].relevance;
+	e.vector:=embed_library[a].vector;
+	embed_library[a].name:=embed_library[b].name;
+	embed_library[a].relevance:=embed_library[b].relevance;
+	embed_library[a].vector:=embed_library[b].vector;
+	embed_library[b].name:=e.name;
+	embed_library[b].relevance:=e.relevance;
+	embed_library[b].vector:=e.vector;
+end;
+
+{
+	The embed library less-than function used by lwdaq_rag to sort the embed
+	library. Must be a global function in order for us to point the quick sort
+	routine to the procedure
+	
+}
+function embed_lt(a,b:integer;p:pointer):boolean;
+begin 
+	embed_lt:=(embed_library[a].relevance < embed_library[b].relevance); 
+end;
 
 {
 	lwdaq_tcl_eval evaluates a string in the Tcl interpreter and returns the
@@ -194,7 +225,8 @@ begin
 end;
 
 {
-	lwdaq_debug_log writes a string to a log file using the LWDAQ_debug_log routine.
+	lwdaq_debug_log writes a string to a log file using the LWDAQ_debug_log
+	routine.
 }
 procedure lwdaq_debug_log(s:string); 
 begin
@@ -6112,17 +6144,23 @@ var
 	vec_len:integer=1536;
 	lib_len:integer=1000;
 	comp_len:integer=100;
+	scale:integer=65536;
 	result:string='';
 	i:integer=-1;
 	j:integer=-1;
 	gx:x_graph_type;
-
+	r:integer;
+	e:embed_type;
+	s:string;
+	limit:integer;
+	
 begin
 	error_string:='';
 	gui_interp_ptr:=interp;
 	lwdaq_rag:=Tcl_Error;
 	lib_len:=length(embed_library);
 	vec_len:=length(embed_library[0].vector);
+lwdaq_debug_log('Starting lwdaq_rag');
 
 	if (argc<2) or odd(argc) then begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -6142,28 +6180,39 @@ begin
 		else if (option='-vec_len') then vec_len:=Tcl_ObjInteger(vp)
 		else if (option='-name') then name:=Tcl_ObjString(vp)	
 		else if (option='-vector') then vector:=Tcl_ObjString(vp)
+		else if (option='-scale') then scale:=Tcl_ObjInteger(vp)
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"-lib_len -comp_len -vec_len -name -vector" in '
+				+'"-lib_len -comp_len -vec_len -name -vector -scale" in '
 				+'lwdaq_rag.');
 			exit;
 		end;
 	end;
 
+	writestr(result,'-lib_len ',lib_len:1,' ',
+		'-vec_len ',vec_len:1,' ',
+		'-comp_len ',comp_len:1,' ',
+		'-scale ',scale);
+
 	command:=Tcl_ObjString(argv[1]);
 	if (command='init') then begin
+lwdaq_debug_log('Entered init.');
 		setlength(embed_library,lib_len);
-		for i:=0 to lib_len-1 do begin
-			embed_library[i].name:=empty_name;
-			setlength(embed_library[i].vector,vec_len);
-		end;
+		for i:=0 to lib_len-1 do 
+			with embed_library[i] do begin
+				name:=empty_name;
+				relevance:=0;
+				setlength(embed_library[i].vector,vec_len);
+			end;
+lwdaq_debug_log('lib_len='+string_from_integer(lib_len,1));
 	end else if (command='add') then begin
+lwdaq_debug_log('Entered add.');
 		gx:=read_x_graph(vector);
 		if length(gx)<>vec_len then begin
-			writestr(result,'Mismatched embed length, expected ',vec_len:1,
+			writestr(result,'Mismatched vector length, expected ',vec_len:1,
 				' received ',length(gx));
-			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag.');
+			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag add.');
 			exit;
 		end;
 		j:=0;
@@ -6171,24 +6220,75 @@ begin
 			inc(j);
 		if j>=length(embed_library) then begin
 			writestr(result,'Embed library full with ',length(embed_library):1,' embeds');
-			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag.');
+			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag add.');
 			exit;
 		end;
 		for i:=0 to vec_len do
 			embed_library[j].vector[i]:=round(gx[i]);
 		embed_library[j].name:=name;
+lwdaq_debug_log('Added embed '+name);
 	end else if (command='compare') then begin
-		writestr(result,command,' ',lib_len:1,' ',vec_len,' ',comp_len:1,' ',i:1,' ',j:1);
-	end else if (command='config') then begin
-		writestr(result,command,' ',lib_len:1,' ',vec_len,' ',comp_len:1,' ',i:1,' ',j:1);
-	end else if (command='dump') then begin
-		result:='';
-		for j:=0 to length(embed_library)-1 do begin
-			result:=result+embed_library[j].name;
-			for i:=0 to length(embed_library[j].vector)-1 do
-				result:=result+string_from_integer(embed_library[j].vector[i],1)+' ';
-			result:=result+eol;
+lwdaq_debug_log('Entered compare.');
+		gx:=read_x_graph(vector);
+		if length(gx)<>vec_len then begin
+			writestr(result,'Mismatched vector length, expected ',vec_len:1,
+				' received ',length(gx));
+			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag compare.');
+			exit;
 		end;
+lwdaq_debug_log('Received comparison real vector.');
+s:='';for i:=0 to vec_len-1 do writestr(s,s,gx[i]:6:1,' ');
+lwdaq_debug_log(s);
+		setlength(e.vector,vec_len);
+		for i:=0 to vec_len-1 do e.vector[i]:=round(gx[i]);
+lwdaq_debug_log('Created comparison integer vector.');
+s:='';for i:=0 to vec_len-1 do writestr(s,s,e.vector[i]:1,' ');
+lwdaq_debug_log(s);
+		for j:=0 to lib_len-1 do 
+			with embed_library[j] do begin 
+				r:=0;
+				for i:=0 to vec_len-1 do
+					r:=r+vector[i]*e.vector[i];
+				relevance:=1.0*r/scale/scale;
+lwdaq_debug_log(name+' '+string_from_real(relevance,1,4));
+			end;
+lwdaq_debug_log('Calculated relevances.');
+		quick_sort(0,lib_len-1,embed_swap,embed_lt,@embed_library);
+lwdaq_debug_log('Sorted library.');
+		result:='';
+		if comp_len>lib_len then limit:=lib_len else limit:=comp_len;
+		for j:=0 to limit-1 do
+			with embed_library[j] do begin
+				writestr(s,name,' ',relevance:1:4,' ');
+				insert(s,result,length(result)+1);
+				if length(result)>long_string_length then begin
+					report_error(
+						'length(result)>long_string_length in lwdaq_rag compare');
+					exit;
+				end;
+			end;
+lwdaq_debug_log('Prepared result string:');
+lwdaq_debug_log(result);
+	end else if (command='config') then begin
+lwdaq_debug_log('Entered config.');
+		writestr(result,'-lib_len ',lib_len:1,' ',
+			'-vec_len ',vec_len:1,' ',
+			'-comp_len ',comp_len:1,' ',
+			'-scale ',scale);
+lwdaq_debug_log('Prepared result string.');
+	end else if (command='dump') then begin
+lwdaq_debug_log('Entered dump.');
+		result:='';
+		for j:=0 to length(embed_library)-1 do 
+			with embed_library[j] do begin
+				s:=name+' ';
+				for i:=0 to length(vector)-1 do
+					writestr(s,s,vector[i]:1,' ');
+				if j<length(embed_library)-1 then s:=s+eol;
+				insert(s,result,length(result)+1);
+			end;
+lwdaq_debug_log('Prepared result string:');
+lwdaq_debug_log(result);
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Bad command "'+command+'", must be one of '
