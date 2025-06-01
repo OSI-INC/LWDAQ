@@ -83,7 +83,7 @@ var
 type
 	embed_type=record
 		name:string;
-		relevance:real;
+		relevance:integer;
 		vector:packed array of integer;
 	end;
 
@@ -6125,9 +6125,51 @@ end;
 
 {
 <p>lwdaq_rag provides routines to support retrieval-assisted generation (RAG).
-In particular these routines are used by the RAG Manager tool to load a library
-of embedding vectors into memory, and subsequently to compare the embedding vector of a
-question to the vectors of the entire library.</p>
+It creates and maintains a library of embedding vectors in memory. It allows us
+to compare a new vector to every vector in the library and obtain a list of the
+most relevant library entries. Each embed in the library has a name, a
+relevance, and an n-dimensional, normalized vector. The name is a string of
+characters that identify a document chunk, although lwdaq_rag at no point
+handles anything but embedding vectors, nor does it read embedding vectors from
+disk or write them to disk. The vector itself must have integer coordinates. All
+vectors in the library must have the same length so that the dot product of a
+test vector with each vector in the library will be proportional to the cosine
+of the angle between each vector and the test vector. The relevance stored with
+each embed is the dot product we obtained from the most recent comparison, and
+is therefore itself an integer.</p>
+
+<p>The lwdaq_rag command is used by the RAG Manager tool to load a library of
+embedding vectors into memory, and subsequently to compare a question vector to
+all library entries. Embedding vectors provided by services such as OpenAI,
+which is the service used by the RAG Manager, are real-valued and normalized to
+a length of one. The RAG Manager tool deals with such vectors and it calls
+lwdaq_rag to manage its embed library. To obtain 0.1% precision in relevance
+measurement, the RAG Manager scales the vectors by &times;100k and rounds the
+coordinates to integers before storing to disk. These integer-coordinate vectors
+all have length 100k and we can pass them directly into the embed library with
+lwdaq_rag commands.</p>
+
+<p>The lwdaq_rag command operates on a persitent embedding library. This library
+can be replaced, but unless replaced, it persists so long as the LWDAQ instance
+that created it persists. We create a new library with the <i>create</i>
+command. Here is an example library creation command.</p>
+
+<pre>lwdaq_rag create -lib_len 1000 -vec_len 1536</pre>
+
+<p>Here we specify the number of entries in the library with the -lib_len option
+and the number of dimensions to each vector with -vec_len. These two options are
+both mandatory if we want to be sure the library fits our embedding vectors, but
+lwdaq_rag initializes both parameters from the existing library, so it will not
+raise an error if we fail to specify one or both.</p>
+
+<center><table border>
+<tr><th>Option</th><th>Function</th></tr>
+<tr><td>-lib_len</td><td>Number of embeds in the library, default 1.</td></tr>
+<tr><td>-vec_len</td><td>Number of coordinates in embedding vectors, default 1.</td></tr>
+<tr><td>-comp_len</td><td>Number of chunks returned by comparison, default 10.</td></tr>
+</table></center>
+
+<p>We add vectors to the library one at a time with the <i>add</i> command.</p>
 }
 function lwdaq_rag(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -6142,9 +6184,8 @@ var
 	name:string=empty_name;
 	vector:string='';
 	vec_len:integer=1536;
-	lib_len:integer=1000;
-	comp_len:integer=100;
-	scale:integer=65536;
+	lib_len:integer=10;
+	comp_len:integer=10;
 	result:string='';
 	i:integer=-1;
 	j:integer=-1;
@@ -6160,7 +6201,6 @@ begin
 	lwdaq_rag:=Tcl_Error;
 	lib_len:=length(embed_library);
 	vec_len:=length(embed_library[0].vector);
-lwdaq_debug_log('Starting lwdaq_rag');
 
 	if (argc<2) or odd(argc) then begin
 		Tcl_SetReturnString(interp,error_prefix
@@ -6180,24 +6220,17 @@ lwdaq_debug_log('Starting lwdaq_rag');
 		else if (option='-vec_len') then vec_len:=Tcl_ObjInteger(vp)
 		else if (option='-name') then name:=Tcl_ObjString(vp)	
 		else if (option='-vector') then vector:=Tcl_ObjString(vp)
-		else if (option='-scale') then scale:=Tcl_ObjInteger(vp)
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"-lib_len -comp_len -vec_len -name -vector -scale" in '
+				+'"-lib_len -comp_len -vec_len -name -vector" in '
 				+'lwdaq_rag.');
 			exit;
 		end;
 	end;
 
-	writestr(result,'-lib_len ',lib_len:1,' ',
-		'-vec_len ',vec_len:1,' ',
-		'-comp_len ',comp_len:1,' ',
-		'-scale ',scale);
-
 	command:=Tcl_ObjString(argv[1]);
-	if (command='init') then begin
-lwdaq_debug_log('Entered init.');
+	if (command='create') then begin
 		setlength(embed_library,lib_len);
 		for i:=0 to lib_len-1 do 
 			with embed_library[i] do begin
@@ -6205,9 +6238,7 @@ lwdaq_debug_log('Entered init.');
 				relevance:=0;
 				setlength(embed_library[i].vector,vec_len);
 			end;
-lwdaq_debug_log('lib_len='+string_from_integer(lib_len,1));
 	end else if (command='add') then begin
-lwdaq_debug_log('Entered add.');
 		gx:=read_x_graph(vector);
 		if length(gx)<>vec_len then begin
 			writestr(result,'Mismatched vector length, expected ',vec_len:1,
@@ -6223,43 +6254,31 @@ lwdaq_debug_log('Entered add.');
 			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag add.');
 			exit;
 		end;
-		for i:=0 to vec_len do
-			embed_library[j].vector[i]:=round(gx[i]);
+		for i:=0 to vec_len do embed_library[j].vector[i]:=round(gx[i]);
 		embed_library[j].name:=name;
-lwdaq_debug_log('Added embed '+name);
 	end else if (command='compare') then begin
-lwdaq_debug_log('Entered compare.');
 		gx:=read_x_graph(vector);
 		if length(gx)<>vec_len then begin
-			writestr(result,'Mismatched vector length, expected ',vec_len:1,
-				' received ',length(gx));
+			writestr(result,'Mismatched vector length, expected ',
+				vec_len:1,' received ',length(gx));
 			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag compare.');
 			exit;
 		end;
-lwdaq_debug_log('Received comparison real vector.');
-s:='';for i:=0 to vec_len-1 do writestr(s,s,gx[i]:6:1,' ');
-lwdaq_debug_log(s);
 		setlength(e.vector,vec_len);
 		for i:=0 to vec_len-1 do e.vector[i]:=round(gx[i]);
-lwdaq_debug_log('Created comparison integer vector.');
-s:='';for i:=0 to vec_len-1 do writestr(s,s,e.vector[i]:1,' ');
-lwdaq_debug_log(s);
 		for j:=0 to lib_len-1 do 
 			with embed_library[j] do begin 
 				r:=0;
 				for i:=0 to vec_len-1 do
 					r:=r+vector[i]*e.vector[i];
-				relevance:=1.0*r/scale/scale;
-lwdaq_debug_log(name+' '+string_from_real(relevance,1,4));
+				relevance:=r;
 			end;
-lwdaq_debug_log('Calculated relevances.');
 		quick_sort(0,lib_len-1,embed_swap,embed_lt,@embed_library);
-lwdaq_debug_log('Sorted library.');
 		result:='';
 		if comp_len>lib_len then limit:=lib_len else limit:=comp_len;
 		for j:=0 to limit-1 do
 			with embed_library[j] do begin
-				writestr(s,name,' ',relevance:1:4,' ');
+				writestr(s,name,' ',relevance:1,' ');
 				insert(s,result,length(result)+1);
 				if length(result)>long_string_length then begin
 					report_error(
@@ -6267,17 +6286,9 @@ lwdaq_debug_log('Sorted library.');
 					exit;
 				end;
 			end;
-lwdaq_debug_log('Prepared result string:');
-lwdaq_debug_log(result);
 	end else if (command='config') then begin
-lwdaq_debug_log('Entered config.');
-		writestr(result,'-lib_len ',lib_len:1,' ',
-			'-vec_len ',vec_len:1,' ',
-			'-comp_len ',comp_len:1,' ',
-			'-scale ',scale);
-lwdaq_debug_log('Prepared result string.');
+		writestr(result,'-lib_len ',lib_len:1,'-vec_len ',vec_len:1);
 	end else if (command='dump') then begin
-lwdaq_debug_log('Entered dump.');
 		result:='';
 		for j:=0 to length(embed_library)-1 do 
 			with embed_library[j] do begin
@@ -6287,12 +6298,10 @@ lwdaq_debug_log('Entered dump.');
 				if j<length(embed_library)-1 then s:=s+eol;
 				insert(s,result,length(result)+1);
 			end;
-lwdaq_debug_log('Prepared result string:');
-lwdaq_debug_log(result);
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Bad command "'+command+'", must be one of '
-			+'"init add compare config dump" in lwdaq_rag.');
+			+'"create add compare config dump" in lwdaq_rag.');
 		exit;
 	end;
 
@@ -7820,6 +7829,7 @@ begin
 	debug_log:=lwdaq_debug_log;
 	setlength(nearest_neighbor_library,1,1);
 	setlength(embed_library,1);
+	setlength(embed_library[0].vector,1);
 	
 	tcl_createobjcommand(interp,'lwdaq_config',lwdaq_config,0,nil);
 	tcl_createobjcommand(interp,'lwdaq_image_create',lwdaq_image_create,0,nil);
