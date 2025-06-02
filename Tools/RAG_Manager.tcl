@@ -25,7 +25,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "2.2"
+	LWDAQ_tool_init "RAG_Manager" "3.1"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -113,23 +113,45 @@ text, figures, and hyperlinks. When answering the user's question:
 	set config(mid_rel_assistant) {
 	
 You are a helpful technical assistant.
-If you are not certain of the answer to a question,
-say you do not know the answer.
-Respond using Markdown formatting. 
-When writing mathematical expressions, 
-use LaTeX formatting within Markdown,
-but never insert newline characters into LaTeX expressions.
+You can perform mathematical calculations and return
+numeric results with appropriate units.
+You are also able to summarize, explain, and answer questions
+about scientific and engineering documentation.
+You are provided with excerpts from documentation that may include
+text, figures, and hyperlinks. When answering the user's question:
+  - If the question asks for a figure, graph, or image
+    and a matching figure is present in the excerpts,
+    include it in your response using Markdown image formatting:  
+    `![Figure Caption](image_url)`  
+  - Do not say "you cannot search the web" or "you cannot find images" if a 
+    relevant figure is already present in the provided content.
+  - Provide hyperlinks to original documentation sources when available.
+  - Prefer newer information over older.
+  - Respond using Markdown formatting.
+  - When writing mathematical expressions, use LaTeX formatting within Markdown,
+    but never insert newline characters into LaTeX math zones.
 
 	}
 	set config(low_rel_assistant) {
 	
 You are a helpful technical assistant.
-If you are not certain of the answer to a question,
-say you do not know the answer.
-Respond using Markdown formatting. 
-When writing mathematical expressions, 
-use LaTeX formatting within Markdown,
-but never insert newline characters into LaTeX expressions.
+You can perform mathematical calculations and return
+numeric results with appropriate units.
+You are also able to summarize, explain, and answer questions
+about scientific and engineering documentation.
+You are provided with excerpts from documentation that may include
+text, figures, and hyperlinks. When answering the user's question:
+  - If the question asks for a figure, graph, or image
+    and a matching figure is present in the excerpts,
+    include it in your response using Markdown image formatting:  
+    `![Figure Caption](image_url)`  
+  - Do not say "you cannot search the web" or "you cannot find images" if a 
+    relevant figure is already present in the provided content.
+  - Provide hyperlinks to original documentation sources when available.
+  - Prefer newer information over older.
+  - Respond using Markdown formatting.
+  - When writing mathematical expressions, use LaTeX formatting within Markdown,
+    but never insert newline characters into LaTeX math zones.
 
 	}
 #
@@ -233,6 +255,7 @@ but never insert newline characters into LaTeX expressions.
 	set info(hash_len) "12"
 	set info(token_size) "4"
 	set info(embed_scale) "100000"
+	set info(retrieve_len) "100" 
 #
 # Check existence of dependent utilities.
 #
@@ -1045,16 +1068,12 @@ proc RAG_Manager_vector_from_embed {embed} {
 
 #
 # RAG_Manager_fetch_embeds makes a list of all match strings in a match
-# directory, which we assume are the files with extention txt, and another list
-# of all the embeddings in an embed directory, which we assume are also text
-# files with extension txt, and checks to see if an embed exists for each chunk.
-# If no embed exists, the routine reads the match string, submits the string to
-# the embedding end point, fetches the embedding vector, extracts the vector,
-# scales and rounds its components, and stores the compacted vector to disk as a
-# Tcl list in the embed directory with the same file name as the match string.
-# At the end, the routine purges any embeds that have no corresponding match
-# string remaining in the match directory. The only parameter we have to pass
-# into this routine is the api_key.
+# directory. It makes a list of all the embeds in the embed directory. For each
+# match string, it checks to see if an embed exists for it. If not, it creates a
+# new embed. The routine counts the number of embeds that have not corresponding
+# match strings, but it does not remove these embeds. Use the purge command to
+# remove obsolete embeds. The only parameter we have to pass into this routine
+# is the api_key. The routine returns the number of new embeds it fetched.
 #
 proc RAG_Manager_fetch_embeds {api_key} {
 	upvar #0 RAG_Manager_info info
@@ -1097,22 +1116,55 @@ proc RAG_Manager_fetch_embeds {api_key} {
 		} 
 		LWDAQ_update
 	}
-	RAG_Manager_print "Checked $count chunks,\
-		found $old_count embeds,\
-		fetched $new_count embeds."
-		
+
 	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
-	set count 0
+	set obsolete_count 0
 	foreach efn $efl {
 		set root [file root [file tail $efn]]
 		if {![regexp $root $mfl]} {
-			file delete $efn
-			incr count
+			incr obsolete_count
 		}
 	}
-	RAG_Manager_print "Purged $count expired embeds from disk."
+
+	RAG_Manager_print "Checked $count chunks,\
+		found $old_count matching embeds,\
+		fetched $new_count new embeds,\
+		there are $obsolete_count obsolete embeds."
+		
+	return $new_count
+}
+
+#
+# RAG_Manager_purge_embeds makes a list of all content strings in a match
+# directory and another list of all the embeds in the embed directory. It
+# deletes any embed for which there is not corresponding match string.
+#
+proc RAG_Manager_purge_embeds {} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+		
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "Purge"
+	RAG_Manager_print "\nPurge Obsolete Embed Vectors [RAG_Manager_time]" purple
 	
-	return $count
+	set cfl [glob -nocomplain [file join $config(content_dir) *.txt]]
+	RAG_Manager_print "Found [llength $cfl] content strings on disk."
+	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
+	RAG_Manager_print "Found [llength $efl] embeds on disk."
+
+	set purge_count 0
+	foreach efn $efl {
+		set root [file root [file tail $efn]]
+		if {![regexp $root $cfl]} {
+			file delete $efn
+			incr purge_count
+		}
+	}
+	RAG_Manager_print "Purged $purge_count embeds with no content string."
+
+	RAG_Manager_print "Purge Complete [RAG_Manager_time]" purple
+	set info(control) "Idle"
+	return $purge_count
 }
 
 #
@@ -1211,7 +1263,7 @@ proc RAG_Manager_apply {w} {
 # the three assistant instructions. We can edit and then apply with an Apply
 # button.
 #
-proc RAG_Manager_assistant {} {
+proc RAG_Manager_assistant_prompts {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
@@ -1223,7 +1275,7 @@ proc RAG_Manager_assistant {} {
 	# Create a new top-level text window that is a child of the main tool
 	# window. Bind the Command-a key to save the metadata.
 	toplevel $w
-	wm title $w "Assistant Instructions, RAG_Manager $info(version)"
+	wm title $w "Assistant Prompts, RAG_Manager $info(version)"
 	LWDAQ_text_widget $w 100 40
 	LWDAQ_enable_text_undo $w.text
 	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
@@ -1234,7 +1286,7 @@ proc RAG_Manager_assistant {} {
 	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
 	pack $w.f.apply -side left
 	
-	# Print the assistant instructions for all relevance levels.
+	# Print the assistant prompts for all relevance levels.
 	foreach level {high mid low} {
 		LWDAQ_print $w.text "set config($level\_rel_assistant) \{\n" blue
 		LWDAQ_print $w.text "[string trim $config($level\_rel_assistant)]"
@@ -1245,10 +1297,10 @@ proc RAG_Manager_assistant {} {
 }
 
 #
-# RAG_Manager_sources opens a text window and prints out the source list. We can
+# RAG_Manager_source_urls opens a text window and prints out the source list. We can
 # edit and then apply with an Apply button.
 #
-proc RAG_Manager_sources {} {
+proc RAG_Manager_source_urls {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
@@ -1281,15 +1333,22 @@ proc RAG_Manager_sources {} {
 
 #
 # RAG_Manager_configure opens the tool configuration window, which allows us to
-# edit the configuration parameters. These do not include multi-line parameters
-# such as the source URL list or the assistant instructions. These multi-line
-# parameters are accessed through their own buttons and windows.
+# edit the configuration parameters. Additional buttons give access to multi-line
+# parameters, like the source url list and the assistant prompts. Another button
+# purges obsolete embeds from the embed directory.
 #
 proc RAG_Manager_configure {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
-	set f [LWDAQ_tool_configure RAG_Manager 3]	
+	set f [LWDAQ_tool_configure RAG_Manager 3]
+
+	foreach a {Source_URLs Assistant_Prompts Purge_Embeds} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
+		pack $f.$b -side left -expand yes
+	}
+		
 	return ""
 }
 
@@ -1364,23 +1423,85 @@ proc RAG_Manager_generate {} {
 	RAG_Manager_print "Submitting all chunk match strings for embedding..."	
 	RAG_Manager_fetch_embeds $api_key
 	
-	RAG_Manager_print "Generation Complete [RAG_Manager_time]." purple
+	RAG_Manager_print "Generation Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
 	return "[llength $chunks]"
 }
 
 #
+# RAG_Manager_load loads all the embedding vectors stored in the embed director
+# into memory using the lwdaq_rag utility. It deduces the number of embed vectors
+# from the list of files and makes a library that is exactly the correct size, and
+# deduces the dimensionality of the vectors from the first vector in the list.
+# 
+proc RAG_Manager_load {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+	
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "Load"
+	RAG_Manager_print "\nLoad Embed Library into Memory [RAG_Manager_time]" purple
+
+	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
+	set lib_len [llength $efl]
+	if {$lib_len == 0} {
+		RAG_Manager_print "ERROR: No embed vectors found in $config(embed_dir)."
+		set info(control) "Idle"
+		return 0
+	}
+	
+	set efn [lindex $efl 0]
+	set f [open $efn r]
+	set vector [read $f]
+	close $f
+	set vec_len [llength $vector]
+	if {$vec_len == 0} {
+		RAG_Manager_print "ERROR: Vector of length zero in [file tail $efn]"
+		set info(control) "Idle"
+		return 0
+	}
+	
+	RAG_Manager_print "Creating embed library in memory..."
+	set start_time [clock milliseconds]
+	lwdaq_rag create -lib_len $lib_len -vec_len $vec_len
+	RAG_Manager_print "Embed library created in\
+		[expr [clock milliseconds] - $start_time] ms,\
+		reading and adding embeds..."
+		
+	set start_time [clock milliseconds]
+	foreach efn $efl {
+		incr count
+		set f [open $efn r]
+		set vector [read $f]
+		close $f
+		set name [file root [file tail $efn]]
+		lwdaq_rag add -name $name -vector $vector
+		RAG_Manager_print "$count\: Added $name" orange
+	}
+	RAG_Manager_print "Embeds read and added to embed library in\
+		[expr [clock milliseconds] - $start_time] ms."
+	
+	RAG_Manager_print "Loading complete, $count embeds [RAG_Manager_time]" purple
+	set info(control) "Idle"
+	return $count
+}
+
+#
 # RAG_Manager_retrieve obtains the embedding vector for the current question and
 # compares this vector to all the vectors in the embed directory, thus making a
-# list of chunks and their relevance to the question. It sorts this list so as
-# to put the most relevant chunks in front. It copies zero or more chunks into a
-# retrieved chunk list until the total number of tokens in the chunks is equal
-# to or greater than the token limit for the question's level of relevance. In
-# the case of high-relevance questions, if it comes to a chunk with relevance
-# lower than the mid-relevance threshold, it stops adding chunks, so as to avoid
-# adding irrelevant information to the completion input, which makes the
-# completion faster. It returns the list of chunks retrieved. In order to embed
-# the question, this routine must read a valid API key from disk.
+# list of chunks and their relevance to the question, sorted in order of
+# descending relevance. The length of the list thus obtained from the lwdaq_rag
+# utility is set by the retrieve_len parameter. It copies zero or more chunks
+# into a retrieved chunk list until the total number of tokens in the chunks is
+# equal to or greater than the token limit for the question's level of
+# relevance. In the case of high-relevance questions, if it comes to a chunk
+# with relevance lower than the mid-relevance threshold, it stops adding chunks,
+# so as to avoid adding irrelevant information to the completion input, which
+# makes the completion faster. It returns the list of chunks retrieved. In order
+# to embed the question, this routine must read a valid API key from disk. When it
+# first receives the retrieval list, it goes through the list and checks each
+# embed name to see if a corresponding content string exists for it. If no content
+# string exists, the routine removes the embed from the retrieval list.
 #
 proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
@@ -1413,50 +1534,57 @@ proc RAG_Manager_retrieve {} {
 	set start_time [clock milliseconds]
 	set q_embed [RAG_Manager_embed_string $config(question) $api_key]
 	set q_vector [RAG_Manager_vector_from_embed $q_embed]
-	
+
 	RAG_Manager_print "Question embed obtained in\
 		[expr [clock milliseconds] - $start_time] ms,\
-		comparing question to embed library..."
-	set comparisons [list]
-	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
-	set len [llength $q_vector]
-	foreach efn $efl {
-		LWDAQ_support
-		set e_name [file root [file tail $efn]]
-		set f [open $efn r]
-		set e_vector [read $f]
-		close $f
-		set dot_product 0
-		for {set i 0} {$i < $len} {incr i} {
-			set x1 [lindex $q_vector $i]
-			set x2 [lindex $e_vector $i]
-			set dot_product [expr $dot_product + $x1*$x2]
-		}
-		set relevance [format %.4f \
-			[expr 1.0*$dot_product/$info(embed_scale)/$info(embed_scale)]]
-		lappend comparisons "$relevance $e_name"
-	}
-	
-	RAG_Manager_print "Comparison complete in\
-		[expr [clock milliseconds] - $start_time] ms,\
-		sorting chunks by relevance..."
+		retrieving relevant embeds..."
 	set start_time [clock milliseconds]
-	set comparisons [lsort -decreasing -real -index 0 $comparisons]
-	set info(relevance) [lindex $comparisons 0 0]
+	if {[catch {
+		set retrieval [lwdaq_rag retrieve \
+			-retrieve_len $info(retrieve_len) -vector $q_vector]
+		RAG_Manager_print [lrange $retrieval 0 9] brown
+	} error_result]} {
+		RAG_Manager_print "ERROR: $error_result"
+		set info(control) "Idle"
+		return ""
+	}	
+	
+	RAG_Manager_print "Retrieval complete in\
+		[expr [clock milliseconds] - $start_time] ms,\
+		selecting content strings..."
+	set start_time [clock milliseconds]
+	set cfl [glob -nocomplain [file join $config(content_dir) *.txt]]
+	set new_retrieval [list]
+	set obsolete_count 0
+	set valid_count 0
+	foreach {name rel} $retrieval {
+		if {[regexp $name $cfl]} {
+			lappend new_retrieval $name $rel
+			incr valid_count
+		} else {
+			incr obsolete_count
+		}
+	}
+	set retrieval $new_retrieval
+	if {$valid_count == 0} {
+		RAG_Manager_print "ERROR: No content strings exist for retrieved embeds."
+		set info(control) "Idle"
+		return 0
+	} 
+	RAG_Manager_print "Have $valid_count valid embeds,\
+		ignoring $obsolete_count obsolete embeds."
 
-	set relevance $info(relevance)
-	if {$relevance >= $config(high_rel_thr)} {
+	set info(relevance) [lindex $retrieval 1]
+	set rel $info(relevance)
+	if {$rel >= $config(high_rel_thr)} {
 		set num $config(high_rel_tokens)
-		RAG_Manager_print "High-relevance question, relevance=$relevance,\
-			retrieve $num\+ tokens." 
-	} elseif {$relevance >= $config(low_rel_thr)} {
+		RAG_Manager_print "High-relevance question, relevance=$rel, provide $num\+ tokens." 
+	} elseif {$rel >= $config(low_rel_thr)} {
 		set num $config(mid_rel_tokens)
-		RAG_Manager_print "Mid-relevance question, relevance=$relevance,\
-			retrieve $num\+ tokens." 
+		RAG_Manager_print "Mid-relevance question, relevance=$rel, provide $num\+ tokens." 
 	} else {
 		set num $config(low_rel_tokens)
-		RAG_Manager_print "Low-relevance question, relevance=$relevance,\
-			retrieve $num\+ tokens." 
+		RAG_Manager_print "Low-relevance question, relevance=$rel, provide $num\+ tokens." 
 	}
 	
 	RAG_Manager_print "List of chunks retrieved to support question." brown
@@ -1464,29 +1592,16 @@ proc RAG_Manager_retrieve {} {
 	set count 0
 	set tokens 0
 	set data [list]
-	foreach comparison $comparisons {
+	foreach {name rel} $retrieval {
 		if {$tokens >= $num} {break}
-		set chunk_relevance [lindex $comparison 0]
-		if {($relevance >= $config(high_rel_thr)) \
-			&& ($chunk_relevance <= $config(low_rel_thr))} {
+		if {($rel >= $config(high_rel_thr)) && ($rel <= $config(low_rel_thr))} {
 			break
 		}
 		incr count
 		RAG_Manager_print "-----------------------------------------------------" brown
-		RAG_Manager_print "$count\: Relevance $chunk_relevance:" brown
-		set embed [lindex $comparison 1]
-		set cfn [file join $config(content_dir) $embed\.txt]
-		if {![file exists $cfn]} {
-			if {$count == 1} {
-				RAG_Manager_print "ERROR:\
-					Most relevant chunk content missing, [file tail $cfn]."
-				incr count -1
-				break
-			} else {
-				RAG_Manager_print "WARNING: No chunk content exists for embed $embed."
-				continue
-			}
-		}
+		RAG_Manager_print "$count\: Relevance $rel:" brown
+		set embed [lindex $retrieval 0]
+		set cfn [file join $config(content_dir) $name\.txt]
 		set f [open $cfn r]
 		set content [read $f]
 		close $f
@@ -1525,9 +1640,9 @@ proc RAG_Manager_retrieve {} {
 	
 
 	set info(data) $data
-	set info(control) "Idle"
 	RAG_Manager_print "Retrieval complete, $count chunks,\
-		$tokens tokens [RAG_Manager_time]." purple
+		$tokens tokens [RAG_Manager_time]" purple
+	set info(control) "Idle"
 	return [llength $data]
 }
 
@@ -1583,7 +1698,7 @@ proc RAG_Manager_txt_from_json {content} {
 }
 
 #
-# RAG_Manager_submit combines the question and the assistant instructions with
+# RAG_Manager_submit combines the question and the assistant prompt with
 # the retrieved data, all of which are stored in elements of the info array, and
 # passes them to the RAG package for submission to the completion end point. In
 # order to submit the question, this routine must read a valid API key from
@@ -1615,25 +1730,25 @@ proc RAG_Manager_submit {} {
 	set info(control) "Submit"
 	RAG_Manager_print "\nSubmit Question and Data to\
 		Completion End Point [RAG_Manager_time]" purple
-	RAG_Manager_print "Choosing answer model and assistant instructions..."
+	RAG_Manager_print "Choosing answer model and assistant prompt..."
 	set r $info(relevance)
 	if {$r >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
 		set assistant [string trim $config(high_rel_assistant)]
 		RAG_Manager_print "High-relevance question, relevance=$r,\
-			use $model and high-relevance instructions." 
+			use $model and high-relevance prompt." 
 	} elseif {$r >= $config(low_rel_thr)} {
 		set model $config(mid_rel_model)
 		set assistant [string trim $config(mid_rel_assistant)]
 		RAG_Manager_print "Mid-relevance question, relevance=$r,\
-		 	use $model and mid-relevance instructions." 
+		 	use $model and mid-relevance prompt." 
 	} else {
 		set model $config(low_rel_model)
 		set assistant [string trim $config(low_rel_assistant)]
 		RAG_Manager_print "Low-relevance question, relevance=$r,\
-		 	use $model and low-relevance instructions." 
+		 	use $model and low-relevance prompt." 
 	}
-	RAG_Manager_print "Assistant instructions being submitted with this question:" brown
+	RAG_Manager_print "Assistant prompt being submitted with this question:" brown
 	RAG_Manager_print "$assistant" green
 
 	RAG_Manager_print "Reading api key $config(key_file)\." brown
@@ -1668,7 +1783,6 @@ proc RAG_Manager_submit {} {
 	}
 
 	RAG_Manager_print "Submission Complete [RAG_Manager_time]" purple
-	set info(control) "Idle"
 
 	RAG_Manager_print "\nAnswer to \"$question\":" purple
 	set answer_txt [RAG_Manager_txt_from_json $answer]
@@ -1676,6 +1790,7 @@ proc RAG_Manager_submit {} {
 	append info(chat) "Answer: $answer_txt\n\n"
 	RAG_Manager_print "End of Answer" purple
 	
+	set info(control) "Idle"
 	return $answer
 }
 
@@ -1734,9 +1849,9 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Sources Delete Generate Retrieve Assistant Submit History Clear} {
+	foreach a {Delete Generate Load Retrieve Submit History Clear} {
 		set b [string tolower $a]
-		button $f.$b -text "$a" -command "RAG_Manager_$b"
+		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
 	
@@ -1746,9 +1861,11 @@ proc RAG_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	button $f.config -text "Configure" -command "RAG_Manager_configure"
+	button $f.config -text "Configure" -command "LWDAQ_post RAG_Manager_configure"
 	pack $f.config -side left -expand yes
-	button $f.help -text "Help" -command "LWDAQ_tool_help RAG_Manager"
+	button $f.help -text "Help" -command {
+		LWDAQ_post [list LWDAQ_tool_help RAG_Manager]
+	}
 	pack $f.help -side left -expand yes
 	
 	foreach a {Question} {
@@ -1795,7 +1912,7 @@ the vector. If we sum the squares of all these numbers, we always obtain a
 result close to 1.00000, so we have concluded that the vectors are normalized at
 the source. Retrieval-assisted generation operates on the assumptioin that the
 angle between two embedding vectors that have similar meaning will be a small
-angle. In particular: if the angle between the embedding vector of a question
+angle. In particular, if the angle between the embedding vector of a question
 and the embedding vector of an chunk is small, that chunk is relevant to the
 question, and should be used as a basis for answering the question.
 
@@ -1814,10 +1931,11 @@ library.
 Before we generate a new chunk libary, we must provide the RAG Manager with a
 list of URLs from which it should download the documents out of which it will
 create the library. The RAG Manager window, which appears when you open the RAG
-manager from a graphical instance of LWDAQ, provides a Source button that allows
-you to define and apply a list of URLs. When the list is "applied" it is saved
-in the RAG Manager's internal array, but the URLs are not yet accessed. The pages
-we are going to download to make our chunk library are our "sources".
+manager from a graphical instance of LWDAQ, provides a Source_URLs button in its
+Configuration Panel that allows you to define and apply a list of URLs. When the
+list is "applied" it is saved in the RAG Manager's internal array, but the URLs
+are not yet accessed. The pages we are going to download to make our chunk
+library are our "sources".
 
 Once we have our list of URLs, we use the Delete button to delete the old
 library. All the chunks will be deleted, but none of the embedding vectors. Each
@@ -1830,15 +1948,15 @@ files. When we delete the chunks, we delete the match and content strings, but
 not the embeds.
 
 We press Generate. Here we don't mean "generate an answer", we mean "generate
-the chunk library". We apologise for the duplicate use of the word "generate".
-The RAG Manager uses the command-line "curl" utility to download the sources.
-The "curl" utility supports both https and http. We test the RAG Manager on
-Linux and MacOS, both of which are UNIX variants with "curl" installed. We do
-not test the RAG Manager on Windows. The RAG Manager proceeds one URL at a time,
-dividing each page into an initial sequence of chunks, and then combining some
-chunks with those before or after in order to bind things like equations to
-their explanatory text below, and lists to their explanatory text above. Check
-"verbose" to see the notification and type of every chunk created.
+the chunk library". The RAG Manager uses the "curl" utility to download the
+sources. The "curl" utility supports both https and http. We test the RAG
+Manager on Linux and MacOS, both of which are UNIX variants with "curl"
+installed. We do not test the RAG Manager on Windows. The RAG Manager proceeds
+one URL at a time, dividing each page into an initial sequence of chunks, and
+then combining some chunks with those before or after in order to bind things
+like equations to their explanatory text below, and lists to their explanatory
+text above. Check "verbose" to see the notification and type of every chunk
+created.
 
 The simplest chunk extraction is to isolate an HTML paragraph using p-tags. Our
 HTML documentation is all hand-typed and follows particular, strict patterns
@@ -1862,9 +1980,9 @@ numbers from the table itself, the embedding vector generated by the entire
 string does not capture the meaning of the caption, but is instead diluted into
 ambiguity by the presence of the numbers, which have little or no syntactic
 meaning. Chapter titles, date stamps, and URLs also dilute the syntactic
-meaning, because they are not written speech. Mathematical equations do have a
-strong syntactic meaning, so we include those in our match string, along with
-all written language, but with all the other metadata text removed.
+meaning, because they are not prose or equations. Mathematical equations do have
+a strong syntactic meaning, so we include those in our match strings, along with
+prose, but with all the other metadata text removed.
 
 Once we have all the match and content strings, the RAG Manager passes the
 content string to  "openssl" to obtain a unique twelve-digit name for the chunk,
@@ -1884,32 +2002,48 @@ which we identify ourselves to OpenAI and agree to pay for the embedding
 service. Embedding is inexpensive. At the time of writing, the
 "text-embedding-3-small" embedding model costs $0.00002 per one thousand tokens,
 where a "token" is four characters. So one thousand chunks, each one thousand
-tokens long, will cost a total of two cents to embed.
+tokens long, will cost a total of two cents to embed. 
 
-The last stage of generation is to eliminate embedding vectors for which there
-is no corresponding match strings. Now we have a complete library of chunks and
-embedding vectors ready for retrieval-assisted generation, and purged of out of
-date content, match, and embed files.
+With generation complete, we have a complete library of chunks and embedding
+vectors ready for retrieval-assisted generation. Note that we have not removed
+obsolete embedding vectors from the embed library. By "obsolete" we mean any
+vector for which there is no corresponding content string. If we want to purge
+obsolete vectors, we use the Purge_Embeds button in the Configuration Panel.
+There is no particular rush to purge obsolete vectors. When we retrieve a list
+of content strings most relevant to a question, any content string that does not
+exist we will skip over. But if obsolete embedding vectors start to outnumber
+our active vectors, retrieval will be less efficient.
 
-The RAG Manager provides instructions to the OpenAI "completion endpoint",
-which is the server tha answers questions. In the RAG Manager window, press
-Assistant and you will be able to edit the instructions we will provide for
-high, mid, and low-relevance questions.
+Now that the library is complete, we load it into memory with the Load button.
+All the embedding vectors in the embed directory are loaded into memory. Each
+embed takes up 8 KByte on disk and 12 KByte in memory. On disk, we store the
+embedding vector components as integers, having multiplied their original
+real-valued components by embed_scale. Saving them as integers makes the disk
+files more compact and easier for us to examine. In memory, we convert back to
+real-valued components. Each component is an eight-byte real number, which is
+slightly larger than the original integer value.
+
+With the embed library loaded into memory, we are ready to retrieve content
+strings relevant to a questin. The RAG Manager provides instructions to the
+OpenAI "completion endpoint", which is the server tha answers questions. We
+refer to these instructions as the "prompt". In the RAG Manager's Configuration
+Panel, press Assistant Prompt and you will be able to edit the prompt we will
+provide for high, mid, and low-relevance questions.
 
 To ask a question, enter a question in the question entry box and press
-Retrieve. The RAG Manager will obtain the embedding vector of the question and
-compare it to every embedding vector in the embed directory. It sorts the
-embedding vectors in order of decreasing relevance. We use the relevance of the
-first chunk as our measure of the relevance of a question to our chunk library.
-We determine if the question is high, mid, or low-relevance. We set a limit on
-the number of content tokens we will submit to the completion endpoint based
-upon the relevance of the question. Low-relevance questions get no documentation
-at all. The generator starts to readcontent strings from disk, starting with the
-most relevant chunk and proceeding through its sorted list. When the total
-number of tokens passes our limit, it stops adding content. If the chat_submit
-flag is set, the manager adds the chat history to submission data as well. In
-the online chatbot implementation, we submit the previous two questions and
-answers to give continuity to the chat. 
+Retrieve. The RAG Manager fetches the embedding vector of the question from the
+embedding end point and compares it to every embedding vector in the embed
+directory. It sorts the embedding vectors in order of decreasing relevance. We
+use the relevance of the first chunk as our measure of the relevance of a
+question to our chunk library. We determine if the question is high, mid, or
+low-relevance. We set a limit on the number of content tokens we will submit to
+the completion endpoint based upon the relevance of the question. Low-relevance
+questions get no documentation at all. The generator starts to readcontent
+strings from disk, starting with the most relevant chunk and proceeding through
+its sorted list. When the total number of tokens passes our limit, it stops
+adding content. If the chat_submit flag is set, the manager adds the chat
+history to submission data as well. In the online chatbot implementation, we
+submit the previous two questions and answers to give continuity to the chat. 
 
 Note that we are submitting the content strings of the chunks, but we selected
 the chunks using their match strings. When we select a table as relevant, we
@@ -1926,7 +2060,7 @@ chunks without waiting for a submission to complete. With the verbose flag set,
 we get to see all the chunks and the chat history.
 
 Once retrieval is complete, we press Submit and the RAG Manager combines the
-assistant instructions, the documentation chunks, and the question in one big
+assistant prompt, the documentation chunks, and the question in one big
 json record. It submits this record to the OpenAI completion endpoint and waits
 for an answer. For high-relevance questions, we are currently using the "gpt-4"
 completion model, which costs $0.01 per thousand input tokens (assistant, chunk,
@@ -1938,7 +2072,7 @@ we see about 200 tokens in response, so our average high-relevance answer costs
 us rouhly four cents.
 
 The answer we receive from the completion endpoint will take a form, tone, and
-level of detail controlled by our assistant instructions. We have chosen to ask
+level of detail controlled by our assistant prompt. We have chosen to ask
 the endpoint to give us answers in Markdown format, with equations in Latex. The
 LLM understands Markdown and Latex very well, having been trained on a largly
 Markdown and Latex body of documents. It is well able to produce both Markdown

@@ -83,8 +83,8 @@ var
 type
 	embed_type=record
 		name:string;
-		relevance:integer;
-		vector:packed array of integer;
+		relevance:real;
+		vector:x_graph_type;
 	end;
 
 var
@@ -316,7 +316,7 @@ variables you specify with 0 for false and 1 for true.</p>
 <tr><td>-log_errors</td><td>Boolean</td><td>Write errors to log file, default 0</td></tr>
 <tr><td>-show_details</td><td>Boolean</td><td>Write execution details to text window, default 0</td></tr>
 <tr><td>-exit_command</td><td>String</td><td>A Tcl command to execute on exit, default ""</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_config command.</small></center>
 
 <p>The lwdaq library routines can write to Tk text windows through -text_name
 and -photo_name. The -text_name should specify a Tk text widget (such as .text),
@@ -474,7 +474,7 @@ routines.</p>
 <tr><td>-top</td><td>Topm row of analysis bounds.</td></tr>
 <tr><td>-bottom</td><td>Bottom row of analysis bounds.</td></tr>
 <tr><td>-try_header</td><td>Try image data for a lwdaq-format header, default 1.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_image_create command.</small></center>
 
 <p>The above table lists the options accepted by lwdaq_image_create, and their
 functions. If you use the -name option and provide the name of a pre-existing
@@ -1249,7 +1249,7 @@ The last row gives the last number.</p>
 <tr><td>7</td><td>min</td><td>the minimum intensity in the analysis bounds</td></tr>
 <tr><td>8</td><td>height</td><td>the number of rows in the image</td></tr>
 <tr><td>9</td><td>width</td><td>the number of colums in the image</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_characteristics command.</small></center>
 
 <p>The lwdaq_image_characteristics routine does not use the global fsr and fsd
 parameters to format its output. Instead, it always provides one and only one
@@ -1717,7 +1717,7 @@ image.</p>
 <tr><td>-top value</td><td>Set the top of the analysis bounds to value.</td></tr>
 <tr><td>-left value</td><td>Set the left of the analysis bounds to value.</td></tr>
 <tr><td>-right value</td><td>Set the rigth of the analysis bounds to value.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_manipulate command.</small></center>
 
 <p>With -name you specify the name of the new image created by the manipulation,
 or the existing image if there is no new image created by the manipulation. Any
@@ -1992,7 +1992,7 @@ error, it returns an error description. The <i>write</i>, <i>shift</i>, and
 <tr><td>read</td><td>Reads a block of data from the data space.</td></tr>
 <tr><td>shift</td><td>Shifts data towards start of data space.</td></tr>
 <tr><td>clear</td><td>Clears the data.</td></tr>
-<tr><td>none</td><td>No action.</td></tr></table></center>
+<tr><td>none</td><td>No action.</td></tr></table><small><b>Table:</b> Options for the lwdaq_data_manipulate command.</small></center>
 
 <p>The <i>write</i> function requires two parameters: the data you wish to write
 to the data space and the byte address at which you want the first byte of your
@@ -2221,7 +2221,7 @@ deduced from the image itself with the use of a threshold symbol.</p>
 <tr><td>-add_x_um</td><td>Add this value in microns to the spot x-position, default 0.</td></tr>
 <tr><td>-add_y_um</td><td>Add this value in microns to the spot y-position, default 0</td></tr>
 <tr><td>-reference_um</td><td>Reference line y-position for line fits, default 0</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_bcam command.</small></center>
 
 <p>The routine makes a list of spots in the image. The threshold string,
 included with the -threshold option, tells lwdaq_bcam how to distinguish
@@ -2666,7 +2666,7 @@ Instrument. The routine clears the image overlay for its own use.</p>
 <tr><td>-show_pixels</td><td>If 1, mark pixels above threshold, default 0.</td></tr>
 <tr><td>-subtract_gradient</td><td>If 1, subtract the image gradient before finding hits, default 0.</td></tr>
 <tr><td>-include_ij</td><td>If 1, include column and row of hit centers, default 0.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_dosimeter command.</small></center>
 
 <p>The lwdaq_dosimeter routine measures the vertical slope of intensity in the
 image, which is a measure of the sensor dark current, and then finds all the
@@ -2879,7 +2879,7 @@ for a description of the options.</p>
 <tr><td>-rotation_mrad</td><td>If <> 0, pre-rotate image before analysis by &minus;<i>value</i>.</td></tr>
 <tr><td>-pattern_only</td><td>If 1, return pattern description not rasnik measurement.</td></tr>
 <tr><td>-disable_skew</td><td>If 1, forces skew and slant values to zero, default 0.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_rasnik command.</small></center>
 
 <p>See the <a
 href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Rasnik">Rasnik
@@ -3174,7 +3174,7 @@ href="http://www.opensourceinstruments.com/WPS/WPS1/index.html#Fitting%
 <tr><td>-reference_um</td><td>Location of reference line in microns from top of image, default zero.</td></tr>
 <tr><td>-show_timinig</td><td>Print timing report to gui text window, default zero.</td></tr>
 <tr><td>-num_shadows</td><td>Number of shadows you want the routine to find.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_shadow command.</small></center>
 
 <p>With -pre_smooth set to 1, the routine smooths the original image with a box
 filter before it applies the gradient and threshold. We use -pre_smooth when
@@ -3328,7 +3328,7 @@ href="http://www.opensourceinstruments.com/WPS/WPS1/">WPS1 Manual</a>.</p>
 <tr><td>-merge</td><td>Merge aligned edge clusters.</td></tr>
 <tr><td>-threshold</td><td>Criteria for finding spots, including threshold specification.</td></tr>
 pixels.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_wps command.</small></center>
 
 <p>The -threshold string is used in the same way as in <a
 href="#lwdaq_bcam">lwdaq_bcam</a>. It can contain an intensity threshold or it
@@ -3548,7 +3548,7 @@ instruction.</p>
 <tr><th>Instruction</th><th>Function</th></tr>
 <tr><td>project</td><td>Project a modelled object into an image overlay.</td></tr>
 <tr><td>disagreement</td><td>Measure disagreement between actual and modelled silhouette.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Instructions for the lwdaq_scam command.</small></center>
 
 <p>The <i>project</i> instruction takes three arguments: a <i>camera</i>
 calibration in the SCAM's mount coordinates, an <i>object</i> definition in the
@@ -3600,7 +3600,7 @@ the modelled object.</p>
 	<td>center of left face</td>
 	<td>x-axis perpendicular to left face, y-axis parallel to top edge</td>
 </tr>
-</table></center>
+</table><small><b>Table:</b> Object Types Supported by the lwdaq_scam Command.</small></center>
 
 <p>Following the location, and possibly the orientation, of the object are one
 or more values giving its dimensions. A <i>sphere</i> consists of a location and
@@ -3972,7 +3972,7 @@ The display looks like an oscilloscope, and provides a software trigger.</p>
 <tr><td>-v_trigger</td><td>The trigger voltage for display and extraction.</td></tr>
 <tr><td>-auto_calib</td><td>Use the device's reference voltages.</td></tr>
 <tr><td>-values</td><td>Return the voltage values rather than characteristics.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_voltmeter command.</small></center>
 
 <p>The lwdaq_voltmeter routine calls lwdaq_A2057_voltmeter to analyze the
 samples in the image. The image results string must contain some information
@@ -4522,7 +4522,7 @@ transmitter sitting on the platform.</p>
 <tr><td>-percentile</td><td>Fraction of power measurements below chosen value, default 50.</td></tr>
 <tr><td>-background</td><td>String of background power levels to be subtracted from coil powers, default all 0.</td></tr>
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_alt command.</small></center>
 
 <p>The output contains <i>x</i>, <i>y</i>, and <i>z</i> in whatever units we
 used to specify the coil centers, followed by a string of detector power values.
@@ -4869,7 +4869,7 @@ numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces.</p>
 <center><table border>
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-slices</td><td>Number of sub-intervals for which we calculate power and position, default 1.</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_tcb command.</small></center>
 
 <p>The lwdaq_tcb output is compatible with that of <a
 href="#lwdaq_alt">lwdaq_alt</a>. The first three values returned are <i>x</i>,
@@ -5125,7 +5125,7 @@ error value, and the number of steps it took.</p>
 	<td>-restarts <i>m</i></td>
 	<td>Number of restarts before starting to shrink, default <i>m</i> = 0.</td>
 </tr>
-</table><small><b>Table:</b> Options Accepted by the Simplex Library Routine.</small></center>
+</table><small><b>Table:</b> Options For the lwdaq_simplex.</small></center>
 
 <p>By default, the simplex routine assumes that the sensitivity of the error to
 each of the n coordinates is similar, so that it sets up its simplex triangle
@@ -5455,7 +5455,7 @@ exactly in the available space.</p>
 <tr><td>-y_only</td><td>1, data is y-values only, default 0.</td></tr>
 <tr><td>-x_only</td><td>1, data is x-values only, default 0.</td></tr>
 <tr><td>-entire</td><td>1 use entire image for plot, 0 use analysis bounds, default 0.</td></tr>
-<tr><td>-in_image</td><td>1 draw as a shade of gray in the image rather than overlay, default 0.</td></tr></table></center>
+<tr><td>-in_image</td><td>1 draw as a shade of gray in the image rather than overlay, default 0.</td></tr></table><small><b>Table:</b> Options for the lwdaq_graph command.</small></center>
 
 <p>By default, the graph will be drawn in the overlay, so it can use colors and
 be accompanied by grid lines that do not interfere with the underlying image
@@ -5650,7 +5650,7 @@ same t-values, but processed v-values.</p>
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-tv_format</td><td>if 0, data points "v", otherwise "t v", default 0</td></tr>
 <tr><td>-ave_start</td><td>if 1, over-write first sample with average, default 0</td></tr>
-</table></center>
+</table><small><b>Table:</b> Options for the lwdaq_filter command.</small></center>
 
 <p>We define the digital signal processing we with lwdaq_filter to perform by
 means of two strings. The first string gives the coefficients a[0]..a[n] by
@@ -6127,34 +6127,38 @@ end;
 <p>lwdaq_rag provides routines to support retrieval-assisted generation (RAG).
 It creates and maintains a library of embedding vectors in memory. It allows us
 to compare a new vector to every vector in the library and obtain a list of the
-most relevant library entries. Each embed in the library has a name, a
-relevance, and an n-dimensional, normalized vector. The name is a string of
-characters that identify a document chunk, although lwdaq_rag at no point
-handles anything but embedding vectors, nor does it read embedding vectors from
-disk or write them to disk. The vector itself must have integer coordinates. All
-vectors in the library must have the same length so that the dot product of a
-test vector with each vector in the library will be proportional to the cosine
-of the angle between each vector and the test vector. The relevance stored with
-each embed is the dot product we obtained from the most recent comparison, and
-is therefore itself an integer.</p>
+most relevant library entries, a process we call <i>retrieval</i>. Each embed in
+the library has a name, a relevance, and an n-dimensional vector. The name is a
+string of characters that identify a document chunk, although lwdaq_rag at no
+point handles anything but embedding vectors, nor does it read embedding vectors
+from disk or write them to disk. The vector itself, as delivered to the library,
+can have integer or real-valued components, but all components will be saved as
+real numbers. All vectors in the library must have the same length so that the
+dot product of a test vector with each vector will be proportional to the cosine
+of the angle between each vector and the test vector.  The relevance stored with
+each embed is the dot product we obtained from the most recent comparison. The
+lwdaq_rag guarantees that all vectors have unit length by calcualting the length
+of each vector it receives, and dividing all its coordinates by the length.</p>
 
 <p>The lwdaq_rag command is used by the RAG Manager tool to load a library of
 embedding vectors into memory, and subsequently to compare a question vector to
-all library entries. Embedding vectors provided by services such as OpenAI,
-which is the service used by the RAG Manager, are real-valued and normalized to
-a length of one. The RAG Manager tool deals with such vectors and it calls
-lwdaq_rag to manage its embed library. To obtain 0.1% precision in relevance
-measurement, the RAG Manager scales the vectors by &times;100k and rounds the
-coordinates to integers before storing to disk. These integer-coordinate vectors
-all have length 100k and we can pass them directly into the embed library with
-lwdaq_rag commands.</p>
+all library entries. Embedding vectors provided by services such as OpenAI's
+text-embedding-3-small have real-valued components and are normalized to unit
+length. The RAG Manager calls lwdaq_rag to manage its embed library. To obtain
+0.1% precision in relevance measurement, while at the same time reducing the
+size of the embeds on disk, the RAG Manager scales the vectors by &times;100k
+and rounds the coordinates to integers before storing to disk. These
+integer-coordinate vectors all have length 100k. We pass them directly into the
+embed directory, and the embed library automatically normalizes them to unit
+length.</p>
 
 <p>The lwdaq_rag command operates on a persitent embedding library. This library
 can be replaced, but unless replaced, it persists so long as the LWDAQ instance
 that created it persists. We create a new library with the <i>create</i>
-command. Here is an example library creation command.</p>
+operation. Here is an example library creation command, one that creates a library
+of 925 embeds, each with 1536-dimensional vectors.</p>
 
-<pre>lwdaq_rag create -lib_len 1000 -vec_len 1536</pre>
+<pre>lwdaq_rag create -lib_len 925 -vec_len 1536</pre>
 
 <p>Here we specify the number of entries in the library with the -lib_len option
 and the number of dimensions to each vector with -vec_len. These two options are
@@ -6166,10 +6170,85 @@ raise an error if we fail to specify one or both.</p>
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-lib_len</td><td>Number of embeds in the library, default 1.</td></tr>
 <tr><td>-vec_len</td><td>Number of coordinates in embedding vectors, default 1.</td></tr>
-<tr><td>-comp_len</td><td>Number of chunks returned by comparison, default 10.</td></tr>
-</table></center>
+<tr><td>-retrieve_len</td><td>Number of chunks returned by comparison, default 10.</td></tr>
+<tr><td>-name</td><td>A name for a new vector, default "Empty".</td></tr>
+<tr><td>-vector</td><td>A list of integers specifying a vector, devault "0".</td></tr>
+<tr><td>-scale</td><td>The scaling factor used to make integer coordinates, default "1".</td></tr>
+</table><small><b>Table:</b> Options for the lwdaq_rag command.</small></center>
 
-<p>We add vectors to the library one at a time with the <i>add</i> command.</p>
+<p>We add vectors to the library one at a time with the <i>add</i> operation.
+When we add a new vector, the library must already exist, and be set up for
+vectors of the same length. We do not specify vector length when we add, we just
+specify a name and provide the vector itself. In the following example, we
+create a library with the <i>create</i> operation, add three embeds with
+<i>add</i> and use the <i>dump</i> operation to show the library contents.</p>
+
+<pre>lwdaq_rag create -lib_len 5 -vec_len 4
+lwdaq_rag add -name v0 -vector "1 2 3 4"
+lwdaq_rag add -name v1 -vector "2 3 4 1"
+lwdaq_rag add -name v2 -vector "3 4 1 2"
+lwdaq_rag dump
+v0 1 2 3 4 
+v1 2 3 4 1 
+v2 3 4 1 2 
+EMPTY 0 0 0 0 
+EMPTY 0 0 0 0</pre>
+
+<p>The three embeds that have not been filled are named "EMPTY" and their
+components are all zero. Any comparison made with empty vectors will produces a
+zero relevance. Creation of a library is fast, but adding vectors is slow,
+because we are passing the vectors as strings, and these must be converted to
+integers before storage. If we create a library larger than our immediate needs,
+we can add more vectors without having to re-load all the existing vectors. The
+lwdaq_rag command has no operation for extending a library.</p>
+
+<p>We compare a test vector to our library and obtain a list of the most
+relevant vectors with the <i>retrieve</i> operation. We pass the vector into the
+lwdaq_rag routine with the -vector option just as we do for the <i>add</i>
+operatin. The text vector must has integer coordinates if it is to be compared
+effectively, because lwdaq_rag will round all its coordinates to the nearest
+integer before proceeding with calculating the dot product of the test vector
+with every vector in the library and storing the dot product in each embed's
+relevance parameter. Here is an example comparison following the code above.</p>
+
+<pre>lwdaq_rag retrieve -retrieve_len 2 -vector "4 3 2 1"
+v2 28 v1 26</pre>
+
+<p>The comparison returns -retrieve_len embeds in order of descending relevance.
+The first embed returned is the one of greatest relevance. The relevant embeds
+are returned as a space-delimited string. Each embed name is followed by its
+relevance.</p>
+
+<p>Each entry in the embed list consists of its name, its relevance, and a
+pointer to the embed vector. When we sort the embed list, we don't have to move
+the vectors around in memory. We just swap the pointers around in the embed
+list. Thus the sort time is independent of the vector size. We use our
+quick_sort routine to sort the embed list in order of decreasing relevance, so
+we expect the sort time to increase as <i>N</i>log<sub>2</sub><i>N</i>, where
+<i>N</i> is the length of the library. Here are creation, vector addition, and
+retrieval times for increasing library lengths.</p>
+
+<center><table border>
+<tr><th>lib_len</th><th>Create (ms)</th><th>Add (ms)</th><th>Load (s)</th><th>Retrieval (ms)</th></tr>
+<tr><td>100</td><td>0</td><td>5.1</td><td>0.5</td><td>4.6</td></tr>
+<tr><td>200</td><td>0</td><td>4.6</td><td>0.9</td><td>5.4</td></tr>
+<tr><td>500</td><td>1</td><td>5.3</td><td>2.6</td><td>6.0</td></tr>
+<tr><td>1000</td><td>1</td><td>4.7</td><td>4.6</td><td>8.0</td></tr>
+<tr><td>2000</td><td>3</td><td>4.8</td><td>9.6</td><td>12.4</td></tr>
+<tr><td>5000</td><td>9</td><td>4.8</td><td>24.3</td><td>26.0</td></tr>
+<tr><td>10000</td><td>13</td><td>5.2</td><td>51.8</td><td>49.6</td></tr>
+</table><small><b>Table:</b> Execution Time of lwdaq_rag Operations for 1536-Dimensional Vectors.</small></center>
+
+<p>The "load" time is the total time taken to load the entire library with
+random integer-valued vectors generated in Tcl and passed into lwdaq_rag as
+strings. We choose 1536-dimensional vectors because this is the size of
+contemporary large language model (LLM) embedding vectors. Each vector takes
+1536 integer locations in memory, each of which is 8 bytes on a 64-bit machine,
+so each embed is 12 KByte and a ten-thousand embed library will take up 123
+MByte of RAM. Once loaded into memory, however, identifying relevant is fast
+compared to the several seconds it takes to obtain an answer from an LLM
+completion endpoint.</p>
+
 }
 function lwdaq_rag(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -6180,20 +6259,19 @@ var
 	option:string='';
 	arg_index:integer;
 	vp:pointer;	
-	command:string='';
+	operation:string='';
 	name:string=empty_name;
-	vector:string='';
+	vector:string='0';
 	vec_len:integer=1536;
 	lib_len:integer=10;
-	comp_len:integer=10;
+	retrieve_len:integer=10;
+	scale,r:real;
 	result:string='';
 	i:integer=-1;
 	j:integer=-1;
-	gx:x_graph_type;
-	r:integer;
-	e:embed_type;
+	limit:integer=1;
+	vg:x_graph_type;
 	s:string;
-	limit:integer;
 	
 begin
 	error_string:='';
@@ -6205,7 +6283,7 @@ begin
 	if (argc<2) or odd(argc) then begin
 		Tcl_SetReturnString(interp,error_prefix
 			+'Wrong number of arguments, must be "'
-			+'lwdaq_rag command ?option value?".');
+			+'lwdaq_rag operation ?option value?".');
 		exit;
 	end;
 
@@ -6216,21 +6294,21 @@ begin
 		vp:=argv[arg_index];
 		inc(arg_index);
 		if (option='-lib_len') then lib_len:=Tcl_ObjInteger(vp)	
-		else if (option='-comp_len') then comp_len:=Tcl_ObjInteger(vp)	
+		else if (option='-retrieve_len') then retrieve_len:=Tcl_ObjInteger(vp)	
 		else if (option='-vec_len') then vec_len:=Tcl_ObjInteger(vp)
 		else if (option='-name') then name:=Tcl_ObjString(vp)	
 		else if (option='-vector') then vector:=Tcl_ObjString(vp)
 		else begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Bad option "'+option+'", must be one of '
-				+'"-lib_len -comp_len -vec_len -name -vector" in '
+				+'"-lib_len -retrieve_len -vec_len -name -vector" in '
 				+'lwdaq_rag.');
 			exit;
 		end;
 	end;
 
-	command:=Tcl_ObjString(argv[1]);
-	if (command='create') then begin
+	operation:=Tcl_ObjString(argv[1]);
+	if (operation='create') then begin
 		setlength(embed_library,lib_len);
 		for i:=0 to lib_len-1 do 
 			with embed_library[i] do begin
@@ -6238,11 +6316,11 @@ begin
 				relevance:=0;
 				setlength(embed_library[i].vector,vec_len);
 			end;
-	end else if (command='add') then begin
-		gx:=read_x_graph(vector);
-		if length(gx)<>vec_len then begin
+	end else if (operation='add') then begin
+		vg:=read_x_graph(vector);
+		if length(vg)<>vec_len then begin
 			writestr(result,'Mismatched vector length, expected ',vec_len:1,
-				' received ',length(gx));
+				' received ',length(vg));
 			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag add.');
 			exit;
 		end;
@@ -6254,54 +6332,58 @@ begin
 			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag add.');
 			exit;
 		end;
-		for i:=0 to vec_len do embed_library[j].vector[i]:=round(gx[i]);
+		scale:=0;
+		for i:=0 to vec_len-1 do scale:=scale+sqr(vg[i]);
+		scale:=sqrt(scale);
+		for i:=0 to vec_len-1 do embed_library[j].vector[i]:=vg[i]/scale;
 		embed_library[j].name:=name;
-	end else if (command='compare') then begin
-		gx:=read_x_graph(vector);
-		if length(gx)<>vec_len then begin
+	end else if (operation='retrieve') then begin
+		vg:=read_x_graph(vector);
+		if length(vg)<>vec_len then begin
 			writestr(result,'Mismatched vector length, expected ',
-				vec_len:1,' received ',length(gx));
-			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag compare.');
+				vec_len:1,' received ',length(vg));
+			Tcl_SetReturnString(interp,error_prefix+result+' in lwdaq_rag retrieve.');
 			exit;
 		end;
-		setlength(e.vector,vec_len);
-		for i:=0 to vec_len-1 do e.vector[i]:=round(gx[i]);
+		scale:=0;
+		for i:=0 to vec_len-1 do scale:=scale+sqr(vg[i]);
+		scale:=sqrt(scale);
+		for i:=0 to vec_len-1 do vg[i]:=vg[i]/scale;
 		for j:=0 to lib_len-1 do 
 			with embed_library[j] do begin 
 				r:=0;
-				for i:=0 to vec_len-1 do
-					r:=r+vector[i]*e.vector[i];
+				for i:=0 to vec_len-1 do r:=r+vector[i]*vg[i];
 				relevance:=r;
 			end;
 		quick_sort(0,lib_len-1,embed_swap,embed_lt,@embed_library);
 		result:='';
-		if comp_len>lib_len then limit:=lib_len else limit:=comp_len;
+		if retrieve_len>lib_len then limit:=lib_len else limit:=retrieve_len;
 		for j:=0 to limit-1 do
 			with embed_library[j] do begin
-				writestr(s,name,' ',relevance:1,' ');
+				writestr(s,name,' ',relevance:1:4,' ');
 				insert(s,result,length(result)+1);
 				if length(result)>long_string_length then begin
 					report_error(
-						'length(result)>long_string_length in lwdaq_rag compare');
+						'length(result)>long_string_length in lwdaq_rag retrieve');
 					exit;
 				end;
 			end;
-	end else if (command='config') then begin
+	end else if (operation='config') then begin
 		writestr(result,'-lib_len ',lib_len:1,'-vec_len ',vec_len:1);
-	end else if (command='dump') then begin
+	end else if (operation='dump') then begin
 		result:='';
 		for j:=0 to length(embed_library)-1 do 
 			with embed_library[j] do begin
 				s:=name+' ';
 				for i:=0 to length(vector)-1 do
-					writestr(s,s,vector[i]:1,' ');
+					writestr(s,s,vector[i]:1:6,' ');
 				if j<length(embed_library)-1 then s:=s+eol;
 				insert(s,result,length(result)+1);
 			end;
 	end else begin
 		Tcl_SetReturnString(interp,error_prefix
-			+'Bad command "'+command+'", must be one of '
-			+'"create add compare config dump" in lwdaq_rag.');
+			+'Bad operation "'+operation+'", must be one of '
+			+'"create add retrieve config dump" in lwdaq_rag.');
 		exit;
 	end;
 
