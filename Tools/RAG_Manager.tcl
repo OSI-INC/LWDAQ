@@ -25,7 +25,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "3.1"
+	LWDAQ_tool_init "RAG_Manager" "3.3"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -36,6 +36,7 @@ proc RAG_Manager_init {} {
 	set info(match_dir) [file join $config(root_dir) "Match"]
 	set info(embed_dir) [file join $config(root_dir) "Embed"]
 	set info(log_dir) [file join $config(root_dir) "Log"]
+	set info(signal_file) [file join $info(log_dir) "signal.txt"]
 #
 # The default question.
 #
@@ -45,11 +46,19 @@ proc RAG_Manager_init {} {
 # Internal flags, lists, and control variables.
 #
 	set info(control) "Idle"
+	set info(engine_ctrl) "Idle"
 	set info(chat) ""
 	set info(result) ""
 	set info(text) "stdout"
 	set info(data) ""
 	set info(relevance) "0.0"
+	set info(signal_time) "0"
+	set info(signal_s) "2"
+	set info(retrieval_giveup_ms) "1000"
+	set info(retrieval_check_ms) "10"
+	set info(library_loaded) "0"
+	set info(reload_s) "60"
+	set info(reload_time) "0"
 #
 # Public control flags.
 #
@@ -264,13 +273,15 @@ but never insert newline characters into LaTeX math zones.
 }
 
 # 
-# RAG_Manager_time provides a timestamp for log messages.
+# RAG_Manager_time provides a timestamp for log messages. It accepts a UNIX time,
+# or will default to current UNIX time.
 #
-proc RAG_Manager_time {} {
+proc RAG_Manager_time {{ts ""}} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-	return [clock format [clock seconds]]
+	if {$ts == ""} {set ts [clock seconds]}
+	return [clock format $ts]
 }
 
 #
@@ -1184,15 +1195,21 @@ proc RAG_Manager_store_chunks {chunks} {
 			break
 		}
 		
-		set mfn [file join $info(match_dir) $hash\.txt]
-		set f [open $mfn w]
-		puts -nonewline $f $match
-		close $f
+		if {[catch {
+			set mfn [file join $info(match_dir) $hash\.txt]
+			set f [open $mfn w]
+			puts -nonewline $f $match
+			close $f
 
-		set cfn [file join $info(content_dir) $hash\.txt]
-		set f [open $cfn w]
-		puts -nonewline $f $content
-		close $f
+			set cfn [file join $info(content_dir) $hash\.txt]
+			set f [open $cfn w]
+			puts -nonewline $f $content
+			close $f
+		} error_message]} {
+			RAG_Manager_print "ERROR: $error_result"
+			RAG_Manager_print "SUGGESTION: Use Set_Root in Configuration Panel."
+			break
+		}
 		
 		incr count
 		if {$config(verbose)} {
@@ -1484,7 +1501,8 @@ proc RAG_Manager_delete {} {
 # RAG_Manager_generate downloads and chunks all URL resources named in the
 # sources list. It submits all chunks for embedding, although the RAG package
 # routines will obtain new embeds only for new chunks. In order to embed the
-# chunks, this routine must read a valid API key from disk.
+# chunks, this routine must read a valid API key from disk. This routine clears
+# the libarary-loaded flag.
 #
 proc RAG_Manager_generate {} {
 	upvar #0 RAG_Manager_config config
@@ -1493,6 +1511,7 @@ proc RAG_Manager_generate {} {
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Generate"
 	RAG_Manager_print "Generate Chunks and Embed Vectors [RAG_Manager_time]" purple
+	set info(library_loaded) 0
 	
 	set chunks [list]
 	foreach url [string trim $config(sources)] {
@@ -1500,7 +1519,6 @@ proc RAG_Manager_generate {} {
 	}
 	RAG_Manager_store_chunks $chunks
 
-	RAG_Manager_print "Reading api key $config(key_file)\..." brown
 	if {![file exists $config(key_file)]} {
 		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
 		set info(control) "Idle"
@@ -1509,6 +1527,7 @@ proc RAG_Manager_generate {} {
 	set f [open $config(key_file) r]
 	set api_key [read $f]
 	close $f 
+	RAG_Manager_print "Read api key from $config(key_file)\." brown
 
 	RAG_Manager_print "Submitting all chunk match strings for embedding..."	
 	RAG_Manager_fetch_embeds $api_key
@@ -1528,16 +1547,13 @@ proc RAG_Manager_load {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	
-	if {$info(control) != "Idle"} {return ""}
-	set info(control) "Load"
-	RAG_Manager_print "Load Embed Library into Memory [RAG_Manager_time]" purple
+	RAG_Manager_print "Loading embed library into memory..."
+	set info(library_loaded) "0"
 
 	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
 	set lib_len [llength $efl]
 	if {$lib_len == 0} {
-		RAG_Manager_print "ERROR: No embed vectors found in $info(embed_dir)."
-		set info(control) "Idle"
-		return 0
+		error "No embed vectors found in $info(embed_dir)."
 	}
 	
 	set efn [lindex $efl 0]
@@ -1546,17 +1562,13 @@ proc RAG_Manager_load {} {
 	close $f
 	set vec_len [llength $vector]
 	if {$vec_len == 0} {
-		RAG_Manager_print "ERROR: Vector of length zero in [file tail $efn]"
-		set info(control) "Idle"
-		return 0
+		error "Vector of length zero in [file tail $efn]."
 	}
 	
-	RAG_Manager_print "Creating embed library in memory..."
 	set start_time [clock milliseconds]
 	lwdaq_rag create -lib_len $lib_len -vec_len $vec_len
 	RAG_Manager_print "Embed library created in\
-		[expr [clock milliseconds] - $start_time] ms,\
-		reading and adding embeds..."
+		[expr [clock milliseconds] - $start_time] ms."
 		
 	set start_time [clock milliseconds]
 	foreach efn $efl {
@@ -1573,47 +1585,179 @@ proc RAG_Manager_load {} {
 			}
 		}
 	}
-	RAG_Manager_print "Embeds read and added to embed library in\
+	RAG_Manager_print "Embeds added to library in\
 		[expr [clock milliseconds] - $start_time] ms."
 	
-	RAG_Manager_print "Loading complete, $count embeds [RAG_Manager_time]" purple
-	set info(control) "Idle"
+	RAG_Manager_print "Loading complete with a total of $count embeds"
+	set info(library_loaded) "1"
 	return $count
 }
 
 #
-# RAG_Manager_engine starts the process that watches the log directory for retrieval
-# requests and services those requests by loading a request embed from disk,
-# retrieving a list of relevant embeds, and writing this list to disk. The engine
-# process posts itself to the event queue. It indicates its existence by touching
-# a signal file every every few seconds. When it sees a 
+# RAG_Manager_engine manages the process that watches the log directory for
+# retrieval requests and services those requests by loading a request embed from
+# disk, retrieving a list of relevant embeds, and writing this list to disk. The
+# engine process posts itself to the event queue. When it starts, it loads the
+# embed library regardless of whether one is already loaded into memory. It will
+# re-load the embed library every reload_s after that. The engine indicates its
+# existence by touching a signal file in the log directory every few seconds.
+# The engine watches the log directory. When it finds there a file with
+# extension ".txt", first letter Q, and remaining letters all hexadecimal, it
+# renames the file by replacing the leading Q with a T. We call the first file
+# the "question file" and the second file the "temporary file". It reads the
+# temporary file. It confirms the contents are a valid vector for matching the
+# embed library. It retrieves relevant embeds using our lwdaq_rag utility. It
+# re-writes the temporary file with the retrieved embed list. It renames the
+# temporary file by replacing thge leading T with an R. This "retrieval file" is
+# now ready for consumption by the process that wrote the question file to the
+# log directory.
 #
-proc RAG_Manager_engine {} {
+proc RAG_Manager_engine {{cmd ""}} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
+	global LWDAQ_Info
+	
+	if {$LWDAQ_Info(gui_enabled) && ![winfo exists $info(window)]} {
+		return ""
+	}
+	if {($cmd == "Stop") && ($info(engine_ctrl) == "Run")} {
+		set info(engine_ctrl) "Stop"
+		return ""
+	}
+	if {($cmd == "") && ($info(engine_ctrl) == "Stop")} {
+		RAG_Manager_print "Engine: Stopping." purple
+		set info(engine_ctrl) "Idle"
+		return ""
+	}
+	if {$cmd == "Start"} {
+		if {$info(engine_ctrl) == "Idle"} {
+			set info(engine_ctrl) "Run"
+			RAG_Manager_print "Engine: Starting up in $info(log_dir)." purple
+			set info(reload_time) "0"
+		} else {
+			return ""
+		}
+	}
+	
+	if {[clock seconds] > $info(reload_time)} {
+		if {[catch {
+			RAG_Manager_load
+		} error_message]} {
+			RAG_Manager_print "ERROR: $error_message"
+			set info(engine_ctrl) "Idle"
+			return ""
+		}
+		set info(reload_time) [expr [clock seconds] + $info(reload_s)]
+		RAG_Manager_print "Next library load at [RAG_Manager_time $info(reload_time)]"
+	}
 
-	LWDAQ_post RAG_Manager_engine
+	if {[file exists $info(signal_file)]} {
+		if {$info(signal_time) <= [clock seconds]} {
+			file mtime $info(signal_file) [clock seconds]
+			set info(signal_time) [expr [clock seconds] + $info(signal_s)]
+			RAG_Manager_print "Engine: Touched signal file $info(signal_file)." salmon
+		}
+	} else {
+		set f [open $info(signal_file) w]
+		puts $f \
+			"This is the RAG Manager Engine Signal File. The engine touches this\
+			file every $info(signal_s) seconds to show that it is running."
+		close $f
+		RAG_Manager_print "Engine: Created signal file $info(signal_file)."
+	}
+	
+	set lfl [glob -nocomplain [file join $info(log_dir) *.txt]]
+	foreach lfn $lfl {
+		set name [file root [file tail $lfn]]
+		if {[regexp {Q([0-9a-f]+)} $name -> name]} {
+			RAG_Manager_print "Retrieval Engine:\
+				Grabbing question embed [file tail $lfn]."
+			set tfn [file join $info(log_dir) "T$name\.txt"]
+			file rename $lfn $tfn
+			
+			set f [open $tfn r]
+			set q_vector [read $f]
+			close $f
+			
+			set good 1
+			foreach x $q_vector {
+				if {![string is double $x]} {
+					RAG_Manager_print "ERROR: Bad component in vector [file tail $lfn],\
+						in Retrieval Engine."
+					set good 0
+					break
+				}
+			}
+			set rc [lwdaq_rag config]
+			if {[regexp -- {-vec_len ([0-9]*)} $rc -> n]} {
+				if {$n != [llength $q_vector]} {
+					RAG_Manager_print "ERROR: Question and library vector\
+						length mismatch, $n<>[llength $vector],\
+						in Retrieval Engine."
+					set good 0
+				}
+			} else {
+				RAG_Manager_print "ERROR: Unexpected lwdaq_rag configuration \"$rc\",\
+					in Retrieval Engine."
+				set good 0
+			}
+			if {!$good} {break}
+			
+			RAG_Manager_print "Retrieval Engine:\
+				Retrieving embeds relevant to question $name..." brown
+			set start_time [clock milliseconds]
+			if {[catch {
+				set retrieval [lwdaq_rag retrieve -retrieve_len \
+					$info(retrieve_len) -vector $q_vector]
+				RAG_Manager_print "Retrieval Engine: [lrange $retrieval 0 3]" brown
+				set f [open $tfn w]
+				puts $f $retrieval
+				close $f
+				file rename $tfn [file join $info(log_dir) "R$name\.txt"]
+				RAG_Manager_print "Retrieval Engine:\
+					Retrieval file R$name\.txt ready for consumption."
+			} error_result]} {
+				RAG_Manager_print "ERROR: $error_result"
+				set info(control) "Idle"
+				return "0"
+			}		
+		}
+	}
+	
+	if {$info(engine_ctrl) == "Run"} {
+		LWDAQ_post RAG_Manager_engine
+	} else {
+		set info(engine_ctrl) "Idle"
+	}
 	return ""
 }
 
 #
 # RAG_Manager_retrieve embeds the current question using an embedding endpoint.
 # We compare the question vector to the vectors in the embed directory and
-# obtain a list of embeds sorted in order of decreasing relevance. We operate on
-# the first retrieve_len embeds in this list. We remove "obsolete embeds". These
-# are embeds for which no supporting content exists. Obsolete embeds arise when
-# we re-generate our chunk library. New match strings will need new embeds, but
-# the embeds of non-existent match strings will remain in the embed library
-# until we deliberately purge them with the Purge Embeds command. Once obsolete
-# embeds have been removed from the list, all remaining embeds have existing
-# content chunks. We use the relevance of the first chunk in the list as a
-# measure of the relevance of the question, and classify the question as high,
-# mid, or low-relevance. We construct the retrieved content based upon this
-# classification. We read content strings from disk and add them to list. When
-# we exceed the token limit for the question relevance, we stop. We return the
-# number of content strings added to our list, and we store the list itself in
-# the global info(data) variable. In order to embed the question, this routine
-# must read a valid API key from disk.
+# obtain a list of embeds sorted in order of decreasing relevance. There are two
+# ways we can perform this retrieval. We can either use the services of a
+# Retrieval Engine, or we can retrieve from the RAG Manager's own embed library.
+# Our first choice is to retrieve from our own embed library, but if the library
+# is not yet loaded, we will see if there is an active signal file in our log
+# directory. If so, we will write the question embed to disk in the log
+# directory and see if an engine grabs it and returns a matching retrieval list
+# file. We will wait a few seconds for that. If we don't see the retrieval list
+# appear, we generate an error and abandon the retrieval. Assuming we obtain a
+# retrieval list, we operate on the first retrieve_len embeds in this list. We
+# remove "obsolete embeds". These are embeds for which no supporting content
+# exists. Obsolete embeds arise when we re-generate our chunk library. New match
+# strings will need new embeds, but the embeds of non-existent match strings
+# will remain in the embed library until we deliberately purge them with the
+# Purge Embeds command. Once obsolete embeds have been removed from the list,
+# all remaining embeds have existing content chunks. We use the relevance of the
+# first chunk in the list as a measure of the relevance of the question, and
+# classify the question as high, mid, or low-relevance. We construct the
+# retrieved content based upon this classification. We read content strings from
+# disk and add them to list. When we exceed the token limit for the question
+# relevance, we stop. We return the number of content strings added to our list,
+# and we store the list itself in the global info(data) variable. In order to
+# embed the question, this routine must read a valid API key from disk.
 #
 proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
@@ -1631,7 +1775,6 @@ proc RAG_Manager_retrieve {} {
 	
 	RAG_Manager_print "Question: $config(question)"
 	
-	RAG_Manager_print "Reading api key $config(key_file)\." brown
 	if {![file exists $config(key_file)]} {
 		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
 		set info(control) "Idle"
@@ -1640,7 +1783,7 @@ proc RAG_Manager_retrieve {} {
 	set f [open $config(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read API key." brown
+	RAG_Manager_print "Read api key from $config(key_file)\." brown
 
 	RAG_Manager_print "Obtaining question embedding vector..."
 	set start_time [clock milliseconds]
@@ -1652,14 +1795,52 @@ proc RAG_Manager_retrieve {} {
 		retrieving relevant embeds..."
 	set start_time [clock milliseconds]
 	if {[catch {
-		set retrieval \
-			[lwdaq_rag retrieve -retrieve_len $info(retrieve_len) -vector $q_vector]
-		RAG_Manager_print "First four chunks: [lrange $retrieval 0 3]" brown
+		set retrieval ""
+		if {$info(library_loaded)} {
+			RAG_Manager_print "Using embed library loaded into memory..."
+			set retrieval [lwdaq_rag retrieve \
+				-retrieve_len $info(retrieve_len) \
+				-vector $q_vector]
+		} else {
+			RAG_Manager_print "No embed library loaded, looking for\
+				retrieval engine in $info(log_dir)..."
+			if {[file exists $info(signal_file)] \
+					&& (([clock seconds]-[file mtime $info(signal_file)]) \
+					< $info(signal_s))} {
+				RAG_Manager_print "Found sign of retrieval engine in $info(log_dir)..."
+				set name [clock milliseconds]
+				set qfn [file join $info(log_dir) "Q$name\.txt"] 
+				set f [open $qfn w]
+				puts $f $q_vector
+				close $f
+				set rfn [file join $info(log_dir) "R$name\.txt"]
+				set start [clock milliseconds]
+				while {[clock milliseconds] < $start + $info(retrieval_giveup_ms)} {
+					LWDAQ_wait_ms $info(retrieval_check_ms)
+					if {[file exists $rfn]} {
+						set f [open $rfn r]
+						set retrieval [read $f]
+						close $f
+						file delete $rfn
+						RAG_Manager_print "Retrieval engine provided $rfn\."
+						break
+					}
+				}
+			}
+		}
+		if {($retrieval == "") && !$info(library_loaded)} {
+			RAG_Manager_print "No retrieval engine available, loading embed library..."
+			RAG_Manager_load
+			set retrieval [lwdaq_rag retrieve \
+				-retrieve_len $info(retrieve_len) \
+				-vector $q_vector]
+		}
 	} error_result]} {
 		RAG_Manager_print "ERROR: $error_result"
 		set info(control) "Idle"
 		return "0"
 	}	
+	RAG_Manager_print "First four chunks: [lrange $retrieval 0 7]"
 	
 	RAG_Manager_print "Retrieval complete in\
 		[expr [clock milliseconds] - $start_time] ms,\
@@ -1872,7 +2053,6 @@ proc RAG_Manager_submit {} {
 	RAG_Manager_print "Assistant prompt being submitted with this question:" brown
 	RAG_Manager_print "$assistant" green
 
-	RAG_Manager_print "Reading api key $config(key_file)\." brown
 	if {![file exists $config(key_file)]} {
 		set answer "ERROR: Cannot find key file $config(key_file)."
 		set info(control) "Idle"
@@ -1881,7 +2061,7 @@ proc RAG_Manager_submit {} {
 	set f [open $config(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read API key." brown
+	RAG_Manager_print "Read api key from $config(key_file)\." brown
 	
 	RAG_Manager_print "Submitting question with [llength $info(data)] chunks..."
 	append info(chat) "Question: [string trim $question]\n"
@@ -1903,13 +2083,11 @@ proc RAG_Manager_submit {} {
 		set answer "ERROR: Could not find answer or error message in result."
 	}
 
-	RAG_Manager_print "Submission Complete [RAG_Manager_time]" purple
-
 	RAG_Manager_print "Answer to \"$question\":" purple
 	set answer_txt [RAG_Manager_txt_from_json $answer]
 	RAG_Manager_print $answer_txt 
 	append info(chat) "Answer: $answer_txt\n\n"
-	RAG_Manager_print "End of Answer" purple
+	RAG_Manager_print "Submission Complete [RAG_Manager_time]" purple
 	
 	set info(control) "Idle"
 	return $answer
@@ -1970,18 +2148,28 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Delete Generate Load Retrieve Submit History Clear} {
+	foreach a {Delete Generate Retrieve Submit History} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
-	
+
 	foreach a {Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text "$a" -variable RAG_Manager_config($b)
 		pack $f.$b -side left -expand yes
 	}
 
+	foreach a {Start Stop} {
+		set b [string tolower $a]
+		button $f.$b -text "Engine $a" -command \
+			[list LWDAQ_post "RAG_Manager_engine $a"]
+		pack $f.$b -side left -expand yes
+	}
+
+	label $f.ectrl -textvariable RAG_Manager_info(engine_ctrl) -fg green -width 8
+	pack $f.ectrl -side left -expand yes
+	
 	button $f.config -text "Configure" -command "LWDAQ_post RAG_Manager_configure"
 	pack $f.config -side left -expand yes
 	button $f.help -text "Help" -command {
@@ -1999,7 +2187,7 @@ proc RAG_Manager_open {} {
 	}
 			
 	set info(text) [LWDAQ_text_widget $w 140 40]
-	LWDAQ_print $info(text) "$info(name) Version $info(version)" purple
+	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple
 	
 	return $w	
 }

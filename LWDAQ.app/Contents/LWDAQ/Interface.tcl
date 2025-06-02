@@ -553,18 +553,23 @@ proc LWDAQ_print {args} {
 		if {($destination == "stdout") || ($destination == "stderr")} {
 			if {$LWDAQ_Info(stdout_available)} {
 				switch -- $color {
-					red {set print_str "\033\[31m$print_str\033\[0m"}
-					blue {set print_str "\033\[34m$print_str\033\[0m"}
+					red {set a "\033\[31m"}
+					blue {set a "\033\[34m"}
 					green -
-					darkgreen {set print_str "\033\[32m$print_str\033\[0m"}
+					darkgreen {set a "\033\[32m"}
 					purple -
-					magenta {set print_str "\033\[35m$print_str\033\[0m"}
-					black {set print_str "\033\[0m$print_str"}
+					pink -
+					salmon -
+					magenta {set a "\033\[35m$"}
 					orange -
 					brown -
-					yellow {set print_str "\033\[33m$print_str"}
+					yellow {set a "\033\[33m"}
+					lightblue -
+					cyan {set a "\033\[36m"}
+					black {set a "\033\[30m"}
 				}
-				puts -nonewline $destination $print_str
+				set b "\033\[0m"
+				puts -nonewline $destination "$a$print_str$b"
 				set printed 1
 			}
 		} {
