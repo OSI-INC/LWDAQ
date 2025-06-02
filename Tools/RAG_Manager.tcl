@@ -2087,7 +2087,7 @@ proc RAG_Manager_submit {} {
 	set answer_txt [RAG_Manager_txt_from_json $answer]
 	RAG_Manager_print $answer_txt 
 	append info(chat) "Answer: $answer_txt\n\n"
-	RAG_Manager_print "Submission Complete [RAG_Manager_time]" purple
+	RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
 	
 	set info(control) "Idle"
 	return $answer
