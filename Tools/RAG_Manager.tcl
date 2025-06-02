@@ -56,6 +56,8 @@ proc RAG_Manager_init {} {
 	set config(chat_submit) "0"
 	set config(verbose) "0"
 	set config(show_match) "0"
+	set config(snippet_len) "50"
+	set config(progress_frac) "0.1" 
 #
 # The source documents. Can be edited with a dedicated window and saved to
 # settings file.
@@ -279,7 +281,7 @@ text, figures, and hyperlinks. When answering the user's question:
 	return ""	
 }
 
-#
+# 
 # RAG_Manager_time provides a timestamp for log messages.
 #
 proc RAG_Manager_time {} {
@@ -882,7 +884,8 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
 		if {([string length $content] == 0)} {
-			RAG_Manager_print "Empty chunk content string, $chunk_id" brown
+			RAG_Manager_print "WARNING: Empty content string at i_start=$i_start,\
+				i_end=$i_end, name=$name."
 			continue
 		}
 
@@ -891,15 +894,20 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		regsub -all {[!]*\[([^\]]+)\]\([^)]+\)} $match {\1} match
 		set match [string trim $match]
 		if {([string length $match] == 0)} {
-			RAG_Manager_print "Empty chunk match string, $chunk_id" brown
+			RAG_Manager_print "WARNING: Empty match string at i_start=$i_start,\
+				i_end=$i_end, name=$name."
 			continue
 		}
 		
-		RAG_Manager_print "[format %8.0f $i_start]\
-			[format %8.0f $i_end]\
-			[format %8s $name]\
-			[format %5.0f [string length $content]]\
-			[string trim [string range [regsub -all {\n} $match " "] 0 50]]..." $color	
+		if {$config(verbose)} {
+			set snippet [string trim \
+				[string range [regsub -all {\n} $match " "] 0 $config(snippet_len)]]
+			RAG_Manager_print "[format %8.0f $i_start]\
+				[format %8.0f $i_end]\
+				[format %8s $name]\
+				[format %5.0f [string length $content]]\
+				$snippet..." $color	
+		}
 
 		switch -- $name {
 			"ol" -
@@ -1205,9 +1213,13 @@ proc RAG_Manager_store_chunks {chunks} {
 		close $f
 		
 		incr count
-		if {$count % 10 == 1} {
-			RAG_Manager_print "$count\: [file tail $mfn]\
-				[string trim [string range [regsub -all {\n} $match " "] 0 60]]..." green
+		if {$config(verbose)} {
+			if {($count % round([llength $chunks]*$config(progress_frac)) == 1) \
+				|| ($count == [llength $chunks])} {
+				RAG_Manager_print "[format %5d $count]: [file tail $mfn]\
+					[string trim [string range [regsub -all {\n} $match " "]\
+						0 $config(snippet_len)]]..." green
+			}
 		}
 		
 		LWDAQ_support
@@ -1300,7 +1312,8 @@ proc RAG_Manager_fetch_embeds {api_key} {
 			set f [open $mfn r]
 			set match [read $f]
 			close $f
-			RAG_Manager_print "$count\: [file tail $mfn] fetching embed..." orange
+			RAG_Manager_print "[format %5d $count]:\
+				[file tail $mfn] fetching embed..." orange
 			set embed [RAG_Manager_embed_string $match $api_key]
 			if {[LWDAQ_is_error_result $embed]} {
 				RAG_Manager_print "ERROR: $embed"
@@ -1318,8 +1331,12 @@ proc RAG_Manager_fetch_embeds {api_key} {
 			incr new_count
 		} else {
 			incr old_count
-			if {$old_count % 10 == 1} {
-				RAG_Manager_print "$count\: Checking embed library..." green
+			if {$config(verbose)} {
+				if {($count % round([llength $mfl]*$config(progress_frac)) == 1) \
+					|| ($count == [llength $mfl])} {
+					RAG_Manager_print "[format %5d $count]:\
+						$root has existing embed." green
+				}
 			}
 		} 
 		LWDAQ_update
@@ -1567,7 +1584,12 @@ proc RAG_Manager_load {} {
 		close $f
 		set name [file root [file tail $efn]]
 		lwdaq_rag add -name $name -vector $vector
-		RAG_Manager_print "$count\: Added $name" orange
+		if {$config(verbose)} {
+			if {($count % round([llength $efl]*$config(progress_frac)) == 1) \
+				|| ($count == [llength $efl])} {
+				RAG_Manager_print "[format %5d $count]: Added $name" orange
+			}
+		}
 	}
 	RAG_Manager_print "Embeds read and added to embed library in\
 		[expr [clock milliseconds] - $start_time] ms."
@@ -1578,9 +1600,18 @@ proc RAG_Manager_load {} {
 }
 
 #
-# RAG_Manager_retrieval_engine provides content retrieval from the embed library
-# for other processes that have access to the log directory.
+# RAG_Manager_engine starts the process that watches the log directory for retrieval
+# requests and services those requests by loading a request embed from disk,
+# retrieving a list of relevant embeds, and writing this list to disk. The engine
+# process posts itself to the event queue. It indicates its existence by touching
+# a signal file every every few seconds. When it sees a 
 #
+proc RAG_Manager_engine {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	return ""
+}
 
 #
 # RAG_Manager_retrieve embeds the current question using an embedding endpoint.
