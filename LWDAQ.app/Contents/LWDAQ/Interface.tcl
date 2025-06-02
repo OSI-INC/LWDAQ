@@ -499,7 +499,8 @@ proc LWDAQ_enable_text_undo {t} {
 # service provided by the routine is to replace any double occurrances of
 # "ERROR:" and "WARNING:" that might arise as we pass error and warning strings
 # through various routines before they are printed. The routine returns the name
-# of the text widget, file, or channel it wrote to.
+# of the text widget, file, or channel it wrote to. When the text device is 
+# stdout, the routine uses escape sequences to implement colors.
 #
 proc LWDAQ_print {args} {
 	global LWDAQ_Info
@@ -551,6 +552,18 @@ proc LWDAQ_print {args} {
 	} {
 		if {($destination == "stdout") || ($destination == "stderr")} {
 			if {$LWDAQ_Info(stdout_available)} {
+				switch -- $color {
+					red {set print_str "\033\[31m$print_str\033\[0m"}
+					blue {set print_str "\033\[34m$print_str\033\[0m"}
+					green -
+					darkgreen {set print_str "\033\[32m$print_str\033\[0m"}
+					purple -
+					magenta {set print_str "\033\[35m$print_str\033\[0m"}
+					black {set print_str "\033\[0m$print_str"}
+					orange -
+					brown -
+					yellow {set print_str "\033\[33m$print_str"}
+				}
 				puts -nonewline $destination $print_str
 				set printed 1
 			}

@@ -30,10 +30,12 @@ proc RAG_Manager_init {} {
 #
 # Directory locations for key, chunks, embeds.
 #
-	set config(key_file) "~/Active/Admin/Keys/OpenAI_API.txt"
-	set config(content_dir) "~/Active/RAG/Content"
-	set config(match_dir) "~/Active/RAG/Match"
-	set config(embed_dir) "~/Active/RAG/Embed"
+	set config(root_dir) "~/Active/RAG"
+	set config(key_file) [file join $config(root_dir) "Key/OpenAI_API.txt"]
+	set info(content_dir) [file join $config(root_dir) "Content"]
+	set info(match_dir) [file join $config(root_dir) "Match"]
+	set info(embed_dir) [file join $config(root_dir) "Embed"]
+	set info(log_dir) [file join $config(root_dir) "Log"]
 #
 # The default question.
 #
@@ -303,6 +305,206 @@ proc RAG_Manager_print {s {color "black"}} {
 		LWDAQ_print $info(text) $s $color
 		LWDAQ_update
 	}
+}
+
+#
+# RAG_Manager_apply reads the contents of a text window and executes them as a
+# Tcl script at the global scope. We can use this routine to reconfigure long
+# string parameters such as our assistant instructions. Within the scripts we
+# can refer to the RAG Manager configuration and information arrays as "config"
+# and "info".
+#
+proc RAG_Manager_apply {w} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+
+	set commands {
+		upvar #0 RAG_Manager_info info
+		upvar #0 RAG_Manager_config config	
+	}
+	append commands [string trim [$w.text get 1.0 end]]
+	if {[catch {eval $commands} error_result]} {
+		RAG_Manager_print "ERROR: $error_result"
+	}
+	
+	return ""
+}
+
+#
+# RAG_Manager_assistant opens a text window and prints out the declarations of
+# the three assistant instructions. We can edit and then apply with an Apply
+# button.
+#
+proc RAG_Manager_assistant_prompts {} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	# If the assistant viewing panel exists, destroy it. We are going to make a
+	# new one.
+	set w $info(window)\.assistant
+	if {[winfo exists $w]} {destroy $w}
+	
+	# Create a new top-level text window that is a child of the main tool
+	# window. Bind the Command-a key to save the metadata.
+	toplevel $w
+	wm title $w "Assistant Prompts, RAG_Manager $info(version)"
+	LWDAQ_text_widget $w 100 40
+	LWDAQ_enable_text_undo $w.text
+	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
+	
+	# Create the Applpy button.
+	frame $w.f
+	pack $w.f -side top
+	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
+	pack $w.f.apply -side left
+	
+	# Print the assistant prompts for all relevance levels.
+	foreach level {high mid low} {
+		LWDAQ_print $w.text "set config($level\_rel_assistant) \{\n" blue
+		LWDAQ_print $w.text "[string trim $config($level\_rel_assistant)]"
+		LWDAQ_print $w.text "\n\}\n" blue
+	}
+	
+	return ""
+}
+
+#
+# RAG_Manager_source_urls opens a text window and prints out the source list. We can
+# edit and then apply with an Apply button.
+#
+proc RAG_Manager_source_urls {} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	# If the source viewing panel exists, destroy it. We are going to make a
+	# new one.
+	set w $info(window)\.sources
+	if {[winfo exists $w]} {destroy $w}
+	
+	# Create a new top-level text window that is a child of the main tool
+	# window. Bind the Command-a key to save the metadata.
+	toplevel $w
+	wm title $w "Source Documents, RAG_Manager $info(version)"
+	LWDAQ_text_widget $w 100 10
+	LWDAQ_enable_text_undo $w.text
+	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
+	
+	# Create the Applpy button.
+	frame $w.f
+	pack $w.f -side top
+	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
+	pack $w.f.apply -side left
+	
+	# Print the sources list in the window.
+	LWDAQ_print $w.text "set config(sources) \{\n" blue
+	LWDAQ_print $w.text "[string trim $config(sources)]"
+	LWDAQ_print $w.text "\n\}\n" blue
+	
+	return ""
+}
+
+#
+# RAG_Manager_set_root takes a directory name as input. If this name is an empty
+# string or omitted, it opens a browser window to allow us to pick a directory
+# to act as the RAG Manager's root directory. If this directory contains the
+# Content, Match, Embed, and Log directories, so much the better, but if not,
+# this procedure will create them. The procedure returns the current root
+# directory, whether it has been changed or not.
+#
+proc RAG_Manager_set_root {{rdn ""}} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "Root_Dir"
+	RAG_Manager_print "Choosing Root Directory [RAG_Manager_time]" purple
+
+	if {$rdn == ""} {
+		set rdn [LWDAQ_get_dir_name $config(root_dir)]
+	}
+	
+	if {![file exists $rdn]} {
+		RAG_Manager_print "ERROR: Directory \"$rdn\" does not exist."
+		set info(control) "Idle"
+		return $config(root_dir)
+	}
+	
+	set config(root_dir) $rdn
+	RAG_Manager_print "Root Directory: $rdn"
+	if {[catch {
+		foreach sdn {Content Match Embed Log} {
+			set sdn [file join $config(root_dir) $sdn]
+			if {[file exists $sdn]} {
+				RAG_Manager_print "Found $sdn"
+			} else {
+				file mkdir $sdn
+				RAG_Manager_print "Created $sdn"
+			}
+		}
+	} error_message]} {
+		RAG_Manager_print "ERROR: $error_message"
+		set info(control) "Idle"
+		return $rdn
+	}
+	
+	set info(content_dir) [file join $config(root_dir) "Content"]
+	set info(match_dir) [file join $config(root_dir) "Match"]
+	set info(embed_dir) [file join $config(root_dir) "Embed"]
+	set info(log_dir) [file join $config(root_dir) "Log"]
+	
+	RAG_Manager_print "New root directory established [RAG_Manager_time]" purple
+	set info(control) "Idle"
+	return $rdn
+}
+
+#
+# RAG_Manager_set_key selects the key file we need to access endpoints.
+#
+proc RAG_Manager_set_key {{kfn ""}} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "Key_File"
+	RAG_Manager_print "Choosing Key File [RAG_Manager_time]" purple
+
+	if {$kfn == ""} {
+		set kfn [LWDAQ_get_file_name]
+	}
+	
+	if {![file exists $kfn]} {
+		RAG_Manager_print "ERROR: File \"$kfn\" does not exist."
+		set info(control) "Idle"
+		return $config(key_file)
+	}
+	
+	set config(key_file) $kfn
+	RAG_Manager_print "Key File: $kfn"
+
+	RAG_Manager_print "New key file chosen [RAG_Manager_time]" purple
+	set info(control) "Idle"
+	return $kfn
+}
+
+#
+# RAG_Manager_configure opens the tool configuration window, which allows us to
+# edit the configuration parameters. Additional buttons give access to multi-line
+# parameters, like the source url list and the assistant prompts. Another button
+# purges obsolete embeds from the embed directory.
+#
+proc RAG_Manager_configure {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	set f [LWDAQ_tool_configure RAG_Manager 3]
+
+	foreach a {Set_Root Set_Key Source_URLs Assistant_Prompts Purge_Embeds} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
+		pack $f.$b -side left -expand yes
+	}
+		
+	return ""
 }
 
 #
@@ -611,11 +813,6 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			"date" {set color orange}
 			default {set color red}
 		}
-		RAG_Manager_print "[format %8.0f $i_start]\
-			[format %8.0f $i_end]\
-			[format %8s $name]\
-			[format %5.0f [string length $content]]\
-			[string trim [string range [regsub -all {\n} $content " "] 0 80]]..." $color	
 		
 		switch -- $name {
 			"ol" {
@@ -698,6 +895,12 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			continue
 		}
 		
+		RAG_Manager_print "[format %8.0f $i_start]\
+			[format %8.0f $i_end]\
+			[format %8s $name]\
+			[format %5.0f [string length $content]]\
+			[string trim [string range [regsub -all {\n} $match " "] 0 60]]..." $color	
+
 		switch -- $name {
 			"ol" -
 			"ul" -
@@ -991,18 +1194,21 @@ proc RAG_Manager_store_chunks {chunks} {
 			break
 		}
 		
-		set mfn [file join $config(match_dir) $hash\.txt]
+		set mfn [file join $info(match_dir) $hash\.txt]
 		set f [open $mfn w]
 		puts -nonewline $f $match
 		close $f
 
-		set cfn [file join $config(content_dir) $hash\.txt]
+		set cfn [file join $info(content_dir) $hash\.txt]
 		set f [open $cfn w]
 		puts -nonewline $f $content
 		close $f
 		
 		incr count
-		RAG_Manager_print "$count\: [file tail $mfn]" green
+		if {$count % 10 == 1} {
+			RAG_Manager_print "$count\: [file tail $mfn]\
+				[string trim [string range [regsub -all {\n} $match " "] 0 60]]..." green
+		}
 		
 		LWDAQ_support
 	}
@@ -1079,14 +1285,14 @@ proc RAG_Manager_fetch_embeds {api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 		
-	set mfl [glob -nocomplain [file join $config(match_dir) *.txt]]
+	set mfl [glob -nocomplain [file join $info(match_dir) *.txt]]
 	RAG_Manager_print "Found [llength $mfl] chunks on disk."
-	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
+	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
 	RAG_Manager_print "Found [llength $efl] embeds on disk."
 	set new_count 0
 	set old_count 0
 	set count 0
-	RAG_Manager_print "Creating embeds for new paragraphs..."
+	RAG_Manager_print "Creating embeds for new match strings..."
 	foreach mfn $mfl {
 		incr count
 		set root [file root [file tail $mfn]]
@@ -1094,7 +1300,7 @@ proc RAG_Manager_fetch_embeds {api_key} {
 			set f [open $mfn r]
 			set match [read $f]
 			close $f
-			RAG_Manager_print "$count\: [file tail $mfn] fetching new embed." orange
+			RAG_Manager_print "$count\: [file tail $mfn] fetching embed..." orange
 			set embed [RAG_Manager_embed_string $match $api_key]
 			if {[LWDAQ_is_error_result $embed]} {
 				RAG_Manager_print "ERROR: $embed"
@@ -1105,19 +1311,21 @@ proc RAG_Manager_fetch_embeds {api_key} {
 				RAG_Manager_print "ERROR: $vector"
 				break
 			}
-			set efn [file join $config(embed_dir) $root\.txt]
+			set efn [file join $info(embed_dir) $root\.txt]
 			set f [open $efn w]
 			puts -nonewline $f $vector
 			close $f
 			incr new_count
 		} else {
 			incr old_count
-			RAG_Manager_print "$count\: [file tail $mfn] embed exists." orange
+			if {$old_count % 10 == 1} {
+				RAG_Manager_print "$count\: Checking embed library..."
+			}
 		} 
 		LWDAQ_update
 	}
 
-	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
+	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
 	set obsolete_count 0
 	foreach efn $efl {
 		set root [file root [file tail $efn]]
@@ -1127,9 +1335,9 @@ proc RAG_Manager_fetch_embeds {api_key} {
 	}
 
 	RAG_Manager_print "Checked $count chunks,\
-		found $old_count matching embeds,\
-		fetched $new_count new embeds,\
-		there are $obsolete_count obsolete embeds."
+		found $old_count embeds,\
+		fetched $new_count embeds,\
+		$obsolete_count obsolete embeds."
 		
 	return $new_count
 }
@@ -1145,11 +1353,11 @@ proc RAG_Manager_purge_embeds {} {
 		
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Purge"
-	RAG_Manager_print "\nPurge Obsolete Embed Vectors [RAG_Manager_time]" purple
+	RAG_Manager_print "Purge Obsolete Embed Vectors [RAG_Manager_time]" purple
 	
-	set cfl [glob -nocomplain [file join $config(content_dir) *.txt]]
+	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings on disk."
-	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
+	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
 	RAG_Manager_print "Found [llength $efl] embeds on disk."
 
 	set purge_count 0
@@ -1236,123 +1444,6 @@ proc RAG_Manager_get_answer {question chunks assistant api_key {model ""}} {
 }
 
 #
-# RAG_Manager_apply reads the contents of a text window and executes them as a
-# Tcl script at the global scope. We can use this routine to reconfigure long
-# string parameters such as our assistant instructions. Within the scripts we
-# can refer to the RAG Manager configuration and information arrays as "config"
-# and "info".
-#
-proc RAG_Manager_apply {w} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-
-	set commands {
-		upvar #0 RAG_Manager_info info
-		upvar #0 RAG_Manager_config config	
-	}
-	append commands [string trim [$w.text get 1.0 end]]
-	if {[catch {eval $commands} error_result]} {
-		RAG_Manager_print "ERROR: $error_result"
-	}
-	
-	return ""
-}
-
-#
-# RAG_Manager_assistant opens a text window and prints out the declarations of
-# the three assistant instructions. We can edit and then apply with an Apply
-# button.
-#
-proc RAG_Manager_assistant_prompts {} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-	
-	# If the assistant viewing panel exists, destroy it. We are going to make a
-	# new one.
-	set w $info(window)\.assistant
-	if {[winfo exists $w]} {destroy $w}
-	
-	# Create a new top-level text window that is a child of the main tool
-	# window. Bind the Command-a key to save the metadata.
-	toplevel $w
-	wm title $w "Assistant Prompts, RAG_Manager $info(version)"
-	LWDAQ_text_widget $w 100 40
-	LWDAQ_enable_text_undo $w.text
-	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
-	
-	# Create the Applpy button.
-	frame $w.f
-	pack $w.f -side top
-	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
-	pack $w.f.apply -side left
-	
-	# Print the assistant prompts for all relevance levels.
-	foreach level {high mid low} {
-		LWDAQ_print $w.text "set config($level\_rel_assistant) \{\n" blue
-		LWDAQ_print $w.text "[string trim $config($level\_rel_assistant)]"
-		LWDAQ_print $w.text "\n\}\n" blue
-	}
-	
-	return ""
-}
-
-#
-# RAG_Manager_source_urls opens a text window and prints out the source list. We can
-# edit and then apply with an Apply button.
-#
-proc RAG_Manager_source_urls {} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-	
-	# If the source viewing panel exists, destroy it. We are going to make a
-	# new one.
-	set w $info(window)\.sources
-	if {[winfo exists $w]} {destroy $w}
-	
-	# Create a new top-level text window that is a child of the main tool
-	# window. Bind the Command-a key to save the metadata.
-	toplevel $w
-	wm title $w "Source Documents, RAG_Manager $info(version)"
-	LWDAQ_text_widget $w 100 10
-	LWDAQ_enable_text_undo $w.text
-	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
-	
-	# Create the Applpy button.
-	frame $w.f
-	pack $w.f -side top
-	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
-	pack $w.f.apply -side left
-	
-	# Print the sources list in the window.
-	LWDAQ_print $w.text "set config(sources) \{\n" blue
-	LWDAQ_print $w.text "[string trim $config(sources)]"
-	LWDAQ_print $w.text "\n\}\n" blue
-	
-	return ""
-}
-
-#
-# RAG_Manager_configure opens the tool configuration window, which allows us to
-# edit the configuration parameters. Additional buttons give access to multi-line
-# parameters, like the source url list and the assistant prompts. Another button
-# purges obsolete embeds from the embed directory.
-#
-proc RAG_Manager_configure {} {
-	upvar #0 RAG_Manager_config config
-	upvar #0 RAG_Manager_info info
-
-	set f [LWDAQ_tool_configure RAG_Manager 3]
-
-	foreach a {Source_URLs Assistant_Prompts Purge_Embeds} {
-		set b [string tolower $a]
-		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
-		pack $f.$b -side left -expand yes
-	}
-		
-	return ""
-}
-
-#
 # RAG_Manager_delete deletes all chunks from the chunk directory. It does not
 # delete embeddings in the embed directory. Unused embedding vectors are culled
 # during generation.
@@ -1363,9 +1454,9 @@ proc RAG_Manager_delete {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Delete"
-	RAG_Manager_print "\nDeleting Content and Match Strings [RAG_Manager_time]" purple
+	RAG_Manager_print "Deleting Content and Match Strings [RAG_Manager_time]" purple
 
-	set cfl [glob -nocomplain [file join $config(content_dir) *.txt]]
+	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings."
 	set count 0
 	foreach cfn $cfl {
@@ -1375,7 +1466,7 @@ proc RAG_Manager_delete {} {
 	}
 	RAG_Manager_print "Deleted $count content strings."
 
-	set mfl [glob -nocomplain [file join $config(match_dir) *.txt]]
+	set mfl [glob -nocomplain [file join $info(match_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] match strings."
 	set count 0
 	foreach mfn $mfl {
@@ -1402,7 +1493,7 @@ proc RAG_Manager_generate {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Generate"
-	RAG_Manager_print "\nGenerate Chunks and Embed Vectors [RAG_Manager_time]" purple
+	RAG_Manager_print "Generate Chunks and Embed Vectors [RAG_Manager_time]" purple
 	
 	set chunks [list]
 	foreach url [string trim $config(sources)] {
@@ -1440,12 +1531,12 @@ proc RAG_Manager_load {} {
 	
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Load"
-	RAG_Manager_print "\nLoad Embed Library into Memory [RAG_Manager_time]" purple
+	RAG_Manager_print "Load Embed Library into Memory [RAG_Manager_time]" purple
 
-	set efl [glob -nocomplain [file join $config(embed_dir) *.txt]]
+	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
 	set lib_len [llength $efl]
 	if {$lib_len == 0} {
-		RAG_Manager_print "ERROR: No embed vectors found in $config(embed_dir)."
+		RAG_Manager_print "ERROR: No embed vectors found in $info(embed_dir)."
 		set info(control) "Idle"
 		return 0
 	}
@@ -1487,21 +1578,28 @@ proc RAG_Manager_load {} {
 }
 
 #
-# RAG_Manager_retrieve obtains the embedding vector for the current question and
-# compares this vector to all the vectors in the embed directory, thus making a
-# list of chunks and their relevance to the question, sorted in order of
-# descending relevance. The length of the list thus obtained from the lwdaq_rag
-# utility is set by the retrieve_len parameter. It copies zero or more chunks
-# into a retrieved chunk list until the total number of tokens in the chunks is
-# equal to or greater than the token limit for the question's level of
-# relevance. In the case of high-relevance questions, if it comes to a chunk
-# with relevance lower than the mid-relevance threshold, it stops adding chunks,
-# so as to avoid adding irrelevant information to the completion input, which
-# makes the completion faster. It returns the list of chunks retrieved. In order
-# to embed the question, this routine must read a valid API key from disk. When it
-# first receives the retrieval list, it goes through the list and checks each
-# embed name to see if a corresponding content string exists for it. If no content
-# string exists, the routine removes the embed from the retrieval list.
+# RAG_Manager_retrieval_engine provides content retrieval from the embed library
+# for other processes that have access to the log directory.
+#
+
+#
+# RAG_Manager_retrieve embeds the current question using an embedding endpoint.
+# We compare the question vector to the vectors in the embed directory and
+# obtain a list of embeds sorted in order of decreasing relevance. We operate on
+# the first retrieve_len embeds in this list. We remove "obsolete embeds". These
+# are embeds for which no supporting content exists. Obsolete embeds arise when
+# we re-generate our chunk library. New match strings will need new embeds, but
+# the embeds of non-existent match strings will remain in the embed library
+# until we deliberately purge them with the Purge Embeds command. Once obsolete
+# embeds have been removed from the list, all remaining embeds have existing
+# content chunks. We use the relevance of the first chunk in the list as a
+# measure of the relevance of the question, and classify the question as high,
+# mid, or low-relevance. We construct the retrieved content based upon this
+# classification. We read content strings from disk and add them to list. When
+# we exceed the token limit for the question relevance, we stop. We return the
+# number of content strings added to our list, and we store the list itself in
+# the global info(data) variable. In order to embed the question, this routine
+# must read a valid API key from disk.
 #
 proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
@@ -1511,11 +1609,11 @@ proc RAG_Manager_retrieve {} {
 	set question [string trim $config(question)]
 	if {$question == ""} {
 		RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
-		return ""
+		return "0"
 	}
 	
 	set info(control) "Retrieve"
-	RAG_Manager_print "\nRetrieve Question-Related Data Chunks [RAG_Manager_time]" purple
+	RAG_Manager_print "Retrieve Question-Related Data Chunks [RAG_Manager_time]" purple
 	
 	RAG_Manager_print "Question: $config(question)"
 	
@@ -1523,7 +1621,7 @@ proc RAG_Manager_retrieve {} {
 	if {![file exists $config(key_file)]} {
 		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
 		set info(control) "Idle"
-		return ""
+		return "0"
 	}
 	set f [open $config(key_file) r]
 	set api_key [read $f]
@@ -1540,20 +1638,20 @@ proc RAG_Manager_retrieve {} {
 		retrieving relevant embeds..."
 	set start_time [clock milliseconds]
 	if {[catch {
-		set retrieval [lwdaq_rag retrieve \
-			-retrieve_len $info(retrieve_len) -vector $q_vector]
-		RAG_Manager_print [lrange $retrieval 0 9] brown
+		set retrieval \
+			[lwdaq_rag retrieve -retrieve_len $info(retrieve_len) -vector $q_vector]
+		RAG_Manager_print "First four chunks: [lrange $retrieval 0 3]" brown
 	} error_result]} {
 		RAG_Manager_print "ERROR: $error_result"
 		set info(control) "Idle"
-		return ""
+		return "0"
 	}	
 	
 	RAG_Manager_print "Retrieval complete in\
 		[expr [clock milliseconds] - $start_time] ms,\
 		selecting content strings..."
 	set start_time [clock milliseconds]
-	set cfl [glob -nocomplain [file join $config(content_dir) *.txt]]
+	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	set new_retrieval [list]
 	set obsolete_count 0
 	set valid_count 0
@@ -1569,7 +1667,7 @@ proc RAG_Manager_retrieve {} {
 	if {$valid_count == 0} {
 		RAG_Manager_print "ERROR: No content strings exist for retrieved embeds."
 		set info(control) "Idle"
-		return 0
+		return "0"
 	} 
 	RAG_Manager_print "Have $valid_count valid embeds,\
 		ignoring $obsolete_count obsolete embeds."
@@ -1601,7 +1699,7 @@ proc RAG_Manager_retrieve {} {
 		RAG_Manager_print "-----------------------------------------------------" brown
 		RAG_Manager_print "$count\: Relevance $rel:" brown
 		set embed [lindex $retrieval 0]
-		set cfn [file join $config(content_dir) $name\.txt]
+		set cfn [file join $info(content_dir) $name\.txt]
 		set f [open $cfn r]
 		set content [read $f]
 		close $f
@@ -1610,7 +1708,7 @@ proc RAG_Manager_retrieve {} {
 		set tokens [expr $tokens + ([string length $content]/$info(token_size))]
 
 		if {$config(show_match)} {
-			set mfn [file join $config(match_dir) $embed\.txt]
+			set mfn [file join $info(match_dir) $embed\.txt]
 			if {![file exists $mfn]} {
 				RAG_Manager_print "WARNING: Cannot find match string for this chunk." blue
 			} else {
@@ -1728,7 +1826,7 @@ proc RAG_Manager_submit {} {
 	}
 	
 	set info(control) "Submit"
-	RAG_Manager_print "\nSubmit Question and Data to\
+	RAG_Manager_print "Submit Question and Data to\
 		Completion End Point [RAG_Manager_time]" purple
 	RAG_Manager_print "Choosing answer model and assistant prompt..."
 	set r $info(relevance)
@@ -1784,7 +1882,7 @@ proc RAG_Manager_submit {} {
 
 	RAG_Manager_print "Submission Complete [RAG_Manager_time]" purple
 
-	RAG_Manager_print "\nAnswer to \"$question\":" purple
+	RAG_Manager_print "Answer to \"$question\":" purple
 	set answer_txt [RAG_Manager_txt_from_json $answer]
 	RAG_Manager_print $answer_txt 
 	append info(chat) "Answer: $answer_txt\n\n"
@@ -1806,7 +1904,7 @@ proc RAG_Manager_history {} {
 	
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "History"
-	RAG_Manager_print "\n------------- Chat History -------------------------" purple
+	RAG_Manager_print "------------- Chat History -------------------------" purple
 	RAG_Manager_print [string trim $info(chat)]
 	if {$config(verbose)} {
 		RAG_Manager_print "------ Full Text of Previous Question Result --------" purple
@@ -1826,7 +1924,7 @@ proc RAG_Manager_clear {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Clear"
-	RAG_Manager_print "\nClear Chat History" purple
+	RAG_Manager_print "Clear Chat History" purple
 	set info(chat) ""
 	RAG_Manager_print "Done" purple
 	set info(control) "Idle"
