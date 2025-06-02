@@ -899,7 +899,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			[format %8.0f $i_end]\
 			[format %8s $name]\
 			[format %5.0f [string length $content]]\
-			[string trim [string range [regsub -all {\n} $match " "] 0 60]]..." $color	
+			[string trim [string range [regsub -all {\n} $match " "] 0 50]]..." $color	
 
 		switch -- $name {
 			"ol" -
@@ -1319,7 +1319,7 @@ proc RAG_Manager_fetch_embeds {api_key} {
 		} else {
 			incr old_count
 			if {$old_count % 10 == 1} {
-				RAG_Manager_print "$count\: Checking embed library..."
+				RAG_Manager_print "$count\: Checking embed library..." green
 			}
 		} 
 		LWDAQ_update
