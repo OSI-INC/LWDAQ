@@ -53,7 +53,7 @@ proc RAG_Manager_init {} {
 #
 # Public control flags.
 #
-	set config(chat_submit) "0"
+	set config(chat_submit) "2"
 	set config(verbose) "0"
 	set config(show_match) "0"
 	set config(snippet_len) "50"
@@ -121,19 +121,10 @@ You can perform mathematical calculations and return
 numeric results with appropriate units.
 You are also able to summarize, explain, and answer questions
 about scientific and engineering documentation.
-You are provided with excerpts from documentation that may include
-text, figures, and hyperlinks. When answering the user's question:
-  - If the question asks for a figure, graph, or image
-    and a matching figure is present in the excerpts,
-    include it in your response using Markdown image formatting:  
-    `![Figure Caption](image_url)`  
-  - Do not say "you cannot search the web" or "you cannot find images" if a 
-    relevant figure is already present in the provided content.
-  - Provide hyperlinks to original documentation sources when available.
-  - Prefer newer information over older.
-  - Respond using Markdown formatting.
-  - When writing mathematical expressions, use LaTeX formatting within Markdown,
-    but never insert newline characters into LaTeX math zones.
+Respond using Markdown formatting.
+When writing mathematical expressions, 
+use LaTeX formatting within Markdown,
+but never insert newline characters into LaTeX math zones.
 
 	}
 	set config(low_rel_assistant) {
@@ -143,19 +134,10 @@ You can perform mathematical calculations and return
 numeric results with appropriate units.
 You are also able to summarize, explain, and answer questions
 about scientific and engineering documentation.
-You are provided with excerpts from documentation that may include
-text, figures, and hyperlinks. When answering the user's question:
-  - If the question asks for a figure, graph, or image
-    and a matching figure is present in the excerpts,
-    include it in your response using Markdown image formatting:  
-    `![Figure Caption](image_url)`  
-  - Do not say "you cannot search the web" or "you cannot find images" if a 
-    relevant figure is already present in the provided content.
-  - Provide hyperlinks to original documentation sources when available.
-  - Prefer newer information over older.
-  - Respond using Markdown formatting.
-  - When writing mathematical expressions, use LaTeX formatting within Markdown,
-    but never insert newline characters into LaTeX math zones.
+Respond using Markdown formatting.
+When writing mathematical expressions, 
+use LaTeX formatting within Markdown,
+but never insert newline characters into LaTeX math zones.
 
 	}
 #
@@ -1610,6 +1592,7 @@ proc RAG_Manager_engine {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
+	LWDAQ_post RAG_Manager_engine
 	return ""
 }
 
@@ -1753,13 +1736,22 @@ proc RAG_Manager_retrieve {} {
 	RAG_Manager_print "-----------------------------------------------------" brown
 
 	if {$config(chat_submit)} {
-		RAG_Manager_print "Adding chat history to the chunk content list..."
+		RAG_Manager_print "Adding entries from chat history to content list..."
 		RAG_Manager_print "-----------------------------------------------------" brown
-		set chat [string trim $info(chat)]
+		set matches [regexp -all -inline -indices \
+			{Question:.*?(?=Question:|$)} $info(chat)]
+		set chat ""
+		set first [expr [llength $matches]-$config(chat_submit)]
+		set last [expr [llength $matches]-1]
+		foreach match [lrange $matches $first $last] {
+			append chat "[string trim [string range $info(chat) {*}$match]]\n"
+		}
+		set chat [string trim $chat]
+		
 		if {$chat != ""} {
-			RAG_Manager_print [string trim $info(chat)] green
+			RAG_Manager_print [string trim $chat] green
 		} else {
-			RAG_Manager_print "Chat history is empty." green
+			RAG_Manager_print "Chat history is empty."
 		}
 		
 		RAG_Manager_print "-----------------------------------------------------" brown
@@ -1984,7 +1976,7 @@ proc RAG_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 	
-	foreach a {Verbose Chat_Submit} {
+	foreach a {Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text "$a" -variable RAG_Manager_config($b)
 		pack $f.$b -side left -expand yes
