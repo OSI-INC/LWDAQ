@@ -54,6 +54,7 @@ proc RAG_Manager_init {} {
 	set info(relevance) "0.0"
 	set info(signal_time) "0"
 	set info(signal_s) "2"
+	set info(rand_fn_scale) "1000000"
 	set info(retrieval_giveup_ms) "1000"
 	set info(retrieval_check_ms) "10"
 	set info(library_loaded) "0"
@@ -239,6 +240,14 @@ but never insert newline characters into LaTeX math zones.
 		/sub ""
 		span ""
 		/span ""
+		font ""
+		/font ""
+		big ""
+		/big ""
+		bold ""
+		/bold ""
+		em ""
+		/em ""
 	}
 #
 # The chunk delimiting tags.
@@ -250,7 +259,7 @@ but never insert newline characters into LaTeX math zones.
 	set info(hash_len) "12"
 	set info(token_size) "4"
 	set info(embed_scale) "100000"
-	set info(retrieve_len) "100" 
+	set info(retrieve_len) "500" 
 #
 # Check existence of dependent utilities.
 #
@@ -300,6 +309,20 @@ proc RAG_Manager_print {s {color "black"}} {
 		LWDAQ_print $info(text) $s $color
 		LWDAQ_update
 	}
+}
+
+#
+# RAG_Manager_snippet returns a snippet of text from a page, starting from
+# a provided index. We extract text from the page, replace all newlines with
+# spaces, trim, and return.
+#
+proc RAG_Manager_snippet {page index} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+
+	set snippet [string range $page $index [expr $index + $config(snippet_len)]]
+	set snippet [string trim [regsub -all {\n} $snippet " "]]
+	return $snippet
 }
 
 #
@@ -516,32 +539,60 @@ proc RAG_Manager_read_url {url} {
  
 #
 # RAG_Manager_locate_field goes to the index'th character in a page and searches
-# forward for the first occurance of the named tage opening, looks further for
-# the same tag to close. The routine returns the locations of four characters in
-# the page. These are the begin and end characters of the body of the field, and
-# the begin and end characters of the entire field including the tags. If an
-# opening tag exits, but no end tag, the routine returns the entire remainder
-# of the page as the contents of the field.
+# forward for the first occurance of the named tag opening, looks further for
+# the same tag to close. If there are further openings of the same tag before
+# the closing, the routine keeps track of these and so finds the closing tag
+# that corresponds to the original opening. The routine returns the locations of
+# four characters in the page. These are the begin and end characters of the
+# body of the field, and the begin and end characters of the field including the
+# tags. If an opening tag exits, but no end tag, the routine returns the entire
+# remainder of the page as the contents of the field.
 #
 proc RAG_Manager_locate_field {page index tag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
-	
-	if {[regexp -indices -start $index "<$tag\[^>\]*?>" $page i_open]} {
-		set i_body_begin [expr [lindex $i_open 1] + 1] 
-		set i_field_begin [lindex $i_open 0]
-		if {[regexp -indices -start $i_body_begin "</$tag>" $page i_close]} {
-			set i_body_end [expr [lindex $i_close 0] - 1]
-			set i_field_end [lindex $i_close 1]
-		} else {
-			set i_body_end [string length $page]
-			set i_field_end $i_body_end
+
+	set i_field_begin [string length $page]
+	set i_field_end $i_field_begin
+	set i_body_begin $i_field_begin
+	set i_body_end $i_field_begin
+
+	set tag_pattern "</?\\s*$tag\(>|\\s+\[^>\]*>\)"
+	set tag_indices [regexp -all -inline -indices -start $index $tag_pattern $page]
+	set warning_given 0
+	set open_count -1
+	if {[llength $tag_indices] > 0} {
+		foreach {ax bx} $tag_indices {
+			lassign $ax start end
+			set key [string range $page $start $end]
+			if {[regexp {^</} $key]} {
+				if {$open_count > 0} {
+					incr open_count -1
+					set i_body_end [expr $start - 1]
+					set i_field_end $end
+				}
+			} else {
+				if {$open_count == -1} {
+					set i_field_begin $start
+					set i_body_begin [expr $end + 1]
+					set open_count 1
+				} else {
+					incr open_count 1
+				}
+			}
+			if {$open_count == 0} {break}
+			if {($open_count > 1) && !$warning_given \
+					&& ($tag != "ul") && ($tag != "ol")} {
+				RAG_Manager_print "WARNING: Nested <$tag>\
+					\"[RAG_Manager_snippet $page $i_field_begin]\""
+				set warning_given 1
+			}
 		}
-	} else {
-		set i_field_begin [string length $page]
-		set i_field_end $i_field_begin
-		set i_body_begin $i_field_begin
-		set i_body_end $i_field_begin
+	}
+	if {($open_count > 0) && !$warning_given} {
+		RAG_Manager_print "WARNING: Unclosed <$tag>\
+			\"[RAG_Manager_snippet $page $i_field_begin]\""
+		set warning_given 1
 	}
 	return "$i_body_begin $i_body_end $i_field_begin $i_field_end"
 }
@@ -758,13 +809,16 @@ proc RAG_Manager_remove_dates {chunk} {
 # routine converts HTML lists to markdown lists. It keeps track of the chapter,
 # section and date using <h2>, <h3>, and our own [01-JAN-69] date entries
 # respectively. It extracts entire sections in <center> fields because these
-# consist only of figures and tables in our documents. Once it has a raw list of
-# chunks, it begins to process them by further extraction, such as extracting
-# figure captions and links. The extractor combines tables, all lists, and <pre>
-# fields with the previous chunk, whatever that may have been, and adds no
-# additional metadata. It combines figures and all equations with the subsequent
-# chunk, whatever that may be, and the subsequent chunk shares the metadata of
-# the equation chunk. The routine constructs a chunk list. Each chunk list entry
+# should consist only of figures and tables in our documents. Once it has a raw
+# list of chunks, it begins to process them by further extraction, such as
+# extracting table and figure captions, and extracting hyper links. The
+# extractor appends <pre>, <ul>, and <oL> chunks with the previous chunk
+# provided the previous chunk was a <p> field. They will share the same chapter,
+# section, and date fields. Otherwise these chunks are stored alone with their
+# own chapter, section, and date fields. Tables and figures are always kept in
+# their own chunks. It combines equations with the subsequent chunk, whatever
+# that chunk may be, and the subsequent chunk shares the metadata of the
+# equation chunk. The routine constructs a chunk list. Each chunk list entry
 # consists of two strings: a match string and a content string. The match string
 # contains text stripped of metadata or tables of numbers or web links. This is
 # the string we will use to generate the embedding vector for the chunk. The
@@ -877,8 +931,8 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
 		if {([string length $content] == 0)} {
-			RAG_Manager_print "WARNING: Empty content string at i_start=$i_start,\
-				i_end=$i_end, name=$name."
+			RAG_Manager_print "WARNING: Empty $name content\
+				\"[RAG_Manager_snippet $page $i_start]\""
 			continue
 		}
 
@@ -887,26 +941,24 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		regsub -all {[!]*\[([^\]]+)\]\([^)]+\)} $match {\1} match
 		set match [string trim $match]
 		if {([string length $match] == 0)} {
-			RAG_Manager_print "WARNING: Empty match string at i_start=$i_start,\
-				i_end=$i_end, name=$name."
+			RAG_Manager_print "WARNING: Empty $name match\
+				\"[RAG_Manager_snippet $page $i_start]\""
 			continue
 		}
 		
 		if {$config(verbose)} {
-			set snippet [string trim \
-				[string range [regsub -all {\n} $match " "] 0 $config(snippet_len)]]
 			RAG_Manager_print "[format %8.0f $i_start]\
 				[format %8.0f $i_end]\
 				[format %8s $name]\
 				[format %5.0f [string length $content]]\
-				$snippet..." $color	
+				\"[RAG_Manager_snippet $match 0]\"" $color	
 		}
 
 		switch -- $name {
 			"ol" -
 			"ul" -
 			"pre" {
-				if {[llength $chunks] > 0} {
+				if {$prev_name == "p"} {
 					lset chunks end 0 "[lindex $chunks end 0]\n\n$match"
 					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
 				} else {
@@ -1213,11 +1265,10 @@ proc RAG_Manager_store_chunks {chunks} {
 		
 		incr count
 		if {$config(verbose)} {
-			if {($count % round([llength $chunks]*$config(progress_frac)) == 1) \
+			if {($count % (round([llength $chunks]*$config(progress_frac))+1) == 1) \
 				|| ($count == [llength $chunks])} {
 				RAG_Manager_print "[format %5d $count]: [file tail $mfn]\
-					[string trim [string range [regsub -all {\n} $match " "]\
-						0 $config(snippet_len)]]..." green
+					\"[RAG_Manager_snippet $match 0]\"" green
 			}
 		}
 		
@@ -1602,7 +1653,7 @@ proc RAG_Manager_load {} {
 # re-load the embed library every reload_s after that. The engine indicates its
 # existence by touching a signal file in the log directory every few seconds.
 # The engine watches the log directory. When it finds there a file with
-# extension ".txt", first letter Q, and remaining letters all hexadecimal, it
+# extension ".txt", first letter Q, and remaining letters all decimal digits, it
 # renames the file by replacing the leading Q with a T. We call the first file
 # the "question file" and the second file the "temporary file". It reads the
 # temporary file. It confirms the contents are a valid vector for matching the
@@ -1808,11 +1859,14 @@ proc RAG_Manager_retrieve {} {
 					&& (([clock seconds]-[file mtime $info(signal_file)]) \
 					< $info(signal_s))} {
 				RAG_Manager_print "Found sign of retrieval engine in $info(log_dir)..."
-				set name [clock milliseconds]
-				set qfn [file join $info(log_dir) "Q$name\.txt"] 
-				set f [open $qfn w]
+				set name [expr round(rand()*$info(rand_fn_scale))]
+				set pfn [file join $info(log_dir) "P$name\.txt"] 
+				set f [open $pfn w]
 				puts $f $q_vector
 				close $f
+				set qfn [file join $info(log_dir) "Q$name\.txt"] 
+				file rename $pfn $qfn
+				RAG_Manager_print "Wrote embedding vector to $qfn\."
 				set rfn [file join $info(log_dir) "R$name\.txt"]
 				set start [clock milliseconds]
 				while {[clock milliseconds] < $start + $info(retrieval_giveup_ms)} {
@@ -1840,7 +1894,7 @@ proc RAG_Manager_retrieve {} {
 		set info(control) "Idle"
 		return "0"
 	}	
-	RAG_Manager_print "First four chunks: [lrange $retrieval 0 7]"
+	RAG_Manager_print "First chunks: [lrange $retrieval 0 7]"
 	
 	RAG_Manager_print "Retrieval complete in\
 		[expr [clock milliseconds] - $start_time] ms,\
