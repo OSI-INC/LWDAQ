@@ -1678,7 +1678,6 @@ proc RAG_Manager_engine {{cmd ""}} {
 			set info(engine_ctrl) "Run"
 			RAG_Manager_print "Engine: Starting Up [RAG_Manager_time]." purple
 			RAG_Manager_print "Engine: Operating in $info(log_dir)."
-				[RAG_Manager_time]." purple
 			set info(reload_time) "0"
 		} else {
 			return ""
