@@ -1676,7 +1676,9 @@ proc RAG_Manager_engine {{cmd ""}} {
 	if {$cmd == "Start"} {
 		if {$info(engine_ctrl) == "Idle"} {
 			set info(engine_ctrl) "Run"
-			RAG_Manager_print "Engine: Starting up in $info(log_dir)." purple
+			RAG_Manager_print "Engine: Starting Up [RAG_Manager_time]." purple
+			RAG_Manager_print "Engine: Operating in $info(log_dir)."
+				[RAG_Manager_time]." purple
 			set info(reload_time) "0"
 		} else {
 			return ""
@@ -1692,7 +1694,8 @@ proc RAG_Manager_engine {{cmd ""}} {
 			return ""
 		}
 		set info(reload_time) [expr [clock seconds] + $info(reload_s)]
-		RAG_Manager_print "Next library load at [RAG_Manager_time $info(reload_time)]"
+		RAG_Manager_print "Engine: Next library load at\
+			[RAG_Manager_time $info(reload_time)]"
 	}
 
 	if {[file exists $info(signal_file)]} {
@@ -1703,8 +1706,8 @@ proc RAG_Manager_engine {{cmd ""}} {
 		}
 	} else {
 		set f [open $info(signal_file) w]
-		puts $f \
-			"This is the RAG Manager Engine Signal File. The engine touches this\
+		puts $f "\
+			This is the RAG Manager Engine Signal File. The engine touches this\
 			file every $info(signal_s) seconds to show that it is running."
 		close $f
 		RAG_Manager_print "Engine: Created signal file $info(signal_file)."
@@ -1714,8 +1717,7 @@ proc RAG_Manager_engine {{cmd ""}} {
 	foreach lfn $lfl {
 		set name [file root [file tail $lfn]]
 		if {[regexp {Q([0-9a-f]+)} $name -> name]} {
-			RAG_Manager_print "Retrieval Engine:\
-				Grabbing question embed [file tail $lfn]."
+			RAG_Manager_print "Engine: Grabbing question embed [file tail $lfn]."
 			set tfn [file join $info(log_dir) "T$name\.txt"]
 			file rename $lfn $tfn
 			
@@ -1747,18 +1749,18 @@ proc RAG_Manager_engine {{cmd ""}} {
 			}
 			if {!$good} {break}
 			
-			RAG_Manager_print "Retrieval Engine:\
-				Retrieving embeds relevant to question $name..." brown
+			RAG_Manager_print "Engine: Retrieving embeds\
+				relevant to question $name..." brown
 			set start_time [clock milliseconds]
 			if {[catch {
 				set retrieval [lwdaq_rag retrieve -retrieve_len \
 					$info(retrieve_len) -vector $q_vector]
-				RAG_Manager_print "Retrieval Engine: [lrange $retrieval 0 3]" brown
+				RAG_Manager_print "Engine: [lrange $retrieval 0 3]" brown
 				set f [open $tfn w]
 				puts $f $retrieval
 				close $f
 				file rename $tfn [file join $info(log_dir) "R$name\.txt"]
-				RAG_Manager_print "Retrieval Engine:\
+				RAG_Manager_print "Engine:\
 					Retrieval file R$name\.txt ready for consumption."
 			} error_result]} {
 				RAG_Manager_print "ERROR: $error_result"
