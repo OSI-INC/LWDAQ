@@ -1758,7 +1758,9 @@ proc RAG_Manager_engine {{cmd ""}} {
 				set f [open $tfn w]
 				puts $f $retrieval
 				close $f
-				file rename $tfn [file join $info(log_dir) "R$name\.txt"]
+				set rfn [file join $info(log_dir) "R$name\.txt"]
+				file rename $tfn $rfn
+				exec chmod 777 $rfn
 				RAG_Manager_print "Engine:\
 					Retrieval file R$name\.txt ready for consumption."
 			} error_result]} {
@@ -1859,6 +1861,7 @@ proc RAG_Manager_retrieve {} {
 				puts $f $q_vector
 				close $f
 				set qfn [file join $info(log_dir) "Q$name\.txt"] 
+				exec chmod 777 $qfn
 				file rename $pfn $qfn
 				RAG_Manager_print "Wrote embedding vector to $qfn\."
 				set rfn [file join $info(log_dir) "R$name\.txt"]
