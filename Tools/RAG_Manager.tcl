@@ -25,7 +25,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "3.3"
+	LWDAQ_tool_init "RAG_Manager" "3.4"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -66,7 +66,7 @@ proc RAG_Manager_init {} {
 	set config(chat_submit) "2"
 	set config(verbose) "0"
 	set config(show_match) "0"
-	set config(snippet_len) "50"
+	set config(snippet_len) "40"
 	set config(progress_frac) "0.1" 
 #
 # The source documents. Can be edited with a dedicated window and saved to
@@ -592,7 +592,6 @@ proc RAG_Manager_locate_field {page index tag} {
 	if {($open_count > 0) && !$warning_given} {
 		RAG_Manager_print "WARNING: Unclosed <$tag>\
 			\"[RAG_Manager_snippet $page $i_field_begin]\""
-		set warning_given 1
 	}
 	return "$i_body_begin $i_body_end $i_field_begin $i_field_end"
 }
@@ -931,8 +930,10 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
 		if {([string length $content] == 0)} {
-			RAG_Manager_print "WARNING: Empty $name content\
-				\"[RAG_Manager_snippet $page $i_start]\""
+			if {$name != "center"} {
+				RAG_Manager_print "WARNING: Empty $name content\
+					\"[RAG_Manager_snippet $page $i_start]\""
+			}
 			continue
 		}
 
@@ -1182,11 +1183,11 @@ proc RAG_Manager_html_chunks {url} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 		
-	RAG_Manager_print "Downloading from $url..." 
+	RAG_Manager_print "Fetch $url..." 
 	set page [RAG_Manager_read_url $url]
-	RAG_Manager_print "Downloaded [string length $page] bytes from $url\." 
+	RAG_Manager_print "Received [string length $page] bytes." 
 	
-	RAG_Manager_print "Resolving urls wrt $url..." 
+	RAG_Manager_print "Resolving urls..." 
 	set page [RAG_Manager_resolve_urls $page $url]
 	
 	RAG_Manager_print "Converting urls to markdown..." 
@@ -1259,7 +1260,7 @@ proc RAG_Manager_store_chunks {chunks} {
 			close $f
 		} error_message]} {
 			RAG_Manager_print "ERROR: $error_result"
-			RAG_Manager_print "SUGGESTION: Use Set_Root in Configuration Panel."
+			RAG_Manager_print "SUGGESTION: Use Set_Root in the Configuration Panel."
 			break
 		}
 		
