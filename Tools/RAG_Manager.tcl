@@ -1875,18 +1875,18 @@ proc RAG_Manager_retrieve {} {
 				}
 			}
 		}
-		if {($retrieval == "") && !$info(library_loaded)} {
-			RAG_Manager_print "No retrieval engine available, loading embed library..."
-			RAG_Manager_load
-			set retrieval [lwdaq_rag retrieve \
-				-retrieve_len $info(retrieve_len) \
-				-vector $q_vector]
-		}
 	} error_result]} {
 		RAG_Manager_print "ERROR: $error_result"
 		set info(control) "Idle"
 		return "0"
 	}	
+	if {($retrieval == "") && !$info(library_loaded)} {
+		RAG_Manager_print "No retrieval engine available, loading embed library..."
+		RAG_Manager_load
+		set retrieval [lwdaq_rag retrieve \
+			-retrieve_len $info(retrieve_len) \
+			-vector $q_vector]
+	}
 	RAG_Manager_print "First chunks: [lrange $retrieval 0 7]"
 	
 	RAG_Manager_print "Retrieval complete in\

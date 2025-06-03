@@ -614,7 +614,7 @@ proc LWDAQ_print {args} {
 		}
 	}
 	
-	return $destination
+	return "$destination"
 }
 
 #
