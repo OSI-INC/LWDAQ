@@ -1838,8 +1838,8 @@ proc RAG_Manager_retrieve {} {
 		[expr [clock milliseconds] - $start_time] ms,\
 		retrieving relevant embeds..."
 	set start_time [clock milliseconds]
+	set retrieval ""
 	if {[catch {
-		set retrieval ""
 		if {$info(library_loaded)} {
 			RAG_Manager_print "Using embed library loaded into memory..."
 			set retrieval [lwdaq_rag retrieve \
