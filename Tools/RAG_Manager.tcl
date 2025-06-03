@@ -1839,15 +1839,15 @@ proc RAG_Manager_retrieve {} {
 		retrieving relevant embeds..."
 	set start_time [clock milliseconds]
 	set retrieval ""
-	if {[catch {
-		if {$info(library_loaded)} {
-			RAG_Manager_print "Using embed library loaded into memory..."
-			set retrieval [lwdaq_rag retrieve \
-				-retrieve_len $info(retrieve_len) \
-				-vector $q_vector]
-		} else {
-			RAG_Manager_print "No embed library loaded, looking for\
-				retrieval engine in $info(log_dir)..."
+	if {$info(library_loaded)} {
+		RAG_Manager_print "Using embed library loaded into memory..."
+		set retrieval [lwdaq_rag retrieve \
+			-retrieve_len $info(retrieve_len) \
+			-vector $q_vector]
+	} else {
+		RAG_Manager_print "No embed library loaded, looking for\
+			retrieval engine in $info(log_dir)..."
+		if {[catch {
 			if {[file exists $info(signal_file)] \
 					&& (([clock seconds]-[file mtime $info(signal_file)]) \
 					< $info(signal_s))} {
@@ -1874,18 +1874,18 @@ proc RAG_Manager_retrieve {} {
 					}
 				}
 			}
+		} error_result]} {
+			RAG_Manager_print "ERROR: $error_result"
+			set info(control) "Idle"
+			return "0"
+		}	
+		if {($retrieval == "") && !$info(library_loaded)} {
+			RAG_Manager_print "No retrieval engine available, loading embed library..."
+			RAG_Manager_load
+			set retrieval [lwdaq_rag retrieve \
+				-retrieve_len $info(retrieve_len) \
+				-vector $q_vector]
 		}
-	} error_result]} {
-		RAG_Manager_print "ERROR: $error_result"
-		set info(control) "Idle"
-		return "0"
-	}	
-	if {($retrieval == "") && !$info(library_loaded)} {
-		RAG_Manager_print "No retrieval engine available, loading embed library..."
-		RAG_Manager_load
-		set retrieval [lwdaq_rag retrieve \
-			-retrieve_len $info(retrieve_len) \
-			-vector $q_vector]
 	}
 	RAG_Manager_print "First chunks: [lrange $retrieval 0 7]"
 	
