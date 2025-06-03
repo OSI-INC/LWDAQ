@@ -1876,8 +1876,6 @@ proc RAG_Manager_retrieve {} {
 			}
 		} error_result]} {
 			RAG_Manager_print "ERROR: $error_result"
-			set info(control) "Idle"
-			return "0"
 		}	
 		if {($retrieval == "") && !$info(library_loaded)} {
 			RAG_Manager_print "No retrieval engine available, loading embed library..."
