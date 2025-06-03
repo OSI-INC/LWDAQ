@@ -557,24 +557,38 @@ proc LWDAQ_print {args} {
 		if {($destination == "stdout") || ($destination == "stderr")} {
 			if {$LWDAQ_Info(stdout_available)} {
 				switch -- $color {
+					crimson -
 					red {set a "\033\[31m$print_str\033\[0m"}
-					blue -
+					
+					indigo -
+					azure -
 					aqua -
-					azure {set a "\033\[34m$print_str\033\[0m"}
+					blue {set a "\033\[34m$print_str\033\[0m"}
+					
 					darkgreen -
 					olive -
+					lawngreen -
 					green  {set a "\033\[32m$print_str\033\[0m"}
+					
 					purple -
+					orchid -
 					pink -
 					salmon -
+					violet -
 					magenta {set a "\033\[35m$print_str\033\[0m"}
+					
 					orange -
 					brown -
 					banana -
 					chartreuse -
+					khaki -
 					yellow {set a "\033\[33m$print_str\033\[0m"}
+					
+					skyblue -
 					lightblue -
 					cyan {set a "\033\[36m$print_str\033\[0m"}
+					
+					maroon -
 					gray -
 					default {set a "\033\[0m$print_str"}
 				}
