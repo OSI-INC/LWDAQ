@@ -1716,7 +1716,8 @@ proc RAG_Manager_engine {{cmd ""}} {
 	foreach lfn $lfl {
 		set name [file root [file tail $lfn]]
 		if {[regexp {Q([0-9a-f]+)} $name -> name]} {
-			RAG_Manager_print "Engine: Grabbing question embed [file tail $lfn]."
+			RAG_Manager_print "Engine: Grabbing question embed\
+				[file tail $lfn], [RAG_Manager_time]."
 			set tfn [file join $info(log_dir) "T$name\.txt"]
 			file rename $lfn $tfn
 			
@@ -1761,7 +1762,7 @@ proc RAG_Manager_engine {{cmd ""}} {
 				set rfn [file join $info(log_dir) "R$name\.txt"]
 				file rename $tfn $rfn
 				RAG_Manager_print "Engine:\
-					Retrieval file R$name\.txt ready for consumption."
+					Retrieval file R$name\.txt ready, [RAG_Manager_time]."
 			} error_result]} {
 				RAG_Manager_print "ERROR: $error_result"
 				set info(control) "Idle"
