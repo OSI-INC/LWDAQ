@@ -1,20 +1,19 @@
 # Retrieval-Assisted Generation Manager, a LWDAQ Tool.
 #
 # Copyright (C) 2025 Kevan Hashemi, Open Source Instruments Inc.
-#
-# RAG Check provides an interface for our Retrieval Access Generation (RAG) 
+
+# RAG Check provides an interface for our Retrieval Access Generation (RAG)
 # routines, provided by our RAG package.
-#
+
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-#
+
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
-# details.
-#
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
@@ -32,11 +31,6 @@ proc RAG_Manager_init {} {
 #
 	set config(root_dir) "~/Active/RAG"
 	set config(key_file) [file join $config(root_dir) "Key/OpenAI_API.txt"]
-	set info(content_dir) [file join $config(root_dir) "Content"]
-	set info(match_dir) [file join $config(root_dir) "Match"]
-	set info(embed_dir) [file join $config(root_dir) "Embed"]
-	set info(log_dir) [file join $config(root_dir) "Log"]
-	set info(signal_file) [file join $info(log_dir) "signal.txt"]
 #
 # The default question.
 #
@@ -269,6 +263,14 @@ Use LaTeX formatting within Markdown for mathematical expressions.
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
+#
+# Configure the file locations based upon the root.
+#
+	set info(content_dir) [file join $config(root_dir) "Content"]
+	set info(match_dir) [file join $config(root_dir) "Match"]
+	set info(embed_dir) [file join $config(root_dir) "Embed"]
+	set info(log_dir) [file join $config(root_dir) "Log"]
+	set info(signal_file) [file join $info(log_dir) "signal.txt"]
 #
 # Empty string return means all well.
 #
@@ -591,6 +593,31 @@ proc RAG_Manager_locate_field {page index tag} {
 }
 
 #
+# RAG_Manager_list_bodies calls the locate-field routine repeatedly to obtain
+# list of all field bodies with a specified tag within a supplied document. The
+# routine does not ignore empty bodies, but adds them to the list.
+#
+proc RAG_Manager_list_bodies {page tag} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	set location 0
+	set bodies [list]
+	while {$location < [string length $page]} {
+		set indices [RAG_Manager_locate_field $page $location $tag]
+		lassign $indices i_body_begin i_body_end i_field_begin i_field_end
+		set location [expr $i_field_end + 1]
+		set field_len [expr $i_field_end - $i_field_begin]
+		if {$field_len > 0} {
+			set body [string range $page $i_body_begin $i_body_end]
+			set body [string trim $body]
+			lappend bodies $body
+		}
+	}
+	return $bodies
+}
+
+#
 # RAG_Manager_extract_list takes the body of a list chunk and converts it to
 # markup format with dashes for bullets and one list entry on each line. It
 # returns the converted chunk body.
@@ -817,11 +844,38 @@ proc RAG_Manager_remove_dates {chunk} {
 # the string we will use to generate the embedding vector for the chunk. The
 # content string contains chapter, section, and date headings, tabulated values
 # for tables, captions, links, and all other metadata. This is the string we
-# will submit as input to the completion endpoint. 
+# will submit as input to the completion endpoint. The extractor looks for
+# commands within the page that will modify its behavior. These comands are
+# strings embedded in hidden "rag" fields. It also looks for retrieval prompts
+# in "prompt" fields. These prompts it leaves in place in the match string, but
+# removes from the content string. The single-chunk command tells the extractor
+# to combine all chunks into one, producing only one content string and only one
+# match string. The match-prompts-only tells the extractor to include only the
+# retrieval prompts in the match string, nothing else.
 #
 proc RAG_Manager_extract_chunks {page catalog} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
+
+	set single_chunk 0
+	set match_prompts_only 0
+	set commands [RAG_Manager_list_bodies $page "rag"]
+	foreach cmd $commands {
+		switch -- $cmd {
+			"single-chunk" {
+				set single_chunk 1
+			}
+			"match-prompts-only" {
+				set match_prompts_only 1
+			}
+			default {
+				RAG_Manager_print "WARNING: Unrecognised retrieval command \"$cmd\""
+			}
+		}
+	}
+	RAG_Manager_print "Extraction rules:\
+		single_chunk=$single_chunk,\
+		match-prompts-only=$match_prompts_only"
 	
 	set date "NONE"
 	set chapter "NONE"
@@ -829,6 +883,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 	set step "NONE"
 	set prev_name "NONE"
 	set rejected 0
+	set total_tokens 0
 	set chunks [list]
 	foreach chunk_id $catalog {
 		scan $chunk_id %d%d%s i_start i_end name
@@ -845,8 +900,8 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		
 		switch $name {
 			"p" {set color brown}
-			"ul" {set color magenta}
-			"ol" {set color magenta}
+			"ul" {set color violet}
+			"ol" {set color violet}
 			"h2" {set color blue}
 			"h3" {set color blue}
 			"center" {set color green}
@@ -901,7 +956,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			}
 			"h2" {
 				set chapter $content
-				set section "NONE"
+				set section "NONE" 
 				continue
 			}
 			"h3" {
@@ -932,22 +987,52 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			continue
 		}
 
-		set match [RAG_Manager_convert_tags $match]
-		set match [RAG_Manager_remove_dates $match]
-		regsub -all {[!]*\[([^\]]+)\]\([^)]+\)} $match {\1} match
-		set match [string trim $match]
-		if {([string length $match] == 0)} {
-			RAG_Manager_print "WARNING: Empty $name match\
-				\"[RAG_Manager_snippet $page $i_start]\""
-			continue
+		if {$match_prompts_only} {
+			set prompts [RAG_Manager_list_bodies $match "prompt"]
+			set prompts [join $prompts "\n"]
+			set prompts [string trim $prompts]
+			if {($prompts == "") && !$single_chunk} {
+				RAG_Manager_print "WARNING: Specified match-prompt-only,\
+					but no prompt found, discarding chunk."
+				continue
+			}
+			set match $prompts
+		} else {
+			set match [RAG_Manager_convert_tags $match]
+			set match [RAG_Manager_remove_dates $match]
+			regsub -all {[!]*\[([^\]]+)\]\([^)]+\)} $match {\1} match
+			set match [string trim $match]
 		}
 		
+		if {$match == ""} {
+			if {!$single_chunk} {
+				RAG_Manager_print "WARNING: Empty match string, discarding \
+					\"[RAG_Manager_snippet $page $i_start]\""
+				continue
+			}
+		}
+		
+		set tokens [format %5.0f [expr [string length $content] / $info(token_size)]]
+		set total_tokens [expr $total_tokens + $tokens]
 		if {$config(verbose)} {
 			RAG_Manager_print "[format %8.0f $i_start]\
 				[format %8.0f $i_end]\
 				[format %8s $name]\
-				[format %5.0f [string length $content]]\
-				\"[RAG_Manager_snippet $match 0]\"" $color	
+				$tokens \"[RAG_Manager_snippet $content 0]\"" $color	
+		}
+
+		set heading ""
+		if {$chapter != "NONE"} {
+			append heading "Chapter: $chapter\n"
+		}
+		if {$section != "NONE"} {
+			append heading "Section: $section\n"
+		}
+		if {$step != "NONE"} {
+			append heading "Step: $step\n"
+		}
+		if {$date != "NONE"} {
+			append heading "Date: $date\n"
 		}
 
 		switch -- $name {
@@ -1005,7 +1090,19 @@ proc RAG_Manager_extract_chunks {page catalog} {
 	}
 	
 	if {$rejected > 0} {
-		RAG_Manager_print "Rejected $rejected chunks with residual anchor and image tags."
+		RAG_Manager_print "Total content tokens $total_tokens,\
+			rejected $rejected chunks."
+	}
+	
+	if {$single_chunk} {
+		set single_match ""
+		set single_content ""
+		foreach chunk $chunks {
+			append single_match "[lindex $chunk 0]\n\n"
+			append single_content "[lindex $chunk 1]\n\n"
+		}
+		set chunks [list [list $single_match $single_content]]
+		RAG_Manager_print "Consolidated chunks into one for single-chunk command."
 	}
 	
 	return $chunks
@@ -1379,7 +1476,7 @@ proc RAG_Manager_fetch_embeds {api_key} {
 		} else {
 			incr old_count
 			if {$config(verbose)} {
-				if {($count % round([llength $mfl]*$config(progress_frac)) == 1) \
+				if {($count % (round([llength $mfl]*$config(progress_frac))+1) == 1) \
 					|| ($count == [llength $mfl])} {
 					RAG_Manager_print "[format %5d $count]:\
 						$root has existing embed." green
@@ -1574,7 +1671,7 @@ proc RAG_Manager_load {} {
 		set name [file root [file tail $efn]]
 		lwdaq_rag add -name $name -vector $vector
 		if {$config(verbose)} {
-			if {($count % round([llength $efl]*$config(progress_frac)) == 1) \
+			if {($count % (round([llength $efl]*$config(progress_frac))+1) == 1) \
 				|| ($count == [llength $efl])} {
 				RAG_Manager_print "[format %5d $count]: Added $name" orange
 			}
@@ -2003,7 +2100,7 @@ proc RAG_Manager_get_answer {question chunks assistant api_key {model ""}} {
 # RAG_Manager_txt_from_json takes a raw json-formatted content string received
 # from the completion endpoint and formats it for display in our plain text
 # window. We want to see newlines in the right places. When the answer includes
-# Latex math, we want to see the exact characters of the Latex code, but the
+# LaTeX math, we want to see the exact characters of the LaTeX code, but the
 # endpoint often adds an excessive number of backslashes within the math string,
 # so we reduce anything more than two down to one backslash within the math
 # regions, including the delimiters on either end. It is this plain text version
@@ -2342,18 +2439,37 @@ ambiguity by the presence of the numbers, which have little or no syntactic
 meaning. Chapter titles, date stamps, and URLs also dilute the syntactic
 meaning, because they are not prose or equations. Mathematical equations do have
 a strong syntactic meaning, so we include those in our match strings, along with
-prose, but with all the other metadata text removed. 
+prose, but with all the other metadata text removed. Furthermore, isn our html
+document, we can add "prompt" fields like this:
 
-In our html document, we can add "prompt" fields like this:
+<prompt>Use this table to calculate SCT or HMT operating life.</prompt>
+
+The RAG Manager will include the bodies of these fields in the chunk's match
+string, but exclude them from the content strings. These fields are "retrieval
+prompts". When we add well-chosen retrieval prompts to the caption of a table or
+figure, we can greatly increase the likelyhood that the table will be retrieved
+for certain questions that require the numbers in the table. We may want to hide
+the prompt strings from the browser view of the html document, in which case we
+can do this:
 
 <prompt style="display:none">What is an SCT?</prompt>
 
-These will not be displayed by a browser. The RAG Manager, however, will include
-them in the match strings, but exclude them from the content strings. These
-fields are "retrieval prompts". When we add a few well-chosen retrieval prompts
-to the caption of a table, for example, we can greatly increase the likelyhood
-that the table will be retrieved for certain questions that require the numbers
-in the table.
+Some documents are sparse but dense. Our implantation protocols, for example,
+consist of lists of concise instructions interspersed with photographs and
+tables. An entire protocol consists of under fifteen hundred tokens. Instead of
+dividing the document into separate chunks, we prefer to place the entire
+document into a single content string, and compose our own match string with
+retrieval prompts. To achive this end, we embed retrieval commands in the
+document by means of "rag" fields. These can be in the html header, but it does
+not really matter where they are. Here is an example series of rag instructions
+with prompt fields that results in a single chunk for the entire document, with
+a match string consisting only of a title and some questions.
+
+<rag style="display:none">single-chunk</rag>
+<rag style="display:none">match-prompts-only</rag>
+<prompt style="display:none">HMT Implantation Protocol</prompt>
+<prompt style="display:none">What is the procedure for implanting an HMT?</prompt>
+<prompt style="display:none">How do I attach an EIF to a mouse?</prompt>
 
 Once we have all the match and content strings, the RAG Manager passes the match
 string to  "openssl" to obtain a unique twelve-digit name for the chunk, which
@@ -2448,14 +2564,14 @@ we see about 200 tokens in response, so our average high-relevance answer costs
 us rouhly four cents.
 
 The answer we receive from the completion endpoint will take a form, tone, and
-level of detail controlled by our assistant prompt. We have chosen to ask
-the endpoint to give us answers in Markdown format, with equations in Latex. The
-LLM understands Markdown and Latex very well, having been trained on a largly
-Markdown and Latex body of documents. It is well able to produce both Markdown
-and Latex, but it does make frequent mistakes in generating Latex. These
-mistakes are to do with backlashes, newlines, and other escape sequences. We
-include in our answer-processing a sequence of steps to look out for and remove
-such errors.
+level of detail controlled by our assistant prompt. Our default promp instructs
+the endpoint to give us answers in Markdown, with equations in LaTeX. The gpt
+LLMs understand Markdown and LaTeX very well, these being the native formats upon
+which they were trained. When it comes to producing answers, Markdown and LaTeX 
+are their preferred output formats, so we instruct the LLM to produce Markdown and LaTeX.
+The answer we receive from the LLM is wrapped in a JSON container, so we have to extract
+the answer, translate the many characters escaped for JSON, so as to recover the
+original Mardown and LaTeX. This we do in the manager's get-answer routine.
 
 Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
