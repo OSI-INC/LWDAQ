@@ -81,7 +81,7 @@ https://www.bndhep.net/Devices/BCAM/User_Manual.html
 	set config(high_rel_model) "gpt-4o"
 	set config(mid_rel_model) "gpt-3.5-turbo"
 	set config(low_rel_model) "gpt-3.5-turbo"
-	set config(high_rel_tokens) "10000"
+	set config(high_rel_tokens) "6000"
 	set config(mid_rel_tokens) "10000"
 	set config(low_rel_tokens) "0"
 	set config(max_question_tokens) "300"
