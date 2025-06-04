@@ -44,7 +44,7 @@ proc RAG_Manager_init {} {
 	set info(chat) ""
 	set info(result) ""
 	set info(text) "stdout"
-	set info(data) ""
+	set info(contents) ""
 	set info(relevance) "0.0"
 	set info(signal_time) "0"
 	set info(signal_s) "2"
@@ -78,14 +78,13 @@ https://www.bndhep.net/Devices/BCAM/User_Manual.html
 #	
 	set config(high_rel_thr) "0.50"
 	set config(low_rel_thr) "0.30"
-	set config(high_rel_model) "gpt-4"
+	set config(high_rel_model) "gpt-4o"
 	set config(mid_rel_model) "gpt-3.5-turbo"
 	set config(low_rel_model) "gpt-3.5-turbo"
-	set config(high_rel_tokens) "3000"
-	set config(mid_rel_tokens) "1000"
+	set config(high_rel_tokens) "10000"
+	set config(mid_rel_tokens) "10000"
 	set config(low_rel_tokens) "0"
 	set config(max_question_tokens) "300"
-	set info(default_gpt_model) "gpt-4"
 	set config(embed_model) "text-embedding-3-small"
 #
 # Titles for content we submit to completion end point.
@@ -1027,7 +1026,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			append heading "%%%%Section: $section\n"
 		}
 		if {$date != "NONE"} {
-			append heading "%%%%Date: $date\n"
+			append heading "Date: $date\n"
 		}
 		set heading [string trim $heading]
 
@@ -1844,8 +1843,8 @@ proc RAG_Manager_engine {{cmd ""}} {
 # retrieved content based upon this classification. We read content strings from
 # disk and add them to list. When we exceed the token limit for the question
 # relevance, we stop. We return the number of content strings added to our list,
-# and we store the list itself in the global info(data) variable. In order to
-# embed the question, this routine must read a valid API key from disk.
+# and we store them in the info(contents) list. In order to embed the question,
+# this routine must read a valid API key from disk.
 #
 proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
@@ -1859,7 +1858,7 @@ proc RAG_Manager_retrieve {} {
 	}
 	
 	set info(control) "Retrieve"
-	RAG_Manager_print "Retrieve Question-Related Data Chunks [RAG_Manager_time]" purple
+	RAG_Manager_print "Retrieve Question-Related Content [RAG_Manager_time]" purple
 	
 	RAG_Manager_print "Question: $config(question)"
 	
@@ -1930,7 +1929,7 @@ proc RAG_Manager_retrieve {} {
 				-vector $q_vector]
 		}
 	}
-	RAG_Manager_print "First chunks: [lrange $retrieval 0 7]"
+	RAG_Manager_print "Top chunks: [lrange $retrieval 0 7]"
 	
 	RAG_Manager_print "Retrieval complete in\
 		[expr [clock milliseconds] - $start_time] ms,\
@@ -1970,14 +1969,19 @@ proc RAG_Manager_retrieve {} {
 		RAG_Manager_print "Low-relevance question, relevance=$rel, provide $num\+ tokens." 
 	}
 	
-	RAG_Manager_print "List of chunks retrieved to support question." brown
+	if {$config(show_match)} {
+		RAG_Manager_print "List of match strings, most relevant first." brown
+	} else {
+		RAG_Manager_print "List of content strings, most relevant first." brown
+	
+	}
 	set index 0
 	set count 0
 	set tokens 0
-	set data [list]
+	set contents [list]
 	foreach {name rel} $retrieval {
 		if {$tokens >= $num} {break}
-		if {($rel >= $config(high_rel_thr)) && ($rel <= $config(low_rel_thr))} {
+		if {($info(relevance) >= $config(high_rel_thr)) && ($rel <= $config(low_rel_thr))} {
 			break
 		}
 		incr count
@@ -1987,7 +1991,7 @@ proc RAG_Manager_retrieve {} {
 		set f [open $cfn r]
 		set content [read $f]
 		close $f
-		lappend data "$config(chunk_title)$content"
+		lappend contents "$config(chunk_title)$content"
 		set tokens [expr $tokens + ([string length $content]/$info(token_size))]
 
 		if {$config(show_match)} {
@@ -2005,8 +2009,6 @@ proc RAG_Manager_retrieve {} {
 	RAG_Manager_print "-----------------------------------------------------" brown
 
 	if {$config(chat_submit)} {
-		RAG_Manager_print "Adding entries from chat history to content list..."
-		RAG_Manager_print "-----------------------------------------------------" brown
 		set matches [regexp -all -inline -indices \
 			{Question:.*?(?=Question:|$)} $info(chat)]
 		set chat ""
@@ -2018,49 +2020,46 @@ proc RAG_Manager_retrieve {} {
 		set chat [string trim $chat]
 		
 		if {$chat != ""} {
+			RAG_Manager_print \
+				"Adding previous $config(chat_submit) exchanges from chat history..."
+			RAG_Manager_print \
+				"-----------------------------------------------------" brown
 			RAG_Manager_print [string trim $chat] green
-		} else {
-			RAG_Manager_print "Chat history is empty."
+			RAG_Manager_print \
+				"-----------------------------------------------------" brown
+			lappend contents "config(chat_title)$info(chat)"
+			set tokens [expr $tokens + ([string length $info(chat)]/$info(token_size))]	
 		}
-		
-		RAG_Manager_print "-----------------------------------------------------" brown
-		lappend data "config(chat_title)$info(chat)"
-		set tokens [expr $tokens + ([string length $info(chat)]/$info(token_size))]	
 	}
-	
 
-	set info(data) $data
+	set info(contents) $contents
 	RAG_Manager_print "Retrieval complete, $count chunks,\
-		$tokens tokens [RAG_Manager_time]" purple
+		total of $tokens content tokens [RAG_Manager_time]" purple
 	set info(control) "Idle"
-	return [llength $data]
+	return [llength $contents]
 }
 
 #
 # RAG_Manager_get_answer submits a list of chunks and a question to the chat
 # completion end point and returns the answer it obtains. It takes as in put
-# four mandatory parameters: the question, the list of reference chunks, a
-# description of the attitude with which the end point is supposed to answer the
-# question, and a key that grants access to the generator. It returns the entire
-# result from the end point, as a json record, and leaves it to the calling
-# procedure to extract the answer. A fifth optional input is the gpt model. If
-# we don't specify, we fall back on the default model specified in
-# default_gpt_model.
+# five parameters: the question, the list of content strings, a description of
+# the attitude with which the end point is supposed to answer the question, a
+# key that grants access to the generator, and a completion model. It returns
+# the entire result from the end point, as a json record, and leaves it to the
+# calling procedure to extract the answer.
 #
-proc RAG_Manager_get_answer {question chunks assistant api_key {model ""}} {
+proc RAG_Manager_get_answer {question contents assistant api_key model} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
-	
-	if {$model == ""} {set model $info(default_gpt_model)}
 	
 	set assistant [RAG_Manager_json_format $assistant]
  	set json_body "\{\n \
 		\"model\": \"$model\",\n \
 		\"messages\": \[\n   \
 		\{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
-	foreach chunk $chunks {
-		set chunk [RAG_Manager_json_format $chunk]
-		append json_body "    \{ \"role\": \"user\", \"content\": \"$chunk\" \},\n"
+	foreach content $contents {
+		set content [RAG_Manager_json_format $content]
+		append json_body "    \{ \"role\": \"user\", \"content\": \"$content\" \},\n"
 	}
 	set question [RAG_Manager_json_format $question]
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
@@ -2171,7 +2170,7 @@ proc RAG_Manager_submit {} {
 	}
 	
 	set info(control) "Submit"
-	RAG_Manager_print "Submit Question and Data to\
+	RAG_Manager_print "Submit Question and Contents to\
 		Completion End Point [RAG_Manager_time]" purple
 	RAG_Manager_print "Choosing answer model and assistant prompt..."
 	set r $info(relevance)
@@ -2204,13 +2203,20 @@ proc RAG_Manager_submit {} {
 	close $f 
 	RAG_Manager_print "Read api key from $config(key_file)\." brown
 	
-	RAG_Manager_print "Submitting question with [llength $info(data)] chunks..."
+	set size [string length $assistant]
+	foreach content $info(contents) {
+		set size [expr $size + [string length $content]]
+	}
+	set size [expr $size + [string length $question]]
+	set tokens [expr $size / $info(token_size)]
+	RAG_Manager_print "Submitting total of $tokens tokens to $model for completion..."
 	append info(chat) "Question: [string trim $question]\n"
+	set start_ms [clock milliseconds]
 	set info(result) [RAG_Manager_get_answer $question\
-		$info(data) $assistant $api_key $model]
+		$info(contents) $assistant $api_key $model]
 	set len [expr [string length $info(result)]/$info(token_size)]
-	RAG_Manager_print "Received $len tokens,\
-		extracting answer and formatting for Markdown."
+	set del [format %.1f [expr 0.001*([clock milliseconds] - $start_ms)]]
+	RAG_Manager_print "Received $len tokens after $del s, processing response..."
 		
 		
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) -> answer]} {
@@ -2258,7 +2264,7 @@ proc RAG_Manager_history {} {
 }
 
 #
-# RAG_Manager_clear cleaers the chat history.
+# RAG_Manager_clear cleaers the chat history and the text window.
 #
 proc RAG_Manager_clear {} {
 	upvar #0 RAG_Manager_config config
@@ -2268,7 +2274,9 @@ proc RAG_Manager_clear {} {
 	set info(control) "Clear"
 	RAG_Manager_print "Clear Chat History" purple
 	set info(chat) ""
-	RAG_Manager_print "Done" purple
+	if {[winfo exists $info(text)]} {
+		$info(text) delete 1.0 end
+	}
 	set info(control) "Idle"
 	return ""
 }
@@ -2289,7 +2297,7 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Delete Generate Retrieve Submit History} {
+	foreach a {Delete Generate Retrieve Submit History Clear} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -2415,7 +2423,7 @@ the beginning of chapters in a particular format to indicate when the chapter
 was last updated. Thus we are able to extract paragraphs, lists, captions, and
 code samples in a uniform and consistent mannger for our chunk library, with
 every chunk given a chapter name, a URL pointing to the chapter on-line, and
-often a last-modified data as well. We translate the chunks from HTML into
+often a last-modified date as well. We translate the chunks from HTML into
 Markdown. This translation includes all URLs. We resolve all relative URLs and
 internal document links to absolute URLs. The answer we get back from the
 completion endpoint will also be in Markdown. The OpenAI LLM likes Markdown.
@@ -2453,10 +2461,10 @@ tables. An entire protocol consists of under fifteen hundred tokens. Instead of
 dividing the document into separate chunks, we prefer to place the entire
 document into a single content string, and compose our own match string with
 retrieval prompts. To achive this end, we embed retrieval commands in the
-document by means of "rag" fields. These can be in the html header, but it does
-not really matter where they are. Here is an example series of rag instructions
-with prompt fields that results in a single chunk for the entire document, with
-a match string consisting only of a title and some questions.
+document by means of "rag" fields. These can be placed anywhere in the html
+file. Here is an example series of rag instructions with prompt fields that
+results in a single chunk for the entire document, with a match string
+consisting only of a title and some questions.
 
 <rag style="display:none">single-chunk</rag>
 <rag style="display:none">match-prompts-only</rag>
@@ -2499,33 +2507,29 @@ of content strings most relevant to a question, any content string that does not
 exist we will skip over. But if obsolete embedding vectors start to outnumber
 our active vectors, retrieval will be less efficient.
 
-Now that the library is complete, we load it into memory with the Load button.
-All the embedding vectors in the embed directory are loaded into memory. Each
+Now that the library is complete, we are ready to retrieve content strings
+relevant to a question. To ask a question, we enter a question in the question
+entry box and press Retrieve. The first time we do this after a library
+generation, the manager will load the library into memory, which will take a few
+seconds. It loads all embedding vectors in the embed directory into memory. Each
 embed takes up 8 KByte on disk and 12 KByte in memory. On disk, we store the
 embedding vector components as integers, having multiplied their original
 real-valued components by embed_scale. Saving them as integers makes the disk
 files more compact and easier for us to examine. In memory, we convert back to
 real-valued components. Each component is an eight-byte real number, which is
-slightly larger than the original integer value.
+slightly larger than the original text-format integer value.
 
-With the embed library loaded into memory, we are ready to retrieve content
-strings relevant to a questin. The RAG Manager provides instructions to the
-OpenAI "completion endpoint", which is the server tha answers questions. We
-refer to these instructions as the "prompt". In the RAG Manager's Configuration
-Panel, press Assistant Prompt and you will be able to edit the prompt we will
-provide for high, mid, and low-relevance questions.
-
-To ask a question, enter a question in the question entry box and press
-Retrieve. The RAG Manager fetches the embedding vector of the question from the
-embedding end point and compares it to every embedding vector in the embed
-directory. It sorts the embedding vectors in order of decreasing relevance. We
+With the embed library loaded into memory, the retrieval will proceed to finding
+the most relevant chunks. The RAG Manager fetches the embedding vector of the
+question from the embedding end point and compares it to every embedding vector
+in its list. It sorts the embedding vectors in order of decreasing relevance. We
 use the relevance of the first chunk as our measure of the relevance of a
 question to our chunk library. We determine if the question is high, mid, or
 low-relevance. We set a limit on the number of content tokens we will submit to
 the completion endpoint based upon the relevance of the question. Low-relevance
-questions get no documentation at all. The generator starts to readcontent
-strings from disk, starting with the most relevant chunk and proceeding through
-its sorted list. When the total number of tokens passes our limit, it stops
+questions get no documentation at all. The generator reads content strings from
+disk, starting with the content string of the most relevant chunk, and proceeds
+through its list. When the total number of tokens passes our limit, it stops
 adding content. If the chat_submit flag is set, the manager adds the chat
 history to submission data as well. In the online chatbot implementation, we
 submit the previous two questions and answers to give continuity to the chat. 
@@ -2545,26 +2549,22 @@ chunks without waiting for a submission to complete. With the verbose flag set,
 we get to see all the chunks and the chat history.
 
 Once retrieval is complete, we press Submit and the RAG Manager combines the
-assistant prompt, the documentation chunks, and the question in one big
-json record. It submits this record to the OpenAI completion endpoint and waits
-for an answer. For high-relevance questions, we are currently using the "gpt-4"
-completion model, which costs $0.01 per thousand input tokens (assistant, chunk,
-question and chat) and $0.03 per thousand output tokens (the answer). For mid
-and low-relevance questions, we use the "gpt-3.5-turbo" model at a cost of
-$0.0005 per thousand input tokens and $0.0015 per thousand output tokens. Our
-default is to send roughly 3400 input tokens for a high-relevance question, and
-we see about 200 tokens in response, so our average high-relevance answer costs
-us rouhly four cents.
+assistant prompt, the documentation chunks, and the question in one big json
+record. It submits this record to the OpenAI completion endpoint and waits for
+an answer. For high-relevance questions, we are currently using the "gpt-4o"
+completion model. For mid and low-relevance questions, we use "gpt-3.5-turbo".
+The former is more accurate and precise. The latter is faster and cheaper. 
 
 The answer we receive from the completion endpoint will take a form, tone, and
 level of detail controlled by our assistant prompt. Our default promp instructs
 the endpoint to give us answers in Markdown, with equations in LaTeX. The gpt
-LLMs understand Markdown and LaTeX very well, these being the native formats upon
-which they were trained. When it comes to producing answers, Markdown and LaTeX 
-are their preferred output formats, so we instruct the LLM to produce Markdown and LaTeX.
-The answer we receive from the LLM is wrapped in a JSON container, so we have to extract
-the answer, translate the many characters escaped for JSON, so as to recover the
-original Mardown and LaTeX. This we do in the manager's get-answer routine.
+LLMs understand Markdown and LaTeX very well, these being the native formats
+upon which they were trained. When it comes to producing answers, Markdown and
+LaTeX are their preferred output formats, so we instruct the LLM to produce
+Markdown and LaTeX. The answer we receive from the LLM is wrapped in a JSON
+container, so we have to extract the answer, translate the many characters
+escaped for JSON, so as to recover the original Mardown and LaTeX. This we do in
+the manager's get-answer routine.
 
 Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
