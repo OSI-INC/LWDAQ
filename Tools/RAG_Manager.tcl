@@ -1900,7 +1900,7 @@ proc RAG_Manager_retrieve {} {
 				set f [open $pfn w]
 				puts $f $q_vector
 				close $f
-				exec chmod 777 $pfn
+				exec chmod 777 [file normalize $pfn]
 				set qfn [file join $info(log_dir) "Q$name\.txt"] 
 				file rename $pfn $qfn
 				RAG_Manager_print "Wrote embedding vector to $qfn\."
