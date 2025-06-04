@@ -240,6 +240,8 @@ Use LaTeX formatting within Markdown for mathematical expressions.
 		/em ""
 		eq ""
 		/eq ""
+		prompt ""
+		/prompt ""
 	}
 #
 # The chunk delimiting tags.
@@ -918,6 +920,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			}
 		}
 		
+		regsub {</?\s*prompt(>|\s+[^>]*>)} $content "" content
 		set content [RAG_Manager_convert_tags $content]
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
@@ -1941,26 +1944,24 @@ proc RAG_Manager_retrieve {} {
 		}
 		incr count
 		RAG_Manager_print "-----------------------------------------------------" brown
-		RAG_Manager_print "$count\: Relevance $rel:" brown
 		set embed [lindex $retrieval 0]
 		set cfn [file join $info(content_dir) $name\.txt]
 		set f [open $cfn r]
 		set content [read $f]
 		close $f
 		lappend data "$config(chunk_title)$content"
-		RAG_Manager_print $content green
 		set tokens [expr $tokens + ([string length $content]/$info(token_size))]
 
 		if {$config(show_match)} {
-			set mfn [file join $info(match_dir) $embed\.txt]
-			if {![file exists $mfn]} {
-				RAG_Manager_print "WARNING: Cannot find match string for this chunk." blue
-			} else {
-				set f [open $mfn r]
-				set match [read $f]
-				close $f
-				RAG_Manager_print $match orange
-			}
+			set mfn [file join $info(match_dir) $name\.txt]
+			set f [open $mfn r]
+			set match [read $f]
+			close $f
+			RAG_Manager_print "$count\: Match String with Relevance $rel:" brown
+			RAG_Manager_print $match darkgreen
+		} else {
+			RAG_Manager_print "$count\: Content String with Relevance $rel:" brown
+			RAG_Manager_print $content green
 		}
 	}
 	RAG_Manager_print "-----------------------------------------------------" brown
