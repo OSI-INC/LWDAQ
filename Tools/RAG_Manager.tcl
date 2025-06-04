@@ -25,7 +25,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "3.4"
+	LWDAQ_tool_init "RAG_Manager" "3.5"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -920,7 +920,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			}
 		}
 		
-		regsub {</?\s*prompt(>|\s+[^>]*>)} $content "" content
+		regsub -all {</?\s*prompt(>|\s+[^>]*>)[^<]*</prompt>} $content "" content
 		set content [RAG_Manager_convert_tags $content]
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
@@ -1209,12 +1209,13 @@ proc RAG_Manager_html_chunks {url} {
 #
 # RAG_Manager_store_chunks stores the match and content strings of a chunk list
 # to disk. It stores the content strings in the contents_dir and the match
-# strings in the matches_dir. disk in the chunks directory. It takes each
-# content string and uses its contents to obtain a unique hash name for the
-# corresponding chunk. It stores the content string with as hash.txt in the
-# contents_dir and the match string as hash.txt in the match_dir. The routine
-# takes as input a chunk list, in which each chunk consists of a match string
-# and a content string.
+# strings in the matches_dir. It takes each match string and uses its contents
+# to obtain a unique hash name for the chunk. We will use this name to form the
+# content, match, and embed names, which will in fact all be the same: hash.txt.
+# With this routine, we store the content string with as hash.txt in the
+# contents_dir, the match string as hash.txt in the match_dir. The routine takes
+# as input a chunk list, in which each chunk consists of a match string and a
+# content string.
 #
 proc RAG_Manager_store_chunks {chunks} {
 	upvar #0 RAG_Manager_info info
@@ -1227,7 +1228,7 @@ proc RAG_Manager_store_chunks {chunks} {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
 
-		set cmd [list echo -n $content | openssl dgst -sha1]
+		set cmd [list echo -n $match | openssl dgst -sha1]
 		if {[catch {
 			set result [eval exec $cmd]
 		} error_result]} {
@@ -1451,59 +1452,6 @@ proc RAG_Manager_json_format {s} {
 	set s [string map {\n \\n} $s]
 	regsub -all {\s+} $s " " s
 	return $s
-}
-
-#
-# RAG_Manager_get_answer submits a list of chunks and a question to the chat
-# completion end point and returns the answer it obtains. It takes as in put
-# four mandatory parameters: the question, the list of reference chunks, a
-# description of the attitude with which the end point is supposed to answer the
-# question, and a key that grants access to the generator. It returns the entire
-# result from the end point, as a json record, and leaves it to the calling
-# procedure to extract the answer. A fifth optional input is the gpt model. If
-# we don't specify, we fall back on the default model specified in
-# default_gpt_model.
-#
-proc RAG_Manager_get_answer {question chunks assistant api_key {model ""}} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-	
-	if {$model == ""} {set model $info(default_gpt_model)}
-	
-	set assistant [RAG_Manager_json_format $assistant]
- 	set json_body "\{\n \
-		\"model\": \"$model\",\n \
-		\"messages\": \[\n   \
-		\{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
-	foreach chunk $chunks {
-		set chunk [RAG_Manager_json_format $chunk]
-		append json_body "    \{ \"role\": \"user\", \"content\": \"$chunk\" \},\n"
-	}
-	set question [RAG_Manager_json_format $question]
-	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
-	append json_body "  \], \n  \"temperature\": 0.0 \n\}"
-	
-	set cmd [list | curl -sS -X POST https://api.openai.com/v1/chat/completions \
-	  -H "Content-Type: application/json" \
-	  -H "Authorization: Bearer $api_key" \
-	  -d $json_body] 
-
-	set ch [open $cmd]
-	set chpid [pid $ch]
-	fconfigure $ch -blocking 0 -buffering line
-	set result ""
-	while {1} {
-		set line [gets $ch]
-		if {[eof $ch]} {
-			break
-		} elseif {$line eq ""} {
-			LWDAQ_update
-			continue
-		} else {
-			append result "$line\n"
-		}
-	}		  
-	return $result
 }
 
 #
@@ -1999,6 +1947,59 @@ proc RAG_Manager_retrieve {} {
 }
 
 #
+# RAG_Manager_get_answer submits a list of chunks and a question to the chat
+# completion end point and returns the answer it obtains. It takes as in put
+# four mandatory parameters: the question, the list of reference chunks, a
+# description of the attitude with which the end point is supposed to answer the
+# question, and a key that grants access to the generator. It returns the entire
+# result from the end point, as a json record, and leaves it to the calling
+# procedure to extract the answer. A fifth optional input is the gpt model. If
+# we don't specify, we fall back on the default model specified in
+# default_gpt_model.
+#
+proc RAG_Manager_get_answer {question chunks assistant api_key {model ""}} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	if {$model == ""} {set model $info(default_gpt_model)}
+	
+	set assistant [RAG_Manager_json_format $assistant]
+ 	set json_body "\{\n \
+		\"model\": \"$model\",\n \
+		\"messages\": \[\n   \
+		\{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
+	foreach chunk $chunks {
+		set chunk [RAG_Manager_json_format $chunk]
+		append json_body "    \{ \"role\": \"user\", \"content\": \"$chunk\" \},\n"
+	}
+	set question [RAG_Manager_json_format $question]
+	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
+	append json_body "  \], \n  \"temperature\": 0.0 \n\}"
+	
+	set cmd [list | curl -sS -X POST https://api.openai.com/v1/chat/completions \
+	  -H "Content-Type: application/json" \
+	  -H "Authorization: Bearer $api_key" \
+	  -d $json_body] 
+
+	set ch [open $cmd]
+	set chpid [pid $ch]
+	fconfigure $ch -blocking 0 -buffering line
+	set result ""
+	while {1} {
+		set line [gets $ch]
+		if {[eof $ch]} {
+			break
+		} elseif {$line eq ""} {
+			LWDAQ_update
+			continue
+		} else {
+			append result "$line\n"
+		}
+	}		  
+	return $result
+}
+
+#
 # RAG_Manager_txt_from_json takes a raw json-formatted content string received
 # from the completion endpoint and formats it for display in our plain text
 # window. We want to see newlines in the right places. When the answer includes
@@ -2341,13 +2342,29 @@ ambiguity by the presence of the numbers, which have little or no syntactic
 meaning. Chapter titles, date stamps, and URLs also dilute the syntactic
 meaning, because they are not prose or equations. Mathematical equations do have
 a strong syntactic meaning, so we include those in our match strings, along with
-prose, but with all the other metadata text removed.
+prose, but with all the other metadata text removed. 
 
-Once we have all the match and content strings, the RAG Manager passes the
-content string to  "openssl" to obtain a unique twelve-digit name for the chunk,
-which we then use to form the names of the content and match strings. They will
-have names like "6270ebd71f0b.txt". We store the content and match strings to
-disk.
+In our html document, we can add "prompt" fields like this:
+
+<prompt style="display:none">What is an SCT?</prompt>
+
+These will not be displayed by a browser. The RAG Manager, however, will include
+them in the match strings, but exclude them from the content strings. These
+fields are "retrieval prompts". When we add a few well-chosen retrieval prompts
+to the caption of a table, for example, we can greatly increase the likelyhood
+that the table will be retrieved for certain questions that require the numbers
+in the table.
+
+Once we have all the match and content strings, the RAG Manager passes the match
+string to  "openssl" to obtain a unique twelve-digit name for the chunk, which
+we then use to form the names of the content and match strings. They will have
+names like "6270ebd71f0b.txt". We store the content and match strings to disk.
+We use the match string instead of the content string to create the name because
+we do not want to change the embedding vector when we change only numbers in a
+table or metadata like hyperlinks. In particular, if we are working with a large
+html file on a local server, we don't want to have to re-embed the entire
+document when we work with the same html file on our remote server, which would
+be required if we generated names based on the hyperlink-rich content strings.
 
 Now that we have the content and match strings, the generation process goes
 through all the match strings and checks to see whether an embedding vector
