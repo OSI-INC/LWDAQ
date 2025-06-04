@@ -880,7 +880,6 @@ proc RAG_Manager_extract_chunks {page catalog} {
 	set date "NONE"
 	set chapter "NONE"
 	set section "NONE"
-	set step "NONE"
 	set prev_name "NONE"
 	set rejected 0
 	set total_tokens 0
@@ -957,10 +956,12 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			"h2" {
 				set chapter $content
 				set section "NONE" 
+				set prev_name $name
 				continue
 			}
 			"h3" {
 				set section $content
+				set prev_name $name
 				continue
 			}
 			"date" {
@@ -969,9 +970,6 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			}
 			default {
 				set match $content
-				if {[regexp {^<b>([^:]+):</b>} $content -> bold]} {
-					set step $bold
-				}
 			}
 		}
 		
@@ -1023,17 +1021,15 @@ proc RAG_Manager_extract_chunks {page catalog} {
 
 		set heading ""
 		if {$chapter != "NONE"} {
-			append heading "Chapter: $chapter\n"
+			append heading "%%%%Chapter: $chapter\n"
 		}
 		if {$section != "NONE"} {
-			append heading "Section: $section\n"
-		}
-		if {$step != "NONE"} {
-			append heading "Step: $step\n"
+			append heading "%%%%Section: $section\n"
 		}
 		if {$date != "NONE"} {
-			append heading "Date: $date\n"
+			append heading "%%%%Date: $date\n"
 		}
+		set heading [string trim $heading]
 
 		switch -- $name {
 			"ol" -
@@ -1043,6 +1039,9 @@ proc RAG_Manager_extract_chunks {page catalog} {
 					lset chunks end 0 "[lindex $chunks end 0]\n\n$match"
 					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
 				} else {
+					if {[string length $heading] > 0} {
+						set content "$heading\n\n$content"
+					}
 					lappend chunks [list $match $content]
 				}
 			}
@@ -1066,21 +1065,8 @@ proc RAG_Manager_extract_chunks {page catalog} {
 						set chunks [lreplace $chunks end end]
 					}
 				}
-				set heading ""
-				if {$chapter != "NONE"} {
-					append heading "Chapter: $chapter\n"
-				}
-				if {$section != "NONE"} {
-					append heading "Section: $section\n"
-				}
-				if {$step != "NONE"} {
-					append heading "Step: $step\n"
-				}
-				if {$date != "NONE"} {
-					append heading "Date: $date\n"
-				}
 				if {[string length $heading] > 0} {
-					set content "$heading\n$content"
+					set content "$heading\n\n$content"
 				}
 				lappend chunks [list $match $content]
 				set step "NONE"
@@ -1223,12 +1209,12 @@ proc RAG_Manager_convert_urls {page} {
 }
 
 #
-# RAG_Manager_chapter_urls converts the "Chapter: Title" at the top of every
-# chunk content string into a markdown anchor with absolute link to the chapter.
-# If a second line with "Section: Title" exists, it inserts a link for that too.
-# It returns the modified chunk list. Note that this routine operates only on
-# the content strings, not the match strings, which should contain not chapeter,
-# section, or date titles.
+# RAG_Manager_chapter_urls converts all lines of the form "%%%%Chapter: Title" or
+# form "%%%%Section: Title" into Markdown anchors with absolute links to chapter and
+# section. We pass the base url into the routine, and the routine attaches the
+# chapter or section name, with spaces replaced with space entities, to form the
+# absolute ur. The routine operates only on the content strings, not match
+# strings.
 #
 proc RAG_Manager_chapter_urls {chunks base_url} {
 	upvar #0 RAG_Manager_info info
@@ -1238,16 +1224,23 @@ proc RAG_Manager_chapter_urls {chunks base_url} {
 	foreach chunk $chunks {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
-		if {[regexp {^Chapter: ([^\n]*)} $content -> title]} {
-			regsub -all { } $title {%20} link
-			regsub {^Chapter: ([^\n]*)} $content \
-				"Chapter: \[$title\]\($base_url\#$link\)" content
-		} 
-		if {[regexp {\nSection: ([^\n]*)} $content -> title]} {
-			regsub -all { } $title {%20} link
-			regsub {\nSection: ([^\n]*)} $content \
-				"\nSection: \[$title\]\($base_url\#$link\)" content
-		} 
+		set found 1
+		while {$found} {
+			set found 0
+			if {[regexp {%%%%Chapter: ([^\n]*)} $content -> title]} {
+				regsub -all { } $title {%20} link
+				regsub {%%%%Chapter: ([^\n]*)} $content \
+					"Chapter: \[$title\]\($base_url\#$link\)" content
+				set found 1
+			} 
+			if {[regexp {%%%%Section: ([^\n]*)} $content -> title]} {
+				regsub -all { } $title {%20} link
+				regsub {%%%%Section: ([^\n]*)} $content \
+					"Section: \[$title\]\($base_url\#$link\)" content
+				set found 1
+			} 
+			LWDAQ_support
+		}
 		lappend new_chunks [list $match $content]
 	}
 	return $new_chunks
