@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "3.5"
+	LWDAQ_tool_init "RAG_Manager" "3.6"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -872,7 +872,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			}
 		}
 	}
-	RAG_Manager_print "Extraction rules:\
+	RAG_Manager_print "Generation rules:\
 		single_chunk=$single_chunk,\
 		match-prompts-only=$match_prompts_only"
 	
@@ -880,8 +880,9 @@ proc RAG_Manager_extract_chunks {page catalog} {
 	set chapter "NONE"
 	set section "NONE"
 	set prev_name "NONE"
-	set rejected 0
-	set total_tokens 0
+	set empty_match 0
+	set empty_content 0
+	set contaminated 0
 	set chunks [list]
 	foreach chunk_id $catalog {
 		scan $chunk_id %d%d%s i_start i_end name
@@ -892,7 +893,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			|| [regexp {<h3>} $content] \
 			|| [regexp {</ul>} $content] \
 			|| [regexp {</ol>} $content]} {
-			incr rejected
+			incr contaminated
 			continue
 		}
 		
@@ -977,6 +978,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
 		if {([string length $content] == 0)} {
+			incr empty_content
 			if {$name != "center"} {
 				RAG_Manager_print "WARNING: Empty $name content\
 					\"[RAG_Manager_snippet $page $i_start]\""
@@ -988,11 +990,6 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			set prompts [RAG_Manager_list_bodies $match "prompt"]
 			set prompts [join $prompts "\n"]
 			set prompts [string trim $prompts]
-			if {($prompts == "") && !$single_chunk} {
-				RAG_Manager_print "WARNING: Specified match-prompt-only,\
-					but no prompt found, discarding chunk."
-				continue
-			}
 			set match $prompts
 		} else {
 			set match [RAG_Manager_convert_tags $match]
@@ -1000,17 +997,13 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			regsub -all {[!]*\[([^\]]+)\]\([^)]+\)} $match {\1} match
 			set match [string trim $match]
 		}
-		
 		if {$match == ""} {
 			if {!$single_chunk} {
-				RAG_Manager_print "WARNING: Empty match string, discarding \
-					\"[RAG_Manager_snippet $page $i_start]\""
+				incr empty_match
 				continue
 			}
 		}
 		
-		set tokens [format %5.0f [expr [string length $content] / $info(token_size)]]
-		set total_tokens [expr $total_tokens + $tokens]
 		if {$config(verbose)} {
 			RAG_Manager_print "[format %8.0f $i_start]\
 				[format %8.0f $i_end]\
@@ -1074,10 +1067,11 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		set prev_name $name
 	}
 	
-	if {$rejected > 0} {
-		RAG_Manager_print "Total content tokens $total_tokens,\
-			rejected $rejected chunks."
-	}
+	RAG_Manager_print "Generated [llength $chunks] chunks,\
+		rejected [expr $contaminated+$empty_match+$empty_content],\
+		of which $contaminated contaminated,\
+		$empty_match empty match,\
+		$empty_content empty content."
 	
 	if {$single_chunk} {
 		set single_match ""
@@ -1087,7 +1081,8 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			append single_content "[lindex $chunk 1]\n\n"
 		}
 		set chunks [list [list $single_match $single_content]]
-		RAG_Manager_print "Consolidated chunks into one for single-chunk command."
+		RAG_Manager_print "Consolidated [llength $chunks] chunks into one\
+			for single-chunk generation rule."
 	}
 	
 	return $chunks
