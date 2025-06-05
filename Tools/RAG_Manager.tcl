@@ -2126,10 +2126,13 @@ proc RAG_Manager_txt_from_json {content} {
 		regsub -all {\s+\*\s+} $prefix { × } prefix
 		append new_content $prefix
 
-		set math [string range $scratch $start $end]
-		regsub -all {\\\\} $math "\\" math
-		regsub -all {\\\\} $math "\\" math
-		append new_content $math
+		set latex [string range $scratch $start $end]
+		regsub -all {\\\\} $latex "\\" latex
+		regsub -all {\\\\} $latex "\\" latex
+		regsub -all {\\\[\n} $latex {\\[} latex
+		regsub -all {\n\\\]} $latex {\\]} latex
+		regsub -all {\n } $latex { } latex
+		append new_content $latex
 		
 		set scratch [string range $scratch [expr $end + 1] end]
 	}
