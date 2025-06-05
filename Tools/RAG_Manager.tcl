@@ -57,7 +57,7 @@ proc RAG_Manager_init {} {
 #
 # Public control flags.
 #
-	set config(chat_submit) "2"
+	set config(chat_submit) "3"
 	set config(verbose) "0"
 	set config(show_match) "0"
 	set config(snippet_len) "40"
@@ -2351,6 +2351,10 @@ return ""
 
 ----------Begin Help----------
 
+
+Introduction
+------------
+
 The RAG Manager provides the routines we use at to support the OSI Chatbot. The
 acronym "RAG" stands for "Retrieval-Assisted Generation", where "generation" is
 the composing of an answer to a question by a large language model (LLM), and
@@ -2360,6 +2364,10 @@ called "chunks". The chat web interface is provided by a PHP process running on
 our server and some JavaScript running on the client web browser. When the user
 provides a new question, the server calls LWDAQ to collect relevant chunks,
 submit them to the LLM, and wait for an answer.
+
+
+Embedding
+---------
 
 The key to retrieval-assisted generation is the ability of the LLM to classify
 the content of an chunk with a unit vector in an n-dimensional sphere. In the
@@ -2389,6 +2397,10 @@ is may be a question about our products, but if less than 0.3, the question is
 almost certainly or general question that cannot be answered by our chatbot
 library.
 
+
+Sources
+-------
+
 Before we generate a new chunk libary, we must provide the RAG Manager with a
 list of URLs from which it should download the documents out of which it will
 create the library. The RAG Manager window, which appears when you open the RAG
@@ -2407,6 +2419,10 @@ locations of these directories are set in the RAG Manager's configuration array.
 All three files corresponding to a chunk have the same name. All three are text
 files. When we delete the chunks, we delete the match and content strings, but
 not the embeds.
+
+
+Generation
+----------
 
 We press Generate. Here we don't mean "generate an answer", we mean "generate
 the chunk library". The RAG Manager uses the "curl" utility to download the
@@ -2510,6 +2526,10 @@ of content strings most relevant to a question, any content string that does not
 exist we will skip over. But if obsolete embedding vectors start to outnumber
 our active vectors, retrieval will be less efficient.
 
+
+Retrieval
+---------
+
 Now that the library is complete, we are ready to retrieve content strings
 relevant to a question. To ask a question, we enter a question in the question
 entry box and press Retrieve. The first time we do this after a library
@@ -2533,23 +2553,31 @@ the completion endpoint based upon the relevance of the question. Low-relevance
 questions get no documentation at all. The generator reads content strings from
 disk, starting with the content string of the most relevant chunk, and proceeds
 through its list. When the total number of tokens passes our limit, it stops
-adding content. If the chat_submit flag is set, the manager adds the chat
-history to submission data as well. In the online chatbot implementation, we
-submit the previous two questions and answers to give continuity to the chat. 
+adding content. If chat_submit is greater than zero, the manager adds the most
+recent chat_submit exchanges from the chat history to the submission data as
+well. By default, we add the previous three exchanges to to give continuity to
+the chat. 
 
-Note that we are submitting the content strings of the chunks, but we selected
-the chunks using their match strings. When we select a table as relevant, we
-have done so based upon the description of the table in its caption. What we
-submit to the completion end point is the entire table. The LLM does well
-understanding and making use of tabulated numbers, especially if they are
-supplied with repeating column titles on every line and in Mardown format. The
-LLM has no trouble understanding URLs in Markdown format, and it can understand
-our chapter, section and date titles as well.
+We select content strings using the embedding vectors of the match strings. When
+we select a table of numbers, we select it based upon its match string, not the
+numbers themselves. The match string could be the table caption, or it could be
+the table caption combined with some retrieval prompts we embedded in the source
+html document. With the match-prompts-only command, we will be matching only on
+prompts: even the table caption will be removed from the match string. But what
+we submit to the completion end point is the entire table with its caption. The
+LLM does well understanding and making use of tabulated numbers, especially if
+they are supplied with repeating column titles on every line and in Mardown
+format. The LLM has no trouble understanding URLs in Markdown format, and it can
+understand our chapter, section and date titles as well.
 
-At the end of retrieval, the question has not yet been submitted: we separate
-retrieval and submission in the RAG Manager so we can examine the retrieved
-chunks without waiting for a submission to complete. With the verbose flag set,
-we get to see all the chunks and the chat history.
+At the end of retrieval, we have all the content strings ready to send to the
+completion endpoint. With the verbose flag set, we get to see all the content
+strings and the chat history printed in the manager's text window. If we set the
+show_matches flag, we will see in place of the content strings the match strings
+used to make the embedding vectors.
+
+Submission
+----------
 
 Once retrieval is complete, we press Submit and the RAG Manager combines the
 assistant prompt, the documentation chunks, and the question in one big json
