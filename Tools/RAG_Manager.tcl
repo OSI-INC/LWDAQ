@@ -111,7 +111,7 @@ When answering the user's question:
   - Prefer newer information over older.
   - Respond using Markdown formatting.
   - Use LaTeX formatting within Markdown for mathematical expressions.
-    
+  - Use the minimal escaping required to represent valid LaTeX.
     }
 	set config(mid_rel_assistant) {
 	
@@ -2084,71 +2084,19 @@ proc RAG_Manager_get_answer {question contents assistant api_key model} {
 }
 
 #
-# RAG_Manager_txt_from_json takes a raw json-formatted content string received
-# from the completion endpoint and formats it for display in our plain text
-# window. We want to see newlines in the right places. When the answer includes
-# LaTeX math, we want to see the exact characters of the LaTeX code, but the
-# endpoint often adds an excessive number of backslashes within the math string,
-# so we reduce anything more than two down to one backslash within the math
-# regions, including the delimiters on either end. It is this plain text version
-# of the answer that we will attach to our local chat history.
-#
-proc RAG_Manager_txt_from_json {content} {
-	upvar #0 RAG_Manager_config config
-	upvar #0 RAG_Manager_info info
-
-	set p1 {(\\\\\[.*?\\\\\])}
-	set p2 {(\\\\\(.*?\\\\\))}
-	set p3 {(\$\$.*?\$\$)}
-	set new_content ""
-	set far "10000000"
-	set scratch $content
-	while {[string length $scratch] > 0} {
-		set start $far
-		set end $far
-		foreach n {1 2 3} {
-			if {[regexp -indices -nocase [set p$n] $scratch idx]} {
-				lassign [set idx] sidx eidx
-				if {$sidx < $start} {
-					set start $sidx
-					set end $eidx
-				}
-			}
-		}
-		set prefix [string range $scratch 0 [expr $start - 1]]
-		regsub -all {\\r\\n|\\r|\\n} $prefix "\n" prefix
-		regsub -all {\\\"} $prefix "\"" prefix
-		regsub -all {\s+\*\s+} $prefix { × } prefix
-		append new_content $prefix
-
-		set latex [string range $scratch $start $end]
-		regsub -all {\\\\} $latex "\\" latex
-		regsub -all {\\\\} $latex "\\" latex
-		regsub -all {\\\[\n} $latex {\\[} latex
-		regsub -all {\n\\\]} $latex {\\]} latex
-		regsub -all {\n } $latex { } latex
-		append new_content $latex
-		
-		set scratch [string range $scratch [expr $end + 1] end]
-	}
-
-	set content [string trim $new_content]
-
-	return $new_content
-}
-
-#
-# RAG_Manager_submit combines the question and the assistant prompt with
-# the retrieved data, all of which are stored in elements of the info array, and
+# RAG_Manager_submit combines the question and the assistant prompt with the
+# retrieved data, all of which are stored in elements of the info array, and
 # passes them to the RAG package for submission to the completion end point. In
 # order to submit the question, this routine must read a valid API key from
 # disk. Once we receive a response from the completion end point, we try to
 # extract an answer from the response json record. If we succeed, we format it
 # for plain text display and print it out in the console or tool window. What we
-# pass back to the calling routine is the raw answer with no formatting. If we
-# can't extract the answer then we try to extract an error message and report
-# the error. If we can't extract an error message, we return a failure error
-# message of our own.
+# pass back to the calling routine, however, is the raw answer with no
+# formatting. If we can't extract the answer then we try to extract an error
+# message and report the error. If we can't extract an error message, we return
+# a failure error message of our own. In all cases, what we return is the raw
+# json, but what we print to the console or log file is formatted for plain text
+# display.
 #
 proc RAG_Manager_submit {} {
 	upvar #0 RAG_Manager_config config
@@ -2228,9 +2176,15 @@ proc RAG_Manager_submit {} {
 		set answer "ERROR: Could not find answer or error message in result."
 	}
 
+	# Print the answer to the console or log file. We perform minimal formatting
+	# on the json answer: we replace escaped newline characters with newlines so
+	# that we can see the answer clearly. But we do not replace escaped backslashes
+	# nor make any attempt to clean up LaTeX. We want to know what the endpoint
+	# returned when we look in our log file. Any newline must have come from an
+	# escaped newline because the json string will never contains newlines.
 	RAG_Manager_print "Answer to \"$question\":" purple
-	set answer_txt [RAG_Manager_txt_from_json $answer]
-	RAG_Manager_print $answer_txt 
+	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
+	RAG_Manager_print $answer_txt
 	append info(chat) "Answer: $answer_txt\n\n"
 	RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
 	
