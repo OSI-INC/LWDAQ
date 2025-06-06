@@ -308,29 +308,42 @@ proc LWDAQ_tool_open {name} {
 }
 
 #
-# LWDAQ_tool_save writes a tool's configuration array to disk.
+# LWDAQ_tool_save writes a tool's configuration array to disk. If a tool
+# text widget exists, the routine writes a notification.
 #
 proc LWDAQ_tool_save {name} {
 	upvar #0 $name\_config config
 	upvar #0 $name\_info info
+	
 	set f [open $info(settings_file_name) w]
 	foreach {name} [lsort -dictionary [array names config]] {
 		puts $f "set $info(name)\_config($name) \{$config($name)\}"
 	}
 	close $f
+	if {[info exists info(text)] && [winfo exists $info(text)]} {
+		LWDAQ_print $info(text) "$info(name) configuration saved to file."
+	}
 	return ""
 }
 
 #
-# LWDAQ_tool_unsave deletes a tool's saved configuration array.
+# LWDAQ_tool_unsave deletes a tool's saved configuration array. If a tool
+# text widget exists, the routine writes a notification to the text widget.
 #
 proc LWDAQ_tool_unsave {name} {
 	upvar #0 $name\_info info
+	
 	set fn $info(settings_file_name)
 	if {[file exists $fn]} {
 		file delete $fn
+		if {[info exists info(text)] && [winfo exists $info(text)]} {
+			LWDAQ_print $info(text) "$info(name) configuration file deleted."
+		}
 		return $fn
 	} {
+		if {[info exists info(text)] && [winfo exists $info(text)]} {
+			LWDAQ_print $info(text) "No $info(name) configuration file exists."
+		}
 		return ""
 	}
 }
