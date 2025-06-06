@@ -60,7 +60,7 @@ proc RAG_Manager_init {} {
 	set config(chat_submit) "3"
 	set config(verbose) "0"
 	set config(show_match) "0"
-	set config(snippet_len) "40"
+	set config(snippet_len) "45"
 	set config(progress_frac) "0.1" 
 #
 # The source documents. Can be edited with a dedicated window and saved to
@@ -1008,7 +1008,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			RAG_Manager_print "[format %8.0f $i_start]\
 				[format %8.0f $i_end]\
 				[format %8s $name]\
-				$tokens \"[RAG_Manager_snippet $content 0]\"" $color	
+				\"[RAG_Manager_snippet $content 0]\"" $color	
 		}
 
 		set heading ""
