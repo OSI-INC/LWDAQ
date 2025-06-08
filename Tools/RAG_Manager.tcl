@@ -67,10 +67,15 @@ proc RAG_Manager_init {} {
 # settings file.
 #
 	set config(sources) {
+
 https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
+https://www.opensourceinstruments.com/Electronics/A3048/M3048.html
+https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
+https://www.opensourceinstruments.com/Electronics/A3047/M3047.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 https://www.opensourceinstruments.com/About/about.php
 https://www.bndhep.net/Devices/BCAM/User_Manual.html
+
 	}
 #
 # Configuration for retrieval and submission based upon relevance of the question
