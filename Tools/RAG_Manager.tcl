@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "3.6"
+	LWDAQ_tool_init "RAG_Manager" "3.7"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -52,7 +52,7 @@ proc RAG_Manager_init {} {
 	set info(retrieval_giveup_ms) "1000"
 	set info(retrieval_check_ms) "10"
 	set info(library_loaded) "0"
-	set info(reload_s) "60"
+	set info(reload_s) "3600"
 	set info(reload_time) "0"
 #
 # Public control flags.
@@ -1726,6 +1726,8 @@ proc RAG_Manager_engine {{cmd ""}} {
 	
 	if {[clock seconds] > $info(reload_time)} {
 		if {[catch {
+			RAG_Manager_print "Engine: Re-loading library\
+				[RAG_Manager_time $info(reload_time)]"
 			RAG_Manager_load
 		} error_message]} {
 			RAG_Manager_print "ERROR: $error_message"
@@ -1733,7 +1735,7 @@ proc RAG_Manager_engine {{cmd ""}} {
 			return ""
 		}
 		set info(reload_time) [expr [clock seconds] + $info(reload_s)]
-		RAG_Manager_print "Engine: Next library load at\
+		RAG_Manager_print "Engine: Next library load\
 			[RAG_Manager_time $info(reload_time)]"
 	}
 
