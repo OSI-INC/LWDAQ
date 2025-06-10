@@ -69,10 +69,15 @@ proc RAG_Manager_init {} {
 	set config(sources) {
 
 https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 https://www.opensourceinstruments.com/Electronics/A3048/M3048.html
 https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
 https://www.opensourceinstruments.com/Electronics/A3047/M3047.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
+https://www.opensourceinstruments.com/Electronics/A3042/M3042.html
+https://www.opensourceinstruments.com/Electronics/A3041/M3041.html
+https://www.opensourceinstruments.com/Electronics/A3036/M3036.html
+https://www.opensourceinstruments.com/IST/Manual.html
+https://www.opensourceinstruments.com/Movies/ACC_Latency.mp4
 https://www.opensourceinstruments.com/About/about.php
 https://www.bndhep.net/Devices/BCAM/User_Manual.html
 
@@ -538,6 +543,20 @@ proc RAG_Manager_read_url {url} {
 }
  
 #
+# RAG_Manager_convert_urls finds all the anchors in a page and converts from
+# html to markup format, where the title of the anchor is in brackets and the
+# url is in parentheses immediately afterwards.
+#
+proc RAG_Manager_convert_urls {page} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	regsub -all {<img +src="([^"]+)"[^>]*>} $page {[Figure](\1)} page
+	regsub -all {<a +href="([^"]+)"[^>]*>([^<]+)</a>} $page {[\2](\1)} page
+	return $page
+}
+
+#
 # RAG_Manager_locate_field goes to the index'th character in a page and searches
 # forward for the first occurance of the named tag opening, looks further for
 # the same tag to close. If there are further openings of the same tag before
@@ -636,16 +655,16 @@ proc RAG_Manager_extract_list {chunk} {
 }
 
 #
-# RAG_Manager_extract_caption looks for a table or figure caption beginning with
-# bold "Figure:" or "Table:". It extracts the text of the caption and returns
-# with Figure or Table.
+# RAG_Manager_extract_caption looks for a table, figure, or video caption beginning with
+# bold "Table:", "Figure:", or "Video:". It extracts the text of the caption and returns
+# with "Table: ", "Figure: ", or "Video: ".
 #
 proc RAG_Manager_extract_caption {chunk} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
 	set caption ""
-	if {[regexp {<b>(Figure|Table):</b>(.+?)</small>} $chunk -> type caption]} {
+	if {[regexp {<b>(Table|Figure|Video):</b>(.+?)</small>} $chunk -> type caption]} {
 		return "$type: [string trim $caption]"
 	} else {
 		return ""
@@ -653,26 +672,44 @@ proc RAG_Manager_extract_caption {chunk} {
 }
 
 #
-# RAG_Manager_extract_figures looks for img tags and creates an image reference
-# to go with a figure caption, one for each image.
+# RAG_Manager_extract_figures looks for figure links and creates an inline image
+# reference reference to go with a figure caption, one for each image.
 #
-proc RAG_Manager_extract_figures {chunk} {
+proc RAG_Manager_extract_figures {content} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
 	set i 0
 	set images ""
-	while {$i < [string length $chunk]} {
-		if {[regexp -indices -start $i {\[Figure\]\(([^)]*)\)} $chunk img url]} {
+	while {$i < [string length $content]} {
+
+		if {[regexp -indices -start $i {\[Figure\]\(([^)]*)\)} $content img url]} {
 			set i [lindex $img 1]
 			incr i
-			set img [string range $chunk {*}$img]
+			set img [string range $content {*}$img]
 			append images "!$img  \n"
 		} else {
 			break
 		}
 	}
 	return [string trim $images]
+}
+
+#
+# RAG_Manager_extract_video looks for a Markdown anchor. It takes everything
+# inside the biggest pair of square brakets it can find, followed by a term in
+# parentheses. Thus it will get the Markdown representation of a clickable
+# image.
+#
+proc RAG_Manager_extract_video {content} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	if {[regexp {\[.+\]\(([^)]*)\)} $content vid url]} {
+		return [string trim $vid]
+	} else {
+		return ""
+	}
 }
 
 #
@@ -899,6 +936,10 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			|| [regexp {</ul>} $content] \
 			|| [regexp {</ol>} $content]} {
 			incr contaminated
+			RAG_Manager_print "[format %7.0f $i_start]\
+				[format %7.0f $i_end]\
+				[format %8s contam]\
+				\"[RAG_Manager_snippet $content 0]\"" blue
 			continue
 		}
 		
@@ -946,6 +987,11 @@ proc RAG_Manager_extract_chunks {page catalog} {
 						set match "$caption"
 					}
 					set name "figure"
+				} elseif {[regexp {^Video} $caption]} {
+					set video [RAG_Manager_extract_video $content]
+					set content "$caption  \n$video"
+					set match "$caption"
+					set name "video"
 				} else {
 					set content "$caption"
 					set match "$caption"
@@ -1010,9 +1056,9 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		}
 		
 		if {$config(verbose)} {
-			RAG_Manager_print "[format %8.0f $i_start]\
-				[format %8.0f $i_end]\
-				[format %8s $name]\
+			RAG_Manager_print "[format %7.0f $i_start]\
+				[format %7.0f $i_end]\
+				[format %10s $name]\
 				\"[RAG_Manager_snippet $content 0]\"" $color	
 		}
 
@@ -1191,20 +1237,6 @@ proc RAG_Manager_resolve_urls {page base_url} {
 	append new_page [string range $page $index end]
 	
 	return $new_page
-}
-
-#
-# RAG_Manager_convert_urls finds all the anchors in a page and converts from
-# html to markup format, where the title of the anchor is in brackets and the
-# url is in parentheses immediately afterwards.
-#
-proc RAG_Manager_convert_urls {page} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-	
-	regsub -all {<a +href="([^"]+)"[^>]*>([^<]+)</a>} $page {[\2](\1)} page
-	regsub -all {<img +src="([^"]+)"[^>]*>} $page {[Figure](\1)} page
-	return $page
 }
 
 #
@@ -1554,7 +1586,7 @@ proc RAG_Manager_delete {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Delete"
-	RAG_Manager_print "Deleting Content and Match Strings [RAG_Manager_time]" purple
+	RAG_Manager_print "Delete Content and Match Strings [RAG_Manager_time]" purple
 
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings."
@@ -1582,26 +1614,41 @@ proc RAG_Manager_delete {} {
 }
 
 #
-# RAG_Manager_generate downloads and chunks all URL resources named in the
-# sources list. It submits all chunks for embedding, although the RAG package
-# routines will obtain new embeds only for new chunks. In order to embed the
-# chunks, this routine must read a valid API key from disk. This routine clears
-# the libarary-loaded flag.
+# RAG_Manager_chunk downloads and chunks all URL resources named in the
+# sources list. 
 #
-proc RAG_Manager_generate {} {
+proc RAG_Manager_chunk {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
 	if {$info(control) != "Idle"} {return ""}
-	set info(control) "Generate"
-	RAG_Manager_print "Generate Chunks and Embed Vectors [RAG_Manager_time]" purple
-	set info(library_loaded) 0
+	set info(control) "Chunk"
+	RAG_Manager_print "Download Sources and Chunk [RAG_Manager_time]" purple
 	
 	set chunks [list]
 	foreach url [string trim $config(sources)] {
 		set chunks [concat $chunks [RAG_Manager_html_chunks $url]]
 	}
 	RAG_Manager_store_chunks $chunks
+	RAG_Manager_print "Chunking complete [RAG_Manager_time]" purple
+
+	set info(control) "Idle"
+	return "[llength $chunks]"
+}
+
+#
+# RAG_Manager_embed identifies match strings for which no embedding vector
+# exists and submits them to the embedding endpoing. This routine needs a valid
+# API key from disk. It clears the libarary-loaded flag.
+#
+proc RAG_Manager_embed {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "Embed"
+	RAG_Manager_print "Embed Match Strings [RAG_Manager_time]" purple	
+	set info(library_loaded) 0
 
 	if {![file exists $config(key_file)]} {
 		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
@@ -1613,12 +1660,12 @@ proc RAG_Manager_generate {} {
 	close $f 
 	RAG_Manager_print "Read api key from $config(key_file)\." brown
 
-	RAG_Manager_print "Submitting all chunk match strings for embedding..."	
+	RAG_Manager_print "Building embedding vector library..."	
 	RAG_Manager_fetch_embeds $api_key
 	
-	RAG_Manager_print "Generation Complete [RAG_Manager_time]" purple
+	RAG_Manager_print "Embed Library Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
-	return "[llength $chunks]"
+	return ""
 }
 
 #
@@ -2256,7 +2303,7 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Delete Generate Retrieve Submit History Clear} {
+	foreach a {Delete Chunk Embed Retrieve Submit History Clear} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -2325,7 +2372,7 @@ submit them to the LLM, and wait for an answer.
 Embedding
 ---------
 
-The key to retrieval-assisted generation is the ability of the LLM to classify
+The key to retrieval-assisted generation is the ability of the LLM to represent
 the content of an chunk with a unit vector in an n-dimensional sphere. In the
 jargon of retrieval-assisted generation, the process of representing the
 syntactic meaning of a chunk as an n-dimensional vector is called "embedding",
@@ -2377,19 +2424,18 @@ files. When we delete the chunks, we delete the match and content strings, but
 not the embeds.
 
 
-Generation
-----------
+Chunk
+-----
 
-We press Generate. Here we don't mean "generate an answer", we mean "generate
-the chunk library". The RAG Manager uses the "curl" utility to download the
-sources. The "curl" utility supports both https and http. We test the RAG
-Manager on Linux and MacOS, both of which are UNIX variants with "curl"
-installed. We do not test the RAG Manager on Windows. The RAG Manager proceeds
-one URL at a time, dividing each page into an initial sequence of chunks, and
-then combining some chunks with those before or after in order to bind things
-like equations to their explanatory text below, and lists to their explanatory
-text above. Check "verbose" to see the notification and type of every chunk
-created.
+We press Chunk to download our sources and divide them all into a single list of
+chunks. The RAG Manager uses "curl" to download the sources. The "curl" utility
+supports both https and http. We test the RAG Manager on Linux and MacOS, both
+of which are UNIX variants with "curl" installed. We do not test the RAG Manager
+on Windows. The RAG Manager proceeds one URL at a time, dividing each page into
+an initial sequence of chunks, and then combining some chunks with those before
+or after in order to bind things like equations to their explanatory text below,
+and lists to their explanatory text above. Check "verbose" to see the
+notification and type of every chunk created.
 
 The simplest chunk extraction is to isolate an HTML paragraph using p-tags. Our
 HTML documentation is all hand-typed and follows particular, strict patterns
@@ -2449,7 +2495,7 @@ consisting only of a title and some questions.
 
 Once we have all the match and content strings, the RAG Manager passes the match
 string to  "openssl" to obtain a unique twelve-digit name for the chunk, which
-we then use to form the names of the content and match strings. They will have
+we use to form the names of the content and match strings. They will have
 names like "6270ebd71f0b.txt". We store the content and match strings to disk.
 We use the match string instead of the content string to create the name because
 we do not want to change the embedding vector when we change only numbers in a
@@ -2458,21 +2504,29 @@ html file on a local server, we don't want to have to re-embed the entire
 document when we work with the same html file on our remote server, which would
 be required if we generated names based on the hyperlink-rich content strings.
 
-Now that we have the content and match strings, the generation process goes
-through all the match strings and checks to see whether an embedding vector
-exists for each in the embed directory. The embedding vector file will have the
-same name as the match string file if it exists. If an embed exists, the chunk
-is ready to deploy. If no embedding vector exists, the generator submits the
-match string to the OpenAI embedding endpoint, obtains the match string
-embedding vector, and writes the match string embedding vector to disk in the
-embed directory. To obtain the vector, we need an API Key, which is the means by
-which we identify ourselves to OpenAI and agree to pay for the embedding
-service. Embedding is inexpensive. At the time of writing, the
-"text-embedding-3-small" embedding model costs $0.00002 per one thousand tokens,
-where a "token" is four characters. So one thousand chunks, each one thousand
-tokens long, will cost a total of two cents to embed. 
+With our contents strings and match strings saved to disk in separate
+directories, each chunk's match and contents strings saved with a unique, shared
+name, our chunking is complete.
 
-With generation complete, we have a complete library of chunks and embedding
+
+Embed
+-----
+
+Now that we have the content and match strings, we are ready to embed the match
+strings. We press "Embed". The manager goes through all the match strings and
+checks to see whether an embedding vector exists for that match string. The
+embed vector, if it exist, will reside in the embed directory and share the same
+name as the match string. If an embed exists, the chunk is ready to deploy. If
+no embedding vector exists, the embedder submits the match string to the OpenAI
+embedding endpoint, obtains the match string embedding vector, and writes the
+match string embedding vector to disk in the embed directory. To obtain the
+vector, we need an API Key, which is the means by which we identify ourselves to
+OpenAI and agree to pay for the embedding service. Embedding is inexpensive. At
+the time of writing, the "text-embedding-3-small" embedding model costs $0.00002
+per one thousand tokens, where a "token" is four characters. So one thousand
+chunks, each one thousand tokens long, will cost a total of two cents to embed.
+
+With embedding complete, we have a library of content strings and embedding
 vectors ready for retrieval-assisted generation. Note that we have not removed
 obsolete embedding vectors from the embed library. By "obsolete" we mean any
 vector for which there is no corresponding content string. If we want to purge
@@ -2488,15 +2542,15 @@ Retrieval
 
 Now that the library is complete, we are ready to retrieve content strings
 relevant to a question. To ask a question, we enter a question in the question
-entry box and press Retrieve. The first time we do this after a library
-generation, the manager will load the library into memory, which will take a few
-seconds. It loads all embedding vectors in the embed directory into memory. Each
-embed takes up 8 KByte on disk and 12 KByte in memory. On disk, we store the
-embedding vector components as integers, having multiplied their original
-real-valued components by embed_scale. Saving them as integers makes the disk
-files more compact and easier for us to examine. In memory, we convert back to
-real-valued components. Each component is an eight-byte real number, which is
-slightly larger than the original text-format integer value.
+entry box and press Retrieve. The first time we do this after chunking, the
+manager will load the library into memory, which will take a few seconds. It
+loads all embedding vectors in the embed directory into memory. Each embed takes
+up 8 KByte on disk and 12 KByte in memory. On disk, we store the embedding
+vector components as integers, having multiplied their original real-valued
+components by embed_scale. Saving them as integers makes the disk files more
+compact and easier for us to examine. In memory, we convert back to real-valued
+components. Each component is an eight-byte real number, which is slightly
+larger than the original text-format integer value.
 
 With the embed library loaded into memory, the retrieval will proceed to finding
 the most relevant chunks. The RAG Manager fetches the embedding vector of the
@@ -2506,7 +2560,7 @@ use the relevance of the first chunk as our measure of the relevance of a
 question to our chunk library. We determine if the question is high, mid, or
 low-relevance. We set a limit on the number of content tokens we will submit to
 the completion endpoint based upon the relevance of the question. Low-relevance
-questions get no documentation at all. The generator reads content strings from
+questions get no documentation at all. The manager reads content strings from
 disk, starting with the content string of the most relevant chunk, and proceeds
 through its list. When the total number of tokens passes our limit, it stops
 adding content. If chat_submit is greater than zero, the manager adds the most
@@ -2531,6 +2585,7 @@ completion endpoint. With the verbose flag set, we get to see all the content
 strings and the chat history printed in the manager's text window. If we set the
 show_matches flag, we will see in place of the content strings the match strings
 used to make the embedding vectors.
+
 
 Submission
 ----------
