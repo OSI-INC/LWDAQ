@@ -69,16 +69,19 @@ proc RAG_Manager_init {} {
 	set config(sources) {
 
 https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
+https://www.opensourceinstruments.com/Electronics/A3042/M3042.html
+https://www.opensourceinstruments.com/Electronics/A3047/M3047.html
 https://www.opensourceinstruments.com/Electronics/A3048/M3048.html
 https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
-https://www.opensourceinstruments.com/Electronics/A3047/M3047.html
-https://www.opensourceinstruments.com/Electronics/A3042/M3042.html
+https://www.opensourceinstruments.com/IST/Manual.html
+https://www.opensourceinstruments.com/Electronics/A3041/Stimulator.html
 https://www.opensourceinstruments.com/Electronics/A3041/M3041.html
 https://www.opensourceinstruments.com/Electronics/A3036/M3036.html
-https://www.opensourceinstruments.com/IST/Manual.html
-https://www.opensourceinstruments.com/Movies/ACC_Latency.mp4
+https://www.opensourceinstruments.com/ACC/Manual.html
+https://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
+https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
 https://www.opensourceinstruments.com/About/about.php
+https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 https://www.bndhep.net/Devices/BCAM/User_Manual.html
 
 	}
@@ -1058,7 +1061,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		if {$config(verbose)} {
 			RAG_Manager_print "[format %7.0f $i_start]\
 				[format %7.0f $i_end]\
-				[format %10s $name]\
+				[format %8s $name]\
 				\"[RAG_Manager_snippet $content 0]\"" $color	
 		}
 
