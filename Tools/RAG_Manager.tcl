@@ -69,10 +69,18 @@ proc RAG_Manager_init {} {
 	set config(sources) {
 
 https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
+https://www.opensourceinstruments.com/Electronics/A3038/M3038.html
 https://www.opensourceinstruments.com/Electronics/A3042/M3042.html
 https://www.opensourceinstruments.com/Electronics/A3047/M3047.html
 https://www.opensourceinstruments.com/Electronics/A3048/M3048.html
 https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
+https://www.opensourceinstruments.com/Electronics/A3040/M3040.html
+https://www.opensourceinstruments.com/Electronics/A3040/EIF.html
+https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
+https://www.opensourceinstruments.com/Electronics/A3018/Neurorecorder.html
+https://www.opensourceinstruments.com/Electronics/A3018/Receiver.html
+https://www.opensourceinstruments.com/Electronics/A3019/Electrodes.html
+https://www.opensourceinstruments.com/Electronics/A3013/Flexible_Wires.html
 https://www.opensourceinstruments.com/IST/Manual.html
 https://www.opensourceinstruments.com/Electronics/A3041/Stimulator.html
 https://www.opensourceinstruments.com/Electronics/A3041/M3041.html
