@@ -275,7 +275,7 @@ Use LaTeX formatting within Markdown for mathematical expressions.
 #
 # The chunk delimiting tags.
 #
-	set info(chunk_tags) {p center pre equation ul ol h2 h3}
+	set info(chunk_tags) {p center pre equation figure ul ol h2 h3}
 #
 # Input-output parameters.
 #	
@@ -733,6 +733,8 @@ proc RAG_Manager_extract_caption {chunk} {
 	set caption ""
 	if {[regexp {<b>(Table|Figure|Video):</b>(.+?)</small>} $chunk -> type caption]} {
 		return "$type: [string trim $caption]"
+	} elseif {[regexp {<figcaption>(.*)</figcaption>} $chunk -> caption]} {
+		return "Figure: [string trim $caption]"
 	} else {
 		return ""
 	}
@@ -1016,6 +1018,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			"h3" {set color blue}
 			"center" {set color green}
 			"equation" {set color green}
+			"figure" {set color green}
 			"pre" {set color gray}
 			"date" {set color orange}
 			default {set color red}
@@ -1062,6 +1065,12 @@ proc RAG_Manager_extract_chunks {page catalog} {
 					set match "$caption"
 					set name "center"
 				}
+			}
+			"figure" {
+				set caption [RAG_Manager_extract_caption $content]
+				set figures [RAG_Manager_extract_figures $content]
+				set content "$caption  \n$figures"
+				set match "$caption"
 			}
 			"equation" {
 				set match $content
