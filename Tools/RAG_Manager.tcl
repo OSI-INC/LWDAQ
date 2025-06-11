@@ -91,6 +91,20 @@ https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
 https://www.opensourceinstruments.com/About/about.php
 https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 https://www.bndhep.net/Devices/BCAM/User_Manual.html
+https://www.opensourceinstruments.com/DFPS/index.html
+https://www.opensourceinstruments.com/CPMS/index.html
+https://www.opensourceinstruments.com/WPS/WPS.php
+https://www.opensourceinstruments.com/DAQ/DAQ.php
+https://www.opensourceinstruments.com/SCT/SCT.php
+https://www.opensourceinstruments.com/SCT/FE.php
+https://www.opensourceinstruments.com/SCT/SCL.php
+https://www.opensourceinstruments.com/SCT/SDE.php
+https://www.opensourceinstruments.com/HMT/HMT.php
+https://www.opensourceinstruments.com/HMT/EIF.php
+https://www.opensourceinstruments.com/IIS/IIS.php
+https://www.opensourceinstruments.com/ACC/ACC.php
+https://www.opensourceinstruments.com/ALT/ALT.php
+https://www.opensourceinstruments.com/SCT/TCB.php
 
 	}
 #
@@ -419,7 +433,7 @@ proc RAG_Manager_source_urls {} {
 	# window. Bind the Command-a key to save the metadata.
 	toplevel $w
 	wm title $w "Source Documents, RAG_Manager $info(version)"
-	LWDAQ_text_widget $w 100 10
+	LWDAQ_text_widget $w 100 20
 	LWDAQ_enable_text_undo $w.text
 	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
 	
@@ -576,7 +590,8 @@ proc RAG_Manager_convert_urls {page} {
 # four characters in the page. These are the begin and end characters of the
 # body of the field, and the begin and end characters of the field including the
 # tags. If an opening tag exits, but no end tag, the routine returns the entire
-# remainder of the page as the contents of the field.
+# remainder of the page as the contents of the field. If no opening tag exists,
+# the routine returns four indices all one greate than the length of the page.
 #
 proc RAG_Manager_locate_field {page index tag} {
 	upvar #0 RAG_Manager_info info
@@ -654,15 +669,55 @@ proc RAG_Manager_list_bodies {page tag} {
 #
 # RAG_Manager_extract_list takes the body of a list chunk and converts it to
 # markup format with dashes for bullets and one list entry on each line. It
-# returns the converted chunk body.
+# returns the converted chunk body. The first thing it does is look for nested
+# lists. If it finds an nested list, it removes the start and end tags of the
+# nested list and calls itself on the body of the nested list. Once all nested
+# lists have been dealt with, it replaces li and /li tags with Markdown
+# equivalents.
 #
-proc RAG_Manager_extract_list {chunk} {
+proc RAG_Manager_extract_list {content} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
+
+	set new_content ""
+	set index 0
+	while {$index < [string length $content]} {
+		set locations [RAG_Manager_locate_field $content $index "ol"]
+		lassign $locations bb be fb fe
+		if {$fb > $index} {
+			append new_content [string trim [string range $content $index [expr $fb - 1]]]
+			append new_content "\n  "
+		}
+		if {$be > $bb} {
+			set nested_list [RAG_Manager_extract_list [string range $content $bb $be]]
+			regsub -all -- {-} $nested_list "  -" nested_list
+			append new_content [string trim $nested_list]
+		}
+		set index [expr $fe + 1]
+	}
+	set content $new_content
+
+	set new_content ""
+	set index 0
+	while {$index < [string length $content]} {
+		set locations [RAG_Manager_locate_field $content $index "ul"]
+		lassign $locations bb be fb fe
+		if {$fb > $index} {
+			append new_content [string trim [string range $content $index [expr $fb - 1]]]
+			append new_content "\n  "
+		}
+		if {$be > $bb} {
+			set nested_list [RAG_Manager_extract_list [string range $content $bb $be]]
+			regsub -all -- {-} $nested_list "  -" nested_list
+			append new_content [string trim $nested_list]
+		}
+		set index [expr $fe + 1]
+	}
+	set content $new_content
 	
-	regsub -all {[\t ]*<li>} $chunk "- " chunk 
-	regsub -all {</li>} $chunk "" chunk
-	return $chunk
+	regsub -all {[\t ]*<li>} $content "- " content 
+	regsub -all {</li>} $content "" content
+	return [string trim $content]
 }
 
 #
@@ -855,10 +910,10 @@ proc RAG_Manager_convert_tags {chunk} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-    foreach {tag replace} $info(tags_to_convert) {
-        regsub -all "<$tag\[^>\]*?>" $chunk $replace chunk
-    }
-    return $chunk
+	foreach {tag replace} $info(tags_to_convert) {
+		regsub -all "<$tag\[^>\]*?>" $chunk $replace chunk
+	}
+	return $chunk
 }
 
 #
@@ -870,7 +925,7 @@ proc RAG_Manager_remove_dates {chunk} {
 	upvar #0 RAG_Manager_config config
 
 	regsub -all {\[[0-9]{2}-[A-Z]{3}-[0-9]{2}\][ ]*} $chunk "" chunk
-    return $chunk
+	return $chunk
 }
 
 #
@@ -943,9 +998,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		
 		if {[regexp {<a href=} $content] \
 			|| [regexp {<img src=} $content] \
-			|| [regexp {<h3>} $content] \
-			|| [regexp {</ul>} $content] \
-			|| [regexp {</ol>} $content]} {
+			|| [regexp {<h3>} $content]} {
 			incr contaminated
 			RAG_Manager_print "[format %7.0f $i_start]\
 				[format %7.0f $i_end]\
@@ -1161,33 +1214,33 @@ proc RAG_Manager_relative_url {base_url relative_url} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-    # Extract the path part from the base URL
-    regexp {^(https?://[^/]+)(/.*)$} $base_url -> domain base_path
+	# Extract the path part from the base URL
+	regexp {^(https?://[^/]+)(/.*)$} $base_url -> domain base_path
 
-    # Convert base path to a list for manipulation
-    set base_parts [split $base_path "/"]
+	# Convert base path to a list for manipulation
+	set base_parts [split $base_path "/"]
 
-    # Remove the last element if it's empty (trailing slash)
-    if {[lindex $base_parts end] eq ""} {
-        set base_parts [lrange $base_parts 0 end-1]
-    }
-    
-    # Check if the last element is a php or html file. If so, remove
-    # and place store elsewhere.
-    if {[regexp {(\.html|\.php)$} [lindex $base_parts end] match]} {
-    	set document [lindex $base_parts end]
-        set base_parts [lrange $base_parts 0 end-1]
-     } else {
-     	set document ""
-     }
+	# Remove the last element if it's empty (trailing slash)
+	if {[lindex $base_parts end] eq ""} {
+		set base_parts [lrange $base_parts 0 end-1]
+	}
+	
+	# Check if the last element is a php or html file. If so, remove
+	# and place store elsewhere.
+	if {[regexp {(\.html|\.php)$} [lindex $base_parts end] match]} {
+		set document [lindex $base_parts end]
+		set base_parts [lrange $base_parts 0 end-1]
+	 } else {
+	 	set document ""
+	 }
 
    # Process relative navigation. For ".." we go up one directory. For "." we
    # stay in the same directory. For a hash sign followed by anything we create
    # an internal link. By default, we go into a subdirectory or file.
-    foreach part [split $relative_url "/"] {
-        switch -glob -- $part {
-            ".." {
-                set base_parts [lrange $base_parts 0 end-1]
+	foreach part [split $relative_url "/"] {
+		switch -glob -- $part {
+			".." {
+				set base_parts [lrange $base_parts 0 end-1]
             }
             "." {
             }
