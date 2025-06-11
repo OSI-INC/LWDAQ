@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "3.7"
+	LWDAQ_tool_init "RAG_Manager" "3.8"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -690,7 +690,7 @@ proc RAG_Manager_extract_list {content} {
 		}
 		if {$be > $bb} {
 			set nested_list [RAG_Manager_extract_list [string range $content $bb $be]]
-			regsub -all -- {-} $nested_list "  -" nested_list
+			regsub -all {(\n\s*)-} $nested_list {\1  -} nested_list
 			append new_content [string trim $nested_list]
 		}
 		set index [expr $fe + 1]
@@ -708,7 +708,7 @@ proc RAG_Manager_extract_list {content} {
 		}
 		if {$be > $bb} {
 			set nested_list [RAG_Manager_extract_list [string range $content $bb $be]]
-			regsub -all -- {-} $nested_list "  -" nested_list
+			regsub -all {(\n\s*)-} $nested_list {\1  -} nested_list
 			append new_content [string trim $nested_list]
 		}
 		set index [expr $fe + 1]
