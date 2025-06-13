@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "3.8"
+	LWDAQ_tool_init "RAG_Manager" "3.9"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -106,6 +106,7 @@ https://www.opensourceinstruments.com/ACC/ACC.php
 https://www.opensourceinstruments.com/ALT/ALT.php
 https://www.opensourceinstruments.com/SCT/TCB.php
 https://www.opensourceinstruments.com/Resources/Surgery/hmt_sp.html
+https://www.opensourceinstruments.com/Prices.html
 
 	}
 #
@@ -786,11 +787,14 @@ proc RAG_Manager_extract_video {content} {
 # markup format. The routine looks for a first row that contains heading cells.
 # It reads the headings and makes a list. If there are no headings, its heading
 # list will be empty. In subsequent rows, if it sees another list of headings,
-# the previous list will be overwritten. In any row consisting of data cells the
-# routine will prefix the contents of the n'th cell with the n'th heading. After
-# extracting the table, we look for a table caption and extract it to append to
-# our table chunk. We extract the caption using the separate caption extract
-# routine.
+# the previous list will be overwritten. But the routine ignores all headings in
+# a heading row that contains the "colspan" attribute. Even if the "colspan"
+# attribute is set to one, the headings row will be skipped. By this means, we
+# can include decorative heading rows without disrupting the names of the
+# columns. In any row consisting of data cells the routine will prefix the
+# contents of the n'th cell with the n'th heading. After extracting the table,
+# we look for a table caption and extract it to append to our table chunk. We
+# extract the caption using the separate caption extract routine.
 #
 proc RAG_Manager_extract_table {chunk} {
 	upvar #0 RAG_Manager_info info
@@ -800,8 +804,14 @@ proc RAG_Manager_extract_table {chunk} {
 	set table ""
 	set i 0
 	while {$i < [string length $chunk]} {
+		LWDAQ_support
 		set indices [RAG_Manager_locate_field $chunk $i "tr"]
 		scan $indices %d%d%d%d cells_begin cells_end row_begin row_end
+		if {[regexp {colspan=} [string range $chunk $row_begin $row_end]]} {
+			set i [expr $row_end + 1]
+			continue
+		}
+
 		if {$row_end <= $row_begin} {break}
 		
 		set ii $cells_begin
@@ -1038,7 +1048,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 				if {[regexp {^Table} $caption]} {
 					set table [RAG_Manager_extract_table $content]
 					if {[string length $table] > 0} {
-						set content "$caption  \n$table"
+						set content "$caption\n\n$table"
 						set match "$caption"
 					} else {
 						set content "$caption"
@@ -1048,7 +1058,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 				} elseif {[regexp {^Figure} $caption]} {
 					set figures [RAG_Manager_extract_figures $content]
 					if {[string length $figures] > 0} {
-						set content "$caption  \n$figures"
+						set content "$caption\n\n$figures"
 						set match "$caption"
 					} else {
 						set content "$caption"
@@ -1057,7 +1067,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 					set name "figure"
 				} elseif {[regexp {^Video} $caption]} {
 					set video [RAG_Manager_extract_video $content]
-					set content "$caption  \n$video"
+					set content "$caption\n\n$video"
 					set match "$caption"
 					set name "video"
 				} else {
@@ -1069,7 +1079,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			"figure" {
 				set caption [RAG_Manager_extract_caption $content]
 				set figures [RAG_Manager_extract_figures $content]
-				set content "$caption  \n$figures"
+				set content "$caption\n\n$figures"
 				set match "$caption"
 			}
 			"equation" {
