@@ -816,6 +816,7 @@ proc RAG_Manager_extract_table {chunk} {
 		
 		set ii $cells_begin
 		set cell_index 0
+		set prev_table_len [string length $table]
 		while {$ii < $cells_end} {
 			LWDAQ_support
 			set indices [RAG_Manager_locate_field $chunk $ii "th"]
@@ -849,7 +850,7 @@ proc RAG_Manager_extract_table {chunk} {
 			set ii $cells_end
 		}
 		
-		append table "\n"
+		if {[string length $table] > $prev_table_len} {append table "\n"}
 		set i [expr $row_end + 1]
 	}
 	
@@ -1109,6 +1110,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		}
 		
 		regsub -all {</?\s*prompt(>|\s+[^>]*>)[^<]*</prompt>} $content "" content
+		regsub -all {\n\n\n+} $content "\n\n" content
 		set content [RAG_Manager_convert_tags $content]
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
