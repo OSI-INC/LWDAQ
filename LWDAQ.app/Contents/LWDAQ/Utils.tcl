@@ -2394,6 +2394,9 @@ proc LWDAQ_command_reference { {file_name ""} } {
 		set line [string map "LWDAQ_Version_Here $LWDAQ_Info(program_patchlevel)" $line]
 	
 		if {$line == "LWDAQ_Scripts"} {
+			puts $ref_file ""
+			puts $ref_file "<h2>LWDAQ Scripts</h2>"
+			puts $ref_file ""
 			foreach f $LWDAQ_Info(scripts) {
 				set description [LWDAQ_script_description $f]
 				if {$description == ""} {continue}
@@ -2425,7 +2428,8 @@ proc LWDAQ_command_reference { {file_name ""} } {
 				puts $ref_file ""
 				puts $ref_file "<h3>$sc</h3>"
 				puts $ref_file ""
-				puts $ref_file "<small><pre>[LWDAQ_proc_declaration $sc $f]</pre></small>"
+				puts $ref_file "<pre>[LWDAQ_proc_declaration $sc $f]</pre>"
+				puts $ref_file ""
 				puts $ref_file "<p>[LWDAQ_proc_description $sc $f]</p>"
 				puts $ref_file ""
 			}
@@ -2450,9 +2454,9 @@ proc LWDAQ_command_reference { {file_name ""} } {
 				puts $ref_file ""
 				if {[catch {$n} error_message]} {
 					regexp {"([^"]+)"} $error_message match syntax
-					puts $ref_file "<small><pre>$syntax</pre></small>"
+					puts $ref_file "<pre>$syntax</pre>"
 				} {
-					puts $ref_file "<small><pre>$n ?option value?</pre></small>"
+					puts $ref_file "<pre>$n ?option value?</pre>"
 				}
 				set r "\{(\[^\\\}\]+)\}\[\\r\\t\\n \]*function $n\[ \\\(\]+"
 				regexp $r $code match comment
@@ -2487,7 +2491,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 				puts $ref_file ""
 				catch {lwdaq $n} error_message
 				regexp {"([^"]+)"} $error_message match syntax
-				puts $ref_file "<small><pre>$syntax</pre></small>"
+				puts $ref_file "<pre>$syntax</pre>"
 				set r "option='$n'\[^\{\}\]+\{(\[^\}\]+)\}"
 				if {[regexp $r $code match comment]} {
 					puts $ref_file "$comment"

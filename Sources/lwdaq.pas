@@ -300,8 +300,8 @@ variables you specify with 0 for false and 1 for true.</p>
 <tr><td>-track_ptrs</td><td>Boolean</td><td>track memory allocation, default 0</td></tr>
 <tr><td>-text_name</td><td>String</td><td>text window, channel, or file in which to print messages, default stdout</td></tr>
 <tr><td>-photo_name</td><td>String</td><td>photo in which to draw images and graphs, default none</td></tr>
-<tr><td>-zoom</td><td>Real</td><td>display scaling for images draw by <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>, default 1.0</td></tr>
-<tr><td>-display_zoom</td><td>Real</td><td>display scaling for all images drawn by library routines, default 1.0</tr></tr>
+<tr><td>-zoom</td><td>Real</td><td>display scaling for images drawn by <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>, default 1.0</td></tr>
+<tr><td>-display_zoom</td><td>Real</td><td>display scaling for images drawn by library routines, default 1.0</td></tr>
 <tr><td>-intensify</td><td>String</td><td>intensification type for images,<br>
 	none, mild, strong, or exact, default exact</td></tr>
 <tr><td>-wait_ms</td><td>Integer</td><td>milliseconds to pause during <a href="#lwdaq_gui_wait">lwdaq_gui_wait</a>, default -1</td></tr>
@@ -336,17 +336,17 @@ default, <i>gui_draw</i> is set to <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>.
 The -intensify specifies <i>gui_intensification</i> for lwdaq_gui_draw. The
 -display_zoom option specifies <i>gui_display_zoom</i>, which applies an
 additional scaling to all images drawn by <i>lwdaq_draw</i> or by
-<i>gui_draw</i>. The <a href=#lwdaq_draw">lwdaq_draw</a> routine multiplies its
+<i>gui_draw</i>. The <a href="#lwdaq_draw">lwdaq_draw</a> routine multiplies its
 image-specific zoom value by the global gui_display_zoom to obtain a total
 scaling value. The -display_zoom option is designed to accommodate different
 computer display resolutions, which sometimes result in lwdaq images being too
 large or too small. The <a href="http://www.cgsd.com/papers/gamma.html">gamma
-correction</a></td> sets the gray scale image display gamma correction used by
+correction</a> sets the gray scale image display gamma correction used by
 lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear
 relationship between the image pixel intensity and the display pixel intensity.
 The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we
 increase the brightness of the red and blue component of the display pixel with
-respect to the green component. By default, these are also 1.0.
+respect to the green component. By default, these are also 1.0.</p>
 
 <p>During execution, analysis routines can pause to allow us to view
 intermediate drarwing results by means of the -wait_ms option. If we set
@@ -465,7 +465,7 @@ routines.</p>
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-name</td><td>Specify the name for the image.</td></tr>
-<tr><td>-results</td><td>Set the image results string.<td></td></tr>
+<tr><td>-results</td><td>Set the image results string.</td></tr>
 <tr><td>-width</td><td>The width of the image in pixels.</td></tr>
 <tr><td>-height</td><td>The height of the image in pixels</td></tr>
 <tr><td>-data</td><td>Pixel intensity values as a binary array of bytes.</td></tr>
@@ -2296,8 +2296,8 @@ href="http://www.bndhep.net/Software/Sources/spot.pas">spot.pas</a>.</p>
 <tr><td>2</td><td>none</td><td>edge of elliptical spot</td><td>Perimiter fit for retroreflecting targets</td></tr>
 <tr><td>3</td><td>none</td><td>vertical stripe</td><td>Weighted fit to a vertical stripe</td></tr>
 <tr><td>4</td><td>negate</td><td>vertical shadow</td><td>Weighted fit to a vertical shadow</td></tr>
-<tr><td>5</td><td>grad_i</td><td>vertical edge</td><td>Weighted fit to edge pixels.</tr>
-<tr><td>6</td><td>negate</td><td>edge of elliptical shadow</td><td>Weighted fit to edge pixels.</tr>
+<tr><td>5</td><td>grad_i</td><td>vertical edge</td><td>Weighted fit to edge pixels.</td></tr>
+<tr><td>6</td><td>negate</td><td>edge of elliptical shadow</td><td>Weighted fit to edge pixels.</td></tr>
 </table><small><b>Table:</b> Analysis Types, Image Manipulations and Calculations</small></center>
 
 <p>With analysis_type=1, which is the default, the position of the spot is the
@@ -2367,7 +2367,6 @@ the <i>-color</i> option. You specify the color with an integer. Color codes 0
 to 15 specity a set of distinct colors, shown <a
 href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
 }
-
 function lwdaq_bcam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
 const
@@ -2864,7 +2863,7 @@ end;
 <p>lwdaq_rasnik analyzes rasnik images. Specify the image with -image_name as
 usual. The routine clears the image overlay for its own use. The routine takes
 the following options, each of which you specify by giving the option name
-followed by its value, ?option value?. See the <a href="">Rasnik Instrument</a>
+followed by its value, ?option value?. See the <a href="https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html#Rasnik">Rasnik Instrument</a>
 for a description of the options.</p>
 
 <center><table border cellspacing=2>
