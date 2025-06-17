@@ -274,9 +274,9 @@ Use LaTeX formatting within Markdown for mathematical expressions.
 		/prompt ""
 	}
 #
-# The chunk delimiting tags.
+# The fragment delimiting tags.
 #
-	set info(chunk_tags) {p center pre equation figure ul ol h2 h3}
+	set info(frag_tags) {p center pre equation figure ul ol h2 h3}
 #
 # Input-output parameters.
 #	
@@ -669,7 +669,7 @@ proc RAG_Manager_list_bodies {page tag} {
 }
 
 #
-# RAG_Manager_extract_list takes the body of a list chunk and converts it to
+# RAG_Manager_extract_list takes the body of a list fragment and converts it to
 # markup format with dashes for bullets and one list entry on each line. It
 # returns the converted chunk body. The first thing it does is look for nested
 # lists. If it finds an nested list, it removes the start and end tags of the
@@ -677,49 +677,49 @@ proc RAG_Manager_list_bodies {page tag} {
 # lists have been dealt with, it replaces li and /li tags with Markdown
 # equivalents.
 #
-proc RAG_Manager_extract_list {content} {
+proc RAG_Manager_extract_list {frag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-	set new_content ""
+	set new_frag ""
 	set index 0
-	while {$index < [string length $content]} {
-		set locations [RAG_Manager_locate_field $content $index "ol"]
+	while {$index < [string length $frag]} {
+		set locations [RAG_Manager_locate_field $frag $index "ol"]
 		lassign $locations bb be fb fe
 		if {$fb > $index} {
-			append new_content [string trim [string range $content $index [expr $fb - 1]]]
-			append new_content "\n  "
+			append new_frag [string trim [string range $frag $index [expr $fb - 1]]]
+			append new_frag "\n  "
 		}
 		if {$be > $bb} {
-			set nested_list [RAG_Manager_extract_list [string range $content $bb $be]]
+			set nested_list [RAG_Manager_extract_list [string range $frag $bb $be]]
 			regsub -all {(\n\s*)-} $nested_list {\1  -} nested_list
-			append new_content [string trim $nested_list]
+			append new_frag [string trim $nested_list]
 		}
 		set index [expr $fe + 1]
 	}
-	set content $new_content
+	set frag $new_frag
 
-	set new_content ""
+	set new_frag ""
 	set index 0
-	while {$index < [string length $content]} {
-		set locations [RAG_Manager_locate_field $content $index "ul"]
+	while {$index < [string length $frag]} {
+		set locations [RAG_Manager_locate_field $frag $index "ul"]
 		lassign $locations bb be fb fe
 		if {$fb > $index} {
-			append new_content [string trim [string range $content $index [expr $fb - 1]]]
-			append new_content "\n  "
+			append new_frag [string trim [string range $frag $index [expr $fb - 1]]]
+			append new_frag "\n  "
 		}
 		if {$be > $bb} {
-			set nested_list [RAG_Manager_extract_list [string range $content $bb $be]]
+			set nested_list [RAG_Manager_extract_list [string range $frag $bb $be]]
 			regsub -all {(\n\s*)-} $nested_list {\1  -} nested_list
-			append new_content [string trim $nested_list]
+			append new_frag [string trim $nested_list]
 		}
 		set index [expr $fe + 1]
 	}
-	set content $new_content
+	set frag $new_frag
 	
-	regsub -all {[\t ]*<li>} $content "- " content 
-	regsub -all {</li>} $content "" content
-	return [string trim $content]
+	regsub -all {[\t ]*<li>} $frag "- " frag 
+	regsub -all {</li>} $frag "" frag
+	return [string trim $frag]
 }
 
 #
@@ -745,18 +745,18 @@ proc RAG_Manager_extract_caption {chunk} {
 # RAG_Manager_extract_figures looks for figure links and creates an inline image
 # reference reference to go with a figure caption, one for each image.
 #
-proc RAG_Manager_extract_figures {content} {
+proc RAG_Manager_extract_figures {frag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
 	set i 0
 	set images ""
-	while {$i < [string length $content]} {
+	while {$i < [string length $frag]} {
 
-		if {[regexp -indices -start $i {\[Figure\]\(([^)]*)\)} $content img url]} {
+		if {[regexp -indices -start $i {\[Figure\]\(([^)]*)\)} $frag img url]} {
 			set i [lindex $img 1]
 			incr i
-			set img [string range $content {*}$img]
+			set img [string range $frag {*}$img]
 			append images "!$img  \n"
 		} else {
 			break
@@ -766,16 +766,16 @@ proc RAG_Manager_extract_figures {content} {
 }
 
 #
-# RAG_Manager_extract_video looks for a Markdown anchor. It takes everything
-# inside the biggest pair of square brakets it can find, followed by a term in
-# parentheses. Thus it will get the Markdown representation of a clickable
-# image.
+# RAG_Manager_extract_img looks for a Markdown image anchor. It takes
+# everything inside the biggest pair of square brakets it can find, followed by
+# a term in parentheses. Thus it will get the Markdown representation of an
+# image anchor.
 #
-proc RAG_Manager_extract_video {content} {
+proc RAG_Manager_extract_img {frag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	if {[regexp {\[.+\]\(([^)]*)\)} $content vid url]} {
+	if {[regexp {\[.+\]\(([^)]*)\)} $frag vid url]} {
 		return [string trim $vid]
 	} else {
 		return ""
@@ -783,7 +783,7 @@ proc RAG_Manager_extract_video {content} {
 }
 
 #
-# RAG_Manager_extract_table takes the body of a table chunk and converts it to
+# RAG_Manager_extract_table takes the body of a table fragment and converts it to
 # markup format. The routine looks for a first row that contains heading cells.
 # It reads the headings and makes a list. If there are no headings, its heading
 # list will be empty. In subsequent rows, if it sees another list of headings,
@@ -793,21 +793,21 @@ proc RAG_Manager_extract_video {content} {
 # can include decorative heading rows without disrupting the names of the
 # columns. In any row consisting of data cells the routine will prefix the
 # contents of the n'th cell with the n'th heading. After extracting the table,
-# we look for a table caption and extract it to append to our table chunk. We
+# we look for a table caption and extract it to append to our table fragment. We
 # extract the caption using the separate caption extract routine.
 #
-proc RAG_Manager_extract_table {chunk} {
+proc RAG_Manager_extract_table {frag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
 	set headings [list]
 	set table ""
 	set i 0
-	while {$i < [string length $chunk]} {
+	while {$i < [string length $frag]} {
 		LWDAQ_support
-		set indices [RAG_Manager_locate_field $chunk $i "tr"]
+		set indices [RAG_Manager_locate_field $frag $i "tr"]
 		scan $indices %d%d%d%d cells_begin cells_end row_begin row_end
-		if {[regexp {colspan=} [string range $chunk $row_begin $row_end]]} {
+		if {[regexp {colspan=} [string range $frag $row_begin $row_end]]} {
 			set i [expr $row_end + 1]
 			continue
 		}
@@ -819,10 +819,10 @@ proc RAG_Manager_extract_table {chunk} {
 		set prev_table_len [string length $table]
 		while {$ii < $cells_end} {
 			LWDAQ_support
-			set indices [RAG_Manager_locate_field $chunk $ii "th"]
+			set indices [RAG_Manager_locate_field $frag $ii "th"]
 			scan $indices %d%d%d%d heading_begin heading_end cell_begin cell_end
 			if {$cell_end <= $cells_end} {
-				set heading [string range $chunk $heading_begin $heading_end]
+				set heading [string range $frag $heading_begin $heading_end]
 				regsub "\n" $heading " " heading
 				regsub "<br>" $heading " " heading
 				if {$cell_index == 0} {
@@ -835,10 +835,10 @@ proc RAG_Manager_extract_table {chunk} {
 				continue
 			} 
 
-			set indices [RAG_Manager_locate_field $chunk $ii "td"]
+			set indices [RAG_Manager_locate_field $frag $ii "td"]
 			scan $indices %d%d%d%d data_begin data_end cell_begin cell_end
 			if {$cell_end <= $cells_end} {
-				set data [string range $chunk $data_begin $data_end]
+				set data [string range $frag $data_begin $data_end]
 				regsub "\n" $data " " data
 				regsub "<br>" $data " " data
 				append table "\"[lindex $headings $cell_index]\": $data "
@@ -858,41 +858,40 @@ proc RAG_Manager_extract_table {chunk} {
 }
 
 #
-# RAG_Manager_extract_date takes the body of a date chunk and converts it to a
-# text title.
+# RAG_Manager_extract_date takes a fragment, finds a date code, and returns the
+# date or an absence keyword if the date code is not found.
 #
-proc RAG_Manager_extract_date {chunk} {
+proc RAG_Manager_extract_date {frag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	if {[regexp {[0-9]{2}-[A-Z]{3}-[0-9]{2}} $chunk date]} {
-		set chunk "$date"
+	if {[regexp {[0-9]{2}-[A-Z]{3}-[0-9]{2}} $frag date]} {
+		return $date
 	} else {
-		set chunk "NONE"
+		return "NONE"
 	}
-
-	return $chunk
 }
 
 #
-# RAG_Manager_catalog_chunks takes an html page and makes a list of chunks
+# RAG_Manager_catalog_frags takes an html page and makes a list of fragments
 # descriptors. Each descriptor consists of a start and end index for the content
-# of the chunk and the chunk type. The indices point to the first and last
-# characters within the chunk, not including whatever delimiters we used to find
-# the chunk. In the case of a paragraph chunk, for example, the indices point to
+# of the fragment and the fragment type. The indices point to the first and last
+# characters within the fragment, not including whatever delimiters we used to find
+# the fragment. In the case of a paragraph fragment, for example, the indices point to
 # the first and last character of the body of the paragraph, between the <p> and
-# </p> tags, but not including the tags themselves. The chunk type is the same
-# as the html tag we use to find tagged chunks, but is some other name in the
-# case of specialized chunks like "date", "figure", and "caption".
+# </p> tags, but not including the tags themselves. The fragment type is the same
+# as the html tag we use to find tagged fragments, but is some other name in the
+# case of specialized fragments like "date", "figure", and "caption".
 #
-proc RAG_Manager_catalog_chunks {page} {
+proc RAG_Manager_catalog_frags {page} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
 	set catalog [list]
-	foreach {tag} $info(chunk_tags) {
+	foreach {tag} $info(frag_tags) {
 		set index 0
 		while {$index < [string length $page]} {
+			LWDAQ_support
 			set indices [RAG_Manager_locate_field $page $index $tag]
 			scan $indices %d%d%d%d i_body_begin i_body_end i_field_begin i_field_end
 			if {$i_body_end > $i_body_begin} {
@@ -912,102 +911,115 @@ proc RAG_Manager_catalog_chunks {page} {
 	}
 
 	set catalog [lsort -increasing -integer -index 0 $catalog]
-	
 	return $catalog
 }
 
 #
 # RAG_Manager_convert_tags removes the html markup tags we won't be using from a
-# chunk of text and returnes the cleaned chunk.
+# fragment of text and returns the cleaned fragment
 #
-proc RAG_Manager_convert_tags {chunk} {
+proc RAG_Manager_convert_tags {frag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
 	foreach {tag replace} $info(tags_to_convert) {
-		regsub -all "<$tag\[^>\]*?>" $chunk $replace chunk
+		regsub -all "<$tag\[^>\]*?>" $frag $replace frag
 	}
-	return $chunk
+	return $frag
 }
 
 #
-# RAG_Manager_remove_dates removes our date stamps from a chunk and returnes the
-# cleaned chunk.
+# RAG_Manager_remove_dates removes our date stamps from a fragment and returnes the
+# cleaned fragment
 #
-proc RAG_Manager_remove_dates {chunk} {
+proc RAG_Manager_remove_dates {frag} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-	regsub -all {\[[0-9]{2}-[A-Z]{3}-[0-9]{2}\][ ]*} $chunk "" chunk
-	return $chunk
+	regsub -all {\[[0-9]{2}-[A-Z]{3}-[0-9]{2}\][ ]*} $frag "" frag
+	return $frag
 }
 
 #
-# RAG_Manager_extract_chunks goes through a page extracting chunks of text from
-# the provided page. By the time the page arrives at this chunking routine, all
-# URLs should have been converted to Markdown. If there are any anchor or img
-# tags left, something has gone wrong. We reject the chunk and count it. This
-# routine converts HTML lists to markdown lists. It keeps track of the chapter,
-# section and date using <h2>, <h3>, and our own [01-JAN-69] date entries
-# respectively. It extracts entire sections in <center> fields because these
-# should consist only of figures and tables in our documents. Once it has a raw
-# list of chunks, it begins to process them by further extraction, such as
-# extracting table and figure captions, and extracting hyper links. The
-# extractor appends <pre>, <ul>, and <oL> chunks with the previous chunk
-# provided the previous chunk was a <p> field. They will share the same chapter,
-# section, and date fields. Otherwise these chunks are stored alone with their
-# own chapter, section, and date fields. Tables and figures are always kept in
-# their own chunks. It combines equations with the subsequent chunk, whatever
-# that chunk may be, and the subsequent chunk shares the metadata of the
-# equation chunk. The routine constructs a chunk list. Each chunk list entry
-# consists of two strings: a match string and a content string. The match string
-# contains text stripped of metadata or tables of numbers or web links. This is
-# the string we will use to generate the embedding vector for the chunk. The
-# content string contains chapter, section, and date headings, tabulated values
-# for tables, captions, links, and all other metadata. This is the string we
-# will submit as input to the completion endpoint. The extractor looks for
-# commands within the page that will modify its behavior. These comands are
-# strings embedded in hidden "rag" fields. It also looks for retrieval prompts
-# in "prompt" fields. These prompts it leaves in place in the match string, but
-# removes from the content string. The single-chunk command tells the extractor
-# to combine all chunks into one, producing only one content string and only one
-# match string. The match-prompts-only tells the extractor to include only the
-# retrieval prompts in the match string, nothing else.
+# RAG_Manager_construct_chunks goes through an html page and breaks it into one
+# or more chunks, returning a list of chunks. By the time the page arrives at
+# this chunking routine, all usls should been converted to Markdown. If there
+# are any anchor or img tags left, the fragment containing them will be
+# discarded as "contaminated". The routine takes as input a list of fragments
+# each fragment represented by the start and end of its body and the start and
+# end of its field, where the "field" includes the html tags that marked the
+# boundaries of the fragment. The extract-chunks routine will use some fragments
+# to set chapter, section, and date values, which are marked in the html by
+# <h2>, <h3>, and [DD-MMM-YY] tags respetively. Once it has a raw list of
+# fragments, it goes through them and extracts table contents, table captions,
+# and figure captions. It converts lists to Mardown. Some fragments form their
+# own chunk with chapter, section, and date titles at the top. By default,
+# tables and figures form their own chunks, equations are combined with the
+# subsequent fragement, lists and pre blocks are combined with the preceding
+# fragment. Each chunk consists of a content string and a match string. The
+# match string contains text stripped of metadata, tables of numbers, and
+# hyperlinks. The match string is what we will use to obtain the chunk's
+# embedding vector. The content string contains chapter, section, and date
+# headings, tabulated values for tables, captions, links, and all other
+# metadata. This is the string we will submit as input to the completion
+# endpoint. The chunk-extractor looks for retrieval directives within the page
+# that will modify its behavior, in particular the manner in which fragments
+# will be combined to form chunks. The page-chunk directive, for example,
+# directs the extractor to combine all fragments in the page into one chunk.
+# These directives are strings embedded in "rag" fields, which are most likely
+# hidden from view in a browser. The extractor looks for retrieval prompts in
+# "prompt" fields. These prompts it leaves in place in the match string, but
+# removes from the content string. For a list of retrieval directives and
+# prompts, see the RAG Manager manual page, accessible with Help from the RAG
+# Manager window.
 #
-proc RAG_Manager_extract_chunks {page catalog} {
+proc RAG_Manager_construct_chunks {page frags} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-	set single_chunk 0
+	set page_chunk 0
+	set chapter_chunk 0
+	set section_chunk 0
 	set match_prompts_only 0
 	set commands [RAG_Manager_list_bodies $page "rag"]
 	foreach cmd $commands {
 		switch -- $cmd {
-			"single-chunk" {
-				set single_chunk 1
+			"single-chunk" -
+			"page-chunk" {
+				set page_chunk 1
+			}
+			"chapter-chunk" {
+				set chapter_chunk 1
+			}
+			"section-chunk" {
+				set section_chunk 1
 			}
 			"match-prompts-only" {
 				set match_prompts_only 1
 			}
 			default {
-				RAG_Manager_print "WARNING: Unrecognised retrieval command \"$cmd\""
+				RAG_Manager_print "WARNING: Unrecognised directive \"$cmd\""
 			}
 		}
 	}
 	RAG_Manager_print "Generation rules:\
-		single_chunk=$single_chunk,\
-		match-prompts-only=$match_prompts_only"
+		page_chunk=$page_chunk,\
+		chapter_chunk=$chapter_chunk,\
+		section-chunk=$section_chunk,\
+		match-prompts-only=$match_prompts_only."
 	
 	set date "NONE"
 	set chapter "NONE"
+	set prev_chapter "NONE"
 	set section "NONE"
+	set prev_section "NONE"
 	set prev_name "NONE"
 	set empty_match 0
 	set empty_content 0
 	set contaminated 0
 	set chunks [list]
-	foreach chunk_id $catalog {
-		scan $chunk_id %d%d%s i_start i_end name
+	foreach frag_id $frags {
+		scan $frag_id %d%d%s i_start i_end name
 		set content [string trim [string range $page $i_start $i_end]]
 		
 		if {[regexp {<a href=} $content] \
@@ -1025,8 +1037,8 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			"p" {set color brown}
 			"ul" {set color violet}
 			"ol" {set color violet}
-			"h2" {set color blue}
-			"h3" {set color blue}
+			"h2" {set color magenta}
+			"h3" {set color magenta}
 			"center" {set color green}
 			"equation" {set color green}
 			"figure" {set color green}
@@ -1067,7 +1079,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 					}
 					set name "figure"
 				} elseif {[regexp {^Video} $caption]} {
-					set video [RAG_Manager_extract_video $content]
+					set video [RAG_Manager_extract_img $content]
 					set content "$caption\n\n$video"
 					set match "$caption"
 					set name "video"
@@ -1090,14 +1102,25 @@ proc RAG_Manager_extract_chunks {page catalog} {
 				set match $content
 			}
 			"h2" {
+				set prev_chapter $chapter
 				set chapter $content
-				set section "NONE" 
+				set section "NONE"
+				set prev_section "NONE"
 				set prev_name $name
+				RAG_Manager_print "[format %7.0f $i_start]\
+					[format %7.0f $i_end]\
+					[format %6s $name]\
+					\"$chapter\"" $color	
 				continue
 			}
 			"h3" {
+				set prev_section $section
 				set section $content
 				set prev_name $name
+				RAG_Manager_print "[format %7.0f $i_start]\
+					[format %7.0f $i_end]\
+					[format %6s $name]\
+					\"$section\"" $color	
 				continue
 			}
 			"date" {
@@ -1114,6 +1137,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		set content [RAG_Manager_convert_tags $content]
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
+		
 		if {([string length $content] == 0)} {
 			incr empty_content
 			if {$name != "center"} {
@@ -1135,7 +1159,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 			set match [string trim $match]
 		}
 		if {$match == ""} {
-			if {!$single_chunk} {
+			if {!$page_chunk && !$chapter_chunk && !$section_chunk} {
 				incr empty_match
 				continue
 			}
@@ -1144,7 +1168,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		if {$config(verbose)} {
 			RAG_Manager_print "[format %7.0f $i_start]\
 				[format %7.0f $i_end]\
-				[format %8s $name]\
+				[format %6s $name]\
 				\"[RAG_Manager_snippet $content 0]\"" $color	
 		}
 
@@ -1160,6 +1184,7 @@ proc RAG_Manager_extract_chunks {page catalog} {
 		}
 		set heading [string trim $heading]
 
+		set append_chunk 0
 		switch -- $name {
 			"ol" -
 			"ul" -
@@ -1168,12 +1193,10 @@ proc RAG_Manager_extract_chunks {page catalog} {
 					lset chunks end 0 "[lindex $chunks end 0]\n\n$match"
 					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
 				} else {
-					if {[string length $heading] > 0} {
-						set content "$heading\n\n$content"
-					}
-					lappend chunks [list $match $content]
+					set append_chunk 1
 				}
 			}
+			
 			"equation" {
 				switch -- $prev_name {
 					"equation" {
@@ -1182,10 +1205,12 @@ proc RAG_Manager_extract_chunks {page catalog} {
 						lset chunks end [list $match $content]
 					}
 					default {
-						lappend chunks [list $match $content]
+						set heading ""
+						set append_chunk 1
 					}
 				} 
 			}
+			
 			default {
 				switch -- $prev_name {
 					"equation" {
@@ -1193,34 +1218,45 @@ proc RAG_Manager_extract_chunks {page catalog} {
 						set content "[lindex $chunks end 1]\n\n$content"
 						set chunks [lreplace $chunks end end]
 					}
+					default {
+						set append_chunk 1	
+					}
 				}
+			}
+		}
+		
+		if {$append_chunk} {
+			if {$page_chunk \
+				|| ($chapter_chunk && ($chapter == $prev_chapter)) \
+				|| ($section_chunk && ($section == $prev_section)) } {
+				if {[llength $chunks] > 0} {
+					lset chunks end 0 "[lindex $chunks end 0]\n\n$match"
+					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
+				} else {
+					if {[string length $heading] > 0} {
+						set content "$heading\n\n$content"
+					}
+					set chunks [list [list $match $content]]
+				}
+			} else {
 				if {[string length $heading] > 0} {
 					set content "$heading\n\n$content"
 				}
 				lappend chunks [list $match $content]
-				set step "NONE"
+				set prev_section $section
+				set prev_chapter $chapter
 			}
 		}
+		
 		set prev_name $name
 	}
 	
-	RAG_Manager_print "Generated [llength $chunks] chunks,\
-		rejected [expr $contaminated+$empty_match+$empty_content],\
-		of which $contaminated contaminated,\
+	RAG_Manager_print "Generated [llength $chunks] chunks\
+		from [llength $frags] fragments,\
+		[expr $contaminated+$empty_match+$empty_content] rejects,\
+		$contaminated contaminated,\
 		$empty_match empty match,\
 		$empty_content empty content."
-	
-	if {$single_chunk} {
-		set single_match ""
-		set single_content ""
-		foreach chunk $chunks {
-			append single_match "[lindex $chunk 0]\n\n"
-			append single_content "[lindex $chunk 1]\n\n"
-		}
-		set chunks [list [list $single_match $single_content]]
-		RAG_Manager_print "Consolidated [llength $chunks] chunks into one\
-			for single-chunk generation rule."
-	}
 	
 	return $chunks
 }
@@ -1364,7 +1400,7 @@ proc RAG_Manager_chapter_urls {chunks base_url} {
 }
 
 #
-# RAG_Manager_convert_entities converts html entities in a page to unicode
+# RAG_Manager_convert_entities converts all html entities in a page to unicode
 # characters and returns the converted page. We also replace tabs with
 # double-spaces.
 #
@@ -1398,15 +1434,13 @@ proc RAG_Manager_html_chunks {url} {
 	RAG_Manager_print "Converting html entities to unicode..." 
 	set page [RAG_Manager_convert_entities $page]
 	
-	RAG_Manager_print "Cataloging chunks, chapters, and dates..." 
-	set catalog [RAG_Manager_catalog_chunks $page]
-	RAG_Manager_print "Catalog contains [llength $catalog] chunks." 
+	RAG_Manager_print "Cataloging fragments in html page..." 
+	set frags [RAG_Manager_catalog_frags $page]
 	
-	RAG_Manager_print "Extracting and combining chunks from source page..." 
-	set chunks [RAG_Manager_extract_chunks $page $catalog]
-	RAG_Manager_print "Extracted [llength $chunks] chunks." 
+	RAG_Manager_print "Constructing chunks using [llength $frags] fragments..." 
+	set chunks [RAG_Manager_construct_chunks $page $frags]
 	
-	RAG_Manager_print "Inserting chapter urls..." 
+	RAG_Manager_print "Inserting chapter urls in all chunks..." 
 	set chunks [RAG_Manager_chapter_urls $chunks $url]
 	RAG_Manager_print "Chunk list complete." 
 	
@@ -1431,6 +1465,7 @@ proc RAG_Manager_store_chunks {chunks} {
 	RAG_Manager_print "Storing [llength $chunks] chunks\
 		in content and match directories..." 
 	set count 0
+	set duplicates 0
 	foreach chunk $chunks {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
@@ -1453,6 +1488,11 @@ proc RAG_Manager_store_chunks {chunks} {
 		
 		if {[catch {
 			set mfn [file join $info(match_dir) $hash\.txt]
+			if {[file exists $mfn]} {
+				RAG_Manager_print "[format %5d $count]: [file tail $mfn]\
+					\"[RAG_Manager_snippet $match 0]\"" brown
+				incr duplicates
+			}
 			set f [open $mfn w]
 			puts -nonewline $f $match
 			close $f
@@ -1478,7 +1518,8 @@ proc RAG_Manager_store_chunks {chunks} {
 		
 		LWDAQ_support
 	}
-	RAG_Manager_print "Stored $count match and content strings." 
+	RAG_Manager_print "Stored $count chunks, of which $duplicates duplicates,\
+		yielding [expr $count - $duplicates] chunks on disk." 
 	return $count
 }
 
@@ -2562,22 +2603,67 @@ can do this:
 
 <prompt style="display:none">What is an SCT?</prompt>
 
+With the addition of the following lines to our cascading style sheet (CSS), we can
+omit the display:none attribute in prompt fields.
+
+prompt {
+  display: none;
+}
+
+Now we can just write:
+
+<prompt style="display:none">What is an SCT?</prompt>
+
 Some documents are sparse but dense. Our implantation protocols, for example,
 consist of lists of concise instructions interspersed with photographs and
 tables. An entire protocol consists of under fifteen hundred tokens. Instead of
 dividing the document into separate chunks, we prefer to place the entire
 document into a single content string, and compose our own match string with
-retrieval prompts. To achive this end, we embed retrieval commands in the
-document by means of "rag" fields. These can be placed anywhere in the html
-file. Here is an example series of rag instructions with prompt fields that
-results in a single chunk for the entire document, with a match string
-consisting only of a title and some questions.
+retrieval prompts. To achive this end, we embed retrieval directives in the
+document by means of "rag" fields. These directives can be placed anywhere in
+the html file and affect the entire html file. Here is an example series of
+retrieval directives and prompts that results in a single chunk for the entire
+page, with a match string consisting only of a title and some questions.
 
-<rag style="display:none">single-chunk</rag>
-<rag style="display:none">match-prompts-only</rag>
-<prompt style="display:none">HMT Implantation Protocol</prompt>
-<prompt style="display:none">What is the procedure for implanting an HMT?</prompt>
-<prompt style="display:none">How do I attach an EIF to a mouse?</prompt>
+<rag>page-chunk</rag>
+<rag>match-prompts-only</rag>
+<prompt>HMT Implantation Protocol</prompt>
+<prompt>What is the procedure for implanting an HMT?</prompt>
+<prompt>How do I attach an EIF to a mouse?</prompt>
+
+Here we assume we have added the following to our CSS so that the rag fields
+will not be visible to a browser.
+
+rag {
+  display: none;
+}
+
+The "page-chunk" directive tells the RAG Manager to combine all chunks it
+extracts from the page containing the directive into one chunk. The content will
+be a concatination of all content chunks, but each content chunk will retain its
+chapter, section, and date titles. The match string will be the concatination of
+all the chunk match strings. Match strings do not contain chapter, section, or
+date titles.
+
+The "single-chunk" directive is the same as page-chunk.
+
+The "chapter-chunk" directive tells the RAG Manager to combine all chunks from a
+single chapter into one chunk. A "chapter" is the content following an h2-level
+title. The resulting content will consist of a single chapter title, with each
+section receiving its own section and date titles. The match string will be a
+concatination of all the match strings.
+
+The "section-chunk" directive tells the RAG Manager to combine all chunks from a
+single section into one chunk. A "section" is the text following an h3-level
+title. The resulting content will consist of a single chapter, date, and section
+title followed by all the content chunks extracted from the section. The match
+strings will be the concatination of all match strings. 
+
+The "match-prompts-only" directive tells the RAG Manager to delete from each
+match string all content other than that provided by "prompt" fields. When used
+with page-chunk, chapter-chunk, or section-chunk, this directive combines all
+the prompts from a page, chapter, or section to form the match string for the
+entire page, chapter, or section.
 
 Once we have all the match and content strings, the RAG Manager passes the match
 string to  "openssl" to obtain a unique twelve-digit name for the chunk, which
@@ -2658,7 +2744,7 @@ We select content strings using the embedding vectors of the match strings. When
 we select a table of numbers, we select it based upon its match string, not the
 numbers themselves. The match string could be the table caption, or it could be
 the table caption combined with some retrieval prompts we embedded in the source
-html document. With the match-prompts-only command, we will be matching only on
+html document. With the match-prompts-only directive, we will be matching only on
 prompts: even the table caption will be removed from the match string. But what
 we submit to the completion end point is the entire table with its caption. The
 LLM does well understanding and making use of tabulated numbers, especially if
