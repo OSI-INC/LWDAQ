@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "3.9"
+	LWDAQ_tool_init "RAG_Manager" "4.0"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -1033,20 +1033,6 @@ proc RAG_Manager_construct_chunks {page frags} {
 			continue
 		}
 		
-		switch $name {
-			"p" {set color brown}
-			"ul" {set color violet}
-			"ol" {set color violet}
-			"h2" {set color magenta}
-			"h3" {set color magenta}
-			"center" {set color green}
-			"equation" {set color green}
-			"figure" {set color green}
-			"pre" {set color gray}
-			"date" {set color orange}
-			default {set color red}
-		}
-		
 		switch -- $name {
 			"ol" {
 				set content [RAG_Manager_extract_list $content]
@@ -1110,7 +1096,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
 					[format %6s $name]\
-					\"$chapter\"" $color	
+					\"$chapter\"" brown	
 				continue
 			}
 			"h3" {
@@ -1120,7 +1106,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
 					[format %6s $name]\
-					\"$section\"" $color	
+					\"$section\"" brown
 				continue
 			}
 			"date" {
@@ -1169,7 +1155,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 			RAG_Manager_print "[format %7.0f $i_start]\
 				[format %7.0f $i_end]\
 				[format %6s $name]\
-				\"[RAG_Manager_snippet $content 0]\"" $color	
+				\"[RAG_Manager_snippet $content 0]\"" green	
 		}
 
 		set heading ""
