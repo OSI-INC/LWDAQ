@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.0"
+	LWDAQ_tool_init "RAG_Manager" "4.1"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -981,6 +981,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 	set chapter_chunk 0
 	set section_chunk 0
 	set match_prompts_only 0
+	set omit_lists 0
 	set commands [RAG_Manager_list_bodies $page "rag"]
 	foreach cmd $commands {
 		switch -- $cmd {
@@ -997,6 +998,9 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"match-prompts-only" {
 				set match_prompts_only 1
 			}
+			"omit-lists" {
+				set omit_lists 1
+			}
 			default {
 				RAG_Manager_print "WARNING: Unrecognised directive \"$cmd\""
 			}
@@ -1006,7 +1010,8 @@ proc RAG_Manager_construct_chunks {page frags} {
 		page_chunk=$page_chunk,\
 		chapter_chunk=$chapter_chunk,\
 		section-chunk=$section_chunk,\
-		match-prompts-only=$match_prompts_only."
+		match-prompts-only=$match_prompts_only\
+		omit-lists=$omit_lists."
 	
 	set date "NONE"
 	set chapter "NONE"
@@ -1028,17 +1033,15 @@ proc RAG_Manager_construct_chunks {page frags} {
 			incr contaminated
 			RAG_Manager_print "[format %7.0f $i_start]\
 				[format %7.0f $i_end]\
-				[format %8s contam]\
+				[format %6s contam]\
 				\"[RAG_Manager_snippet $content 0]\"" blue
 			continue
 		}
 		
 		switch -- $name {
-			"ol" {
-				set content [RAG_Manager_extract_list $content]
-				set match $content
-			}
+			"ol" -
 			"ul" {
+				if {$omit_lists} {continue}
 				set content [RAG_Manager_extract_list $content]
 				set match $content
 			}
@@ -2536,9 +2539,47 @@ All three files corresponding to a chunk have the same name. All three are text
 files. When we delete the chunks, we delete the match and content strings, but
 not the embeds.
 
+The sources we assume are HTML files. They must follow a strict format
+compatible with the RAG Manager. All our HTML files are hand-typed. We never
+generate them with any kind of website builder, nor will we create HTML from a
+word processor. We type our HTML by hand. All paragraphs are enclosed in p-tags
+like this:
 
-Chunk
------
+<p>Text of paragrap.</p>
+
+We are allowed to insert attributes into these and any opening tags. All tables
+are enclosed in <center> tags, with captions in the
+<small><b>Table:</b>...</small>, like this:
+
+<center>
+<center><table border cellspacing="2">
+<tr>
+	<th>Sample Rate (SPS)</th>
+	<th>Active Current (&mu;A)</th>
+</tr>
+<tr><td>64</td><td>27.2</td></tr>
+<tr><td>128</td><td>32.2</td></tr>
+</table><small>Table:</small> Active Current versus Sample Rate.</small>
+</center>
+
+Figures can be in the same form as tables, but with <b>Figure:</b> in place of
+<b>Table:</b>. Or they can be in the form:
+
+<figure>
+  <img src="../HTML/HMT_Surgery7.jpg" width="100%">
+  <figcaption>HMT Implantation Surgery</figcaption>
+</figure>
+
+Any retrival prompts (see below) must be inside the table or figure caption.
+Lists can be either ordered or unordered. They will be chunked together with
+their preceeding paragraph. Equations made with HTML entities can be in their
+own paragraph. Equations made with LaTeX must be in equation-tags if they stand
+alone, or in eq-tags if they are in-line. We use h2 headings for "chapters". We
+use h3 headings for "sections". Date codes in the form [dd-mmm-yy].
+
+
+Chunking
+--------
 
 We press Chunk to download our sources and divide them all into a single list of
 chunks. The RAG Manager uses "curl" to download the sources. The "curl" utility
@@ -2548,34 +2589,43 @@ on Windows. The RAG Manager proceeds one URL at a time, dividing each page into
 an initial sequence of chunks, and then combining some chunks with those before
 or after in order to bind things like equations to their explanatory text below,
 and lists to their explanatory text above. Check "verbose" to see the
-notification and type of every chunk created.
+notification and type of every chunk created. 
 
-The simplest chunk extraction is to isolate an HTML paragraph using p-tags. Our
-HTML documentation is all hand-typed and follows particular, strict patterns
-when it comes to tables, lists, figures, and chapter titles. We include dates at
-the beginning of chapters in a particular format to indicate when the chapter
-was last updated. Thus we are able to extract paragraphs, lists, captions, and
-code samples in a uniform and consistent mannger for our chunk library, with
-every chunk given a chapter name, a URL pointing to the chapter on-line, and
-often a last-modified date as well. We translate the chunks from HTML into
-Markdown. This translation includes all URLs. We resolve all relative URLs and
-internal document links to absolute URLs. The answer we get back from the
-completion endpoint will also be in Markdown. The OpenAI LLM likes Markdown.
+The first step in chunking an HTML document is to resolve all its internal
+hyperlinks into absolute URLs. We then convert them into Markdown format. We
+convert all HTML entities into unicode characters. The embedding and completion
+endpoints like Markdown. They like unicode in preference to HTML entities, so
+this conversion is to improve embedding and completion.
 
-As we are generating the chunks, we are generating two strings for each chunk.
-One is the "content string", which is the one that includes the chapter title
-and link, a date timestamp, URL links, and tables. The tables are written
-verbosely in Markdown with every table cell receiving a column title. The other
-string is the "match string". The match string is the best representation of the
-syntactic meaning of the chunk. If we accompany a table caption with one hundred
-numbers from the table itself, the embedding vector generated by the entire
-string does not capture the meaning of the caption, but is instead diluted into
-ambiguity by the presence of the numbers, which have little or no syntactic
-meaning. Chapter titles, date stamps, and URLs also dilute the syntactic
-meaning, because they are not prose or equations. Mathematical equations do have
-a strong syntactic meaning, so we include those in our match strings, along with
-prose, but with all the other metadata text removed. Furthermore, isn our html
-document, we can add "prompt" fields like this:
+Now we are ready to fragment the page. The RAG Manager has a list of HTML tags
+it uses to extract fragments from the page. This list is stored in the frag_tags
+element of the tool info array. The simplest fragment is a paragraph bounded by
+p-tags. We call this a p-field. The text within a field, but not including, the
+tags, we call the body of the field. We provide chapter and section titles with
+h2 and h3 fields. In addition to fragment extraction by tags, the RAG Manager
+looks for timestamps in the format [dd-mmm,yy], and whenver it finds them, it
+creates a fragement for these as well. Once it has all the fragments of a page,
+it sorts them in order of ascending first character index. Now we have a list of
+fragments in the order they appear in the text.
+
+We go through the fragments and do several things at once. We create a content
+string and a match string for the next chunk. We combine the current chunk with
+a previous chunk if the fragment type requires us to do so, or we instert the
+current chunk in front of the previous chunk if this is required. The "content
+string" includes a chapter title and link, a section title and link if a section
+is defined, and a date timestamp if one has been supplied, as well as all
+hyperlinks and table contents. The tables are written in a verbose Markdown
+format in which every table cell receives its column title. The "match string"
+is a best representation of the syntactic meaning of the content. If we
+accompany a table caption with one hundred numbers from the table itself, the
+embedding vector generated by the entire string does not capture the meaning of
+the caption, but is instead diluted into ambiguity by the presence of the
+numbers, which have little or no syntactic meaning. Chapter titles, date stamps,
+and URLs also dilute the syntactic meaning, because they are not prose or
+equations. Mathematical equations do have a strong syntactic meaning, so we
+include those in our match strings, along with prose, but with all the other
+metadata text removed. Furthermore, in our HTML document, we can add "prompt"
+fields like this:
 
 <prompt>Use this table to calculate SCT or HMT operating life.</prompt>
 
@@ -2584,7 +2634,7 @@ string, but exclude them from the content strings. These fields are "retrieval
 prompts". When we add well-chosen retrieval prompts to the caption of a table or
 figure, we can greatly increase the likelyhood that the table will be retrieved
 for certain questions that require the numbers in the table. We may want to hide
-the prompt strings from the browser view of the html document, in which case we
+the prompt strings from the browser view of the HTML document, in which case we
 can do this:
 
 <prompt style="display:none">What is an SCT?</prompt>
@@ -2607,7 +2657,7 @@ dividing the document into separate chunks, we prefer to place the entire
 document into a single content string, and compose our own match string with
 retrieval prompts. To achive this end, we embed retrieval directives in the
 document by means of "rag" fields. These directives can be placed anywhere in
-the html file and affect the entire html file. Here is an example series of
+the HTML file and affect the entire HTML file. Here is an example series of
 retrieval directives and prompts that results in a single chunk for the entire
 page, with a match string consisting only of a title and some questions.
 
@@ -2651,6 +2701,9 @@ with page-chunk, chapter-chunk, or section-chunk, this directive combines all
 the prompts from a page, chapter, or section to form the match string for the
 entire page, chapter, or section.
 
+The "omit-lists" directive tells the RAG Manager to discard all list fragments
+found in the current page.
+
 Once we have all the match and content strings, the RAG Manager passes the match
 string to  "openssl" to obtain a unique twelve-digit name for the chunk, which
 we use to form the names of the content and match strings. They will have
@@ -2658,8 +2711,8 @@ names like "6270ebd71f0b.txt". We store the content and match strings to disk.
 We use the match string instead of the content string to create the name because
 we do not want to change the embedding vector when we change only numbers in a
 table or metadata like hyperlinks. In particular, if we are working with a large
-html file on a local server, we don't want to have to re-embed the entire
-document when we work with the same html file on our remote server, which would
+HTML file on a local server, we don't want to have to re-embed the entire
+document when we work with the same HTML file on our remote server, which would
 be required if we generated names based on the hyperlink-rich content strings.
 
 With our contents strings and match strings saved to disk in separate
@@ -2667,8 +2720,8 @@ directories, each chunk's match and contents strings saved with a unique, shared
 name, our chunking is complete.
 
 
-Embed
------
+Embedding
+---------
 
 Now that we have the content and match strings, we are ready to embed the match
 strings. We press "Embed". The manager goes through all the match strings and
@@ -2730,7 +2783,7 @@ We select content strings using the embedding vectors of the match strings. When
 we select a table of numbers, we select it based upon its match string, not the
 numbers themselves. The match string could be the table caption, or it could be
 the table caption combined with some retrieval prompts we embedded in the source
-html document. With the match-prompts-only directive, we will be matching only on
+HTML document. With the match-prompts-only directive, we will be matching only on
 prompts: even the table caption will be removed from the match string. But what
 we submit to the completion end point is the entire table with its caption. The
 LLM does well understanding and making use of tabulated numbers, especially if
