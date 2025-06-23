@@ -1,47 +1,109 @@
 <script>
-# This script illustrates the use of our database package, searching
-# through our Devices.xml file for devices with part number A3038 and
-# customer name "Natalia", then listing them.
-package require DB
-set devices [DB_read]
-set devices [DB_get_list $devices device]
-set count 0
-foreach d $devices {
-	set sn [DB_get_list $d sn]
-	set pn [DB_get_list $d pn]
-	set c [DB_get_list $d c]
-	if {[regexp {A3038} $pn] && [regexp {Natalia} $c]} {
-		LWDAQ_print $t "$sn $pn \"[lindex $c 0]\""
-		incr count
-	}
+#
+# A Toolmaker Script with a button that initiates the capture of multiple images
+# from the BCAM Instrument. The routine assumes the BCAM Instrument is
+# configured to obtain an image from a BCAM. We configure the BCAM to look for
+# two spots and to sort them in order of increasing x-coordinate. This sorting
+# is effective when the two spots are separated horizontally in the image. The
+# routine analyzes each image to obtain the x and y position of both spots. The
+# number of images it captures is set by a parameter in an entry box in the
+# Toolmaker execution window. Once it has captured the requested number of
+# images, the routine calculates the average x and y positions and prints them
+# to the Toolmaker execution window. The script illustrates the use of "upvar"
+# commands to refer to the instrument configuration and information arrays
+# within a Tcl procedure. Within the procedure we refer to the config and info
+# arrays as config and info. We also see global declarations for the Toolmaker
+# text window variable, "t", and a the number of images variable. The script
+# illustrates how to create buttons and entry boxes in a Toolmaker script so
+# that they appear in the execution window. We see the button posting the
+# acquisition command to the LWDAQ event queue.
+#
+
+# Create a button and entry box in the Toolmaker execution window. These widgets
+# will go in the Toolmaker execution window's widget frame, which has global
+# name "f". The button itself, when pressed, does not immediatly initiate
+# acquisition, but instead posts the request for the averaging acquisition to
+# the LWDAQ event queue. Posting to the queue stops the button press from
+# interrupting and breaking a data acquisition that is already in progress.
+button $f.button -text "BCAM_Average" -command "LWDAQ_post BCAM_Average"
+pack $f.button -side left
+label $f.nil -text "Number:" 
+entry $f.nie -textvariable BCAM_Average_num_images 
+pack $f.nil $f.nie -side left
+set BCAM_Average_num_images 10
+
+# This is the averaging procedure that gets called by the button press.
+proc BCAM_Average {} {
+
+	# We must declare global variables. Here we illustrate how a routine like
+	# this, which acquires from an instrument, should declare the existence
+	# of the global BCAM info and config arrays: using upvar commands. These
+	# arrays will then be available with shorter names in the script.
+	upvar #0 LWDAQ_info_$name info
+	upvar #0 LWDAQ_config_$name config
+	global BCAM_Average_num_images
+	global t
+	
+    # Check the number of images requested and save locally.
+    set num_images $BCAM_Average_num_images
+    if {$num_images <= 0} {
+    	LWDAQ_print $t "ERROR: Cannot capture and analyze \"$num_images\" images."
+    	return ""
+    }
+
+	# Initialize the position variables.
+    set sum_x1 0
+    set sum_y1 0
+    set sum_x2 0
+    set sum_y2 0
+    
+	# Configure the BCAM Instrument.
+	set config(num_spots) "2"
+	set config(sort_code) "2"
+    
+	# Capture and analyze the requested number of images.
+    for {set i 0} {$i < $num_images} {incr i} {
+    
+        # Acquire an image using the BCAM Instrument
+        set result [LWDAQ_acquire BCAM]
+
+        # Parse the result to get x and y positions of the two spots. Here we
+        # are using the lassign command to assign the elements of the result
+        # list to the x1, y1, x2, and y2 variables. We use underscores as dummy
+        # variable names to skip over the elements of the BCAM result string
+        # that we don't need.
+        lassign $result _ x1 y1 _ _ _ _ x2 y2 _ _ _ _
+
+        # Accumulate the x and y positions
+        set sum_x1 [expr $sum_x1 + $x1]
+        set sum_y1 [expr $sum_y1 + $y1]
+        set sum_x2 [expr $sum_x2 + $x2]
+        set sum_y2 [expr $sum_y2 + $y2]
+    }
+
+    # Calculate the average x and y positions for each spot
+    set avg_x1 [format %.2f [expr $sum_x1 / $num_images]]
+    set avg_y1 [format %.2f [expr $sum_y1 / $num_images]]
+    set avg_x2 [format %.2f [expr $sum_x2 / $num_images]]
+    set avg_y2 [format %.2f [expr $sum_y2 / $num_images]]
+
+    # Print the average positions in the Toolmaker text window
+    LWDAQ_print $t "$avg_x1 $avg_y1 $avg_x2 $avg_y2" purple
+    
+    # Return an empty string.
+    return ""
 }
-LWDAQ_print $t "Found $count matching devices."
 </script>
 
 <script>
-# We used this script to align circular survey targets with the 
-# field of view of a BCAM. The script opens a canvas widget in
-# the TK master window (the funny little window with the quit
-# button in it). We draw the BCAM image photo in the canvas
-# widget, and a red circle on top of that. Whenever the BCAM
-# instrument updates its bcam_photo, the same canvas widget re-
-# draws the photo in the canvas widget.
-destroy .survey
-canvas .survey -width 400 -height 400 -bd 2 -relief solid
-pack .survey
-.survey create image 200 200 -image bcam_photo
-.survey create oval 130 130 250 250 -outline red
-</script>
-
-<script>
-# Call the WPS instrument and obtains measurements for a range of 
-# exposure times (values of daq_flash_seconds). The exposure time, 
-# the position of the wire, and the rotation of the wire are 
-# printed to the script output window during execution. You can 
-# watch the WPS activity by opening the WPS Instrument. When the 
-# script is done, you can copy the results from the output window 
-# and into a spreadsheet. That's what we did to obtain the following 
-# graph: http://www.opensourceinstruments.com/WPS/WPS1/HTML/Flash.gif
+#
+# A Toolmaker Script that calls the WPS instrument and obtains measurements for
+# a range of exposure times (values of daq_flash_seconds). The exposure time,
+# the position of the wire, and the rotation of the wire are printed to the
+# script output window during execution. You can watch the WPS activity by
+# opening the WPS Instrument. When the script is done, you can copy the results
+# from the output window and into a spreadsheet. 
+#
 for {set x 0.01} {$x <= 0.3} {set x [expr $x * 1.1]} {
 	set LWDAQ_config_WPS(daq_flash_seconds) $x
 	LWDAQ_print $t \
@@ -51,7 +113,9 @@ for {set x 0.01} {$x <= 0.3} {set x [expr $x * 1.1]} {
 </script>
 
 <script>
-# Measure byte_write instruction execution time.
+# 
+# A Toolmaker Script that measures byte_write instruction execution time.
+#
 while {[winfo exists $f]} {
 set sock [LWDAQ_socket_open 10.0.0.37]
 set ta [clock microseconds]
@@ -69,12 +133,14 @@ LWDAQ_update
 </script>
 
 <script>
-# Measure the instruction execution time, ram delete speed, and
-# ram read and TCPIP transfer speed combined by instructing the 
-# relay to perform numdels ram delete instructions, each deleting 
-# delsize bytes in ram, and after that to read one block of readsize 
-# bytes from the relay ram. The script makes a button that you press 
-# to start the test. The IP address is hard-wired in the code.
+#
+# A Toolmaker Script that measures the instruction execution time, ram delete
+# speed, and ram read and TCPIP transfer speed combined by instructing the relay
+# to perform numdels ram delete instructions, each deleting delsize bytes in
+# ram, and after that to read one block of readsize bytes from the relay ram.
+# The script makes a button that you press to start the test. The IP address is
+# hard-wired in the code.
+#
 global p
 set p(t) $t
 set p(delsize) 1000
@@ -118,9 +184,11 @@ proc do {} {
 </script>
 
 <script>
-# Test the fast adc8 job on the LWDAQ driver.
-# First we use the fast adc job to get some data. We 
-# must feed the signal into socket 1 on the driver.
+#
+# A Toolmaker Script that tests the fast adc8 job on the LWDAQ driver. First we
+# use the fast adc job to get some data. We must feed the signal into socket 1
+# on the driver.
+#
 set sock [LWDAQ_socket_open 10.0.0.37:90]
 LWDAQ_set_driver_mux $sock 1 15
 LWDAQ_byte_write $sock $LWDAQ_Driver(clen_addr) 0
@@ -162,10 +230,12 @@ lwdaq_draw plot_image plot_photo
 </script>
 
 <script>
-# Write a simulated BCAM image to the memory on a LWDAQ
-# driver. Read it back out again multiple times and check
-# where the simulated spot is in the returned image. This
-# code looks for write and read-back errors.
+#
+# A Toolmaker Script that writes a simulated BCAM image to the memory on a LWDAQ
+# driver. Read it back out again multiple times and check where the simulated
+# spot is in the returned image. This code looks for write and read-back errors.
+#
+
 set dim 256
 set stop 0
 set addr 129.64.37.44
@@ -215,10 +285,11 @@ pack $f.r -side left
 </script>
 
 <script>
-# Test a driver's LWDAQ server for resistance to a message
-# that is longer than its incoming message buffer. When the buffer
-# overflows, the driver must close the socket and return to its
-# rest state.
+# 
+# A Toolmaker Script that tests a driver's LWDAQ server for resistance to a
+# message that is longer than its incoming message buffer. When the buffer
+# overflows, the driver must close the socket and return to its rest state.
+#
 
 # Open the socket and create a button that will close the socket.
 set sock [LWDAQ_socket_open "10.0.0.37:90"]
@@ -233,20 +304,37 @@ set s ""
 for {set i 1} {$i < 2000} {incr i} {append s "A"}
 LWDAQ_print $t "Sending message with $i bytes in content."
 
-# Transmit the string through the socket. The message ID of 0 
-# is the version read identifier. After passing the redundant 
-# long string as the message content, we expect the server to 
-# return its software version number.
+# Transmit the string through the socket. The message ID of 0 is the version
+# read identifier. After passing the redundant long string as the message
+# content, we expect the server to return its software version number.
 LWDAQ_transmit_message $sock 0 $s
 LWDAQ_print $t [LWDAQ_receive_integer $sock]
 
+# Close the socket: we are done.
 LWDAQ_socket_close $sock
 </script>
 
 <script>
-# Write a gray-scale image to LWDAQ server's RAM. This tests
-# the writing to memory, the reading back from memory, and the
-# data rate.
+#
+# A Toolmaker Script that writes a gray-scale image to LWDAQ server's RAM,
+# reading back the same image, and displays to the Toolmaker window, as well as
+# printing the download data download speed.
+#
+frame $f.f
+pack $f.f -side top
+button $f.f.a -text Acquire -command "acquire $t"
+button $f.f.s -text Stop -command "set stop 1"
+label $f.f.ol -text Offset:
+entry $f.f.oe -textvariable offset
+pack $f.f.a $f.f.s $f.f.ol $f.f.oe -side left
+catch {image create photo data_photo}
+label $f.il -image data_photo
+pack $f.il
+
+set width 1000
+set offset 0
+set stop 0
+
 proc acquire {t} {
 	global stop offset width
 	if {$stop || ![winfo exists $t]} {
@@ -284,30 +372,22 @@ proc acquire {t} {
 	
 	LWDAQ_post [list acquire $t]
 }
-
-frame $f.f
-pack $f.f -side top
-button $f.f.a -text Acquire -command "acquire $t"
-button $f.f.s -text Stop -command "set stop 1"
-label $f.f.ol -text Offset:
-entry $f.f.oe -textvariable offset
-pack $f.f.a $f.f.s $f.f.ol $f.f.oe -side left
-catch {image create photo data_photo}
-label $f.il -image data_photo
-pack $f.il
-
-set width 1000
-set offset 0
-set stop 0
 </script>
 
 <script>
-# Test a LWDAQ Driver's RAM by writing bytes to random locations
-# and reading them back. To write to each location, we set the 
-# data address, write a byte to the RAM portal, set the data address
-# again (because it will have been incremented by the write to the
-# portal) and read back the byte. We compare the byte we wrote to the
-# one we read back. 
+#
+# A Toolmaker Scriopt that tests a LWDAQ Driver's RAM by writing bytes to random
+# locations and reading them back. To write to each location, we set the data
+# address, write a byte to the RAM portal, set the data address again (because
+# it will have been incremented by the write to the portal) and read back the
+# byte. We compare the byte we wrote to the one we read back. 
+#
+button $f.a -text Acquire -command "acquire $t"
+pack $f.a -side top
+button $f.s -text Stop -command "set stop 1"
+pack $f.s -side top
+set stop 0
+
 proc acquire {t} {
 	global stop
 	if {$stop || ![winfo exists $t]} {
@@ -344,31 +424,15 @@ proc acquire {t} {
 	LWDAQ_print $t "SCORE: $count out of $num"
 	LWDAQ_post [list acquire $t]
 }
-
-button $f.a -text Acquire -command "acquire $t"
-pack $f.a -side top
-button $f.s -text Stop -command "set stop 1"
-pack $f.s -side top
-set stop 0
 </script>
 
 <script>
-# Exercise every instrument.
-global LWDAQ_Info
-foreach i $LWDAQ_Info(instruments) {
-	LWDAQ_update
-	LWDAQ_open $i
-	set result [LWDAQ_acquire $i]
-	LWDAQ_print -nonewline $t "$i " green
-	LWDAQ_print $t $result
-}
-</script>
-
-<script>
-# Demonstrate the LWDAQ command-line simplex fitter. We define
-# an altitude function and call the fitter with a starting point.
-# The fitter returns with the coordinates of the point in the
-# fitting space at which the altitude function is a minimum.
+#
+# A Toolmaker Script that demonstrates the LWDAQ command-line simplex fitter. We
+# define an altitude function and call the fitter with a starting point. The
+# fitter returns with the coordinates of the point in the fitting space at which
+# the altitude function is a minimum.
+#
 proc altitude {u v w x y z} {
   set uu 10
   set vv 20
@@ -387,12 +451,12 @@ LWDAQ_print $t $minimum
 </script>
 
 <script>
-# This script sets up an instrument so that when we click
-# on an image pixel with the mouse, its column and row is
-# printed to the instrument text window. In instruments
-# where the analysis_pixel_size_um parameter is defined,
-# we calculate the image coordinates of the mouse click as
-# well.
+#
+# A Toolmaker Script that sets up an instrument so that when we click on an
+# image pixel with the mouse, its column and row is printed to the instrument
+# text window. In instruments where the analysis_pixel_size_um parameter is
+# defined, we calculate the image coordinates of the mouse click as well.
+#
 set instrument BCAM
 
 bind .[string tolower $instrument].ic.i.image <Button-1> \
@@ -418,11 +482,12 @@ proc image_point {instrument x y} {
 </script>
 
 <script>
-# A template script that repeats a LWDAQ messaging 
-# job over and over to permit us to test the behavior
-# of various LWDAQ relays. Insert your own test procedure
-# in the "go" routine. We use a global "p" array to handle
+#
+# A Template Toolmaker Script that repeats a LWDAQ messaging job over and over
+# to permit us to test the behavior of various LWDAQ Relays. Insert your own
+# test procedure in the "go" routine. We use a global "p" array to handle
 # starting and stopping the procedure.
+#
 global p
 set p(t) $t
 set p(location) 19
@@ -432,14 +497,11 @@ button $f.stop -text Stop -command "stop"
 label $f.control -textvariable p(control)
 pack $f.go $f.stop $f.control -side left
 
-# The go procedure executes in a while loop until we
-# press the stop button. In our example, we open a
-# socket and repeatedly read back the firmware version
-# number until it's time to stop, then we close the
-# socket. We include the LWDAQ_support routine so that
-# we can receive and respond to mouse and keyboard events.
-# One such event will cause the control variable to be
-# set to Stop.
+# The go procedure executes in a while loop until we press the stop button. In
+# our example, we open a socket and repeatedly read back the firmware version
+# number until it's time to stop, then we close the socket. We include the
+# LWDAQ_support routine so that we can receive and respond to mouse and keyboard
+# events. One such event will cause the control variable to be set to Stop.
 proc go {} {
   global p
   set p(control) "Run"
@@ -452,10 +514,9 @@ proc go {} {
   set p(control) "Idle"
 }
 
-# The stop procedure, which will be executed when we press
-# the stop button. Note that we must have LWDAQ_support or 
-# some equivalent Tcl update command in the go loop for our 
-# mouse click on the stop button to be effective.
+# The stop procedure, which will be executed when we press the stop button. Note
+# that we must have LWDAQ_support or some equivalent Tcl update command in the
+# go loop for our mouse click on the stop button to be effective.
 proc stop {} {
   global p
   set p(control) "Stop"
@@ -463,9 +524,11 @@ proc stop {} {
 </script>
 
 <script>
-# Send a sequence of LWDAQ commands to a device repeatedly
-# after pressing Transmit. Stop with stop button. List the
-# commands in hex format.
+#
+# A Toolmaker Script that send a sequence of LWDAQ commands to a device
+# repeatedly after pressing Transmit. Stop with stop button. List the commands
+# in hex format.
+#
 set p(commands) "0001 0000 AA02"
 set p(text) $t
 set p(ip_addr) "10.0.0.37"
@@ -492,11 +555,12 @@ proc Transmit {} {
 </script>
 
 <script>
-# Use every instrument analysis procedure to analyze
-# every image in the Images directory. We use this script
-# to check our error handling. If LWDAQ crashes during
-# the execution, we know we have a bug in the analysis 
-# library.
+#
+# A Toolmaker Script that uses every instrument analysis procedure to analyze
+# every image in the Images directory. We use this script to check our error
+# handling. If LWDAQ crashes during the execution, we know we have a bug in the
+# analysis library.
+#
 global LWDAQ_Info
 set fl [glob [file join $LWDAQ_Info(program_dir) Images *]]
 foreach i $LWDAQ_Info(instruments) {
@@ -512,4 +576,42 @@ foreach i $LWDAQ_Info(instruments) {
 	}
 }
 </script>
+
+<script>
+#
+# A Toolmaker Script that illustrates the use of our database package, searching
+# through our Devices.xml file for devices with part number A3038 and customer
+# name "Natalia", then listing them.
+#
+package require DB
+set devices [DB_read]
+set devices [DB_get_list $devices device]
+set count 0
+foreach d $devices {
+	set sn [DB_get_list $d sn]
+	set pn [DB_get_list $d pn]
+	set c [DB_get_list $d c]
+	if {[regexp {A3038} $pn] && [regexp {Natalia} $c]} {
+		LWDAQ_print $t "$sn $pn \"[lindex $c 0]\""
+		incr count
+	}
+}
+LWDAQ_print $t "Found $count matching devices."
+</script>
+
+<script>
+#
+# A Toolmaker Script that aligns a circular survey targets with the field of
+# view of a BCAM. The script opens a canvas widget in the Toolmaker execution
+# window. It draws the BCAM image photo in the canvas widget and a red circle on
+# top of that. Whenever the BCAM instrument updates its bcam_photo, the same
+# canvas widget re-draws the photo in the canvas widget.
+#
+canvas $f.survey -width 400 -height 400 -bd 2 -relief solid
+pack $f.survey
+$f.survey create image 200 200 -image bcam_photo
+$f.survey create oval 130 130 250 250 -outline red
+</script>
+
+
 
