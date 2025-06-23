@@ -203,12 +203,10 @@ if {[catch {
 				[glob -nocomplain [file join $LWDAQ_Info(config_dir) *.tcl]]]
 
 	# For our help routines, we construct a list of all the TclTk files that define
-	# the LWDAQ routines and all the routines in the packages provided by the 
-	# LWDAQ package directory.
+	# the LWDAQ routines.
 	set LWDAQ_Info(scripts) [concat \
 		[glob -nocomplain [file join $LWDAQ_Info(scripts_dir) *.tcl]] \
-		[glob -nocomplain [file join $LWDAQ_Info(instruments_dir) *.tcl]] \
-		[glob -nocomplain [file join $LWDAQ_Info(package_dir) *.tcl]] ]
+		[glob -nocomplain [file join $LWDAQ_Info(instruments_dir) *.tcl]] ]
 		
 	# Add the LWDAQ's package directory to the auto_path for library searches.
 	global auto_path

@@ -771,6 +771,8 @@ end;
 	zero or more bytes of payload. The routine will return the sixteen-bit
 	sample values, or various characteristics of the data block, depending upon
 	the options passed in through the command string.
+	
+	Note: This routine was formerly called "lwdaq_sct_recorder".
 
 	The routine does not return the payload directly, but instead uses the
 	global electronics_trace to store indices that allow another routine to

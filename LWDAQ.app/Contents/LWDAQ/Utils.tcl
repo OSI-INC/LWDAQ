@@ -2379,7 +2379,8 @@ proc LWDAQ_html_tables { {file_name ""} } {
 # entries and the template file ./LWDAQ.app/Contents/LWDAQ/CRT.html, as well as
 # our LWDAQ command listing and help extraction routines. By default, the
 # routine creates the command reference in the current LWDAQ working directory,
-# and names it Commands.html.
+# and names it Commands.html. But we can pass is a specific file name if we
+# like.
 #
 proc LWDAQ_command_reference { {file_name ""} } {
 	global LWDAQ_Info
