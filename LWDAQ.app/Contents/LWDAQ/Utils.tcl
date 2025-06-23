@@ -2514,25 +2514,28 @@ proc LWDAQ_command_reference { {file_name ""} } {
 
 #
 # LWDAQ_tool_reference generates an HTML manual page for the routines defined in
-# a LWDAQ tool script. We name the tool script and the routine does the rest.
-# The routine creates the tool reference in the LWDAQ directory, and names it
-# Tool.html. If we don't specify a a file, the routine will open a file browser.
-# The routine writes an h3-level title, a declaration showing the parameters
-# that we must pass into the procedure, and the description of the procedure
-# extracted from the comments above. 
+# a LWDAQ tool script, or any script with procedural explanatory comments
+# conforming to the LWDAQ format. We name the tool file and the routine reads
+# the contents of the file and creates the tool reference HTML file in the LWDAQ
+# directory, naming it Toolfile.html, where Toolfile is the root of the tool
+# file name. If we don't specify a a file, the routine will open a file browser.
+# For each procedure defined by the tool, the routine writes an h3-level title,
+# a declaration showing the parameters that we must pass into the procedure, and
+# the description of the procedure extracted from the comments above. 
 #
-proc LWDAQ_tool_reference {{script ""}} {
+proc LWDAQ_tool_reference {{toolfile ""}} {
 	global LWDAQ_Info
 	
-	if {$script == ""} {set script [LWDAQ_get_file_name]}
-	if {$script == ""} {return ""}
-	set f [open [file join $LWDAQ_Info(program_dir) "Tool.html"] w]
-	set script_list [LWDAQ_proc_list * $script]
-	set script_list [lsort -dictionary -index 0 $script_list]
-	foreach {s} $script_list {
+	if {$toolfile == ""} {set toolfile [LWDAQ_get_file_name]}
+	if {$toolfile == ""} {return ""}
+	set toolname [file root [file tail $toolfile]]
+	set f [open [file join $LWDAQ_Info(program_dir) "$toolname\.html"] w]
+	set proc_list [LWDAQ_proc_list * $toolfile]
+	set proc_list [lsort -dictionary -index 0 $proc_list]
+	foreach {s} $proc_list {
 		puts $f "<h3 id=\"$s\">$s</h3>"
-		puts $f "<small><pre>[LWDAQ_proc_declaration $s $script]</pre></small>"
-		puts $f "<p>[LWDAQ_proc_description $s $script]</p>"
+		puts $f "<small><pre>[LWDAQ_proc_declaration $s $toolfile]</pre></small>"
+		puts $f "<p>[LWDAQ_proc_description $s $toolfile]</p>"
 		puts $f ""
 	}
 	close $f

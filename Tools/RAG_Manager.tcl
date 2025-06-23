@@ -382,7 +382,7 @@ proc RAG_Manager_apply {w} {
 }
 
 #
-# RAG_Manager_assistant opens a text window and prints out the declarations of
+# RAG_Manager_assistant_prompts opens a text window and prints out the declarations of
 # the three assistant instructions. We can edit and then apply with an Apply
 # button.
 #
@@ -879,8 +879,8 @@ proc RAG_Manager_extract_date {frag} {
 # of the fragment and the fragment type. The indices point to the first and last
 # characters within the fragment, not including whatever delimiters we used to find
 # the fragment. In the case of a paragraph fragment, for example, the indices point to
-# the first and last character of the body of the paragraph, between the <p> and
-# </p> tags, but not including the tags themselves. The fragment type is the same
+# the first and last character of the body of the paragraph, between the p and
+# /p tags, but not including the tags themselves. The fragment type is the same
 # as the html tag we use to find tagged fragments, but is some other name in the
 # case of specialized fragments like "date", "figure", and "caption".
 #
@@ -951,7 +951,7 @@ proc RAG_Manager_remove_dates {frag} {
 # end of its field, where the "field" includes the html tags that marked the
 # boundaries of the fragment. The extract-chunks routine will use some fragments
 # to set chapter, section, and date values, which are marked in the html by
-# <h2>, <h3>, and [DD-MMM-YY] tags respetively. Once it has a raw list of
+# h2, h3, and [DD-MMM-YY] tags respetively. Once it has a raw list of
 # fragments, it goes through them and extracts table contents, table captions,
 # and figure captions. It converts lists to Mardown. Some fragments form their
 # own chunk with chapter, section, and date titles at the top. By default,
