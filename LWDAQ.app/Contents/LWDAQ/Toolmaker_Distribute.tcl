@@ -1,22 +1,22 @@
 <script>
 #
-# A Toolmaker Script with a button that initiates the capture of multiple images
-# from the BCAM Instrument. The routine assumes the BCAM Instrument is
-# configured to obtain an image from a BCAM. We configure the BCAM to look for
-# two spots and to sort them in order of increasing x-coordinate. This sorting
-# is effective when the two spots are separated horizontally in the image. The
-# routine analyzes each image to obtain the x and y position of both spots. The
-# number of images it captures is set by a parameter in an entry box in the
-# Toolmaker execution window. Once it has captured the requested number of
-# images, the routine calculates the average x and y positions and prints them
-# to the Toolmaker execution window. The script illustrates the use of "upvar"
-# commands to refer to the instrument configuration and information arrays
-# within a Tcl procedure. Within the procedure we refer to the config and info
-# arrays as config and info. We also see global declarations for the Toolmaker
-# text window variable, "t", and a the number of images variable. The script
-# illustrates how to create buttons and entry boxes in a Toolmaker script so
-# that they appear in the execution window. We see the button posting the
-# acquisition command to the LWDAQ event queue.
+# A LWDAQ Toolmaker Script with a button that initiates the capture of multiple
+# images from the BCAM Instrument. The routine assumes the BCAM Instrument is
+# configured to obtain an image in which two light sources are visible. We
+# configure the BCAM to look for two spots and to sort them in order of
+# increasing x-coordinate. This sorting is effective when the two spots are
+# separated horizontally in the image. The routine analyzes each image to obtain
+# the x and y position of both spots. The number of images it captures is set by
+# a parameter in an entry box in the Toolmaker execution window. Once it has
+# captured the requested number of images, the routine calculates the average x
+# and y positions and prints them to the Toolmaker execution window. The script
+# illustrates the use of "upvar" commands to refer to the instrument
+# configuration and information arrays within a Tcl procedure. Within the
+# procedure we refer to the config and info arrays as config and info. We also
+# see global declarations for the Toolmaker text window variable, "t", and a the
+# number of images variable. The script illustrates how to create buttons and
+# entry boxes in a Toolmaker script so that they appear in the execution window.
+# We see the button posting the acquisition command to the LWDAQ event queue.
 #
 
 # Create a button and entry box in the Toolmaker execution window. These widgets
@@ -97,12 +97,12 @@ proc BCAM_Average {} {
 
 <script>
 #
-# A Toolmaker Script that calls the WPS instrument and obtains measurements for
-# a range of exposure times (values of daq_flash_seconds). The exposure time,
-# the position of the wire, and the rotation of the wire are printed to the
-# script output window during execution. You can watch the WPS activity by
-# opening the WPS Instrument. When the script is done, you can copy the results
-# from the output window and into a spreadsheet. 
+# A LWDAQ Toolmaker Script that calls the WPS instrument and obtains
+# measurements for a range of exposure times (values of daq_flash_seconds). The
+# exposure time, the position of the wire, and the rotation of the wire are
+# printed to the script output window during execution. You can watch the WPS
+# activity by opening the WPS Instrument. When the script is done, you can copy
+# the results from the output window and into a spreadsheet. 
 #
 for {set x 0.01} {$x <= 0.3} {set x [expr $x * 1.1]} {
 	set LWDAQ_config_WPS(daq_flash_seconds) $x
@@ -114,7 +114,7 @@ for {set x 0.01} {$x <= 0.3} {set x [expr $x * 1.1]} {
 
 <script>
 # 
-# A Toolmaker Script that measures byte_write instruction execution time.
+# A LWDAQ Toolmaker Script that measures byte_write instruction execution time.
 #
 while {[winfo exists $f]} {
 set sock [LWDAQ_socket_open 10.0.0.37]
@@ -134,12 +134,12 @@ LWDAQ_update
 
 <script>
 #
-# A Toolmaker Script that measures the instruction execution time, ram delete
-# speed, and ram read and TCPIP transfer speed combined by instructing the relay
-# to perform numdels ram delete instructions, each deleting delsize bytes in
-# ram, and after that to read one block of readsize bytes from the relay ram.
-# The script makes a button that you press to start the test. The IP address is
-# hard-wired in the code.
+# A LWDAQ Toolmaker Script that measures the instruction execution time, ram
+# delete speed, and ram read and TCPIP transfer speed combined by instructing
+# the relay to perform numdels ram delete instructions, each deleting delsize
+# bytes in ram, and after that to read one block of readsize bytes from the
+# relay ram. The script makes a button that you press to start the test. The IP
+# address is hard-wired in the code.
 #
 global p
 set p(t) $t
@@ -185,9 +185,9 @@ proc do {} {
 
 <script>
 #
-# A Toolmaker Script that tests the fast adc8 job on the LWDAQ driver. First we
-# use the fast adc job to get some data. We must feed the signal into socket 1
-# on the driver.
+# A LWDAQ Toolmaker Script that tests the fast adc8 job on the LWDAQ driver.
+# First we use the fast adc job to get some data. We must feed the signal into
+# socket 1 on the driver.
 #
 set sock [LWDAQ_socket_open 10.0.0.37:90]
 LWDAQ_set_driver_mux $sock 1 15
@@ -231,10 +231,17 @@ lwdaq_draw plot_image plot_photo
 
 <script>
 #
-# A Toolmaker Script that writes a simulated BCAM image to the memory on a LWDAQ
-# driver. Read it back out again multiple times and check where the simulated
-# spot is in the returned image. This code looks for write and read-back errors.
+# A LWDAQ Toolmaker Script that writes a simulated BCAM image to the memory on a
+# LWDAQ driver. Read it back out again multiple times and check where the
+# simulated spot is in the returned image. This code looks for write and
+# read-back errors.
 #
+button $f.a -text Acquire -command "acquire $dim $addr $base none $t"
+pack $f.a -side left
+button $f.s -text Stop -command "set stop 1"
+pack $f.s -side left
+button $f.r -text Refresh -command [list LWDAQ_post [list setup $dim $addr $base]]
+pack $f.r -side left
 
 set dim 256
 set stop 0
@@ -276,18 +283,12 @@ proc acquire {dim addr base last t} {
 }
 
 setup $dim $addr $base
-button $f.a -text Acquire -command "acquire $dim $addr $base none $t"
-pack $f.a -side left
-button $f.s -text Stop -command "set stop 1"
-pack $f.s -side left
-button $f.r -text Refresh -command [list LWDAQ_post [list setup $dim $addr $base]]
-pack $f.r -side left
 </script>
 
 <script>
 # 
-# A Toolmaker Script that tests a driver's LWDAQ server for resistance to a
-# message that is longer than its incoming message buffer. When the buffer
+# A LWDAQ Toolmaker Script that tests a driver's LWDAQ server for resistance to
+# a message that is longer than its incoming message buffer. When the buffer
 # overflows, the driver must close the socket and return to its rest state.
 #
 
@@ -316,7 +317,7 @@ LWDAQ_socket_close $sock
 
 <script>
 #
-# A Toolmaker Script that writes a gray-scale image to LWDAQ server's RAM,
+# A LWDAQ Toolmaker Script that writes a gray-scale image to LWDAQ server's RAM,
 # reading back the same image, and displays to the Toolmaker window, as well as
 # printing the download data download speed.
 #
@@ -376,11 +377,11 @@ proc acquire {t} {
 
 <script>
 #
-# A Toolmaker Scriopt that tests a LWDAQ Driver's RAM by writing bytes to random
-# locations and reading them back. To write to each location, we set the data
-# address, write a byte to the RAM portal, set the data address again (because
-# it will have been incremented by the write to the portal) and read back the
-# byte. We compare the byte we wrote to the one we read back. 
+# A LWDAQ Toolmaker Script that tests a LWDAQ Driver's RAM by writing bytes to
+# random locations and reading them back. To write to each location, we set the
+# data address, write a byte to the RAM portal, set the data address again
+# (because it will have been incremented by the write to the portal) and read
+# back the byte. We compare the byte we wrote to the one we read back. 
 #
 button $f.a -text Acquire -command "acquire $t"
 pack $f.a -side top
@@ -428,10 +429,10 @@ proc acquire {t} {
 
 <script>
 #
-# A Toolmaker Script that demonstrates the LWDAQ command-line simplex fitter. We
-# define an altitude function and call the fitter with a starting point. The
-# fitter returns with the coordinates of the point in the fitting space at which
-# the altitude function is a minimum.
+# A LWDAQ Toolmaker Script that demonstrates the LWDAQ command-line simplex
+# fitter. We define an altitude function and call the fitter with a starting
+# point. The fitter returns with the coordinates of the point in the fitting
+# space at which the altitude function is a minimum.
 #
 proc altitude {u v w x y z} {
   set uu 10
@@ -452,8 +453,8 @@ LWDAQ_print $t $minimum
 
 <script>
 #
-# A Toolmaker Script that sets up an instrument so that when we click on an
-# image pixel with the mouse, its column and row is printed to the instrument
+# A LWDAQ Toolmaker Script that sets up an instrument so that when we click on
+# an image pixel with the mouse, its column and row is printed to the instrument
 # text window. In instruments where the analysis_pixel_size_um parameter is
 # defined, we calculate the image coordinates of the mouse click as well.
 #
@@ -483,9 +484,9 @@ proc image_point {instrument x y} {
 
 <script>
 #
-# A Template Toolmaker Script that repeats a LWDAQ messaging job over and over
-# to permit us to test the behavior of various LWDAQ Relays. Insert your own
-# test procedure in the "go" routine. We use a global "p" array to handle
+# A Template LWDAQ Toolmaker Script that repeats a LWDAQ messaging job over and
+# over to permit us to test the behavior of various LWDAQ Relays. Insert your
+# own test procedure in the "go" routine. We use a global "p" array to handle
 # starting and stopping the procedure.
 #
 global p
@@ -525,7 +526,7 @@ proc stop {} {
 
 <script>
 #
-# A Toolmaker Script that send a sequence of LWDAQ commands to a device
+# A LWDAQ Toolmaker Script that send a sequence of LWDAQ commands to a device
 # repeatedly after pressing Transmit. Stop with stop button. List the commands
 # in hex format.
 #
@@ -556,10 +557,10 @@ proc Transmit {} {
 
 <script>
 #
-# A Toolmaker Script that uses every instrument analysis procedure to analyze
-# every image in the Images directory. We use this script to check our error
-# handling. If LWDAQ crashes during the execution, we know we have a bug in the
-# analysis library.
+# A LWDAQ Toolmaker Script that uses every instrument analysis procedure to
+# analyze every image in the Images directory. We use this script to check our
+# error handling. If LWDAQ crashes during the execution, we know we have a bug
+# in the analysis library.
 #
 global LWDAQ_Info
 set fl [glob [file join $LWDAQ_Info(program_dir) Images *]]
@@ -579,9 +580,9 @@ foreach i $LWDAQ_Info(instruments) {
 
 <script>
 #
-# A Toolmaker Script that illustrates the use of our database package, searching
-# through our Devices.xml file for devices with part number A3038 and customer
-# name "Natalia", then listing them.
+# A LWDAQ Toolmaker Script that illustrates the use of our database package,
+# searching through our Devices.xml file for devices with part number A3038 and
+# customer name "Natalia", then listing them.
 #
 package require DB
 set devices [DB_read]
@@ -601,8 +602,8 @@ LWDAQ_print $t "Found $count matching devices."
 
 <script>
 #
-# A Toolmaker Script that aligns a circular survey targets with the field of
-# view of a BCAM. The script opens a canvas widget in the Toolmaker execution
+# A LWDAQ Toolmaker Script that aligns a circular survey targets with the field
+# of view of a BCAM. The script opens a canvas widget in the Toolmaker execution
 # window. It draws the BCAM image photo in the canvas widget and a red circle on
 # top of that. Whenever the BCAM instrument updates its bcam_photo, the same
 # canvas widget re-draws the photo in the canvas widget.

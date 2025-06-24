@@ -91,6 +91,7 @@ https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
 https://www.opensourceinstruments.com/About/about.php
 https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Commands.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Toolmaker_Library.html
 https://www.bndhep.net/Devices/BCAM/User_Manual.html
 https://www.opensourceinstruments.com/DFPS/index.html
 https://www.opensourceinstruments.com/CPMS/index.html
