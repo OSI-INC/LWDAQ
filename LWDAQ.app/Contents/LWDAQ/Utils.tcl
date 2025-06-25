@@ -2513,15 +2513,17 @@ proc LWDAQ_command_reference { {file_name ""} } {
 }
 
 #
-# LWDAQ_tool_reference generates an HTML manual page for the routines defined in
+# LWDAQ_tool_reference generates HTML sections for the routines defined in
 # a LWDAQ tool script, or any script with procedural explanatory comments
 # conforming to the LWDAQ format. We name the tool file and the routine reads
 # the contents of the file and creates the tool reference HTML file in the LWDAQ
-# directory, naming it Toolfile.html, where Toolfile is the root of the tool
+# directory, naming it ToolName.html, where ToolName is the root of the tool
 # file name. If we don't specify a a file, the routine will open a file browser.
 # For each procedure defined by the tool, the routine writes an h3-level title,
 # a declaration showing the parameters that we must pass into the procedure, and
-# the description of the procedure extracted from the comments above. 
+# the description of the procedure extracted from the comments above. The output
+# file is designed to be incorporated into a command reference HTML page of 
+# some sort.
 #
 proc LWDAQ_tool_reference {{toolfile ""}} {
 	global LWDAQ_Info
@@ -2534,7 +2536,7 @@ proc LWDAQ_tool_reference {{toolfile ""}} {
 	set proc_list [lsort -dictionary -index 0 $proc_list]
 	foreach {s} $proc_list {
 		puts $f "<h3 id=\"$s\">$s</h3>"
-		puts $f "<small><pre>[LWDAQ_proc_declaration $s $toolfile]</pre></small>"
+		puts $f "<pre>[LWDAQ_proc_declaration $s $toolfile]</pre>"
 		puts $f "<p>[LWDAQ_proc_description $s $toolfile]</p>"
 		puts $f ""
 	}

@@ -77,6 +77,7 @@ https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
 https://www.opensourceinstruments.com/Electronics/A3040/M3040.html
 https://www.opensourceinstruments.com/Electronics/A3040/EIF.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
+https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer_Commands.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neurorecorder.html
 https://www.opensourceinstruments.com/Electronics/A3018/Receiver.html
 https://www.opensourceinstruments.com/Electronics/A3019/Electrodes.html

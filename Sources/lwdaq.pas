@@ -4214,8 +4214,8 @@ end;
 {
 	lwdaq_simplex_error takes a simplex vertex type and a pointer to a string
 	containing a Tcl command name and executes this command with the numerical
-	values specified in the vertex type. The routine is used exclusively by <a
-	href="#lwdaq_simplex">lwdaq_simplex</a>.
+	values specified in the vertex type. The routine is used exclusively by
+	lwdaq_simplex.
 }
 function lwdaq_simplex_error(v:simplex_vertex_type;ep:pointer):real;
 type
@@ -4228,7 +4228,7 @@ var
 	result:string;
 begin
 	command:=error_string_ptr(ep)^+' [list ';
-	for j:=1 to length(v)-1 do
+	for j:=1 to length(v) do
 		writestr(command,command,v[j]:fsr:fsd,' ');
 	writestr(command,command,']');
 	error:=Tcl_Eval(gui_interp_ptr,PChar(command));
@@ -4243,7 +4243,7 @@ begin
 end;
 
 {
-<p>lwdaq_simplex finds a point in an <i>n</i>-dimensional space at which an error function is a minium. The routine takes a minimum of two parameters: the initial position and an error procedure name. The initial position must be a list of <i>n</i> real numbers. The error procedure must be defined in the Tcl interpreter, take a list of <i>n</i> real numbers as its input, and return a real-valued error measurement. We call the Tcl error routine with the help of the lwdaq_simplex_error interface function. The simplex fitter starts at the initial position and moves through the n-dimensional space until it reaches a maximum number of steps specified with the "-max_steps <i>m</i>" option. When it stops, it returns the point of convergeance as <i>n</i> real numbers, the final error value, and the number of steps it took.</p>
+<p>lwdaq_simplex finds a point in an <i>n</i>-dimensional space at which an error function is a minium. The routine takes a minimum of two parameters: the initial position and an error procedure name. The initial position must be a list of <i>n</i> real numbers. The error procedure must be defined in the Tcl interpreter, take a single list as its input, and return a real-valued error measurement. The single list argument, when passed into the error funtion by lwdaq_simplex, will contain <i>n</i> space-delimited real numbers. The error routine must extract and assign the numbers from this list. We call the Tcl error routine with the help of the lwdaq_simplex_error interface function. This helper function prints <i>n</i> real numbers to a string and makes sure they are passed as a single list argument into the Tcl error function. The simplex fitter starts at the initial position and moves through the n-dimensional space until it reaches a maximum number of steps specified with the "-max_steps <i>m</i>" option. When it stops, it returns the point of convergeance as <i>n</i> real numbers, the final error value, and the number of steps it took.</p>
 
 <center><table border cellspacing=2>
 <tr>
