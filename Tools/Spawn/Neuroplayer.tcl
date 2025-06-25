@@ -613,6 +613,13 @@ proc Neuroplayer_init {} {
 	set info(export_timestamp) "0"
 	set info(export_buffer) [list]
 	set info(export_sequence) [list]
+	set info(export_edf_transducer) "SCT"
+	set info(export_edf_unit) "uV"
+	set info(export_edf_min) "-18000"
+	set info(export_edf_max) "+12000"
+	set info(export_edf_lo) "-32768"
+	set info(export_edf_hi) "+32768"
+	set info(export_edf_filter) "unknown"
 #
 # Video playback parameters. We define executable names for ffmpeg.
 #
@@ -4906,7 +4913,7 @@ proc Neuroexporter_edf_setup {} {
 			foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 16} {
 				set b [string tolower $a]
 				if {![info exists EDF($b\_$id)]} {
-					set EDF($b\_$id) [set EDF($b)]
+					set EDF($b\_$id) [set info(exporter_edf_$b)]
 				}
 				label $f.l$b -text "$a\:" -fg $info(label_color) 
 				entry $f.e$b -textvariable EDF($b\_$id) -width $len

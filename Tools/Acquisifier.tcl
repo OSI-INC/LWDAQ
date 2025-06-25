@@ -1054,6 +1054,6 @@ return 1
 
 ----------Begin Help----------
 
-http://www.bndhep.net/Electronics/LWDAQ/Acquisifier.html
+http://www.opensourceinstruments.com/Software/LWDAQ/Acquisifier.html
 
 ----------End Help----------
