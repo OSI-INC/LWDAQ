@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "172"
+	LWDAQ_tool_init "Neuroplayer" "173"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -4913,7 +4913,7 @@ proc Neuroexporter_edf_setup {} {
 			foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 16} {
 				set b [string tolower $a]
 				if {![info exists EDF($b\_$id)]} {
-					set EDF($b\_$id) [set info(exporter_edf_$b)]
+					set EDF($b\_$id) [set info(export_edf_$b)]
 				}
 				label $f.l$b -text "$a\:" -fg $info(label_color) 
 				entry $f.e$b -textvariable EDF($b\_$id) -width $len
