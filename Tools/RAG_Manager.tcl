@@ -239,8 +239,6 @@ provide hyperlinks to these portions of the documentation.
 		&amp;       "&"
 		&nbsp;      " "
 		&pi;        "π"
-		&lt;        "<"
-		&gt;        ">"
 		&le;        "≤"
 		&ge;        "≥"
 		&asymp;     "≈"
@@ -252,6 +250,13 @@ provide hyperlinks to these portions of the documentation.
 		&radic;     "√"
 		&asymp;     "≈"
 	}
+#
+# Tags we convert only after we perform chunking.
+#	
+set info(entities_final_convert) {
+		&lt;        "<"
+		&gt;        ">"
+}
 #
 # A list of tags we want to remove
 #
@@ -285,7 +290,7 @@ provide hyperlinks to these portions of the documentation.
 #
 # The fragment delimiting tags.
 #
-	set info(frag_tags) {p center pre equation figure ul ol h2 h3}
+	set info(frag_tags) {p center pre equation figure ul ol h1 h2 h3}
 #
 # Input-output parameters.
 #	
@@ -928,11 +933,11 @@ proc RAG_Manager_catalog_frags {page} {
 # RAG_Manager_convert_tags removes the html markup tags we won't be using from a
 # fragment of text and returns the cleaned fragment
 #
-proc RAG_Manager_convert_tags {frag} {
+proc RAG_Manager_convert_tags {frag taglist} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-	foreach {tag replace} $info(tags_to_convert) {
+	foreach {tag replace} $taglist {
 		regsub -all "<$tag\[^>\]*?>" $frag $replace frag
 	}
 	return $frag
@@ -959,16 +964,16 @@ proc RAG_Manager_remove_dates {frag} {
 # each fragment represented by the start and end of its body and the start and
 # end of its field, where the "field" includes the html tags that marked the
 # boundaries of the fragment. The extract-chunks routine will use some fragments
-# to set chapter, section, and date values, which are marked in the html by
-# h2, h3, and [DD-MMM-YY] tags respetively. Once it has a raw list of
-# fragments, it goes through them and extracts table contents, table captions,
-# and figure captions. It converts lists to Mardown. Some fragments form their
-# own chunk with chapter, section, and date titles at the top. By default,
-# tables and figures form their own chunks, equations are combined with the
-# subsequent fragement, lists and pre blocks are combined with the preceding
-# fragment. Each chunk consists of a content string and a match string. The
-# match string contains text stripped of metadata, tables of numbers, equations,
-# and hyperlinks. The match string is what we will use to obtain the chunk's
+# to set chapter, section, and date values, which are marked in the html by h2,
+# h3, and [DD-MMM-YY] tags respetively. Once it has a raw list of fragments, it
+# goes through them and extracts table contents, table captions, and figure
+# captions. It converts lists to Mardown. Some fragments form their own chunk
+# with page, chapter, section, and date titles at the top. By default, tables
+# and figures form their own chunks, equations are combined with the subsequent
+# fragement, lists and pre blocks are combined with the preceding fragment. Each
+# chunk consists of a content string and a match string. The match string
+# contains text stripped of metadata, tables of numbers, equations, and
+# hyperlinks. The match string is what we will use to obtain the chunk's
 # embedding vector. The content string contains chapter, section, and date
 # headings, tabulated values for tables, captions, links, and all other
 # metadata. This is the string we will submit as input to the completion
@@ -1024,6 +1029,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		omit-lists=$omit_lists."
 	
 	set date "NONE"
+	set document "NONE"
 	set chapter "NONE"
 	set prev_chapter "NONE"
 	set section "NONE"
@@ -1100,6 +1106,12 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"pre" {
 				set match $content
 			}
+			"h1" {
+				regsub -all {\[Figure\]} $content "" content
+				regsub -all {\[.*?\]} $content "" content
+				regsub -all {\(.*?\)} $content "" content
+				set document [string trim $content]
+			}
 			"h2" {
 				set prev_chapter $chapter
 				set chapter $content
@@ -1133,7 +1145,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		
 		regsub -all {</?\s*prompt(>|\s+[^>]*>)[^<]*</prompt>} $content "" content
 		regsub -all {\n\n\n+} $content "\n\n" content
-		set content [RAG_Manager_convert_tags $content]
+		set content [RAG_Manager_convert_tags $content $info(tags_to_convert)]
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
 		
@@ -1152,7 +1164,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 			set prompts [string trim $prompts]
 			set match $prompts
 		} else {
-			set match [RAG_Manager_convert_tags $match]
+			set match [RAG_Manager_convert_tags $match $info(tags_to_convert)]
 			set match [RAG_Manager_remove_dates $match]
 			regsub -all {[!]*\[([^\]]+)\]\([^)]+\)} $match {\1} match
 			set match [string trim $match]
@@ -1172,6 +1184,9 @@ proc RAG_Manager_construct_chunks {page frags} {
 		}
 
 		set heading ""
+		if {$document != "NONE"} {
+			append heading "%%%%Document: $document\n"
+		}
 		if {$chapter != "NONE"} {
 			append heading "%%%%Chapter: $chapter\n"
 		}
@@ -1361,12 +1376,12 @@ proc RAG_Manager_resolve_urls {page base_url} {
 }
 
 #
-# RAG_Manager_chapter_urls converts all lines of the form "%%%%Chapter: Title" or
-# form "%%%%Section: Title" into Markdown anchors with absolute links to chapter and
-# section. We pass the base url into the routine, and the routine attaches the
-# chapter or section name, with spaces replaced with space entities, to form the
-# absolute ur. The routine operates only on the content strings, not match
-# strings.
+# RAG_Manager_chapter_urls converts all lines of the form "%%%%Document: Title"
+# "%%%%Chapter: Title" or form "%%%%Section: Title" into Markdown anchors with
+# absolute links to chapter and section. We pass base_url into the routine,
+# which is the url of the page itself. The routine attaches the chapter or
+# section name, with spaces replaced with space entities, to form the absolute
+# ur. The routine operates only on the content strings, not match strings.
 #
 proc RAG_Manager_chapter_urls {chunks base_url} {
 	upvar #0 RAG_Manager_info info
@@ -1379,6 +1394,11 @@ proc RAG_Manager_chapter_urls {chunks base_url} {
 		set found 1
 		while {$found} {
 			set found 0
+			if {[regexp {%%%%Document: ([^\n]*)} $content -> title]} {
+				regsub {%%%%Document: ([^\n]*)} $content \
+					"Document: \[$title\]\($base_url\)" content
+				set found 1
+			} 
 			if {[regexp {%%%%Chapter: ([^\n]*)} $content -> title]} {
 				regsub -all { } $title {%20} link
 				regsub {%%%%Chapter: ([^\n]*)} $content \
@@ -1399,13 +1419,14 @@ proc RAG_Manager_chapter_urls {chunks base_url} {
 }
 
 #
-# RAG_Manager_convert_entities converts all html entities in a page to unicode
-# characters and returns the converted page. We also replace tabs with
-# double-spaces.
+# RAG_Manager_convert_entities converts html entities in a page to unicode
+# characters and returns the converted page. It also replaces tabs with
+# double-spaces. The list of entities to convert is in entitylist. Each element
+# in this list is an HTML entity paired with a unicode character.
 #
-proc RAG_Manager_convert_entities {page} {
+proc RAG_Manager_convert_entities {page entitylist} {
 	upvar #0 RAG_Manager_info info
-    foreach {entity char} $info(entities_to_convert) {
+    foreach {entity char} $entitylist {
         regsub -all $entity $page $char page
     }
     regsub -all {\t} $page {    } page
@@ -1413,11 +1434,11 @@ proc RAG_Manager_convert_entities {page} {
 }
 
 #
-# RAG_Manager_html_chunks downloads an html page from a url, splits it into
+# RAG_Manager_chunk_page downloads an html page from a url, splits it into
 # chunks of text, and returns a list of chunks. If the dump flag is set, the
 # routine writes all the chunk match and content strings to a chunk dump file.
 #
-proc RAG_Manager_html_chunks {url} {
+proc RAG_Manager_chunk_page {url} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 			
@@ -1432,13 +1453,24 @@ proc RAG_Manager_html_chunks {url} {
 	set page [RAG_Manager_convert_urls $page]
 	
 	RAG_Manager_print "Converting html entities to unicode..." 
-	set page [RAG_Manager_convert_entities $page]
+	set page [RAG_Manager_convert_entities $page $info(entities_to_convert)]
 	
 	RAG_Manager_print "Cataloging fragments in html page..." 
 	set frags [RAG_Manager_catalog_frags $page]
 	
 	RAG_Manager_print "Constructing chunks using [llength $frags] fragments..." 
 	set chunks [RAG_Manager_construct_chunks $page $frags]
+	
+	RAG_Manager_print "Converting final html entities in chunks..."
+	set new_chunks [list]
+	foreach chunk $chunks {
+		set match [RAG_Manager_convert_entities \
+			[lindex $chunk 0] $info(entities_final_convert)]
+		set content [RAG_Manager_convert_entities \
+			[lindex $chunk 1] $info(entities_final_convert)]
+		lappend new_chunks [list $match $content]
+	}
+	set chunks $new_chunks
 	
 	RAG_Manager_print "Inserting chapter urls in all chunks..." 
 	set chunks [RAG_Manager_chapter_urls $chunks $url]
@@ -1741,8 +1773,10 @@ proc RAG_Manager_delete {} {
 }
 
 #
-# RAG_Manager_chunk downloads and chunks all URL resources named in the
-# sources list. 
+# RAG_Manager_chunk downloads and chunks all URL resources named in the sources
+# list. It usees the chunk_page routine to get a list of chunks from each page.
+# If the page-chunking returns a non-empty list, the main chunk routine adds the
+# new list of chunks to its accumulating list.
 #
 proc RAG_Manager_chunk {} {
 	upvar #0 RAG_Manager_config config
@@ -1754,8 +1788,12 @@ proc RAG_Manager_chunk {} {
 	
 	set chunks [list]
 	foreach url [string trim $config(sources)] {
-		set chunks [concat $chunks [RAG_Manager_html_chunks $url]]
+		set new_chunks [RAG_Manager_chunk_page $url]
+		if {[llength $new_chunks] > 0} {
+			set chunks [concat $chunks $new_chunks]
+		}
 	}
+	
 	if {$config(dump)} {
 		RAG_Manager_print "Writing chunks to dump file..." 
 		if {[file exists $info(dump_file)]} {file delete $info(dump_file)}
