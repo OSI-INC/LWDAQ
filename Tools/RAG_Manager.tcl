@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.2"
+	LWDAQ_tool_init "RAG_Manager" "4.3"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -59,6 +59,7 @@ proc RAG_Manager_init {} {
 #
 	set config(chat_submit) "3"
 	set config(verbose) "0"
+	set config(dump) "0"
 	set config(show_match) "0"
 	set config(snippet_len) "45"
 	set config(progress_frac) "0.1" 
@@ -119,10 +120,10 @@ https://www.opensourceinstruments.com/Prices.html
 	set config(high_rel_thr) "0.50"
 	set config(low_rel_thr) "0.30"
 	set config(high_rel_model) "gpt-4o"
-	set config(mid_rel_model) "gpt-3.5-turbo"
-	set config(low_rel_model) "gpt-3.5-turbo"
+	set config(mid_rel_model) "gpt-4o-mini"
+	set config(low_rel_model) "gpt-4o-mini"
 	set config(high_rel_tokens) "6000"
-	set config(mid_rel_tokens) "10000"
+	set config(mid_rel_tokens) "12000"
 	set config(low_rel_tokens) "0"
 	set config(max_question_tokens) "300"
 	set config(embed_model) "text-embedding-3-small"
@@ -147,11 +148,12 @@ When answering the user's question:
     `![Figure Caption](image_url)`  
   - Do not say "you cannot search the web" or "you cannot find images" if a 
     relevant figure is available in the provided content.
-  - Provide hyperlinks to original documentation sources when available.
+  - Always provide at least one hyperlinks to original documentation.
   - Prefer newer information over older.
   - Respond using Markdown formatting.
   - Use LaTeX formatting within Markdown for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
+  
     }
 	set config(mid_rel_assistant) {
 	
@@ -159,8 +161,10 @@ You are a helpful technical assistant.
 You will summarize and explain technical documentation.
 You will complete mathematical calculations whenever possible.
 Respond using Markdown formatting.
-When writing mathematical expressions.
 Use LaTeX formatting within Markdown for mathematical expressions.
+Use the minimal escaping required to represent valid LaTeX.
+If any of the supporting documentation discusses the exact topic presented in the question,
+try to provide at least three hyperlinks to relevant supporting documentation.
 
 	}
 	set config(low_rel_assistant) {
@@ -169,8 +173,10 @@ You are a helpful technical assistant.
 You will summarize and explain technical documentation.
 You will complete mathematical calculations whenever possible.
 Respond using Markdown formatting.
-When writing mathematical expressions.
 Use LaTeX formatting within Markdown for mathematical expressions.
+Use the minimal escaping required to represent valid LaTeX.
+If portions of the supporting documentation discuss the exact topic presented in the question,
+provide hyperlinks to these portions of the documentation.
 
 	}
 #
@@ -310,6 +316,7 @@ Use LaTeX formatting within Markdown for mathematical expressions.
 	set info(embed_dir) [file join $config(root_dir) "Embed"]
 	set info(log_dir) [file join $config(root_dir) "Log"]
 	set info(signal_file) [file join $info(log_dir) "signal.txt"]
+	set info(dump_file) [file join $info(log_dir) "dump.txt"]
 #
 # Empty string return means all well.
 #
@@ -960,8 +967,8 @@ proc RAG_Manager_remove_dates {frag} {
 # tables and figures form their own chunks, equations are combined with the
 # subsequent fragement, lists and pre blocks are combined with the preceding
 # fragment. Each chunk consists of a content string and a match string. The
-# match string contains text stripped of metadata, tables of numbers, and
-# hyperlinks. The match string is what we will use to obtain the chunk's
+# match string contains text stripped of metadata, tables of numbers, equations,
+# and hyperlinks. The match string is what we will use to obtain the chunk's
 # embedding vector. The content string contains chapter, section, and date
 # headings, tabulated values for tables, captions, links, and all other
 # metadata. This is the string we will submit as input to the completion
@@ -1206,7 +1213,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 			default {
 				switch -- $prev_name {
 					"equation" {
-						set match "[lindex $chunks end 0]\n\n$match"
+						set match "$match"
 						set content "[lindex $chunks end 1]\n\n$content"
 						set chunks [lreplace $chunks end end [list $match $content]]
 					}
@@ -1407,12 +1414,13 @@ proc RAG_Manager_convert_entities {page} {
 
 #
 # RAG_Manager_html_chunks downloads an html page from a url, splits it into
-# chunks of text, and returns a list of chunks.
+# chunks of text, and returns a list of chunks. If the dump flag is set, the
+# routine writes all the chunk match and content strings to a chunk dump file.
 #
 proc RAG_Manager_html_chunks {url} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
-		
+			
 	RAG_Manager_print "Fetch $url..." 
 	set page [RAG_Manager_read_url $url]
 	RAG_Manager_print "Received [string length $page] bytes." 
@@ -1435,7 +1443,7 @@ proc RAG_Manager_html_chunks {url} {
 	RAG_Manager_print "Inserting chapter urls in all chunks..." 
 	set chunks [RAG_Manager_chapter_urls $chunks $url]
 	RAG_Manager_print "Chunk list complete." 
-	
+
 	return $chunks
 }
 
@@ -1748,6 +1756,24 @@ proc RAG_Manager_chunk {} {
 	foreach url [string trim $config(sources)] {
 		set chunks [concat $chunks [RAG_Manager_html_chunks $url]]
 	}
+	if {$config(dump)} {
+		RAG_Manager_print "Writing chunks to dump file..." 
+		if {[file exists $info(dump_file)]} {file delete $info(dump_file)}
+		set count 0
+		foreach chunk $chunks {
+			incr count
+			LWDAQ_print $info(dump_file) \
+				"---------- MATCH -----------"
+			LWDAQ_print $info(dump_file) [lindex $chunk 0]
+			LWDAQ_print $info(dump_file) \
+				"--------- CONTENT ----------"
+			LWDAQ_print $info(dump_file) [lindex $chunk 1]
+			LWDAQ_print $info(dump_file) \
+				"----------- END ------------\n"
+		}
+		RAG_Manager_print "Dump file complete." 
+	}
+	
 	RAG_Manager_store_chunks $chunks
 	RAG_Manager_print "Chunking complete [RAG_Manager_time]" purple
 
@@ -2428,7 +2454,7 @@ proc RAG_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {Verbose} {
+	foreach a {Verbose Dump} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text "$a" -variable RAG_Manager_config($b)
 		pack $f.$b -side left -expand yes

@@ -234,15 +234,7 @@ begin
 end;
 
 {
-<p>lwdaq_error_string returns the global error string into which our library routines record potentially fatal errors they encounter during execution. If we
-set the -append_errors flag with <a href="#lwdaq_config">lwdaq_config</a>, the
-string will contain all errors encountered, separated by line breaks. Otherwise,
-the string will contain only the most recent error. Each error line begins with
-the error prefix string, which is defined in <a
-href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. If we
-pass the -value option, we provide a string that is to take the place of the
-current error string. If this string parameter is empty, the error string is
-cleared.</p>
+<p>lwdaq_error_string returns the global error string into which our library routines record potentially fatal errors they encounter during execution. If we set the -append_errors flag with <a href="#lwdaq_config">lwdaq_config</a>, the string will contain all errors encountered, separated by line breaks. Otherwise, the string will contain only the most recent error. Each error line begins with the error prefix string, which is defined in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. If we pass the -value option, we provide a string that is to take the place of the current error string. If this string parameter is empty, the error string is cleared.</p>
 }
 function lwdaq_error_string(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -285,11 +277,7 @@ begin
 end;
 
 {
-<p>lwdaq_config sets global variables that control the operation of the lwdaq libraries. If you specify no options, lwdaq_config returns a string giving you
-the current values of all the options, <i>except</i> the -eol option. Each
-option requires a value, which will be assigned to the global variable names in
-the option. Here are the options and their expected value types. Boolean
-variables you specify with 0 for false and 1 for true.</p>
+<p>lwdaq_config sets global variables that control the operation of the lwdaq libraries. If you specify no options, lwdaq_config returns a string giving you the current values of all the options, <i>except</i> the -eol option. Each option requires a value, which will be assigned to the global variable names in the option. Here are the options and their expected value types. Boolean variables you specify with 0 for false and 1 for true.</p>
 
 <center><table cellspacing=1 border>
 <tr><th>Option</th><th>Type</th><th>Function</th></tr>
@@ -316,55 +304,17 @@ variables you specify with 0 for false and 1 for true.</p>
 <tr><td>-exit_command</td><td>String</td><td>A Tcl command to execute on exit, default ""</td></tr>
 </table><small><b>Table:</b> Options for lwdaq_config.</small></center>
 
-<p>The lwdaq library routines can write to Tk text windows through -text_name and -photo_name. The -text_name should specify a Tk text widget (such as .text),
-<i>stdout</i>, or a file name. The default is <i>stdout</i>. If the -text_name
-does not begin with a period, indicating a text window, nor is it <i>stdout</i>,
-we assume it is the name of a file. File names cannot be numbers. If the file
-name contains a path, that path must exist. The -show_details option is used by
-some library routines to generate additional exectution details that will be
-printed to the text window specified by -text_name.</p>
+<p>The lwdaq library routines can write to Tk text windows through -text_name and -photo_name. The -text_name should specify a Tk text widget (such as .text), <i>stdout</i>, or a file name. The default is <i>stdout</i>. If the -text_name does not begin with a period, indicating a text window, nor is it <i>stdout</i>, we assume it is the name of a file. File names cannot be numbers. If the file name contains a path, that path must exist. The -show_details option is used by some library routines to generate additional exectution details that will be printed to the text window specified by -text_name.</p>
 
-<p>The library routines can draw an image in a Tk photo by calling <i>gui_draw</i> and specifying the name of the image. The photo that will
-receive the image is the one named by a global variable we set with the
--photo_name option. The -photo_name must be an existing Tk photo (such as
-bcam_photo), and has default value "none", which disables the drawing. By
-default, <i>gui_draw</i> is set to <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>.
-The -intensify specifies <i>gui_intensification</i> for lwdaq_gui_draw. The
--display_zoom option specifies <i>gui_display_zoom</i>, which applies an
-additional scaling to all images drawn by <i>lwdaq_draw</i> or by
-<i>gui_draw</i>. The <a href="#lwdaq_draw">lwdaq_draw</a> routine multiplies its
-image-specific zoom value by the global gui_display_zoom to obtain a total
-scaling value. The -display_zoom option is designed to accommodate different
-computer display resolutions, which sometimes result in lwdaq images being too
-large or too small. The <a href="http://www.cgsd.com/papers/gamma.html">gamma
-correction</a> sets the gray scale image display gamma correction used by
-lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear
-relationship between the image pixel intensity and the display pixel intensity.
-The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we
-increase the brightness of the red and blue component of the display pixel with
-respect to the green component. By default, these are also 1.0.</p>
+<p>The library routines can draw an image in a Tk photo by calling <i>gui_draw</i> and specifying the name of the image. The photo that will receive the image is the one named by a global variable we set with the -photo_name option. The -photo_name must be an existing Tk photo (such as bcam_photo), and has default value "none", which disables the drawing. By default, <i>gui_draw</i> is set to <a href="#lwdaq_gui_draw">lwdaq_gui_draw</a>. The -intensify specifies <i>gui_intensification</i> for lwdaq_gui_draw. The -display_zoom option specifies <i>gui_display_zoom</i>, which applies an additional scaling to all images drawn by <i>lwdaq_draw</i> or by <i>gui_draw</i>. The <a href="#lwdaq_draw">lwdaq_draw</a> routine multiplies its image-specific zoom value by the global gui_display_zoom to obtain a total scaling value. The -display_zoom option is designed to accommodate different computer display resolutions, which sometimes result in lwdaq images being too large or too small. The <a href="http://www.cgsd.com/papers/gamma.html">gamma correction</a> sets the gray scale image display gamma correction used by lwdaq_draw and lwdaq_rggb_draw. By default it is 1.0, which gives us a linear relationship between the image pixel intensity and the display pixel intensity. The <i>rggb_red_scale</i> and <i>rggb_blue_scale</i> parameters determine how we increase the brightness of the red and blue component of the display pixel with respect to the green component. By default, these are also 1.0.</p>
 
-<p>During execution, analysis routines can pause to allow us to view intermediate drarwing results by means of the -wait_ms option. If we set
--wait_ms to 1000, the analysis routine will pause for one second. If we set
--wait_ms to -1, Tk will open a window with a <i>Continue</i> button in it, which
-we click before the analysis proceeds.</p>
+<p>During execution, analysis routines can pause to allow us to view intermediate drarwing results by means of the -wait_ms option. If we set -wait_ms to 1000, the analysis routine will pause for one second. If we set -wait_ms to -1, Tk will open a window with a <i>Continue</i> button in it, which we click before the analysis proceeds.</p>
 
-<p>Many routines return real numbers in strings. These real numbers will have a fixed number of decimal places equal to the global Pascal variable <i>fsd</i>
-and a total field size equal to the global Pascal variable <i>fsr</i>.</p>
+<p>Many routines return real numbers in strings. These real numbers will have a fixed number of decimal places equal to the global Pascal variable <i>fsd</i> and a total field size equal to the global Pascal variable <i>fsr</i>.</p>
 
-<p>The global error_string variable is used by all the command routines in lwdaq.pas. Each command routine resets error_string and checks it when it's
-finished. If error_string is not empty, the routine will return an error
-condition and error_string will be its result. The append_errors option tells
-the analysis library to append new errors to error_string instead of
-over-writing previous errors with the new error. By default, append_errors is
-false. When we set log_errors to 1, each error reported by the report_error
-routine will, in addition, be written to a log file with the global debug_log
-procedure.</p>
+<p>The global error_string variable is used by all the command routines in lwdaq.pas. Each command routine resets error_string and checks it when it's finished. If error_string is not empty, the routine will return an error condition and error_string will be its result. The append_errors option tells the analysis library to append new errors to error_string instead of over-writing previous errors with the new error. By default, append_errors is false. When we set log_errors to 1, each error reported by the report_error routine will, in addition, be written to a log file with the global debug_log procedure.</p>
 
-<p>The -exit_command option allows us to specify a Tcl command that will be executed during an orderly exit from the lwdaq process. This command will be executed
-if the user presses the Quit button or enters an exit command in some other way, but
-not if the user closes the main window with a window-destroy button. Default exit
-command is empty.</p>
+<p>The -exit_command option allows us to specify a Tcl command that will be executed during an orderly exit from the lwdaq process. This command will be executed if the user presses the Quit button or enters an exit command in some other way, but not if the user closes the main window with a window-destroy button. Default exit command is empty.</p>
 }
 function lwdaq_config(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -450,8 +400,7 @@ begin
 end;
 
 {
-<p>lwdaq_image_create creates a new image and returns a unique name for the image, by which the interpreter can identify the image to other lwdaq
-routines.</p>
+<p>lwdaq_image_create creates a new image and returns a unique name for the image, by which the interpreter can identify the image to other lwdaq routines.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Option</th><th>Function</th></tr>
@@ -467,20 +416,9 @@ routines.</p>
 <tr><td>-try_header</td><td>Try image data for a lwdaq-format header, default 1.</td></tr>
 </table><small><b>Table:</b> Options for lwdaq_image_create.</small></center>
 
-<p>The above table lists the options accepted by lwdaq_image_create, and their functions. If you use the -name option and provide the name of a pre-existing
-image in the lwdaq image list, lwdaq_image_create deletes the pre-existing
-image. If you specify "-data $value", the routine copies $value into the image's
-intensity array, starting at the first pixel of the first row. When you combine
-"-data $value" with "-try_header 1", the routine looks at the first bytes in
-$value to see if it contains a valid image header, specifying image width and
-height, as well as analysis bounds and a results string. When the routine looks
-for the header, it assumes that the bytes in the header specify two-byte
-integers in big-endian order.</p>
+<p>The above table lists the options accepted by lwdaq_image_create, and their functions. If you use the -name option and provide the name of a pre-existing image in the lwdaq image list, lwdaq_image_create deletes the pre-existing image. If you specify "-data $value", the routine copies $value into the image's intensity array, starting at the first pixel of the first row. When you combine "-data $value" with "-try_header 1", the routine looks at the first bytes in $value to see if it contains a valid image header, specifying image width and height, as well as analysis bounds and a results string. When the routine looks for the header, it assumes that the bytes in the header specify two-byte integers in big-endian order.</p>
 
-<p>If you have -try_header 0, or if the routine's effort to find a header fails, lwdaq_image_create will look at the values you specify for the analysis bounds
-with the -left, -top, -right, and -bottom options. A value of &minus;1 directs
-the routine to place the boundary at the edge of the image. The default values
-for these options are all &minus;1.</p>
+<p>If you have -try_header 0, or if the routine's effort to find a header fails, lwdaq_image_create will look at the values you specify for the analysis bounds with the -left, -top, -right, and -bottom options. A value of &minus;1 directs the routine to place the boundary at the edge of the image. The default values for these options are all &minus;1.</p>
 }
 function lwdaq_image_create(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -654,53 +592,15 @@ begin
 end;
 
 {
-<p>lwdaq_draw transfers the contents of a lwdaq image into a Tk photo. We pass the lwdaq image name followed by the Tk photo name, and then our options in the
-form ?option value?. When the routine draws the image, it over-writes the first
-few pixels in the first image row with a header block containing the image
-dimensions, its analysis bounds, and its results string.</p>
+<p>lwdaq_draw transfers the contents of a lwdaq image into a Tk photo. We pass the lwdaq image name followed by the Tk photo name, and then our options in the form ?option value?. When the routine draws the image, it over-writes the first few pixels in the first image row with a header block containing the image dimensions, its analysis bounds, and its results string.</p>
 
-<p>The -intensify option can take four values: mild, strong, exact, and none. Mild intensification displays anything darker than four standard deviations
-below the mean intensity as black, and anything brighter than four standard
-deviations above the mean intensity as white. In between black and white the
-display is linear with pixel brightness. Strong intensification does the same
-thing, but for a range of two standard deviations from the mean. Exact displays
-the darkest spot in the image as black and the brightest as white. In all three
-cases, we calculate the mean, standard deviation, minimum, and maximum intensity
-of the image within the <i>analysis bounds</i>, not across the entire image.</p>
+<p>The -intensify option can take four values: mild, strong, exact, and none. Mild intensification displays anything darker than four standard deviations below the mean intensity as black, and anything brighter than four standard deviations above the mean intensity as white. In between black and white the display is linear with pixel brightness. Strong intensification does the same thing, but for a range of two standard deviations from the mean. Exact displays the darkest spot in the image as black and the brightest as white. In all three cases, we calculate the mean, standard deviation, minimum, and maximum intensity of the image within the <i>analysis bounds</i>, not across the entire image.</p>
 
-<p>The -zoom option scales the image as we draw it in the Tk photo. This scaling is in addition to the scaling called for by the global <i>gui_display_zoom</i>
-parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. The Tk
-photo will expand or contract to match the size of the zoomed image. The product
-of the zoom value and the global <i>gui_display_zoom</i> can take any value
-between 0.1 and 10. But the effective value of the scaling factor is dicated by
-the requirements of sub-sampling. If the scaling factor is greater than 1, we
-round it to the nearest integer, <i>e</i>, and draw each image pixel on the
-screen as a block of <i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we
-round its inverse to the nearest integer, <i>c</i>. We draw only one pixel out
-of every <i>c</i> pixels in the Tk photo. If the scaling factor is 0.3, we draw
-every third pixel. If 0.4, we draw every third pixel if your computer rounds
-1/0.4 to 3, or every second pixel if your computer rounds 1/0.4 to 2. With
-scaling factor 0.0, we draw every tenth pixel. Prior to drawing, the image
-overlay may contain lines that show the results of analysis or mark features in
-the image. These lines are likely to be only one pixel wide. If we are
-sub-sampling the image, all such markings will be partially erased. When drawing
-with a scaling factor less than 0.5, <i>lwdaq_draw</i> spreads out each pixel in
-the overlay so that, when subsampled, the integrity of the overlay markings is
-preserved. After the draw, the overlay markings remain spread, which means that
-subsequent drawing of the same image with a larger scaling factor will appear
-with thicker overlay lines.</p>
+<p>The -zoom option scales the image as we draw it in the Tk photo. This scaling is in addition to the scaling called for by the global <i>gui_display_zoom</i> parameter, which we set with <a href="#lwdaq_config">lwdaq_config</a>. The Tk photo will expand or contract to match the size of the zoomed image. The product of the zoom value and the global <i>gui_display_zoom</i> can take any value between 0.1 and 10. But the effective value of the scaling factor is dicated by the requirements of sub-sampling. If the scaling factor is greater than 1, we round it to the nearest integer, <i>e</i>, and draw each image pixel on the screen as a block of <i>e</i>&times;<i>e</i> pixels. If -zoom is less than 1, we round its inverse to the nearest integer, <i>c</i>. We draw only one pixel out of every <i>c</i> pixels in the Tk photo. If the scaling factor is 0.3, we draw every third pixel. If 0.4, we draw every third pixel if your computer rounds 1/0.4 to 3, or every second pixel if your computer rounds 1/0.4 to 2. With scaling factor 0.0, we draw every tenth pixel. Prior to drawing, the image overlay may contain lines that show the results of analysis or mark features in the image. These lines are likely to be only one pixel wide. If we are sub-sampling the image, all such markings will be partially erased. When drawing with a scaling factor less than 0.5, <i>lwdaq_draw</i> spreads out each pixel in the overlay so that, when subsampled, the integrity of the overlay markings is preserved. After the draw, the overlay markings remain spread, which means that subsequent drawing of the same image with a larger scaling factor will appear with thicker overlay lines.</p>
 
-<p>With -clear set to 1, lwdaq_draw clears the overlay in the lwdaq image before drawing in the Tk photo. The overlay may contain a graph or oscilloscope
-display, or analysis indicator lines. If you don't want these to be displayed,
-set -clear to 1. Whatever was in the overlay will be erased from the overlay
-before drawing.</p>
+<p>With -clear set to 1, lwdaq_draw clears the overlay in the lwdaq image before drawing in the Tk photo. The overlay may contain a graph or oscilloscope display, or analysis indicator lines. If you don't want these to be displayed, set -clear to 1. Whatever was in the overlay will be erased from the overlay before drawing.</p>
 
-<p>By default, -show_bounds is 1, and the routine draws a blue rectangle to show the the image analysis boundaries, which are used by image analysis routines
-like lwdaq_rasnik and lwdaq_bcam. But with -show_bounds set to 0, this blue
-rectangle is not drawn. If you want to be sure that you don't have a blue
-rectangle drawn over your gray-scale image, you should also specify -clear 1, so
-that lwdaq_draw will clear the image overlay of any pre-existing blue
-rectangles.</p>
+<p>By default, -show_bounds is 1, and the routine draws a blue rectangle to show the the image analysis boundaries, which are used by image analysis routines like lwdaq_rasnik and lwdaq_bcam. But with -show_bounds set to 0, this blue rectangle is not drawn. If you want to be sure that you don't have a blue rectangle drawn over your gray-scale image, you should also specify -clear 1, so that lwdaq_draw will clear the image overlay of any pre-existing blue rectangles.</p>
 }
 function lwdaq_draw(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -851,12 +751,7 @@ begin
 end;
 
 {
-<p>lwdaq_draw_raw renders a block of raw image data in a Tk photo. The -pix_fmt option follows the naming conventions of <i>ffmpeg</i>. We currently recognise
-formats "gray" for eight-bit gray-scale, and "rgb24" for three-byte color. The
--width and -height options specify the dimensions of the image. The -zoom option
-scales the image as we draw it in the Tk photo. See <a
-href="#lwdaq_draw">lwdaq_draw</a> for description of these last three
-options.</p>
+<p>lwdaq_draw_raw renders a block of raw image data in a Tk photo. The -pix_fmt option follows the naming conventions of <i>ffmpeg</i>. We currently recognise formats "gray" for eight-bit gray-scale, and "rgb24" for three-byte color. The -width and -height options specify the dimensions of the image. The -zoom option scales the image as we draw it in the Tk photo. See <a href="#lwdaq_draw">lwdaq_draw</a> for description of these last three options.</p>
 }
 function lwdaq_draw_raw(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1081,9 +976,7 @@ begin
 end;
 
 {
-<p>lwdaq_image_destroy disposes of an image. You can specify multiple images, or
-image name patterns with * and ? wild cards. You can enter multiple image names
-on the command line, too.</p>
+<p>lwdaq_image_destroy disposes of an image. You can specify multiple images, or image name patterns with * and ? wild cards. You can enter multiple image names on the command line, too.</p>
 }
 function lwdaq_image_destroy(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
