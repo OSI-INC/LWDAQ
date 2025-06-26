@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.1"
+	LWDAQ_tool_init "RAG_Manager" "4.2"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -34,7 +34,7 @@ proc RAG_Manager_init {} {
 #
 # The default question.
 #
-	set config(question) "Calculate the operating life of an A3048 SCT\
+	set config(question) "What is the operating life of an SCT\
 		with 160-Hz bandwidth and mass 2 g."
 #
 # Internal flags, lists, and control variables.
@@ -1208,7 +1208,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 					"equation" {
 						set match "[lindex $chunks end 0]\n\n$match"
 						set content "[lindex $chunks end 1]\n\n$content"
-						set chunks [lreplace $chunks end end]
+						set chunks [lreplace $chunks end end [list $match $content]]
 					}
 					default {
 						set append_chunk 1	
