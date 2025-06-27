@@ -111,6 +111,7 @@ https://www.opensourceinstruments.com/ALT/ALT.php
 https://www.opensourceinstruments.com/SCT/TCB.php
 https://www.opensourceinstruments.com/Resources/Surgery/hmt_sp.html
 https://www.opensourceinstruments.com/Prices.html
+https://www.opensourceinstruments.com/Chat/Manual.html
 
 	}
 #
@@ -1107,10 +1108,15 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set match $content
 			}
 			"h1" {
-				regsub -all {\[Figure\]} $content "" content
-				regsub -all {\[.*?\]} $content "" content
-				regsub -all {\(.*?\)} $content "" content
+				regsub -all {\n} $content "" content
+				regsub -all {\[Figure\]\(http.*?\)} $content "" content
+				regsub -all {\(http.*?\)} $content "" content
+				regsub -all {\[\]} $content "" content
 				set document [string trim $content]
+				RAG_Manager_print "[format %7.0f $i_start]\
+					[format %7.0f $i_end]\
+					[format %6s $name]\
+					\"$document\"" brown	
 			}
 			"h2" {
 				set prev_chapter $chapter
@@ -1183,20 +1189,20 @@ proc RAG_Manager_construct_chunks {page frags} {
 				\"[RAG_Manager_snippet $content 0]\"" green	
 		}
 
-		set heading ""
+		set content_heading ""
 		if {$document != "NONE"} {
-			append heading "%%%%Document: $document\n"
+			append content_heading "%%%%Document: $document\n"
 		}
 		if {$chapter != "NONE"} {
-			append heading "%%%%Chapter: $chapter\n"
+			append content_heading "%%%%Chapter: $chapter\n"
 		}
 		if {$section != "NONE"} {
-			append heading "%%%%Section: $section\n"
+			append content_heading "%%%%Section: $section\n"
 		}
 		if {$date != "NONE"} {
-			append heading "Date: $date\n"
+			append content_heading "Date: $date\n"
 		}
-		set heading [string trim $heading]
+		set content_heading [string trim $content_heading]
 
 		set append_chunk 0
 		switch -- $name {
@@ -1204,7 +1210,10 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"ul" -
 			"pre" {
 				if {$prev_name == "p"} {
-					lset chunks end 0 "[lindex $chunks end 0]\n\n$match"
+					if {$match != ""} {
+						lset chunks end 0 \
+							"[string trim [lindex $chunks end 0]\n\n$match]"
+					}
 					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
 				} else {
 					set append_chunk 1
@@ -1214,12 +1223,15 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"equation" {
 				switch -- $prev_name {
 					"equation" {
-						set match "[lindex $chunks end 0]\n\n$match"
+						if {$match != ""} {
+							set match \
+								"[string trim [lindex $chunks end 0]\n\n$match]"
+						}
 						set content "[lindex $chunks end 1]\n\n$content"
 						lset chunks end [list $match $content]
 					}
 					default {
-						set heading ""
+						set content_heading ""
 						set append_chunk 1
 					}
 				} 
@@ -1244,17 +1256,20 @@ proc RAG_Manager_construct_chunks {page frags} {
 				|| ($chapter_chunk && ($chapter == $prev_chapter)) \
 				|| ($section_chunk && ($section == $prev_section)) } {
 				if {[llength $chunks] > 0} {
-					lset chunks end 0 "[lindex $chunks end 0]\n\n$match"
+					if {$match != ""} {
+						lset chunks end 0 \
+							"[string trim [lindex $chunks end 0]\n\n$match]"
+					}
 					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
 				} else {
-					if {[string length $heading] > 0} {
-						set content "$heading\n\n$content"
+					if {$content_heading != ""} {
+						set content "$content_heading\n\n$content"
 					}
 					set chunks [list [list $match $content]]
 				}
 			} else {
-				if {[string length $heading] > 0} {
-					set content "$heading\n\n$content"
+				if {$content_heading != ""} {
+					set content "$content_heading\n\n$content"
 				}
 				lappend chunks [list $match $content]
 				set prev_section $section

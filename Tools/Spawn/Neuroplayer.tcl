@@ -2039,7 +2039,7 @@ proc Neuroplayer_spectrum {{values ""}} {
 # first opened, the overview extends across the entire archive, but we can
 # select an interval of the file for the overview as well. Previous and Next NDF
 # buttons allow us to look at the next NDF file in the playback directory tree.
-# An Exerpt button causes the Overview to extract the inteval of the original
+# An Excerpt button causes the Overview to extract the inteval of the original
 # NDF archive and write it to disk as a new, shorter NDF archive. 
 #
 proc Neuroplayer_overview {{fn ""} } {
