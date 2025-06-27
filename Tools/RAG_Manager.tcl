@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.3"
+	LWDAQ_tool_init "RAG_Manager" "4.4"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -69,47 +69,52 @@ proc RAG_Manager_init {} {
 #
 	set config(sources) {
 
+https://www.bndhep.net/Electronics/A2071/M2071.html
+https://www.bndhep.net/Electronics/LWDAQ/LWDAQ.html
+https://www.bndhep.net/Devices/BCAM/User_Manual.html
+https://www.opensourceinstruments.com/Electronics/A3013/Flexible_Wires.html
 https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
-https://www.opensourceinstruments.com/Electronics/A3038/M3038.html
-https://www.opensourceinstruments.com/Electronics/A3042/M3042.html
-https://www.opensourceinstruments.com/Electronics/A3047/M3047.html
-https://www.opensourceinstruments.com/Electronics/A3048/M3048.html
-https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
-https://www.opensourceinstruments.com/Electronics/A3040/M3040.html
-https://www.opensourceinstruments.com/Electronics/A3040/EIF.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer_Commands.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neurorecorder.html
 https://www.opensourceinstruments.com/Electronics/A3018/Receiver.html
+https://www.opensourceinstruments.com/Electronics/A3018/Faraday_Enclosures.html
 https://www.opensourceinstruments.com/Electronics/A3019/Electrodes.html
-https://www.opensourceinstruments.com/Electronics/A3013/Flexible_Wires.html
-https://www.opensourceinstruments.com/IST/Manual.html
+https://www.opensourceinstruments.com/Electronics/A3027/M3027.html
+https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
+https://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
+https://www.opensourceinstruments.com/Electronics/A3036/M3036.html
+https://www.opensourceinstruments.com/Electronics/A3038/M3038.html
+https://www.opensourceinstruments.com/Electronics/A3040/M3040.html
+https://www.opensourceinstruments.com/Electronics/A3040/EIF.html
 https://www.opensourceinstruments.com/Electronics/A3041/Stimulator.html
 https://www.opensourceinstruments.com/Electronics/A3041/M3041.html
-https://www.opensourceinstruments.com/Electronics/A3036/M3036.html
-https://www.opensourceinstruments.com/ACC/Manual.html
-https://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
-https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
-https://www.opensourceinstruments.com/About/about.php
-https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Commands.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Toolmaker_Library.html
-https://www.bndhep.net/Devices/BCAM/User_Manual.html
-https://www.opensourceinstruments.com/DFPS/index.html
+https://www.opensourceinstruments.com/Electronics/A3042/M3042.html
+https://www.opensourceinstruments.com/Electronics/A3047/M3047.html
+https://www.opensourceinstruments.com/Electronics/A3048/M3048.html
+https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
+https://www.opensourceinstruments.com/ACC/ACC.php
+https://www.opensourceinstruments.com/ACC/Overview.html
+https://www.opensourceinstruments.com/ALT/ALT.php
 https://www.opensourceinstruments.com/CPMS/index.html
-https://www.opensourceinstruments.com/WPS/WPS.php
 https://www.opensourceinstruments.com/DAQ/DAQ.php
+https://www.opensourceinstruments.com/DFPS/index.html
+https://www.opensourceinstruments.com/HMT/HMT.php
+https://www.opensourceinstruments.com/HMT/EIF.php
+https://www.opensourceinstruments.com/IIS/IIS.php
+https://www.opensourceinstruments.com/IST/IST.php
+https://www.opensourceinstruments.com/IST/Overview.html
 https://www.opensourceinstruments.com/SCT/SCT.php
 https://www.opensourceinstruments.com/SCT/FE.php
 https://www.opensourceinstruments.com/SCT/SCL.php
 https://www.opensourceinstruments.com/SCT/SDE.php
-https://www.opensourceinstruments.com/HMT/HMT.php
-https://www.opensourceinstruments.com/HMT/EIF.php
-https://www.opensourceinstruments.com/IIS/IIS.php
-https://www.opensourceinstruments.com/ACC/ACC.php
-https://www.opensourceinstruments.com/ALT/ALT.php
 https://www.opensourceinstruments.com/SCT/TCB.php
+https://www.opensourceinstruments.com/WPS/WPS.php
+https://www.opensourceinstruments.com/About/about.php
 https://www.opensourceinstruments.com/Resources/Surgery/hmt_sp.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Commands.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Toolmaker_Library.html
 https://www.opensourceinstruments.com/Prices.html
 https://www.opensourceinstruments.com/Chat/Manual.html
 
@@ -248,6 +253,8 @@ provide hyperlinks to these portions of the documentation.
 		&deg;       "°"
 		&middot;    "·"
 		&minus;     "−"
+		&mdash;     "−"
+		&ndash;     "−"
 		&radic;     "√"
 		&asymp;     "≈"
 	}
@@ -291,7 +298,7 @@ set info(entities_final_convert) {
 #
 # The fragment delimiting tags.
 #
-	set info(frag_tags) {p center pre equation figure ul ol h1 h2 h3}
+	set info(frag_tags) {p center pre equation figure ul ol title h1 h2 h3}
 #
 # Input-output parameters.
 #	
@@ -322,6 +329,7 @@ set info(entities_final_convert) {
 	set info(embed_dir) [file join $config(root_dir) "Embed"]
 	set info(log_dir) [file join $config(root_dir) "Log"]
 	set info(signal_file) [file join $info(log_dir) "signal.txt"]
+	set info(offline_file) [file join $info(log_dir) "offline.txt"]
 	set info(dump_file) [file join $info(log_dir) "dump.txt"]
 #
 # Empty string return means all well.
@@ -1030,7 +1038,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		omit-lists=$omit_lists."
 	
 	set date "NONE"
-	set document "NONE"
+	set document "Untitled Document"
 	set chapter "NONE"
 	set prev_chapter "NONE"
 	set section "NONE"
@@ -1107,6 +1115,10 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"pre" {
 				set match $content
 			}
+			"title" {
+				set document [string trim $content]
+				continue
+			}
 			"h1" {
 				regsub -all {\n} $content "" content
 				regsub -all {\[Figure\]\(http.*?\)} $content "" content
@@ -1116,7 +1128,8 @@ proc RAG_Manager_construct_chunks {page frags} {
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
 					[format %6s $name]\
-					\"$document\"" brown	
+					\"$document\"" brown
+				continue
 			}
 			"h2" {
 				set prev_chapter $chapter
@@ -1190,14 +1203,25 @@ proc RAG_Manager_construct_chunks {page frags} {
 		}
 
 		set content_heading ""
-		if {$document != "NONE"} {
-			append content_heading "%%%%Document: $document\n"
+		set match_heading ""
+		append content_heading "%%%%Document: $document\n"
+		if {[regexp \
+				{Manual$|Guide$|^Guide|Tutorial$|Protocol$|Reference$|Overview$} \
+				$document]} {
+			append match_heading "This is an excerpt from the $document"
+		} else {
+			append match_heading "This is an excerpt from $document"
 		}
 		if {$chapter != "NONE"} {
 			append content_heading "%%%%Chapter: $chapter\n"
+			append match_heading ", $chapter chapter"
 		}
 		if {$section != "NONE"} {
 			append content_heading "%%%%Section: $section\n"
+			append match_heading ",$section section"
+		}
+		if {$match_heading != ""} {
+			append match_heading "."
 		}
 		if {$date != "NONE"} {
 			append content_heading "Date: $date\n"
@@ -1232,6 +1256,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 					}
 					default {
 						set content_heading ""
+						set match_heading ""
 						set append_chunk 1
 					}
 				} 
@@ -1265,11 +1290,17 @@ proc RAG_Manager_construct_chunks {page frags} {
 					if {$content_heading != ""} {
 						set content "$content_heading\n\n$content"
 					}
+					if {$match_heading != ""} {
+						set match "$match_heading\n\n$match"
+					}
 					set chunks [list [list $match $content]]
 				}
 			} else {
 				if {$content_heading != ""} {
 					set content "$content_heading\n\n$content"
+				}
+				if {$match_heading != ""} {
+					set match "$match_heading\n\n$match"
 				}
 				lappend chunks [list $match $content]
 				set prev_section $section
@@ -1280,6 +1311,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		set prev_name $name
 	}
 	
+	RAG_Manager_print "Final document title \"$document\"."
 	RAG_Manager_print "Generated [llength $chunks] chunks\
 		from [llength $frags] fragments,\
 		[expr $contaminated+$empty_match+$empty_content] rejects,\
@@ -1537,7 +1569,7 @@ proc RAG_Manager_store_chunks {chunks} {
 			set mfn [file join $info(match_dir) $hash\.txt]
 			if {[file exists $mfn]} {
 				RAG_Manager_print "[format %5d $count]: [file tail $mfn]\
-					\"[RAG_Manager_snippet $match 0]\"" brown
+					\"[RAG_Manager_snippet [regsub {^.*?\n\n} $match ""] 0]\"" brown
 				incr duplicates
 			}
 			set f [open $mfn w]
@@ -1559,7 +1591,7 @@ proc RAG_Manager_store_chunks {chunks} {
 			if {($count % (round([llength $chunks]*$config(progress_frac))+1) == 1) \
 				|| ($count == [llength $chunks])} {
 				RAG_Manager_print "[format %5d $count]: [file tail $mfn]\
-					\"[RAG_Manager_snippet $match 0]\"" green
+					\"[RAG_Manager_snippet [regsub {^.*?\n\n} $match ""] 0]\"" green
 			}
 		}
 		
@@ -1761,6 +1793,11 @@ proc RAG_Manager_delete {} {
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Delete"
 	RAG_Manager_print "Delete Content and Match Strings [RAG_Manager_time]" purple
+	
+	set f [open $info(offline_file) w]
+	puts $f [clock seconds]
+	close $f
+	RAG_Manager_print "Chatbot going offline for library update."
 
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings."
@@ -1809,9 +1846,9 @@ proc RAG_Manager_chunk {} {
 		}
 	}
 	
+	if {[file exists $info(dump_file)]} {file delete $info(dump_file)}
 	if {$config(dump)} {
 		RAG_Manager_print "Writing chunks to dump file..." 
-		if {[file exists $info(dump_file)]} {file delete $info(dump_file)}
 		set count 0
 		foreach chunk $chunks {
 			incr count
@@ -1860,6 +1897,15 @@ proc RAG_Manager_embed {} {
 
 	RAG_Manager_print "Building embedding vector library..."	
 	RAG_Manager_fetch_embeds $api_key
+	
+	if {[file exists $info(offline_file)]} {
+		set f [open $info(offline_file)]
+		set start_time [read $f]
+		close $f
+		set run_min [expr round(([clock seconds]-$start_time)/60.0)]
+		file delete $info(offline_file)
+		RAG_Manager_print "Chatbot online again after $run_min minutes." 
+	}
 	
 	RAG_Manager_print "Embed Library Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
@@ -2091,13 +2137,24 @@ proc RAG_Manager_engine {{cmd ""}} {
 # disk and add them to list. When we exceed the token limit for the question
 # relevance, we stop. We return the number of content strings added to our list,
 # and we store them in the info(contents) list. In order to embed the question,
-# this routine must read a valid API key from disk.
+# this routine must read a valid API key from disk. If a file called offline.txt
+# exists in the log directory, this routine will exit without doing anything.
 #
 proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	
 	if {$info(control) != "Idle"} {return ""}
+
+	if {[file exists $info(offline_file)]} {
+		set f [open $info(offline_file)]
+		set start_time [read $f]
+		close $f
+		set run_min [expr round(([clock seconds]-$start_time)/60.0)]		
+		RAG_Manager_print "Chatbot has been offline for $run_min minutes."
+		return "0"
+	}
+
 	set question [string trim $config(question)]
 	if {$question == ""} {
 		RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
@@ -2348,13 +2405,15 @@ proc RAG_Manager_get_answer {question contents assistant api_key model} {
 # message and report the error. If we can't extract an error message, we return
 # a failure error message of our own. In all cases, what we return is the raw
 # json, but what we print to the console or log file is formatted for plain text
-# display.
+# display. If a file called offline.txt exists in the log directory, this
+# routine will return an announcement that the chatbot is offline.
 #
 proc RAG_Manager_submit {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	
 	if {$info(control) != "Idle"} {return ""}
+	
 	set question [string trim $config(question)]
 	if {$question == ""} {
 		RAG_Manager_print "ERROR: Empty question, abandoning submission."
@@ -2364,6 +2423,28 @@ proc RAG_Manager_submit {} {
 			> $config(max_question_tokens)} {
 		set answer "ERROR: Question is longer than\
 			[expr $config(max_question_tokens)*$info(token_size)] characters."
+		return $answer
+	}
+
+	if {[file exists $info(offline_file)]} {
+		set f [open $info(offline_file)]
+		set start_time [read $f]
+		close $f
+		set run_min [expr round(([clock seconds]-$start_time)/60.0)]
+		set answer "### OSI Chatbot Temporarily Offline\\n\\n\
+			The OSI Chatbot is currently undergoing a documentation library update.\\n\\n\
+			This process began $run_min minutes ago and is expected to take\
+			no more than 10 minutes.\\n\\n\
+			Please try again shortly.\
+			We apologize for any inconvenience."
+		RAG_Manager_print "-----------------------------------------------------" brown
+		RAG_Manager_print "Detected offline file: $info(offline_file):" brown
+		RAG_Manager_print $answer green
+		RAG_Manager_print "-----------------------------------------------------" brown
+		RAG_Manager_print "Answer to \"$question\":" purple
+		regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
+		RAG_Manager_print $answer_txt
+		append info(chat) "Answer: $answer_txt\n\n"
 		return $answer
 	}
 	
