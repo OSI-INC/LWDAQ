@@ -2312,7 +2312,7 @@ proc RAG_Manager_retrieve {} {
 	}
 	RAG_Manager_print "-----------------------------------------------------" brown
 
-	if {$config(chat_submit)} {
+	if {$config(chat_submit)} {	
 		set matches [regexp -all -inline -indices \
 			{Question:.*?(?=Question:|$)} $info(chat)]
 		set chat ""
@@ -2432,7 +2432,7 @@ proc RAG_Manager_submit {} {
 		close $f
 		set run_min [expr round(([clock seconds]-$start_time)/60.0)]
 		set answer "### OSI Chatbot Temporarily Offline\\n\\n\
-			The OSI Chatbot is currently undergoing a documentation library update.\\n\\n\
+			We are currently updating the OSI Chatbot's documentation library.\\n\\n\
 			This process began $run_min minutes ago and is expected to take\
 			no more than 10 minutes.\\n\\n\
 			Please try again shortly.\
@@ -2449,7 +2449,7 @@ proc RAG_Manager_submit {} {
 	}
 	
 	set info(control) "Submit"
-	RAG_Manager_print "Submit Question and Contents to\
+	RAG_Manager_print "Submit Question, History and Retrieved Content to\
 		Completion End Point [RAG_Manager_time]" purple
 	RAG_Manager_print "Choosing answer model and assistant prompt..."
 	set r $info(relevance)
