@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.4"
+	LWDAQ_tool_init "RAG_Manager" "4.5"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -133,6 +133,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(low_rel_tokens) "0"
 	set config(max_question_tokens) "300"
 	set config(embed_model) "text-embedding-3-small"
+	set config(answer_timeout_s) "30" 
 #
 # Titles for content we submit to completion end point.
 #	
@@ -2375,19 +2376,24 @@ proc RAG_Manager_get_answer {question contents assistant api_key model} {
 	  -d $json_body] 
 
 	set ch [open $cmd]
-	set chpid [pid $ch]
 	fconfigure $ch -blocking 0 -buffering line
 	set result ""
+	set start_time [clock seconds]
 	while {1} {
 		set line [gets $ch]
 		if {[eof $ch]} {
 			break
-		} elseif {$line eq ""} {
-			LWDAQ_update
-			continue
-		} else {
+		} elseif {$line != ""} {
 			append result "$line\n"
 		}
+		if {[clock seconds] - $start_time > $config(answer_timeout_s)} {
+			set result "\"content\": \"Hello? Oh dear, I lost my train of thought.\
+				I do apologise. It happens sometimes. Please ask your question\
+				again.\""
+			close $ch
+			break
+		}
+		LWDAQ_update
 	}		  
 	return $result
 }
