@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "2.3"
+	LWDAQ_tool_init "SCT_Check" "2.4"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -49,17 +49,17 @@ proc SCT_Check_init {} {
 	set config(sweep_time) "2"
 
 	set config(min_num_clocks) "64"
-	set config(max_num_clocks) "512"
+	set config(max_num_clocks) "1024"
 	set config(min_id) "1"
 	set config(max_id) "254"
 	set config(glitch) "0"
-	set config(settle) "0.5"
+	set config(settle_s) "1.0"
 	
 	set config(off_frequency) "40e6"
 	set config(vbat_ref) "1.80"
 	
 	set config(sample_rates) "64 128 256 512 1024 2048"
-	set config(frequencies_shared) "0.25 0.5 1.0 2.0 4 10\
+	set config(frequencies_shared) "0.125 0.25 0.5 1.0 2.0 4 10\
 		20 40 100 200 400 1000"
 	set config(frequencies_wrt_sps) "0.13 0.15 0.17 0.19 0.21 0.23\
 		0.27 0.29 0.31 0.33 0.35 0.37 0.39 0.41 0.43 0.45 0.49 0.55 0.57"
@@ -284,7 +284,7 @@ proc SCT_Check_measure {{index "-1"}} {
 		set $config(waveform_type) "sine"
 
 		set frequency [lindex $config(frequencies) $index]
-		set num_clocks [expr round(2.0*$iinfo(clock_frequency)/$frequency)]
+		set num_clocks [expr round(1.0*$iinfo(clock_frequency)/$frequency)]
 		if {$num_clocks < $config(min_num_clocks)} {
 			set num_clocks $config(min_num_clocks)
 		}
@@ -294,7 +294,7 @@ proc SCT_Check_measure {{index "-1"}} {
 		set iconfig(daq_num_clocks) $num_clocks
 		set config(waveform_frequency) $frequency
 		SCT_Check_waveform_on
-		LWDAQ_wait_ms [expr round(1000.0*$config(settle)/$frequency)]
+		LWDAQ_wait_ms [expr round(1000.0*$config(settle_s)/$frequency)]
 
 		LWDAQ_reset_Receiver
 		set iconfig(analysis_channels) $config(signals)
