@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.5"
+	LWDAQ_tool_init "RAG_Manager" "4.6"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -1750,39 +1750,6 @@ proc RAG_Manager_fetch_embeds {api_key} {
 }
 
 #
-# RAG_Manager_purge_embeds makes a list of all content strings in a match
-# directory and another list of all the embeds in the embed directory. It
-# deletes any embed for which there is not corresponding match string.
-#
-proc RAG_Manager_purge_embeds {} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-		
-	if {$info(control) != "Idle"} {return ""}
-	set info(control) "Purge"
-	RAG_Manager_print "Purge Obsolete Embed Vectors [RAG_Manager_time]" purple
-	
-	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
-	RAG_Manager_print "Found [llength $cfl] content strings on disk."
-	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
-	RAG_Manager_print "Found [llength $efl] embeds on disk."
-
-	set purge_count 0
-	foreach efn $efl {
-		set root [file root [file tail $efn]]
-		if {![regexp $root $cfl]} {
-			file delete $efn
-			incr purge_count
-		}
-	}
-	RAG_Manager_print "Purged $purge_count embeds with no content string."
-
-	RAG_Manager_print "Purge Complete [RAG_Manager_time]" purple
-	set info(control) "Idle"
-	return $purge_count
-}
-
-#
 # RAG_Manager_json_format takes a string and formats double quotes, newlines,
 # backslashes, and multiple white spaces for a json string.
 #
@@ -1800,9 +1767,11 @@ proc RAG_Manager_json_format {s} {
 #
 # RAG_Manager_delete deletes all chunks from the chunk directory. It does not
 # delete embeddings in the embed directory. Unused embedding vectors are culled
-# during generation.
+# during generation. By default, the offline flag is set, and the routine creates
+# an offline flag file to tell the chatbot and retrieval engine that the library
+# is unavailable.
 #
-proc RAG_Manager_delete {} {
+proc RAG_Manager_delete {{offline "1"}} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
@@ -1810,11 +1779,13 @@ proc RAG_Manager_delete {} {
 	set info(control) "Delete"
 	RAG_Manager_print "Delete Content and Match Strings [RAG_Manager_time]" purple
 	
-	set f [open $info(offline_file) w]
-	puts $f [clock seconds]
-	close $f
-	RAG_Manager_print "Chatbot going offline for library update."
-
+	if {$offline} {
+		set f [open $info(offline_file) w]
+		puts $f [clock seconds]
+		close $f
+		RAG_Manager_print "Chatbot going offline for library update."
+	}
+	
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings."
 	set count 0
@@ -1890,9 +1861,10 @@ proc RAG_Manager_chunk {} {
 #
 # RAG_Manager_embed identifies match strings for which no embedding vector
 # exists and submits them to the embedding endpoing. This routine needs a valid
-# API key from disk. It clears the libarary-loaded flag.
+# API key from disk. It clears the libarary-loaded flag. By default, the offline
+# flag is set, and this routine will delete any offline flag file.
 #
-proc RAG_Manager_embed {} {
+proc RAG_Manager_embed {{offline "1"}} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
@@ -1914,7 +1886,7 @@ proc RAG_Manager_embed {} {
 	RAG_Manager_print "Building embedding vector library..."	
 	RAG_Manager_fetch_embeds $api_key
 	
-	if {[file exists $info(offline_file)]} {
+	if {$offline && [file exists $info(offline_file)]} {
 		set f [open $info(offline_file)]
 		set start_time [read $f]
 		close $f
@@ -1929,6 +1901,50 @@ proc RAG_Manager_embed {} {
 }
 
 #
+# RAG_Manager_purge_embeds makes a list of all content strings in a match
+# directory and another list of all the embeds in the embed directory. It
+# deletes any embed for which there is not corresponding match string. By
+# default, the offline flag is set, and this routine will delete any offline
+# flag file.
+#
+proc RAG_Manager_purge_embeds {{offline "1"}} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+		
+	if {$info(control) != "Idle"} {return ""}
+	set info(control) "Purge"
+	RAG_Manager_print "Purge Obsolete Embed Vectors [RAG_Manager_time]" purple
+	
+	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
+	RAG_Manager_print "Found [llength $cfl] content strings on disk."
+	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
+	RAG_Manager_print "Found [llength $efl] embeds on disk."
+
+	set purge_count 0
+	foreach efn $efl {
+		set root [file root [file tail $efn]]
+		if {![regexp $root $cfl]} {
+			file delete $efn
+			incr purge_count
+		}
+	}
+	RAG_Manager_print "Purged $purge_count embeds with no content string."
+
+	if {$offline && [file exists $info(offline_file)]} {
+		set f [open $info(offline_file)]
+		set start_time [read $f]
+		close $f
+		set run_min [expr round(([clock seconds]-$start_time)/60.0)]
+		file delete $info(offline_file)
+		RAG_Manager_print "Chatbot online again after $run_min minutes." 
+	}
+
+	RAG_Manager_print "Purge Complete [RAG_Manager_time]" purple
+	set info(control) "Idle"
+	return $purge_count
+}
+
+#
 # RAG_Manager_load loads all the embedding vectors stored in the embed director
 # into memory using the lwdaq_rag utility. It deduces the number of embed vectors
 # from the list of files and makes a library that is exactly the correct size, and
@@ -1938,7 +1954,6 @@ proc RAG_Manager_load {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	
-	RAG_Manager_print "Loading embed library into memory..."
 	set info(library_loaded) "0"
 
 	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
@@ -1958,8 +1973,9 @@ proc RAG_Manager_load {} {
 	
 	set start_time [clock milliseconds]
 	lwdaq_rag create -lib_len $lib_len -vec_len $vec_len
-	RAG_Manager_print "Embed library created in\
+	RAG_Manager_print "Memory for embed library allocated in\
 		[expr [clock milliseconds] - $start_time] ms."
+	RAG_Manager_print "Loading embeds into memory..."
 		
 	set start_time [clock milliseconds]
 	foreach efn $efl {
@@ -1976,8 +1992,7 @@ proc RAG_Manager_load {} {
 			}
 		}
 	}
-	RAG_Manager_print "Embeds added to library in\
-		[expr [clock milliseconds] - $start_time] ms."
+	RAG_Manager_print "Embeds loaded in [expr [clock milliseconds] - $start_time] ms."
 	
 	RAG_Manager_print "Loading complete with a total of $count embeds"
 	set info(library_loaded) "1"
@@ -2078,6 +2093,7 @@ proc RAG_Manager_engine {{cmd ""}} {
 		if {[regexp {Q([0-9a-f]+)} $name -> name]} {
 			RAG_Manager_print "Engine: Grabbing question embed\
 				[file tail $lfn], [RAG_Manager_time]."
+			set start_ms [clock milliseconds]
 			set tfn [file join $info(log_dir) "T$name\.txt"]
 			file rename $lfn $tfn
 			
@@ -2122,7 +2138,9 @@ proc RAG_Manager_engine {{cmd ""}} {
 				set rfn [file join $info(log_dir) "R$name\.txt"]
 				file rename $tfn $rfn
 				RAG_Manager_print "Engine:\
-					Retrieval file R$name\.txt ready, [RAG_Manager_time]."
+					Retrieval file R$name\.txt ready in\
+					[expr [clock milliseconds]-$start_ms] ms,\
+					[RAG_Manager_time]."
 			} error_result]} {
 				RAG_Manager_print "ERROR: $error_result"
 				set info(control) "Idle"
