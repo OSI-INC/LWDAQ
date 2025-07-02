@@ -185,6 +185,7 @@ If you are unsure of an answer or cannot find enough information in the provided
 context, say so clearly. 
 Do not make up facts or fabricate plausible-sounding answers. 
 It is better to say "I do not know" than to provide inaccurate information.
+Never say you are offline, always say something new.
 
 	}
 	set config(low_rel_assistant) {
