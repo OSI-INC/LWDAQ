@@ -53,7 +53,7 @@ proc RAG_Manager_init {} {
 	set info(retrieval_check_ms) "10"
 	set info(library_loaded) "0"
 	set info(reload_s) "3600"
-	set info(reload_time) "0"
+	set info(offline_flag) "0"
 #
 # Public control flags.
 #
@@ -195,8 +195,10 @@ You will complete mathematical calculations whenever possible.
 Respond using Markdown formatting.
 Use LaTeX formatting within Markdown for mathematical expressions.
 Use the minimal escaping required to represent valid LaTeX.
-If portions of the supporting documentation discuss the exact topic presented in the question,
+If portions of the supporting documentation discuss 
+the exact topic presented in the question,
 provide hyperlinks to these portions of the documentation.
+Never say you are offline, always say something new.
 
 	}
 #
@@ -1999,7 +2001,9 @@ proc RAG_Manager_load {} {
 # re-writes the temporary file with the retrieved embed list. It renames the
 # temporary file by replacing thge leading T with an R. This "retrieval file" is
 # now ready for consumption by the process that wrote the question file to the
-# log directory.
+# log directory. When it sees the offline flag file, it sets an offline flag.
+# When it sees no offline flag file, but its own offline flag is set, it re-loads
+# the library. Otherwise it does not reload the library.
 #
 proc RAG_Manager_engine {{cmd ""}} {
 	upvar #0 RAG_Manager_config config
@@ -2021,34 +2025,42 @@ proc RAG_Manager_engine {{cmd ""}} {
 	if {$cmd == "Start"} {
 		if {$info(engine_ctrl) == "Idle"} {
 			set info(engine_ctrl) "Run"
-			RAG_Manager_print "Engine: Starting Up [RAG_Manager_time]." purple
-			RAG_Manager_print "Engine: Operating in $info(log_dir)."
-			set info(reload_time) "0"
+			RAG_Manager_print "Engine: Starting up in \"$info(log_dir)\",\
+				[RAG_Manager_time]." purple
+			set info(offline_flag) "1"
+			set info(signal_time) "0"
 		} else {
 			return ""
 		}
 	}
 	
-	if {[clock seconds] > $info(reload_time)} {
-		if {[catch {
-			RAG_Manager_print "Engine: Re-loading library\
-				[RAG_Manager_time $info(reload_time)]"
-			RAG_Manager_load
-		} error_message]} {
-			RAG_Manager_print "ERROR: $error_message"
-			set info(engine_ctrl) "Idle"
-			return ""
+	if {[file exists $info(offline_file)]} {
+		if {!$info(offline_flag)} {
+			set info(offline_flag) "1"
+			RAG_Manager_print "Engine: Going offline, [RAG_Manager_time]"
 		}
-		set info(reload_time) [expr [clock seconds] + $info(reload_s)]
-		RAG_Manager_print "Engine: Next library load\
-			[RAG_Manager_time $info(reload_time)]"
+		LWDAQ_post RAG_Manager_engine
+		return ""
+	} else {
+		if {$info(offline_flag)} {
+			set info(offline_flag) "0"		
+			if {[catch {
+				RAG_Manager_print "Engine: Coming online, loading new library,\
+					[RAG_Manager_time]"
+				RAG_Manager_load
+			} error_message]} {
+				RAG_Manager_print "ERROR: $error_message"
+				set info(engine_ctrl) "Idle"
+				return ""
+			}
+		}
 	}
 
 	if {[file exists $info(signal_file)]} {
 		if {$info(signal_time) <= [clock seconds]} {
 			file mtime $info(signal_file) [clock seconds]
 			set info(signal_time) [expr [clock seconds] + $info(signal_s)]
-			RAG_Manager_print "Engine: Touched signal file $info(signal_file)." salmon
+			RAG_Manager_print "Engine: Touched signal file $info(signal_file)." brown
 		}
 	} else {
 		set f [open $info(signal_file) w]
@@ -2056,7 +2068,8 @@ proc RAG_Manager_engine {{cmd ""}} {
 			This is the RAG Manager Engine Signal File. The engine touches this\
 			file every $info(signal_s) seconds to show that it is running."
 		close $f
-		RAG_Manager_print "Engine: Created signal file $info(signal_file)."
+		RAG_Manager_print "Engine: Created signal file $info(signal_file),\
+			[RAG_Manager_time]."
 	}
 	
 	set lfl [glob -nocomplain [file join $info(log_dir) *.txt]]
@@ -2449,11 +2462,11 @@ proc RAG_Manager_submit {} {
 		set f [open $info(offline_file)]
 		set start_time [read $f]
 		close $f
-		set run_min [expr round(([clock seconds]-$start_time)/60.0)]
+		set run_min [format %.1f [expr ([clock seconds]-$start_time)/60.0]]
 		set answer "### OSI Chatbot Temporarily Offline\\n\\n\
 			We are currently updating the OSI Chatbot's documentation library.\\n\\n\
 			This process began $run_min minutes ago and is expected to take\
-			no more than 10 minutes.\\n\\n\
+			no more than ten minutes.\\n\\n\
 			Please try again shortly.\
 			We apologize for any inconvenience."
 		RAG_Manager_print "-----------------------------------------------------" brown
