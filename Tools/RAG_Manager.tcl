@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.6"
+	LWDAQ_tool_init "RAG_Manager" "4.7"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -185,7 +185,7 @@ If you are unsure of an answer or cannot find enough information in the provided
 context, say so clearly. 
 Do not make up facts or fabricate plausible-sounding answers. 
 It is better to say "I do not know" than to provide inaccurate information.
-Never say you are offline, always say something new.
+Never say you are offline, inform user that you are available to answer questions.
 
 	}
 	set config(low_rel_assistant) {
@@ -199,7 +199,7 @@ Use the minimal escaping required to represent valid LaTeX.
 If portions of the supporting documentation discuss 
 the exact topic presented in the question,
 provide hyperlinks to these portions of the documentation.
-Never say you are offline, always say something new.
+Never say you are offline, inform user that you are available to answer questions.
 
 	}
 #
@@ -580,8 +580,7 @@ proc RAG_Manager_set_key {{kfn ""}} {
 #
 # RAG_Manager_configure opens the tool configuration window, which allows us to
 # edit the configuration parameters. Additional buttons give access to multi-line
-# parameters, like the source url list and the assistant prompts. Another button
-# purges obsolete embeds from the embed directory.
+# parameters, like the source url list and the assistant prompts.
 #
 proc RAG_Manager_configure {} {
 	upvar #0 RAG_Manager_config config
@@ -589,7 +588,7 @@ proc RAG_Manager_configure {} {
 
 	set f [LWDAQ_tool_configure RAG_Manager 3]
 
-	foreach a {Set_Root Set_Key Source_URLs Assistant_Prompts Purge_Embeds} {
+	foreach a {Set_Root Set_Key Source_URLs Assistant_Prompts} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -1766,26 +1765,54 @@ proc RAG_Manager_json_format {s} {
 }
 
 #
+# RAG_Manager_offline creates or destroys a flag file in the log directory whose
+# presence instructs the chatbot and retrieval engine to go offline. The file
+# contains the UNIX time at which it was written. If we pass a 1 to the routine,
+# it creates the file. If we pass a 0, it deletes the file. In both cases, it
+# makes an announcement.
+#
+proc RAG_Manager_offline {offline} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+
+	if {$offline} {
+		if {![file exists $info(offline_file)]} {
+			set f [open $info(offline_file) w]
+			puts $f [clock seconds]
+			close $f
+			RAG_Manager_print "Chatbot going offline, [RAG_Manager_time]." purple
+		} else {
+			RAG_Manager_print "Chatbot is already offline, [RAG_Manager_time]." purple
+		}
+	} else {
+		if {[file exists $info(offline_file)]} {
+			set f [open $info(offline_file)]
+			set start_time [read $f]
+			close $f
+			set run_min [expr round(([clock seconds]-$start_time)/60.0)]
+			file delete $info(offline_file)
+			RAG_Manager_print "Chatbot back online after $run_min minutes,\
+				[RAG_Manager_time]." purple
+		} else {
+			RAG_Manager_print "Chatbot is already online, [RAG_Manager_time]." purple
+		}
+	}
+	
+	return $offline
+}
+
+#
 # RAG_Manager_delete deletes all chunks from the chunk directory. It does not
 # delete embeddings in the embed directory. Unused embedding vectors are culled
-# during generation. By default, the offline flag is set, and the routine creates
-# an offline flag file to tell the chatbot and retrieval engine that the library
-# is unavailable.
+# during generation.
 #
-proc RAG_Manager_delete {{offline "1"}} {
+proc RAG_Manager_delete {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Delete"
 	RAG_Manager_print "Delete Content and Match Strings [RAG_Manager_time]" purple
-	
-	if {$offline} {
-		set f [open $info(offline_file) w]
-		puts $f [clock seconds]
-		close $f
-		RAG_Manager_print "Chatbot going offline for library update."
-	}
 	
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings."
@@ -1862,10 +1889,9 @@ proc RAG_Manager_chunk {} {
 #
 # RAG_Manager_embed identifies match strings for which no embedding vector
 # exists and submits them to the embedding endpoing. This routine needs a valid
-# API key from disk. It clears the libarary-loaded flag. By default, the offline
-# flag is set, and this routine will delete any offline flag file.
+# API key from disk. It clears the libarary-loaded flag.
 #
-proc RAG_Manager_embed {{offline "1"}} {
+proc RAG_Manager_embed {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
@@ -1887,28 +1913,20 @@ proc RAG_Manager_embed {{offline "1"}} {
 	RAG_Manager_print "Building embedding vector library..."	
 	RAG_Manager_fetch_embeds $api_key
 	
-	if {$offline && [file exists $info(offline_file)]} {
-		set f [open $info(offline_file)]
-		set start_time [read $f]
-		close $f
-		set run_min [expr round(([clock seconds]-$start_time)/60.0)]
-		file delete $info(offline_file)
-		RAG_Manager_print "Chatbot online again after $run_min minutes." 
-	}
-	
 	RAG_Manager_print "Embed Library Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
 	return ""
 }
 
 #
-# RAG_Manager_purge_embeds makes a list of all content strings in a match
-# directory and another list of all the embeds in the embed directory. It
-# deletes any embed for which there is not corresponding match string. By
-# default, the offline flag is set, and this routine will delete any offline
-# flag file.
+# RAG_Manager_purge makes a list of all content strings in a match directory and
+# another list of all the embeds in the embed directory. It deletes any embed
+# for which there is not corresponding match string. If we set the offline flag,
+# the routine will take the chatbot and retrieval engine offline while it
+# operates. By default, however, the routine does not create or delete an
+# offline flag file.
 #
-proc RAG_Manager_purge_embeds {{offline "1"}} {
+proc RAG_Manager_purge {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 		
@@ -1930,15 +1948,6 @@ proc RAG_Manager_purge_embeds {{offline "1"}} {
 		}
 	}
 	RAG_Manager_print "Purged $purge_count embeds with no content string."
-
-	if {$offline && [file exists $info(offline_file)]} {
-		set f [open $info(offline_file)]
-		set start_time [read $f]
-		close $f
-		set run_min [expr round(([clock seconds]-$start_time)/60.0)]
-		file delete $info(offline_file)
-		RAG_Manager_print "Chatbot online again after $run_min minutes." 
-	}
 
 	RAG_Manager_print "Purge Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
@@ -2633,11 +2642,14 @@ proc RAG_Manager_open {} {
 	label $f.control -textvariable RAG_Manager_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 
-	foreach a {Delete Chunk Embed Retrieve Submit History Clear} {
+	foreach a {Delete Chunk Embed Purge Retrieve Submit History Clear} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
+	
+	set f [frame $w.more]
+	pack $f -side top -fill x
 
 	foreach a {Verbose Dump} {
 		set b [string tolower $a]
@@ -2655,6 +2667,10 @@ proc RAG_Manager_open {} {
 	label $f.ectrl -textvariable RAG_Manager_info(engine_ctrl) -fg green -width 8
 	pack $f.ectrl -side left -expand yes
 	
+	button $f.offline -text "Offline" -command "RAG_Manager_offline 1"
+	button $f.online -text "Online" -command "RAG_Manager_offline 0"
+	pack $f.offline $f.online -side left -expand yes
+	
 	button $f.config -text "Configure" -command "LWDAQ_post RAG_Manager_configure"
 	pack $f.config -side left -expand yes
 	button $f.help -text "Help" -command {
@@ -2667,11 +2683,11 @@ proc RAG_Manager_open {} {
 		set f [frame $w.$b]
 		pack $f -side top
 		label $f.l$b -text "$a\:" -fg green
-		entry $f.e$b -textvariable RAG_Manager_config($b) -width 140
+		entry $f.e$b -textvariable RAG_Manager_config($b) -width 100
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 			
-	set info(text) [LWDAQ_text_widget $w 140 40]
+	set info(text) [LWDAQ_text_widget $w 100 40]
 	LWDAQ_print $info(text) "$info(name) Version $info(version)\n" purple
 	
 	return $w	
