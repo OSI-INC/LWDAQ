@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.7"
+	LWDAQ_tool_init "RAG_Manager" "4.8"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -2050,10 +2050,12 @@ proc RAG_Manager_engine {{cmd ""}} {
 	if {$cmd == "Start"} {
 		if {$info(engine_ctrl) == "Idle"} {
 			set info(engine_ctrl) "Run"
-			RAG_Manager_print "Engine: Starting up in \"$info(log_dir)\",\
-				[RAG_Manager_time]." purple
+			RAG_Manager_print "Engine: Starting up, [RAG_Manager_time]." purple
 			set info(offline_flag) "1"
 			set info(signal_time) "0"
+			if {[file exists $info(offline_file)]} {
+				RAG_Manager_print "Engine: Chatbot is offline, waiting to load library."
+			}
 		} else {
 			return ""
 		}
@@ -2491,11 +2493,10 @@ proc RAG_Manager_submit {} {
 		set start_time [read $f]
 		close $f
 		set run_min [format %.1f [expr ([clock seconds]-$start_time)/60.0]]
-		set answer "### OSI Chatbot Temporarily Offline\\n\\n\
-			We are currently updating the OSI Chatbot's documentation library.\\n\\n\
-			This process began $run_min minutes ago and is expected to take\
-			no more than ten minutes.\\n\\n\
-			Please try again shortly.\
+		set answer "The OSI Chatbot is temporarily offline.\
+			We are updating its documentation library.\
+			This process began $run_min minutes ago\
+			and is expected to take no more than ten minutes.\
 			We apologize for any inconvenience."
 		RAG_Manager_print "-----------------------------------------------------" brown
 		RAG_Manager_print "Detected offline file: $info(offline_file):" brown
