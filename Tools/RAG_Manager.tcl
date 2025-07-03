@@ -134,6 +134,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(max_question_tokens) "300"
 	set config(embed_model) "text-embedding-3-small"
 	set config(answer_timeout_s) "30" 
+	set config(offline_min) "4"
 #
 # Titles for content we submit to completion end point.
 #	
@@ -2496,7 +2497,7 @@ proc RAG_Manager_submit {} {
 		set answer "The OSI Chatbot is temporarily offline.\
 			We are updating its documentation library.\
 			This process began $run_min minutes ago\
-			and is expected to take no more than ten minutes.\
+			and is expected to take no more than $config(offline_min) minutes.\
 			We apologize for any inconvenience."
 		RAG_Manager_print "-----------------------------------------------------" brown
 		RAG_Manager_print "Detected offline file: $info(offline_file):" brown
