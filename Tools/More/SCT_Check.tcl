@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "2.4"
+	LWDAQ_tool_init "SCT_Check" "2.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -38,6 +38,7 @@ proc SCT_Check_init {} {
 
 	set config(gen_ip) "10.0.0.37"
 	set config(gen_ch) "1"
+	set config(rx_ip) "10.0.0.37"
 
 	set config(waveform_type) "sine"
 	set config(waveform_types) "sine triangle square sweep"
@@ -203,6 +204,7 @@ proc SCT_Check_battery {} {
 	LWDAQ_print $info(text) "Measuring battery voltages for selected signals." purple
 	LWDAQ_reset_Receiver
 	set iconfig(analysis_channels) $config(signals)
+	set iconfig(daq_ip_addr) $config(rx_ip)
 	set iinfo(glitch_threshold) $config(glitch)
 	set result [LWDAQ_acquire Receiver]
 	set iconfig(analysis_channels) "*"
@@ -238,6 +240,7 @@ proc SCT_Check_detect {} {
 	LWDAQ_reset_Receiver
 	set iconfig(daq_num_clocks) 128
 	set iconfig(analysis_channels) "*"
+	set iconfig(daq_ip_addr) $config(rx_ip)
 	set result [LWDAQ_acquire Receiver]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
@@ -298,6 +301,7 @@ proc SCT_Check_measure {{index "-1"}} {
 
 		LWDAQ_reset_Receiver
 		set iconfig(analysis_channels) $config(signals)
+		set iconfig(daq_ip_addr) $config(rx_ip)
 		set iinfo(glitch_threshold) $config(glitch)
 		set result [LWDAQ_acquire Receiver]
 		set iconfig(analysis_channels) "*"
@@ -383,11 +387,11 @@ proc SCT_Check_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {Receiver} {
-		set b [string tolower $a]
-		button $f.$b -text "$a" -command "LWDAQ_open $a"
-		pack $f.$b -side left -expand yes
+	button $f.receiver -text "Receiver" -command {
+		LWDAQ_open Receiver
+		set LWDAQ_config_Receiver(daq_ip_addr) $SCT_Check_config(rx_ip)
 	}
+	pack $f.receiver -side left -expand yes
 	
 	foreach a {Spectrometer} {
 		set b [string tolower $a]
@@ -443,7 +447,7 @@ proc SCT_Check_open {} {
 	pack $f.lgip $f.egip -side left -expand yes
 
 	label $f.lrip -text "RXIP:" -fg $config(label_color)
-	entry $f.erip -textvariable LWDAQ_config_Receiver(daq_ip_addr) -width 16
+	entry $f.erip -textvariable SCT_Check_config(rx_ip) -width 16
 	pack $f.lrip $f.erip -side left -expand yes
 	
 	foreach a {Glitch} {
@@ -524,22 +528,23 @@ generator. It uses the Receiver Instrument, included with LWDAQ, to download
 telemetry signals from the receiver.
 
 Measure: Start a detailed measurement of frequency response. We will go through
-all the frequencies defined for the measurement, starting with the lowest frequency. We
-assert this frequency and measure the amplitude of the response from all transmitters
-listed in the signals string. We move to the next frequency, and so on, recording 
-the amplitudes of all signals as we go.
+all the frequencies defined for the measurement, starting with the lowest
+frequency. We assert this frequency and measure the amplitude of the response
+from all transmitters listed in the signals string. We move to the next
+frequency, and so on, recording the amplitudes of all signals as we go.
 
 Stop: Abort a sweep.
 
 Print: Print the results of a sweep to the text window.
 
-Waveform_On: Turn on the waveform specified by the Waveform entry boxes. We now see
-a repeating waveform produced by the function generator, perhaps even a repeating frequency sweep, on our function
-generator, and we can see what this looks like in the Receiver window.
+Waveform_On: Turn on the waveform specified by the Waveform entry boxes. We now
+see a repeating waveform produced by the function generator, perhaps even a
+repeating frequency sweep, on our function generator, and we can see what this
+looks like in the Receiver window.
 
 Waveform_Off: Turn off the waveform, the function generator output goes to zero.
 
-Receiver: Open the Receiver Instrument. 
+Receiver: Open the Receiver Instrument and set its daq_ip_addr.
 
 Spectrometer: Open the Spectrometer Tool.
 
@@ -573,7 +578,9 @@ FGIP: The function generator IP address.
 RXIP: The data receiver IP address. If we are using an ODR, we must also specify
 the driver socket into which we have plugged the ODR. By default we use socket
 one (1). We can specify another socket by opening the Receiver Instrument with
-the Receiver button and setting daq_driver_socket to our chosen value.
+the Receiver button and setting daq_driver_socket to our chosen value. The SCT
+Check tool uses its own configuration parameter to store the receiver IP address
+it will use with the Receiver Instrument.
 
 Version: The SCT assembly version. The A3048S2 would be "S", the A3049Q4 would
 be "Q". We could also write "A3Z" if we wanted, but if we write "A3", the "3"

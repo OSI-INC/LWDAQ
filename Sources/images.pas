@@ -758,7 +758,8 @@ end;
 	line with real-valued coordinates so as to avoid rounding errors in the
 	start and end of the line it draws. The "color" parameter specifies not only
 	the color of the line but also its width. Byte zero is the color, byte one
-	is the width minus one. We reserve bytes two and three for future use. }
+	is the width minus one. We reserve bytes two and three for future use. 
+}
 procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;
 	color:integer);
 	
@@ -820,6 +821,9 @@ end;
 	draw_overlay_line draws a line in two-dimensional integer space onto the
 	overlay of the specified image. The routine draws the line in the specified
 	color, and clips it to the analysis bounds. It calls draw_overlay_xy_line.
+	The "color" parameter specifies not only the color of the line but also its
+	width. Byte zero is the color, byte one is the width minus one. We reserve
+	bytes two and three for future use. 
 }
 procedure draw_overlay_line(ip:image_ptr_type;line:ij_line_type;
 	color:integer);

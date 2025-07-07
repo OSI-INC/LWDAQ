@@ -439,7 +439,9 @@ begin
 end;
 
 {
-	Draws a line in the overlay.
+	Draws a line in the overlay. The "color" parameter specifies not only the
+	color of the line but also its width. Byte zero is the color, byte one is
+	the width minus one. We reserve bytes two and three for future use. 
 }
 procedure display_ccd_line(ip:image_ptr_type;line:ij_line_type;color:integer);
 begin
@@ -550,7 +552,9 @@ end;
 	code. We can draw grid lines on the graph with the x_div and y_div
 	parameters. If these are greater than zero, they specify the separation of
 	the x-axis and y-axis grid lines. The grid lines are drawn in the image
-	overlay.
+	overlay. The "color" parameter specifies not only the color of the line but
+	also its width. Byte zero is the color, byte one is the width minus one. We
+	reserve bytes two and three for future use. 
 }
 procedure display_real_graph(ip:image_ptr_type;
 	var graph:xy_graph_type;
