@@ -51,18 +51,21 @@
 # Version 30: Replace tk_optionMenu with menubutton and menu commands.
 #
 # Version 31: Improve menubuttons on Windows.
+#
+# Version 32: Add RFPM ip address field.
 
 proc Spectrometer_init {} {
 	upvar #0 Spectrometer_info info
 	upvar #0 Spectrometer_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Spectrometer" "29"
+	LWDAQ_tool_init "Spectrometer" "32"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# Software constants for the Spectrometer Tool.
 	set info(control) "Idle"
 	set info(instrument) "RFPM"
+	set config(ip_addr) "10.0.0.37"
 	set info(graph_width) 900
 	set info(graph_height) 300
 	set info(measurement_names) "SCT Peak Average"
@@ -290,6 +293,7 @@ proc Spectrometer_execute {} {
 	} {
 		set iconfig(analysis_enable) 1
 	}
+	set iconfig(daq_ip_addr) $config(ip_addr)
 	set result [LWDAQ_acquire $info(instrument)]
 	if {$result == ""} {
 		set result "ERROR: $info(instrument) returned empty result."
@@ -388,6 +392,10 @@ proc Spectrometer_open {} {
 	entry $f.ag -textvariable Spectrometer_config(active_graph) -width 4
 	set config(active_graph) "0"
 	pack $f.lgraph $f.ag -side left -expand 1
+	
+	label $f.lip -text "ip_addr:" 
+	entry $f.eip -textvariable Spectrometer_config(ip_addr) -width 12
+	pack $f.lip $f.eip -side left -expand 1
 	
 	button $f.increment -text "Increment" -command {
 		incr Spectrometer_config(active_graph)

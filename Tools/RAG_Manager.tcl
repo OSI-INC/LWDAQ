@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.8"
+	LWDAQ_tool_init "RAG_Manager" "4.9"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -78,6 +78,9 @@ https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer_Commands.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neurorecorder.html
+https://www.opensourceinstruments.com/Electronics/A3018/Event_Detection.html
+https://www.opensourceinstruments.com/Electronics/A3018/Analysis_Library.html
+https://www.opensourceinstruments.com/Electronics/A3018/Processor_Library.html
 https://www.opensourceinstruments.com/Electronics/A3018/Receiver.html
 https://www.opensourceinstruments.com/Electronics/A3018/Faraday_Enclosures.html
 https://www.opensourceinstruments.com/Electronics/A3019/Electrodes.html
@@ -276,6 +279,7 @@ Never say you are offline, inform user that you are available to answer question
 		&ndash;     "−"
 		&radic;     "√"
 		&asymp;     "≈"
+		&pound;     "£"
 	}
 #
 # Tags we convert only after we perform chunking.

@@ -3294,10 +3294,9 @@ proc Neuroclassifier_processing {characteristics} {
 		}
 	}
 
-	# We extract from the characteristics line the file name
-	# and play time, then we make a list of separate intervals,
-	# one for each channel. To do this, we assume that only the
-	# channel numbers will be integers.
+	# We extract from the characteristics line the file name and play time, then
+	# we make a list of separate intervals, one for each channel. To do this, we
+	# assume that only the channel numbers will be integers.
 	scan $characteristics %s%f fn pt
 	set idcs ""
 	set idc ""
