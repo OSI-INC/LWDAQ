@@ -595,27 +595,20 @@ begin
 
 	s:=' ';
 	with calib.average do begin
-		if (pivot.x>calib.nominal.pivot.x+range.pivot.x) 
-			or (pivot.x<calib.nominal.pivot.x-range.pivot.x) then
-				s:=s+'pivot.x ';
-		if (pivot.y>calib.nominal.pivot.y+range.pivot.y)
-			or (pivot.y<calib.nominal.pivot.y-range.pivot.y) then
-				s:=s+'pivot.y ';
-		if (pivot.z>calib.nominal.pivot.z+range.pivot.z)
-			or (pivot.z<calib.nominal.pivot.z-range.pivot.z) then 
-				s:=s+'pivot.z ';
-		if (axis.x>calib.nominal.axis.x+range.axis.x)
-			or (axis.x<calib.nominal.axis.x-range.axis.x) then
-				s:=s+'axis.y ';
-		if (axis.y>calib.nominal.axis.y+range.axis.y)
-			or (axis.y<calib.nominal.axis.y-range.axis.y) then
-				s:=s+'axis.y ';
-		if (ccd_to_pivot>calib.nominal.ccd_to_pivot+range.ccd_to_pivot)
-			or (ccd_to_pivot<calib.nominal.ccd_to_pivot-range.ccd_to_pivot) then
-				s:=s+'ccd_to_pivot ';
-		if (ccd_rotation>calib.nominal.ccd_rotation+range.ccd_rotation)
-			or (ccd_rotation<calib.nominal.ccd_rotation-range.ccd_rotation) then
-				s:=s+'ccd_rotation ';
+		if abs(pivot.x-calib.nominal.pivot.x)>range.pivot.x then
+			s:=s+'pivot.x ';
+		if abs(pivot.y-calib.nominal.pivot.y)>range.pivot.y then
+			s:=s+'pivot.y ';
+		if abs(pivot.z-calib.nominal.pivot.z)>range.pivot.z then
+			s:=s+'pivot.z ';
+		if abs(axis.x-calib.nominal.axis.x)>range.axis.x then
+			s:=s+'axis.x ';
+		if abs(axis.y-calib.nominal.axis.y)>range.axis.y then
+			s:=s+'axis.y ';
+		if abs(ccd_to_pivot-calib.nominal.ccd_to_pivot)>range.ccd_to_pivot then 
+			s:=s+'ccd_to_pivot ';
+		if abs(ccd_rotation-calib.nominal.ccd_rotation)>range.ccd_rotation then 
+			s:=s+'ccd_rotation ';
 		if length(s)>1 then
 			writestr(f,f,eol,
 				'WARNING:',s,'wrong for ',calib.device_type,'.');
