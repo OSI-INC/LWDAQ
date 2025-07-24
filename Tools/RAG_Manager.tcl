@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.9"
+	LWDAQ_tool_init "RAG_Manager" "4.10"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -42,6 +42,7 @@ proc RAG_Manager_init {} {
 	set info(control) "Idle"
 	set info(engine_ctrl) "Idle"
 	set info(chat) ""
+	set info(ip) "127.0.0.1"
 	set info(result) ""
 	set info(text) "stdout"
 	set info(contents) ""
@@ -1990,8 +1991,7 @@ proc RAG_Manager_load {} {
 	set start_time [clock milliseconds]
 	lwdaq_rag create -lib_len $lib_len -vec_len $vec_len
 	RAG_Manager_print "Memory for embed library allocated in\
-		[expr [clock milliseconds] - $start_time] ms."
-	RAG_Manager_print "Loading embeds into memory..."
+		[expr [clock milliseconds] - $start_time] ms." brown
 		
 	set start_time [clock milliseconds]
 	foreach efn $efl {
@@ -2008,9 +2008,8 @@ proc RAG_Manager_load {} {
 			}
 		}
 	}
-	RAG_Manager_print "Embeds loaded in [expr [clock milliseconds] - $start_time] ms."
-	
-	RAG_Manager_print "Loading complete with a total of $count embeds"
+	RAG_Manager_print "Loaded embed library in\
+		[expr [clock milliseconds] - $start_time] ms, $count embeds."
 	set info(library_loaded) "1"
 	return $count
 }
@@ -2225,8 +2224,7 @@ proc RAG_Manager_retrieve {} {
 	}
 	
 	set info(control) "Retrieve"
-	RAG_Manager_print "Retrieve Question-Related Content [RAG_Manager_time]" purple
-	
+	RAG_Manager_print "Retrieval for $info(ip) [RAG_Manager_time]" purple
 	RAG_Manager_print "Question: $config(question)"
 	
 	if {![file exists $config(key_file)]} {
@@ -2239,29 +2237,29 @@ proc RAG_Manager_retrieve {} {
 	close $f 
 	RAG_Manager_print "Read api key from $config(key_file)\." brown
 
-	RAG_Manager_print "Obtaining question embedding vector..."
+	RAG_Manager_print "Obtaining question embedding vector..." brown
 	set start_time [clock milliseconds]
 	set q_embed [RAG_Manager_embed_string $config(question) $api_key]
 	set q_vector [RAG_Manager_vector_from_embed $q_embed]
 
 	RAG_Manager_print "Question embed obtained in\
-		[expr [clock milliseconds] - $start_time] ms,\
-		retrieving relevant embeds..."
+		[expr [clock milliseconds] - $start_time] ms."
 	set start_time [clock milliseconds]
 	set retrieval ""
 	if {$info(library_loaded)} {
-		RAG_Manager_print "Using embed library loaded into memory..."
+		RAG_Manager_print "Using embed library loaded into memory."
 		set retrieval [lwdaq_rag retrieve \
 			-retrieve_len $info(retrieve_len) \
 			-vector $q_vector]
 	} else {
 		RAG_Manager_print "No embed library loaded, looking for\
-			retrieval engine in $info(log_dir)..."
+			retrieval engine in $info(log_dir)..." brown
 		if {[catch {
 			if {[file exists $info(signal_file)] \
 					&& (([clock seconds]-[file mtime $info(signal_file)]) \
 					< $info(signal_s))} {
-				RAG_Manager_print "Found sign of retrieval engine in $info(log_dir)..."
+				RAG_Manager_print \
+					"Found sign of retrieval engine in $info(log_dir)..." brown
 				set name [expr round(rand()*$info(rand_fn_scale))]
 				set pfn [file join $info(log_dir) "P$name\.txt"] 
 				set f [open $pfn w]
@@ -2270,7 +2268,7 @@ proc RAG_Manager_retrieve {} {
 				exec chmod 777 [file normalize $pfn]
 				set qfn [file join $info(log_dir) "Q$name\.txt"] 
 				file rename $pfn $qfn
-				RAG_Manager_print "Wrote embedding vector to $qfn\."
+				RAG_Manager_print "Wrote embedding vector to $qfn\." brown
 				set rfn [file join $info(log_dir) "R$name\.txt"]
 				set start [clock milliseconds]
 				while {[clock milliseconds] < $start + $info(retrieval_giveup_ms)} {
@@ -2289,18 +2287,16 @@ proc RAG_Manager_retrieve {} {
 			RAG_Manager_print "ERROR: $error_result"
 		}	
 		if {($retrieval == "") && !$info(library_loaded)} {
-			RAG_Manager_print "No retrieval engine available, loading embed library..."
 			RAG_Manager_load
 			set retrieval [lwdaq_rag retrieve \
 				-retrieve_len $info(retrieve_len) \
 				-vector $q_vector]
 		}
 	}
-	RAG_Manager_print "Top chunks: [lrange $retrieval 0 7]"
+	RAG_Manager_print "Top chunks: [lrange $retrieval 0 7]" brown
 	
 	RAG_Manager_print "Retrieval complete in\
-		[expr [clock milliseconds] - $start_time] ms,\
-		selecting content strings..."
+		[expr [clock milliseconds] - $start_time] ms." brown
 	set start_time [clock milliseconds]
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	set new_retrieval [list]
@@ -2321,7 +2317,7 @@ proc RAG_Manager_retrieve {} {
 		return "0"
 	} 
 	RAG_Manager_print "Have $valid_count valid embeds,\
-		ignoring $obsolete_count obsolete embeds."
+		ignoring $obsolete_count obsolete embeds." brown
 
 	set info(relevance) [lindex $retrieval 1]
 	set rel $info(relevance)
@@ -2340,7 +2336,6 @@ proc RAG_Manager_retrieve {} {
 		RAG_Manager_print "List of match strings, most relevant first." brown
 	} else {
 		RAG_Manager_print "List of content strings, most relevant first." brown
-	
 	}
 	set index 0
 	set count 0
@@ -2401,7 +2396,7 @@ proc RAG_Manager_retrieve {} {
 
 	set info(contents) $contents
 	RAG_Manager_print "Retrieval complete, $count chunks,\
-		total of $tokens content tokens [RAG_Manager_time]" purple
+		$tokens content tokens [RAG_Manager_time]" purple
 	set info(control) "Idle"
 	return [llength $contents]
 }
@@ -2516,25 +2511,25 @@ proc RAG_Manager_submit {} {
 	}
 	
 	set info(control) "Submit"
-	RAG_Manager_print "Submit Question, History and Retrieved Content to\
-		Completion End Point [RAG_Manager_time]" purple
-	RAG_Manager_print "Choosing answer model and assistant prompt..."
+	RAG_Manager_print "Submit Question, History and Retrieved Content\
+		[RAG_Manager_time]" purple
+	RAG_Manager_print "Choosing answer model and assistant prompt..." brown
 	set r $info(relevance)
 	if {$r >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
 		set assistant [string trim $config(high_rel_assistant)]
 		RAG_Manager_print "High-relevance question, relevance=$r,\
-			use $model and high-relevance prompt." 
+			use $model and high-relevance prompt." brown
 	} elseif {$r >= $config(low_rel_thr)} {
 		set model $config(mid_rel_model)
 		set assistant [string trim $config(mid_rel_assistant)]
 		RAG_Manager_print "Mid-relevance question, relevance=$r,\
-		 	use $model and mid-relevance prompt." 
+		 	use $model and mid-relevance prompt." brown
 	} else {
 		set model $config(low_rel_model)
 		set assistant [string trim $config(low_rel_assistant)]
 		RAG_Manager_print "Low-relevance question, relevance=$r,\
-		 	use $model and low-relevance prompt." 
+		 	use $model and low-relevance prompt." brown
 	}
 	RAG_Manager_print "Assistant prompt being submitted with this question:" brown
 	RAG_Manager_print "$assistant" green
@@ -2555,14 +2550,14 @@ proc RAG_Manager_submit {} {
 	}
 	set size [expr $size + [string length $question]]
 	set tokens [expr $size / $info(token_size)]
-	RAG_Manager_print "Submitting total of $tokens tokens to $model for completion..."
+	RAG_Manager_print "Submitting $tokens tokens to $model for completion."
 	append info(chat) "Question: [string trim $question]\n"
 	set start_ms [clock milliseconds]
 	set info(result) [RAG_Manager_get_answer $question\
 		$info(contents) $assistant $api_key $model]
 	set len [expr [string length $info(result)]/$info(token_size)]
 	set del [format %.1f [expr 0.001*([clock milliseconds] - $start_ms)]]
-	RAG_Manager_print "Received $len tokens after $del s, processing response..."
+	RAG_Manager_print "Received $len tokens, latency $del s, answer below."
 		
 		
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) -> answer]} {
@@ -2582,7 +2577,6 @@ proc RAG_Manager_submit {} {
 	# nor make any attempt to clean up LaTeX. We want to know what the endpoint
 	# returned when we look in our log file. Any newline must have come from an
 	# escaped newline because the json string will never contains newlines.
-	RAG_Manager_print "Answer to \"$question\":" purple
 	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
 	RAG_Manager_print $answer_txt
 	append info(chat) "Answer: $answer_txt\n\n"
