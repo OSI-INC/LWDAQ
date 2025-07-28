@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.10"
+	LWDAQ_tool_init "RAG_Manager" "4.11"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -128,8 +128,8 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 # Configuration for retrieval and submission based upon relevance of the question
 # to the chunk library. We have three tiers of relevance: high, mid, and low.
 #	
-	set config(high_rel_thr) "0.50"
-	set config(low_rel_thr) "0.30"
+	set config(high_rel_thr) "0.55"
+	set config(mid_rel_thr) "0.40"
 	set config(high_rel_model) "gpt-4o"
 	set config(mid_rel_model) "gpt-4o-mini"
 	set config(low_rel_model) "gpt-4o-mini"
@@ -2324,7 +2324,7 @@ proc RAG_Manager_retrieve {} {
 	if {$rel >= $config(high_rel_thr)} {
 		set num $config(high_rel_tokens)
 		RAG_Manager_print "High-relevance question, relevance=$rel, provide $num\+ tokens." 
-	} elseif {$rel >= $config(low_rel_thr)} {
+	} elseif {$rel >= $config(mid_rel_thr)} {
 		set num $config(mid_rel_tokens)
 		RAG_Manager_print "Mid-relevance question, relevance=$rel, provide $num\+ tokens." 
 	} else {
@@ -2343,7 +2343,7 @@ proc RAG_Manager_retrieve {} {
 	set contents [list]
 	foreach {name rel} $retrieval {
 		if {$tokens >= $num} {break}
-		if {($info(relevance) >= $config(high_rel_thr)) && ($rel <= $config(low_rel_thr))} {
+		if {($info(relevance) >= $config(high_rel_thr)) && ($rel < $config(mid_rel_thr))} {
 			break
 		}
 		incr count
@@ -2520,7 +2520,7 @@ proc RAG_Manager_submit {} {
 		set assistant [string trim $config(high_rel_assistant)]
 		RAG_Manager_print "High-relevance question, relevance=$r,\
 			use $model and high-relevance prompt." brown
-	} elseif {$r >= $config(low_rel_thr)} {
+	} elseif {$r >= $config(mid_rel_thr)} {
 		set model $config(mid_rel_model)
 		set assistant [string trim $config(mid_rel_assistant)]
 		RAG_Manager_print "Mid-relevance question, relevance=$r,\
