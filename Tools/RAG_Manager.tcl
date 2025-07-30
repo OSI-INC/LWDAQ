@@ -63,7 +63,7 @@ proc RAG_Manager_init {} {
 	set config(dump) "0"
 	set config(show_match) "0"
 	set config(snippet_len) "45"
-	set config(progress_frac) "0.1" 
+	set config(progress_frac) "0.1"
 #
 # The source documents. Can be edited with a dedicated window and saved to
 # settings file.
@@ -141,11 +141,6 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(answer_timeout_s) "30" 
 	set config(offline_min) "4"
 #
-# Titles for content we submit to completion end point.
-#	
-	set config(chunk_title) "### Documentation Chunk\n\n"
-	set config(chat_title) "### Previous Q&A\n\n"
-#
 # Completion assistant instructions for the three tiers of relevance. Can be
 # edited with a dedicated window and saved to settings file.
 #
@@ -174,24 +169,22 @@ It is better to say "I do not know" than to provide inaccurate information.
     }
 	set config(mid_rel_assistant) {
 	
-You are a helpful technical assistant.
-You will summarize and explain technical documentation.
-You will complete mathematical calculations whenever possible.
-When answering the user's question:
-  - Respond using Markdown formatting.
-  - Use LaTeX formatting within Markdown for mathematical expressions.
-  - Use the minimal escaping required to represent valid LaTeX.
-  - If any of the supporting documentation discusses the exact topic presented 
-    in the question,try to provide at least three hyperlinks to relevant 
-    supporting documentation.
-  - Prefer factual, grounded responses over speculative ones.
-  - Base your answers on known facts or the content provided. Do not infer 
-    beyond the evidence.
-If you are unsure of an answer or cannot find enough information in the provided 
-context, say so clearly. 
-Do not make up facts or fabricate plausible-sounding answers. 
-It is better to say "I do not know" than to provide inaccurate information.
-Never say you are offline, inform user that you are available to answer questions.
+You are helping improve a support chatbot's ability to retrieve relevant documentation.
+
+The user has asked a vague or ambiguous question that relies on context or lacks
+important details. Your task is to rewrite the user's latest question so that it
+is clear, specific, and self-contained — meaning it should make sense on its own
+and include all necessary details to retrieve relevant documents.
+
+Use the following:
+- **Chat History**: previous user and assistant messages that may clarify the user's intent
+- **Documentation**: potentially relevant excerpts from manuals or reference guides
+- **Original Question**: the ambiguous question the user most recently asked
+
+Focus on specificity and technical clarity. Your output should be **only the
+rewritten question**, with no extra explanation.
+
+Rewritten Question:
 
 	}
 	set config(low_rel_assistant) {
@@ -2332,15 +2325,48 @@ proc RAG_Manager_retrieve {} {
 		RAG_Manager_print "Low-relevance question, relevance=$rel, provide $num\+ tokens." 
 	}
 	
+	set contents [list]
+	set chat_tokens 0
+	if {$config(chat_submit) >  0} {
+		set matches [regexp -all -inline -indices \
+			{\nQuestion: .*?(?=\nQuestion: |$)} "\n$info(chat)"]
+		set chat ""
+		set first [expr [llength $matches]-$config(chat_submit)]
+		set last [expr [llength $matches]-1]
+		set chat [list]
+		foreach match [lrange $matches $first $last] {
+			set qa [string trim [string range $info(chat) {*}$match]]
+			if {[regexp {Question: (.*?)(?=\nAnswer:)} $qa match question remaining]} {
+				lappend contents "Question: $question"
+			}
+			if {[regexp {Answer: (.*?)(?=\nQuestion: |$)} $qa match answer remaining]} {
+				lappend contents "Answer: $answer"
+			}
+		}
+		
+		if {[llength $contents] > 0} {
+			RAG_Manager_print \
+				"Adding previous $config(chat_submit) exchanges from chat history..."
+			RAG_Manager_print \
+				"-----------------------------------------------------" brown
+			foreach qa $contents {
+				RAG_Manager_print [string trim $qa] green
+				RAG_Manager_print \
+					"-----------------------------------------------------" brown
+				set chat_tokens [expr $chat_tokens + \
+					([string length $info(chat)]/$info(token_size))]
+				incr count
+			}
+		}
+	}
+
+	set count 0
+	set tokens 0
 	if {$config(show_match)} {
 		RAG_Manager_print "List of match strings, most relevant first." brown
 	} else {
 		RAG_Manager_print "List of content strings, most relevant first." brown
 	}
-	set index 0
-	set count 0
-	set tokens 0
-	set contents [list]
 	foreach {name rel} $retrieval {
 		if {$tokens >= $num} {break}
 		if {($info(relevance) >= $config(high_rel_thr)) && ($rel < $config(mid_rel_thr))} {
@@ -2353,7 +2379,7 @@ proc RAG_Manager_retrieve {} {
 		set f [open $cfn r]
 		set content [read $f]
 		close $f
-		lappend contents "$config(chunk_title)$content"
+		lappend contents "$content"
 		set tokens [expr $tokens + ([string length $content]/$info(token_size))]
 
 		if {$config(show_match)} {
@@ -2370,33 +2396,9 @@ proc RAG_Manager_retrieve {} {
 	}
 	RAG_Manager_print "-----------------------------------------------------" brown
 
-	if {$config(chat_submit)} {	
-		set matches [regexp -all -inline -indices \
-			{Question:.*?(?=Question:|$)} $info(chat)]
-		set chat ""
-		set first [expr [llength $matches]-$config(chat_submit)]
-		set last [expr [llength $matches]-1]
-		foreach match [lrange $matches $first $last] {
-			append chat "[string trim [string range $info(chat) {*}$match]]\n"
-		}
-		set chat [string trim $chat]
-		
-		if {$chat != ""} {
-			RAG_Manager_print \
-				"Adding previous $config(chat_submit) exchanges from chat history..."
-			RAG_Manager_print \
-				"-----------------------------------------------------" brown
-			RAG_Manager_print [string trim $chat] green
-			RAG_Manager_print \
-				"-----------------------------------------------------" brown
-			lappend contents "config(chat_title)$info(chat)"
-			set tokens [expr $tokens + ([string length $info(chat)]/$info(token_size))]	
-		}
-	}
-
 	set info(contents) $contents
-	RAG_Manager_print "Retrieval complete, $count chunks,\
-		$tokens content tokens [RAG_Manager_time]" purple
+	RAG_Manager_print "Retrieval complete, $count chunks, $tokens content tokens,\
+		$chat_tokens chat tokens [RAG_Manager_time]" purple
 	set info(control) "Idle"
 	return [llength $contents]
 }
@@ -2410,22 +2412,34 @@ proc RAG_Manager_retrieve {} {
 # the entire result from the end point, as a json record, and leaves it to the
 # calling procedure to extract the answer.
 #
-proc RAG_Manager_get_answer {question contents assistant api_key model} {
+proc RAG_Manager_get_answer {model assistant contents question api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
 	set assistant [RAG_Manager_json_format $assistant]
  	set json_body "\{\n \
 		\"model\": \"$model\",\n \
+		\"temperature\": 0.0, \n \
 		\"messages\": \[\n   \
 		\{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
 	foreach content $contents {
-		set content [RAG_Manager_json_format $content]
-		append json_body "    \{ \"role\": \"user\", \"content\": \"$content\" \},\n"
+		if {[regexp {^Question: (.*)} $content match chat]} {
+			set chat [RAG_Manager_json_format $chat]
+			append json_body \
+				"    \{ \"role\": \"user\", \"content\": \"$chat\" \},\n"
+		
+		} elseif {[regexp {^Answer: (.*)} $content match chat]} {
+			set chat [RAG_Manager_json_format $chat]
+			append json_body \
+				"    \{ \"role\": \"assistant\", \"content\": \"$chat\" \},\n"	
+		} else {
+			set content [RAG_Manager_json_format $content]
+			append json_body "    \{ \"role\": \"user\", \"content\": \"$content\" \},\n"
+		}
 	}
 	set question [RAG_Manager_json_format $question]
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
-	append json_body "  \], \n  \"temperature\": 0.0 \n\}"
+	append json_body "  \] \n\}"
 	
 	set cmd [list | curl -sS -X POST https://api.openai.com/v1/chat/completions \
 	  -H "Content-Type: application/json" \
@@ -2553,8 +2567,8 @@ proc RAG_Manager_submit {} {
 	RAG_Manager_print "Submitting $tokens tokens to $model for completion."
 	append info(chat) "Question: [string trim $question]\n"
 	set start_ms [clock milliseconds]
-	set info(result) [RAG_Manager_get_answer $question\
-		$info(contents) $assistant $api_key $model]
+	set info(result) [RAG_Manager_get_answer \
+		 $model $assistant $info(contents) $question $api_key]
 	set len [expr [string length $info(result)]/$info(token_size)]
 	set del [format %.1f [expr 0.001*([clock milliseconds] - $start_ms)]]
 	RAG_Manager_print "Received $len tokens, latency $del s, answer below."
