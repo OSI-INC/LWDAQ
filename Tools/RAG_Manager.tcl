@@ -2682,6 +2682,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 		}
 		append info(chat) "Answer: $answer_txt\n\n"
 		RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
+		set info(control) "Idle"
 	} else {
 	# If we requested disambiguation and the question is not a request for
 	# clarification, and is not an error, we assume the question is re-written
@@ -2693,10 +2694,9 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 		regsub -all {\\r\\n|\\r|\\n} $answer "\n" rewritten_question
 		RAG_Manager_retrieve $rewritten_question
 		set answer [RAG_Manager_submit $rewritten_question]
-		return $answer
 	} 
-	
-	set info(control) "Idle"
+
+	return $answer
 }
 
 #
