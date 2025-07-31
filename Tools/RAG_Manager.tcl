@@ -135,6 +135,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(high_rel_tokens) "6000"
 	set config(mid_rel_tokens) "6000"
 	set config(low_rel_tokens) "0"
+	set config(disambiguation_tokens) "12000"
 	set config(max_question_tokens) "300"
 	set config(embed_model) "text-embedding-3-small"
 	set config(answer_timeout_s) "30" 
@@ -144,7 +145,6 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 # edited with a dedicated window and saved to settings file.
 #
 	set config(high_rel_assistant) {
-	
 You are a helpful technical assistant.
 You will summarize and explain technical documentation.
 You will complete mathematical calculations whenever possible.
@@ -164,10 +164,8 @@ If you are unsure of an answer or cannot find enough information in the provided
 context, say so clearly. 
 Do not make up facts or fabricate plausible-sounding answers. 
 It is better to say "I do not know" than to provide inaccurate information.
-  
     }
     set config(disambiguation_assistant) {
-	
 You are helping improve a support chatbot's ability to retrieve relevant documentation.
 
 The user has asked a vague or ambiguous question that relies on context or lacks
@@ -184,10 +182,8 @@ Focus on specificity and technical clarity. Your output should be **only the
 rewritten question**, with no extra explanation.
 
 Rewritten Question:
-
 	}
 	set config(mid_rel_assistant) {
-
 You are a helpful technical assistant.
 You will summarize and explain technical documentation.
 You will complete mathematical calculations whenever possible.
@@ -198,10 +194,8 @@ If portions of the supporting documentation discuss
 the exact topic presented in the question,
 provide hyperlinks to these portions of the documentation.
 Never say you are offline, inform user that you are available to answer questions.
-
 	}
 	set config(low_rel_assistant) {
-	
 You are a helpful technical assistant.
 You will summarize and explain technical documentation.
 You will complete mathematical calculations whenever possible.
@@ -212,14 +206,14 @@ If portions of the supporting documentation discuss
 the exact topic presented in the question,
 provide hyperlinks to these portions of the documentation.
 Never say you are offline, inform user that you are available to answer questions.
-
 	}
 #
 # Chat submission control.
 #
-	set config(high_rel_chat_submit) "3"
-	set config(mid_rel_chat_submit) "6"
-	set config(low_rel_chat_submit) "12"
+	set config(high_rel_chat_depth) "3"
+	set config(mid_rel_chat_depth) "6"
+	set config(disambiguation_depth) "12"
+	set config(low_rel_chat_depth) "12"
 #
 # A list of html entities and the unicode characters we want to replace them
 # with.
@@ -2343,28 +2337,45 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 	set rel $info(relevance)
 	if {$rel >= $config(high_rel_thr)} {
 		set num $config(high_rel_tokens)
-		set chat_submit $config(high_rel_chat_submit)
-		RAG_Manager_print "High-relevance question, relevance=$rel,\
-			provide $num\+ content tokens and $chat_submit chat exchanges." 
+		set chat_depth $config(high_rel_chat_depth)
+		if {$rewritten_question != ""} {
+			RAG_Manager_print "High-relevance re-written question,\
+				relevance=$rel, provide $num\+ tokens, chat depth $chat_depth." 
+		} else {
+			RAG_Manager_print "High-relevance user question,\
+				relevance=$rel, provide $num\+ tokens, chat depth $chat_depth." 
+		}
 	} elseif {$rel >= $config(mid_rel_thr)} {
-		set num $config(mid_rel_tokens)
-		set chat_submit $config(mid_rel_chat_submit)
-		RAG_Manager_print "Mid-relevance question, relevance=$rel,\
-			provide $num\+ content tokens and $chat_submit chat exchanges." 
+		if {$rewritten_question != ""} {
+			set num $config(mid_rel_tokens)
+			set chat_depth $config(mid_rel_chat_depth)
+			RAG_Manager_print "Mid-relevance re-written question, relevance=$rel,\
+				provide $num\+ tokens, chat depth $chat_depth." 
+		} else {
+			set num $config(disambiguation_tokens)
+			set chat_depth $config(disambiguation_depth)
+			RAG_Manager_print "Mid-relevance user question,\
+				relevance=$rel, provide $num\+ tokens, chat depth $chat_depth." 
+		}
 	} else {
 		set num $config(low_rel_tokens)
-		set chat_submit $config(low_rel_chat_submit)
-		RAG_Manager_print "Low-relevance question, relevance=$rel,\
-			provide $num\+ content tokens and $chat_submit chat exchanges." 
+		set chat_depth $config(low_rel_chat_depth)
+		if {$rewritten_question != ""} {
+			RAG_Manager_print "Low-relevance re-written question,\
+				relevance=$rel, provide $num\+ tokens, chat depth $chat_depth." 
+		} else {
+			RAG_Manager_print "Low-relevance user question,\
+				relevance=$rel, provide $num\+ tokens, chat depth $chat_depth." 
+		}
 	}
 	
 	set contents [list]
 	set chat_tokens 0
-	if {$chat_submit >  0} {
+	if {$chat_depth >  0} {
 		set matches [regexp -all -inline -indices \
 			{\nQuestion: .*?(?=\nQuestion: |$)} "\n$info(chat)"]
 		set chat ""
-		set first [expr [llength $matches]-$chat_submit]
+		set first [expr [llength $matches]-$chat_depth]
 		set last [expr [llength $matches]-1]
 		set chat [list]
 		foreach match [lrange $matches $first $last] {
@@ -2379,7 +2390,7 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 		
 		if {[llength $contents] > 0} {
 			RAG_Manager_print \
-				"Adding up to $chat_submit previous exchanges from chat history..."
+				"Adding up to $chat_depth previous exchanges from chat history..."
 			RAG_Manager_print \
 				"-----------------------------------------------------" brown
 			foreach qa $contents {
@@ -2584,7 +2595,6 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 			RAG_Manager_print "Mid-relevance question, relevance=$r,\
 				use $model and mid-relevance completion prompt." brown
 		}
-		
 	} else {
 		set model $config(low_rel_model)
 		set assistant [string trim $config(low_rel_assistant)]
@@ -2679,6 +2689,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	# question because that will be done by the retrieval procedure. But we do
 	# perform minimal formatting on the json answer before passing it to
 	# retrieval.
+		RAG_Manager_print "Disambiguation Submission Complete [RAG_Manager_time]" purple
 		regsub -all {\\r\\n|\\r|\\n} $answer "\n" rewritten_question
 		RAG_Manager_retrieve $rewritten_question
 		set answer [RAG_Manager_submit $rewritten_question]
