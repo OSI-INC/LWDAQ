@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "4.11"
+	LWDAQ_tool_init "RAG_Manager" "5.1"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -58,7 +58,6 @@ proc RAG_Manager_init {} {
 #
 # Public control flags.
 #
-	set config(chat_submit) "3"
 	set config(verbose) "0"
 	set config(dump) "0"
 	set config(show_match) "0"
@@ -129,12 +128,12 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 # to the chunk library. We have three tiers of relevance: high, mid, and low.
 #	
 	set config(high_rel_thr) "0.55"
-	set config(mid_rel_thr) "0.40"
+	set config(mid_rel_thr) "0.20"
 	set config(high_rel_model) "gpt-4o"
 	set config(mid_rel_model) "gpt-4o-mini"
 	set config(low_rel_model) "gpt-4o-mini"
 	set config(high_rel_tokens) "6000"
-	set config(mid_rel_tokens) "12000"
+	set config(mid_rel_tokens) "6000"
 	set config(low_rel_tokens) "0"
 	set config(max_question_tokens) "300"
 	set config(embed_model) "text-embedding-3-small"
@@ -167,7 +166,7 @@ Do not make up facts or fabricate plausible-sounding answers.
 It is better to say "I do not know" than to provide inaccurate information.
   
     }
-	set config(mid_rel_assistant) {
+    set config(disambiguation_assistant) {
 	
 You are helping improve a support chatbot's ability to retrieve relevant documentation.
 
@@ -187,6 +186,20 @@ rewritten question**, with no extra explanation.
 Rewritten Question:
 
 	}
+	set config(mid_rel_assistant) {
+
+You are a helpful technical assistant.
+You will summarize and explain technical documentation.
+You will complete mathematical calculations whenever possible.
+Respond using Markdown formatting.
+Use LaTeX formatting within Markdown for mathematical expressions.
+Use the minimal escaping required to represent valid LaTeX.
+If portions of the supporting documentation discuss 
+the exact topic presented in the question,
+provide hyperlinks to these portions of the documentation.
+Never say you are offline, inform user that you are available to answer questions.
+
+	}
 	set config(low_rel_assistant) {
 	
 You are a helpful technical assistant.
@@ -201,6 +214,12 @@ provide hyperlinks to these portions of the documentation.
 Never say you are offline, inform user that you are available to answer questions.
 
 	}
+#
+# Chat submission control.
+#
+	set config(high_rel_chat_submit) "3"
+	set config(mid_rel_chat_submit) "6"
+	set config(low_rel_chat_submit) "12"
 #
 # A list of html entities and the unicode characters we want to replace them
 # with.
@@ -2195,11 +2214,11 @@ proc RAG_Manager_engine {{cmd ""}} {
 # this routine must read a valid API key from disk. If a file called offline.txt
 # exists in the log directory, this routine will exit without doing anything.
 #
-proc RAG_Manager_retrieve {} {
+proc RAG_Manager_retrieve {{rewritten_question ""}} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	
-	if {$info(control) != "Idle"} {return ""}
+	if {($info(control) != "Idle") && ($rewritten_question == "")} {return ""}
 
 	if {[file exists $info(offline_file)]} {
 		set f [open $info(offline_file)]
@@ -2210,15 +2229,23 @@ proc RAG_Manager_retrieve {} {
 		return "0"
 	}
 
-	set question [string trim $config(question)]
-	if {$question == ""} {
-		RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
-		return "0"
+	if {$rewritten_question != ""} {
+		set question $rewritten_question
+	} else {
+		set question [string trim $config(question)]
+		if {$question == ""} {
+			RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
+			return "0"
+		}
 	}
-	
+		
 	set info(control) "Retrieve"
 	RAG_Manager_print "Retrieval for $info(ip) [RAG_Manager_time]" purple
-	RAG_Manager_print "Question: $config(question)"
+	if {$rewritten_question == ""} {
+		RAG_Manager_print "Question: $question"
+	} else {
+		RAG_Manager_print "Re-Written Question: $question"
+	}
 	
 	if {![file exists $config(key_file)]} {
 		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
@@ -2232,7 +2259,7 @@ proc RAG_Manager_retrieve {} {
 
 	RAG_Manager_print "Obtaining question embedding vector..." brown
 	set start_time [clock milliseconds]
-	set q_embed [RAG_Manager_embed_string $config(question) $api_key]
+	set q_embed [RAG_Manager_embed_string $question $api_key]
 	set q_vector [RAG_Manager_vector_from_embed $q_embed]
 
 	RAG_Manager_print "Question embed obtained in\
@@ -2316,22 +2343,28 @@ proc RAG_Manager_retrieve {} {
 	set rel $info(relevance)
 	if {$rel >= $config(high_rel_thr)} {
 		set num $config(high_rel_tokens)
-		RAG_Manager_print "High-relevance question, relevance=$rel, provide $num\+ tokens." 
+		set chat_submit $config(high_rel_chat_submit)
+		RAG_Manager_print "High-relevance question, relevance=$rel,\
+			provide $num\+ content tokens and $chat_submit chat exchanges." 
 	} elseif {$rel >= $config(mid_rel_thr)} {
 		set num $config(mid_rel_tokens)
-		RAG_Manager_print "Mid-relevance question, relevance=$rel, provide $num\+ tokens." 
+		set chat_submit $config(mid_rel_chat_submit)
+		RAG_Manager_print "Mid-relevance question, relevance=$rel,\
+			provide $num\+ content tokens and $chat_submit chat exchanges." 
 	} else {
 		set num $config(low_rel_tokens)
-		RAG_Manager_print "Low-relevance question, relevance=$rel, provide $num\+ tokens." 
+		set chat_submit $config(low_rel_chat_submit)
+		RAG_Manager_print "Low-relevance question, relevance=$rel,\
+			provide $num\+ content tokens and $chat_submit chat exchanges." 
 	}
 	
 	set contents [list]
 	set chat_tokens 0
-	if {$config(chat_submit) >  0} {
+	if {$chat_submit >  0} {
 		set matches [regexp -all -inline -indices \
 			{\nQuestion: .*?(?=\nQuestion: |$)} "\n$info(chat)"]
 		set chat ""
-		set first [expr [llength $matches]-$config(chat_submit)]
+		set first [expr [llength $matches]-$chat_submit]
 		set last [expr [llength $matches]-1]
 		set chat [list]
 		foreach match [lrange $matches $first $last] {
@@ -2346,7 +2379,7 @@ proc RAG_Manager_retrieve {} {
 		
 		if {[llength $contents] > 0} {
 			RAG_Manager_print \
-				"Adding previous $config(chat_submit) exchanges from chat history..."
+				"Adding up to $chat_submit previous exchanges from chat history..."
 			RAG_Manager_print \
 				"-----------------------------------------------------" brown
 			foreach qa $contents {
@@ -2485,22 +2518,26 @@ proc RAG_Manager_get_answer {model assistant contents question api_key} {
 # display. If a file called offline.txt exists in the log directory, this
 # routine will return an announcement that the chatbot is offline.
 #
-proc RAG_Manager_submit {} {
+proc RAG_Manager_submit {{rewritten_question ""}} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	
-	if {$info(control) != "Idle"} {return ""}
+	if {($info(control) != "Idle") && ($rewritten_question == "")} {return ""}
 	
-	set question [string trim $config(question)]
-	if {$question == ""} {
-		RAG_Manager_print "ERROR: Empty question, abandoning submission."
-		return ""
-	}
-	if {[string length $question]/$info(token_size) \
-			> $config(max_question_tokens)} {
-		set answer "ERROR: Question is longer than\
-			[expr $config(max_question_tokens)*$info(token_size)] characters."
-		return $answer
+	if {$rewritten_question != ""} {
+		set question $rewritten_question
+	} else {
+		set question [string trim $config(question)]
+		if {$question == ""} {
+			RAG_Manager_print "ERROR: Empty question, abandoning submission."
+			return ""
+		}
+		if {[string length $question]/$info(token_size) \
+				> $config(max_question_tokens)} {
+			set answer "ERROR: Question is longer than\
+				[expr $config(max_question_tokens)*$info(token_size)] characters."
+			return $answer
+		}
 	}
 
 	if {[file exists $info(offline_file)]} {
@@ -2529,21 +2566,30 @@ proc RAG_Manager_submit {} {
 		[RAG_Manager_time]" purple
 	RAG_Manager_print "Choosing answer model and assistant prompt..." brown
 	set r $info(relevance)
+	set answer_type "completion"
 	if {$r >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
 		set assistant [string trim $config(high_rel_assistant)]
 		RAG_Manager_print "High-relevance question, relevance=$r,\
-			use $model and high-relevance prompt." brown
+			use $model and high-relevance completion prompt." brown
 	} elseif {$r >= $config(mid_rel_thr)} {
 		set model $config(mid_rel_model)
-		set assistant [string trim $config(mid_rel_assistant)]
-		RAG_Manager_print "Mid-relevance question, relevance=$r,\
-		 	use $model and mid-relevance prompt." brown
+		if {$rewritten_question == ""} {
+			set assistant [string trim $config(disambiguation_assistant)]
+			set answer_type "disambiguation"
+			RAG_Manager_print "Mid-relevance question, relevance=$r,\
+				use $model and disambiguation prompt." brown
+		} else {
+			set assistant [string trim $config(mid_rel_assistant)]
+			RAG_Manager_print "Mid-relevance question, relevance=$r,\
+				use $model and mid-relevance completion prompt." brown
+		}
+		
 	} else {
 		set model $config(low_rel_model)
 		set assistant [string trim $config(low_rel_assistant)]
 		RAG_Manager_print "Low-relevance question, relevance=$r,\
-		 	use $model and low-relevance prompt." brown
+		 	use $model and low-relevance completion prompt." brown
 	}
 	RAG_Manager_print "Assistant prompt being submitted with this question:" brown
 	RAG_Manager_print "$assistant" green
@@ -2564,16 +2610,14 @@ proc RAG_Manager_submit {} {
 	}
 	set size [expr $size + [string length $question]]
 	set tokens [expr $size / $info(token_size)]
-	RAG_Manager_print "Submitting $tokens tokens to $model for completion."
+	RAG_Manager_print "Submitting $tokens tokens to $model for $answer_type."
 	append info(chat) "Question: [string trim $question]\n"
 	set start_ms [clock milliseconds]
 	set info(result) [RAG_Manager_get_answer \
 		 $model $assistant $info(contents) $question $api_key]
 	set len [expr [string length $info(result)]/$info(token_size)]
 	set del [format %.1f [expr 0.001*([clock milliseconds] - $start_ms)]]
-	RAG_Manager_print "Received $len tokens, latency $del s, answer below."
-		
-		
+	RAG_Manager_print "Received $answer_type, length $len tokens, latency $del s."
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) -> answer]} {
 		RAG_Manager_print "-----------------------------------------------------" brown
 		RAG_Manager_print "Raw answer content from completion endpoint:" brown
@@ -2584,20 +2628,64 @@ proc RAG_Manager_submit {} {
 	} else {
 		set answer "ERROR: Could not find answer or error message in result."
 	}
-
-	# Print the answer to the console or log file. We perform minimal formatting
-	# on the json answer: we replace escaped newline characters with newlines so
-	# that we can see the answer clearly. But we do not replace escaped backslashes
-	# nor make any attempt to clean up LaTeX. We want to know what the endpoint
-	# returned when we look in our log file. Any newline must have come from an
-	# escaped newline because the json string will never contains newlines.
-	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
-	RAG_Manager_print $answer_txt
-	append info(chat) "Answer: $answer_txt\n\n"
-	RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
+	
+	# If we requested a disambiguation, as we do with mid-relevance questions,
+	# we will either get a request for clarification or a re-written question.
+	# We try to distinguish between the two with some clarification patterns.
+	set clarification 0
+	set disambiguation 0
+	if {$answer_type == "disambiguation"} {
+		set disambiguation 1
+		set clarification_patterns {
+			{^Could you (please )?(provide|clarify|specify|let me know)}
+			{^Can you (please )?(clarify|tell me|specify)}
+			{^Would you mind}
+			{^Are you referring}
+			{^Please clarify}
+			{^It's not clear}
+			{^Which (type|device|tool)}
+			{^What do you mean}
+		}
+		foreach pattern $clarification_patterns {
+			if {[regexp -nocase $pattern $answer]} {
+				set clarification 1
+				break
+			}
+		}
+	}
+	
+	# If we did not request a disambiguation, or we did request disambiguation
+	# and we received a clarification question for the user, or if in any case
+	# the answer is an error, print the answer to the console or log file. We
+	# perform minimal formatting on the json answer: we replace escaped newline
+	# characters with newlines so that we can see the answer clearly. But we do
+	# not replace escaped backslashes nor make any attempt to clean up LaTeX. We
+	# want to know what the endpoint returned when we look in our log file. Any
+	# newline must have come from an escaped newline because the json string
+	# will never contains newlines.
+	if {!$disambiguation || $clarification || [LWDAQ_is_error_result $answer]} {
+		regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
+		if {!$clarification} {
+			RAG_Manager_print "Completion: $answer_txt"
+		} else {
+			RAG_Manager_print "Clarification: $answer_txt"
+		}
+		append info(chat) "Answer: $answer_txt\n\n"
+		RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
+	} else {
+	# If we requested disambiguation and the question is not a request for
+	# clarification, and is not an error, we assume the question is re-written
+	# and we perform another submission. We do not print or log the re-written
+	# question because that will be done by the retrieval procedure. But we do
+	# perform minimal formatting on the json answer before passing it to
+	# retrieval.
+		regsub -all {\\r\\n|\\r|\\n} $answer "\n" rewritten_question
+		RAG_Manager_retrieve $rewritten_question
+		set answer [RAG_Manager_submit $rewritten_question]
+		return $answer
+	} 
 	
 	set info(control) "Idle"
-	return $answer
 }
 
 #
