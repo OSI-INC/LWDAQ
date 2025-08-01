@@ -164,12 +164,31 @@ When answering the user's question:
     
     set config(disambig_assistant) {
 
-The user has asked a question that is not relevant enough to our documentation to support effective retrieval. Do not answer the question. Your job is to re-write the question so that it is more detailed and more specific. In order to re-write the question, you will use the reference documents we have provided and the history of user questions and assistant answers we have provided. If these records do not provide you with enough information to compose a detailed and specific re-written question, respond instead with a request for clarification. Under no circumstances should you respond with an answer to the question. If you respond with a re-written question, prefix the question with "Rewrite: ". If you respond with a request for clarification, prefix the request with "Clarify: ".
+The user has asked a question that is too vague or ambiguous to retrieve relevant documentation.
 
-Rewritten Question or Request for Clarification:
+Do not answer the question.
+
+Instead, you must choose one of the following two options:
+
+1. If the chat history and the provided reference documentation give you enough information to rewrite the question in a more specific and self-contained form, do so. Begin your output with:
+Rewrite: [your rewritten question]
+
+2. If the question is too vague and cannot be rewritten based on available context, ask the user for clarification. Begin your output with:
+Clarify: [your clarification question]
+
+You must **never** answer the question directly. You are not an answering assistant — you are a question rewriter. If you attempt to answer the question instead of rewriting or clarifying it, you will be failing your task.
+
+Output only one line. Do not add any explanation or formatting.
+
+Rewritten Question or Clarification Request:
 
 	}
 	
+	set config(diambig_prefix) {
+	
+Reminder: the assistant should not answer this question. The assistant should be allowed only to rewrite or clarify the question.
+
+	}
 	set config(mid_rel_assistant) {
 You are a helpful technical assistant. You will summarize and explain technical documentation. You will complete mathematical calculations whenever possible. Respond using Markdown formatting. Use LaTeX formatting within Markdown for mathematical expressions. Use the minimal escaping required to represent valid LaTeX. If portions of the supporting documentation discuss the exact topic presented in the question, provide hyperlinks to these portions of the documentation. Never say you are offline, inform user that you are available to answer questions.
 	}
@@ -2311,7 +2330,7 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 	} elseif {$rel >= $config(mid_rel_thr)} {
 		if {$rewritten_question != ""} {
 			set content_max $config(mid_rel_words)
-			set chat_max $config(mid_rel_chat_max)
+			set chat_max $config(mid_rel_chat_words)
 			RAG_Manager_print "Mid-relevance re-written question,\
 				relevance=$rel, provide $content_max words content,\
 				$chat_max words chat." 
@@ -2337,36 +2356,6 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 	}
 	
 	set contents [list]
-	set chat_words 0
-	set matches [regexp -all -inline -indices \
-		{\nQuestion: .*?(?=\nQuestion: |$)} \
-		"\n$info(chat)"]
-	foreach match [lrange $matches 0 [expr [llength $matches]-1]] {
-		set qa [string trim [string range $info(chat) {*}$match]]
-		if {[regexp {Question: (.*?)(?=\nAnswer:)} $qa match question remaining]} {
-			lappend contents "Question: [string trim $question]"
-			set chat_words [expr $chat_words \
-				+ ([string length $question]/$info(word_size))]
-		}
-		if {[regexp {Answer: (.*?)(?=\nQuestion: |$)} $qa match answer remaining]} {
-			lappend contents "Answer: [string trim $answer]"
-			set chat_words [expr $chat_words \
-				+ ([string length $answer]/$info(word_size))]
-		}
-	}
-	
-	if {$chat_words > 0} {
-		RAG_Manager_print \
-			"Submitting $chat_words of chat history..."
-		RAG_Manager_print \
-			"-----------------------------------------------------" brown
-		foreach qa $contents {
-			RAG_Manager_print $qa green
-			RAG_Manager_print \
-				"-----------------------------------------------------" brown
-		}
-	}
-
 	set chunk_count 0
 	set content_words 0
 	if {$config(show_match)} {
@@ -2403,6 +2392,36 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 	}
 	RAG_Manager_print "-----------------------------------------------------" brown
 
+	set chat_words 0
+	set matches [regexp -all -inline -indices \
+		{\nQuestion: .*?(?=\nQuestion: |$)} \
+		"\n$info(chat)"]
+	foreach match [lrange $matches 0 [expr [llength $matches]-1]] {
+		set qa [string trim [string range $info(chat) {*}$match]]
+		if {[regexp {Question: (.*?)(?=\nAnswer:)} $qa match question remaining]} {
+			lappend contents "Question: [string trim $question]"
+			set chat_words [expr $chat_words \
+				+ ([string length $question]/$info(word_size))]
+		}
+		if {[regexp {Answer: (.*?)(?=\nQuestion: |$)} $qa match answer remaining]} {
+			lappend contents "Answer: [string trim $answer]"
+			set chat_words [expr $chat_words \
+				+ ([string length $answer]/$info(word_size))]
+		}
+	}
+	
+	if {$chat_words > 0} {
+		RAG_Manager_print \
+			"Submitting $chat_words of chat history..."
+		RAG_Manager_print \
+			"-----------------------------------------------------" brown
+		foreach qa $contents {
+			RAG_Manager_print $qa green
+			RAG_Manager_print \
+				"-----------------------------------------------------" brown
+		}
+	}
+
 	set info(contents) $contents
 	RAG_Manager_print "Retrieval complete, $chunk_count chunks,\
 		$content_words content words,\
@@ -2420,16 +2439,15 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 # the entire result from the end point, as a json record, and leaves it to the
 # calling procedure to extract the answer.
 #
-proc RAG_Manager_get_answer {model assistant contents question api_key} {
+proc RAG_Manager_get_answer {model contents assistant question api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
 	set assistant [RAG_Manager_json_format $assistant]
- 	set json_body "\{\n \
-		\"model\": \"$model\",\n \
-		\"temperature\": 0.0, \n \
-		\"messages\": \[\n   \
-		\{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
+ 	set json_body "\{\n\
+		\"model\": \"$model\",\n\
+		\"temperature\": 0.0,\n\
+		\"messages\": \[\n"
 	foreach content $contents {
 		if {[regexp {^Question: (.*)} $content match chat]} {
 			set chat [RAG_Manager_json_format $chat]
@@ -2446,8 +2464,11 @@ proc RAG_Manager_get_answer {model assistant contents question api_key} {
 		}
 	}
 	set question [RAG_Manager_json_format $question]
-	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \} \n"
-	append json_body "  \] \n\}"
+	append json_body "    \{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
+	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \}\n"
+	append json_body "  \]\n\}"
+	
+#	RAG_Manager_print $json_body
 	
 	set cmd [list | curl -sS -X POST https://api.openai.com/v1/chat/completions \
 	  -H "Content-Type: application/json" \
@@ -2603,8 +2624,21 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	}
 	append info(chat) "Question: [string trim $question]\n"
 	set start_ms [clock milliseconds]
-	set info(result) [RAG_Manager_get_answer \
-		 $model $assistant $info(contents) $question $api_key]
+	if {!$disambig} {
+		set info(result) [RAG_Manager_get_answer \
+			 $model \
+			 $info(contents) \
+			 $assistant \
+			 $question \
+			 $api_key]
+	} else {
+		set info(result) [RAG_Manager_get_answer \
+			 $model \
+			 $info(contents) \
+			 $assistant \
+			 [string trim "$config(diambig_prefix)$question"] \
+			 $api_key]
+	}
 	set len [expr [string length $info(result)]/$info(word_size)]
 	set del [format %.1f [expr 0.001*([clock milliseconds] - $start_ms)]]
 	if {$disambig} {
