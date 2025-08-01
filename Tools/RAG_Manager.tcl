@@ -60,7 +60,7 @@ proc RAG_Manager_init {} {
 #
 	set config(verbose) "0"
 	set config(dump) "0"
-	set config(resubmit) "1"
+	set config(disambiguate) "0"
 	set config(show_match) "0"
 	set config(snippet_len) "45"
 	set config(progress_frac) "0.1"
@@ -137,38 +137,38 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(high_rel_words) "5000"
 	set config(mid_rel_words) "5000"
 	set config(low_rel_words) "0"
-	set config(disambig_words) "10000"
-	set config(max_question_words) "500"
+	set config(disambig_words) "2000"
+	set config(high_rel_chat_words) "3000"
+	set config(mid_rel_chat_words) "3000"
+	set config(low_rel_chat_words) "10000"
+	set config(disambig_chat_words) "10000"
+	set config(max_question_words) "1000"
 	set config(embed_model) "text-embedding-3-small"
 	set config(answer_timeout_s) "30" 
 	set config(offline_min) "4"
-	set config(high_rel_chat_words) "1000"
-	set config(mid_rel_chat_words) "3000"
-	set config(disambig_chat_words) "6000"
-	set config(low_rel_chat_words) "12000"
 #
 # Completion assistant instructions for the three tiers of relevance. Can be
 # edited with a dedicated window and saved to settings file.
 #
 	set config(high_rel_assistant) {
-You are a helpful technical assistant. You will summarize and explain technical documentation. You will complete mathematical calculations whenever possible. If you are unsure of an answer or cannot find enough information in the provided context, say so clearly. Do not make up facts or fabricate plausible-sounding answers. It is better to say "I do not know" than to provide inaccurate information.
+	
+You are a helpful technical assistant for a support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. If you do not have enough information, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
 
 When answering the user's question:
+  - Summarize and explain technical documentation.
+  - Complete mathematical calculations whenever possible.
   - If the question asks for a figure, graph, or image, and a relevant figure is available in the provided content, include the figure in your response like this: `![Figure Caption](image_url)`  
   - Do not say "I cannot search the web" or "I cannot find images" if a relevant figure is available in the provided content.
-  - Provide at least one hyperlinks to original documentation.
+  - Provide at least one hyperlink to original documentation.
   - Respond using Markdown formatting.
   - Use LaTeX formatting within Markdown for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
+  
     }
     
     set config(disambig_assistant) {
 
-The user has asked a question that is too vague or ambiguous to retrieve relevant documentation.
-
-Do not answer the question.
-
-Instead, you must choose one of the following two options:
+The user has asked a question that is too vague or ambiguous to retrieve relevant documentation. Do not answer the question. Instead, you must choose one of the following two options:
 
 1. If the chat history and the provided reference documentation give you enough information to rewrite the question in a more specific and self-contained form, do so. Begin your output with:
 Rewrite: [your rewritten question]
@@ -176,26 +176,44 @@ Rewrite: [your rewritten question]
 2. If the question is too vague and cannot be rewritten based on available context, ask the user for clarification. Begin your output with:
 Clarify: [your clarification question]
 
-You must **never** answer the question directly. You are not an answering assistant — you are a question rewriter. If you attempt to answer the question instead of rewriting or clarifying it, you will be failing your task.
-
-Output only one line. Do not add any explanation or formatting.
+You must **never** answer the question directly. You are not an answering assistant — you are a question rewriter. If you attempt to answer the question instead of rewriting or clarifying it, you will be failing your task. Output only one line. Do not add any explanation or formatting.
 
 Rewritten Question or Clarification Request:
 
 	}
 	
-	set config(diambig_prefix) {
+	set config(disambig_prefix) {
 	
 Reminder: the assistant should not answer this question. The assistant should be allowed only to rewrite or clarify the question.
 
 	}
+	
 	set config(mid_rel_assistant) {
-You are a helpful technical assistant. You will summarize and explain technical documentation. You will complete mathematical calculations whenever possible. Respond using Markdown formatting. Use LaTeX formatting within Markdown for mathematical expressions. Use the minimal escaping required to represent valid LaTeX. If portions of the supporting documentation discuss the exact topic presented in the question, provide hyperlinks to these portions of the documentation. Never say you are offline, inform user that you are available to answer questions.
+
+You are a helpful technical assistant for a support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. If you do not have enough information, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
+
+When answering the user's question:
+  - Summarize and explain technical documentation.
+  - Complete mathematical calculations whenever possible.
+  - If the question asks for a figure, graph, or image, and a relevant figure is available in the provided content, include the figure in your response like this: `![Figure Caption](image_url)`  
+  - Do not say "I cannot search the web" or "I cannot find images" if a relevant figure is available in the provided content.
+  - Provide at least one hyperlink to original documentation.
+  - Respond using Markdown formatting.
+  - Use LaTeX formatting within Markdown for mathematical expressions.
+  - Use the minimal escaping required to represent valid LaTeX.
+
 	}
 	
 	set config(low_rel_assistant) {
-You are a helpful technical assistant. You will summarize and explain technical documentation. You will complete mathematical calculations whenever possible.
-Respond using Markdown formatting. Use LaTeX formatting within Markdown for mathematical expressions. Use the minimal escaping required to represent valid LaTeX. Never say you are offline, inform user that you are available to answer questions.
+
+You are a helpful technical assistant for a support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the chat history to answer the user’s question with confidence, then answer the question. If you do not have enough information, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
+
+When answering the user's question:
+  - Complete mathematical calculations whenever possible.
+  - Respond using Markdown formatting.
+  - Use LaTeX formatting within Markdown for mathematical expressions.
+  - Use the minimal escaping required to represent valid LaTeX.
+
 	}
 #
 # A list of html entities and the unicode characters we want to replace them
@@ -2320,38 +2338,46 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 		set chat_max $config(high_rel_chat_words)
 		if {$rewritten_question != ""} {
 			RAG_Manager_print "High-relevance re-written question,\
-				relevance=$rel, provide $content_max words content,\
-				$chat_max words chat." 
+				relevance=$rel, $content_max words content,\
+				$chat_max words chat for completion." 
 		} else {
 			RAG_Manager_print "High-relevance user question,\
-				relevance=$rel, provide $content_max words content,\
-				$chat_max words chat." 
+				relevance=$rel, $content_max words content,\
+				$chat_max words chat for completion." 
 		}
 	} elseif {$rel >= $config(mid_rel_thr)} {
 		if {$rewritten_question != ""} {
 			set content_max $config(mid_rel_words)
 			set chat_max $config(mid_rel_chat_words)
 			RAG_Manager_print "Mid-relevance re-written question,\
-				relevance=$rel, provide $content_max words content,\
-				$chat_max words chat." 
+				relevance=$rel, $content_max words content,\
+				$chat_max words chat for completion." 
 		} else {
-			set content_max $config(disambig_words)
-			set chat_max $config(disambig_chat_words)
-			RAG_Manager_print "Mid-relevance user question,\
-				relevance=$rel, provide $content_max words content,\
-				$chat_max words chat." 
+			if {$config(disambiguate)} {
+				set content_max $config(disambig_words)
+				set chat_max $config(disambig_chat_words)
+				RAG_Manager_print "Mid-relevance user question,\
+					relevance=$rel, $content_max words content,\
+					$chat_max words chat for disambiguation." 
+			} else {
+				set content_max $config(mid_rel_words)
+				set chat_max $config(mid_rel_chat_words)
+				RAG_Manager_print "Mid-relevance user question,\
+					relevance=$rel, $content_max words content,\
+					$chat_max words chat for completion." 
+			}
 		}
 	} else {
 		set content_max $config(low_rel_words)
 		set chat_max $config(low_rel_chat_words)
 		if {$rewritten_question != ""} {
 			RAG_Manager_print "Low-relevance re-written question,\
-				relevance=$rel, provide $content_max words content,\
-				$chat_max words chat." 
+				relevance=$rel, $content_max words content,\
+				$chat_max words chat for completion." 
 		} else {
 			RAG_Manager_print "Low-relevance user question,\
-				relevance=$rel, provide $content_max words content,\
-				$chat_max words chat." 
+				relevance=$rel, $content_max words content,\
+				$chat_max words chat for completion." 
 		}
 	}
 	
@@ -2468,8 +2494,6 @@ proc RAG_Manager_get_answer {model contents assistant question api_key} {
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \}\n"
 	append json_body "  \]\n\}"
 	
-#	RAG_Manager_print $json_body
-	
 	set cmd [list | curl -sS -X POST https://api.openai.com/v1/chat/completions \
 	  -H "Content-Type: application/json" \
 	  -H "Authorization: Bearer $api_key" \
@@ -2504,26 +2528,26 @@ proc RAG_Manager_get_answer {model contents assistant question api_key} {
 # passes them to the RAG package for submission to the completion end point. It
 # has two modes of operation, depending upon whethere or not we pass it a
 # non-empty rewritten question. When the rewritten question is empty and the
-# user question is of mid-relevance, the submit routine performs a
-# disambiguation submission, where it passes the question and an excessive
-# quantity of documentation to a fast, cheap completion endpoint with
-# instructions to either re-write the question or return a clarifying question
-# we will present to the user. If we get a re-written question, the submit
-# routine calls itself, passing this re-written question as an argument. This
-# second execution of the submit procedure will submit the re-written question
-# as it is, regardless of its relevance. If the disambiguation response is a
-# clarifying question for the user, we pass that back as an answer. In order to
-# submit any question, this routine must read a valid API key from disk. Once we
-# receive a response from the completion end point, we try to extract an answer
-# from the response json record. If we succeed, we format it for plain text
-# display and print it out in the console or tool window. What we pass back to
-# the calling routine, however, is the raw answer with no formatting. If we
-# can't extract the answer then we try to extract an error message and report
-# the error. If we can't extract an error message, we return a failure error
-# message of our own. In all cases, what we return is the raw json, but what we
-# print to the console or log file is formatted for plain text display. If a
-# file called offline.txt exists in the log directory, this routine will return
-# an announcement that the chatbot is offline.
+# user question is of mid-relevance and disambiguation is enabled, the submit
+# routine performs a disambiguation submission, where it passes the question and
+# an excessive quantity of documentation to a fast, cheap completion endpoint
+# with instructions to either re-write the question or return a clarifying
+# question we will present to the user. If we get a re-written question, the
+# submit routine calls itself, passing this re-written question as an argument.
+# This second execution of the submit procedure will submit the re-written
+# question as it is, regardless of its relevance. If the disambiguation response
+# is a clarifying question for the user, we pass that back as an answer. In
+# order to submit any question, this routine must read a valid API key from
+# disk. Once we receive a response from the completion end point, we try to
+# extract an answer from the response json record. If we succeed, we format it
+# for plain text display and print it out in the console or tool window. What we
+# pass back to the calling routine, however, is the raw answer with no
+# formatting. If we can't extract the answer then we try to extract an error
+# message and report the error. If we can't extract an error message, we return
+# a failure error message of our own. In all cases, what we return is the raw
+# json, but what we print to the console or log file is formatted for plain text
+# display. If a file called offline.txt exists in the log directory, this
+# routine will return an announcement that the chatbot is offline.
 #
 proc RAG_Manager_submit {{rewritten_question ""}} {
 	upvar #0 RAG_Manager_config config
@@ -2580,7 +2604,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 		RAG_Manager_print "High-relevance question, relevance=$r,\
 			use $model and high-relevance completion prompt." brown
 	} elseif {$r >= $config(mid_rel_thr)} {
-		if {$rewritten_question == ""} {
+		if {($rewritten_question == "") && $config(disambiguate)} {
 			set assistant [string trim $config(disambig_assistant)]
 			set model $config(disambig_model)
 			set disambig 1
@@ -2636,7 +2660,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 			 $model \
 			 $info(contents) \
 			 $assistant \
-			 [string trim "$config(diambig_prefix)$question"] \
+			 [string trim "$config(disambig_prefix)$question"] \
 			 $api_key]
 	}
 	set len [expr [string length $info(result)]/$info(word_size)]
@@ -2686,7 +2710,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
 	if {!$disambig || $clarification \
 			|| [LWDAQ_is_error_result $answer] \
-			|| !$config(resubmit)} {
+			|| !$config(disambiguate)} {
 		if {!$clarification} {
 			RAG_Manager_print "$answer_txt"
 		} else {
@@ -2703,7 +2727,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	} else {
 	# If we requested disambiguation and the question is not a request for
 	# clarification, and is not an error, we assume the question is re-written.
-	# Provided that the resubmit box is checked, we perform another submission.
+	# Provided that the disambiguate box is checked, we perform another submission.
 	# We do not print or log the re-written question because that will be done
 	# by the retrieval procedure. But we do perform minimal formatting on the
 	# json answer before passing it to retrieval.
@@ -2783,7 +2807,7 @@ proc RAG_Manager_open {} {
 	set f [frame $w.more]
 	pack $f -side top -fill x
 
-	foreach a {Verbose Dump Resubmit} {
+	foreach a {Verbose Dump Disambiguate} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text "$a" -variable RAG_Manager_config($b)
 		pack $f.$b -side left -expand yes
