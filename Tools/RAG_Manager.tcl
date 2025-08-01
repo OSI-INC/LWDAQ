@@ -133,19 +133,19 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(high_rel_model) "gpt-4o"
 	set config(mid_rel_model) "gpt-4o"
 	set config(low_rel_model) "gpt-4o-mini"
-	set config(disambiguation_model) "gpt-4o-mini"
+	set config(disambig_model) "gpt-4o-mini"
 	set config(high_rel_words) "5000"
 	set config(mid_rel_words) "5000"
 	set config(low_rel_words) "0"
-	set config(disambiguation_words) "10000"
+	set config(disambig_words) "10000"
 	set config(max_question_words) "500"
 	set config(embed_model) "text-embedding-3-small"
 	set config(answer_timeout_s) "30" 
 	set config(offline_min) "4"
-	set config(high_rel_chat_depth) "3"
-	set config(mid_rel_chat_depth) "6"
-	set config(disambiguation_depth) "12"
-	set config(low_rel_chat_depth) "12"
+	set config(high_rel_chat_words) "1000"
+	set config(mid_rel_chat_words) "3000"
+	set config(disambig_chat_words) "6000"
+	set config(low_rel_chat_words) "12000"
 #
 # Completion assistant instructions for the three tiers of relevance. Can be
 # edited with a dedicated window and saved to settings file.
@@ -154,20 +154,19 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 You are a helpful technical assistant. You will summarize and explain technical documentation. You will complete mathematical calculations whenever possible. If you are unsure of an answer or cannot find enough information in the provided context, say so clearly. Do not make up facts or fabricate plausible-sounding answers. It is better to say "I do not know" than to provide inaccurate information.
 
 When answering the user's question:
-  - If the question asks for a figure, graph, or image and a relevant figure is available in the provided content, include the figure in your response like this: `![Figure Caption](image_url)`  
-  - Do not say "you cannot search the web" or "you cannot find images" if a relevant figure is available in the provided content.
-  - Always provide at least one hyperlinks to original documentation.
-  - Prefer newer information over older.
+  - If the question asks for a figure, graph, or image, and a relevant figure is available in the provided content, include the figure in your response like this: `![Figure Caption](image_url)`  
+  - Do not say "I cannot search the web" or "I cannot find images" if a relevant figure is available in the provided content.
+  - Provide at least one hyperlinks to original documentation.
   - Respond using Markdown formatting.
   - Use LaTeX formatting within Markdown for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
     }
     
-    set config(disambiguation_assistant) {
+    set config(disambig_assistant) {
 
-The user has asked a vague question that we believe cannot be used for effective documentation retrievel. We are supplying you with the documents that we retrieved using this question, a history of user questions and assistant answers, and the vague question itself. We do not want you to answer the question. Instead, we want you to re-write the question by adding context, details, names, and part numbers so as to create a new question that is specific enough for effective document retrieval. If the documentation and context we have submitted do not contain sufficient information for you to re-write the question effectively, respond instead with a clarifying question for the user. Never response with an answer to the question. You must always respond with either a re-written question or a clarifying question. If you respond with a re-written question, begin your response with the key phrase "Rewrite: ". If you respond with a clarifying question, add no preface to your response. 
+The user has asked a question that is not relevant enough to our documentation to support effective retrieval. Do not answer the question. Your job is to re-write the question so that it is more detailed and more specific. In order to re-write the question, you will use the reference documents we have provided and the history of user questions and assistant answers we have provided. If these records do not provide you with enough information to compose a detailed and specific re-written question, respond instead with a request for clarification. Under no circumstances should you respond with an answer to the question. If you respond with a re-written question, prefix the question with "Rewrite: ". If you respond with a request for clarification, prefix the request with "Clarify: ".
 
-Rewritten or Clarifying Question:
+Rewritten Question or Request for Clarification:
 
 	}
 	
@@ -428,7 +427,7 @@ proc RAG_Manager_assistant_prompts {} {
 	pack $w.f.apply -side left
 	
 	# Print the assistant prompts for all relevance levels.
-	foreach level {high_rel mid_rel low_rel disambiguation} {
+	foreach level {high_rel mid_rel low_rel disambig} {
 		LWDAQ_print $w.text "set config($level\_assistant) \{\n" blue
 		LWDAQ_print $w.text "[string trim $config($level\_assistant)]"
 		LWDAQ_print $w.text "\n\}\n" blue
@@ -2298,87 +2297,89 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 	set info(relevance) [lindex $retrieval 1]
 	set rel $info(relevance)
 	if {$rel >= $config(high_rel_thr)} {
-		set num $config(high_rel_words)
-		set chat_depth $config(high_rel_chat_depth)
+		set content_max $config(high_rel_words)
+		set chat_max $config(high_rel_chat_words)
 		if {$rewritten_question != ""} {
 			RAG_Manager_print "High-relevance re-written question,\
-				relevance=$rel, provide $num\+ words, chat depth $chat_depth." 
+				relevance=$rel, provide $content_max words content,\
+				$chat_max words chat." 
 		} else {
 			RAG_Manager_print "High-relevance user question,\
-				relevance=$rel, provide $num\+ words, chat depth $chat_depth." 
+				relevance=$rel, provide $content_max words content,\
+				$chat_max words chat." 
 		}
 	} elseif {$rel >= $config(mid_rel_thr)} {
 		if {$rewritten_question != ""} {
-			set num $config(mid_rel_words)
-			set chat_depth $config(mid_rel_chat_depth)
-			RAG_Manager_print "Mid-relevance re-written question, relevance=$rel,\
-				provide $num\+ words, chat depth $chat_depth." 
+			set content_max $config(mid_rel_words)
+			set chat_max $config(mid_rel_chat_max)
+			RAG_Manager_print "Mid-relevance re-written question,\
+				relevance=$rel, provide $content_max words content,\
+				$chat_max words chat." 
 		} else {
-			set num $config(disambiguation_words)
-			set chat_depth $config(disambiguation_depth)
+			set content_max $config(disambig_words)
+			set chat_max $config(disambig_chat_words)
 			RAG_Manager_print "Mid-relevance user question,\
-				relevance=$rel, provide $num\+ words, chat depth $chat_depth." 
+				relevance=$rel, provide $content_max words content,\
+				$chat_max words chat." 
 		}
 	} else {
-		set num $config(low_rel_words)
-		set chat_depth $config(low_rel_chat_depth)
+		set content_max $config(low_rel_words)
+		set chat_max $config(low_rel_chat_words)
 		if {$rewritten_question != ""} {
 			RAG_Manager_print "Low-relevance re-written question,\
-				relevance=$rel, provide $num\+ words, chat depth $chat_depth." 
+				relevance=$rel, provide $content_max words content,\
+				$chat_max words chat." 
 		} else {
 			RAG_Manager_print "Low-relevance user question,\
-				relevance=$rel, provide $num\+ words, chat depth $chat_depth." 
+				relevance=$rel, provide $content_max words content,\
+				$chat_max words chat." 
 		}
 	}
 	
 	set contents [list]
 	set chat_words 0
-	if {$chat_depth >  0} {
-		set matches [regexp -all -inline -indices \
-			{\nQuestion: .*?(?=\nQuestion: |$)} "\n$info(chat)"]
-		set chat ""
-		set first [expr [llength $matches]-$chat_depth]
-		set last [expr [llength $matches]-1]
-		set chat [list]
-		foreach match [lrange $matches $first $last] {
-			set qa [string trim [string range $info(chat) {*}$match]]
-			if {[regexp {Question: (.*?)(?=\nAnswer:)} $qa match question remaining]} {
-				lappend contents "Question: $question"
-			}
-			if {[regexp {Answer: (.*?)(?=\nQuestion: |$)} $qa match answer remaining]} {
-				lappend contents "Answer: $answer"
-			}
+	set matches [regexp -all -inline -indices \
+		{\nQuestion: .*?(?=\nQuestion: |$)} \
+		"\n$info(chat)"]
+	foreach match [lrange $matches 0 [expr [llength $matches]-1]] {
+		set qa [string trim [string range $info(chat) {*}$match]]
+		if {[regexp {Question: (.*?)(?=\nAnswer:)} $qa match question remaining]} {
+			lappend contents "Question: [string trim $question]"
+			set chat_words [expr $chat_words \
+				+ ([string length $question]/$info(word_size))]
 		}
-		
-		if {[llength $contents] > 0} {
-			RAG_Manager_print \
-				"Adding up to $chat_depth previous exchanges from chat history..."
+		if {[regexp {Answer: (.*?)(?=\nQuestion: |$)} $qa match answer remaining]} {
+			lappend contents "Answer: [string trim $answer]"
+			set chat_words [expr $chat_words \
+				+ ([string length $answer]/$info(word_size))]
+		}
+	}
+	
+	if {$chat_words > 0} {
+		RAG_Manager_print \
+			"Submitting $chat_words of chat history..."
+		RAG_Manager_print \
+			"-----------------------------------------------------" brown
+		foreach qa $contents {
+			RAG_Manager_print $qa green
 			RAG_Manager_print \
 				"-----------------------------------------------------" brown
-			foreach qa $contents {
-				RAG_Manager_print [string trim $qa] green
-				RAG_Manager_print \
-					"-----------------------------------------------------" brown
-				set chat_words [expr $chat_words + \
-					([string length $info(chat)]/$info(word_size))]
-				incr count
-			}
 		}
 	}
 
-	set count 0
-	set words 0
+	set chunk_count 0
+	set content_words 0
 	if {$config(show_match)} {
 		RAG_Manager_print "List of match strings, most relevant first." brown
 	} else {
 		RAG_Manager_print "List of content strings, most relevant first." brown
 	}
 	foreach {name rel} $retrieval {
-		if {$words >= $num} {break}
+		if {$content_words >= $content_max} {break}
 		if {($info(relevance) >= $config(high_rel_thr)) && ($rel < $config(mid_rel_thr))} {
 			break
 		}
-		incr count
+		incr chunk_count
 		RAG_Manager_print "-----------------------------------------------------" brown
 		set embed [lindex $retrieval 0]
 		set cfn [file join $info(content_dir) $name\.txt]
@@ -2386,24 +2387,25 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 		set content [read $f]
 		close $f
 		lappend contents "$content"
-		set words [expr $words + ([string length $content]/$info(word_size))]
+		set content_words [expr $content_words + ([string length $content]/$info(word_size))]
 
 		if {$config(show_match)} {
 			set mfn [file join $info(match_dir) $name\.txt]
 			set f [open $mfn r]
 			set match [read $f]
 			close $f
-			RAG_Manager_print "$count\: Match String with Relevance $rel:" brown
+			RAG_Manager_print "$chunk_count\: Match String with Relevance $rel:" brown
 			RAG_Manager_print $match darkgreen
 		} else {
-			RAG_Manager_print "$count\: Content String with Relevance $rel:" brown
+			RAG_Manager_print "$chunk_count\: Content String with Relevance $rel:" brown
 			RAG_Manager_print $content green
 		}
 	}
 	RAG_Manager_print "-----------------------------------------------------" brown
 
 	set info(contents) $contents
-	RAG_Manager_print "Retrieval complete, $count chunks, $words content words,\
+	RAG_Manager_print "Retrieval complete, $chunk_count chunks,\
+		$content_words content words,\
 		$chat_words chat words [RAG_Manager_time]" purple
 	set info(control) "Idle"
 	return [llength $contents]
@@ -2550,7 +2552,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 		[RAG_Manager_time]" purple
 	RAG_Manager_print "Choosing answer model and assistant prompt..." brown
 	set r $info(relevance)
-	set disambiguation 0
+	set disambig 0
 	if {$r >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
 		set assistant [string trim $config(high_rel_assistant)]
@@ -2558,9 +2560,9 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 			use $model and high-relevance completion prompt." brown
 	} elseif {$r >= $config(mid_rel_thr)} {
 		if {$rewritten_question == ""} {
-			set assistant [string trim $config(disambiguation_assistant)]
-			set model $config(disambiguation_model)
-			set disambiguation 1
+			set assistant [string trim $config(disambig_assistant)]
+			set model $config(disambig_model)
+			set disambig 1
 			RAG_Manager_print "Mid-relevance question, relevance=$r,\
 				use $model and disambiguation prompt." brown
 		} else {
@@ -2594,7 +2596,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	}
 	set size [expr $size + [string length $question]]
 	set words [expr $size / $info(word_size)]
-	if {$disambiguation} {
+	if {$disambig} {
 		RAG_Manager_print "Submitting $words words to $model for disambiguation."
 	} else {
 		RAG_Manager_print "Submitting $words words to $model for completion."
@@ -2605,7 +2607,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 		 $model $assistant $info(contents) $question $api_key]
 	set len [expr [string length $info(result)]/$info(word_size)]
 	set del [format %.1f [expr 0.001*([clock milliseconds] - $start_ms)]]
-	if {$disambiguation} {
+	if {$disambig} {
 		RAG_Manager_print "Received disambiguation, length $len words, latency $del s."
 	} else {
 		RAG_Manager_print "Received completion, length $len words, latency $del s."
@@ -2627,10 +2629,14 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	# clause in the answer, but failing that we will assume the question is 
 	# a request for clarification.
 	set clarification 1
-	if {$disambiguation} {
+	if {$disambig} {
 		if {[regexp {^Rewrite} $answer]} {
 			set clarification 0
 			regsub {^Rewrite:*\s*} $answer "" answer
+		}
+		if {[regexp {^Clarify} $answer]} {
+			set clarification 1
+			regsub {^Clarify:*\s*} $answer "" answer
 		}
 	}
 	
@@ -2644,7 +2650,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	# newline must have come from an escaped newline because the json string
 	# will never contains newlines.
 	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
-	if {!$disambiguation || $clarification \
+	if {!$disambig || $clarification \
 			|| [LWDAQ_is_error_result $answer] \
 			|| !$config(resubmit)} {
 		if {!$clarification} {
@@ -2653,7 +2659,7 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 			RAG_Manager_print "$answer_txt"
 		}
 		append info(chat) "Answer: $answer_txt\n\n"
-		if {$disambiguation} {
+		if {$disambig} {
 			RAG_Manager_print "Dismbiguation Submission Complete\
 				[RAG_Manager_time]\n" purple
 		} else {
