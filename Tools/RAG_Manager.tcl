@@ -60,6 +60,7 @@ proc RAG_Manager_init {} {
 #
 	set config(verbose) "0"
 	set config(dump) "0"
+	set config(resubmit) "1"
 	set config(show_match) "0"
 	set config(snippet_len) "45"
 	set config(progress_frac) "0.1"
@@ -163,17 +164,11 @@ When answering the user's question:
     }
     
     set config(disambiguation_assistant) {
-You are helping improve a support chatbot's ability to retrieve relevant documentation. The user has asked a vague or ambiguous question that relies on context or lacks important details. Your task is to rewrite the user's latest question so that it is clear, specific, and self-contained — meaning it should make sense on its own and include all necessary details to retrieve relevant documents. Failing that, you will return a question for the user, asking the user to provide more details and specifics in their question.
 
-When deciding how to re-write the question, or compose a clarifying question, use the following:
-  - Chat History: previous user and assistant messages that may clarify the user's intent
-  - Documentation: potentially relevant excerpts from manuals or reference guides
-  - Original Question: the ambiguous question the user most recently asked
-Focus on specificity and technical clarity. Your output should be only the rewritten question or clarifying question with no extra explanation.
+The user has asked a vague question that we believe cannot be used for effective documentation retrievel. We are supplying you with the documents that we retrieved using this question, a history of user questions and assistant answers, and the vague question itself. We do not want you to answer the question. Instead, we want you to re-write the question by adding context, details, names, and part numbers so as to create a new question that is specific enough for effective document retrieval. If the documentation and context we have submitted do not contain sufficient information for you to re-write the question effectively, respond instead with a clarifying question for the user. Never response with an answer to the question. You must always respond with either a re-written question or a clarifying question. If you respond with a re-written question, begin your response with the key phrase "Rewrite: ". If you respond with a clarifying question, add no preface to your response. 
 
-If your answer is a rewritten question that we can use for retrieval, preface your response with "Rewrite: ". If your answer is a question we should forward to the user, preface your response with "Clarify: ".
+Rewritten or Clarifying Question:
 
-Rewritten Question or Clarification Question:
 	}
 	
 	set config(mid_rel_assistant) {
@@ -433,9 +428,9 @@ proc RAG_Manager_assistant_prompts {} {
 	pack $w.f.apply -side left
 	
 	# Print the assistant prompts for all relevance levels.
-	foreach level {high mid low} {
-		LWDAQ_print $w.text "set config($level\_rel_assistant) \{\n" blue
-		LWDAQ_print $w.text "[string trim $config($level\_rel_assistant)]"
+	foreach level {high_rel mid_rel low_rel disambiguation} {
+		LWDAQ_print $w.text "set config($level\_assistant) \{\n" blue
+		LWDAQ_print $w.text "[string trim $config($level\_assistant)]"
 		LWDAQ_print $w.text "\n\}\n" blue
 	}
 	
@@ -2633,10 +2628,6 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	# a request for clarification.
 	set clarification 1
 	if {$disambiguation} {
-		if {[regexp {^Clarify} $answer]} {
-			set clarification 1
-			regsub {^Clarify:*\s*} $answer "" answer
-		}
 		if {[regexp {^Rewrite} $answer]} {
 			set clarification 0
 			regsub {^Rewrite:*\s*} $answer "" answer
@@ -2653,22 +2644,29 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	# newline must have come from an escaped newline because the json string
 	# will never contains newlines.
 	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
-	if {!$disambiguation || $clarification || [LWDAQ_is_error_result $answer]} {
+	if {!$disambiguation || $clarification \
+			|| [LWDAQ_is_error_result $answer] \
+			|| !$config(resubmit)} {
 		if {!$clarification} {
 			RAG_Manager_print "$answer_txt"
 		} else {
 			RAG_Manager_print "$answer_txt"
 		}
 		append info(chat) "Answer: $answer_txt\n\n"
-		RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
+		if {$disambiguation} {
+			RAG_Manager_print "Dismbiguation Submission Complete\
+				[RAG_Manager_time]\n" purple
+		} else {
+			RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
+		}
 		set info(control) "Idle"
 	} else {
 	# If we requested disambiguation and the question is not a request for
-	# clarification, and is not an error, we assume the question is re-written
-	# and we perform another submission. We do not print or log the re-written
-	# question because that will be done by the retrieval procedure. But we do
-	# perform minimal formatting on the json answer before passing it to
-	# retrieval.
+	# clarification, and is not an error, we assume the question is re-written.
+	# Provided that the resubmit box is checked, we perform another submission.
+	# We do not print or log the re-written question because that will be done
+	# by the retrieval procedure. But we do perform minimal formatting on the
+	# json answer before passing it to retrieval.
 		RAG_Manager_print "$answer_txt"
 		RAG_Manager_print "Disambiguation Submission Complete [RAG_Manager_time]" purple
 		regsub -all {\\r\\n|\\r|\\n} $answer "\n" rewritten_question
@@ -2745,7 +2743,7 @@ proc RAG_Manager_open {} {
 	set f [frame $w.more]
 	pack $f -side top -fill x
 
-	foreach a {Verbose Dump} {
+	foreach a {Verbose Dump Resubmit} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text "$a" -variable RAG_Manager_config($b)
 		pack $f.$b -side left -expand yes
