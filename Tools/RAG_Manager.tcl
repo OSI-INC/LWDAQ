@@ -2290,7 +2290,8 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 						set retrieval [read $f]
 						close $f
 						file delete $rfn
-						RAG_Manager_print "Retrieval engine provided $rfn\."
+						RAG_Manager_print "Retrieval engine provided\
+							[file tail $rfn]\."
 						break
 					}
 				}
@@ -2382,74 +2383,68 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 	}
 	
 	set contents [list]
-	set chunk_count 0
 	set content_words 0
-	if {$config(show_match)} {
-		RAG_Manager_print "List of match strings, most relevant first." brown
-	} else {
-		RAG_Manager_print "List of content strings, most relevant first." brown
-	}
 	foreach {name rel} $retrieval {
 		if {$content_words >= $content_max} {break}
-		if {($info(relevance) >= $config(high_rel_thr)) && ($rel < $config(mid_rel_thr))} {
+		if {($info(relevance) >= $config(high_rel_thr)) \
+			&& ($rel < $config(mid_rel_thr))} {
 			break
 		}
-		incr chunk_count
-		RAG_Manager_print "-----------------------------------------------------" brown
+		
 		set embed [lindex $retrieval 0]
 		set cfn [file join $info(content_dir) $name\.txt]
 		set f [open $cfn r]
 		set content [read $f]
 		close $f
 		lappend contents "$content"
-		set content_words [expr $content_words + ([string length $content]/$info(word_size))]
+		set content_words [expr $content_words \
+			+ ([string length $content]/$info(word_size))]
 
 		if {$config(show_match)} {
 			set mfn [file join $info(match_dir) $name\.txt]
 			set f [open $mfn r]
 			set match [read $f]
 			close $f
-			RAG_Manager_print "$chunk_count\: Match String with Relevance $rel:" brown
+			RAG_Manager_print "[llength $contents]\:\
+				Match String with Relevance $rel:" brown
 			RAG_Manager_print $match darkgreen
 		} else {
-			RAG_Manager_print "$chunk_count\: Content String with Relevance $rel:" brown
+			RAG_Manager_print "[llength $contents]\:\
+				Content String with Relevance $rel:" brown
 			RAG_Manager_print $content green
 		}
 	}
-	RAG_Manager_print "-----------------------------------------------------" brown
 
-	set chat_words 0
-	set matches [regexp -all -inline -indices \
+	set chat_boundaries [regexp -all -inline -indices \
 		{\nQuestion: .*?(?=\nQuestion: |$)} \
 		"\n$info(chat)"]
-	foreach match [lrange $matches 0 [expr [llength $matches]-1]] {
-		set qa [string trim [string range $info(chat) {*}$match]]
+	set chat_boundaries [lsort -decreasing -integer -index 0 $chat_boundaries]
+	set chat_words 0
+	set chat_select [list]
+	foreach boundary $chat_boundaries {
+		if {$chat_words >= $chat_max} {break}
+		lassign $boundary a b
+		set chat_words [expr $chat_words + (($b - $a + 1) / $info(word_size))]		
+		lappend chat_select $boundary
+	}
+	set chat_select [lsort -increasing -integer -index 0 $chat_select]
+	
+	foreach boundary $chat_select {
+		set qa [string trim [string range $info(chat) {*}$boundary]]
 		if {[regexp {Question: (.*?)(?=\nAnswer:)} $qa match question remaining]} {
 			lappend contents "Question: [string trim $question]"
-			set chat_words [expr $chat_words \
-				+ ([string length $question]/$info(word_size))]
+			RAG_Manager_print "[llength $contents]\: Previous Chat Question:" brown
+			RAG_Manager_print [string trim $question] green
 		}
 		if {[regexp {Answer: (.*?)(?=\nQuestion: |$)} $qa match answer remaining]} {
 			lappend contents "Answer: [string trim $answer]"
-			set chat_words [expr $chat_words \
-				+ ([string length $answer]/$info(word_size))]
+			RAG_Manager_print "[llength $contents]\: Previous Chat Answer:" brown
+			RAG_Manager_print [string trim $answer] green
 		}
 	}
 	
-	if {$chat_words > 0} {
-		RAG_Manager_print \
-			"Submitting $chat_words of chat history..."
-		RAG_Manager_print \
-			"-----------------------------------------------------" brown
-		foreach qa $contents {
-			RAG_Manager_print $qa green
-			RAG_Manager_print \
-				"-----------------------------------------------------" brown
-		}
-	}
-
 	set info(contents) $contents
-	RAG_Manager_print "Retrieval complete, $chunk_count chunks,\
+	RAG_Manager_print "Retrieval complete, [llength $contents] chunks,\
 		$content_words content words,\
 		$chat_words chat words [RAG_Manager_time]" purple
 	set info(control) "Idle"
