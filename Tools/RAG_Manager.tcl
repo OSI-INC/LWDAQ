@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "5.2"
+	LWDAQ_tool_init "RAG_Manager" "5.3"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -60,7 +60,6 @@ proc RAG_Manager_init {} {
 #
 	set config(verbose) "0"
 	set config(dump) "0"
-	set config(disambiguate) "0"
 	set config(show_match) "0"
 	set config(snippet_len) "45"
 	set config(progress_frac) "0.1"
@@ -135,15 +134,12 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(high_rel_model) "gpt-4o"
 	set config(mid_rel_model) "gpt-4o"
 	set config(low_rel_model) "gpt-4o-mini"
-	set config(disambig_model) "gpt-4o-mini"
 	set config(high_rel_words) "5000"
 	set config(mid_rel_words) "5000"
 	set config(low_rel_words) "0"
-	set config(disambig_words) "2000"
 	set config(high_rel_chat_words) "3000"
 	set config(mid_rel_chat_words) "3000"
 	set config(low_rel_chat_words) "10000"
-	set config(disambig_chat_words) "10000"
 	set config(max_question_words) "1000"
 	set config(embed_model) "text-embedding-3-small"
 	set config(answer_timeout_s) "30" 
@@ -168,28 +164,6 @@ When answering the user's question:
   
     }
     
-    set config(disambig_assistant) {
-
-The user has asked a question that is too vague or ambiguous to retrieve relevant documentation. Do not answer the question. Instead, you must choose one of the following two options:
-
-1. If the chat history and the provided reference documentation give you enough information to rewrite the question in a more specific and self-contained form, do so. Begin your output with:
-Rewrite: [your rewritten question]
-
-2. If the question is too vague and cannot be rewritten based on available context, ask the user for clarification. Begin your output with:
-Clarify: [your clarification question]
-
-You must **never** answer the question directly. You are not an answering assistant — you are a question rewriter. If you attempt to answer the question instead of rewriting or clarifying it, you will be failing your task. Output only one line. Do not add any explanation or formatting.
-
-Rewritten Question or Clarification Request:
-
-	}
-	
-	set config(disambig_prefix) {
-	
-Reminder: the assistant should not answer this question. The assistant should be allowed only to rewrite or clarify the question.
-
-	}
-	
 	set config(mid_rel_assistant) {
 
 You are a helpful technical assistant for a support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. If you do not have enough information, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
@@ -466,7 +440,7 @@ proc RAG_Manager_assistant_prompts {} {
 	pack $w.f.apply -side left
 	
 	# Print the assistant prompts for all relevance levels.
-	foreach level {high_rel mid_rel low_rel disambig} {
+	foreach level {high_rel mid_rel low_rel} {
 		LWDAQ_print $w.text "set config($level\_assistant) \{\n" blue
 		LWDAQ_print $w.text "[string trim $config($level\_assistant)]"
 		LWDAQ_print $w.text "\n\}\n" blue
@@ -2211,11 +2185,11 @@ proc RAG_Manager_engine {{cmd ""}} {
 # this routine must read a valid API key from disk. If a file called offline.txt
 # exists in the log directory, this routine will exit without doing anything.
 #
-proc RAG_Manager_retrieve {{rewritten_question ""}} {
+proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	
-	if {($info(control) != "Idle") && ($rewritten_question == "")} {return ""}
+	if {$info(control) != "Idle"} {return ""}
 
 	if {[file exists $info(offline_file)]} {
 		set f [open $info(offline_file)]
@@ -2226,21 +2200,15 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 		return "0"
 	}
 
-	if {$rewritten_question != ""} {
-		set question $rewritten_question
-	} else {
-		set question [string trim $config(question)]
-		if {$question == ""} {
-			RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
-			return "0"
-		}
+	set question [string trim $config(question)]
+	if {$question == ""} {
+		RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
+		return "0"
 	}
 		
 	set info(control) "Retrieve"
 	RAG_Manager_print "Retrieval for $info(ip) [RAG_Manager_time]" purple
-	if {$rewritten_question == ""} {
-		RAG_Manager_print "Question: $question"
-	}
+	RAG_Manager_print "Question: $question"
 	if {![file exists $config(key_file)]} {
 		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
 		set info(control) "Idle"
@@ -2339,49 +2307,21 @@ proc RAG_Manager_retrieve {{rewritten_question ""}} {
 	if {$rel >= $config(high_rel_thr)} {
 		set content_max $config(high_rel_words)
 		set chat_max $config(high_rel_chat_words)
-		if {$rewritten_question != ""} {
-			RAG_Manager_print "High-relevance re-written question,\
-				relevance=$rel, $content_max words content,\
-				$chat_max words chat for completion." 
-		} else {
-			RAG_Manager_print "High-relevance user question,\
-				relevance=$rel, $content_max words content,\
-				$chat_max words chat for completion." 
-		}
+		RAG_Manager_print "High-relevance user question,\
+			relevance=$rel, $content_max words content,\
+			$chat_max words chat for completion." 
 	} elseif {$rel >= $config(mid_rel_thr)} {
-		if {$rewritten_question != ""} {
-			set content_max $config(mid_rel_words)
-			set chat_max $config(mid_rel_chat_words)
-			RAG_Manager_print "Mid-relevance re-written question,\
-				relevance=$rel, $content_max words content,\
-				$chat_max words chat for completion." 
-		} else {
-			if {$config(disambiguate)} {
-				set content_max $config(disambig_words)
-				set chat_max $config(disambig_chat_words)
-				RAG_Manager_print "Mid-relevance user question,\
-					relevance=$rel, $content_max words content,\
-					$chat_max words chat for disambiguation." 
-			} else {
-				set content_max $config(mid_rel_words)
-				set chat_max $config(mid_rel_chat_words)
-				RAG_Manager_print "Mid-relevance user question,\
-					relevance=$rel, $content_max words content,\
-					$chat_max words chat for completion." 
-			}
-		}
+		set content_max $config(mid_rel_words)
+		set chat_max $config(mid_rel_chat_words)
+		RAG_Manager_print "Mid-relevance user question,\
+			relevance=$rel, $content_max words content,\
+			$chat_max words chat for completion." 
 	} else {
 		set content_max $config(low_rel_words)
 		set chat_max $config(low_rel_chat_words)
-		if {$rewritten_question != ""} {
-			RAG_Manager_print "Low-relevance re-written question,\
-				relevance=$rel, $content_max words content,\
-				$chat_max words chat for completion." 
-		} else {
-			RAG_Manager_print "Low-relevance user question,\
-				relevance=$rel, $content_max words content,\
-				$chat_max words chat for completion." 
-		}
+		RAG_Manager_print "Low-relevance user question,\
+			relevance=$rel, $content_max words content,\
+			$chat_max words chat for completion." 
 	}
 	
 	set contents [list]
@@ -2522,18 +2462,7 @@ proc RAG_Manager_get_answer {model contents assistant question api_key} {
 #
 # RAG_Manager_submit combines the question and the assistant prompt with the
 # retrieved data, all of which are stored in elements of the info array, and
-# passes them to the RAG package for submission to the completion end point. It
-# has two modes of operation, depending upon whethere or not we pass it a
-# non-empty rewritten question. When the rewritten question is empty and the
-# user question is of mid-relevance and disambiguation is enabled, the submit
-# routine performs a disambiguation submission, where it passes the question and
-# an excessive quantity of documentation to a fast, cheap completion endpoint
-# with instructions to either re-write the question or return a clarifying
-# question we will present to the user. If we get a re-written question, the
-# submit routine calls itself, passing this re-written question as an argument.
-# This second execution of the submit procedure will submit the re-written
-# question as it is, regardless of its relevance. If the disambiguation response
-# is a clarifying question for the user, we pass that back as an answer. In
+# passes them to the RAG package for submission to the completion end point. In
 # order to submit any question, this routine must read a valid API key from
 # disk. Once we receive a response from the completion end point, we try to
 # extract an answer from the response json record. If we succeed, we format it
@@ -2546,26 +2475,22 @@ proc RAG_Manager_get_answer {model contents assistant question api_key} {
 # display. If a file called offline.txt exists in the log directory, this
 # routine will return an announcement that the chatbot is offline.
 #
-proc RAG_Manager_submit {{rewritten_question ""}} {
+proc RAG_Manager_submit {} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 	
-	if {($info(control) != "Idle") && ($rewritten_question == "")} {return ""}
+	if {($info(control) != "Idle")} {return ""}
 	
-	if {$rewritten_question != ""} {
-		set question $rewritten_question
-	} else {
-		set question [string trim $config(question)]
-		if {$question == ""} {
-			RAG_Manager_print "ERROR: Empty question, abandoning submission."
-			return ""
-		}
-		if {[string length $question]/$info(word_size) \
-				> $config(max_question_words)} {
-			set answer "ERROR: Question is longer than\
-				[expr $config(max_question_words)*$info(word_size)] characters."
-			return $answer
-		}
+	set question [string trim $config(question)]
+	if {$question == ""} {
+		RAG_Manager_print "ERROR: Empty question, abandoning submission."
+		return ""
+	}
+	if {[string length $question]/$info(word_size) \
+			> $config(max_question_words)} {
+		set answer "ERROR: Question is longer than\
+			[expr $config(max_question_words)*$info(word_size)] characters."
+		return $answer
 	}
 
 	if {[file exists $info(offline_file)]} {
@@ -2594,25 +2519,16 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 		[RAG_Manager_time]" purple
 	RAG_Manager_print "Choosing answer model and assistant prompt..." brown
 	set r $info(relevance)
-	set disambig 0
 	if {$r >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
 		set assistant [string trim $config(high_rel_assistant)]
 		RAG_Manager_print "High-relevance question, relevance=$r,\
 			use $model and high-relevance completion prompt." brown
 	} elseif {$r >= $config(mid_rel_thr)} {
-		if {($rewritten_question == "") && $config(disambiguate)} {
-			set assistant [string trim $config(disambig_assistant)]
-			set model $config(disambig_model)
-			set disambig 1
-			RAG_Manager_print "Mid-relevance question, relevance=$r,\
-				use $model and disambiguation prompt." brown
-		} else {
-			set assistant [string trim $config(mid_rel_assistant)]
-			set model $config(mid_rel_model)
-			RAG_Manager_print "Mid-relevance question, relevance=$r,\
-				use $model and mid-relevance completion prompt." brown
-		}
+		set assistant [string trim $config(mid_rel_assistant)]
+		set model $config(mid_rel_model)
+		RAG_Manager_print "Mid-relevance question, relevance=$r,\
+			use $model and mid-relevance completion prompt." brown
 	} else {
 		set model $config(low_rel_model)
 		set assistant [string trim $config(low_rel_assistant)]
@@ -2638,35 +2554,18 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 	}
 	set size [expr $size + [string length $question]]
 	set words [expr $size / $info(word_size)]
-	if {$disambig} {
-		RAG_Manager_print "Submitting $words words to $model for disambiguation."
-	} else {
-		RAG_Manager_print "Submitting $words words to $model for completion."
-	}
+	RAG_Manager_print "Submitting $words words to $model for completion."
 	append info(chat) "Question: [string trim $question]\n"
 	set start_ms [clock milliseconds]
-	if {!$disambig} {
-		set info(result) [RAG_Manager_get_answer \
-			 $model \
-			 $info(contents) \
-			 $assistant \
-			 $question \
-			 $api_key]
-	} else {
-		set info(result) [RAG_Manager_get_answer \
-			 $model \
-			 $info(contents) \
-			 $assistant \
-			 [string trim "$config(disambig_prefix)$question"] \
-			 $api_key]
-	}
+	set info(result) [RAG_Manager_get_answer \
+		 $model \
+		 $info(contents) \
+		 $assistant \
+		 $question \
+		 $api_key]
 	set len [expr [string length $info(result)]/$info(word_size)]
 	set del [format %.1f [expr 0.001*([clock milliseconds] - $start_ms)]]
-	if {$disambig} {
-		RAG_Manager_print "Received disambiguation, length $len words, latency $del s."
-	} else {
-		RAG_Manager_print "Received completion, length $len words, latency $del s."
-	}
+	RAG_Manager_print "Received completion, length $len words, latency $del s."
 	if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $info(result) -> answer]} {
 		RAG_Manager_print "-----------------------------------------------------" brown
 		RAG_Manager_print "Raw answer content from completion endpoint:" brown
@@ -2678,63 +2577,19 @@ proc RAG_Manager_submit {{rewritten_question ""}} {
 		set answer "ERROR: Could not find answer or error message in result."
 	}
 	
-	# If we requested a disambiguation, as we do with mid-relevance questions,
-	# we will either get a request for clarification or a re-written question.
-	# We try to distinguish between the two by looking for an introductory
-	# clause in the answer, but failing that we will assume the question is 
-	# a request for clarification.
-	set clarification 1
-	if {$disambig} {
-		if {[regexp {^Rewrite} $answer]} {
-			set clarification 0
-			regsub {^Rewrite:*\s*} $answer "" answer
-		}
-		if {[regexp {^Clarify} $answer]} {
-			set clarification 1
-			regsub {^Clarify:*\s*} $answer "" answer
-		}
-	}
-	
-	# If we did not request a disambiguation, or we did request disambiguation
-	# and we received a clarification question for the user, or if in any case
-	# the answer is an error, print the answer to the console or log file. We
-	# perform minimal formatting on the json answer: we replace escaped newline
-	# characters with newlines so that we can see the answer clearly. But we do
-	# not replace escaped backslashes nor make any attempt to clean up LaTeX. We
-	# want to know what the endpoint returned when we look in our log file. Any
-	# newline must have come from an escaped newline because the json string
-	# will never contains newlines.
+	# Print the answer to the console or log file. We perform minimal formatting
+	# on the json answer: we replace escaped newline characters with newlines so
+	# that we can see the answer clearly. But we do not replace escaped
+	# backslashes nor make any attempt to clean up LaTeX. We want to know what
+	# the endpoint returned when we look in our log file. Any newline must have
+	# come from an escaped newline because the json string will never contains
+	# newlines.
 	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
-	if {!$disambig || $clarification \
-			|| [LWDAQ_is_error_result $answer] \
-			|| !$config(disambiguate)} {
-		if {!$clarification} {
-			RAG_Manager_print "$answer_txt"
-		} else {
-			RAG_Manager_print "$answer_txt"
-		}
-		append info(chat) "Answer: $answer_txt\n\n"
-		if {$disambig} {
-			RAG_Manager_print "Dismbiguation Submission Complete\
-				[RAG_Manager_time]\n" purple
-		} else {
-			RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
-		}
-		set info(control) "Idle"
-	} else {
-	# If we requested disambiguation and the question is not a request for
-	# clarification, and is not an error, we assume the question is re-written.
-	# Provided that the disambiguate box is checked, we perform another submission.
-	# We do not print or log the re-written question because that will be done
-	# by the retrieval procedure. But we do perform minimal formatting on the
-	# json answer before passing it to retrieval.
-		RAG_Manager_print "$answer_txt"
-		RAG_Manager_print "Disambiguation Submission Complete [RAG_Manager_time]" purple
-		regsub -all {\\r\\n|\\r|\\n} $answer "\n" rewritten_question
-		RAG_Manager_retrieve $rewritten_question
-		set answer [RAG_Manager_submit $rewritten_question]
-	} 
-
+	RAG_Manager_print "$answer_txt"
+	append info(chat) "Answer: $answer_txt\n\n"
+	RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
+	
+	set info(control) "Idle"
 	return $answer
 }
 
@@ -2804,7 +2659,7 @@ proc RAG_Manager_open {} {
 	set f [frame $w.more]
 	pack $f -side top -fill x
 
-	foreach a {Verbose Dump Disambiguate} {
+	foreach a {Verbose Dump} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text "$a" -variable RAG_Manager_config($b)
 		pack $f.$b -side left -expand yes
