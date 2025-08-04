@@ -2148,21 +2148,26 @@ proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
 	}
 	
 	# Create table of contents after contents heading
+	puts $f "<table>"
 	set h3list [list]
 	foreach {h t} $headings {
 		if {$h == "h2"} {
 			if {[llength $h3list] > 0} {
+				puts $f "<tr><td>"
 				LWDAQ_html_contents_tabulate $h3list $f $cell_spacing $num_columns
+				puts $f "</td></tr>"
 				set h3list [list]
 			}
 			if {($t != "End") && ($t != "Contents")} {
-				puts $f "<a href=\"\#$t\">$t</a><br>"
+				puts $f "<tr><td><a href=\"\#$t\">$t</a></td></tr>"
 			}
 		}
 		if {$h == "h3"} {
 			lappend h3list $t
 		}
 	}
+	puts $f "</table>"
+
 	
 	# Add a line break before the next heading.
 	puts $f ""
