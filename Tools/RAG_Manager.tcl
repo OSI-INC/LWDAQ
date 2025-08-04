@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "5.3"
+	LWDAQ_tool_init "RAG_Manager" "5.4"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -2396,13 +2396,12 @@ proc RAG_Manager_retrieve {} {
 #
 # RAG_Manager_get_answer submits a list of chunks and a question to the chat
 # completion end point and returns the answer it obtains. It takes as in put
-# five parameters: the question, the list of content strings, a description of
-# the attitude with which the end point is supposed to answer the question, a
-# key that grants access to the generator, and a completion model. It returns
-# the entire result from the end point, as a json record, and leaves it to the
-# calling procedure to extract the answer.
+# five parameters: the completion model name, the assistant instructions, the
+# documentation and chat history content, the question, and an api key location.
+# It returns the entire result from the end point, as a json record, and leaves
+# it to the calling procedure to extract the answer.
 #
-proc RAG_Manager_get_answer {model contents assistant question api_key} {
+proc RAG_Manager_get_answer {model assistant contents question api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
@@ -2411,6 +2410,7 @@ proc RAG_Manager_get_answer {model contents assistant question api_key} {
 		\"model\": \"$model\",\n\
 		\"temperature\": 0.0,\n\
 		\"messages\": \[\n"
+	append json_body "    \{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
 	foreach content $contents {
 		if {[regexp {^Question: (.*)} $content match chat]} {
 			set chat [RAG_Manager_json_format $chat]
@@ -2427,7 +2427,6 @@ proc RAG_Manager_get_answer {model contents assistant question api_key} {
 		}
 	}
 	set question [RAG_Manager_json_format $question]
-	append json_body "    \{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \}\n"
 	append json_body "  \]\n\}"
 	
@@ -2559,8 +2558,8 @@ proc RAG_Manager_submit {} {
 	set start_ms [clock milliseconds]
 	set info(result) [RAG_Manager_get_answer \
 		 $model \
-		 $info(contents) \
 		 $assistant \
+		 $info(contents) \
 		 $question \
 		 $api_key]
 	set len [expr [string length $info(result)]/$info(word_size)]
