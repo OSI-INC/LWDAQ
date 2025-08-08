@@ -118,6 +118,8 @@ https://www.opensourceinstruments.com/SCT/TCB.php
 https://www.opensourceinstruments.com/WPS/WPS.php
 https://www.opensourceinstruments.com/About/about.php
 https://www.opensourceinstruments.com/Resources/Surgery/hmt_sp.html
+https://www.opensourceinstruments.com/Resources/Surgery/sct_sp.html
+https://www.opensourceinstruments.com/Resources/Surgery/electrode_sp.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Commands.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Toolmaker_Library.html
@@ -142,6 +144,10 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(low_rel_chat_words) "10000"
 	set config(max_question_words) "1000"
 	set config(embed_model) "text-embedding-3-small"
+	set config(temperature) "0.0"
+#
+# Behavior of the chat handler.
+#
 	set config(answer_timeout_s) "30" 
 	set config(offline_min) "4"
 #
@@ -2408,7 +2414,7 @@ proc RAG_Manager_get_answer {model assistant contents question api_key} {
 	set assistant [RAG_Manager_json_format $assistant]
  	set json_body "\{\n\
 		\"model\": \"$model\",\n\
-		\"temperature\": 0.0,\n\
+		\"temperature\": $config(temperature),\n\
 		\"messages\": \[\n"
 	append json_body "    \{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
 	foreach content $contents {

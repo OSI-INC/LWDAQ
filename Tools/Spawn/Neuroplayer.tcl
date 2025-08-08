@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "173"
+	LWDAQ_tool_init "Neuroplayer" "174"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -1391,34 +1391,38 @@ proc Neuroplayer_end_time {fn payload {ref_time 0} {ref_index 0}} {
 
 #
 # Neuroplayer_filter is for use in processor scripts as a means of detecting
-# events in a signal. The routine scales the amplitude of the discrete transform 
+# events in a signal. The routine scales the amplitude of the discrete transform
 # components according to four numbers, which specify the central region of the
-# pass-band and the two extremes of the pass-band. The scaling is linear,
-# which is not something we can do easily with recursive filters, or with
-# analog filters, but is simple in software. The four numbers are band_lo_end,
-# band_lo_center, band_hi_center, and band_hi_end. They are in units of frequency.
-# Components below band_lo_end and above band_hi_end are multiplied by zero. 
-# Components between band_lo_end and band_lo_center are scaled by zero to one
-# from the lower to the upper frequency. Components from band_lo_center to 
-# band_hi_center are added as they are. Components from band_hi_center to
+# pass-band and the two extremes of the pass-band. The scaling is linear, which
+# is not something we can do easily with recursive filters, or with analog
+# filters, but is simple in software. The four numbers are band_lo_end,
+# band_lo_center, band_hi_center, and band_hi_end. They are in units of
+# frequency. Components below band_lo_end and above band_hi_end are multiplied
+# by zero. Components between band_lo_end and band_lo_center are scaled by zero
+# to one from the lower to the upper frequency. Components from band_lo_center
+# to band_hi_center are added as they are. Components from band_hi_center to
 # band_hi_end are scaled from one to zero from the lower to the upper frequency.
-# Thus we have a pass-band that might be sharp or gentle. We can implement
-# a high-pass filter by setting band_lo_end and band_lo_center to zero. The
-# routine returns the total power of the remaining components, which is the
-# sum of their squares. We do not multiply the combined power by any scaling
-# factor because there are several variants of the discrete fourier transform
-# with different scaling factors, and we want to avoid hiding such multiplications
-# in our code. If "show" is set, the routine plots the filtered signal on the 
-# screen by taking the inverse transform of the selected frequency components. 
-# If "replace" is set, the routine calculates the inverse transform of the filtered 
-# signal, making it available to the calling routine in the info(values) variable.
-# Note that the routine does not replace the info(signal) string, which contains
-# the reconstructed signal values and their timestamps. Only the info(values) 
-# string is replaced. By default, the routine does not plot nor does it perform 
-# the inverse transform, both of which take time and slow down processing. The 
-# show parameter, if not zero, is used to scale the signal for display. By default
-# the filter is band-pass. But if we set "bandpass" to 0, the filter is a band-stop
-# filter.
+# Thus we have a pass-band that might be sharp or gentle. We can implement a
+# high-pass filter by setting band_lo_end and band_lo_center to zero. The
+# routine returns the total power of the remaining components, which is the sum
+# of their squares. We do not multiply the combined power by any scaling factor
+# because there are several variants of the discrete fourier transform with
+# different scaling factors, and we want to avoid hiding such multiplications in
+# our code. If either "show" or "replace" is set, the routine calculates the
+# inverse transform of the signal. The values it obtains from the inverse
+# transform are rounded to the nearest integer, so they look like sixteen-bit
+# ADC counts. If "show" is set, the routine plots the inverse transform in the
+# value versus time display. If "replace" is set, the routine replaces the
+# original info(values) string with the filtered signal values. Note that the
+# routine does not replace the info(signal) string, which contains a list of the
+# original reconstructed samples as pairs of values "timestamp sample". Nor does
+# the routine make any change to the info(spectrum) string, which contains the
+# amplitudes and phases of all the Fourier transform components. The bandpass
+# flag selects a band-pass filter, and is by default set. But if this flag is
+# cleared, the filter acts as a band-stop filter, where the specified range of
+# frequency components is removed from the spectrum rather than retained, and
+# all other components are retained rather than removed. By default, show and
+# replace are cleared and bandpass is set.
 #
 proc Neuroplayer_filter {band_lo_end band_lo_center \
 		band_hi_center band_hi_end \
@@ -1470,7 +1474,10 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 	# If show or replace, take the inverse transform. The filtered values will
 	# be available to the calling procedure in a variable of the same name.
 	if {$show || $replace} {
+		set saved_config [lwdaq_config]
+		lwdaq_config -fsd 0
 		set filtered_values [lwdaq_fft $filtered_spectrum -inverse 1]
+		eval lwdaq_config $saved_config
 	}
 	
 	# If show, plot the filtered signal to the screen. If our frequency band
@@ -1494,7 +1501,9 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 	
 	# If replace, replace the existing info(values) string with the new
 	# filtered values.
-	if {$replace} {set info(values) $filtered_values}
+	if {$replace} {
+		set info(values) $filtered_values
+	}
 	
 	# Return the power.
 	return $band_power
@@ -7831,7 +7840,9 @@ proc Neuroplayer_play {{command ""}} {
 	}
 	
 	# We apply processing to each channel for this interval, plot the signal,
-	# and plot the spectrum, as enabled by the user.
+	# and plot the spectrum, as enabled by the user. We run the processor
+	# script, provided it is enabled, and after that we export the signal, if
+	# the exporter is running.
 	foreach info(channel_code) $selected_channels {
 		set info(channel_num) [lindex [split $info(channel_code) :] 0]
 		if {![string is integer -strict $info(channel_num)] \
@@ -7862,10 +7873,6 @@ proc Neuroplayer_play {{command ""}} {
 		if {[winfo exists $info(tracker_window)]} {
 			Neurotracker_plot
 		}
-		if {$info(export_state) == "Play"} {
-			Neuroexporter_export "Play"
-			if {$info(play_control) == "Stop"} {break}
-		}
 		if {![LWDAQ_is_error_result $result] && $en_proc} {
 			if {[catch {eval $info(processor_script)} error_result]} {
 				set result "ERROR: In $info(processor_file_tail)\
@@ -7877,6 +7884,10 @@ proc Neuroplayer_play {{command ""}} {
 				}
 			}
 		}
+		if {$info(export_state) == "Play"} {
+			Neuroexporter_export "Play"
+			if {$info(play_control) == "Stop"} {break}
+		}		
 		LWDAQ_support
 	}
 	
