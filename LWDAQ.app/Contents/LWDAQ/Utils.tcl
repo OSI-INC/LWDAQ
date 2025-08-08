@@ -2063,14 +2063,14 @@ proc man { {pattern ""} {option "none"} } {
 }
 
 #
-# LWDAQ_html_contents creates a table of contents for an HTML document.
-# Each h2 and h3 level heading must have a unique name in the document, because
-# this routine uses the heading text as the identifier for each heading line.
-# The table of contents will be placed underneath an h2 heading with text
+# LWDAQ_html_contents creates a table of contents for an HTML document. Each h2
+# and h3 level heading must have a unique name in the document, because this
+# routine uses the heading text as the identifier for each heading line. The
+# table of contents will be placed underneath an h2 heading with text
 # "Contents". Any pre-existing table of contents between this h2 heading and the
 # next h2 heading will be removed from the document. The routine takes three
-# optional parameters. The first two are cell_spacing and num_columns for the 
-# h3 heading tables beneath each h2 heading. The third parameter is the name of the
+# optional parameters. The first two are cell_spacing and num_columns for the h3
+# heading tables beneath each h2 heading. The third parameter is the name of the
 # HTML file to be processed.
 #
 proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
