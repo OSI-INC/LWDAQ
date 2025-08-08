@@ -181,16 +181,25 @@ proc Neuroplayer_init {} {
 # amplitude versus frequency, which we display in the a-t window. The empty
 # value for these two graphs is a point at the origin. When we have real data in
 # the graphs, each graph point is two numbers: an x and y value, which would
-# give time and value or frequency and amplitude. Note that the info(signal) and
-# info(spectrum) elements are strings of characters. Their x-y values are
-# represented as characters giving each number, with each number separated from
-# its neighbors by spaces. 
+# give time and value or frequency and amplitude. The info(signal) parameter is
+# a list of numbers alternating between sample timestamps and sample values. The
+# info(values) parameter is a list of sample values. The info(spectrum)
+# parameter is a list of numbers alternating between component amplitudes and
+# component phases, where the phases are in radians. 
 #
 	set info(channel_code) "0"
 	set info(channel_num) "0"
 	set info(signal) "0 0"
 	set info(spectrum) "0 0"
 	set info(values) "0"
+#
+# The sample values are sixteen-bit unsigned integers. We define their minimum
+# and maximum values, and an offset that we can use to displace average-zero
+# value series to turn them into unsigned integer series.
+#
+	set info(sample_offset) "32768"
+	set info(sample_min) "0"
+	set info(sample_max) "65535"
 #
 # Parameters that handle auxiliary messages.
 #
@@ -199,7 +208,7 @@ proc Neuroplayer_init {} {
 # Any channel with a activity_threshold samples per second in the playback
 # interval will be considered active. 
 #
-	set config(activity_threshold) 14
+	set config(activity_threshold) "14"
 #
 # During play-back, we obtain a list of all channels in which there exists
 # at least one sample. From this list we select any channels from which we
@@ -1390,38 +1399,41 @@ proc Neuroplayer_end_time {fn payload {ref_time 0} {ref_index 0}} {
 }
 
 #
-# Neuroplayer_filter is for use in processor scripts as a means of detecting
-# events in a signal. The routine scales the amplitude of the discrete transform
-# components according to four numbers, which specify the central region of the
-# pass-band and the two extremes of the pass-band. The scaling is linear, which
-# is not something we can do easily with recursive filters, or with analog
-# filters, but is simple in software. The four numbers are band_lo_end,
-# band_lo_center, band_hi_center, and band_hi_end. They are in units of
-# frequency. Components below band_lo_end and above band_hi_end are multiplied
-# by zero. Components between band_lo_end and band_lo_center are scaled by zero
-# to one from the lower to the upper frequency. Components from band_lo_center
-# to band_hi_center are added as they are. Components from band_hi_center to
-# band_hi_end are scaled from one to zero from the lower to the upper frequency.
-# Thus we have a pass-band that might be sharp or gentle. We can implement a
-# high-pass filter by setting band_lo_end and band_lo_center to zero. The
-# routine returns the total power of the remaining components, which is the sum
-# of their squares. We do not multiply the combined power by any scaling factor
-# because there are several variants of the discrete fourier transform with
-# different scaling factors, and we want to avoid hiding such multiplications in
-# our code. If either "show" or "replace" is set, the routine calculates the
-# inverse transform of the signal. The values it obtains from the inverse
-# transform are rounded to the nearest integer, so they look like sixteen-bit
-# ADC counts. If "show" is set, the routine plots the inverse transform in the
-# value versus time display. If "replace" is set, the routine replaces the
-# original info(values) string with the filtered signal values. Note that the
-# routine does not replace the info(signal) string, which contains a list of the
-# original reconstructed samples as pairs of values "timestamp sample". Nor does
-# the routine make any change to the info(spectrum) string, which contains the
-# amplitudes and phases of all the Fourier transform components. The bandpass
-# flag selects a band-pass filter, and is by default set. But if this flag is
-# cleared, the filter acts as a band-stop filter, where the specified range of
-# frequency components is removed from the spectrum rather than retained, and
-# all other components are retained rather than removed. By default, show and
+# Neuroplayer_filter applies a band-pass or band-stop filter to the current
+# signal. We will first explain how the band-pass filter works. The routine
+# takes the discrete Fourier transform and elminates or attenuates its
+# components according to four frequencies we specify in Hertz as arguments to
+# the routine. These are band_lo_end, band_lo_center, band_hi_center, and
+# band_hi_end. All components below band_lo_end and above band_hi_end are
+# eliminated. All components between band_lo_center and band_hi_center are left
+# intact and unaltered. The components between band_lo_end and band_lo_center
+# are scaled linearly so that a component at band_lo_end is multiplied by zero,
+# a component half-way between band_lo_end and band_lo_center is multiplied by
+# one half, and a component at band_lo_center is multiplied by one. The same
+# linear scaling occurs from band_hi_end down to band_hi_center, but in the
+# opposite frequency direction. By this means, the routine obtains the spectrum
+# of a band-pass filtered signal. A band-stop filter it obtains by taking the
+# band-pass spectrum and subtracting it from the original spectrum. We select a
+# band-stop filter by clearing the bandpass flag to zero. This flag is set by
+# default, so our default filter is a band-pass filter. We implement a high-pass
+# filter by setting band_lo_end and band_lo_center to zero. We implement lo-pass
+# by setting band_hi_center and band_hi_end to a frequency greater than or equal
+# to half the signal sample rate. The routine returns the total power of the
+# remaining components, which is the sum of their squares. If either "show" or
+# "replace" is set, the routine calculates the inverse transform of the filtered
+# signal, which is what the filtered signal looks like. The values it obtains
+# from the inverse transform are rounded to the nearest integer, so they remain
+# sixteen-bit ADC counts. If the zero-frequency component has been removed by
+# the filtering, the filtered signal will contain negative values. Any time the
+# filter removes the zero-frequency component, we add to the filtered signal
+# values a sample offset so as to bring the values into the range 0-65535. If,
+# after adding this offset, the value is still less than zero, we clip to zero,
+# and if it becomes greater than 65535, we clip to 65535. If "show" is set, the
+# routine plots the inverse transform in the value versus time display. If
+# "replace" is set, the routine replaces the original info(values) string with
+# the filtered values strin. The routine does not replace the info(signal)
+# string, which will still contain the reconstructed signal as a list of numbers
+# alternating between signal timestamps and signal values. By default, show and
 # replace are cleared and bandpass is set.
 #
 proc Neuroplayer_filter {band_lo_end band_lo_center \
@@ -1471,13 +1483,27 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 		set f [expr $f + $info(f_step)]
 	}
 
-	# If show or replace, take the inverse transform. The filtered values will
-	# be available to the calling procedure in a variable of the same name.
+	# If show or replace, take the inverse transform. We round the inverse
+	# transform values so as to make them integers. Our exporter expects the
+	# values to be unsigned sixteen-bit values 0-65535. If our inverse transform
+	# contains negative values, as it will for any filter function that excludes
+	# the zero-frequency component, we must offset the values so that they
+	# remain in the range 0-65536. 
 	if {$show || $replace} {
 		set saved_config [lwdaq_config]
 		lwdaq_config -fsd 0
 		set filtered_values [lwdaq_fft $filtered_spectrum -inverse 1]
 		eval lwdaq_config $saved_config
+		if {[lindex $filtered_spectrum 0] == 0} {
+			set offset_values [list]
+			foreach v $filtered_values {
+				set vv [expr $v + $info(sample_offset)]
+				if {$vv < $info(sample_min)} {set vv $info(sample_min)}
+				if {$vv > $info(sample_max)} {set vv $info(sample_max)}
+				lappend offset_values $vv
+			}
+			set filtered_values $offset_values
+		}
 	}
 	
 	# If show, plot the filtered signal to the screen. If our frequency band
@@ -1485,15 +1511,10 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 	# value so that the filtered signal will be super-imposed upon the
 	# unfiltered signal in the display.
 	if {$show} {
-		if {$band_lo_center > 0} {
-			set offset [lindex $info(spectrum) 0]
-		} {
-			set offset 0
-		}
 		set filtered_signal ""
 		set timestamp 0
 		foreach v $filtered_values {
-			append filtered_signal "$timestamp [expr $show*$v + $offset] "
+			append filtered_signal "$timestamp $v "
 			incr timestamp
 		}
 		Neuroplayer_plot_signal [expr $info(channel_num) + 32] $filtered_signal
@@ -1564,106 +1585,10 @@ proc Neuroplayer_band_amplitude {band_lo band_hi {show 0} {replace 0}} {
 }
 
 #
-# Neuroplayer_multi_band_filter allows us to specify ranges of frequency
-# to be included in the filtered signal. The routine returns the sum of the
-# squares of the selected components. The "band_list" parameter is a list
-# containing an even number of real-valued frequencies. Each pair of 
-# frequencies is the lowest and highest frequency of a band. The lowest
-# must be specified first. The bands may overlap. Any component in the 
-# discrete fourier transform that lies within one or more of these bands
-# will be included in the spectrum of the filtered signal. The band edges
-# are themselves contained in the band, so a 1-4 Hz band will include 
-# components of 1 Hz and 4 Hz. When "replace" is set, the routine calculates
-# the inverse fourier transform of the selected components and replaces
-# the original info(values) string with the filtered signal values. But 
-# the info(signal) and info(spectrum) are not changed. If a processor
-# is to change info(signal), it can replace all the sample values in 
-# info(signal) with the sample values in info(values).
-#
-proc Neuroplayer_multi_band_filter {{band_list ""} {show 0} {replace 0}} {
-	upvar #0 Neuroplayer_info info
-	upvar #0 Neuroplayer_config config
-
-	# Check the inputs.
-	if {[llength $band_list] == 0} {
-		error "no band frequencies specified"
-	}
-	if {[llength $band_list] % 2 != 0} {
-		error "odd number of frequencies specified"
-	}
-	foreach {flo fhi} $band_list {
-		if {![string is double -strict $flo]} {
-			error "invalid frequency \"$flo\""
-		}
-		if {![string is double -strict $fhi]} {
-			error "invalid frequency \"$fhi\""
-		}
-		if {$flo >= $fhi} {
-			error "cannot have flo >= fhi"
-		}
-	}
-
-	# Check the current spectrum.
-	if {[llength $info(spectrum)] <= 1} {
-		error "no spectrum exists to filter"
-	}
-	
-	# Filter the current spectrum and calculate the total power.
-	set filtered_spectrum ""
-	set f 0
-	set band_power 0.0
-	foreach {a p} $info(spectrum) {
-		set b 0
-		foreach {flo fhi} $band_list {
-			if {($f >= $flo) && ($f <= $fhi)} {
-				set b $a
-				break
-			}
-		}
-		append filtered_spectrum "$b $p "
-		set band_power [expr $band_power + ($b * $b)/2.0]
-		set f [expr $f + $info(f_step)]
-	}
-
-	# If show or replace, take the inverse transform. The filtered
-	# values will be available to the calling procedure in a variable
-	# of the same name.
-	if {$show || $replace} {
-		set filtered_values [lwdaq_fft $filtered_spectrum -inverse 1]
-	}
-	
-	# If show, plot the filtered signal to the screen. If our  
-	# frequency band does not include zero, we add the zero-frequency
-	# component to every sample value so that the filtered signal 
-	# will be super-imposed upon the unfiltered signal in the display.
-	if {$show} {
-		if {[lindex $band_list 0] > 0} {
-			set offset [lindex $info(spectrum) 0]
-		} {
-			set offset 0
-		}
-		set filtered_signal ""
-		set timestamp 0
-		foreach {v} $filtered_values {
-			append filtered_signal "$timestamp [expr $show*$v + $offset] "
-			incr timestamp
-		}
-		Neuroplayer_plot_signal [expr $info(channel_num) + 32] $filtered_signal
-	}
-	
-	# If replace, replace the existing info(values) string with the new
-	# filtered values.
-	if {$replace} {set info(values) $filtered_values}
-	
-	# Return the power.
-	return $band_power
-}
-
-#
 # Neuroplayer_contiguous_band_power accepts a low and high frequency
 # to define a range of frequencies to be analyzed, and then a number of
 # contiguous bands into which to divide that range. It returns the power
-# of the signal in each band in units of square counts.
+# of the signal in each band separately in units of square counts.
 #
 proc Neuroplayer_contiguous_band_power {flo fhi num} {
 	upvar #0 Neuroplayer_info info
