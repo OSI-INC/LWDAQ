@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "5.4"
+	LWDAQ_tool_init "RAG_Manager" "5.5"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -1046,7 +1046,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		page_chunk=$page_chunk,\
 		chapter_chunk=$chapter_chunk,\
 		section-chunk=$section_chunk,\
-		match-prompts-only=$match_prompts_only\
+		match-prompts-only=$match_prompts_only,\
 		omit-lists=$omit_lists."
 	
 	set date "NONE"
