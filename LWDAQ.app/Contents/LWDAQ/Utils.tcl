@@ -2071,7 +2071,9 @@ proc man { {pattern ""} {option "none"} } {
 # next h2 heading will be removed from the document. The routine takes three
 # optional parameters. The first two are cell_spacing and num_columns for the h3
 # heading tables beneath each h2 heading. The third parameter is the name of the
-# HTML file to be processed.
+# HTML file to be processed. The table will be given a class "contents" so that
+# we can configure the font and spacing of the table of contents in our style
+# sheet.
 #
 proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
 
@@ -2148,7 +2150,7 @@ proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
 	}
 	
 	# Create table of contents after contents heading
-	puts $f "<table>"
+	puts $f "<table class=\"contents\">"
 	set h3list [list]
 	foreach {h t} $headings {
 		if {$h == "h2"} {
