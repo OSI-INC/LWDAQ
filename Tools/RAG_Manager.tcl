@@ -73,6 +73,7 @@ https://www.bndhep.net/Electronics/A2071/M2071.html
 https://www.bndhep.net/Electronics/LWDAQ/LWDAQ.html
 https://www.bndhep.net/Devices/BCAM/User_Manual.html
 https://www.opensourceinstruments.com/Electronics/A3013/Flexible_Wires.html
+https://www.opensourceinstruments.com/Electronics/A3013/Hum.html
 https://www.opensourceinstruments.com/Electronics/A3015/M3015.html
 https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
 https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
@@ -307,6 +308,8 @@ set info(entities_final_convert) {
 		/eq ""
 		prompt ""
 		/prompt ""
+		strong ""
+		/strong ""
 	}
 #
 # The fragment delimiting tags.

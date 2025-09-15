@@ -52,7 +52,7 @@ proc DFPS_Manager_init {} {
 	set info(focal_ratio) "13.5"
 
 	# Data acquisition parameters for the DFPS-4A.
-	set config(ip_addr) "192.168.1.30"
+	set config(ip_addr) "192.168.1.10"
 	# Breadboard OSI Local: 192.168.1.10
 	# DFPS-4A OSI Local: 192.168.1.30
 	# DFPS-4A OSI Global: 71.174.73.186
