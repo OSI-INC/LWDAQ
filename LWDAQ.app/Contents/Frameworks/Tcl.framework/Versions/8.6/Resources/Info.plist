@@ -14,8 +14,8 @@
 	<string>Tcl</string>
 	<key>CFBundleGetInfoString</key>
 	<string>Tcl 8.6.16,
-Copyright © 1987-2024 Tcl Core Team,
-Copyright © 2001-2024 Daniel A. Steffen,
+Copyright © 1987-2025 Tcl Core Team,
+Copyright © 2001-2025 Daniel A. Steffen,
 Copyright © 2001-2009 Apple Inc.,
 Copyright © 2001-2002 Jim Ingham &amp; Ian Reid</string>
 	<key>CFBundleIdentifier</key>
