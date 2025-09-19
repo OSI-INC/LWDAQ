@@ -3,7 +3,7 @@
 
 # This Makefile requires the Free Pascal Compiler (FPC).
 # (C) 2004-2020, Kevan Hashemi, Brandeis University
-# (C) 2021, Kevan Hashemi, Open Source Instruments Inc.
+# (C) 2021-2025, Kevan Hashemi, Open Source Instruments Inc.
 
 # Determine the operating system. Our Default
 # operating system is Unix.

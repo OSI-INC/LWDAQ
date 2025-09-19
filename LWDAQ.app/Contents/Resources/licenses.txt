@@ -1,0 +1,27 @@
+LWDAQ License Information
+=========================
+
+LWDAQ (Long-Wire Data Acquisition Software)
+-------------------------------------------
+Copyright © 2003–2025 Kevan Hashemi,
+Open Source Instruments Inc.
+
+This software is distributed under the terms of the
+GNU General Public License (GPL).
+
+The complete text of the GNU GPL is provided in the
+LICENSE.txt file included with this distribution,
+and is also available online at:
+https://www.gnu.org/licenses/gpl-3.0.html
+
+Tcl/Tk
+------
+This application bundles Tcl/Tk, which is also licensed
+under the GNU GPL. Copyright notices for Tcl/Tk are
+preserved in the source code distribution.
+
+Source Code Availability
+------------------------
+Source code for LWDAQ and the Tcl/Tk libraries included
+herein is freely available from:
+https://opensourceinstruments.com/

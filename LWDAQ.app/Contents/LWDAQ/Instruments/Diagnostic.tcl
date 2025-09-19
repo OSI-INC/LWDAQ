@@ -283,11 +283,11 @@ proc LWDAQ_loop_time_Diagnostic {sock} {
 	upvar #0 LWDAQ_config_Diagnostic config
 	upvar #0 LWDAQ_info_Diagnostic info
 	global LWDAQ_Driver LWDAQ_Info
-	LWDAQ_print -nonewline $info(text) "Measuring loop time..."
+	LWDAQ_print -nonewline $info(text) "Measuring loop time... "
 	LWDAQ_update
 	LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 	LWDAQ_wake $sock
-	LWDAQ_delay_seconds $sock $LWDAQ_Driver(adc16_settling_delay)
+	LWDAQ_delay_seconds $sock $LWDAQ_Driver(wake_delay)
 	LWDAQ_execute_job $sock $LWDAQ_Driver(loop_job)
 	LWDAQ_sleep $sock
 	set time [expr [LWDAQ_loop_time $sock] * $LWDAQ_Driver(loop_timer_period)]

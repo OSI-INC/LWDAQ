@@ -85,6 +85,8 @@ https://www.opensourceinstruments.com/Electronics/A3018/Processor_Library.html
 https://www.opensourceinstruments.com/Electronics/A3018/Receiver.html
 https://www.opensourceinstruments.com/Electronics/A3018/Faraday_Enclosures.html
 https://www.opensourceinstruments.com/Electronics/A3019/Electrodes.html
+https://www.opensourceinstruments.com/Electronics/A3025/M3025.html
+https://www.opensourceinstruments.com/Electronics/A3026/M3026.html
 https://www.opensourceinstruments.com/Electronics/A3027/M3027.html
 https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
 https://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html

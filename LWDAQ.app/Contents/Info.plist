@@ -4,52 +4,52 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
-	<key>CFBundleDocumentTypes</key>
+	
+	<key>CFBundleSupportedPlatforms</key>
 	<array>
-		<dict>
-			<key>CFBundleTypeExtensions</key>
-			<array>
-				<string>*</string>
-			</array>
-			<key>CFBundleTypeName</key>
-			<string>NSStringPboardType</string>
-			<key>CFBundleTypeOSTypes</key>
-			<array>
-				<string>TEXT</string>
-			</array>
-			<key>CFBundleTypeRole</key>
-			<string>Viewer</string>
-		</dict>
+	  <string>MacOSX</string>
 	</array>
+	
 	<key>CFBundleExecutable</key>
 	<string>Wish</string>
-	<key>CFBundleGetInfoString</key>
-	<string>LWDAQ Software,
-	Copyright © 2003-2024 Kevan Hashemi,
-	Wish Shell 8.6.16,
-	Copyright © 1989-2019 Tcl Core Team,
-	Copyright © 1989-2019 Contributors,
-	Copyright © 2011-2019 Kevin Walzer,
-	Copyright © 2014-2019 Marc Culler,
-	Copyright © 2002-2019 Daniel A. Steffen,
-	Copyright © 2001-2009 Apple Inc.,
-	Copyright © 2001-2002 Jim Ingham,
-	Copyright © 2001-2002 Ian Reid</string>
+	
+	<key>NSHumanReadableCopyright</key>
+	<string>LWDAQ Software, Copyright © 2003-2025 Kevan Hashemi</string>
+	
 	<key>CFBundleIconFile</key>
 	<string>LWDAQ.icns</string>
+	
 	<key>CFBundleIdentifier</key>
-	<string>com.lwdaq</string>
+	<string>com.opensourceinstruments.lwdaq</string>
+	
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	
 	<key>CFBundleName</key>
 	<string>LWDAQ</string>
+	
+	<key>CFBundleDisplayName</key>
+	<string>LWDAQ</string>
+	
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	
 	<key>CFBundleShortVersionString</key>
 	<string>10.7</string>
-	<key>CFBundleSignature</key>
-	<string>LWDQ</string>
+	
 	<key>CFBundleVersion</key>
-	<string>10.7</string>
+	<string>10.7.5</string>
+	
+	<key>LSMinimumSystemVersion</key>
+	<string>10.15</string>
+	
+	<key>NSHighResolutionCapable</key>
+	<true/>	
+	
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
 </dict>
 </plist>
