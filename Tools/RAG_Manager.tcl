@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "5.5"
+	LWDAQ_tool_init "RAG_Manager" "5.6"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -88,6 +88,7 @@ https://www.opensourceinstruments.com/Electronics/A3019/Electrodes.html
 https://www.opensourceinstruments.com/Electronics/A3025/M3025.html
 https://www.opensourceinstruments.com/Electronics/A3026/M3026.html
 https://www.opensourceinstruments.com/Electronics/A3027/M3027.html
+https://www.opensourceinstruments.com/Electronics/A3029/M3029.html
 https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
 https://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
 https://www.opensourceinstruments.com/Electronics/A3036/M3036.html
@@ -130,6 +131,12 @@ https://www.opensourceinstruments.com/Prices.html
 https://www.opensourceinstruments.com/Chat/Manual.html
 
 	}
+#
+# Of we need to send a password to get access to our URLs, we set the password
+# here, in the format "username:password".
+#
+set config(userpass) "username:password"
+
 #
 # Configuration for retrieval and submission based upon relevance of the question
 # to the chunk library. We have three tiers of relevance: high, mid, and low.
@@ -599,14 +606,18 @@ proc RAG_Manager_configure {} {
 }
 
 #
-# RAG_Manager_read_url fetches the source html code at a url and returns it as a single
-# text string.
+# RAG_Manager_read_url fetches the source html code at a url and returns it as a
+# single text string. The routine uses the config(userpass) parameter to send a
+# username and password to the source. If the the source requires
+# authentication, the server will check the userpass string. If the source does
+# not require authentification, the server will ignore the string. 
 #
 proc RAG_Manager_read_url {url} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-	set page [exec curl -sS $url]
+	set page [exec curl -sS -u $config(userpass) $url]
+	
 	return $page
 }
  
