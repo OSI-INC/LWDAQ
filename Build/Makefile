@@ -35,7 +35,7 @@ FPC_FLAGS = -O3
 # framework directory with the -Ff flag.
 ifeq ($(OS),MacOS)
 	TCL_FLAGS = -Ff../LWDAQ.app/Contents/Frameworks
-	FPC_FLAGS = -Px86_64 -O3 -WM10.9
+	FPC_FLAGS = -Px86_64 -O3 -WM10.15
 endif
 
 # On Windows, we tell FPC where it can find the TclTk libraries, so that it can
