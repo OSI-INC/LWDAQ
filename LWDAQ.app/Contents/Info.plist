@@ -38,10 +38,10 @@
 	<string>10.7</string>
 	
 	<key>CFBundleVersion</key>
-	<string>10.7.5</string>
+	<string>10.7.4</string>
 	
 	<key>LSMinimumSystemVersion</key>
-	<string>10.15</string>
+	<string>10.9</string>
 	
 	<key>NSHighResolutionCapable</key>
 	<true/>	
