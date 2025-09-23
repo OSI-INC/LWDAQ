@@ -1,7 +1,7 @@
 # BCAM_Calculator, a LWDAQ Tool
 #
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2021-2023 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2021-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -44,13 +44,15 @@
 #
 # Version 31: Routines with no useful return value return empty string. Remove
 # pre-defined name choices from operator dropdown menu.
+#
+# Version 32: All add calibration measurements receive their own report line.
 
 proc BCAM_Calculator_init {} {
 	upvar #0 BCAM_Calculator_info info
 	upvar #0 BCAM_Calculator_config config
 	global LWDAQ_Info
 	
-	LWDAQ_tool_init "BCAM_Calculator" "31"
+	LWDAQ_tool_init "BCAM_Calculator" "32"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set info(apparatus_database) ""
@@ -510,19 +512,9 @@ proc BCAM_Calculator_add {} {
 		set duplicate [regexp $ct $info(calibration_database) match]
 		incr index
 		if {$duplicate} {
-			if {$num_new_entries<=100} {
-				LWDAQ_print $info(text) "$index\: Duplicate, will ignore." blue
-			} {
-				LWDAQ_print -nonewline $info(text) "X" 
-				if {$index % 60 == 0} {LWDAQ_print $info(text)}
-			}
+			LWDAQ_print $info(text) "$index\: Duplicate, will ignore." blue
 		} {
-			if {$num_new_entries<=100} {
-				LWDAQ_print $info(text) "$index\: Unique, will add." 
-			} {
-				LWDAQ_print -nonewline $info(text) "U" 
-				if {$index % 60 == 0} {LWDAQ_print $info(text)}
-			}				
+			LWDAQ_print $info(text) "$index\: Unique, will add." 
 			incr num_added
 			lappend info(calibration_database) $n
 		}

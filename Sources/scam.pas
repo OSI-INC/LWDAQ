@@ -1,7 +1,7 @@
 {
 	Silhouette Camera (SCAM) Projection and Fitting Routines
 
-	Copyright (C) 2023 Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2023-2025 Kevan Hashemi, Open Source Instruments Inc.
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by

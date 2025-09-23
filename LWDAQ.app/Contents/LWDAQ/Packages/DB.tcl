@@ -672,6 +672,12 @@ proc DB_text_window {window width height} {
 	return $t
 }
 
+#
+# DB_number replaces double-quotes with spaces, checks to see if the result is a
+# number, and returns that number or an empty string otherwise. It is designed
+# to convert spreadsheet numbers in literal quotations or with leading
+# quotations.
+#
 proc DB_number {s} {
 	set s [string map {\" \ } $s]
 	if {[string is double $s]} {

@@ -1,6 +1,6 @@
 # Stimulator, a LWDAQ Tool
 #
-# Copyright (C) 2014-2024 Kevan Hashemi, Open Source Instruments
+# Copyright (C) 2014-2025 Kevan Hashemi, Open Source Instruments
 #
 # The Stimulator controls implantable stimulator-transponders (ISTs).
 #
@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "4.3"
+	LWDAQ_tool_init "Stimulator" "4.4"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -224,7 +224,7 @@ proc Stimulator_transmit {id commands} {
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		LWDAQ_transmit_command_hex $sock $config(rf_off_op)
-		LWDAQ_delay_seconds $sock $sd
+		if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
 		set counter 0
 		foreach c $commands {
 			LWDAQ_transmit_command_hex $sock "[format %02X $c]$config(rf_xmit_op)"
@@ -532,7 +532,7 @@ proc Stimulator_monitor {} {
 	if {[info exists ninfo(aux_messages)]} {
 		set aux_messages $ninfo(aux_messages)
 		set ninfo(aux_messages) ""
-		set now_time \($ninfo(datetime_play_time)\)
+		set now_time \($ninfo(play_datetime)\)
 	} elseif {[info exists rinfo(aux_messages)]} {
 		set aux_messages $rinfo(aux_messages)
 		set rinfo(aux_messages) ""

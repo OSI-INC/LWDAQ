@@ -1,6 +1,6 @@
 # Videoplayer.tcl, a LWDAQ Tool.
 #
-# Copyright (C) 2023-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2023-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # Reads videos from disk, receives video from TCPIP streams, displays video
 # without sound, re-encodes with higher compression and new aspect ratios.

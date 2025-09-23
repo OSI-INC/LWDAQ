@@ -404,11 +404,11 @@ proc EDF_header_read {file_name} {
 
 #
 # EDF_append adds data to an existing EDF file. It takes a string of unsigned
-# integers in the range 0..65535 and translates them into little-endian
-# sixteen-bit signed integers, with 0 being translated to -32768 and 65535
-# becoming 32767. The binary data is added to the end of the named EDF file. If
-# the incoming data is outside the range 0..65535, it will be translated as if
-# it were its value modulo 65536.
+# integers or real numbers in the range 0..65535  and translates them into
+# little-endian sixteen-bit signed integers, with 0 being translated to -32768
+# and 65535 becoming 32767. The binary data is added to the end of the named EDF
+# file. If the incoming data is outside the range 0..65535, it will be
+# translated as if it were its value modulo 65536.
 #
 proc EDF_append {file_name data} {
 

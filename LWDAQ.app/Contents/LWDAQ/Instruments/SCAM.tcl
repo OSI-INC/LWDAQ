@@ -73,7 +73,7 @@ proc LWDAQ_init_SCAM {} {
 	set config(image_source) "daq"
 	set config(file_name) "./Images/$info(name)\*"
 	set config(memory_name) "$info(name)\_0"
-	set config(daq_ip_addr) "71.174.73.187"
+	set config(daq_ip_addr) "10.0.0.37"
 	set config(daq_source_driver_socket) "3"
 	set config(daq_source_mux_socket) "1"
 	set config(daq_source_device_element) "1"

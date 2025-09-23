@@ -3,7 +3,7 @@
 
 # This Makefile requires the Free Pascal Compiler (FPC).
 # (C) 2004-2020, Kevan Hashemi, Brandeis University
-# (C) 2021, Kevan Hashemi, Open Source Instruments Inc.
+# (C) 2021-2025, Kevan Hashemi, Open Source Instruments Inc.
 
 # Determine the operating system. Our Default
 # operating system is Unix.
@@ -106,7 +106,7 @@ test: test.pas $(OBJA)
 
 # Compile the LWDAQ shared library. We don't list all the required objects in
 # the fpc command line because fpc will look for them as it compiles the dynamic
-# library. On MacOS when compiling our library with reference to the Tcl 8.7
+# library. On MacOS when compiling our library with reference to our Tcl
 # framework, we find that the Tcl library self-reference is an absolute path to
 # the Tcl library in a /Library subdirectory, as if it had been installed in the
 # operating system, so our lwdaq library will try to find the Tcl library in the
@@ -118,8 +118,12 @@ $(LWDAQ): $(SRC_DIR)/lwdaq.pas $(OBJA) $(OBJB)
 	cp -f $@ $(LWDAQ_DIR)/$@
 ifeq ($(OS),MacOS)
 	install_name_tool -change \
-	  /Library/Frameworks/Tcl.framework/Versions/8.7/Tcl \
-	  @executable_path/../Frameworks/Tcl.framework/Versions/8.7/Tcl \
+	  /Library/Frameworks/Tcl.framework/Versions/8.6/Tcl \
+	  @executable_path/../Frameworks/Tcl.framework/Versions/8.6/Tcl \
+	  $(LWDAQ_DIR)/$@
+	install_name_tool -change \
+	  /Library/Frameworks/Tk.framework/Versions/8.6/Tk \
+	  @executable_path/../Frameworks/Tk.framework/Versions/8.6/Tk \
 	  $(LWDAQ_DIR)/$@
 endif
 

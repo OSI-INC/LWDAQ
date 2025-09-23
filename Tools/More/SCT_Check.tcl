@@ -1,6 +1,6 @@
 # SCT Check, a LWDAQ Tool.
 #
-# Copyright (C) 2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2024-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # SCT Check measures the frequency response of subcutaneous transmitters (SCTs).
 # It operates a LWDAQ Function Generator (A3050) to deliver increasing
@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "1.8"
+	LWDAQ_tool_init "SCT_Check" "2.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require LWFG
@@ -38,27 +38,29 @@ proc SCT_Check_init {} {
 
 	set config(gen_ip) "10.0.0.37"
 	set config(gen_ch) "1"
+	set config(rx_ip) "10.0.0.37"
 
 	set config(waveform_type) "sine"
+	set config(waveform_types) "sine triangle square sweep"
 	set config(waveform_amplitude) "3"
 	set config(waveform_offset) "0"
 	set config(waveform_frequency) "10"
 	set config(sweep_flo) "1"
 	set config(sweep_fhi) "1000"
-	set config(sweep_duration) "2"
+	set config(sweep_time) "2"
 
 	set config(min_num_clocks) "64"
-	set config(max_num_clocks) "512"
+	set config(max_num_clocks) "1024"
 	set config(min_id) "1"
 	set config(max_id) "254"
 	set config(glitch) "0"
-	set config(settle) "0.5"
+	set config(settle_s) "1.0"
 	
 	set config(off_frequency) "40e6"
 	set config(vbat_ref) "1.80"
 	
 	set config(sample_rates) "64 128 256 512 1024 2048"
-	set config(frequencies_shared) "0.25 0.5 1.0 2.0 4 10\
+	set config(frequencies_shared) "0.125 0.25 0.5 1.0 2.0 4 10\
 		20 40 100 200 400 1000"
 	set config(frequencies_wrt_sps) "0.13 0.15 0.17 0.19 0.21 0.23\
 		0.27 0.29 0.31 0.33 0.35 0.37 0.39 0.41 0.43 0.45 0.49 0.55 0.57"
@@ -123,7 +125,7 @@ proc SCT_Check_set_frequencies {{print 0}} {
 	return ""
 }
 
-proc SCT_Check_on {} {
+proc SCT_Check_waveform_on {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	global LWFG
@@ -156,14 +158,14 @@ proc SCT_Check_on {} {
 	} else {
 		LWDAQ_print $info(text) "Channel $config(gen_ch), sweep,\
 			$config(sweep_flo) to $config(sweep_fhi) Hz,\
-			$config(sweep_duration) s,\
+			$config(sweep_time) s,\
 			$config(waveform_amplitude) V amplitude,\
 			$config(waveform_offset) V offset." purple
 		set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
 		set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
 		set result [LWFG_sweep_sine $config(gen_ip) $config(gen_ch) \
 			$config(sweep_flo) $config(sweep_fhi) $v_lo $v_hi \
-			$config(sweep_duration) 1]
+			$config(sweep_time) 1]
 		if {[LWDAQ_is_error_result $result]} {
 			LWDAQ_print $info(text) $result
 		} elseif {$config(verbose)} {
@@ -180,7 +182,7 @@ proc SCT_Check_on {} {
 	return ""
 }
 
-proc SCT_Check_off {} {
+proc SCT_Check_waveform_off {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 
@@ -202,6 +204,7 @@ proc SCT_Check_battery {} {
 	LWDAQ_print $info(text) "Measuring battery voltages for selected signals." purple
 	LWDAQ_reset_Receiver
 	set iconfig(analysis_channels) $config(signals)
+	set iconfig(daq_ip_addr) $config(rx_ip)
 	set iinfo(glitch_threshold) $config(glitch)
 	set result [LWDAQ_acquire Receiver]
 	set iconfig(analysis_channels) "*"
@@ -237,6 +240,7 @@ proc SCT_Check_detect {} {
 	LWDAQ_reset_Receiver
 	set iconfig(daq_num_clocks) 128
 	set iconfig(analysis_channels) "*"
+	set iconfig(daq_ip_addr) $config(rx_ip)
 	set result [LWDAQ_acquire Receiver]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
@@ -257,31 +261,33 @@ proc SCT_Check_detect {} {
 	return ""
 }
 
-proc SCT_Check_sweep {{index "-1"}} {
+proc SCT_Check_measure {{index "-1"}} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	upvar #0 LWDAQ_config_Receiver iconfig
 	upvar #0 LWDAQ_info_Receiver iinfo
 
 	if {$index < 0} {
-		if {$info(control) == "Sweep"} {return "0"}
-		set info(control) "Sweep"
+		if {$info(control) == "Measure"} {return "0"}
+		set info(control) "Measure"
 		set info(start_time) [clock seconds]
 		set info(data) [list]
-		LWDAQ_post [list SCT_Check_sweep "0"]
+		LWDAQ_post [list SCT_Check_measure "0"]
 		return ""
 	}
 	
 	if {$index >= 0} {
 		if {$info(control) == "Stop"} {
-			LWDAQ_print $info(text) "Sweep aborted."
+			LWDAQ_print $info(text) "Measurement aborted."
 			set info(control) "Idle"
-			SCT_Check_off
+			SCT_Check_waveform_off
 			return ""
 		}
+		
+		set $config(waveform_type) "sine"
 
 		set frequency [lindex $config(frequencies) $index]
-		set num_clocks [expr round(2.0*$iinfo(clock_frequency)/$frequency)]
+		set num_clocks [expr round(1.0*$iinfo(clock_frequency)/$frequency)]
 		if {$num_clocks < $config(min_num_clocks)} {
 			set num_clocks $config(min_num_clocks)
 		}
@@ -290,11 +296,12 @@ proc SCT_Check_sweep {{index "-1"}} {
 		}
 		set iconfig(daq_num_clocks) $num_clocks
 		set config(waveform_frequency) $frequency
-		SCT_Check_on
-		LWDAQ_wait_ms [expr round(1000.0*$config(settle)/$frequency)]
+		SCT_Check_waveform_on
+		LWDAQ_wait_ms [expr round(1000.0*$config(settle_s)/$frequency)]
 
 		LWDAQ_reset_Receiver
 		set iconfig(analysis_channels) $config(signals)
+		set iconfig(daq_ip_addr) $config(rx_ip)
 		set iinfo(glitch_threshold) $config(glitch)
 		set result [LWDAQ_acquire Receiver]
 		set iconfig(analysis_channels) "*"
@@ -312,18 +319,18 @@ proc SCT_Check_sweep {{index "-1"}} {
 		LWDAQ_print $info(text) "$output_line"
 		lappend info(data) "$output_line"
 		
-		# Call the sweep routine with the next frequency, or if we are done,
-		# write data to output file.
+		# Call the measurement routine with the next frequency, or if we are
+		# done, write data to output file.
 		incr index
 		if {$index < [llength $config(frequencies)]} {
-			LWDAQ_post [list SCT_Check_sweep $index]
+			LWDAQ_post [list SCT_Check_measure $index]
 			return ""
 		} else {
-			LWDAQ_print $info(text) "Sweep Complete,\
+			LWDAQ_print $info(text) "Measurement Complete,\
 				[llength $config(frequencies)] frequencies\
 				in [expr [clock seconds] - $info(start_time)] s." purple
 			set iconfig(daq_num_clocks) 128
-			SCT_Check_off
+			SCT_Check_waveform_off
 			set info(control) "Idle"
 			return ""
 		}
@@ -374,15 +381,21 @@ proc SCT_Check_open {} {
 	label $f.control -textvariable SCT_Check_info(control) -fg blue -width 8
 	pack $f.control -side left -expand yes
 		
-	foreach a {On Off Sweep Stop Print Battery} {
+	foreach a {Measure Stop Print Waveform_On Waveform_Off } {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post SCT_Check_$b"
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {Receiver} {
+	button $f.receiver -text "Receiver" -command {
+		LWDAQ_open Receiver
+		set LWDAQ_config_Receiver(daq_ip_addr) $SCT_Check_config(rx_ip)
+	}
+	pack $f.receiver -side left -expand yes
+	
+	foreach a {Spectrometer} {
 		set b [string tolower $a]
-		button $f.$b -text "$a" -command "LWDAQ_open $a"
+		button $f.$b -text "$a" -command "LWDAQ_run_tool $a"
 		pack $f.$b -side left -expand yes
 	}
 	
@@ -398,48 +411,45 @@ proc SCT_Check_open {} {
 	set f [frame $w.configure]
 	pack $f -side top -fill x
 	
-	foreach a {Type Frequency Amplitude Offset} {
-		set b [string tolower $a]
-		label $f.l$a -text "$a\:" -fg $config(label_color)
-		entry $f.e$a -textvariable SCT_Check_config(waveform_$b) -width 6
-		pack $f.l$a $f.e$a -side left -expand yes
+	label $f.wfl -text "Waveform:" -fg $config(label_color)
+	menubutton $f.wfm -menu $f.wfm.m \
+		-width 8 -relief raised -indicatoron 1 \
+		-textvariable SCT_Check_config(waveform_type)
+	set m [menu $f.wfm.m]
+	foreach wt $config(waveform_types) {
+		$m add command -label $wt -command \
+			[list set SCT_Check_config(waveform_type) $wt]
+	}
+	pack $f.wfl $f.wfm -side left -expand yes
+
+	foreach {a b c} {"Channel" gen_ch 3 \
+		"Frequency (Hz)" waveform_frequency 10 \
+		"Amplitude (Vpp)" waveform_amplitude 10 \
+		"Offset (V)" waveform_offset 10 } {
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width $c
+		pack $f.l$b $f.e$b -side left -expand yes
 	}
 		
-	label $f.lgch -text "Channel:" -fg $config(label_color)
-	entry $f.egch -textvariable SCT_Check_config(gen_ch) -width 3
-	pack $f.lgch $f.egch -side left -expand yes
+	set f [frame $w.misc]
+	pack $f -side top -fill x
 
+	foreach {a b} {"Sweep_Lo (Hz)" sweep_flo \
+		"Sweep_Hi (Hz)" sweep_fhi \
+		"Sweep_Time (s)" sweep_time} {
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width 6
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+		
 	label $f.lgip -text "FGIP:" -fg $config(label_color)
 	entry $f.egip -textvariable SCT_Check_config(gen_ip) -width 16
 	pack $f.lgip $f.egip -side left -expand yes
 
 	label $f.lrip -text "RXIP:" -fg $config(label_color)
-	entry $f.erip -textvariable LWDAQ_config_Receiver(daq_ip_addr) -width 16
+	entry $f.erip -textvariable SCT_Check_config(rx_ip) -width 16
 	pack $f.lrip $f.erip -side left -expand yes
 	
-	set f [frame $w.batch]
-	pack $f -side top -fill x
-
-	foreach a {Version Batch} {
-		set b [string tolower $a]
-		label $f.l$b -text "$a\:" -fg $config(label_color)
-		entry $f.e$b -textvariable SCT_Check_config($b) -width 4
-		pack $f.l$b $f.e$b -side left -expand yes
-	}
-	
-	foreach a {Signals} {
-		set b [string tolower $a]
-		label $f.l$b -text "$a\:" -fg $config(label_color)
-		entry $f.e$b -textvariable SCT_Check_config($b) -width 50
-		pack $f.l$b $f.e$b -side left -expand yes
-	}
-		
-	foreach a {Detect} {
-		set b [string tolower $a]
-		button $f.$b -text "$a" -command "LWDAQ_post SCT_Check_$b"
-		pack $f.$b -side left -expand yes
-	}
-
 	foreach a {Glitch} {
 		set b [string tolower $a]
 		label $f.l$b -text "$a\:" -fg $config(label_color)
@@ -447,12 +457,35 @@ proc SCT_Check_open {} {
 		pack $f.l$b $f.e$b -side left -expand yes
 	}
 		
+	set f [frame $w.batch]
+	pack $f -side top -fill x
+
+	foreach a {Signals} {
+		set b [string tolower $a]
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width 100
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
+		
+	foreach a {Detect Battery} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command "LWDAQ_post SCT_Check_$b"
+		pack $f.$b -side left -expand yes
+	}
+
 	set f [frame $w.frequencies]
 	pack $f -side top -fill x
 
 	label $f.lf -text "Frequenies:" -fg $config(label_color)
 	entry $f.ef -textvariable SCT_Check_config(frequencies) -width 100
 	pack $f.lf $f.ef -side left -expand yes
+	
+	foreach a {Version Batch} {
+		set b [string tolower $a]
+		label $f.l$b -text "$a\:" -fg $config(label_color)
+		entry $f.e$b -textvariable SCT_Check_config($b) -width 4
+		pack $f.l$b $f.e$b -side left -expand yes
+	}
 	
 	set f [frame $w.sps]
 	pack $f -side top -fill x
@@ -480,26 +513,49 @@ return ""
 
 ----------Begin Help----------
 
-The Subcutaneous Transmitter (SCT) Check tool uses a data receiver and a
+The Subcutaneous Transmitter (SCT) Check tool uses a telemetry receiver and a
 function generator to measure the frequency response and battery voltages of
 SCTs during and after assembly and encapsulation. We use the tool to produce
 rapid frequency sweeps that allow us to see the approximate frequency response
-of a transmitter prior to encapsulation, or when we are checking the
-transmitters taking part in our accelerated aging tests. We use the tool to
-produce plots of gain versus frequency after encapsulation. The function
-generator must be one of our LWDAQ instruments, such as the Function Generator
-(A3050). The receiver must be one of our LWDAQ telemetry receivers, such as the
-Octal Data Receiver (A3027E), Animal Location Tracker, (ALT), or Telemetry
-Control Box (TCB). The tool uses the LWFG package, included with LWDAQ, to
-configure the function generator. It uses the Receiver Instrument, included with
-LWDAQ, to download telemetry signals from the receiver.
+of a transmitter prior to encapsulation or during accelerated aging. We use the
+Measure button to produce plots of gain versus frequency for permanent and
+detailed records of the frequency response. The function generator is the
+Function Generator (A3050) or other compatible PoE generator. The receiver must
+be one of our LWDAQ telemetry receivers, such as the Octal Data Receiver
+(A3027E), Animal Location Tracker, (ALT), or Telemetry Control Box (TCB). The
+tool uses the LWFG package, included with LWDAQ, to configure the function
+generator. It uses the Receiver Instrument, included with LWDAQ, to download
+telemetry signals from the receiver.
 
-Type: The waveform type, by default a sinusoid, can be "sine", "square",
+Measure: Start a detailed measurement of frequency response. We will go through
+all the frequencies defined for the measurement, starting with the lowest
+frequency. We assert this frequency and measure the amplitude of the response
+from all transmitters listed in the signals string. We move to the next
+frequency, and so on, recording the amplitudes of all signals as we go.
+
+Stop: Abort a sweep.
+
+Print: Print the results of a sweep to the text window.
+
+Waveform_On: Turn on the waveform specified by the Waveform entry boxes. We now
+see a repeating waveform produced by the function generator, perhaps even a
+repeating frequency sweep, on our function generator, and we can see what this
+looks like in the Receiver window.
+
+Waveform_Off: Turn off the waveform, the function generator output goes to zero.
+
+Receiver: Open the Receiver Instrument and set its daq_ip_addr.
+
+Spectrometer: Open the Spectrometer Tool.
+
+Waveform: The waveform type, by default a sinusoid, can be "sine", "square",
 "triangle", or "sweep". If "sine", "square", or "triangle", we will get a
 waveform of fixed frequency, amplitude, and offset. If "sweep", we will get a
-logarithmic, sinusoidal sweep. The sweep will start at sweep_flo and end at
-sweep_fhi. It will take sweep_duration seconds. Its amplitude and offset will be
-the same as for any other waveform.
+logarithmic, sinusoidal sweep. The sweep will start at sweep_lo and end at
+sweep_hi in Hertz. It will take sweep_time seconds. Its amplitude and offset
+will be the same as for any other waveform.
+
+Channel: The function generator channel we want to produce our waveform.
 
 Frequency: The waveform frequency, anything from 1 mHz to 1 MHz.
 
@@ -509,15 +565,27 @@ peak amplitude. Can be anything from 0 to 10 V.
 Offset: The offset of the waveform average from zero. Subject to a signal range
 of -10 V to +10 V, the offset can be anything from -10 V to + 10 V.
 
+Sweep_Lo: The low frequency we generate when the waveform type is "sweep", in
+Hertz.
+
+Sweep_Hi: The high frequency we generate when the waveform type is "sweep", in
+Hertz.
+
+Sweep_Time: The duration of a "sweep" type waveform, in seconds.
+
 FGIP: The function generator IP address.
 
 RXIP: The data receiver IP address. If we are using an ODR, we must also specify
 the driver socket into which we have plugged the ODR. By default we use socket
 one (1). We can specify another socket by opening the Receiver Instrument with
-the Receiver button and setting daq_driver_socket to our chosen value.
+the Receiver button and setting daq_driver_socket to our chosen value. The SCT
+Check tool uses its own configuration parameter to store the receiver IP address
+it will use with the Receiver Instrument.
 
-Version: The SCT assembly version, a letter. The A3048S2 would be "S", the
-A3049Q4 would be "Q".
+Version: The SCT assembly version. The A3048S2 would be "S", the A3049Q4 would
+be "Q". We could also write "A3Z" if we wanted, but if we write "A3", the "3"
+will blend with the batch number, which is an integer, thus blending the two
+numbers.
 
 Batch: The SCT assembly batch number, which is the first part of its serial
 number. Transmitter Q216.109 has batch number 216, and will share this batch
@@ -543,12 +611,12 @@ each sample rate enabled by the sample rate checkboxes. We print the frequencies
 to the screen so that we can cut and paste them into a spreadsheet.
 
 Sample Rates: A series of checkboxes that turn on detailed measurement around
-the corner frequency of SCT filters with various sample rates. When we check
-the 256 box, we add to our sweep the frequencies that will give us a good plot
-of the SCT's low-pass filter near its corner frequency of 80 Hz. Check multiple
+the corner frequency of SCT filters with various sample rates. When we check the
+256 box, we add to our sweep the frequencies that will give us a good plot of
+the SCT's low-pass filter near its corner frequency of 80 Hz. Check multiple
 boxes to measure in detail around multiple corner frequencies.
 
-Copyright (C) 2024, Kevan Hashemi, Open Source Instruments Inc.
+Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
 
 ----------End Help----------
 

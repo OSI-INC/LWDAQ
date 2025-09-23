@@ -1,7 +1,7 @@
 # Teletypwriter Console Package 
 #
 # (C) 2023-2024 Haley Hashemi, Open Source Instruments Inc.
-# (C) 2023-2024 Kevan Hashemi, Open Source Instruments Inc.
+# (C) 2023-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # Routines to set up a console interface using a TTY terminal.
 #
@@ -44,7 +44,6 @@ set TTY(saved) [eval exec [auto_execok stty] -g]
 # The channel becomes readable when a string of text is ready to be read out of
 # it.
 #
-
 proc TTY_start {} {
 	global TTY
 	eval exec [auto_execok stty] raw -echo 
@@ -76,7 +75,6 @@ proc TTY_start {} {
 # set to insert, the command is added to the command list, and the command
 # variable is cleared.
 #
-
 proc TTY_execute {} {
 	global TTY
 	if {[catch {
@@ -172,7 +170,6 @@ proc TTY_execute {} {
 	flush stdout
 }
 
-
 #
 # TTY_clear is used when you want to get rid of all of the text in the command
 # line, while your cursor is not at the end of the text line. It does so by
@@ -181,7 +178,6 @@ proc TTY_execute {} {
 # the remove space character is able to remove every character from the left of
 # the cursor, which happens to be every character in the command line.
 #
-
 proc TTY_clear {} {
 	global TTY
 	TTY_removespace
@@ -200,7 +196,6 @@ proc TTY_clear {} {
 # print the command that is located at the point in the command list determined
 # by the pointer.
 #
-
 proc TTY_up {} {
 	global TTY
 	if {$TTY(commandlist) != ""} {
@@ -218,7 +213,6 @@ proc TTY_up {} {
 # recent command in the command list, functions in an opposing manner to the
 # TTY_up procedure.
 #
-
 proc TTY_down {} {
 	global TTY
 	if {$TTY(pointer) != 0} {
@@ -235,7 +229,6 @@ proc TTY_down {} {
 # cursor. The cursor position, subtracted from the string length of the command
 # denotes the number of back spaces to do.
 #
-
 proc TTY_removespace {} {
 	global TTY
 	for {set i 0} {$i < [expr [string length $TTY(command)] - $TTY(cursor)]} {incr i} {
@@ -249,7 +242,6 @@ proc TTY_removespace {} {
 # text by saving the original command, removing it, rewriting it, and
 # printing the new command with the inserted character to the screen
 #
-
 proc TTY_insert {c} {
 	global TTY
 	if {$TTY(command) != ""} {
@@ -279,7 +271,6 @@ proc TTY_insert {c} {
 # cannot move any more spaces to the left if it is in front of the command
 # line text.
 #
-
 proc TTY_left {} {
 	global TTY
 	if {$TTY(cursor) < [string length $TTY(command)]} {
@@ -300,7 +291,6 @@ proc TTY_left {} {
 # may delete up to the prompt, which is done by only allowing the backspace
 # procedure to occur if the command exists.
 #
-
 proc TTY_delete {} {
 	global TTY 
 	if {$TTY(cursor) > 0} {
@@ -339,18 +329,15 @@ proc TTY_delete {} {
 #
 # TTY_backspace deletes the prveious character in the text command line.
 #
-
 proc TTY_backspace {} {
 	puts -nonewline "\x08"
 }
-
 
 #
 # TTY_right decrements the cursor value, by removeting the entire command
 # from the screen, rewriting it, and then navigating the cursor to the new
 # spot in the text(one space to the right)
 #
-
 proc TTY_right {} {
 	global TTY
 	TTY_clear
@@ -362,8 +349,4 @@ proc TTY_right {} {
 		}
 	}
 }
-
-
-
-
 

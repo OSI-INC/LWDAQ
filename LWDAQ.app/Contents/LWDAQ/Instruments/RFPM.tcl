@@ -63,7 +63,7 @@ proc LWDAQ_init_RFPM {} {
 	set info(A3008_COEN_bit) 8
 	set info(A3008_LOEN_bit) 2
 	set info(A3008_CFR_bit) 9
-	set info(A3008_wake) 0000000010000000
+	set info(A3008_wake) "0000000010000000"
 	set info(daq_startup_skip) 10
 	set info(display_us_per_div) 0.5
 	set info(display_V_per_div) 0.1
@@ -77,7 +77,7 @@ proc LWDAQ_init_RFPM {} {
 	set config(image_source) "daq"
 	set config(file_name) ./Images/$info(name)\*
 	set config(memory_name) lwdaq_image_1
-	set config(daq_ip_addr) 10.0.0.37
+	set config(daq_ip_addr) "10.0.0.37"
 	set config(daq_driver_socket) 2
 	set config(daq_mux_socket) 3
 	set config(daq_num_samples) 25000

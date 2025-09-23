@@ -2,7 +2,7 @@
 	Routines for Analysis of Data Retrieved from Miscellaneous LWDAQ Devices
 
 	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-	Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -771,6 +771,8 @@ end;
 	zero or more bytes of payload. The routine will return the sixteen-bit
 	sample values, or various characteristics of the data block, depending upon
 	the options passed in through the command string.
+	
+	Note: This routine was formerly called "lwdaq_sct_recorder".
 
 	The routine does not return the payload directly, but instead uses the
 	global electronics_trace to store indices that allow another routine to
@@ -1384,7 +1386,7 @@ begin
 			m:=image_message(ip,message_index);
 			with m do begin
 				writestr(message_string,
-					index:5,' ',id:3,' ',sample:5,' ',timestamp:3,' $',
+					index:5,' ',id:3,' ',sample:5,' ',timestamp:3,' 0x',
 					string_from_decimal(id,16,2),
 					string_from_decimal(sample,16,4),
 					string_from_decimal(timestamp,16,2));

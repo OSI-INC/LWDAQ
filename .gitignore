@@ -1,9 +1,9 @@
 /**/.DS_Store
-/Tools/Data/*_Settings.tcl
+/Tools/Data/*.tcl
 /LWDAQ.app/Contents/LWDAQ/Toolmaker.tcl
 /LWDAQ.app/Contents/LWDAQ/Packages/pkgIndex.tcl
-/LWDAQ.app/Contents/LWDAQ/Configuration/*_Settings.tcl
-/LWDAQ.app/Contents/LWDAQ/Temporary/*
+/LWDAQ.app/Contents/LWDAQ/Configuration/*.tcl
+/LWDAQ.app/Contents/LWDAQ/Temporary/*.tcl
 /Build/*.o
 /Build/*.so
 /Build/*.dylib
@@ -11,4 +11,3 @@
 /Build/*.ppu
 /Build/*.exe
 /LWDAQ.app/Icon?
-/LWDAQ.bbprojectd

@@ -1,7 +1,7 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 #
 # Copyright (C) 2005-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 # 
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -33,7 +33,7 @@ proc LWDAQ_utils_init {} {
 	upvar #0 LWDAQ_Info info
 	set info(quit) 0
 	set info(queue_run) 0
-	set info(queue_ms) 10
+	set info(queue_ms) 20
 	set info(queue_events) [list]
 	set info(current_event) "Stopped"
 	
@@ -226,7 +226,7 @@ proc LWDAQ_socket_protocol {sock} {
 
 #
 # LWDAQ_socket_listen opens a server socket for listening on the specified port
-# on the local machine. You specify an acceptance procedure that TCL will call
+# on the local machine. You specify an acceptance procedure that Tcl will call
 # when the server accepts a new connection.
 #
 proc LWDAQ_socket_listen {{accept ""} {port ""}} {
@@ -324,16 +324,54 @@ proc LWDAQ_socket_flush {sock} {
 }
 
 #
+# LWDAQ_socket_read_partial is designed to be called by a readable file event
+# during a non-blocking read operation. We pass it the total size of the data
+# block we want to assemble, the name of a unique global data buffer, and the
+# name of a unique global vwait status message. If the size is "line", rather
+# than an integer, we read all available bytes. Otherwise we try to read as many
+# bytes as we need to complete "size" bytes, knowing how many bytes we have so
+# far accumulated in the data buffer. The routine first checks the status of the
+# socket, because the socket may have generated a "readable" event because the
+# peer closed the socket. In the event of an error, the routine sets the status
+# message with an error description and returns without reading the socket.
+# Otherwise, it reads and appends the data it reads to the data buffer. It
+# returns and empty string to indicate no error.
+#
+proc LWDAQ_socket_read_partial {sock size data_name vwait_var_name} {
+	global LWDAQ_Info
+	upvar #0 $data_name data
+	upvar #0 $vwait_var_name vwait_var
+
+ 	set status [fconfigure $sock -error]
+	if {$status != ""} {set vwait_var "socket error, $status"}
+	if {![string match "Reading*" $vwait_var]} {return ""}
+	
+	if {[string is integer $size]} {
+ 		set vwait_var "Reading [expr $size - [string length $data]]\
+ 			of $size bytes from $sock"
+		set new_data [read $sock [expr $size - [string length $data]]]
+	} {
+ 		set vwait_var "Reading characters from $sock"
+		set new_data [read $sock 1]
+	}
+	if {[string length $new_data] > 0} {
+		append data $new_data
+	}
+	return ""
+}
+
+#
 # LWDAQ_socket_read reads $size bytes from the input buffer of $sock. If the
-# global LWDAQA_Info(blocking_sockets) variable is 1, the read takes place in
-# one entire data block. While the data arrives, the LWDAQ program freezes. If
-# the same variable is 0, the this procedure reads the data in fragments,
-# allowing the program to respond to menu and window events between fragments.
-# The routine collects all the necessary fragments together and returns them.
-# Use this routine with sockets opened by the LWDAQ_socket_open command. If the
-# size parameter is not an integer, but instead the word "line", we read
-# characters from the socket until we get a newline character, or until a
-# timeout occurs.
+# blocking_sockets flag is set, LWDAQ will freeze while the read takes place.
+# But if this same flag is cleared, LWDAQ will read the data as it arrives, and
+# while it is waiting, it will respond to menu and window events. The routine
+# collects all the necessary fragments together and returns them. Use this
+# routine with sockets opened by the LWDAQ_socket_open command. If the size
+# parameter is not an integer, but instead the word "line", we read characters
+# from the socket until we get a newline character. In all cases, if the peer
+# closes the socket, or some other interruption occurs, the routine generates a
+# Tcl error and returns an informative error message. During non-blocking
+# reads, this routine uses LWDAQ_socket_read_partial.
 #
 proc LWDAQ_socket_read {sock size} {
 	global LWDAQ_Info
@@ -353,62 +391,48 @@ proc LWDAQ_socket_read {sock size} {
 	# return of our data.
 	LWDAQ_socket_flush $sock
 
-	# If we are working with a blocking socket, we read the data from the socket
-	# in one block. If the block we get back from the read command is the wrong
-	# size, we close the socket and report an error.
-	if {$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
-		set data [read $sock $size]
-		if {[string length $data] != $size} {
-			LWDAQ_socket_close $sock
-			error "failed to read from socket"
-		}	
-	} 
-	
-	# If we are working with a blocking socket, but the size is not an integer,
-	# we use line buffering, and read the socket until we get an end of line.
-	if {$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
-		fconfigure $sock -buffering line -translation auto
-		set data [gets $sock]
-		fconfigure $sock -buffering full -translation binary
-	} 
-
-	# When we work with a non-blocking socket, which is our default, we define a
-	# unique global variable that we use in conjunction with vwait to direct a
-	# data-reading loop that continues reading until all the required data has
-	# arrived, or until the global variable is set to an error string. A
-	# "readable" file-event for the socket sets the global variable, thus
-	# notifying the data-reading loop that it should read all available data
-	# from the socket. This "readable" file-event does not read the data itself,
-	# and in this sense our use of the "readable" event is unconventional. Most
-	# asynchronous socket-handling in Tcl uses the "readable" event to itself to
-	# read the data. But we use the "readable" event only to set a global
-	# variable. As a result, we retain control over the asynchronous read, and
-	# we can preserve the integrity of our event loop.
+	# Non-blocking sockets are our default and preferred style of socket. As we
+	# read from them, we are able to update windows, respond to mouse events,
+	# and accept a command to abort the read. Our objective is to read "size"
+	# bytes from the socket, but we do not want to attempt the read until at
+	# least one byte of data is available in the socket. Any time there is data
+	# available in the socket, we will read all the data from the socket, or as
+	# much as we need to complete "size" bytes of data, whichever is less. When
+	# data is available in the socket, the Tcl event loop generates a "readable"
+	# file event for the socket. We associate with this event our partial-read
+	# routine, which append the new data to our accumulating block of "size"
+	# bytes. When we have all the bytes we want, we dissociate our partial-read
+	# routine from the socket's "readable" event, and return the data. Error
+	# handling takes place in the read loop, where we reset a timeout delay
+	# every time we see more data arrive, and in the partial read routine, where
+	# we check the status of the socket before reading. If the peer closes the
+	# socket, this generates a "readable" event, but the socket status will be
+	# an error message. The error messages will be recorded in a global, unique
+	# vwait variable. We use the LWDAQ vwait_var_name routine to generate this
+	# variable name, because all such variables are automatically displayed in
+	# our System Monitor panel, which allows us to watch the progress of the
+	# unblocking socket read.
 	if {!$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
+		fconfigure $sock -buffering full -translation binary
 		set vwait_var_name [LWDAQ_vwait_var_name]
+		set data_name $sock\_data
 		upvar #0 $vwait_var_name vwait_var
+		upvar #0 $data_name data
 		set vwait_var "Reading $size bytes from $sock"
-		fileevent $sock readable [list set $vwait_var_name \
-			"Reading $size bytes from $sock"]
 		set data ""
+		fileevent $sock readable \
+			[list LWDAQ_socket_read_partial $sock $size $data_name $vwait_var_name]
 		set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
 			[list set $vwait_var_name \
 			"Timeout reading $size bytes from $sock"]]
 		while {[string length $data] < $size} {
-			fileevent $sock readable [list set $vwait_var_name \
-				"Reading [expr $size - [string length $data]] of $size bytes from $sock"]
 			LWDAQ_vwait $vwait_var_name
-			set status [fconfigure $sock -error]
-			if {$status != ""} {set vwait_var "socket error, $status"}
 			if {![string match "Reading*" $vwait_var]} {break}
-			set new_data [read $sock [expr $size - [string length $data]]]
-			if {[string length $new_data] > 0} {
-				append data $new_data
-				after cancel $cmd_id
-				set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
-					[list set $vwait_var_name \
-					"Timeout reading $size bytes from $sock"]]
-			}
+			after cancel $cmd_id
+			set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
+				[list set $vwait_var_name \
+					"Timeout reading [expr $size - [string length $data]]\
+ 					of $size bytes from $sock"]]
 		}
 		fileevent $sock readable {}
 		after cancel $cmd_id
@@ -420,33 +444,35 @@ proc LWDAQ_socket_read {sock size} {
 		}
 	}
 
-	# When we work with a non-blocking socket and we have a non-integer
-	# size, we read until we read a newline character.
+	# When we work with a non-blocking socket and we have a non-integer size,
+	# our approach is almost identical to our binary read, except we read one
+	# character at a time until we encounter a newline. We configure our
+	# partial-read routine for the single-character reading by passing a
+	# non-integer string for the size argument. This non-blocking line read is
+	# intended for text strings no more than one or two hundred characters long,
+	# so we are not concerned about the inefficiency of reading one character at
+	# a time, nor of repeatedly checking to see if our string contains a newline
+	# character.
 	if {!$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
+		fconfigure $sock -buffering full -translation binary
 		set vwait_var_name [LWDAQ_vwait_var_name]
+		set data_name $sock\_data
 		upvar #0 $vwait_var_name vwait_var
+		upvar #0 $data_name data
 		set vwait_var "Reading line from $sock"
-		fileevent $sock readable [list set $vwait_var_name \
-			"Reading line from $sock"]
 		set data ""
+		fileevent $sock readable \
+			[list LWDAQ_socket_read_partial $sock $size $data_name $vwait_var_name]
 		set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
 			[list set $vwait_var_name \
 			"Timeout reading line from $sock"]]
 		while {![regexp {\n} $data]} {
-			fileevent $sock readable [list set $vwait_var_name \
-				"Reading character from $sock"]
 			LWDAQ_vwait $vwait_var_name
-			set status [fconfigure $sock -error]
-			if {$status != ""} {set vwait_var "socket error, $status"}
 			if {![string match "Reading*" $vwait_var]} {break}
-			set char [read $sock 1]
-			if {[string length $char] > 0} {
-				append data $char
-				after cancel $cmd_id
-				set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
-					[list set $vwait_var_name \
+			after cancel $cmd_id
+			set cmd_id [after $LWDAQ_Info(tcp_timeout_ms) \
+				[list set $vwait_var_name \
 					"Timeout reading line from $sock"]]
-			}
 		}
 		set data [string trim $data]
 		fileevent $sock readable {}
@@ -458,6 +484,30 @@ proc LWDAQ_socket_read {sock size} {
 			error "$vwait_var_copy"
 		}
 	}
+
+	# We use blocking sockets only for diagnostic purposes. A blocking socket
+	# that encounters any sort of network interruption, such as unplugging the
+	# peer's ethernet cable, will freeze our application until the connection
+	# is restored. Here we read an integer number of binary bytes from a blocking
+	# socket.
+	if {$LWDAQ_Info(blocking_sockets) && [string is integer $size]} {
+		fconfigure $sock -buffering full -translation binary
+		set data [read $sock $size]
+		if {[string length $data] != $size} {
+			LWDAQ_socket_close $sock
+			error "failed to read from socket"
+		}	
+	} 
+	
+	# We can also read to a newline character from a blocking socket, and for this
+	# we configure the socket for line buffering and character translation. Our
+	# assumption is that we will be reading a line of text. We recommend using 
+	# blocking sockets only for diagnostic purposes.
+	if {$LWDAQ_Info(blocking_sockets) && ![string is integer $size]} {
+		fconfigure $sock -buffering line -translation auto
+		set data [gets $sock]
+		fconfigure $sock -buffering full -translation binary
+	} 
 
 	return $data
 } 
@@ -1079,16 +1129,14 @@ proc LWDAQ_ndf_data_read {file_name start_addr num_bytes} {
 
 #
 # LWDAQ_xml_get_list takes an xml string and extracts the list of records from
-# the database that matches a specified tag you specify. If an xml string
-# contains one thousand entries delimited by <donor>...</donor>, the routine
-# returns a TCL list of the contents of all the <donor> entries when you pass it
-# the xml string and the tag "donor". You don't pass it the brackets on either
-# side of the tag, even though these brackets always appear in the xml string.
-# Each element in the list the routine returns will be the contents of a single
-# record, with its start and end tags removed. You can now apply this same
-# routine to each element in this list sequentially, to extract fields from each
-# record, and you can apply LWDAQ_xml_get to these fields to look at sub-fields
-# and so on.
+# the database that matches the specified tag. If an xml string contains one
+# thousand entries delimited by "donor" xml tags, the routine returns a Tcl list
+# of the contents of all the "donor" entries when we pass it the xml string and
+# "donor". Each element in the list the routine returns will be the contents of
+# a single record, with its start and end tags removed. You can now apply this
+# same routine to each element in this list sequentially, to extract fields from
+# each record. The routine does not support nested tagging. The routine will not
+# interpret nested fields correctly.
 #
 proc LWDAQ_xml_get_list {xml tag} {
 	set result [list]
@@ -1106,15 +1154,6 @@ proc LWDAQ_xml_get_list {xml tag} {
 		lappend result $field
 	}
 	return $result
-}
-
-#
-# LWDAQ_xml_get calls LWDAQ_xml_get_list and returns the contents of the first
-# list entry in the result. We use this routine to extract the value of a field
-# in an xml record.
-#
-proc LWDAQ_xml_get {xml tag} {
-	return [lindex [LWDAQ_xml_get_list $xml $tag] 0]
 }
 
 #
@@ -1365,22 +1404,30 @@ proc LWDAQ_put_file_name {{name ""}} {
 
 #
 # LWDAQ_find_files takes a directory and a glob matching pattern to produce a
-# list of all matching files in the directory and its sub-directories. It
-# assembles the list by calling itself recursively. The routine is not sensitive
-# to case in the matching pattern. The list is not sorted. 
+# list of all matching files in the directory and its sub-directories. The match
+# is case-insensitive, but the complete file name, including its extension, must
+# match the patter. Thus AFileName.txt will not be matched with FileName.txt,
+# although it will match with *Name.txt and ?FileName.*. The routine assembles
+# its match list by calling itself recursively. The fact that the routine must
+# support recursive calls dictates that the final list is not sorted. If we were
+# to sort the list, we would be sorting in every recursive call to the routine,
+# which makes the routine inefficient. Follow your call to this routine with a
+# list sort to obtain an ordered list.
 #
 proc LWDAQ_find_files {directory pattern} {
 	set ffl [list]
 	set dfl [glob -nocomplain [file join $directory *]]
 	foreach fn $dfl {
-		if {[string match -nocase *$pattern $fn]} {
-			lappend ffl $fn
-		}
 		if {[file isdirectory $fn]} {
 			foreach fn [LWDAQ_find_files $fn $pattern] {
 				lappend ffl $fn
 			}
+		} else {
+			if {[string match -nocase $pattern [file tail $fn]]} {
+				lappend ffl $fn
+			}
 		}
+		LWDAQ_support
 	}
 	return $ffl
 }
@@ -1458,7 +1505,7 @@ proc LWDAQ_is_error_result {s} {
 
 #
 # LWDAQ_vwait_var_name will return a unique name for a global vwait variable.
-# All LWDAQ routines that call TCL's vwait routine use a global timeout variable
+# All LWDAQ routines that call Tcl's vwait routine use a global timeout variable
 # assigned by this routine, so that its partner routine LWDAQ_stop_vwaits can go
 # through all existing timeout variables and set them, which aborts the vwaits.
 #
@@ -1514,7 +1561,7 @@ proc LWDAQ_vwait {var_name} {
 
 #
 # LWDAQ_stop_vwaits sets all vwait variables generated by the above routine,
-# which aborts all the current LWDAQ vwaits. Because TCL vwaits are nested,
+# which aborts all the current LWDAQ vwaits. Because Tcl vwaits are nested,
 # LWDAQ_stop_vwaits will cause any depth of nesting to terminate, even it the
 # nesting is in deadlock.
 #
@@ -1729,7 +1776,7 @@ proc LWDAQ_url_open {url} {
 # LWDAQ_random returns a number between min and max. If both min and max are
 # integers, then the number returned is also and integer. If either min or max
 # is real, then the number returned is real. The random calculation we take from
-# Practical Programming in TCL and TK by Brent Welch et al. 
+# Practical Programming in Tcl and Tk by Brent Welch et al. 
 #
 proc LWDAQ_random {{min 0.0} {max 1.0}} {
 	global LWDAQ_random_seed
@@ -1747,7 +1794,7 @@ proc LWDAQ_random {{min 0.0} {max 1.0}} {
 
 #
 # LWDAQ_random_wait_ms waits for a random number of milliseconds between min and
-# max. During the wait, it passes control to the TCL/TK event loop so that idle
+# max. During the wait, it passes control to the TclTk event loop so that idle
 # tasks can be executed.
 #
 proc LWDAQ_random_wait_ms {{min 0} {max 1000}} {
@@ -1796,12 +1843,12 @@ proc LWDAQ_proc_list {{proc_name "LWDAQ_*"} {file_name ""} } {
 
 #
 # LWDAQ_proc_description returns a list of procedure descriptions, such as this
-# one, as exctracted from the TCL/TK script that defines the procedure. If there
+# one, as exctracted from the TclTk script that defines the procedure. If there
 # are procedures in the script that match the proc_name parameter, but do not
 # have their own descriptions, the routine returns an empty element in its list.
 # The script must indicate the description by quoting the procedure name after
 # "# " on a new line. If you pass keep_breaks=1, the procedure will retain the
-# original line breaks, which can be useful for printing directly to the TCL
+# original line breaks, which can be useful for printing directly to the Tcl
 # console.
 #
 proc LWDAQ_proc_description {{proc_name "LWDAQ_*"} {file_name ""} {keep_breaks 0} } {
@@ -1839,29 +1886,38 @@ proc LWDAQ_proc_description {{proc_name "LWDAQ_*"} {file_name ""} {keep_breaks 0
 }
 
 #
-# LWDAQ_proc_declaration returns a list of procedure declarations that
-# match proc_name from the script file specified by file_name. The script
-# must indicate a procedure declaration by quoting the procedure name after
-# "proc " on a new line.
+# LWDAQ_proc_declaration returns a list of procedure declarations that match
+# proc_name from the script file specified by file_name. The script must
+# indicate a procedure declaration by quoting the procedure name after "proc "
+# on a new line. The routine is tolerant of long lists of procedure arguments
+# that are wrapped with backslashes onto the next line.
 #
 proc LWDAQ_proc_declaration {{proc_name "LWDAQ_*"} {file_name ""} } {
 	if {$file_name == ""} {
 		set file_name [LWDAQ_get_file_name]
 		if {$file_name == ""} {return}
 	}
+	
 	set proc_list [LWDAQ_proc_list $proc_name $file_name]
+
+	set f [open $file_name r]
+	set contents [read $f]
+	close $f
+	set contents [regsub -all {\\\n} $contents " "]
+	set contents [regsub -all {[\t ][\t ]+} $contents " "]
+	set lines [split $contents "\n"]
+
 	set declaration ""
 	foreach p $proc_list {
-		set f [open $file_name r]
 		set d ""
-		while {[gets $f line] >= 0} {
+		foreach line $lines {
 			if {[string match "proc $proc_name *" $line]} {
 				set d [string last "\{" $line]
 				set d [string replace $line $d end]
+				break
 			}
 		}
 		lappend declaration [string trim $d]
-		close $f
 	}
 	if {[llength $declaration] > 1} {
 		return $declaration
@@ -1909,12 +1965,12 @@ proc LWDAQ_proc_definition {{proc_name "LWDAQ_*"} {file_name ""} } {
 
 #
 # LWDAQ_script_description returns the introductory paragraph of a 
-# TCL/TK script. It extracts the script name from the file_name
+# TclTk script. It extracts the script name from the file_name
 # parameter. The script name is the tail of the file_name. The script
 # must indicate the introductory paragraph by quoting the script name
 # after "# " on a new line. If you pass keep_breaks=1, the procedure
 # will retain the original line breaks, which can be useful for printing
-# directly to the TCL console.
+# directly to the Tcl console.
 #
 proc LWDAQ_script_description {{file_name ""} {keep_breaks 0} } {
 	if {$file_name == ""} {
@@ -2007,15 +2063,17 @@ proc man { {pattern ""} {option "none"} } {
 }
 
 #
-# LWDAQ_html_contents creates a table of contents for an HTML document.
-# Each h2 and h3 level heading must have a unique name in the document, because
-# this routine uses the heading text as the identifier for each heading line.
-# The table of contents will be placed underneath an h2 heading with text
+# LWDAQ_html_contents creates a table of contents for an HTML document. Each h2
+# and h3 level heading must have a unique name in the document, because this
+# routine uses the heading text as the identifier for each heading line. The
+# table of contents will be placed underneath an h2 heading with text
 # "Contents". Any pre-existing table of contents between this h2 heading and the
 # next h2 heading will be removed from the document. The routine takes three
-# optional parameters. The first two are cell_spacing and num_columns for the 
-# h3 heading tables beneath each h2 heading. The third parameter is the name of the
-# HTML file to be processed.
+# optional parameters. The first two are cell_spacing and num_columns for the h3
+# heading tables beneath each h2 heading. The third parameter is the name of the
+# HTML file to be processed. The table will be given a class "contents" so that
+# we can configure the font and spacing of the table of contents in our style
+# sheet.
 #
 proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
 
@@ -2092,21 +2150,26 @@ proc LWDAQ_html_contents { {cell_spacing 4} {num_columns 4} {file_name ""} } {
 	}
 	
 	# Create table of contents after contents heading
+	puts $f "<table class=\"contents\">"
 	set h3list [list]
 	foreach {h t} $headings {
 		if {$h == "h2"} {
 			if {[llength $h3list] > 0} {
+				puts $f "<tr><td>"
 				LWDAQ_html_contents_tabulate $h3list $f $cell_spacing $num_columns
+				puts $f "</td></tr>"
 				set h3list [list]
 			}
 			if {($t != "End") && ($t != "Contents")} {
-				puts $f "<a href=\"\#$t\">$t</a><br>"
+				puts $f "<tr><td><a href=\"\#$t\">$t</a></td></tr>"
 			}
 		}
 		if {$h == "h3"} {
 			lappend h3list $t
 		}
 	}
+	puts $f "</table>"
+
 	
 	# Add a line break before the next heading.
 	puts $f ""
@@ -2323,7 +2386,8 @@ proc LWDAQ_html_tables { {file_name ""} } {
 # entries and the template file ./LWDAQ.app/Contents/LWDAQ/CRT.html, as well as
 # our LWDAQ command listing and help extraction routines. By default, the
 # routine creates the command reference in the current LWDAQ working directory,
-# and names it Commands.html.
+# and names it Commands.html. But we can pass is a specific file name if we
+# like.
 #
 proc LWDAQ_command_reference { {file_name ""} } {
 	global LWDAQ_Info
@@ -2337,7 +2401,10 @@ proc LWDAQ_command_reference { {file_name ""} } {
 	while {[gets $template_file line] >= 0} {
 		set line [string map "LWDAQ_Version_Here $LWDAQ_Info(program_patchlevel)" $line]
 	
-		if {$line == "Script_Descriptions"} {
+		if {$line == "LWDAQ_Scripts"} {
+			puts $ref_file ""
+			puts $ref_file "<h2>LWDAQ Scripts</h2>"
+			puts $ref_file ""
 			foreach f $LWDAQ_Info(scripts) {
 				set description [LWDAQ_script_description $f]
 				if {$description == ""} {continue}
@@ -2350,9 +2417,9 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			continue
 		}
 		
-		if {$line == "Script_Commands"} {
+		if {$line == "LWDAQ_Commands"} {
 			puts $ref_file ""
-			puts $ref_file "<h2>Script Commands</h2>"
+			puts $ref_file "<h2>LWDAQ Commands</h2>"
 			puts $ref_file ""
 			set script_list [list]
 			foreach f $LWDAQ_Info(scripts) {
@@ -2369,14 +2436,15 @@ proc LWDAQ_command_reference { {file_name ""} } {
 				puts $ref_file ""
 				puts $ref_file "<h3>$sc</h3>"
 				puts $ref_file ""
-				puts $ref_file "<small><pre>[LWDAQ_proc_declaration $sc $f]</pre></small>"
+				puts $ref_file "<pre>[LWDAQ_proc_declaration $sc $f]</pre>"
+				puts $ref_file ""
 				puts $ref_file "<p>[LWDAQ_proc_description $sc $f]</p>"
 				puts $ref_file ""
 			}
 			continue
 		}
 	
-		if {$line == "Library_Commands"} {
+		if {$line == "lwdaq_Commands"} {
 			set fn [file join $LWDAQ_Info(sources_dir) lwdaq.pas]
 			puts $fn
 			LWDAQ_update
@@ -2385,7 +2453,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			close $f
 			
 			puts $ref_file ""
-			puts $ref_file "<h2>Library Commands</h2>"
+			puts $ref_file "<h2>lwdaq Commands</h2>"
 			puts $ref_file ""
 			set lwdaq_names [lsort -dictionary [info commands lwdaq_*]]
 			foreach n $lwdaq_names {
@@ -2394,9 +2462,9 @@ proc LWDAQ_command_reference { {file_name ""} } {
 				puts $ref_file ""
 				if {[catch {$n} error_message]} {
 					regexp {"([^"]+)"} $error_message match syntax
-					puts $ref_file "<small><pre>$syntax</pre></small>"
+					puts $ref_file "<pre>$syntax</pre>"
 				} {
-					puts $ref_file "<small><pre>$n ?option value?</pre></small>"
+					puts $ref_file "<pre>$n ?option value?</pre>"
 				}
 				set r "\{(\[^\\\}\]+)\}\[\\r\\t\\n \]*function $n\[ \\\(\]+"
 				regexp $r $code match comment
@@ -2405,7 +2473,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			continue
 		}
 		
-		if {$line == "Library_Routines"} {
+		if {$line == "lwdaq_Routines"} {
 			set fn [file join $LWDAQ_Info(sources_dir) lwdaq.pas] 
 			puts $fn
 			LWDAQ_update
@@ -2414,7 +2482,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 			close $f
 
 			puts $ref_file ""
-			puts $ref_file "<h2>Library Routines</h2>"
+			puts $ref_file "<h2>lwdaq Routines</h2>"
 			puts $ref_file ""
 
 			set r "\{(\[^\\\}\]+)\}\[\\r\\t\\n \]*function lwdaq\[^_\]"
@@ -2431,7 +2499,7 @@ proc LWDAQ_command_reference { {file_name ""} } {
 				puts $ref_file ""
 				catch {lwdaq $n} error_message
 				regexp {"([^"]+)"} $error_message match syntax
-				puts $ref_file "<small><pre>$syntax</pre></small>"
+				puts $ref_file "<pre>$syntax</pre>"
 				set r "option='$n'\[^\{\}\]+\{(\[^\}\]+)\}"
 				if {[regexp $r $code match comment]} {
 					puts $ref_file "$comment"
@@ -2452,26 +2520,31 @@ proc LWDAQ_command_reference { {file_name ""} } {
 }
 
 #
-# LWDAQ_tool_reference generates an HTML manual page for the routines defined in
-# a LWDAQ tool script. We name the tool script and the routine does the rest.
-# The routine creates the tool reference in the LWDAQ directory, and names it
-# Tool.html. If we don't specify a a file, the routine will open a file browser.
-# The routine writes an h3-level title, a declaration showing the parameters
-# that we must pass into the procedure, and the description of the procedure
-# extracted from the comments above. 
+# LWDAQ_tool_reference generates HTML sections for the routines defined in
+# a LWDAQ tool script, or any script with procedural explanatory comments
+# conforming to the LWDAQ format. We name the tool file and the routine reads
+# the contents of the file and creates the tool reference HTML file in the LWDAQ
+# directory, naming it ToolName.html, where ToolName is the root of the tool
+# file name. If we don't specify a a file, the routine will open a file browser.
+# For each procedure defined by the tool, the routine writes an h3-level title,
+# a declaration showing the parameters that we must pass into the procedure, and
+# the description of the procedure extracted from the comments above. The output
+# file is designed to be incorporated into a command reference HTML page of 
+# some sort.
 #
-proc LWDAQ_tool_reference {{script ""}} {
+proc LWDAQ_tool_reference {{toolfile ""}} {
 	global LWDAQ_Info
 	
-	if {$script == ""} {set script [LWDAQ_get_file_name]}
-	if {$script == ""} {return ""}
-	set f [open [file join $LWDAQ_Info(program_dir) "Tool.html"] w]
-	set script_list [LWDAQ_proc_list * $script]
-	set script_list [lsort -dictionary -index 0 $script_list]
-	foreach {s} $script_list {
-		puts $f "<h3>$s</h3>"
-		puts $f "<small><pre>[LWDAQ_proc_declaration $s $script]</pre></small>"
-		puts $f "<p>[LWDAQ_proc_description $s $script]</p>"
+	if {$toolfile == ""} {set toolfile [LWDAQ_get_file_name]}
+	if {$toolfile == ""} {return ""}
+	set toolname [file root [file tail $toolfile]]
+	set f [open [file join $LWDAQ_Info(program_dir) "$toolname\.html"] w]
+	set proc_list [LWDAQ_proc_list * $toolfile]
+	set proc_list [lsort -dictionary -index 0 $proc_list]
+	foreach {s} $proc_list {
+		puts $f "<h3 id=\"$s\">$s</h3>"
+		puts $f "<pre>[LWDAQ_proc_declaration $s $toolfile]</pre>"
+		puts $f "<p>[LWDAQ_proc_description $s $toolfile]</p>"
 		puts $f ""
 	}
 	close $f

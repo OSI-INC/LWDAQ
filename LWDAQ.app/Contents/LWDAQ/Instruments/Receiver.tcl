@@ -1,6 +1,6 @@
 # Receiver Instrument, Long-Wire Data Acquisition Software (LWDAQ)
 #
-# Copyright (C) 2006-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2006-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -43,8 +43,8 @@ proc LWDAQ_init_Receiver {} {
 	set info(daq_extended) "0"
 	set info(delete_old_images) "1"
 	set info(file_use_daq_bounds) "0"
-	set info(daq_image_width) "500"
-	set info(daq_image_height) "300"
+	set info(daq_image_width) "900"
+	set info(daq_image_height) "500"
 	set info(daq_buffer_width) "1000"
 	set info(daq_image_left) "-1"
 	set info(daq_image_right) "-1"
@@ -98,6 +98,7 @@ proc LWDAQ_init_Receiver {} {
 	set info(clock_id) "0"
 	set info(show_errors) "0"
 	set info(show_messages) "0"
+	set info(show_aux_messages) "0"
 	set info(min_id) "0"
 	set info(max_id) "255"
 	set info(activity_rows) "32"
@@ -287,11 +288,11 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			set raw_data [lwdaq_receiver $image_name \
 				"-payload $config(payload_length) print 0 $info(show_messages)"]
 			LWDAQ_print $info(text) $raw_data
-			if {[llength $info(aux_messages)] > 0} {
-				LWDAQ_print $info(text) "Auxiliary Messages:"
-				foreach m $info(aux_messages) {
-					LWDAQ_print $info(text) $m
-				}
+		}
+		if {$info(show_aux_messages) > 0} {
+			LWDAQ_print $info(text) "Auxiliary Messages:"
+			foreach m $info(aux_messages) {
+				LWDAQ_print $info(text) $m
 			}
 		}
 		
@@ -441,7 +442,7 @@ proc LWDAQ_reset_Receiver {} {
 					set info(receiver_type) "A3042"
 					set config(payload_length) 2
 					set info(daq_avail_cntr) 1
-					set channel_select_available 1
+					set channel_select_available 0
 					set send_all_sets_cmd 0
 					set info(purge_duplicates) 1
 					set info(max_block_reads) "50"

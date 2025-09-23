@@ -364,7 +364,9 @@ proc LWDAQ_make_tool_menu {} {
 		foreach d $allsubdirs {
 			if {[llength [glob -nocomplain [file join $d *.tcl]]] != 0} {
 				if {($d != [file join $info(tools_dir) Data]) \
-					&& ($d != [file join $info(tools_dir) Spawn])} {lappend toolsubdirs $d}
+					&& ($d != [file join $info(tools_dir) Spawn])} {
+					lappend toolsubdirs $d
+				}
 			}
 		}
 	}
@@ -482,24 +484,27 @@ proc LWDAQ_enable_text_undo {t} {
 # LWDAQ_print prints a string to the end of a text device. The text device can
 # be a text window or a file. When the routine writes to a text window, it does
 # so in a specified color, unless the string begins with "ERROR: ", "WARNING: ",
-# or "SUGGESTION: ", in which case the routine forces the color itself. If you
-# pass "-nonewline" as an option after LWDAQ_print, the routine does not add a
-# carriage return to the end of the print string. The routine also recognises
-# "-newline", which is the default. The routine assumes the text device is a
-# text window if its name starts with a period and this period is not followed
-# by a forward slash or a backslash. If the text window exists, the routine
-# writes the print string to the end of the window. If the text device is either
-# "stdout" or "stderr", the routine writes directly to these channels. If the
-# text device is a file name and the directory of the file exists, the routine
-# appends the string to the file, or creates the file if the file does not
-# exist. The routine will not accept any file name that contains a space, is an
-# empty string, or is a real number. If the routine cannot find any valid device
-# that matches the device name, it will write the string to stdout provided the
-# default_to_stdout flag is set. Otherwise the routine does nothing. Another
-# service provided by the routine is to replace any double occurrances of
-# "ERROR:" and "WARNING:" that might arise as we pass error and warning strings
-# through various routines before they are printed. The routine returns the name
-# of the text widget, file, or channel it wrote to.
+# or "SUGGESTION: ", in which case the routine forces its own color itself. If
+# you pass "-nonewline" as an option after LWDAQ_print, the routine does not add
+# a carriage return to the end of the print string. The routine also recognises
+# "-newline", which is the default. If the text device name begins with a
+# period, the routine assumes the device is a text widget. It checks if the
+# widget exists, and if it does, the routine writes the print string to the end
+# of the window. If the text device is "stdout" or "stderr", the routine writes
+# directly to these channels. When writing to stdout and stderr, the routine
+# uses escape sequences to provide "common color codes" to approximate the
+# larger range of colors available in Tk. If the text device is a file name and
+# the file exists, it creates the file and writes to it. If the file does not
+# exist, but the directory specified in the file name does exist, the routine
+# creates the file and appends the string to the file. The routine will not
+# accept any file name that contains a space, is an empty string, or is a real
+# number. If the routine cannot find any valid device that matches the device
+# name, it will fall back to writing to stdout, provided the default_to_stdout
+# flag is set. Otherwise the routine does nothing. Another service provided by
+# the routine is to replace double occurrances of "ERROR:" and "WARNING:" that
+# might arise as we pass error and warning strings through various routines
+# before they are printed. The routine returns the name of the text widget,
+# file, or channel it wrote to.
 #
 proc LWDAQ_print {args} {
 	global LWDAQ_Info
@@ -551,7 +556,43 @@ proc LWDAQ_print {args} {
 	} {
 		if {($destination == "stdout") || ($destination == "stderr")} {
 			if {$LWDAQ_Info(stdout_available)} {
-				puts -nonewline $destination $print_str
+				switch -- $color {
+					crimson -
+					red {set a "\033\[31m$print_str\033\[0m"}
+					
+					indigo -
+					azure -
+					aqua -
+					blue {set a "\033\[34m$print_str\033\[0m"}
+					
+					darkgreen -
+					olive -
+					lawngreen -
+					green  {set a "\033\[32m$print_str\033\[0m"}
+					
+					purple -
+					orchid -
+					pink -
+					salmon -
+					violet -
+					magenta {set a "\033\[35m$print_str\033\[0m"}
+					
+					orange -
+					brown -
+					banana -
+					chartreuse -
+					khaki -
+					yellow {set a "\033\[33m$print_str\033\[0m"}
+					
+					skyblue -
+					lightblue -
+					cyan {set a "\033\[36m$print_str\033\[0m"}
+					
+					maroon -
+					gray -
+					default {set a "\033\[0m$print_str"}
+				}
+				puts -nonewline $destination "$a"
 				set printed 1
 			}
 		} {
@@ -573,7 +614,7 @@ proc LWDAQ_print {args} {
 		}
 	}
 	
-	return $destination
+	return "$destination"
 }
 
 #
@@ -1239,7 +1280,13 @@ proc LWDAQ_server_open {} {
 		pack $f.l$i $f.e$i -side left
 	}
 	label $f.lmode -text "mode" -width 10
-	tk_optionMenu $f.emode LWDAQ_Info(server_mode) execute post echo receive
+	menubutton $f.emode -menu $f.emode.m -textvariable LWDAQ_Info(server_mode) \
+		-relief raised -indicatoron 1
+	menu $f.emode.m
+	foreach x {"execute" "post" "echo" "receive"} {
+		$f.emode.m add command -label "$x" -command \
+			[list set LWDAQ_Info(server_mode) $x]
+	}
 	pack $f.lmode $f.emode -side left
 
 	LWDAQ_text_widget $w 80 20

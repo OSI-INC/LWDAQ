@@ -1,6 +1,6 @@
 # Long-Wire Function Generator Package
 # 
-# (C) 2023-2024, Kevan Hashemi, Open Source Instruments Inc.
+# (C) 2023-2025, Kevan Hashemi, Open Source Instruments Inc.
 #
 # Routines that interact with Long-Wire Data Acquisition Function Generators
 # (LWFGs). These are devices are TCPIP servers that we control using LWDAQ
@@ -136,9 +136,9 @@ proc LWFG_off {ip ch_num} {
 }
 
 #
-# LWFG_configure configures a function generator for continuous generation of a square,
-# triangle, or sine wave. We specify an IP address and channel number. We give the 
-# frequency and the low and high voltages of the waveform.
+# LWFG_configure configures a function generator for continuous generation of a
+# square, triangle, or sine wave. We specify an IP address and channel number.
+# We give the frequency and the low and high voltages of the waveform.
 #
 proc LWFG_configure {ip ch_num waveform frequency v_lo v_hi} {
 	global LWFG

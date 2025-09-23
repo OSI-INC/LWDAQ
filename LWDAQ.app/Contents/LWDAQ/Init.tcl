@@ -1,7 +1,7 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 #
 # Copyright (C) 2005-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 # 
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -21,8 +21,8 @@ set num_errors 0
 
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
-set LWDAQ_Info(program_version) "10.6"
-set LWDAQ_Info(program_patchlevel) "10.6.12"
+set LWDAQ_Info(program_version) "10.7"
+set LWDAQ_Info(program_patchlevel) "10.7.5"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 set LWDAQ_Init(default_prompt) "LWDAQ$ "
 set LWDAQ_Info(prompt) $LWDAQ_Init(default_prompt)
@@ -100,9 +100,18 @@ set LWDAQ_Info(terminal_connected) "0"
 set LWDAQ_Info(configuration_file) ""
 set LWDAQ_Info(argv) ""
 
+# Decide whether or not we should enable LWDAQ's graphical user interface (GUI).
+# If LWDAQ is running in the "wish" shell, which is the TclTk shell, we turn on
+# the GUI. But if LWDAQ is running in "tclsh", the Tcl-only shell, we turn off
+# the GUI
+set LWDAQ_Info(gui_enabled) \
+	[string match -nocase "*wish*" \
+		[file tail [info nameofexecutable]]]
+
 # Go through the list of arguments passed to this script, and set the
 # configuration file name and deteremine if we should commandeer the launching
-# terminal's standard input and output for use as a Tcl console. 
+# terminal's standard input and output for use as a Tcl console. If we are
+# running without a GUI, any error causes us to print an error message and exit.
 foreach a $argv {
 	switch -glob -- $a {
 		"" {
@@ -147,6 +156,7 @@ foreach a $argv {
 					set LWDAQ_Info(configuration_file) $mfn
 				} else {
 					puts "ERROR: No such option or file \"$a\"."
+					if {!$LWDAQ_Info(gui_enabled)} {exit}
 					incr num_errors
 				}
 			} {
@@ -155,14 +165,6 @@ foreach a $argv {
 		}
 	}
 }
-
-# Decide whether or not we should enable LWDAQ's graphical user interface (GUI).
-# If LWDAQ is running in the "wish" shell, which is the TclTk shell, we turn on
-# the GUI. But if LWDAQ is running in "tclsh", the Tcl-only shell, we turn off
-# the GUI
-set LWDAQ_Info(gui_enabled) \
-	[string match -nocase "*wish*" \
-		[file tail [info nameofexecutable]]]
 
 # If the GUI is disabled, create a dummy TK window procedure. The winfo
 # procedure returns zero always to indicate that windows don't exist.
@@ -201,12 +203,10 @@ if {[catch {
 				[glob -nocomplain [file join $LWDAQ_Info(config_dir) *.tcl]]]
 
 	# For our help routines, we construct a list of all the TclTk files that define
-	# the LWDAQ routines and all the routines in the packages provided by the 
-	# LWDAQ package directory.
+	# the LWDAQ routines.
 	set LWDAQ_Info(scripts) [concat \
 		[glob -nocomplain [file join $LWDAQ_Info(scripts_dir) *.tcl]] \
-		[glob -nocomplain [file join $LWDAQ_Info(instruments_dir) *.tcl]] \
-		[glob -nocomplain [file join $LWDAQ_Info(package_dir) *.tcl]] ]
+		[glob -nocomplain [file join $LWDAQ_Info(instruments_dir) *.tcl]] ]
 		
 	# Add the LWDAQ's package directory to the auto_path for library searches.
 	global auto_path
@@ -269,6 +269,7 @@ if {[catch {
 	}
 } error_message]} {
 	puts "ERROR: In initialization, $error_message"
+	if {!$LWDAQ_Info(gui_enabled)} {exit}
 	incr num_errors
 }
 
@@ -299,6 +300,7 @@ set LWDAQ_Info(loading_settings_scripts) 1
 foreach s $LWDAQ_Info(settings_scripts) {
 	if {[catch {source $s} error_message]} {
 		puts "ERROR: $error_message in startup script \"[file tail $s]\"."
+		if {!$LWDAQ_Info(gui_enabled)} {exit}
 		incr num_errors
 	}
 	incr LWDAQ_Info(num_settings_scripts_loaded)
@@ -308,7 +310,9 @@ set LWDAQ_Info(loading_settings_scripts) 0
 # Run the configuration script, if it exists.
 if {$LWDAQ_Info(configuration_file) != ""} {
 	if {[catch {source $LWDAQ_Info(configuration_file)} error_message]} {
-		puts "ERROR: $error_message in configuration file \"$LWDAQ_Info(configuration_file)\"."
+		puts "ERROR: $error_message in configuration file\
+			\"$LWDAQ_Info(configuration_file)\"."
+		if {!$LWDAQ_Info(gui_enabled)} {exit}
 		incr num_errors
 	}
 }
@@ -316,10 +320,13 @@ if {$LWDAQ_Info(configuration_file) != ""} {
 # Check to see if there are spaces in the LWDAQ program directory.
 if {[regexp { } $LWDAQ_Info(program_dir)]} {
 	puts "ERROR: Installation directory \"$LWDAQ_Info(program_dir)\" contains spaces."
+	if {!$LWDAQ_Info(gui_enabled)} {exit}
 	incr num_errors
 }
 
-# Report number of errors if greater than zero.
+# If we are operating in no-gui mode, exit so that we don't freeze any process
+# that has called LWDAQ to do some job. Otherwise, report the number of errors
+# to the console.
 if {$num_errors > 0} {
 	puts "Initialization concluded with $num_errors errors."
 }

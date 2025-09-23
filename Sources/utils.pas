@@ -2,7 +2,7 @@
 	Utilities for Mathematical Analysis
 
 	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-	Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -1424,7 +1424,8 @@ begin
 end;
 
 {
-	string_from_integer takes an integer and turns it into an ascii string fsi characters long.
+	string_from_integer takes an integer and turns it into an ascii string fsi
+	characters long.
 }
 function string_from_integer(value,fsi:integer):string;
 

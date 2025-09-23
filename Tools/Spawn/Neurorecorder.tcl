@@ -1,6 +1,6 @@
 # Neurorecorder.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2007-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2025 Kevan Hashemi, Open Source Instruments Inc.
 
 # The Neurorecorder records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "168"
+	LWDAQ_tool_init "Neurorecorder" "169"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -578,7 +578,7 @@ proc Neurorecorder_set_receiver {version} {
 			set iconfig(payload_length) $info(A3042_payload)
 			set config(tracker_coordinates) $info(A3042_coordinates)
 			Neurorecorder_print "Detected: Telemetry Control Box (A3042),\
-				applying channel selection, ignoring driver socket."
+				ignoring driver socket, ignoring channel selection."
 		}
 		default {
 			set iconfig(payload_length) 0

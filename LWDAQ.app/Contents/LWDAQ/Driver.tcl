@@ -161,6 +161,7 @@ proc LWDAQ_driver_init {} {
 	set LWDAQ_Driver(min_adc16_sample_period) 0.000010 ;# s
 	set LWDAQ_Driver(adc16_startup_ticks) 3;# ticks before starts timer
 	set LWDAQ_Driver(adc16_settling_delay) 0.001 ;# s
+	set LWDAQ_Driver(wake_delay) 0.001 ;# s
 	set LWDAQ_Driver(max_delay_seconds) 1.0
 #
 # Memory Parameters

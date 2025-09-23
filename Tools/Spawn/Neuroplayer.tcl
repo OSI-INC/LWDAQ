@@ -1,6 +1,6 @@
 # Neuroplayer.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2007-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # The Neuroplayer records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
@@ -19,7 +19,7 @@
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-# details.
+# details. 
 # 
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see <https://www.gnu.org/licenses/>.
@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "171"
+	LWDAQ_tool_init "Neuroplayer" "174"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -181,16 +181,25 @@ proc Neuroplayer_init {} {
 # amplitude versus frequency, which we display in the a-t window. The empty
 # value for these two graphs is a point at the origin. When we have real data in
 # the graphs, each graph point is two numbers: an x and y value, which would
-# give time and value or frequency and amplitude. Note that the info(signal) and
-# info(spectrum) elements are strings of characters. Their x-y values are
-# represented as characters giving each number, with each number separated from
-# its neighbors by spaces. 
+# give time and value or frequency and amplitude. The info(signal) parameter is
+# a list of numbers alternating between sample timestamps and sample values. The
+# info(values) parameter is a list of sample values. The info(spectrum)
+# parameter is a list of numbers alternating between component amplitudes and
+# component phases, where the phases are in radians. 
 #
 	set info(channel_code) "0"
 	set info(channel_num) "0"
 	set info(signal) "0 0"
 	set info(spectrum) "0 0"
 	set info(values) "0"
+#
+# The sample values are sixteen-bit unsigned integers. We define their minimum
+# and maximum values, and an offset that we can use to displace average-zero
+# value series to turn them into unsigned integer series.
+#
+	set info(sample_offset) "32768"
+	set info(sample_min) "0"
+	set info(sample_max) "65535"
 #
 # Parameters that handle auxiliary messages.
 #
@@ -199,7 +208,7 @@ proc Neuroplayer_init {} {
 # Any channel with a activity_threshold samples per second in the playback
 # interval will be considered active. 
 #
-	set config(activity_threshold) 14
+	set config(activity_threshold) "14"
 #
 # During play-back, we obtain a list of all channels in which there exists
 # at least one sample. From this list we select any channels from which we
@@ -397,7 +406,7 @@ proc Neuroplayer_init {} {
 #
 	set config(slow_play) 0
 	set config(slow_play_ms) 1000
-	set config(fast_play_ms) $LWDAQ_Info(queue_ms)
+	set info(fast_play_ms) $LWDAQ_Info(queue_ms)
 #
 # By default, the player moves from one file to the next automatically, or
 # waits for data to be added to a file if there is no other later file. But
@@ -480,6 +489,7 @@ proc Neuroplayer_init {} {
 	set info(play_interval_copy) 1.0
 	set info(clocks_per_second) 128
 	set info(ticks_per_clock) 256
+	set info(tick_frequency) [expr $info(clocks_per_second) * $info(ticks_per_clock)]
 	set info(max_message_value) 65535
 	set info(value_range) [expr $info(max_message_value) + 1]
 	set info(clock_cycle_period) \
@@ -609,6 +619,16 @@ proc Neuroplayer_init {} {
 	set info(export_size_s) "0"
 	set config(export_reps) "1"
 	set config(export_activity_max) "10000"
+	set info(export_timestamp) "0"
+	set info(export_buffer) [list]
+	set info(export_sequence) [list]
+	set info(export_edf_transducer) "SCT"
+	set info(export_edf_unit) "uV"
+	set info(export_edf_min) "-18000"
+	set info(export_edf_max) "+12000"
+	set info(export_edf_lo) "-32768"
+	set info(export_edf_hi) "+32768"
+	set info(export_edf_filter) "unknown"
 #
 # Video playback parameters. We define executable names for ffmpeg.
 #
@@ -1379,35 +1399,42 @@ proc Neuroplayer_end_time {fn payload {ref_time 0} {ref_index 0}} {
 }
 
 #
-# Neuroplayer_filter is for use in processor scripts as a means of detecting
-# events in a signal. The routine scales the amplitude of the discrete transform 
-# components according to four numbers, which specify the central region of the
-# pass-band and the two extremes of the pass-band. The scaling is linear,
-# which is not something we can do easily with recursive filters, or with
-# analog filters, but is simple in software. The four numbers are band_lo_end,
-# band_lo_center, band_hi_center, and band_hi_end. They are in units of frequency.
-# Components below band_lo_end and above band_hi_end are multiplied by zero. 
-# Components between band_lo_end and band_lo_center are scaled by zero to one
-# from the lower to the upper frequency. Components from band_lo_center to 
-# band_hi_center are added as they are. Components from band_hi_center to
-# band_hi_end are scaled from one to zero from the lower to the upper frequency.
-# Thus we have a pass-band that might be sharp or gentle. We can implement
-# a high-pass filter by setting band_lo_end and band_lo_center to zero. The
-# routine returns the total power of the remaining components, which is the
-# sum of their squares. We do not multiply the combined power by any scaling
-# factor because there are several variants of the discrete fourier transform
-# with different scaling factors, and we want to avoid hiding such multiplications
-# in our code. If "show" is set, the routine plots the filtered signal on the 
-# screen by taking the inverse transform of the selected frequency components. 
-# If "replace" is set, the routine calculates the inverse transform of the filtered 
-# signal, making it available to the calling routine in the info(values) variable.
-# Note that the routine does not replace the info(signal) string, which contains
-# the reconstructed signal values and their timestamps. Only the info(values) 
-# string is replaced. By default, the routine does not plot nor does it perform 
-# the inverse transform, both of which take time and slow down processing. The 
-# show parameter, if not zero, is used to scale the signal for display. By default
-# the filter is band-pass. But if we set "bandpass" to 0, the filter is a band-stop
-# filter.
+# Neuroplayer_filter applies a band-pass or band-stop filter to the current
+# signal. We will first explain how the band-pass filter works. The routine
+# takes the discrete Fourier transform and elminates or attenuates its
+# components according to four frequencies we specify in Hertz as arguments to
+# the routine. These are band_lo_end, band_lo_center, band_hi_center, and
+# band_hi_end. All components below band_lo_end and above band_hi_end are
+# eliminated. All components between band_lo_center and band_hi_center are left
+# intact and unaltered. The components between band_lo_end and band_lo_center
+# are scaled linearly so that a component at band_lo_end is multiplied by zero,
+# a component half-way between band_lo_end and band_lo_center is multiplied by
+# one half, and a component at band_lo_center is multiplied by one. The same
+# linear scaling occurs from band_hi_end down to band_hi_center, but in the
+# opposite frequency direction. By this means, the routine obtains the spectrum
+# of a band-pass filtered signal. A band-stop filter it obtains by taking the
+# band-pass spectrum and subtracting it from the original spectrum. We select a
+# band-stop filter by clearing the bandpass flag to zero. This flag is set by
+# default, so our default filter is a band-pass filter. We implement a high-pass
+# filter by setting band_lo_end and band_lo_center to zero. We implement lo-pass
+# by setting band_hi_center and band_hi_end to a frequency greater than or equal
+# to half the signal sample rate. The routine returns the total power of the
+# remaining components, which is the sum of their squares. If either "show" or
+# "replace" is set, the routine calculates the inverse transform of the filtered
+# signal, which is what the filtered signal looks like. The values it obtains
+# from the inverse transform are rounded to the nearest integer, so they remain
+# sixteen-bit ADC counts. If the zero-frequency component has been removed by
+# the filtering, the filtered signal will contain negative values. Any time the
+# filter removes the zero-frequency component, we add to the filtered signal
+# values a sample offset so as to bring the values into the range 0-65535. If,
+# after adding this offset, the value is still less than zero, we clip to zero,
+# and if it becomes greater than 65535, we clip to 65535. If "show" is set, the
+# routine plots the inverse transform in the value versus time display. If
+# "replace" is set, the routine replaces the original info(values) string with
+# the filtered values strin. The routine does not replace the info(signal)
+# string, which will still contain the reconstructed signal as a list of numbers
+# alternating between signal timestamps and signal values. By default, show and
+# replace are cleared and bandpass is set.
 #
 proc Neuroplayer_filter {band_lo_end band_lo_center \
 		band_hi_center band_hi_end \
@@ -1456,10 +1483,27 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 		set f [expr $f + $info(f_step)]
 	}
 
-	# If show or replace, take the inverse transform. The filtered values will
-	# be available to the calling procedure in a variable of the same name.
+	# If show or replace, take the inverse transform. We round the inverse
+	# transform values so as to make them integers. Our exporter expects the
+	# values to be unsigned sixteen-bit values 0-65535. If our inverse transform
+	# contains negative values, as it will for any filter function that excludes
+	# the zero-frequency component, we must offset the values so that they
+	# remain in the range 0-65536. 
 	if {$show || $replace} {
+		set saved_config [lwdaq_config]
+		lwdaq_config -fsd 0
 		set filtered_values [lwdaq_fft $filtered_spectrum -inverse 1]
+		eval lwdaq_config $saved_config
+		if {[lindex $filtered_spectrum 0] == 0} {
+			set offset_values [list]
+			foreach v $filtered_values {
+				set vv [expr $v + $info(sample_offset)]
+				if {$vv < $info(sample_min)} {set vv $info(sample_min)}
+				if {$vv > $info(sample_max)} {set vv $info(sample_max)}
+				lappend offset_values $vv
+			}
+			set filtered_values $offset_values
+		}
 	}
 	
 	# If show, plot the filtered signal to the screen. If our frequency band
@@ -1467,15 +1511,10 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 	# value so that the filtered signal will be super-imposed upon the
 	# unfiltered signal in the display.
 	if {$show} {
-		if {$band_lo_center > 0} {
-			set offset [lindex $info(spectrum) 0]
-		} {
-			set offset 0
-		}
 		set filtered_signal ""
 		set timestamp 0
 		foreach v $filtered_values {
-			append filtered_signal "$timestamp [expr $show*$v + $offset] "
+			append filtered_signal "$timestamp $v "
 			incr timestamp
 		}
 		Neuroplayer_plot_signal [expr $info(channel_num) + 32] $filtered_signal
@@ -1483,7 +1522,9 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 	
 	# If replace, replace the existing info(values) string with the new
 	# filtered values.
-	if {$replace} {set info(values) $filtered_values}
+	if {$replace} {
+		set info(values) $filtered_values
+	}
 	
 	# Return the power.
 	return $band_power
@@ -1492,16 +1533,16 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 #
 # Neuroplayer_band_power is for use in processor scripts as a means of detecting
 # events in a signal. The routine selects the frequency components in
-# $info(spectrum) that lie between band_lo and band_hi Hertz (inclusive), adds the
-# power of all components in this band, and returns the total. If show is set, the
-# routine plots the filtered signal on the screen by taking the inverse transform
-# of the selected frequency components. If replace is set, the routine calculates
-# the inverse transform of the filtered signal, making it available to the calling
-# routine in the info(values) variable. Note that the routine does not change,
-# info(signal), which contains the reconstructed signal values and their timestamps,
-# nor the spectrum of the signal. Only the info(values) string is replaced. By default, 
-# the routine does not plot nor does it perform the inverse transform, both of which 
-# take time and slow down processing. The show parameter, if not zero, is used to 
+# info(spectrum) that lie between band_lo and band_hi Hertz (inclusive), adds
+# the power of all components in this band, and returns the total. If show is
+# set, the routine plots the filtered signal on the screen by taking the inverse
+# transform of the selected frequency components. If replace is set, the routine
+# calculates the inverse transform of the filtered signal, making it available
+# to the calling routine in the info(values) variable. Note that the routine
+# does not change info(signal), which contains the reconstructed signal values
+# and their timestamps, nor the spectrum of the signal. By default, the routine
+# does not plot nor does it perform the inverse transform, both of which take
+# time and slow down processing. The show parameter, if not zero, is used to
 # scale the signal for display.
 #
 proc Neuroplayer_band_power {band_lo band_hi {show 0} {replace 0}} {
@@ -1544,106 +1585,10 @@ proc Neuroplayer_band_amplitude {band_lo band_hi {show 0} {replace 0}} {
 }
 
 #
-# Neuroplayer_multi_band_filter allows us to specify ranges of frequency
-# to be included in the filtered signal. The routine returns the sum of the
-# squares of the selected components. The "band_list" parameter is a list
-# containing an even number of real-valued frequencies. Each pair of 
-# frequencies is the lowest and highest frequency of a band. The lowest
-# must be specified first. The bands may overlap. Any component in the 
-# discrete fourier transform that lies within one or more of these bands
-# will be included in the spectrum of the filtered signal. The band edges
-# are themselves contained in the band, so a 1-4 Hz band will include 
-# components of 1 Hz and 4 Hz. When "replace" is set, the routine calculates
-# the inverse fourier transform of the selected components and replaces
-# the original info(values) string with the filtered signal values. But 
-# the info(signal) and info(spectrum) are not changed. If a processor
-# is to change info(signal), it can replace all the sample values in 
-# info(signal) with the sample values in info(values).
-#
-proc Neuroplayer_multi_band_filter {{band_list ""} {show 0} {replace 0}} {
-	upvar #0 Neuroplayer_info info
-	upvar #0 Neuroplayer_config config
-
-	# Check the inputs.
-	if {[llength $band_list] == 0} {
-		error "no band frequencies specified"
-	}
-	if {[llength $band_list] % 2 != 0} {
-		error "odd number of frequencies specified"
-	}
-	foreach {flo fhi} $band_list {
-		if {![string is double -strict $flo]} {
-			error "invalid frequency \"$flo\""
-		}
-		if {![string is double -strict $fhi]} {
-			error "invalid frequency \"$fhi\""
-		}
-		if {$flo >= $fhi} {
-			error "cannot have flo >= fhi"
-		}
-	}
-
-	# Check the current spectrum.
-	if {[llength $info(spectrum)] <= 1} {
-		error "no spectrum exists to filter"
-	}
-	
-	# Filter the current spectrum and calculate the total power.
-	set filtered_spectrum ""
-	set f 0
-	set band_power 0.0
-	foreach {a p} $info(spectrum) {
-		set b 0
-		foreach {flo fhi} $band_list {
-			if {($f >= $flo) && ($f <= $fhi)} {
-				set b $a
-				break
-			}
-		}
-		append filtered_spectrum "$b $p "
-		set band_power [expr $band_power + ($b * $b)/2.0]
-		set f [expr $f + $info(f_step)]
-	}
-
-	# If show or replace, take the inverse transform. The filtered
-	# values will be available to the calling procedure in a variable
-	# of the same name.
-	if {$show || $replace} {
-		set filtered_values [lwdaq_fft $filtered_spectrum -inverse 1]
-	}
-	
-	# If show, plot the filtered signal to the screen. If our  
-	# frequency band does not include zero, we add the zero-frequency
-	# component to every sample value so that the filtered signal 
-	# will be super-imposed upon the unfiltered signal in the display.
-	if {$show} {
-		if {[lindex $band_list 0] > 0} {
-			set offset [lindex $info(spectrum) 0]
-		} {
-			set offset 0
-		}
-		set filtered_signal ""
-		set timestamp 0
-		foreach {v} $filtered_values {
-			append filtered_signal "$timestamp [expr $show*$v + $offset] "
-			incr timestamp
-		}
-		Neuroplayer_plot_signal [expr $info(channel_num) + 32] $filtered_signal
-	}
-	
-	# If replace, replace the existing info(values) string with the new
-	# filtered values.
-	if {$replace} {set info(values) $filtered_values}
-	
-	# Return the power.
-	return $band_power
-}
-
-#
 # Neuroplayer_contiguous_band_power accepts a low and high frequency
 # to define a range of frequencies to be analyzed, and then a number of
 # contiguous bands into which to divide that range. It returns the power
-# of the signal in each band in units of square counts.
+# of the signal in each band separately in units of square counts.
 #
 proc Neuroplayer_contiguous_band_power {flo fhi num} {
 	upvar #0 Neuroplayer_info info
@@ -1792,7 +1737,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set frequency [lindex $fl 0]
 		foreach f $fl {
 			if {![string is integer -strict $f]} {
-				Neuroplayer_print "ERROR: Invalid frequency \"$f\" in default frequency list."
+				Neuroplayer_print "ERROR: Invalid frequency \"$f\" in default list."
 				return "0 0"	
 			}
 			if {$num_received < [expr $config(extra_fraction) \
@@ -2019,10 +1964,17 @@ proc Neuroplayer_spectrum {{values ""}} {
 }
 
 #
-# Neuroplayer_overview displays an overview of a file's contents. This
-# routine sets up the overview window and calles a plot routine to sample
-# the archvie and plot the results. An Export button provides a way to
-# export the graph data to disk for plotting in other programs.
+# Neuroplayer_overview displays an overview of a file's contents. If no overview
+# window exists, the Overview create one. If an overview window exists, the
+# Overview take over that window and plots the current arive. The plot respects
+# the settings asserted for the value versus time plot in the main Neuroplayer
+# window. These same settings are available in the overview window itself. The
+# Overview plots the channels specficied in the channel select string. When
+# first opened, the overview extends across the entire archive, but we can
+# select an interval of the file for the overview as well. Previous and Next NDF
+# buttons allow us to look at the next NDF file in the playback directory tree.
+# An Excerpt button causes the Overview to extract the inteval of the original
+# NDF archive and write it to disk as a new, shorter NDF archive. 
 #
 proc Neuroplayer_overview {{fn ""} } {
 	upvar #0 Neuroplayer_info info
@@ -2210,11 +2162,11 @@ proc Neuroplayer_overview {{fn ""} } {
 }
 
 #
-# Neuroplayer_overview_jump jumps to the point in the overview archive that
-# lies under the coordinates (x,y) in the overview graph. We call it after a
-# mouse double-click in the graph. We round the jump-to time to the nearest
-# second so that accompanying synchronous video will have a key frame to show at
-# the start of the interval.
+# Neuroplayer_overview_jump jumps to the point in the overview archive that lies
+# under the coordinates (x,y) in the overview graph. We call it after a mouse
+# double-click in the graph. We round the jump-to time to the nearest second so
+# that accompanying synchronous video will have a key frame to show at the start
+# of the interval.
 #
 proc Neuroplayer_overview_jump {x y} {
 	upvar #0 Neuroplayer_info info
@@ -2243,7 +2195,7 @@ proc Neuroplayer_overview_jump {x y} {
 
 #
 # Neuroplayer_overview_cursor draws a vertical line over the plot to show the
-# start of the current playback interval, assuming the file displayed is the 
+# start of the current playback interval, assuming the file displayed is the
 # current play file.
 #
 proc Neuroplayer_overview_cursor {} {
@@ -2374,12 +2326,11 @@ proc Neuroplayer_overview_plot {} {
 	}
 	close $f
 	
-	# Go through the list of messages, calculating the time of each message
-	# by interpolating between the times of existing clock messages. We assume
-	# that less than one clock cycle period (that's 512 s) passes between clock 
-	# messages so that we can keep time by looking at the clock message values.
+	# Go through the list of messages, calculating the time of each message by
+	# interpolating between the times of existing clock messages. We assume that
+	# less than one clock cycle period of 512 s passes between clock messages so
+	# that we can keep time by looking at the clock message values.
 	set ov_config(status) "Analyzing"
-	LWDAQ_update
 	set offset_time -1
 	set lo_time $ov_config(t_min)
 	set time_step 0
@@ -2387,6 +2338,7 @@ proc Neuroplayer_overview_plot {} {
 	set clock_cycles 0
 	set previous_clock 0
 	for {set sample_num 0} {$sample_num < [llength $samples]} {incr sample_num} {
+		LWDAQ_support
 		scan [lindex $samples $sample_num] %u%u id value
 		if {$id == 0} {
 			if {$value < $previous_clock} {incr clock_cycles}
@@ -2555,14 +2507,14 @@ proc Neuroplayer_overview_newndf {step} {
 	set ov_config(status) "Searching"
 	LWDAQ_update
 
-	# We obtain a list of all NDF files in the play_dir directory tree. If
-	# can't find the current file in the directory tree, we abort.
-	set fl [LWDAQ_find_files $config(play_dir) *.ndf]
+	# We obtain a list of all NDF files in the playback directory tree. If can't
+	# find the current file in the directory tree, we abort.
+	set fl [LWDAQ_find_files $config(play_dir) "*.ndf"]
 	set fl [LWDAQ_sort_files $fl]
 	set index [lsearch $fl $ov_config(fn)]
 	if {$index < 0} {
-		Neuroplayer_print "ERROR: In Overview, cannot find\
-			\"[file tail $ov_config(fn)]\" in playback directory tree."
+		Neuroplayer_print "ERROR: Overview cannot find\
+			$ov_config(fn_tail) in playback directory tree."
 		set ov_config(status) "Idle"
 		return ""
 	}
@@ -2571,15 +2523,16 @@ proc Neuroplayer_overview_newndf {step} {
 	# switch to this file.
 	set file_name [lindex $fl [expr $index + $step]]
 	if {$file_name == ""} {
-		Neuroplayer_print "ERROR: Overview cannot step $step from\
-			\"[file tail $ov_config(fn)]\" in Player Directory Tree."
+		Neuroplayer_print "ERROR: Overview failed to step=$step,\
+			no such NDF file in playback directory tree."
 		set ov_config(status) "Idle"
 		return ""	
 	}
 	set ov_config(fn) $file_name
 	set ov_config(fn_tail) [file tail $ov_config(fn)]
 	
-	# Try to determine the start time of the new archive.
+	# Try to determine the start time of the new archive using a UNIX timestamp
+	# extracted from the file tail. Otherwise, set the archive time to zero.
 	if {![regexp {([0-9]{10})\.ndf} [file tail $ov_config(fn)] match atime]} {
 		set atime 0
 	}
@@ -2691,15 +2644,16 @@ proc Neuroclassifier_open {} {
 	frame $w.controls2
 	pack $w.controls2 -side top -fill x
 	set f $w.controls2
-	label $f.yml -text "y:"
-	set info(classifier_y_menu) [tk_optionMenu $f.ym \
-		Neuroplayer_config(classifier_y_metric) "none"]
-	pack $f.yml $f.ym -side left -expand yes
-	label $f.xml -text "x:"
-	set info(classifier_x_menu) [tk_optionMenu $f.xm \
-		Neuroplayer_config(classifier_x_metric) "none"]
-	pack $f.xml $f.xm -side left -expand yes
-
+	
+	foreach a {x y} {
+		label $f.$a\ml -text "$a\:"
+		menubutton $f.$a\m -menu $f.$a\m.m -textvariable \
+			Neuroplayer_config(classifier_$a\_metric) \
+			-relief raised -indicatoron 1
+		set info(classifier_$a\_menu) [menu $f.$a\m.m]
+		pack $f.$a\ml $f.$a\m -side left -expand yes
+	}
+	
 	checkbutton $f.handler -text "Handler" \
 		-variable Neuroplayer_config(enable_handler)
 	pack $f.handler -side left -expand yes
@@ -3002,7 +2956,7 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 
 #
 # Neuroclassifier_metric_display sets up the x-y plot menus so they each contain
-# all the metrics in the classifier_metrics list, and makes a checkbutton for each 
+# all the metrics in the classifier_metrics list. It makes a checkbutton for each 
 # metric to enable or disable the metric for classification.
 #
 proc Neuroclassifier_metric_display {} {
@@ -3274,10 +3228,9 @@ proc Neuroclassifier_processing {characteristics} {
 		}
 	}
 
-	# We extract from the characteristics line the file name
-	# and play time, then we make a list of separate intervals,
-	# one for each channel. To do this, we assume that only the
-	# channel numbers will be integers.
+	# We extract from the characteristics line the file name and play time, then
+	# we make a list of separate intervals, one for each channel. To do this, we
+	# assume that only the channel numbers will be integers.
 	scan $characteristics %s%f fn pt
 	set idcs ""
 	set idc ""
@@ -4193,22 +4146,42 @@ proc Neurotracker_open {} {
 		entry $f.e$a -textvariable Neuroplayer_config(tracker_$a) -width 4
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
+
 	label $f.lsps -text "sample_rate"
-	tk_optionMenu $f.msps Neuroplayer_config(tracker_sample_rate) \
-		1 2 4 8 16 32 64
+	menubutton $f.msps -menu $f.msps.m \
+		-textvariable Neuroplayer_config(tracker_sample_rate) \
+		-relief raised -indicatoron 1		
+	menu $f.msps.m
+	foreach x {1 2 4 8 16 32 64} {
+		$f.msps.m add command -label "$x" -command \
+			[list set Neuroplayer_config(tracker_sample_rate) $x]
+	}
 	$f.msps configure -width 3
 	pack $f.lsps $f.msps -side left -expand yes
+
 	label $f.ldiv -text "filter_divisor"
-	tk_optionMenu $f.mdiv \
-		Neuroplayer_config(tracker_filter_divisor) \
-		1 8 16 32 64 128 256 512
+	menubutton $f.mdiv -menu $f.mdiv.m \
+		-textvariable Neuroplayer_config(tracker_filter_divisor) \
+		-relief raised -indicatoron 1
+	menu $f.mdiv.m
+	foreach x {1 8 16 32 64 128 256 512} {
+		$f.mdiv.m add command -label "$x" -command \
+			[list set Neuroplayer_config(tracker_filter_divisor) $x]
+	}
 	$f.mdiv configure -width 3
 	pack $f.ldiv $f.mdiv -side left -expand yes
-	label $f.lp -text "persistence"
-	tk_optionMenu $f.mp \
-		Neuroplayer_config(tracker_persistence) \
-		None Path Mark
+
+	label $f.lp -text "persistence"	
+	menubutton $f.mp -menu $f.mp.m \
+		-textvariable Neuroplayer_config(tracker_persistence) \
+		-relief raised -indicatoron 1
+	menu $f.mp.m
+	foreach x {"None" "Path" "Mark"} {
+		$f.mp.m add command -label "$x" -command \
+			[list set Neuroplayer_config(tracker_persistence) $x]
+	}
 	pack $f.lp $f.mp -side left -expand yes
+
 	checkbutton $f.tsc -text "Coils" \
 		-variable Neuroplayer_config(tracker_show_coils)
 	pack $f.tsc -side left -expand yes
@@ -4463,6 +4436,30 @@ proc Neurotracker_clear {} {
 }
 
 #
+# Neuroplayer_clock_update updates the playback datetime, and if necessary
+# updates the archive start datetime as well. In order to determine the starte
+# dateeimt, the routine looks for a UNIX timestamp just before the NDF file
+# extension, and uses this time stamp as the archive start time.
+#
+proc Neuroplayer_clock_update {} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+
+	set pfn [file tail $config(play_file)]
+	if {$pfn != $info(clock_archive_name)} {
+		set info(clock_archive_name) $pfn
+		if {![regexp {([0-9]{10})\.ndf} $pfn match atime]} {
+			set atime 0
+		}
+		set info(start_datetime) [Neuroplayer_clock_convert $atime]
+	}
+	set info(play_datetime) [Neuroplayer_clock_convert \
+		[expr [Neuroplayer_clock_convert $info(start_datetime)] \
+			+ round($config(play_time)) ] ]
+	return ""
+}
+
+#
 # Neuroplayer_clock opens the Clock Panel, or raises it to the top for viewing
 # if it already exists.
 #
@@ -4538,7 +4535,7 @@ proc Neuroexporter_open {} {
 	
 	label $f.lformat -text "File:" -anchor w -fg $info(label_color)
 	pack $f.lformat -side left -expand yes
-	foreach a "TXT BIN EDF" {
+	foreach a "TXT BIN EDF NDF" {
 		set b [string tolower $a]
 		radiobutton $f.$b -variable Neuroplayer_config(export_format) \
 			-text $a -value $a
@@ -4721,10 +4718,9 @@ proc Neuroplayer_autofill {} {
 		}		
 	}
 	if {$autofill == ""} {
-		set report "Autofill found no active channels,\
-			setting channel select to \"*\".\
-			Play one interval and try again."
-		LWDAQ_print $info(export_text) $report
+		set report "WARNING: No channels with status \"Okay\" to select,\
+			play on and try again."
+		if {[winfo exists $info(export_text)]} {LWDAQ_print $info(export_text) $report}
 		Neuroplayer_print $report
 		set config(channel_selector) "*"
 	} else {
@@ -4773,9 +4769,9 @@ proc Neuroexporter_edf_rewrite {} {
 }
 
 #
-# Neurotracker_edf_setup is used by the exporter to set the various titles and names
-# that the EDF export file header provides for describing signals and defining their
-# ranges. 
+# Neurotracker_edf_setup is used by the exporter to set the various titles and
+# names that the EDF export file header provides for describing signals and
+# defining their ranges. 
 #
 proc Neuroexporter_edf_setup {} {
 	upvar #0 Neuroplayer_info info
@@ -4850,7 +4846,7 @@ proc Neuroexporter_edf_setup {} {
 			foreach {a len} {Transducer 30 Unit 4 Min 6 Max 6 Lo 6 Hi 6 Filter 16} {
 				set b [string tolower $a]
 				if {![info exists EDF($b\_$id)]} {
-					set EDF($b\_$id) [set EDF($b)]
+					set EDF($b\_$id) [set info(export_edf_$b)]
 				}
 				label $f.l$b -text "$a\:" -fg $info(label_color) 
 				entry $f.e$b -textvariable EDF($b\_$id) -width $len
@@ -4954,6 +4950,100 @@ proc Neuroexporter_txt_save {w} {
 }
 
 #
+# Neuroexporter_ndf_create makes a new export NDF file. It reads the comments from
+# the current play file and includes them in the new file's metadata. It adds a
+# record of the export to the metadata.
+#
+proc Neuroexporter_ndf_create {sfn} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+	global LWDAQ_Info
+
+	LWDAQ_ndf_create $sfn $config(ndf_metadata_size)
+	set metadata [LWDAQ_ndf_string_read $config(play_file)]
+	set comments [LWDAQ_xml_get_list $metadata "c"]
+	set metadata ""
+	foreach c $comments {append metadata "<c>$c</c>\n"}
+	append metadata "<c>Exported: [clock format [clock seconds]\
+		-format $info(datetime_format)].\
+		\nExporter: Neuroplayer $info(version),\
+		LWDAQ_$LWDAQ_Info(program_patchlevel).\
+		\nPlatform: $LWDAQ_Info(os).</c>\n"
+	append metadata "<payload>0</payload>\n"
+	append metadata "<glitch>$config(glitch_threshold)</glitch>\n"
+	if {$config(enable_processing)} {
+		append metadata "<processor>[file tail \
+			$config(processor_file)]</processor>"
+	} {
+		append metadata "<processor>NONE</processor>"
+	}
+	LWDAQ_ndf_string_write $sfn $metadata
+	
+	return $sfn
+}
+
+#
+# Neuroexporter_ndf_combines the signals in the export buffer to make an NDF
+# data block containing all signals with clock messages.
+#
+proc Neuroexporter_ndf_combine {} {
+	upvar #0 Neuroplayer_info info
+	upvar #0 Neuroplayer_config config
+
+	set debug 0
+	
+	set interval_length [expr round($config(play_interval) * $info(tick_frequency))]
+	set step $info(ticks_per_clock)
+	set num_channels [llength $info(export_buffer)]
+	
+	for {set i 0} {$i < $num_channels} {incr i} {
+		set length_$i [llength [lindex $info(export_buffer) $i]]
+		set period_$i [expr $interval_length / [set length_$i]]
+		if {[set period_$i] < $step} {set step [set period_$i]}
+		set index_$i 0
+		set key [lindex $config(channel_selector) $i]
+		set key [split $key ":"]
+		set id_$i [lindex $key 0]
+	}
+	
+	if {$debug} {
+		LWDAQ_print -nonewline $info(export_text) "$info(export_timestamp) " green
+	}
+	
+	set ts $info(export_timestamp)
+	set info(export_timestamp) [expr $ts + $interval_length]
+	
+	set data ""
+	while {$ts < $info(export_timestamp)} {
+		if {$ts % $info(ticks_per_clock) == "0"} {
+			append data [binary format cSc "0" \
+				[expr ($ts % 0x01000000) / 0x100] [expr 0xF0] ]
+		}
+		for {set i 0} {$i < $num_channels} {incr i} {
+			if {$ts % [set period_$i] == "0"} {
+				append data [binary format cSc [set id_$i] \
+					[lindex $info(export_buffer) $i [set index_$i]] \
+					[expr ($ts % 0x100)]]
+				incr index_$i
+			}
+		}		
+		set ts [expr $ts + $step]
+	}
+	
+	set info(export_timestamp) [expr $info(export_timestamp) % 0x01000000]
+	
+	if {$debug} {
+		for {set i 0} {$i < 10} {incr i} {
+			binary scan [string range $data [expr $i*4] [expr $i*4+3]] cuSucu id value ts
+			LWDAQ_print -nonewline $info(export_text) "$id-$value-$ts "
+		}
+		LWDAQ_print $info(export_text)
+	}
+	
+	return $data
+}
+
+#
 # Neuroexporter_export manages the exporting of recorded signals to files,
 # tracker signals to files, and the creation of simultaneous video to
 # concatinated video files that match the export intervals. It takes one of the
@@ -4964,8 +5054,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 	upvar #0 Neuroplayer_info info
 	upvar #0 Neuroplayer_config config
 	
-	# Decide where to write messages. If the Exporter panel is not open, we write
-	# messages to the Neuroplayer text window.
+	# Decide where to write messages. If the Exporter panel is not open, we
+	# write messages to the Neuroplayer text window.
 	if {[winfo exists $info(export_text)]} {
 		set t $info(export_text)
 	} {
@@ -5021,11 +5111,16 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}
 
 		# Check options.
-		if {$config(export_centroid) || $config(export_powers)} {
-			if {$config(export_format) == "EDF"} {
-				LWDAQ_print $t "ERROR: Cannot store centroid or powers in EDF."
-				return ""
-			}
+		if {($config(export_centroid) || $config(export_powers)) \
+			&& (($config(export_format) == "EDF") || ($config(export_format) == "NDF"))} {
+			LWDAQ_print $t "ERROR: Cannot store centroid or powers\
+				in $config(export_format) format."
+			return ""
+		}	
+		if {!$config(export_combine) && ($config(export_format) == "NDF")} {
+			LWDAQ_print $t "ERROR: You must combine all selected channels for\
+				$config(export_format) format."
+			return ""
 		}	
 		if {[catch {expr $config(export_duration)}]} {
 			LWDAQ_print $t "ERROR: Invalid duration expression\
@@ -5063,7 +5158,11 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		set info(export_concat_pid) "0"
 		set info(export_vfl) [list]
 		set info(export_backup) "0"
-
+		
+		# Reset the NDF export timestamp and set the combining sequence for the
+		# timestamps and channels.
+		set info(export_timestamp) "0"
+		
 		# Start the exporter. Calculate Unix start time, the requested duration,
 		# and the ideal end time. The duration can be a mathematical expression,
 		# such as 24*60*60 for the number of seconds in a day. The ideal end
@@ -5140,13 +5239,13 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						set sfn [file join $config(export_dir) \
 							"E$info(export_start_s)\_$id\.$ext"]
 					}
-					LWDAQ_print $t "Exporting signal of channel\
-						$id at $sps SPS to [file tail $sfn]."
 					if {[file exists $sfn]} {
 						LWDAQ_print $t \
 							"WARNING: Deleting existing [file tail $sfn]."
 						file delete $sfn
 					}
+					LWDAQ_print $t "Exporting signal of channel\
+						$id at $sps SPS to [file tail $sfn]."
 					if {!$config(export_combine) && ($config(export_format) == "EDF")} {
 						LWDAQ_print $t "Creating EDF file [file tail $sfn]."
 						EDF_create $sfn $config(play_interval) \
@@ -5192,7 +5291,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 							"A$info(export_start_s)\_$id\.$ext"]
 					}
 					LWDAQ_print $t "Exporting activity of channel\
-						$id at $sps SPS to $afn."
+						$id at $config(tracker_sample_rate) SPS to $afn."
 					if {[file exists $afn]} {
 						LWDAQ_print $t \
 							"WARNING: Deleting existing [file tail $afn]."
@@ -5246,6 +5345,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				}
 			}
 		
+			# If we are exporting to one NDF file, create the header now.
+			if {$config(export_combine) && ($config(export_format) == "NDF")} {
+				if {$config(export_signal)} {
+					LWDAQ_print $t "Creating NDF file [file tail $sfn]."
+					Neuroexporter_ndf_create $sfn
+				}
+			}
+
 			# Enable position calculation if required, and close the tracker window
 			# if its open. 
 			if {$config(export_activity) \
@@ -5490,11 +5597,11 @@ proc Neuroexporter_export {{cmd "Start"}} {
 						-i [file nativename $vfn] \
 						-c:v copy $nvfn >> $info(video_export_log)
 						
-					# We now have a file Extracted_V$vt\.mp4. We want to change
-					# the name to V$vt\.mp4 in the scratch directory. But we may
+					# We now have a file Extracted_V$vt.mp4. We want to change
+					# the name to V$vt.mp4 in the scratch directory. But we may
 					# have created V$vt\.mp4 with a previous extraction, and
 					# just now extracted our boundary segment from this file. So
-					# we delete V$vt.\mp4 if it exists, and only then do we
+					# we delete V$vt.mp4 if it exists, and only then do we
 					# rename our boundary segment to a proper timestamp video
 					# name.
 					set vfn V$vt\.mp4
@@ -5581,12 +5688,14 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		# interval, and the next file's time stamp is after the export end time.
 		if {$interval_start_s < $info(export_end_s)} {
 		
-			# Write the signal to disk. This is the reconstructed signal we
-			# receive from a transmitter. Each sample is a sixteen-bit unsigned
-			# integer and we save these in a manner suitable for each export
-			# format. If we are combining multiple channels into one file, we
-			# will write the same data to the combined file. Our export file
-			# will contain consecutive same-size blocks of data from the
+			# Write the signal to disk, or in the case of NDF export, write the
+			# signal to a buffer. The signal has been reconstructed and possibly
+			# processed. Raw samples are sixteen-bit unsigned integers.
+			# Processed samples might be real-valued, but they must still lie in
+			# the range 0..65535. We save these in a manner suitable for each
+			# export format. If we are combining multiple channels into one
+			# file, we will write the same data to the combined file. Our export
+			# file or buffer will receive consecutive blocks of data from the
 			# exported channels.
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
@@ -5596,32 +5705,52 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					set sfn [file join $config(export_dir) \
 						"E$info(export_start_s)\_$info(channel_num)\.$ext"]
 				}
+				set first_channel \
+					[string match "$info(channel_num):*" \
+						[lindex $config(channel_selector) 0]]
+				set last_channel \
+					[string match "$info(channel_num):*" \
+						[lindex $config(channel_selector) end]]
+						
 				if {$config(export_format) == "TXT"} {
 					set f [open $sfn a]
 					foreach value $info(values) {
 						puts $f $value
 					}
 					close $f
+					
 				} elseif {$config(export_format) == "BIN"} {
 					set export_bytes ""
 					foreach value $info(values) {
-					  append export_bytes [binary format S $value]
+					  append export_bytes [binary format S [expr round($value)]]
 					}
 					set f [open $sfn a]
 					fconfigure $f -translation binary
 					puts -nonewline $f $export_bytes
 					close $f
+					
 				} elseif {$config(export_format) == "EDF"} {
-					if {[file exists $sfn]} {
-						if {!$config(export_combine) || \
-								[string match "$info(channel_num):*" \
-									[lindex $config(channel_selector) 0]]} {
-							EDF_num_records_incr $sfn
-						} 
-						EDF_append $sfn $info(values)
-					} else {
+					if {![file exists $sfn]} {
 						LWDAQ_print $t "ERROR: File \"$sfn\" no longer exists."
 						return ""
+					}
+					if {!$config(export_combine) || $first_channel} {
+						EDF_num_records_incr $sfn
+					} 
+					EDF_append $sfn $info(values)
+					
+				} elseif {$config(export_format) == "NDF"} {
+					if {![file exists $sfn]} {
+						LWDAQ_print $t "ERROR: File \"$sfn\" no longer exists."
+						return ""
+					}
+					if {$first_channel} {
+						set info(export_buffer) [list]		
+					} 
+					lappend info(export_buffer) $info(values)
+					if {$last_channel} {
+						set data [Neuroexporter_ndf_combine]
+						LWDAQ_ndf_data_append $sfn $data
 					}
 				}
 			}
@@ -5985,28 +6114,6 @@ proc Neuroexporter_export {{cmd "Start"}} {
 		}		
 	}
 
-	return ""
-}
-
-#
-# Neuroplayer_clock_update always updates the playback datetime, and if necessary 
-# updates the archive start datetime.
-#
-proc Neuroplayer_clock_update {} {
-	upvar #0 Neuroplayer_info info
-	upvar #0 Neuroplayer_config config
-
-	set pfn [file tail $config(play_file)]
-	if {$pfn != $info(clock_archive_name)} {
-		set info(clock_archive_name) $pfn
-		if {![regexp {([0-9]{10})\.ndf} $pfn match atime]} {
-			set atime 0
-		}
-		set info(start_datetime) [Neuroplayer_clock_convert $atime]
-	}
-	set info(play_datetime) [Neuroplayer_clock_convert \
-		[expr [Neuroplayer_clock_convert $info(start_datetime)] \
-			+ round($config(play_time)) ] ]
 	return ""
 }
 
@@ -6859,7 +6966,7 @@ proc Neuroplayer_play {{command ""}} {
 	if {$config(slow_play)} {
 		set LWDAQ_Info(queue_ms) $config(slow_play_ms)
 	} {
-		set LWDAQ_Info(queue_ms) $config(fast_play_ms)
+		set LWDAQ_Info(queue_ms) $info(fast_play_ms)
 	}
 
 	# Consider various ways in which we will do nothing and return.
@@ -6941,15 +7048,14 @@ proc Neuroplayer_play {{command ""}} {
 		set info(play_control) "Repeat"
 	}
 
-	# If First or Last we find the first or last file in the playback directory tree.
-	# We update the exporter start time.
-	if {($info(play_control) == "First") \
-		|| ($info(play_control) == "Last")} {
+	# If First or Last we find the first or last NDF file in the playback
+	# directory tree. We set the play time to zero and refresh the voltage and
+	# amplitude plots.
+	if {($info(play_control) == "First") || ($info(play_control) == "Last")} {
 		set play_list [LWDAQ_find_files $config(play_dir) *.ndf]
 		set play_list [LWDAQ_sort_files $play_list]
 		if {[llength $play_list] < 1} {
-			Neuroplayer_print "ERROR: There are no NDF files in the\
-				playback directory tree."
+			Neuroplayer_print "ERROR: No NDF files in playback directory tree."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
 			return ""
@@ -7076,28 +7182,29 @@ proc Neuroplayer_play {{command ""}} {
 			[expr $config(play_time) - 2.0 * $info(play_interval_copy)]]
 
 		# If we are going back before the start of this archive, we try to find
-		# an previous archive. We get a list of all NDF files in the play_dir
-		# directory tree.
+		# an earlier archive, and to do this we make a list of all NDF files in the
+		# directory tree, sort them alphabetically, and see if we can find our play
+		# file and one earlier file in the sorted list.  
 		if {$config(play_time) < 0.0} {
-			set fl [LWDAQ_find_files $config(play_dir) *.ndf]
+			set p [string index [file tail $config(play_file)] 0]
+			set fl [LWDAQ_find_files $config(play_dir) "*.ndf"]
 			set fl [LWDAQ_sort_files $fl]
 			set i [lsearch $fl $config(play_file)]
 			if {$i < 0} {
-				Neuroplayer_print "ERROR: Cannot move to previous file,\
-					\"$info(play_file_tail)\" not in playback directory tree."
+				Neuroplayer_print "ERROR: Cannot find current play file\
+					\"[file tail $config(play_file)]\" in playback directory tree."
 				LWDAQ_set_bg $info(play_control_label) white
 				set info(play_control) "Idle"
 				return ""
 			}
 			set file_name [lindex $fl [expr $i - 1]]
 			if {$file_name != ""} {
-				Neuroplayer_print "Playback switching to previous file \"$file_name\"."
+				Neuroplayer_print "Playback switching to $file_name."
 				set config(play_file) $file_name
 				set info(play_file_tail) [file tail $file_name]
 				set config(play_time) $info(max_play_time)
 			} {
-				Neuroplayer_print "ERROR: No previous file in\
-					playback directory tree."
+				Neuroplayer_print "ERROR: No earlier file in playback directory tree."
 				set config(play_time) 0.0
 				LWDAQ_set_bg $info(play_control_label) white
 				set info(play_control) "Idle"
@@ -7288,25 +7395,32 @@ proc Neuroplayer_play {{command ""}} {
 			return ""
 		}
 		
-		# We obtain a list of all NDF files in the play_dir directory tree. If
-		# can't find the current file in the directory tree, we abort.
-		set fl [LWDAQ_find_files $config(play_dir) *.ndf]
+		# We obtain a list of all ndf files in the playback directory tree and
+		# sort them in alphabetical order. We try to find the current file in
+		# this list, and a file after it. If we find a later file, we will use
+		# it for playback. Otherwise we will wait until such a file appears.
+		set fl [LWDAQ_find_files $config(play_dir) "*.ndf"]
 		set fl [LWDAQ_sort_files $fl]
 		set i [lsearch $fl $config(play_file)]
 		if {$i < 0} {
-			Neuroplayer_print "ERROR: Cannot continue to a later file,\
-				\"$info(play_file_tail)\" not in playback directory tree."
+			Neuroplayer_print "ERROR: Cannot find current play file\
+				\"[file tail $config(play_file)]\" in playback directory tree."
 			LWDAQ_set_bg $info(play_control_label) white
 			set info(play_control) "Idle"
 			return ""
 		}
 		
-		# We see if there is a later file in the directory tree. If so, we switch to
-		# the later file. Otherwise, we wait for a new file or new data, by calling
-		# the Neuroplayer play routine again and turning the control label yellow.
+		# We see if there is a later file in the directory tree. If so, we
+		# switch to the later file. Otherwise, we wait for a new file or new
+		# data, by calling the Neuroplayer play routine again and turning the
+		# control label yellow. We attempt to update the archive start time with
+		# our clock update routine, but this will work only if the file we are
+		# switching to is named with a ten-digit UNIX timestamp just before the
+		# extension. If the file does not have the timestamp, the new start time
+		# will be zero.
 		set file_name [lindex $fl [expr $i + 1]]
 		if {$file_name != ""} {
-			Neuroplayer_print "Playback switching to next file $file_name."
+			Neuroplayer_print "Playback switching to $file_name."
 			set config(play_file) $file_name
 			set info(play_file_tail) [file tail $file_name]
 			set config(play_time) 0.0
@@ -7324,14 +7438,14 @@ proc Neuroplayer_play {{command ""}} {
 			LWDAQ_post Neuroplayer_play
 			return ""
 		} {
-			# This is the case where we have $num_clocks but need
-			# $play_num_clocks and we have no later file to switch to. This case
-			# arises during live play-back, when the player is trying to read
-			# more data out of the file that is being written to by the
-			# recorder. The screen will show you when the Player is waiting. By
-			# checking the state of the play_control_label, we make sure that we
-			# issue the following print statement only once. While the Player is
-			# waiting, the label remains yellow.
+			# This is the case where we don't yet have $play_num_clocks and we
+			# have no later file to switch to. This case arises during live
+			# play-back, when the player is trying to read more data out of the
+			# file that is being written to by the recorder. The screen will
+			# show you when the Player is waiting. By checking the state of the
+			# play_control_label, we make sure that we issue the following print
+			# statement only once. While the Player is waiting, the label
+			# remains yellow.
 			if {[winfo exists $info(window)]} {
 				if {[$info(play_control_label) cget -bg] != "yellow"} {
 					Neuroplayer_print "Have $num_clocks clocks, need $play_num_clocks.\
@@ -7651,7 +7765,9 @@ proc Neuroplayer_play {{command ""}} {
 	}
 	
 	# We apply processing to each channel for this interval, plot the signal,
-	# and plot the spectrum, as enabled by the user.
+	# and plot the spectrum, as enabled by the user. We run the processor
+	# script, provided it is enabled, and after that we export the signal, if
+	# the exporter is running.
 	foreach info(channel_code) $selected_channels {
 		set info(channel_num) [lindex [split $info(channel_code) :] 0]
 		if {![string is integer -strict $info(channel_num)] \
@@ -7682,10 +7798,6 @@ proc Neuroplayer_play {{command ""}} {
 		if {[winfo exists $info(tracker_window)]} {
 			Neurotracker_plot
 		}
-		if {$info(export_state) == "Play"} {
-			Neuroexporter_export "Play"
-			if {$info(play_control) == "Stop"} {break}
-		}
 		if {![LWDAQ_is_error_result $result] && $en_proc} {
 			if {[catch {eval $info(processor_script)} error_result]} {
 				set result "ERROR: In $info(processor_file_tail)\
@@ -7697,6 +7809,10 @@ proc Neuroplayer_play {{command ""}} {
 				}
 			}
 		}
+		if {$info(export_state) == "Play"} {
+			Neuroexporter_export "Play"
+			if {$info(play_control) == "Stop"} {break}
+		}		
 		LWDAQ_support
 	}
 	
@@ -7860,9 +7976,11 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 	# a list of NDFs in the playback directory tree, so as to identify
 	# the next or preceeding file.
 	if {[lsearch "Next_NDF Current_NDF Previous_NDF" $event] >= 0} {
-		# We obtain a list of all NDF files in the play_dir directory tree. If
-		# can't find the current file in the directory tree, we abort.
-		set fl [LWDAQ_find_files $config(play_dir) *.ndf]
+		# We obtain a list of all NDF files in the play_dir directory tree. We
+		# sort ehe list in increasing order, find the play file in the list and
+		# select either the next, current, or previous file as our next play
+		# file.
+		set fl [LWDAQ_find_files $config(play_dir) "*.ndf"]
 		set fl [LWDAQ_sort_files $fl]
 		set index [lsearch $fl $config(play_file)]
 		if {$index < 0} {
@@ -7878,7 +7996,7 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 		if {$event == "Previous_NDF"} {set file_name [lindex $fl [expr $index - 1]]}
 		if {$event == "Current_NDF"} {set file_name [lindex $fl [expr $index]]}
 		if {$file_name == ""} {
-			set error_message "ERROR: No matching file in playback directory tree."
+			set error_message "ERROR: Cannot find \"$event\" in playback directory tree."
 			Neuroplayer_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white		
 			return $error_message
@@ -7946,7 +8064,7 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 	if {([string match -nocase *.ndf [lindex $event 0]]) \
 			&& ([string is double [lindex $event 1]])} {
 
-		# Try to find the event NDF file in the playback directory tree.
+		# Try to find the event file in the playback directory tree.
 		set fl [LWDAQ_find_files $config(play_dir) *.ndf]
 		set pft [lindex $event 0]
 		set index [lsearch $fl "*[lindex $event 0]"]
@@ -7970,10 +8088,9 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 		set config(play_time) [Neuroplayer_play_time_format \
 		  [expr [lindex $event 1] + $config(jump_offset)]]
 
-	# If the event contains an absolute time, as an integer number of seconds 
-	# since 1970, we find the archive with start time closest before the absolute
-	# time, and see if we can jump to the correct absolute time within this
-	# archive.
+	# If the event contains an absolute time, in the form of a UNIX timestamp,
+	# we find the archive with start time closest before the absolute time, and
+	# see if we can jump to the correct absolute time within this archive.
 	} elseif {([regexp {^[0-9]{10}$} [lindex $event 0] datetime]) \
 			&& ([string is double [lindex $event 1]])} {
 			
@@ -7984,11 +8101,8 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 		set offset [expr fmod([lindex $event 1],1.0)]
 		set datetime [expr round($datetime + [lindex $event 1] - $offset)]
 		
-		# We focus on files with names in the form *xxxxxxxxxx.ndf, where the 
-		# ten x's are the digits of the archive's start time and the * is a 
-		# prefix, which is by default "M". We find the one that starts soonest 
-		# before our target time.
-		set fl [LWDAQ_find_files $config(play_dir) *??????????.ndf]
+		# Make a list of all NDF files in the directory tree and sort them.
+		set fl [LWDAQ_find_files $config(play_dir) *.ndf]
 		set fl [LWDAQ_sort_files $fl]
 		set pf ""
 		set atime 0
@@ -8001,9 +8115,9 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 			}
 		}
 		if {$pf == ""} {
-			set error_message "ERROR: Cannot find\
+			set error_message "ERROR: Cannot find time\
 				\"[Neuroplayer_clock_convert $datetime]\"\
-				in $config(play_dir)."
+				in playback directory tree."
 			Neuroplayer_print $error_message
 			LWDAQ_set_bg $info(play_control_label) white	
 			return $error_message
@@ -8699,11 +8813,17 @@ proc Neuroplayer_open {} {
 	}
 
 	label $f.lrs -text "Interval (s):" -fg $info(label_color)
-	tk_optionMenu $f.mrs Neuroplayer_config(play_interval) \
-		0.0625 0.125 0.25 0.5 1.0 2.0 4.0 8.0 16.0 32.0
+	menubutton $f.mrs -menu $f.mrs.m -textvariable Neuroplayer_config(play_interval) \
+		-relief raised -indicatoron 1
+	menu $f.mrs.m
+	foreach x {0.0625 0.125 0.25 0.5 1.0 2.0 4.0 8.0 16.0 32.0} {
+		$f.mrs.m add command -label $x -command \
+			[list set Neuroplayer_config(play_interval) $x]
+	}
+	pack $f.lrs $f.mrs -side left -expand yes
 	label $f.li -text "Time (s):" -fg $info(label_color)
 	entry $f.ei -textvariable Neuroplayer_config(play_time) -width 8
-	pack $f.lrs $f.mrs $f.li $f.ei -side left -expand yes
+	pack $f.li $f.ei -side left -expand yes
 	label $f.le -text "Length (s):" -fg $info(label_color)
 	label $f.ee -textvariable Neuroplayer_info(play_end_time) -width 8 \
 		-bg $info(variable_bg) -anchor w
@@ -8902,3 +9022,4 @@ return ""
 http://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
 
 ----------End Help----------
+

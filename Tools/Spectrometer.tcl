@@ -1,6 +1,6 @@
 # Spectrometer.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2006-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2006-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # Plots results from the RFPM Instrument.
 #
@@ -47,18 +47,25 @@
 # Version 28: Add increment button.
 #
 # Version 29: Add active and inactive line width parameters.
+#
+# Version 30: Replace tk_optionMenu with menubutton and menu commands.
+#
+# Version 31: Improve menubuttons on Windows.
+#
+# Version 32: Add RFPM ip address field.
 
 proc Spectrometer_init {} {
 	upvar #0 Spectrometer_info info
 	upvar #0 Spectrometer_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Spectrometer" "29"
+	LWDAQ_tool_init "Spectrometer" "32"
 	if {[winfo exists $info(window)]} {return ""}
 
 	# Software constants for the Spectrometer Tool.
 	set info(control) "Idle"
 	set info(instrument) "RFPM"
+	set config(ip_addr) "10.0.0.37"
 	set info(graph_width) 900
 	set info(graph_height) 300
 	set info(measurement_names) "SCT Peak Average"
@@ -286,6 +293,7 @@ proc Spectrometer_execute {} {
 	} {
 		set iconfig(analysis_enable) 1
 	}
+	set iconfig(daq_ip_addr) $config(ip_addr)
 	set result [LWDAQ_acquire $info(instrument)]
 	if {$result == ""} {
 		set result "ERROR: $info(instrument) returned empty result."
@@ -385,6 +393,10 @@ proc Spectrometer_open {} {
 	set config(active_graph) "0"
 	pack $f.lgraph $f.ag -side left -expand 1
 	
+	label $f.lip -text "ip_addr:" 
+	entry $f.eip -textvariable Spectrometer_config(ip_addr) -width 12
+	pack $f.lip $f.eip -side left -expand 1
+	
 	button $f.increment -text "Increment" -command {
 		incr Spectrometer_config(active_graph)
 		LWDAQ_post Spectrometer_refresh
@@ -421,9 +433,12 @@ proc Spectrometer_open {} {
 	pack $f.ccursor -side left -expand 1
 
 	label $f.mtl -text "Measurement:"
-	tk_optionMenu $f.mtm Spectrometer_config(measurement_type) none
+	menubutton $f.mtm -menu $f.mtm.m \
+		-textvariable Spectrometer_config(measurement_type) \
+		-relief raised -indicatoron 1
+	menu $f.mtm.m 
 	foreach gn $info(measurement_names) {
-		$f.mtm.menu add command -label $gn \
+		$f.mtm.m add command -label $gn \
 			-command "set Spectrometer_config(measurement_type) $gn"
 	}
 	set config(measurement_type) [lindex $info(measurement_names) 0]

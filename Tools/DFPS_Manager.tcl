@@ -30,7 +30,7 @@ proc DFPS_Manager_init {} {
 	upvar #0 LWDAQ_config_BCAM iconfig
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "DFPS_Manager" "3.6"
+	LWDAQ_tool_init "DFPS_Manager" "3.1"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Set the precision of the lwdaq libraries. We need six places after the
@@ -50,54 +50,23 @@ proc DFPS_Manager_init {} {
 	set info(detector_fibers) "1 2"	
 	set info(fiber_view_cameras) "left right"
 	set info(focal_ratio) "13.5"
-	
-	# Telescope calibration. The scope_x and scope_y are in millimeters, and
-	# give the local coordinates of the center of the telescope's field of view.
-	# The star_x and star_y give the local coordinates of a a reference star. The s_rah and
-	# s_dec give the telescope pointing direction. The guide_rah and
-	# g_dec give a guide star's location in the sky. The scale is in
-	# arcseconds per millimeter. The rotation is in milliradians. The right
-	# ascension (rah) is in decimal hours. The declination (dec) is in decimal
-	# degrees.
-	set info(scope_x) "0.0"
-	set info(scope_y) "0.0"
-	set info(star_x) "0.0"
-	set info(star_y) "0.0"
-	set info(plate_scale) "7.31"
-	set info(plate_rot) "22.0"
-	set config(reckoning) "SCOPE"
-	set config(g_rah) "0.000000"
-	set config(g_dec) "0.000000"
-	set config(s_rah) "0.000000"
-	set config(s_dec) "0.000000"
-	set info(arcsec_per_degree) "3600"
-	set info(pi) "3.141592654"
-	set info(radians_per_degree) [expr $info(pi)/180.0]
-	set info(deg_per_hr_equator) "15.0"
 
 	# Data acquisition parameters for the DFPS-4A.
-	set config(ip_addr) "198.214.229.251"
-	# C0625 OSI Local: 192.168.1.25
-	# C0625 OSI Global: 71.174.73.187
-	# C0630 OSI Local: 192.168.1.30
-	# C0630 OSI Global: 71.174.73.186
-	# C0630 McDonald Local: 198.214.229.251
+	set config(ip_addr) "192.168.1.10"
+	# Breadboard OSI Local: 192.168.1.10
+	# DFPS-4A OSI Local: 192.168.1.30
+	# DFPS-4A OSI Global: 71.174.73.186
+	# DFPS-4A McDonald Local: 198.214.229
 	set config(fvc_left) "5 0"
 	set config(fvc_right) "4 0"
 	set config(injector) "8 0"
 	set config(fiducial_leds) "A5 A7 A6 A8"
-	# C0625: C9 D9 D10 C10
-	# C0630: A5 A7 A6 A8
 	set config(guide_leds) "D3 D4 D2 D1"
-	# C0625: C1 D2 C2 D1
-	# C0630: D3 D4 D2 D1
 	set config(flash_s) "0.004"
-	set config(g_expose_s) "1.0"
+	set config(expose_s) "0.1"
 	set config(sort_code) "8"
 	set config(transceiver) "1 0"
 	set config(controllers) "0x6912 0x1834 0xC323 0x1845"
-	# C0625: 0xB341 0xD729 0xE393 0x2712
-	# C0630: 0x6912 0x1834 0xC323 0x1845
 	set config(source_type) "9"
 	set config(camera_element) "2"
 	set config(source_pwr) "2"
@@ -105,6 +74,10 @@ proc DFPS_Manager_init {} {
 	set info(dac_zero) "32000"
 	set info(dac_max) "65535"
 	set info(dac_min) "0"
+	set info(image_sensor) "ICX424"
+	LWDAQ_set_image_sensor $info(image_sensor) BCAM
+	LWDAQ_set_image_sensor $info(image_sensor) Rasnik
+	LWDAQ_set_image_sensor $info(image_sensor) Camera
 	set config(analysis_threshold) "10 #"
 	set config(guide_daq_1) "7 0 2"
 	set config(guide_daq_2) "6 0 1"
@@ -114,10 +87,8 @@ proc DFPS_Manager_init {} {
 	
 	# Acquisition and analysis results.
 	set info(fiducial_sources) ""
-	set config(detector_set) "2"
 	foreach m $info(positioner_masts) {
 		set info(mast_$m) "0.000 0.000"
-		set info(detector_$m) "$config(s_rah)  $config(s_dec)"
 		set info(target_$m) "0.000 0.000"
 		set info(offset_$m) "0.000 0.000"
 	}
@@ -130,27 +101,33 @@ proc DFPS_Manager_init {} {
 	set info(cam_default) "12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000" 
 	set info(cam_left) \
 "12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172"
-# Nominal: 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
-# C0630 Y71010: 12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172
-# C0625 Y71066: 12.675 39.312 1.000 -14.424 -3.267 2.000 18.777 2.173
+# Nominal FVC:
+# 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
+# DFPS-4A Y71010:
+# 12.675 39.312 1.000 -7.070 1.241 2.000 19.026 5.172
+# Breadboard Y71066:
+# 12.675 39.312 1.000 -14.793 -2.790 2.000 18.778 2.266
 	set info(cam_right) \
 "12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765"
-# Nominal: 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
-# C0630 Y71003: 12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765
-# C0625 Y71080: 12.675 39.312 1.000 -6.766 3.157 2.000 19.020 2.003
-
+# Nominal: 
+# FVC 12.675 39.312 1.000 0.000 0.000 2.000 19.000 0.000
+# DFPS-4A Y71003:
+# 12.675 39.312 1.000 2.954 -1.443 2.000 19.172 7.765
+# Breadboard Y71080:
+# 12.675 39.312 1.000 -7.059 3.068 2.000 19.016 1.316
+	
 	# Fiber view camera mount measurents.
 	set info(mount_left) \
 "80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868"
-# C0630: 
+# DFPS-4A: 
 # 80.259 50.931 199.724 120.012 50.514 264.564 79.473 50.593 275.868
-# C0625: 
+# Breadboard: 
 # 79.614 51.505 199.754 119.777 51.355 264.265 79.277 51.400 275.713
 	set info(mount_right) \
 "-104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948"
-# C0630: 
+# DFPS-4A: 
 # -104.780 51.156 198.354 -107.973 50.745 274.238 -147.781 50.858 260.948
-# C0625: 
+# Breadboard: 
 # -104.039 51.210 199.297 -108.680 51.004 275.110 -148.231 50.989 261.059
 	
 	# We obtain the pose of the mount coordinats by a fit to the mount measurements.
@@ -163,37 +140,37 @@ proc DFPS_Manager_init {} {
 	# Local coordinate pose in global coordinates.
 	set info(local_coord) "-13.0 90.0 -92.0 0.0 0.0 0.0"
 	# Nominal -13.0 90.0 -92.0 0 0 0
-	# C0630 -12.904 89.042 -96.586 0.001 -0.001 0.000
+	# DFPS-4A -12.904 89.042 -96.586 0.001 -0.001 0.000
 	
 	# Fiducial positions in local coordinates.
 	set info(fiducial_1) "-15.0 +15.0 2.8"
 	# Nominal: -15.0 +15.0 2.8
-	# C0630: -15.255 14.899 2.800
+	# DFPS-4A: -15.255 14.899 2.800
 	set info(fiducial_2) "+15.0 +15.0 2.8"
 	# Nominal: +15.0 +15.0 2.8
-	# C0630:  14.684 14.941 2.550
+	# DFPS-4A:  14.684 14.941 2.550
 	set info(fiducial_3) "-15.0 -15.0 2.8"
 	# Nominal: -15.0 -15.0 2.8
-	# C0630: -15.292 -15.074 2.238
+	# DFPS-4A: -15.292 -15.074 2.238
 	set info(fiducial_4) "+15.0 -15.0 2.8"
 	# Nominal: +15.0 -15.0 2.8
-	# C0630:  14.562 -15.076 2.726
+	# DFPS-4A:  14.562 -15.076 2.726
 	
 	# Guide sensor pose in local coordinates. We have the origin x, y, z followed by
 	# the rotation anti-clockwise in milliradians about the z-axis. We assume the guide
 	# sensor lies in a local coordinate z-plane.
 	set info(guide_1) "-24.4 19.9 2.7 0.0"
 	# Nominal: -24.4 19.9 2.7 0.0
-	# C0630: -24.572 19.714 2.7 5.188
+	# DFPS-4A: -24.572 19.714 2.7 5.188
 	set info(guide_2) "-24.4 19.9 2.7 0.0"
 	# Nominal: -24.4 19.9 2.7 0.0
-	# C0630: 20.310 19.685 2.7 3.932
+	# DFPS-4A: 20.310 19.685 2.7 3.932
 	set info(guide_3) "-24.4 -25.1 2.7 0.0"
 	# Nominal: -24.4 -25.1 2.7 0.0
-	# C0630: -24.651 -25.258 2.7 0.987
+	# DFPS-4A: -24.651 -25.258 2.7 0.987
 	set info(guide_4) "20.6 -25.1 2.7 0.0"
 	# Nominal: 20.6 -25.1 2.7 0.0
-	# C0630: 20.391 -25.227 2.7 9.697
+	# DFPS-4A: 20.391 -25.227 2.7 9.697
 	
 	# Default control values for the upleft and upright.
 	set config(upleft) $info(dac_zero) 
@@ -212,47 +189,32 @@ proc DFPS_Manager_init {} {
 	set info(mast_control_time) "0"
 	set config(fiducial_survey_period) "1000"
 	set config(mast_control_period) "60"
-	set config(mast_control) "OFF"
+	set config(enable_mast_control) "0"
 	foreach m $info(positioner_masts) {
 		set info(voltage_$m) "$info(dac_zero) $info(dac_zero)"
 	}
 	set config(gain) "10000"
 	set config(displacement) "0.0 0.0"
-	set config(guide_auto) "OFF"
-	set config(guide_auto_period) "5"
-	set info(guide_auto_time) "0"
 	set info(binary_result) "0"
-	set config(scope_url) "http://198.214.229.56:22401/register"
-	set info(scope_pattern) {"RA_HOUR": ([^,]*),.*?"DEC_DEGREE": ([^,]*)}
-	set config(spiral_control) "Idle"
 	
 	# Window settings.
 	set info(label_color) "brown"
-	set config(guide_zoom) "1.0"
-	set config(guide_mag_zoom) "2.0"
-	set config(guide_intensify) "exact"
+	set config(guide_zoom) "0.3"
+	set config(guide_mag_zoom) "1.0"
 	set config(fvc_zoom) "0.5"
-	set config(fvc_mag_zoom) "1.0"
-	set config(fvc_intensify) "exact"	
+	set config(fvc_mag_zoom) "2.0"
+	set config(intensify) "exact"	
 	set config(mouse_offset_x) "2"
 	set config(mouse_offset_y) "2"
 	
 	# Image dimensions.
-	set info(fvc_sensor) "ICX424"
-	LWDAQ_set_image_sensor $info(fvc_sensor) BCAM
-	LWDAQ_set_image_sensor $info(fvc_sensor) Rasnik
+	set info(guide_width_um) "3848"
+	set info(guide_height_um) "5180"
 	set info(bcam_width_um) "5180"
 	set info(bcam_height_um) "3848"
 	set info(icx424_col) "700"
 	set info(icx424_row) "520"
 	set info(icx424_pix_um) "7.4"
-	set info(guide_sensor) "ICX424Q"
-	LWDAQ_set_image_sensor $info(guide_sensor) Camera
-	set info(guide_width_um) "3848"
-	set info(guide_height_um) "5180"
-	set info(icx424q_col) "350"
-	set info(icx424q_row) "260"
-	set info(icx424q_pix_um) "14.8"
 
 	# Utility panel parameters.
 	set config(utils_id) "0xFFFF"
@@ -306,25 +268,25 @@ proc DFPS_Manager_init {} {
 "24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597"
 # Nominal: 
 # 24.4 68.2 0 69.4 68.2 0 24.4 23.2 0 69.4 23.2 0
-# C0630: 
+# DFPS-4A: 
 # 24.335 68.344 -5.088 69.217 68.315 -3.832 24.256 23.372 -0.887 69.298 23.403 -9.597 
 	set info(gscalib_mask_90) \
 "29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000"
 # Nominal: 
 # 28.9 23.9 0 28.9 68.9 0 73.9 23.9 0 73.9 68.9 0
-# C0630: 
+# DFPS-4A: 
 # 29.204 24.074 -5.196 29.233 68.955 -3.762 74.179 23.986 -0.955 74.137 69.036 -10.000 
 	set info(gscalib_mask_180) \
 "73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665"
 # Nominal: 
 # 73.2 28.4 0 28.2 28.4 0 73.2 73.4 0 28.2 73.4 0
-# C0630: 
+# DFPS-4A: 
 # 73.459 28.917 -5.187 28.577 28.951 -3.851 73.555 73.893 -0.862 28.506 73.849 -9.665 
 	set info(gscalib_mask_270) \
 "68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795"
 # Nominal: 
 # 68.7 72.7 0 68.7 27.7 0 23.7 72.7 0 23.7 27.7 0
-# C0630: 
+# DFPS-4A: 
 # 68.625 73.183 -5.271 68.588 28.300 -3.737 23.652 73.275 -0.754 23.685 28.226 -9.795 
 	set info(gscalib_rot_mrad) "-0.10"
 	# Nominal: 0.00
@@ -402,7 +364,7 @@ proc DFPS_Manager_init {} {
 	foreach guide $info(guide_sensors) {
 		set info(image_$guide) dfps_guide_$guide
 		lwdaq_image_create -name $info(image_$guide) \
-			-width $info(icx424q_row) -height $info(icx424q_col)
+			-width $info(icx424_row) -height $info(icx424_col)
 	}
 
 	# Create spaces to store FVC images read from disk.
@@ -451,12 +413,6 @@ proc DFPS_Manager_save_calibration {{fn ""}} {
 	}
 	
 	set f [open $config(calib_file) w]
-	foreach a {scale rot} {
-		puts $f "set DFPS_Manager_info(plate_$a) \"$info(plate_$a)\""
-	}
-	foreach a {x y} {
-		puts $f "set DFPS_Manager_info(scope_$a) \"$info(scope_$a)\""
-	}
 	foreach or $info(gscalib_orientations) {
 		puts $f "set DFPS_Manager_info(gscalib_mask_$or) \"$info(gscalib_mask_$or)\""
 	}
@@ -513,7 +469,7 @@ proc DFPS_Manager_examine_calibration {} {
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Calibration Constants, DFPS Manager $info(version)"
-	} else {
+	} {
 		raise $w
 		return ""
 	}
@@ -523,13 +479,6 @@ proc DFPS_Manager_examine_calibration {} {
 	set se 20
 	set i 0
 	
-	set f [frame $w.f[incr i]]
-	foreach a {plate_scale plate_rot scope_x scope_y} {
-		pack $f -side top -fill x
-		label $f.ml$a -text "$a\:" -fg $info(label_color) -width $sl
-		entry $f.me$a -textvariable DFPS_Manager_info($a) -width $se
-		pack $f.ml$a $f.me$a -side left -expand yes
-	}
 	foreach a $info(fiber_view_cameras) {
 		set f [frame $w.f[incr i]]
 		pack $f -side top -fill x
@@ -827,61 +776,6 @@ proc DFPS_Manager_controller_zero_all {} {
 }
 
 #
-# DFPS_Manager_controller_spiral executes one step in an outward spiral of one
-# or more fibers. The first argument is a list of controller identifiers,
-# "step" is the size of the control voltage step, in units of sixteen-bit DAC
-# counts, "remaining" tells the routine how many more steps remain
-# in the spiral before it's complete. The "path" is a list of previous upleft
-# and upright voltages. The routine shows mast positions and recalculates
-# detector fiber positions as it goes. The routine stops calling itself when it
-# completes the final step, or when we set spiral_control to "Stop".
-#
-proc DFPS_Manager_controller_spiral  {controllers step remaining path} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	if {$config(spiral_control) == "Stop"} {
-		set config(spiral_control) "Idle"
-		return ""
-	} else {
-		set config(spiral_control) "Spiral"
-	}
-	
-	
-	
-	if {[llength $path] == 0} {
-		set point "0 0"
-	} elseif {[llength $path] == 1} {
-		set point "1 0"
-	} else {
-		scan [lindex $path end] %d%d ii jj
-		scan [lindex $path end-1] %d%d iii jjj
-		set di [expr $ii - $iii]
-		set dj [expr $jj - $jjj]
-		set rsi [expr $dj]
-		set rsj [expr 0 - $di]
-		set ri [expr $ii + $rsi]
-		set rj [expr $jj + $rsj]
-		set point "$ri $rj"
-		if {[lsearch $path $point] >= 0} {
-			set point "[expr $ii + $di] [expr $jj + $dj]"
-		}
-	}
-	
-	lappend path $point
-	scan $point %d%d i j
-	LWDAQ_print $info(text) "[format %.2f [expr $i*$step]]\
-		[format %.2f [expr $j*$step]]"
-
-	set remaining [expr $remaining - 1]
-	if {$remaining > 0} {
-		LWDAQ_post [list DFPS_Manager_controller_spiral \
-			$controllers $step $remaining $path]
-	}
-	return ""
-}
-
-#
 # DFPS_Manager_spots captures an image of the sources whose light sources are
 # listed in the leds argument. If we pass an empty string for the elements, the
 # routine combines the fiducial and guide elements to obtain a list of all
@@ -935,7 +829,7 @@ proc DFPS_Manager_spots {{leds ""}} {
 			lwdaq_image_manipulate $info(image_$side) \
 				transfer_overlay $iconfig(memory_name)
 			lwdaq_draw $info(image_$side) dfps_fvc_$side \
-				-intensify $config(fvc_intensify) -zoom $config(fvc_zoom)
+				-intensify $config(intensify) -zoom $config(fvc_zoom)
 		}
 		
 	}
@@ -1042,7 +936,7 @@ proc DFPS_Manager_sources_global {spots} {
 #
 # DFPS_Manager_local_from_global takes a point in global coordinates and
 # transforms it into local coordinates using the local coordinate pose. We pass
-# the global x, y, and z coordinates in one or more strings. The DFPS global
+# the global x, y, and z coordinates as separate parameter. The DFPS global
 # coordinate system is defined by three half-inch steel balls sitting on the
 # base plate in front of the fiducial stage. The DFPS local coordinate system is
 # defined by its fiducial plate. The fiducial plate defines a frame coordinate
@@ -1062,12 +956,9 @@ proc DFPS_Manager_sources_global {spots} {
 # the transformation between local and global coordinates is to be accurate, we
 # must be sure to survey the fiducials at the start of each observing session.
 #
-proc DFPS_Manager_local_from_global {args} {
+proc DFPS_Manager_local_from_global {x_G y_G z_G} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
-
-	set params [join $args]
-	scan $params %f%f%f x_G y_G z_G
 
 	set lp [lwdaq xyz_local_from_global_point "$x_G $y_G $z_G" $info(local_coord)]
 	return $lp
@@ -1080,117 +971,12 @@ proc DFPS_Manager_local_from_global {args} {
 # routine. See local_from_global for more information about the local and global
 # coordinate systems.
 #
-proc DFPS_Manager_global_from_local {args} {
+proc DFPS_Manager_global_from_local {x_L y_L z_L} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set params [join $args]
-	scan $params %f%f%f x_L y_L z_L
-	
 	set gp [lwdaq xyz_global_from_local_point "$x_L $y_L $z_L" $info(local_coord)]
 	return $gp
-}
-
-#
-# DFPS_Manager_sky_from_local takes a point in local coordinates and transforms
-# it into sky coordinates using the telescope calibration and the current
-# telescope pointing declination and right ascension. We can pass the local x and
-# y in a single string or two strings.
-#
-proc DFPS_Manager_sky_from_local {args} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	set params [join $args]
-	scan $params %f%f x_L y_L
-	
-	set a [expr $info(plate_rot)*0.001]
-	if {$config(reckoning) == "GUIDE"} {
-		set plate_x $info(star_x)
-		set plate_y $info(star_y)
-	} else {
-		set plate_x $info(scope_x)
-		set plate_y $info(scope_y)
-	}
-	set east_s  [expr -($x_L-$plate_x)*cos($a) - ($y_L-$plate_y)*sin($a)]
-	set north_s [expr +($x_L-$plate_x)*sin($a) - ($y_L-$plate_y)*cos($a)]
-
-	set dec [expr $north_s * $info(plate_scale) / $info(arcsec_per_degree)]
-	if {$config(reckoning) == "GUIDE"} {
-		set dec [expr $dec + $config(g_dec)]
-	} else {
-		set dec [expr $dec + $config(s_dec)]
-	}
-
-	set rah [expr $east_s * $info(plate_scale) / $info(arcsec_per_degree) \
-		/ $info(deg_per_hr_equator) \
-		/ cos($dec*$info(radians_per_degree))]
-	if {$config(reckoning) == "GUIDE"} {
-		set rah [expr $rah + $config(g_rah)]
-	} else {
-		set rah [expr $rah + $config(s_rah)]
-	}
-	
-	set rah [format %.6f $rah] 
-	set dec [format %.6f $dec]
-
-	if {$config(verbose)} {
-		LWDAQ_print $info(text) "sky_from_local\
-			east_s=[format %.3f $east_s]\
-			north_s=[format %.3f $north_s]\
-			rah=$rah dec=$dec" $info(vcolor)
-	}
-
-	return "$rah $dec"
-}
-
-#
-# DFPS_Manager_local_from_sky takes a point in sky coordinates and transforms
-# it into local coordinates using the telescope calibration and the current 
-# telescope pointing declination and right ascension. The sky coordinates are
-# in right ascension, decimal hours, and declination, decimal degrees. We can
-# pass the two in a single string of two strings.
-#
-proc DFPS_Manager_local_from_sky {args} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	set params [join $args]
-	scan $params %f%f rah dec
-	
-	if {$config(reckoning) == "GUIDE"} {
-		set rah [expr $rah - $config(g_rah)]
-		set dec [expr $dec - $config(g_dec)]
-		set plate_x $info(star_x)
-		set plate_y $info(star_y)
-	} else {
-		set rah [expr $rah - $config(s_rah)]
-		set dec [expr $dec - $config(s_dec)]
-		set plate_x $info(scope_x)
-		set plate_y $info(scope_y)
-	}
-
-	set east_s [expr $rah * $info(deg_per_hr_equator) \
-		* cos($dec*$info(radians_per_degree)) \
-		* $info(arcsec_per_degree) \
-		/ $info(plate_scale)]
-	set north_s [expr $dec * $info(arcsec_per_degree) / $info(plate_scale)]
-
-	set a [expr $info(plate_rot)*0.001]
-	set x_L [expr (-$east_s*cos($a) + $north_s*sin($a)) + $plate_x]
-	set y_L [expr (-$east_s*sin($a) - $north_s*cos($a)) + $plate_y]
-	
-	set x_L [format %.3f $x_L] 
-	set y_L [format %.3f $y_L]
-	
-	if {$config(verbose)} {
-		LWDAQ_print $info(text) "local_from_sky\
-			east_s=[format %.3f $east_s]\
-			north_s=[format %.3f $north_s]\
-			x_L=$x_L y_L=$y_L" $info(vcolor)
-	}
-
-	return "$x_L $y_L"
 }
 
 #
@@ -1245,11 +1031,6 @@ proc DFPS_Manager_mast_measure {mast} {
 		LWDAQ_print $info(text) "mast_measure x=$x y=$y z=$z\
 			xo=$xo yo=$yo" $info(vcolor)
 	}
-	set local [DFPS_Manager_detector_get $mast $config(detector_set)]
-	scan $local %f%f%f x y z
-	set sky [DFPS_Manager_sky_from_local $x $y]
-	scan $sky %f%f ra dec
-	set info(detector_$mast) "[format %.6f $ra]   [format %.6f $dec]"
 		
 	set info(state) "Idle"	
 	return $mast_local
@@ -1496,7 +1277,7 @@ proc DFPS_Manager_detector_set {mast detector x_d y_d} {
 
 	if {$config(verbose)} {
 		LWDAQ_print $info(text) \
-			"detector_set mast=$mast detector=$detector\
+			"detector_get mast=$mast detector=$detector\
 			x_d=$x_d y_d=$y_d x_o=$x_o y_o=$y_o" $info(vcolor)
 	}
 	
@@ -1530,10 +1311,9 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 	
 	set info(state) "Acquire"
 
-	LWDAQ_set_image_sensor $info(guide_sensor) Camera
 	set iconfig(analysis_manipulation) $info(guide_manipulations)
 	set iconfig(daq_ip_addr) $config(ip_addr)
-	set iconfig(intensify) $config(guide_intensify) 
+	set iconfig(intensify) $config(intensify) 
 	scan $config(guide_daq_$guide) %d%d%d \
 		iconfig(daq_driver_socket) \
 		iconfig(daq_mux_socket) \
@@ -1546,26 +1326,23 @@ proc DFPS_Manager_guide_acquire {guide exposure_s} {
 		return $camera
 	}
 	
-	lwdaq_image_manipulate $iconfig(memory_name) transfer_overlay dfps_guide_$guide
 	lwdaq_image_manipulate $iconfig(memory_name) copy -name dfps_guide_$guide
-	lwdaq_image_manipulate dfps_guide_$guide transfer_overlay $iconfig(memory_name)
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
+		-intensify $config(intensify) -zoom $config(guide_zoom)
+	if {[winfo exists $info(window).mag_guide$guide]} {
+		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+	}
 	
 	set ave [lindex $camera 5]
 	set stdev [lindex $camera 6]
-	set max [lindex $camera 7]
-	set min [lindex $camera 8]
 	if {$config(verbose)} {
 		LWDAQ_print $info(text) "guide_acquire guide=$guide\
-			ave=$ave stdev=$stdev max=$max min=$min" $info(vcolor)
-	}
-	if {$config(report)} {
-		LWDAQ_print $info(text) "[clock seconds] $guide $ave $max $min"
+			ave=$ave stdev=$stdev" $info(vcolor)
 	}
 	
 	set info(state) "Idle"
-	return "[lrange $camera 5 end] $info(icx424q_pix_um)"
+	return "[lrange $camera 5 end] $info(icx424_pix_um)"
 }
 
 #
@@ -1578,7 +1355,7 @@ proc DFPS_Manager_guide_acquire_all {} {
 	upvar #0 DFPS_Manager_info info
 
 	foreach g $info(guide_sensors) {
-		set result [DFPS_Manager_guide_acquire $g $config(g_expose_s)]
+		set result [DFPS_Manager_guide_acquire $g $config(expose_s)]
 		if {[LWDAQ_is_error_result $result]} {
 			return $result
 		}
@@ -1586,126 +1363,6 @@ proc DFPS_Manager_guide_acquire_all {} {
 			LWDAQ_print $info(text) $result
 		}
 	}
-	return ""
-}
-
-#
-# DFPS_Manager_guide_auto captures images from a list of guide sensors,
-# attempting to do so in parallel, which will work if the list contains only
-# sensors that are all connected to different readout boards, or boards that
-# support simultaneous exposure. It uses the default guide exposure time
-# exposure_s.
-#
-proc DFPS_Manager_guide_auto {guides} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-	global LWDAQ_Info LWDAQ_Driver
-	upvar #0 LWDAQ_info_Camera iinfo
-	upvar #0 LWDAQ_config_Camera iconfig
-
-	foreach guide $guides {
-		if {[lsearch $info(guide_sensors) $guide] < 0} {
-			LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in guide_auto."
-			return ""
-		}	
-	}
-
-	set info(state) "Guide_Auto"
-
-	LWDAQ_set_image_sensor $info(guide_sensor) Camera
-	set image_size [expr $iinfo(daq_image_width) * $iinfo(daq_image_height)]
-
-	if {[catch {
-		
-		set sock [LWDAQ_socket_open $config(ip_addr)]
-		LWDAQ_login $sock $iinfo(daq_password)
-		LWDAQ_set_device_type $sock $iconfig(daq_device_type)
-		
-		foreach dsock {6 7} {
-			LWDAQ_set_driver_mux $sock $dsock 0
-			LWDAQ_execute_job $sock $LWDAQ_Driver(move_job)
-			LWDAQ_transmit_command_hex $sock 0098
-			LWDAQ_transmit_command_hex $sock 00B8
-			LWDAQ_transmit_command_hex $sock 0098
-		}
-
-		LWDAQ_delay_seconds $sock $config(g_expose_s)
-	
-		foreach dsock {6 7} {
-			LWDAQ_set_driver_mux $sock $dsock 0
-			LWDAQ_transmit_command_hex $sock 0099
-			LWDAQ_transmit_command_hex $sock 0098
-			LWDAQ_transmit_command_hex $sock 0088
-		}
-		
-		LWDAQ_set_data_addr $sock 0
-		foreach guide $guides {
-			scan $config(guide_daq_$guide) %d%d%d dsock msock del
-			LWDAQ_set_driver_mux $sock $dsock $msock
-			LWDAQ_set_device_element $sock $del
-			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
-		}
-
-		set addr 0
-		foreach guide $guides {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_auto\
-					downloading from driver guide=$guide" $info(vcolor)
-			}
-			set contents_$guide [LWDAQ_ram_read $sock $addr $image_size]
-			set addr [expr $addr + $image_size]
-		}
-		
-		foreach dsock {6 7} {
-			LWDAQ_set_driver_mux $sock $dsock 0
-			LWDAQ_sleep $sock
-		}
-		LWDAQ_socket_close $sock
-	} error_result]} { 
-		if {[info exists sock]} {LWDAQ_socket_close $sock}
-		LWDAQ_print $info(text) "ERROR: $error_result"
-		set info(state) "Idle"
-		return "ERROR: $error_result"
-	}
-		
-	set result "[clock seconds] "
-	foreach guide $guides {
-		lwdaq_image_create \
-			-width $iinfo(daq_image_width) \
-			-height $iinfo(daq_image_height) \
-			-left $iinfo(daq_image_left) \
-			-right $iinfo(daq_image_right) \
-			-top $iinfo(daq_image_top) \
-			-bottom $iinfo(daq_image_bottom) \
-			-data [set contents_$guide] \
-			-name dfps_temp
-		foreach m $info(guide_manipulations) {
-			lwdaq_image_manipulate dfps_temp $m -replace 1
-		}
-		lwdaq_image_manipulate dfps_temp transfer_overlay dfps_guide_$guide
-		lwdaq_image_manipulate dfps_temp copy -name dfps_guide_$guide
-		lwdaq_image_manipulate dfps_guide_$guide transfer_overlay dfps_temp
-		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-			-intensify $config(guide_intensify) -zoom $config(guide_zoom)
-		set camera [lwdaq_image_characteristics dfps_guide_$guide]
-		set ave [lindex $camera 4]
-		set stdev [lindex $camera 5]
-		set max [lindex $camera 6]
-		set min [lindex $camera 7]
-		append result "$guide $ave $max $min "
-		if {$config(verbose)} {
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) "guide_auto guide=$guide\
-					ave=$ave stdev=$stdev max=$max min=$min" $info(vcolor)
-			}
-		}
-	}
-	
-	if {$config(report)} {
-		LWDAQ_print $info(text) [string trim $result]
-	}
-
-	set info(state) "Idle"
 	return ""
 }
 
@@ -1729,7 +1386,7 @@ proc DFPS_Manager_guide_get {guide} {
 		LWDAQ_print $info(text) "ERROR: Invalid guide \"$guide\" in guide_acquire,\
 			returning blank image."
 		lwdaq_image_create -name guide_blank \
-			-width $info(icx424q_row) -height $info(icx424q_col)
+			-width $info(icx424_row) -height $info(icx424_col)
 		set contents [lwdaq_image_contents guide_blank]
 		lwdaq_image_destroy guide_blank
 	}
@@ -1796,9 +1453,14 @@ proc DFPS_Manager_guide_mark {guide x_g y_g {color "2"}} {
 		-x_min 0 -x_max $info(guide_width_um) \
 		-y_min 0 -y_max $info(guide_height_um) -color $color
 		
-	# Draw the guide image with its updated overlay.
+	# Draw the guide image with its updated overlay into the magnified photo
+	# first, if it exists, and then the standard photo.
+	if {[winfo exists $info(window).mag_guide$guide]} {
+		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+	}
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
+		-intensify $config(intensify) -zoom $config(guide_zoom)
 		
 	# An empty string return means nothing went wrong.
 	return ""
@@ -1824,14 +1486,10 @@ proc DFPS_Manager_guide_mark {guide x_g y_g {color "2"}} {
 # the fiducial stage. The routine returns x, y, and z coordinates of the
 # transformed local point in millimeters. 
 #
-proc DFPS_Manager_local_from_guide {args} {
+proc DFPS_Manager_local_from_guide {guide x_g y_g} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
-	# Extract the guide number and sensor coordinates from the argument string.
-	set params [join $args]
-	scan $params %d%f%f guide x_g y_g
-
 	# Check the input parameters.
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
 		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in local_from_guide."
@@ -1876,18 +1534,14 @@ proc DFPS_Manager_local_from_guide {args} {
 # is a two-dimensional plane, we take the three-dimensional local coordinate
 # point and project it onto the guide sensor in the z-direction. We pass the
 # local coordinates into the routine with a string of three numbers xyz in
-# millimeters. We provide the guide number and local coordinates x, y, and z in
-# millimeters, either in one string or seprate strings. The routine returns the
-# guide coordinate x and y in microns.
+# millimeters. We pass the local coordinate point as three separate parameters
+# x, y, and z in millimeters. The routine returns the guide coordinate x and y
+# in microns.
 #
-proc DFPS_Manager_guide_from_local {args} {
+proc DFPS_Manager_guide_from_local {guide x_L y_L z_L} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 	
-	# Extract the guide number and sensor coordinates from the argument string.
-	set params [join $args]
-	scan $params %d%f%f%f guide x_L y_L z_L
-
 	# Check the guide sensor number.
 	if {[lsearch $info(guide_sensors) $guide] < 0} {
 		LWDAQ_print $info(text) "ERROR: No guide sensor \"$guide\" in guide_from_local."
@@ -1953,7 +1607,7 @@ proc DFPS_Manager_guide_put_square {guide x_L y_L z_L width {shade "200"}} {
 	set z_L [lindex $local_point 2]
 	set z_g [lindex [DFPS_Manager_local_from_guide $guide $guide_point] 2]
 	set width_um [format %.1f [expr $width*(1 + abs($z_L-$z_g)/$info(focal_ratio))]]
-	set width_px [format %.2f [expr $width_um/$info(icx424q_pix_um)]]
+	set width_px [format %.2f [expr $width_um/$info(icx424_pix_um)]]
 	# Clear the image overlay, but otherwise do not affect the image.
 	lwdaq_graph "[expr $x_g - 0.5*$width_px] $y_g [expr $x_g + 0.5*$width_px] $y_g" \
 		dfps_guide_$guide -entire 1 -in_image 1 -color $shade -width $width_px \
@@ -1969,8 +1623,12 @@ proc DFPS_Manager_guide_put_square {guide x_L y_L z_L width {shade "200"}} {
 
 	# Draw the updated guide image into the magnified photo first, if it exists,
 	# and the standard photo.
+	if {[winfo exists $info(window).mag_guide$guide]} {
+		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+	}
 	lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-		-intensify $config(guide_intensify) -zoom $config(guide_zoom)
+		-intensify $config(intensify) -zoom $config(guide_zoom)
 		
 	# Return the guide coordinates and the defocused width.
 	return "$x_g $y_g $width"
@@ -2187,7 +1845,7 @@ proc DFPS_Manager_fvcalib_read {{fn ""}} {
 	if {$fn == ""} {
 		set info(fvcalib) "Idle"
 		return ""
-	} else {
+	} {
 		set img_dir [file dirname $fn]
 	}
 	
@@ -2387,7 +2045,7 @@ proc DFPS_Manager_fvcalib {} {
 		toplevel $w
 		wm title $w "Fiber View Camera Coordinate Measurement Machine Calibrator,\
 			DFPS Manager $info(version)"
-	} else {
+	} {
 		raise $w
 	}
 	
@@ -2617,7 +2275,7 @@ proc DFPS_Manager_gscalib {} {
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Guide Sensor Rasnik Calibration, DFPS Manager $info(version)"
-	} else {
+	} {
 		raise $w
 		return ""
 	}
@@ -2828,7 +2486,7 @@ proc DFPS_Manager_frot {} {
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Fiducial Calibration, DFPS Manager $info(version)"
-	} else {
+	} {
 		raise $w
 		return ""
 	}
@@ -2973,19 +2631,10 @@ proc DFPS_Manager_fsurvey {} {
 	set info(local_coord) [string trim $pl]
 
 	if {$config(verbose)} {
-		LWDAQ_print $t "fsurvey steps=[lindex $end_params 7]\
-			error_um=[format %.1f [expr 1000*[lindex $end_params 6]]]" \
+		LWDAQ_print $t \
+			"fsurvey steps=[lindex $end_params 7]\
+				error_um=[format %.1f [expr 1000*[lindex $end_params 6]]]" \
 			$info(vcolor)
-		foreach {x y z} $info(fiducial_sources) {
-			incr count
-			set ffg [lwdaq xyz_global_from_local_point \
-				$info(fiducial_$count) $info(local_coord)]
-			scan $ffg %f%f%f xx yy zz
-			set x_err [format %.1f [expr 1000.0*($xx-$x)]]
-			set y_err [format %.1f [expr 1000.0*($yy-$y)]]
-			set z_err [format %.1f [expr 1000.0*($zz-$z)]]
-			LWDAQ_print $t "fiducial_$count x_err=$x_err y_err=$y_err z_err=$z_err (um)" $info(vcolor)
-		}
 	}
 	if {$config(report)} {
 		LWDAQ_print $t "$info(local_coord)"
@@ -3254,56 +2903,6 @@ proc DFPS_Manager_utils_transmit {} {
 }
 
 #
-# DFPS_Manager_sky_table
-#
-proc DFPS_Manager_sky_table {} {
-	upvar #0 DFPS_Manager_config config
-	upvar #0 DFPS_Manager_info info
-
-	LWDAQ_print $info(utils_text) "Object Positions (object, RAH, DEC):"
-	set guides [list]
-	foreach g $info(guide_sensors) {
-		set local [DFPS_Manager_local_from_guide \
-			$g [expr $info(guide_width_um)/2.0] [expr $info(guide_height_um)/2.0]]
-		scan $local %f%f x y
-		set sky [DFPS_Manager_sky_from_local $x $y]
-		lappend guides "Guide_$g $sky"
-	}
-	set detectors [list]
-	foreach m $info(positioner_masts) {
-		set local [DFPS_Manager_detector_get $m $config(detector_set)]
-		scan $local %f%f x y
-		set sky [DFPS_Manager_sky_from_local $x $y]
-		lappend detectors "Detector_$m $sky"
-	}
-	
-	foreach g $guides {
-		LWDAQ_print $info(utils_text) $g
-	}
-	foreach m $detectors {
-		LWDAQ_print $info(utils_text) $m
-	}
-		
-	LWDAQ_print $info(utils_text) "\nTranslation Vectors (object, object, RAH, DEC):"
-	set vectors [list]
-	foreach g $guides {
-		scan $g %s%f%f gn grah gdec
-		foreach m $detectors {
-			scan $m %s%f%f dn drah ddec
-			set rahdiff [format %.6f [expr $drah-$grah]]
-			set decdiff [format %.6f [expr $ddec-$gdec]]
-			lappend vectors "$gn $dn $rahdiff $decdiff"
-		}
-	}
-	
-	foreach v $vectors {
-		LWDAQ_print $info(utils_text) $v	
-	}
-	
-	return ""
-}
-
-#
 # DFPS_Manager_utils opens the Utilities Panel, where we have various options for
 # calibrating the DFPS optical components, transmitting commands to fiber controllers,
 # and opening LWDAQ instruments.
@@ -3316,7 +2915,7 @@ proc DFPS_Manager_utils {} {
 	if {![winfo exists $w]} {
 		toplevel $w
 		wm title $w "Utilities Panel, DFPS Manager $info(version)"
-	} else {
+	} {
 		raise $w
 		return ""
 	}
@@ -3354,8 +2953,7 @@ proc DFPS_Manager_utils {} {
 			"Guide Sensor Calib" gscalib \
 			"Fiducial Fiber Calib" frot \
 			"Mast and Detector Calib" mcalib \
-			"Fiber View Camera Calib" fvcalib \
-			"Sky Table" sky_table} {
+			"Fiber View Camera Calib" fvcalib} {
 		button $f.$b -text $a -command "LWDAQ_post DFPS_Manager_$b"
 		pack $f.$b -side left -expand 1
 	}
@@ -3376,7 +2974,7 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	foreach a {ip_addr fiducial_leds guide_leds} {
+	foreach a {fiducial_leds guide_leds} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) -width 16
 		pack $f.l$a $f.e$a -side left -expand yes
@@ -3423,26 +3021,6 @@ proc DFPS_Manager_utils {} {
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 
-	label $f.title -text "Mast Positions:" -fg $info(label_color) -width $lw
-	pack $f.title -side left -expand yes
-	foreach m $info(positioner_masts) {
-		entry $f.e$m -textvariable DFPS_Manager_info(mast_$m) -width $ew
-		pack $f.e$m -side left -expand yes
-	}
-
-	set f [frame $w.f[incr i]]
-	pack $f -side top -fill x
-
-	label $f.title -text "Mast Targets:" -fg $info(label_color) -width $lw
-	pack $f.title -side left -expand yes
-	foreach m $info(positioner_masts) {
-		entry $f.e$m -textvariable DFPS_Manager_info(target_$m) -width $ew
-		pack $f.e$m -side left -expand yes
-	}
-
-	set f [frame $w.f[incr i]]
-	pack $f -side top -fill x
-
 	label $f.title -text "Mast Offsets:" -fg $info(label_color) -width $lw
 	pack $f.title -side left -expand yes
 	foreach m $info(positioner_masts) {
@@ -3485,24 +3063,19 @@ proc DFPS_Manager_utils {} {
 
 #
 # DFPS_Manager_watchdog watches the system commands list for incoming commands,
-# manages periodic survey of the fiducial fibers, manages the mast position
-# controller, and manages periodic reading of guide sensors and updating of the
-# telescope position from a url. It posts itself repeatedly to the LWDAQ event
-# queue. Each time it runs, it checks the fiducial survey timer, the mast
-# control timer, and the server command list. A fiducial survey causes the fiber
-# view cameras to measure the fiducial positions, followed by adjustment of the
-# local coordinate pose in the global DFPS coordinates. This pose allows us to
-# convert fiber view camera measurements of mast positions into local
-# coordinates. The mast controller measures mast positions, calculates their
-# offsets from their target positions, and adjusts the actuator drive voltages
-# so as to move the mast closer to its target position. We can enable and
-# disable the mast controller, as well as set the controller sample period, with
-# the configure_mast_control routine. When we have guide_auto set to a list of
-# guide sensor, we read out these guide sensors every guide_auto_period seconds.
-# We also, check scope_url to see if it is a valid url, and if so, we download
-# from it and parse the result with a regular expression scope_pattern that
-# provides two substrings. One substring must be s_rah, the other s_dec.
-# 
+# manages periodic survey of the fiducial fibers, and manages the mast position
+# controller. It posts itself repeatedly to the LWDAQ event queue. Each time it
+# runs, it checks the fiducial survey timer, the mast control timer, and the
+# server command list. A fiducial survey causes the fiber view cameras to
+# measure the fiducial positions, followed by adjustment of the local coordinate
+# pose in the global DFPS coordinates. This pose allows us to convert fiber view
+# camera measurements of mast positions into local coordinates. The mast
+# controller measures mast positions, calculates their offsets from their target
+# positions, and adjusts the actuator drive voltages so as to move the mast
+# closer to its target position. We can enable and disable the mast controller,
+# as well as set the controller sample period, with the configure_mast_control
+# routine. The system server takes commands from the server socket, executes
+# them, and returns the command result string over the same socket.
 #
 proc DFPS_Manager_watchdog {} {
 	upvar #0 DFPS_Manager_config config
@@ -3528,7 +3101,7 @@ proc DFPS_Manager_watchdog {} {
 	# At intervals, survey the fiducial fibers an adjust frame
 	# coordinate pose. The fiducial period is in units of
 	# mast_control_period.
-	if {$config(mast_control) != "OFF"} {
+	if {$config(enable_mast_control)} {
 		if {[clock seconds] - $info(fiducial_survey_time) \
 				>= $config(fiducial_survey_period)} {
 			set info(fiducial_survey_time) [clock seconds]
@@ -3538,7 +3111,7 @@ proc DFPS_Manager_watchdog {} {
 			}
 			DFPS_Manager_fsurvey
 		}
-	} else {
+	} {
 		set info(fiducial_survey_time) "0"
 	}
 	
@@ -3546,7 +3119,7 @@ proc DFPS_Manager_watchdog {} {
 	# measure the mast positions, look at the offsets from their target
 	# positions, and adjust their control voltages so as to move the mast
 	# towards the target.
-	if {$config(mast_control) != "OFF"} {
+	if {$config(enable_mast_control)} {
 		if {[clock seconds] - $info(mast_control_time) \
 				>= $config(mast_control_period)} {
 			set info(mast_control_time) [clock seconds]
@@ -3554,10 +3127,9 @@ proc DFPS_Manager_watchdog {} {
 				LWDAQ_print $info(text) \
 					"mast_control_time [clock seconds]" $info(vcolor)
 			}
-			set control_report "[clock seconds] $config(s_rah) $config(s_dec) "
-			
-			foreach m $config(mast_control) {
-				DFPS_Manager_mast_measure $m
+			set control_report "[clock seconds] "
+			DFPS_Manager_mast_measure_all
+			foreach m $info(positioner_masts) {
 				scan $info(voltage_$m) %d%d upleft upright
 				scan $info(offset_$m) %f%f xo yo
 				set ulo [format %.3f [expr $yo/sqrt(2)-$xo/sqrt(2)]]
@@ -3570,42 +3142,15 @@ proc DFPS_Manager_watchdog {} {
 					"[format %.3f $xo] [format %.3f $yo] $info(voltage_$m) "
 			}
 			if {![winfo exists $info(window)]} {return ""}
-			if {$config(report)} {
-				LWDAQ_print $info(text) $control_report
+			if {[winfo exists $info(utils_text)] && $config(report)} {
+				LWDAQ_print $info(utils_text) $control_report
 			} 
 			if {$config(verbose)} {
 				LWDAQ_print $info(text) $control_report $info(vcolor)
 			}
 		}
-	} else {
+	} {
 		set info(mast_control_time) "0"
-	}
-	
-	# If guide auto is enabled, at intervals, get new guide images.
-	if {$config(guide_auto) != "OFF"} {
-		if {[clock seconds] - $info(guide_auto_time) >= $config(guide_auto_period)} {
-			set info(guide_auto_time) [clock seconds]
-			if {$config(verbose)} {
-				LWDAQ_print $info(text) \
-					"guide_auto_time [clock seconds]" $info(vcolor)
-			}
-			DFPS_Manager_guide_auto $config(guide_auto)
-			if {[regexp {http://} $config(scope_url) match]} {
-				set scope [LWDAQ_url_download $config(scope_url)]
-				if {[regexp $config(scope_pattern) $scope match rah dec]} {
-					set config(s_rah) $rah
-					set config(s_dec) $dec
-					if {$config(verbose)} {
-						LWDAQ_print $info(text) \
-							"scope_url \"$rah\" \"$dec\"" $info(vcolor)
-					}
-				} else {
-					set scope [string range [string replace $scope \n " "] 0 50]
-				}
-			}			
-		}
-	} else {
-		set info(guide_auto_time) "0"
 	}
 	
 	# Handle incoming server commands.
@@ -3675,21 +3220,21 @@ proc DFPS_Manager_watchdog {} {
 
 #
 # DFPS_Manager_configure_mast_control starts or stops the mast controller and
-# adjusts the mast control period. We pass OFF or a list of masts to disable or
-# enable controllers. We pass a real-valued period in seconds. The controller
-# will measure mast positions with this period, and adjust actuator voltages
-# after its measurements.
+# adjusts the mast control period. We pass 0 or 1 for enable to disable or
+# enable the controller respectively. We pass a real-valued period in seconds.
+# The controller will measure mast positions with this period, and adjust
+# actuator voltages after its measurements.
 #
-proc DFPS_Manager_configure_mast_control {control period_s} {
+proc DFPS_Manager_configure_mast_control {enable period_s} {
 	upvar #0 DFPS_Manager_config config
 	upvar #0 DFPS_Manager_info info
 
-	set config(mast_control) $control
+	set config(enable_mast_control) $enable
 	set config(mast_control_period) $period
 	
 	if {$config(verbose)} {
 		LWDAQ_print $info(text) \
-			"configure_mast_control control=$control period_s=$period_s" $info(vcolor)
+			"configure_mast_control enable=$enable period_s=$period_s" $info(vcolor)
 	}
 	return ""
 }
@@ -3735,7 +3280,13 @@ proc DFPS_Manager_reset {} {
 
 #
 # DFPS_Manager_guide_click handles mouse clicks on guide sensor images. It takes
-# a guide sensor number, an x and y coordinate, and a command. .
+# a guide sensor number, an x and y coordinate, and a command. The mag_g command
+# tells the routine to open a new magnified view of a guide sensor. The mark_g
+# and mark_gm commands tell the routine to mark a guide sensor view, based upon
+# the x-y coordinates of a mouse click in the normal guide sensor display or the
+# magnified guide sensor display. The actual marking, which will be a cross of
+# some sort, will be done in the guide_mark routine, which will in turn be
+# called by local_from_guide, which we call from this routine.
 #
 proc DFPS_Manager_guide_click {guide x y cmd} {
 	upvar #0 DFPS_Manager_config config
@@ -3746,12 +3297,30 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 		return ""
 	}
 	
-	if {($cmd == "guide_mark")} {
-		set zoom $config(guide_zoom)
-		if {$zoom < 1.0} {
-			set pix [expr $info(icx424q_pix_um)*round(1.0/$zoom)]
+	if {$cmd == "mag_g"} {
+		set w $info(window).mag_guide$guide
+		if {[winfo exists $w]} {
+			raise $w
 		} else {
-			set pix [expr $info(icx424q_pix_um)/round($zoom)]
+			toplevel $w
+			wm title $w "Guide $guide, DFPS Manager $info(version)"
+			image create photo dfps_guide_mag_$guide
+			label $w.img -image dfps_guide_mag_$guide
+			pack $w.img -side top
+			bind $w.img <Button-1> \
+				[list LWDAQ_post "DFPS_Manager_guide_click $guide %x %y click_gm"]
+		}
+	
+		lwdaq_draw dfps_guide_$guide dfps_guide_mag_$guide \
+			-intensify $config(intensify) -zoom $config(guide_mag_zoom)
+	}	
+
+	if {($cmd == "click_gm")} {
+		set zoom $config(guide_mag_zoom)
+		if {$zoom < 1.0} {
+			set pix [expr round(1.0/$zoom)*$info(icx424_pix_um)]
+		} else {
+			set pix [expr round($zoom)*$info(icx424_pix_um)]
 		}
 		set y_g [format %.1f [expr \
 			$info(guide_height_um)-$pix*($y-$config(mouse_offset_y))]]
@@ -3764,37 +3333,6 @@ proc DFPS_Manager_guide_click {guide x y cmd} {
 		}
 		DFPS_Manager_guide_mark $guide $x_g $y_g "2"
 		set local [DFPS_Manager_local_from_guide $guide $x_g $y_g]
-		scan $local %f%f x_L y_L
-		set sky [DFPS_Manager_sky_from_local $x_L $y_L]
-		scan $sky %f%f rah dec
-		LWDAQ_print $info(text) "$guide [format %.3f $x_L]\
-			[format %.3f $y_L] [format %.6f $rah] [format %.6f $dec]" green
-	}
-
-	if {($cmd == "guide_star")} {
-		set zoom $config(guide_zoom)
-		if {$zoom < 1.0} {
-			set pix [expr $info(icx424q_pix_um)*round(1.0/$zoom)]
-		} else {
-			set pix [expr $info(icx424q_pix_um)/round($zoom)]
-		}
-		set y_g [format %.1f [expr \
-			$info(guide_height_um)-$pix*($y-$config(mouse_offset_y))]]
-		set x_g [format %.1f [expr \
-			$pix*($x-$config(mouse_offset_x))]]
-		if {$config(verbose)} {
-			LWDAQ_print $info(text) \
-				"guide_click guide=$guide x=$x y=$y cmd=$cmd\
-					zoom=$zoom pix=[format %.3f $pix]" $info(vcolor)
-		}
-		DFPS_Manager_guide_mark $guide $x_g $y_g "1"
-		set local [DFPS_Manager_local_from_guide $guide $x_g $y_g]
-		scan $local %f%f x_L y_L
-		set info(star_x) $x_L
-		set info(star_y) $y_L
-		set config(reckoning) "GUIDE"
-		LWDAQ_print $info(text) "$guide [format %.3f $x_L]\
-			[format %.3f $y_L] GUIDE_SET" green
 	}
 		
 	return ""
@@ -3828,11 +3366,12 @@ proc DFPS_Manager_fvc_click {fvc x y cmd} {
 		}
 	
 		lwdaq_draw dfps_fvc_$fvc dfps_fvc_mag_$fvc \
-			-intensify $config(fvc_intensify) -zoom $config(fvc_mag_zoom)
+			-intensify $config(intensify) -zoom $config(fvc_mag_zoom)
 	}	
 
 	return ""
 }
+
 
 #
 # DFPS_Manager_open creates the DFPS Manager window if it does not exist, brings it
@@ -3866,34 +3405,19 @@ proc DFPS_Manager_open {} {
 	button $f.help -text "Help" -command "LWDAQ_tool_help DFPS_Manager"
 	pack $f.help -side left -expand yes
 	
-	foreach a {Report Verbose} {
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+
+	foreach a {Enable_Mast_Control Report Verbose} {
 		set b [string tolower $a]
 		checkbutton $f.$b -text $a -variable DFPS_Manager_config($b)
 		pack $f.$b -side left -expand yes
 	}
 
-	set f [frame $w.f[incr i]]
-	pack $f -side top -fill x
-
-	label $f.lmc -text "mast_control:" -fg $info(label_color)
-	tk_optionMenu $f.mmc DFPS_Manager_config(mast_control) \
-		"OFF" "1" "2" "3" "4" "1 2" "1 3" "1 4" "2 3" "2 4" \
-		"3 4" "1 2 3" "1 2 4" "1 3 4" "2 3 4" "1 2 3 4"
-	pack $f.lmc $f.mmc -side left -expand yes
-	
-	label $f.lgauto -text "guide_auto:" -fg $info(label_color)
-	tk_optionMenu $f.mgauto DFPS_Manager_config(guide_auto) \
-		"OFF" "1" "2" "3" "4" "1 2" "3 4"
-	pack $f.lgauto $f.mgauto -side left -expand yes
-	
-	label $f.lreckon -text "reckoning:" -fg $info(label_color)
-	tk_optionMenu $f.mreckon DFPS_Manager_config(reckoning) "GUIDE" "SCOPE"
-	pack $f.lreckon $f.mreckon -side left -expand yes
-
-	foreach a {g_expose_s g_rah g_dec s_rah s_dec} {
+	foreach a {ip_addr flash_s expose_s} {
 		label $f.l$a -text "$a\:" -fg $info(label_color)
 		entry $f.e$a -textvariable DFPS_Manager_config($a) \
-			-width [expr [string length $config($a)] + 1]
+			-width [string length $config($a)]
 		pack $f.l$a $f.e$a -side left -expand yes
 	}
 	
@@ -3903,15 +3427,36 @@ proc DFPS_Manager_open {} {
 	foreach guide $info(guide_sensors) {
 		image create photo "dfps_guide_$guide"
 		label $f.l$guide -image "dfps_guide_$guide"
-		bind $f.l$guide <Button-1> [list LWDAQ_post \
-			"DFPS_Manager_guide_click $guide %x %y guide_mark"]
 		bind $f.l$guide <Double-Button-1> [list LWDAQ_post \
-			"DFPS_Manager_guide_click $guide %x %y guide_star"]
+			"DFPS_Manager_guide_click $guide 0 0 mag_g"]
 		pack $f.l$guide -side left -expand yes
 		lwdaq_draw dfps_guide_$guide dfps_guide_$guide \
-			-intensify $config(guide_intensify) -zoom $config(guide_zoom)
+			-intensify $config(intensify) -zoom $config(guide_zoom)
 	}
 	
+	set lw 15
+	set ew 12
+	
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+
+	label $f.title -text "Mast Positions:" -fg $info(label_color) -width $lw
+	pack $f.title -side left -expand yes
+	foreach m $info(positioner_masts) {
+		entry $f.e$m -textvariable DFPS_Manager_info(mast_$m) -width $ew
+		pack $f.e$m -side left -expand yes
+	}
+
+	set f [frame $w.f[incr i]]
+	pack $f -side top -fill x
+
+	label $f.title -text "Mast Targets:" -fg $info(label_color) -width $lw
+	pack $f.title -side left -expand yes
+	foreach m $info(positioner_masts) {
+		entry $f.e$m -textvariable DFPS_Manager_info(target_$m) -width $ew
+		pack $f.e$m -side left -expand yes
+	}
+
 	set f [frame $w.f[incr i]]
 	pack $f -side top -fill x
 	
@@ -3922,24 +3467,8 @@ proc DFPS_Manager_open {} {
 			"DFPS_Manager_fvc_click $side 0 0 mag_fvc"]
 		pack $f.$side -side left -expand yes
 		lwdaq_draw dfps_fvc_$side dfps_fvc_$side \
-			-intensify $config(fvc_intensify) -zoom $config(fvc_zoom)	
+			-intensify $config(intensify) -zoom $config(fvc_zoom)	
 	}
-	
-	set ff [frame $f.offsets]
-	pack $ff -side top -fill x
-
-	set lw 18
-	set ew 24
-	
-	foreach m $info(positioner_masts) {
-		set fff [frame $ff.m$m]
-		pack $fff -side top -fill x
-		label $fff.title -text "Detector $m:" -fg $info(label_color) -width $lw
-		pack $fff.title -side left -expand yes
-		entry $fff.e$m -textvariable DFPS_Manager_info(detector_$m) -width $ew
-		pack $fff.e$m -side left -expand yes
-	}
-	
 	
 	set info(text) [LWDAQ_text_widget $w 80 15 1 1]
 	LWDAQ_print $info(text) "Manager Text Output" purple
