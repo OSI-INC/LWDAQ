@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.1"
+	LWDAQ_tool_init "RAG_Manager" "6.2"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -2356,9 +2356,9 @@ proc RAG_Manager_retrieve {} {
 			&& ([llength $question_history] > 0)} {
 		RAG_Manager_print "A mid-relevance question, relevance=$rel, \
 			repeat retrieval with one previous question appended."
-		set question "[lindex $question_history 0] $question"
+		set new_question "[lindex $question_history 0] $question"
 		set question_history [lreplace $question_history 0 0]
-		set retrieval [RAG_Manager_relevant_chunks $question $api_key]
+		set retrieval [RAG_Manager_relevant_chunks $new_question $api_key]
 		set rel [lindex $retrieval 1]
 	}
 	if {($rel < $config(high_rel_thr)) \
@@ -2366,9 +2366,9 @@ proc RAG_Manager_retrieve {} {
 			&& ([llength $question_history] > 0)} {
 		RAG_Manager_print "Still a mid-relevance question, relevance=$rel,\
 			repeat retrieval with two previous question appended."
-		set question "[lindex $question_history 0] $question"
+		set new_question "[lindex $question_history 0] $new_question"
 		set question_history [lreplace $question_history 0 0]
-		set retrieval [RAG_Manager_relevant_chunks $question $api_key]
+		set retrieval [RAG_Manager_relevant_chunks $new_question $api_key]
 		set rel [lindex $retrieval 1]
 	}
 
