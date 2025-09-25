@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "5.6"
+	LWDAQ_tool_init "RAG_Manager" "6.1"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -2180,66 +2180,30 @@ proc RAG_Manager_engine {{cmd ""}} {
 }
 
 #
-# RAG_Manager_retrieve embeds the current question using an embedding endpoint.
-# We compare the question vector to the vectors in the embed directory and
-# obtain a list of embeds sorted in order of decreasing relevance. There are two
-# ways we can perform this retrieval. We can either use the services of a
-# Retrieval Engine, or we can retrieve from the RAG Manager's own embed library.
-# Our first choice is to retrieve from our own embed library, but if the library
-# is not yet loaded, we will see if there is an active signal file in our log
-# directory. If so, we will write the question embed to disk in the log
-# directory and see if an engine grabs it and returns a matching retrieval list
-# file. We will wait a few seconds for that. If we don't see the retrieval list
-# appear, we generate an error and abandon the retrieval. Assuming we obtain a
-# retrieval list, we operate on the first retrieve_len embeds in this list. We
-# remove "obsolete embeds". These are embeds for which no supporting content
-# exists. Obsolete embeds arise when we re-generate our chunk library. New match
-# strings will need new embeds, but the embeds of non-existent match strings
-# will remain in the embed library until we deliberately purge them with the
-# Purge Embeds command. Once obsolete embeds have been removed from the list,
-# all remaining embeds have existing content chunks. We use the relevance of the
-# first chunk in the list as a measure of the relevance of the question, and
-# classify the question as high, mid, or low-relevance. We construct the
-# retrieved content based upon this classification. We read content strings from
-# disk and add them to list. When we exceed the word limit for the question
-# relevance, we stop. We return the number of content strings added to our list,
-# and we store them in the info(contents) list. In order to embed the question,
-# this routine must read a valid API key from disk. If a file called offline.txt
-# exists in the log directory, this routine will exit without doing anything.
+# RAG_Manager_relevant_chunks compares the embed vector to the vectors in the
+# embed directory and obtains a list of embeds sorted in order of decreasing
+# relevance. We pass into the routine two arguments: the question and the api
+# key we use to gain access to the embedding engine. There are two ways we can
+# perform this retrieval. We can either use the services of a Retrieval Engine,
+# or we can retrieve from the RAG Manager's own embed library. Our first choice
+# is to retrieve from our own embed library, but if the library is not yet
+# loaded, we will see if there is an active signal file in our log directory. If
+# so, we will write the question embed to disk in the log directory and see if
+# an engine grabs it and returns a matching retrieval list file. We will wait a
+# few seconds for that. If we don't see the retrieval list appear, we generate
+# an error and abandon the retrieval. Assuming we obtain a retrieval list, we
+# operate on the first retrieve_len embeds in this list. We remove "obsolete
+# embeds". These are embeds for which no supporting content exists. Obsolete
+# embeds arise when we re-generate our chunk library. New match strings will
+# need new embeds, but the embeds of non-existent match strings will remain in
+# the embed library until we deliberately purge them. Once obsolete embeds have
+# been removed from the list, all remaining embeds have existing content chunks.
+# We return the list of relevant chunks. Each element in the list consists of
+# two sub-elements: the name of the chunk and its relevance to the question.
 #
-proc RAG_Manager_retrieve {} {
+proc RAG_Manager_relevant_chunks {question api_key} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
-	
-	if {$info(control) != "Idle"} {return ""}
-
-	if {[file exists $info(offline_file)]} {
-		set f [open $info(offline_file)]
-		set start_time [read $f]
-		close $f
-		set run_min [expr round(([clock seconds]-$start_time)/60.0)]		
-		RAG_Manager_print "Chatbot has been offline for $run_min minutes."
-		return "0"
-	}
-
-	set question [string trim $config(question)]
-	if {$question == ""} {
-		RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
-		return "0"
-	}
-		
-	set info(control) "Retrieve"
-	RAG_Manager_print "Retrieval for $info(ip) [RAG_Manager_time]" purple
-	RAG_Manager_print "Question: $question"
-	if {![file exists $config(key_file)]} {
-		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
-		set info(control) "Idle"
-		return "0"
-	}
-	set f [open $config(key_file) r]
-	set api_key [read $f]
-	close $f 
-	RAG_Manager_print "Read api key from $config(key_file)\." brown
 
 	RAG_Manager_print "Obtaining question embedding vector..." brown
 	set start_time [clock milliseconds]
@@ -2299,10 +2263,9 @@ proc RAG_Manager_retrieve {} {
 		}
 	}
 	RAG_Manager_print "Top chunks: [lrange $retrieval 0 7]" brown
-	
 	RAG_Manager_print "Retrieval complete in\
 		[expr [clock milliseconds] - $start_time] ms." brown
-	set start_time [clock milliseconds]
+
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	set new_retrieval [list]
 	set obsolete_count 0
@@ -2324,8 +2287,92 @@ proc RAG_Manager_retrieve {} {
 	RAG_Manager_print "Have $valid_count valid embeds,\
 		ignoring $obsolete_count obsolete embeds." brown
 
-	set info(relevance) [lindex $retrieval 1]
-	set rel $info(relevance)
+	return $retrieval
+}
+
+#
+# RAG_Manager_retrieve calls the Relevant Chunks routine to obtain a list of
+# chunks relevant to the current question. We use the relevance of the first
+# chunk in the list as a measure of the relevance of the question, and classify
+# the question as high, mid, or low-relevance. We construct the retrieved
+# content based upon this classification. We read content strings from disk and
+# add them to list. When we exceed the word limit for the question relevance, we
+# stop. We return the number of content strings added to our list, and we store
+# them in the info(contents) list. In order to embed the question, this routine
+# must read a valid API key from disk. If a file called offline.txt exists in
+# the log directory, this routine will exit without doing anything.
+#
+proc RAG_Manager_retrieve {} {
+	upvar #0 RAG_Manager_config config
+	upvar #0 RAG_Manager_info info
+	
+	if {$info(control) != "Idle"} {return ""}
+
+	if {[file exists $info(offline_file)]} {
+		set f [open $info(offline_file)]
+		set start_time [read $f]
+		close $f
+		set run_min [expr round(([clock seconds]-$start_time)/60.0)]		
+		RAG_Manager_print "Chatbot has been offline for $run_min minutes."
+		return "0"
+	}
+
+	set question [string trim $config(question)]
+	if {$question == ""} {
+		RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
+		return "0"
+	}
+		
+	set info(control) "Retrieve"
+	RAG_Manager_print "Retrieval for $info(ip) [RAG_Manager_time]" purple
+	RAG_Manager_print "Question: $question"
+	if {![file exists $config(key_file)]} {
+		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
+		set info(control) "Idle"
+		return "0"
+	}
+	set f [open $config(key_file) r]
+	set api_key [read $f]
+	close $f 
+	RAG_Manager_print "Read api key from $config(key_file)\." brown
+	
+	set chat_boundaries [regexp -all -inline -indices \
+		{\nQuestion: .*?(?=\nQuestion: |$)} \
+		"\n$info(chat)"]
+	set chat_boundaries [lsort -decreasing -integer -index 0 $chat_boundaries]
+
+	set question_history [list]
+	foreach boundary $chat_boundaries {
+		set qa [string trim [string range $info(chat) {*}$boundary]]
+		if {[regexp {Question: (.*?)(?=\nAnswer:)} $qa match prev_q remaining]} {
+			lappend question_history $prev_q
+		}
+	}
+
+	set retrieval [RAG_Manager_relevant_chunks $question $api_key]
+	set rel [lindex $retrieval 1]
+	if {($rel < $config(high_rel_thr)) \
+			&& ($rel >= $config(mid_rel_thr)) \
+			&& ([llength $question_history] > 0)} {
+		RAG_Manager_print "A mid-relevance question, relevance=$rel, \
+			repeat retrieval with one previous question appended."
+		set question "[lindex $question_history 0] $question"
+		set question_history [lreplace $question_history 0 0]
+		set retrieval [RAG_Manager_relevant_chunks $question $api_key]
+		set rel [lindex $retrieval 1]
+	}
+	if {($rel < $config(high_rel_thr)) \
+			&& ($rel >= $config(mid_rel_thr)) \
+			&& ([llength $question_history] > 0)} {
+		RAG_Manager_print "Still a mid-relevance question, relevance=$rel,\
+			repeat retrieval with two previous question appended."
+		set question "[lindex $question_history 0] $question"
+		set question_history [lreplace $question_history 0 0]
+		set retrieval [RAG_Manager_relevant_chunks $question $api_key]
+		set rel [lindex $retrieval 1]
+	}
+
+	set info(relevance) $rel
 	if {$rel >= $config(high_rel_thr)} {
 		set content_max $config(high_rel_words)
 		set chat_max $config(high_rel_chat_words)
@@ -2379,10 +2426,6 @@ proc RAG_Manager_retrieve {} {
 		}
 	}
 
-	set chat_boundaries [regexp -all -inline -indices \
-		{\nQuestion: .*?(?=\nQuestion: |$)} \
-		"\n$info(chat)"]
-	set chat_boundaries [lsort -decreasing -integer -index 0 $chat_boundaries]
 	set chat_words 0
 	set chat_select [list]
 	foreach boundary $chat_boundaries {
