@@ -797,8 +797,8 @@ proc Videoarchiver_update {n} {
 			 $command]} message
 		if {![regexp "SUCCESS" $message]} {error $message}
 
-		# Wait for the streaming to start up, or else the videoplayer process may find
-		# no listening port and abort.
+		# Wait for the tcpip interface to start up, or else the videoplayer
+		# process may find no listening port and abort.
 		LWDAQ_wait_ms $info(pi_start_ms)
 	
 		# Open a socket to the tcpip interface.
