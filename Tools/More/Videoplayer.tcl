@@ -52,7 +52,7 @@ proc Videoplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Videoplayer" "6"
+	LWDAQ_tool_init "Videoplayer" "8"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -751,10 +751,18 @@ proc Videoplayer_stream {} {
 	set info(control) "Stream"
 	LWDAQ_update
 
-	# Define the ffmpeg command.
+	# Define the ffmpeg command. We want the display to keep up with the stream.
+	# We are not worried about retaining all frames. We tell ffmpeg to probe the
+	# incoming stream for no more than 500 KByte and to spend no more than 1 s
+	# on figuring out the incoming stream video format. This keeps the display
+	# startup delay down to less then one second. We set ffmpeg to buffer no
+	# frames, to display with as little delay as possible, so that the display
+	# will catch up with the stream rather than respect the frame rate. 
 	set cmd "| $info(ffmpeg) \
 		-nostdin \
 		-loglevel error \
+		-fflags nobuffer -flags low_delay \
+		-probesize 500k -analyzeduration 1000000 \
 		-i $stream \
 		-c:v rawvideo \
 		-pix_fmt $config(video_pix_fmt) \
