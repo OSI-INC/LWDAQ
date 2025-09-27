@@ -2354,7 +2354,7 @@ proc RAG_Manager_retrieve {} {
 	if {($rel < $config(high_rel_thr)) \
 			&& ($rel >= $config(mid_rel_thr)) \
 			&& ([llength $question_history] > 0)} {
-		RAG_Manager_print "A mid-relevance question, relevance=$rel, \
+		RAG_Manager_print "A mid-relevance question, relevance=$rel,\
 			repeat retrieval with one previous question appended."
 		set new_question "[lindex $question_history 0] $question"
 		set question_history [lreplace $question_history 0 0]
