@@ -527,15 +527,19 @@ proc LWDAQ_print {args} {
 
 	set color [lindex $args 2]
 	if {$color == ""} {set color black}
+	set message_type "NORMAL"
 	if {[regexp {^SUGGESTION: } $print_str]} {
+		set message_type "SUGGESTION"
 		set color $LWDAQ_Info(suggestion_color)
 		set print_str [regsub -all {^SUGGESTION: SUGGESTION: } $print_str {SUGGESTION: }]
 	}
 	if {[regexp {^WARNING: } $print_str]} {
+		set message_type "WARNING"
 		set color $LWDAQ_Info(warning_color)
 		set print_str [regsub -all {^WARNING: WARNING: } $print_str {WARNING: }]
 	}
 	if {[regexp {^ERROR: } $print_str]} {
+		set message_type "ERROR"
 		set color $LWDAQ_Info(error_color)
 		set print_str [regsub -all {^ERROR: ERROR: } $print_str {ERROR: }]
 	}
@@ -557,10 +561,17 @@ proc LWDAQ_print {args} {
 		}
 	} {
 		if {($destination == "stdout") || ($destination == "stderr")} {
+			if {$message_type != "NORMAL"} {set color "$color\_bold"}
 			if {$LWDAQ_Info(stdout_available)} {
 				switch -- $color {
-					crimson -
-					red {set a "\033\[31m$print_str\033\[0m"}
+					red_bold {set a "\033\[1;31m$print_str\033\[0m"}
+					
+					blue_bold {set a "\033\[1;34m$print_str\033\[0m"}
+					
+					green_bold {set a "\033\[1;32m$print_str\033\[0m"}
+
+					red -
+					crimson {set a "\033\[31m$print_str\033\[0m"}
 					
 					indigo -
 					azure -
