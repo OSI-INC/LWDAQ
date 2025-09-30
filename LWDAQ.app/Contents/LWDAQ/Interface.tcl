@@ -45,6 +45,7 @@ proc LWDAQ_interface_init {} {
 	set LWDAQ_Info(numbered_colors) "red green blue orange yellow\
 		magenta brown salmon LightSlateBlue black gray40 gray60 maroon\
 		green4 blue4 brown4"
+	set LWDAQ_Info(print_tart) "stdout"
 
 	if {!$LWDAQ_Info(gui_enabled)} {return ""}
 
@@ -503,8 +504,9 @@ proc LWDAQ_enable_text_undo {t} {
 # flag is set. Otherwise the routine does nothing. Another service provided by
 # the routine is to replace double occurrances of "ERROR:" and "WARNING:" that
 # might arise as we pass error and warning strings through various routines
-# before they are printed. The routine returns the name of the text widget,
-# file, or channel it wrote to.
+# before they are printed. If it encounters no error, this routine returns an
+# empty string. If we want to know where it printed to, we check the
+# print_target element in LWDAQ_Info immediately after running LWDAQ_print.
 #
 proc LWDAQ_print {args} {
 	global LWDAQ_Info
@@ -614,7 +616,8 @@ proc LWDAQ_print {args} {
 		}
 	}
 	
-	return "$destination"
+	set LWDAQ_Info(print_target) $destination
+	return ""
 }
 
 #
