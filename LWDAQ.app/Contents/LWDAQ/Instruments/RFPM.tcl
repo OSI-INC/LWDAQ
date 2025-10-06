@@ -30,10 +30,6 @@ proc LWDAQ_init_RFPM {} {
 	array unset config
 	array unset info
 	
-	# The info array elements will not be displayed in the 
-	# instrument window. The only info variables set in the 
-	# LWDAQ_open_Instrument procedure are those which are checked
-	# only when the instrument window is open.
 	set info(name) "RFPM"
 	set info(control) "Idle"
 	set info(counter) 0 
@@ -52,28 +48,20 @@ proc LWDAQ_init_RFPM {} {
 	set info(daq_image_top) -1
 	set info(daq_image_bottom) -1
 	set info(daq_password) "no_password"
-	set info(A3008_commands) "\
-		0000000010000100 \
-		0000000010000101 \
-		0000000010000110 \
-		0000000010000111"
-	set info(A3008_FS_bit) 3
-	set info(A3008_DIN_bit) 4
-	set info(A3008_SCLK_bit) 5
-	set info(A3008_COEN_bit) 8
-	set info(A3008_LOEN_bit) 2
-	set info(A3008_CFR_bit) 9
-	set info(A3008_wake) "0000000010000000"
-	set info(daq_startup_skip) 10
-	set info(display_us_per_div) 0.5
-	set info(display_V_per_div) 0.1
-	set info(display_V_offset) 0
-	set info(display_num_div) 10
+	set info(start_cmd) "81"
+	set info(end_cmd) "82"
+	set info(dwell_cmd) "83"
+	set info(select_gnd) "0085"
+	set info(select_if1) "0086"
+	set info(select_if2) "0087"
+	set info(select_if3) "0088"
+	set info(data_startup_skip) "10"
+	set info(display_us_per_div) "0.5"
+	set info(display_V_per_div) "0.1"
+	set info(display_V_offset) "0.0"
+	set info(display_num_div) "10.0"
 	set info(verbose_description) "{Amplitude (V)}"
 	
-	# All elements of the config array will be displayed in the
-	# instrument window. No config array variables can be set in the
-	# LWDAQ_open_Instrument procedure
 	set config(image_source) "daq"
 	set config(file_name) ./Images/$info(name)\*
 	set config(memory_name) lwdaq_image_1
@@ -91,14 +79,12 @@ proc LWDAQ_init_RFPM {} {
 }
 
 #
-# LWDAQ_analysis_RFPM converts the ADC measurements
-# contained in $image_name into voltages, and plots them 
-# in the RFPM window. By default, the routine uses image 
-# $config(memory_name). If analysis_enable is set to 1, 
-# the analysis returns the peak-to-peak value of the 
-# signal on all four RFPM signal paths in units of ADC
-# counts. If analysis_enanalysis is 2, the analysis returns 
-# the rms values of the signals.
+# LWDAQ_analysis_RFPM converts the ADC measurements contained in $image_name
+# into voltages, and plots them in the RFPM window. By default, the routine uses
+# image $config(memory_name). If analysis_enable is set to 1, the analysis
+# returns the peak-to-peak value of the signal on all four RFPM signal paths in
+# units of ADC counts. If analysis_enanalysis is 2, the analysis returns the rms
+# values of the signals.
 #
 proc LWDAQ_analysis_RFPM {{image_name ""}} {
 	upvar #0 LWDAQ_config_RFPM config
@@ -121,9 +107,9 @@ proc LWDAQ_analysis_RFPM {{image_name ""}} {
 }
 
 #
-# LWDAQ_refresh_RFPM refreshes the display of the data, given new
-# display settings. RFPM analysis assumes that certain parameters
-# are stored in the image's results string. 
+# LWDAQ_refresh_RFPM refreshes the display of the data, given new display
+# settings. RFPM analysis assumes that certain parameters are stored in the
+# image's results string. 
 #
 proc LWDAQ_refresh_RFPM {} {
 	upvar #0 LWDAQ_config_RFPM config
@@ -137,8 +123,7 @@ proc LWDAQ_refresh_RFPM {} {
 }
 
 #
-# LWDAQ_controls_RFPM creates secial controls 
-# for the RFPM instrument.
+# LWDAQ_controls_RFPM creates secial controls for the RFPM instrument.
 #
 proc LWDAQ_controls_RFPM {} {
 	global LWDAQ_Info LWDAQ_Driver
@@ -182,9 +167,7 @@ proc LWDAQ_daq_RFPM {} {
 	upvar #0 LWDAQ_config_RFPM config
 
 	set repeat [expr $config(daq_num_samples) + $info(daq_startup_skip) - 1]
-	set data_size [expr \
-		[llength $info(A3008_commands)] * [expr $repeat + 1] \
-		+ $info(daq_image_width)]
+	set data_size [expr 4 * [expr $repeat + 1] + $info(daq_image_width)]
 	set max_data_size [expr $info(daq_image_width) * $info(daq_image_height)]
 	if {$data_size > $max_data_size} {
 		return "ERROR: Data size exceeds available image area."
@@ -197,36 +180,22 @@ proc LWDAQ_daq_RFPM {} {
 		LWDAQ_set_device_type $sock $info(daq_device_type)
 		LWDAQ_set_data_addr $sock $info(daq_image_width)
 		
-		#Transmit the eight-bit DAC value.
-		set cmd [LWDAQ_set_bit $info(A3008_wake) $info(A3008_FS_bit) 1]
-		LWDAQ_transmit_command_binary $sock $cmd
-		set cmd [LWDAQ_set_bit $cmd $info(A3008_SCLK_bit) 1]
-		LWDAQ_transmit_command_binary $sock $cmd
-		LWDAQ_transmit_command_binary $sock $cmd
-		LWDAQ_transmit_command_binary $sock $cmd
-		LWDAQ_transmit_command_binary $sock $cmd
-		for {set i 0} {$i < 8} {incr i} {
-			set cmd [LWDAQ_set_bit $cmd $info(A3008_DIN_bit) \
-				[string index [LWDAQ_decimal_to_binary $config(daq_dac_value) 8] $i]]
-			LWDAQ_transmit_command_binary $sock $cmd		
-		}
-		set cmd [LWDAQ_set_bit $cmd $info(A3008_DIN_bit) 0]
-		LWDAQ_transmit_command_binary $sock $cmd
-		LWDAQ_transmit_command_binary $sock $cmd
-		LWDAQ_transmit_command_binary $sock $cmd
-		LWDAQ_transmit_command_binary $sock $cmd	
-		LWDAQ_transmit_command_binary $sock $info(A3008_wake)
+		# Configure the spectrometer's local oscillator. 
+		set dac $info(daq_dac_value)
+		LWDAQ_transmit_command_hex $sock "[format %02X $dac]$config(start_cmd)"
+		set dac [expr $dac + 1]
+		LWDAQ_transmit_command_hex $sock "[format %02X $dac]$config(end_cmd)"
+		LWDAQ_transmit_command_hex $sock "[format %02X 1]$config(dwell_cmd)"
 
 		# Acquire traces for each of the four A3008 gain settings.
 		LWDAQ_byte_write $sock $LWDAQ_Driver(clen_addr) 0
-		foreach cmd $info(A3008_commands) {
-			LWDAQ_transmit_command_binary $sock $cmd
+		foreach src {gnd if1 if2 if3} {
+			LWDAQ_transmit_command_hex $sock $info(elect_$src)
 			LWDAQ_delay_seconds $sock 0.010
 			LWDAQ_set_repeat_counter $sock $repeat
 			LWDAQ_set_delay_ticks $sock $config(daq_delay_ticks)
 			LWDAQ_execute_job $sock $LWDAQ_Driver(adc8_job)
 		}
-		LWDAQ_sleep $sock
 		LWDAQ_byte_write $sock $LWDAQ_Driver(clen_addr) 1
 		
 		set image_contents [LWDAQ_ram_read $sock 0 $data_size]
