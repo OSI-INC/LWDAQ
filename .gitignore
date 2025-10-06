@@ -1,13 +1,26 @@
-/**/.DS_Store
-/Tools/Data/*.tcl
-/LWDAQ.app/Contents/LWDAQ/Toolmaker.tcl
-/LWDAQ.app/Contents/LWDAQ/Packages/pkgIndex.tcl
-/LWDAQ.app/Contents/LWDAQ/Configuration/*.tcl
-/LWDAQ.app/Contents/LWDAQ/Temporary/*.tcl
+# MacOS Metadata
+.DS_Store
+._*
+.AppleDouble
+
+# Code Signing Artifacts.
+_CodeSignature/
+
+# LWDAQ Build Outputs
 /Build/*.o
 /Build/*.so
 /Build/*.dylib
 /Build/*.dll
 /Build/*.ppu
 /Build/*.exe
+
+# Transient Tcl Scripts and Generated Files
+/Tools/Data/*.tcl
+/LWDAQ.app/Contents/LWDAQ/Toolmaker.tcl
+/LWDAQ.app/Contents/LWDAQ/Packages/pkgIndex.tcl
+/LWDAQ.app/Contents/LWDAQ/Configuration/*.tcl
+/LWDAQ.app/Contents/LWDAQ/Temporary/*.tcl
+
+# Icon files.
 /LWDAQ.app/Icon?
+Icon?
