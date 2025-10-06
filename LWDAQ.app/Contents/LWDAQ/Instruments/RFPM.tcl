@@ -51,11 +51,11 @@ proc LWDAQ_init_RFPM {} {
 	set info(start_cmd) "81"
 	set info(end_cmd) "82"
 	set info(dwell_cmd) "83"
-	set info(select_gnd) "0085"
-	set info(select_if1) "0086"
-	set info(select_if2) "0087"
-	set info(select_if3) "0088"
-	set info(data_startup_skip) "10"
+	set info(select_gnd) "0084"
+	set info(select_if1) "0085"
+	set info(select_if2) "0086"
+	set info(select_if3) "0087"
+	set info(daq_startup_skip) "10"
 	set info(display_us_per_div) "0.5"
 	set info(display_V_per_div) "0.1"
 	set info(display_V_offset) "0.0"
@@ -180,17 +180,19 @@ proc LWDAQ_daq_RFPM {} {
 		LWDAQ_set_device_type $sock $info(daq_device_type)
 		LWDAQ_set_data_addr $sock $info(daq_image_width)
 		
-		# Configure the spectrometer's local oscillator. 
-		set dac $info(daq_dac_value)
-		LWDAQ_transmit_command_hex $sock "[format %02X $dac]$config(start_cmd)"
+		# Configure the spectrometer's local oscillator to dither between two
+		# frequencies one step apart. The dither stops a false zero for constant
+		# frequency interference near the LO frequency.
+		set dac $config(daq_dac_value)
+		LWDAQ_transmit_command_hex $sock "[format %02X $dac]$info(start_cmd)"
 		set dac [expr $dac + 1]
-		LWDAQ_transmit_command_hex $sock "[format %02X $dac]$config(end_cmd)"
-		LWDAQ_transmit_command_hex $sock "[format %02X 1]$config(dwell_cmd)"
+		LWDAQ_transmit_command_hex $sock "[format %02X $dac]$info(end_cmd)"
+		LWDAQ_transmit_command_hex $sock "[format %02X 3]$info(dwell_cmd)"
 
 		# Acquire traces for each of the four A3008 gain settings.
 		LWDAQ_byte_write $sock $LWDAQ_Driver(clen_addr) 0
 		foreach src {gnd if1 if2 if3} {
-			LWDAQ_transmit_command_hex $sock $info(elect_$src)
+			LWDAQ_transmit_command_hex $sock $info(select_$src)
 			LWDAQ_delay_seconds $sock 0.010
 			LWDAQ_set_repeat_counter $sock $repeat
 			LWDAQ_set_delay_ticks $sock $config(daq_delay_ticks)
@@ -213,9 +215,7 @@ proc LWDAQ_daq_RFPM {} {
 		-top $info(daq_image_top) \
 		-bottom $info(daq_image_bottom) \
 		-data $image_contents \
-		-results "$config(daq_num_samples) \
-			$info(daq_startup_skip) \
-			[llength $info(A3008_commands)]" \
+		-results "$config(daq_num_samples) $info(daq_startup_skip) 4" \
 		-name "$info(name)\_$info(counter)"]
 	return $config(memory_name) 
 } 
