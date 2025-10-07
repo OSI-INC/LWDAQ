@@ -55,6 +55,8 @@ proc LWDAQ_init_RFPM {} {
 	set info(select_if1) "0085"
 	set info(select_if2) "0086"
 	set info(select_if3) "0087"
+	set info(dither) "1"
+	set info(dwell) "3"
 	set info(daq_startup_skip) "10"
 	set info(display_us_per_div) "0.5"
 	set info(display_V_per_div) "0.1"
@@ -167,7 +169,9 @@ proc LWDAQ_daq_RFPM {} {
 	upvar #0 LWDAQ_config_RFPM config
 
 	set repeat [expr $config(daq_num_samples) + $info(daq_startup_skip) - 1]
-	set data_size [expr 4 * [expr $repeat + 1] + $info(daq_image_width)]
+	set channels "gnd if1 if2 if3"
+	set data_size [expr [llength $channels] * [expr $repeat + 1] \
+		+ $info(daq_image_width)]
 	set max_data_size [expr $info(daq_image_width) * $info(daq_image_height)]
 	if {$data_size > $max_data_size} {
 		return "ERROR: Data size exceeds available image area."
@@ -185,13 +189,13 @@ proc LWDAQ_daq_RFPM {} {
 		# frequency interference near the LO frequency.
 		set dac $config(daq_dac_value)
 		LWDAQ_transmit_command_hex $sock "[format %02X $dac]$info(start_cmd)"
-		set dac [expr $dac + 1]
+		if {$dac <= 255 - $info(dither)} {set dac [expr $dac + $info(dither)]}
 		LWDAQ_transmit_command_hex $sock "[format %02X $dac]$info(end_cmd)"
-		LWDAQ_transmit_command_hex $sock "[format %02X 3]$info(dwell_cmd)"
+		LWDAQ_transmit_command_hex $sock "[format %02X $info(dwell)]$info(dwell_cmd)"
 
 		# Acquire traces for each of the four A3008 gain settings.
 		LWDAQ_byte_write $sock $LWDAQ_Driver(clen_addr) 0
-		foreach src {gnd if1 if2 if3} {
+		foreach src $channels {
 			LWDAQ_transmit_command_hex $sock $info(select_$src)
 			LWDAQ_delay_seconds $sock 0.010
 			LWDAQ_set_repeat_counter $sock $repeat
@@ -215,7 +219,8 @@ proc LWDAQ_daq_RFPM {} {
 		-top $info(daq_image_top) \
 		-bottom $info(daq_image_bottom) \
 		-data $image_contents \
-		-results "$config(daq_num_samples) $info(daq_startup_skip) 4" \
+		-results "$config(daq_num_samples) $info(daq_startup_skip)\
+			[llength $channels]" \
 		-name "$info(name)\_$info(counter)"]
 	return $config(memory_name) 
 } 
