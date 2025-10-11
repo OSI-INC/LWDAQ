@@ -21,7 +21,7 @@ proc DM_Check_init {} {
 #
 # Set up the tool within LWDAQ.
 #
-	LWDAQ_tool_init "DM_Check" "1.1"
+	LWDAQ_tool_init "DM_Check" "1.2"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Process control variabls.
@@ -59,7 +59,7 @@ proc DM_Check_init {} {
 	set info(A3008E_end_cmd) "82"
 	set info(A3008E_dwell_cmd) "83"
 	set config(A3008E_ip_addr) "192.168.1.11"
-	set config(A3008E_driver_socket) "2"
+	set config(A3008E_driver_socket) "3"
 #
 # Target parameters for our A3057B, which reads the P and D outputs from the detector
 # module.
@@ -71,8 +71,8 @@ proc DM_Check_init {} {
 # attenuator value, in case we put an attenuator in between the generator and
 # our detector module.
 #
-	set config(meas_step) "2.0"
-	set config(meas_pwrs) "-40 -30 -20 -10 0"
+	set config(test_step) "2.0"
+	set config(test_pwrs) "-75 -60 -45 -30"
 	set config(attenuator) "30"
 #
 # Display parameters.
@@ -84,7 +84,9 @@ proc DM_Check_init {} {
 	set config(plot_y_min) "0.0"
 	set config(plot_y_max) "2.2"
 	set config(plot_x_div) "10.0"
-	set config(plot_y_div) "0.2"	
+	set config(plot_y_div) "0.2"
+	set config(plot_line_width) "2"
+	set config(plot_first_color) "1"
 #
 # Display initialization.
 #
@@ -109,7 +111,7 @@ proc DM_Check_init {} {
 	set info(measurements) ""
 	set info(measurement_header) ""
 	set config(serial_number) "ABCD"
-	set config(data_dir) "~/Desktop"
+	set config(data_dir) "/Users/kevan/Active/OSI/Electronics/A3042/Data"
 #
 # Look for a saved configuration file, and if we find one, load it.
 #
@@ -142,7 +144,7 @@ proc DM_Check_browse {} {
 	set ndir [LWDAQ_get_dir_name]
 	if {($ndir != "") && ([file exists $ndir])} {
 		set config(data_dir) $ndir
-		LWDAQ_print $info(text) "Set data directory to $ndir."
+		LWDAQ_print $info(text) "Data Directory: \"$ndir\"."
 	}
 	return $ndir
 }
@@ -161,7 +163,7 @@ proc DM_Check_store {} {
 		puts $f $meas
 	}
 	close $f
-	LWDAQ_print $info(text) "Stored measurements in \"$fn\"."
+	LWDAQ_print $info(text) "Stored: \"$fn\"."
 	return $fn
 }
 
@@ -457,13 +459,15 @@ proc DM_Check_plot {measurements} {
 				-y_max $config(plot_y_max) \
 				-y_div $config(plot_y_div)
 	}
+	set color [expr $config(plot_first_color) - 1]
 	for {set i 1} {$i < [llength [lindex $measurements 0]]} {incr i} {
 		set sweep ""
 		foreach meas $measurements {
 			append sweep "[lindex $meas 0] [lindex $meas $i] "
 		}
-		if {$i % 2 == 0} {
+		if {$i % 2 == 1} {
 			set img $info(power_image)
+			incr color
 		} else {
 			set img $info(demod_image)
 		}
@@ -472,7 +476,8 @@ proc DM_Check_plot {measurements} {
 			-x_max $config(sweep_high) \
 			-y_min $config(plot_y_min) \
 			-y_max $config(plot_y_max) \
-			-color $i -width 2
+			-color $color \
+			-width $config(plot_line_width)
 	}
 	foreach d {power demod} {
 		lwdaq_draw $info($d\_image) $info($d\_photo)
@@ -509,17 +514,16 @@ proc DM_Check_measure {{freq ""}} {
 		DM_Check_clear
 		set freq $config(sweep_low)
 		set header "Freq "
-		foreach pwr $config(meas_pwrs) {
-			append header "P[format %.1f [expr $pwr - $config(attenuator)]]\
-				D[format %.1f [expr $pwr - $config(attenuator)]] "
+		foreach pwr $config(test_pwrs) {
+			append header "P[format %.1f $pwr] D[format %.1f $pwr] "
 		}
 		LWDAQ_print $info(text) $header 
 		set info(measurement_header) $header
 	} 
 	
 	set line "$freq "
-	foreach pwr $config(meas_pwrs) {
-		DM_Check_gen_on $freq $pwr
+	foreach pwr $config(test_pwrs) {
+		DM_Check_gen_on $freq [expr $pwr + $config(attenuator)]
 		LWDAQ_wait_ms $config(gen_wait_ms)
 		DM_Check_gen_read 0
 		set iconfig(analysis_auto_calib) "1"
@@ -536,7 +540,7 @@ proc DM_Check_measure {{freq ""}} {
 	DM_Check_plot $info(measurements)
 	
 	if {$freq < $config(sweep_high)} {
-		set freq [format %.3f [expr $freq + $config(meas_step)]]
+		set freq [format %.3f [expr $freq + $config(test_step)]]
 		LWDAQ_post [list DM_Check_measure $freq]
 	} else {
 		LWDAQ_print $info(text) "Measurement Complete" purple
@@ -589,7 +593,7 @@ proc DM_Check_open {} {
 	pack $f -side top -fill x
 	
 	foreach {a width} {gen_port 25 sweep_low 8 sweep_high 8\
-			meas_step 4 meas_pwrs 16 attenuator 4} {
+			test_step 4 test_pwrs 16 attenuator 4} {
 		label $f.l$a -text "$a:"
 		entry $f.e$a -textvariable DM_Check_config($a) -width $width
 		pack $f.l$a $f.e$a -side left -expand yes
