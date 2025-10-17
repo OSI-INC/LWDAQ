@@ -21,7 +21,7 @@ proc DM_Check_init {} {
 #
 # Set up the tool within LWDAQ.
 #
-	LWDAQ_tool_init "DM_Check" "1.2"
+	LWDAQ_tool_init "DM_Check" "1.3"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Process control variabls.
@@ -168,14 +168,17 @@ proc DM_Check_store {} {
 }
 
 #
-# DM_Check_read reads an existing data file, sets the serial number, and
-# plots.
+# DM_Check_read reads an existing data file, sets the serial number using the
+# file name, reads the power values from the header line, and plots the graphs.
 #
 proc DM_Check_read {} {
 	upvar #0 DM_Check_info info
 	upvar #0 DM_Check_config config
 
-	set fn [LWDAQ_get_file_name 0]
+	if {![file exists $config(data_dir)]} {
+		set config(data_dir) "~"
+	}
+	set fn [LWDAQ_get_file_name 0 $config(data_dir)]
 	if {($fn == "") || ![file exists $fn]} {
 		return ""
 	}
@@ -183,6 +186,13 @@ proc DM_Check_read {} {
 	set contents [split [string trim [read $f]] \n]
 	close $f
 	set info(measurement_header) [lindex $contents 0]
+	set codes [lrange $info(measurement_header) 1 end]
+	set config(test_pwrs) ""
+	foreach {p d} $codes {
+		if {[regexp {P([+|-][0-9]+\.[0-9]+)} $p match pwr]} {
+			lappend config(test_pwrs) $pwr
+		}
+	}
 	set info(measurements) [lrange $contents 1 end]
 	set config(serial_number) [file root [file tail $fn]]
 	set config(data_dir) [file dirname $fn]
@@ -650,15 +660,17 @@ proc DM_Check_help {} {
 	
 	LWDAQ_print $info(text) {
 	
-The program will run on Windows, MacOS, Linux, and Rasbian. The only thing you
-have to figure out on your particular platform is the name or mount point of
-your RF Explorer once you plug it into your computer. On MacOS, use something
+This tool will run on Windows, MacOS, Linux, and Rasbian. On all three
+platforms, it will connect over USB to an RF Explorer signal generator and
+connect over TCP/IP to a LWDAQ Driver to read out an Input-Output Head (A2057B).
+The only thing that varies from one platform to another is the USB mount point
+of your RF Explorer once you plug it into your computer. On MacOS, use something
 matching "/dev/cu.*". On Windows, it will be something like "\\.\COM13", or for
 COM1-COM9, just "COM1" to "COM9". On Linux it will be another "/dev"-like value.
-On MacOS, USB devices appear in two places, one is a /dev/tty.*" and the other
-is /dev/cu.*. Use the "cu" one. There may be similar dual-entries on Windows and
-Linux. One entry is for an stty interface, the other for a more generic
-interface such as the one provided by Tcl's channel routines.
+On MacOS, USB devices appear in two places, one is a
+/dev/tty.*" and the other is /dev/cu.*. Use the "cu" one. There may be similar
+dual-entries on Windows and Linux. One entry is for an stty interface, the other
+for a more generic interface such as the one provided by Tcl's channel routines.
 
 [09-OCT-25] Kevan Hashemi, Open Source Instruments Inc.
 	} brown
