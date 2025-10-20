@@ -619,6 +619,8 @@ proc Neuroplayer_init {} {
 	set info(export_size_s) "0"
 	set config(export_reps) "1"
 	set config(export_activity_max) "10000"
+	set config(export_loss_replace) "0"
+	set config(export_null_value) "32768"
 	set info(export_timestamp) "0"
 	set info(export_buffer) [list]
 	set info(export_sequence) [list]
@@ -5718,7 +5720,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			# export format. If we are combining multiple channels into one
 			# file, we will write the same data to the combined file. Our export
 			# file or buffer will receive consecutive blocks of data from the
-			# exported channels.
+			# exported channels. If we have the export_loss_replace flag set, we
+			# will replace the signal with all null-values before export.
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
 					set sfn [file join $config(export_dir) \
@@ -5733,6 +5736,16 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				set last_channel \
 					[string match "$info(channel_num):*" \
 						[lindex $config(channel_selector) end]]
+						
+				if {$config(export_loss_replace)} {
+					if {$info(loss) > 1 - $config(min_reception)} {
+						set replace_values ""
+						foreach value $info(values) {
+							lappend replace_values $config(export_null_value)
+						}
+						set info(values) $replace_values
+					}
+				}
 						
 				if {$config(export_format) == "TXT"} {
 					set f [open $sfn a]

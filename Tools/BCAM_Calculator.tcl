@@ -236,7 +236,7 @@ proc BCAM_Calculator_print_result {dc s} {
 		}
 	}
 	if {$config(output_style) == "Fancy"} {
-		append line "<h2 style=\"page-break-before: always;\">Calibration Certificate: \
+		append line "<h2>Calibration Certificate:\
 			[BCAM_Calculator_get_param $dc device_id]</h2>\n"
 		foreach p {device_id calibration_time calibration_type \
 				apparatus_version operator_name} {
@@ -248,7 +248,7 @@ proc BCAM_Calculator_print_result {dc s} {
 	}
 	append line $s
 	if {$config(output_style) == "Fancy"} {
-		append line "</pre>"
+		append line "</pre>\n"
 	}
 	
 	set w [string first "WARNING: " $line]
