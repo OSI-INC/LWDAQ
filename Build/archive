@@ -77,45 +77,51 @@ echo "Software Version: $VERSION"
 cd $BUILD_DIR
 make clean
 
-# Prepare to make archive.
-echo "Preparing LWDAQ files for archive..."
-rm $LWDAQ_DIR/Tools/Data/*.*
-rm $LIB_DIR/Configuration/*.tcl
-rm $LIB_DIR/Temporary/*.tcl
+# Replace some files with dedicated distribution files.
+echo "Exchanging LWDAQ files for distribution..."
 mv $LIB_DIR/Toolmaker.tcl $MASTER_DIR/Toolmaker.tcl
 mv $LIB_DIR/Toolmaker_Distribute.tcl $LIB_DIR/Toolmaker.tcl
 
-# We move the .git library out of the LWDAQ 
-# package because it is large.
-mv $GIT_DIR $MASTER_DIR/GIT
-
-# Move to master directory and define archive name.
-cd $MASTER_DIR
-ARCHIVE=LWDAQ_$VERSION.zip
-
 # Make the zip archive. The archive will appear beside the 
 # LWDAQ directory.
+cd $MASTER_DIR
 if [ $OS == "MacOS" ]
 then
 # On MacOS we use the ditto command on MacOS because it 
 # preserve MacOS resource information, so that the LWDAQ
 # program icon will be intact when we unzip on another MacOS
 # machine.
-	echo "Creating $ARCHIVE with MacOS compression utility..."
-	ditto -c -k --sequesterRsrc --keepParent `basename $LWDAQ_DIR` $ARCHIVE
+	echo "Creating LWDAQ_$VERSION.zip with ditto compression utility..."
+	rsync -a \
+	  --exclude='.git' \
+	  --exclude='.gitignore' \
+	  --exclude='Tools/Data/*' \
+	  --exclude='LWDAQ.app/Contents/LWDAQ/Configuration/*.tcl' \
+	  --exclude='LWDAQ.app/Contents/LWDAQ/Temporary/*.tcl' \
+	  "LWDAQ/" Distribution/LWDAQ_$VERSION
+	cd Distribution
+	ditto -c -k --sequesterRsrc --keepParent LWDAQ_$VERSION ../LWDAQ_$VERSION.zip
+	cd ..
+	rm -rf Distribution
 else
-# We use the zip command on other platforms. It does not 
-# preserve the MacOS icon. We try to remove resource information
-# to make a more generic archive with the X option.
-	echo "Creating $ARCHIVE with zip compression utility..."
-	zip -rqX $ARCHIVE `basename $LWDAQ_DIR`
+# We use the zip command on other platforms. It does not preserve the MacOS
+# icon. We try to remove resource information to make a more generic archive
+# with the X option.
+	echo "Creating LWDAQ_$VERSION.zip with zip compression utility..."
+	mv LWDAQ LWDAQ_$VERSION
+	zip -rqX LWDAQ_$VERSION.zip LWDAQ_$VERSION \
+		-x "LWDAQ_$VERSION/.git" \
+		"LWDAQ_$VERSION/.gitignore" \
+		"LWDAQ_$VERSION/Tools/Data/*" \
+		"LWDAQ_$VERSION/LWDAQ.app/Contents/LWDAQ/Configuration/*.tcl" \
+		"LWDAQ_$VERSION/LWDAQ_app/Contents/LWDAQ/Temporary/*.tcl"
+	mv LWDAQ_$VERSION LWDAQ
 fi
 
-# Restore LWDAQ files to former places.
-echo "Restoring LWDAQ files."
+# Restore files.
+echo "Restoring LWDAQ files with originals..."
 mv $LIB_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker_Distribute.tcl
 mv $MASTER_DIR/Toolmaker.tcl $LIB_DIR/Toolmaker.tcl
-mv $MASTER_DIR/GIT $GIT_DIR
 
 # Copy documents to website.
 DOCS="../Active/OSI/Software/LWDAQ"
