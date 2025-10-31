@@ -21,8 +21,8 @@ set num_errors 0
 
 # Set version numbers in a few entries of the global LWDAQ_Info array
 set LWDAQ_Info(program_name) "LWDAQ"
-set LWDAQ_Info(program_version) "10.8"
-set LWDAQ_Info(program_patchlevel) "10.8.2"
+set LWDAQ_Info(program_version) "10.7"
+set LWDAQ_Info(program_patchlevel) "10.7.4"
 set LWDAQ_Info(tcl_version) [info patchlevel]
 set LWDAQ_Init(default_prompt) "LWDAQ$ "
 set LWDAQ_Info(prompt) $LWDAQ_Init(default_prompt)

@@ -1956,17 +1956,17 @@ begin
 	input_string:=ip^.results;
 	num_samples:=read_integer(input_string);
 	if (num_samples>(ip^.j_size-1)*ip^.i_size) or (num_samples<1) then begin
-		report_error('Invalid num_samples in lwdaq_sct_receiver');
+		report_error('Invalid num_samples in lwdaq_A3008_rfpm');
 		exit;
 	end;
 	startup_skip:=read_integer(input_string);
 	if (startup_skip>ip^.i_size) or (startup_skip<=0) then begin
-		report_error('Invalid startup_skip in lwdaq_sct_receiver');
+		report_error('Invalid startup_skip in lwdaq_A3008_rfpm');
 		exit;
 	end;
 	num_channels:=read_integer(input_string);
 	if (num_channels>max_num_channels) or (num_channels<=0) then begin
-		report_error('Invalid num_channels in lwdaq_sct_receiver');
+		report_error('Invalid num_channels in lwdaq_A3008_rfpm');
 		exit;
 	end;
 
