@@ -515,6 +515,13 @@ proc LWDAQ_open {name} {
 	upvar #0 LWDAQ_info_$name info
 	upvar #0 LWDAQ_config_$name config
 	
+	# See if we have graphics available. If not, set the info(text) to point
+	# to stdout and return.
+	if {!$LWDAQ_Info(gui_enabled)} {
+		set info(text) "stdout"
+		return ""
+	}
+	
 	# See if the instrument window already exists, and if it does, bring
 	# it to the front and return.
 	set w $info(window)
@@ -602,11 +609,14 @@ proc LWDAQ_close {name} {
 
 #
 # LWDAQ_instrument_save saves instrument settings to a settings file in the
-# LWDAQ configuration directory, so they will be loaded automatically when LWDAQ is
-# next launched, or when a new LWDAQ is spawned. There is one parameter we don't
-# want to save or read back: the name of the data image, which is something that
-# cannot persist from one launch of LWDAQ to the next. It returns the name of the
-# settings file.
+# LWDAQ configuration directory. The next time LWDAQ is launched, these settings
+# will be loaded automatically. Any other instance of LWDAQ launched from the
+# same directory tree will receive the same settings. There is one parameter we
+# don't want to save or read back: the name of the data image, which is
+# something that cannot persist from one launch of LWDAQ to the next. The
+# routine returns the name of the settings file. If the instrument panel is open
+# at the time this routine executes, the routine writes a confirmation message
+# to the panel text window.
 #
 proc LWDAQ_instrument_save {name} {
 	global LWDAQ_Info 
@@ -629,6 +639,10 @@ proc LWDAQ_instrument_save {name} {
 	}
 
 	close $f
+	
+	if {[winfo exists $info(text)]} {
+		LWDAQ_print $info(text) "$name settings saved to disk."
+	}
 	return $fn
 }
 
@@ -639,12 +653,20 @@ proc LWDAQ_instrument_save {name} {
 #
 proc LWDAQ_instrument_unsave {name} {
 	global LWDAQ_Info 
+	upvar LWDAQ_info_$name info
+	upvar LWDAQ_config_$name config
 
 	set fn [file join $LWDAQ_Info(config_dir) "$name\_Settings.tcl"]
 	if {[file exists $fn]} {
 		file delete $fn
+		if {[winfo exists $info(text)]} {
+			LWDAQ_print $info(text) "$name settings file deleted."
+		}
 		return $fn
 	} {
+		if {[winfo exists $info(text)]} {
+			LWDAQ_print $info(text) "No $name settings file exists."
+		}
 		return ""
 	}
 }

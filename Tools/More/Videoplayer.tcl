@@ -1250,7 +1250,8 @@ return ""
 
 The Videoplayer provides silent playback of videos, capture and display of
 silent video streams, examination of video characteristics, and re-encoding of
-videos.
+videos. It is used by the Videoarchiver to perform live streaming of video. We
+use it to compress videos before adding them to our website.
 
 When launched from the LWDAQ Tool menu, the Videoplayer presents a graphical
 user interface with buttons to select and play videos, adjust playback speed,

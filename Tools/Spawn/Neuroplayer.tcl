@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "174"
+	LWDAQ_tool_init "Neuroplayer" "175"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -619,6 +619,8 @@ proc Neuroplayer_init {} {
 	set info(export_size_s) "0"
 	set config(export_reps) "1"
 	set config(export_activity_max) "10000"
+	set config(export_loss_replace) "0"
+	set config(export_null_value) "32768"
 	set info(export_timestamp) "0"
 	set info(export_buffer) [list]
 	set info(export_sequence) [list]
@@ -3958,14 +3960,36 @@ proc Neuroclassifier_load {{name ""}} {
 }
 
 #
-# Neurotracker_extract calculates the position of a transmitter over an array of
-# detector coils and returns the position as a sequency of xyz coordinates
-# accompanied by the power measurement provided by each detector coil. The
-# routine relies upon a prior call to lwdaq_receiver filling a list of power
-# measurements that correspond to some device we want to locate. This list
-# exists in the lwdaq library global variable space, but not in the LWDAQ TclTk
-# variable space. The indices allow the lwdaq_alt routine to find the message
-# payloads in the data image that correspond to the device.
+# Neurotracker_extract use ALT or TCB power measurements to estimate the
+# movement of a transmitter during the current playback interval. The routine
+# divides he interval into tracker_sample_rate * play_interval "slices". For
+# each slice, the routine calculates a position. The slices combined represent
+# the movement. Not only does the routine calculate a raw position, but it also
+# low-pass filters the position as directed by the filter_divisor parameter and
+# so obtains a smoothed position. The routine calculates activity as the
+# distance moved by the smoothed position during the interval. For each slice
+# the routine produces seven numbers: x, y, and z unfiltered, x, y, and z
+# filtered, and activity. In the case of an ALT, the routine calculates the
+# position of the power centroid of the transmitter. In the case of a TCB, it
+# returns the coordinates of the TCB's top antenna, which is the antenna that
+# recorded the greatest power from the transmitter. Having calculated these
+# seven numbers for a slice, the routine adds to the list all the ALT detector
+# coil powers, or the TCB top antenna power followed by the top antenna index.
+# The routine relies upon a prior call to lwdaq_receiver filling a list that
+# exists in the lwdaq library's private variable space. This list contains
+# pointers to the current channel's messages in the current data image. The
+# extraction routine calls either lwdaq_alt or lwdaq_tcb to obtain the slice
+# data, and it is these routines that make use of the list the lwdaq_receiver
+# fills out. The list allows the routines to find the message payloads that they
+# need to calculate position and return median power values. The filtering
+# performed by this routine is first-order. In order to provide the filtered
+# output for the current interval, the routine needs the unfiltered and filtered
+# output from the final slice of the previous interval. Each telemetry channel
+# has its own tracker history variable of the form info(tracker_id) where "id"
+# is the channel number. The extract routine sets the tracker history equal to
+# the final slice of the previous interval followed by all the slices of this
+# interval. In the routine, the current channel number's history is referred to
+# simply as "history".
 #
 proc Neurotracker_extract {} {
 	upvar #0 Neuroplayer_info info
@@ -5696,7 +5720,8 @@ proc Neuroexporter_export {{cmd "Start"}} {
 			# export format. If we are combining multiple channels into one
 			# file, we will write the same data to the combined file. Our export
 			# file or buffer will receive consecutive blocks of data from the
-			# exported channels.
+			# exported channels. If we have the export_loss_replace flag set, we
+			# will replace the signal with all null-values before export.
 			if {$config(export_signal)} {
 				if {$config(export_combine)} {
 					set sfn [file join $config(export_dir) \
@@ -5711,6 +5736,16 @@ proc Neuroexporter_export {{cmd "Start"}} {
 				set last_channel \
 					[string match "$info(channel_num):*" \
 						[lindex $config(channel_selector) end]]
+						
+				if {$config(export_loss_replace)} {
+					if {$info(loss) > 1 - $config(min_reception)} {
+						set replace_values ""
+						foreach value $info(values) {
+							lappend replace_values $config(export_null_value)
+						}
+						set info(values) $replace_values
+					}
+				}
 						
 				if {$config(export_format) == "TXT"} {
 					set f [open $sfn a]
@@ -7794,10 +7829,14 @@ proc Neuroplayer_play {{command ""}} {
 		
 		if {$config(alt_calculate) || [winfo exists $info(tracker_window)]} {
 			Neurotracker_extract
-		} 
+			set info(tracker_slices) [lrange $info(tracker_$info(channel_num)) 1 end]
+		} {
+			set info(tracker_slices) [list "0 0 0 0 0 0 0"]
+		}
 		if {[winfo exists $info(tracker_window)]} {
 			Neurotracker_plot
 		}
+		
 		if {![LWDAQ_is_error_result $result] && $en_proc} {
 			if {[catch {eval $info(processor_script)} error_result]} {
 				set result "ERROR: In $info(processor_file_tail)\
@@ -7809,6 +7848,7 @@ proc Neuroplayer_play {{command ""}} {
 				}
 			}
 		}
+		
 		if {$info(export_state) == "Play"} {
 			Neuroexporter_export "Play"
 			if {$info(play_control) == "Stop"} {break}

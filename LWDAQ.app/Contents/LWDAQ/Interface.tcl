@@ -45,6 +45,7 @@ proc LWDAQ_interface_init {} {
 	set LWDAQ_Info(numbered_colors) "red green blue orange yellow\
 		magenta brown salmon LightSlateBlue black gray40 gray60 maroon\
 		green4 blue4 brown4"
+	set LWDAQ_Info(print_tart) "stdout"
 
 	if {!$LWDAQ_Info(gui_enabled)} {return ""}
 
@@ -503,8 +504,9 @@ proc LWDAQ_enable_text_undo {t} {
 # flag is set. Otherwise the routine does nothing. Another service provided by
 # the routine is to replace double occurrances of "ERROR:" and "WARNING:" that
 # might arise as we pass error and warning strings through various routines
-# before they are printed. The routine returns the name of the text widget,
-# file, or channel it wrote to.
+# before they are printed. If it encounters no error, this routine returns an
+# empty string. If we want to know where it printed to, we check the
+# print_target element in LWDAQ_Info immediately after running LWDAQ_print.
 #
 proc LWDAQ_print {args} {
 	global LWDAQ_Info
@@ -525,15 +527,19 @@ proc LWDAQ_print {args} {
 
 	set color [lindex $args 2]
 	if {$color == ""} {set color black}
+	set message_type "NORMAL"
 	if {[regexp {^SUGGESTION: } $print_str]} {
+		set message_type "SUGGESTION"
 		set color $LWDAQ_Info(suggestion_color)
 		set print_str [regsub -all {^SUGGESTION: SUGGESTION: } $print_str {SUGGESTION: }]
 	}
 	if {[regexp {^WARNING: } $print_str]} {
+		set message_type "WARNING"
 		set color $LWDAQ_Info(warning_color)
 		set print_str [regsub -all {^WARNING: WARNING: } $print_str {WARNING: }]
 	}
 	if {[regexp {^ERROR: } $print_str]} {
+		set message_type "ERROR"
 		set color $LWDAQ_Info(error_color)
 		set print_str [regsub -all {^ERROR: ERROR: } $print_str {ERROR: }]
 	}
@@ -555,10 +561,17 @@ proc LWDAQ_print {args} {
 		}
 	} {
 		if {($destination == "stdout") || ($destination == "stderr")} {
+			if {$message_type != "NORMAL"} {set color "$color\_bold"}
 			if {$LWDAQ_Info(stdout_available)} {
 				switch -- $color {
-					crimson -
-					red {set a "\033\[31m$print_str\033\[0m"}
+					red_bold {set a "\033\[1;31m$print_str\033\[0m"}
+					
+					blue_bold {set a "\033\[1;34m$print_str\033\[0m"}
+					
+					green_bold {set a "\033\[1;32m$print_str\033\[0m"}
+
+					red -
+					crimson {set a "\033\[31m$print_str\033\[0m"}
 					
 					indigo -
 					azure -
@@ -614,7 +627,8 @@ proc LWDAQ_print {args} {
 		}
 	}
 	
-	return "$destination"
+	set LWDAQ_Info(print_target) $destination
+	return ""
 }
 
 #

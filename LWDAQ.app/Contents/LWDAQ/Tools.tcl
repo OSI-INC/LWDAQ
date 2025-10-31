@@ -221,8 +221,10 @@ proc LWDAQ_tool_init {name version} {
 	# inside the root window, rather than its own top-level window.
 	set info(window) [string tolower .$name]
 	
-	# If we are running with graphics, the tool will have its own text widget.
-	set info(text) $info(window).text
+	# If we are running with graphics, the tool will have its own text widget created
+	# by a tool-opening routine. In the meantime, we set the text window equal to 
+	# standard output.
+	set info(text) "stdout"
 
 	# Fill in elements common to all tools in all modes.
 	set info(name) $name
@@ -239,23 +241,34 @@ proc LWDAQ_tool_init {name version} {
 }
 
 #
-# LWDAQ_tool_open opens a tool window if none exists, and returns the name of
-# the window. The routine assumes that the tool has already been initialized. If
-# the tool window does exist, the routine raises the tool window and returns an
-# empty string. If graphics are disabled, the routine returns an empty string.
-# The routine recognises two special opening modes, Standalone and Slave, in
-# which the tool will take over the main window and delete the Quit button.
+# LWDAQ_tool_open is designed to perform the window-opening functions common to
+# all tools, and to adapt itself to the manner in which the tool is being
+# opened. A tool called "Tool" will most declare a procedure called Tool_open,
+# and this procedure should call LWDAQ_tool_open to create its toplevel window.
+# This routine opens a tool window if none exists, and returns the name of the
+# window. The routine assumes that the tool has already been initialized. If the
+# tool window already exist, the routine raises the tool window and returns an
+# empty string. If graphics are disabled, or if the tool is marked as being
+# incompatible with graphics, the routine sets the info(text) equal to standard
+# out and returns an empty string. The routine recognises two special opening
+# modes: "Standalone" and "Slave", in which the tool will take over the main
+# window and delete the Quit button.
 #
 proc LWDAQ_tool_open {name} {
+	global LWDAQ_Info
 	upvar #0 $name\_info info
 	
 	# Report an error if the tool has not been initialized.
 	if {![info exists info]} {
 		error "Cannot open $name window before initialization."
 	}
-
-	# Return if the tool is not supposed to be opened with graphics.
-	if {!$info(gui)} {return ""}
+	
+	# If graphics are not enabled, or if this tool is marked as being non-gui, then
+	# we just return an empty string.
+	if {!$LWDAQ_Info(gui_enabled) || !$info(gui)} {
+		set info(text) "stdout"
+		return ""
+	}
 
 	# Get the maximum size of the root window. We are going to double this
 	# for our tool window.
@@ -320,8 +333,8 @@ proc LWDAQ_tool_save {name} {
 		puts $f "set $info(name)\_config($name) \{$config($name)\}"
 	}
 	close $f
-	if {[info exists info(text)] && [winfo exists $info(text)]} {
-		LWDAQ_print $info(text) "$info(name) configuration saved to file."
+	if {[winfo exists $info(text)]} {
+		LWDAQ_print $info(text) "$info(name) configuration saved to disk."
 	}
 	return ""
 }
@@ -336,12 +349,12 @@ proc LWDAQ_tool_unsave {name} {
 	set fn $info(settings_file_name)
 	if {[file exists $fn]} {
 		file delete $fn
-		if {[info exists info(text)] && [winfo exists $info(text)]} {
+		if {[winfo exists $info(text)]} {
 			LWDAQ_print $info(text) "$info(name) configuration file deleted."
 		}
 		return $fn
 	} {
-		if {[info exists info(text)] && [winfo exists $info(text)]} {
+		if {[winfo exists $info(text)]} {
 			LWDAQ_print $info(text) "No $info(name) configuration file exists."
 		}
 		return ""
