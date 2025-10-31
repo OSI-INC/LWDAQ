@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "169"
+	LWDAQ_tool_init "Neurorecorder" "170"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -308,16 +308,17 @@ proc Neurorecorder_print {line {color "black"}} {
 }
 
 #
-# Neurorecorder_pick allows the user to pick a new record_directory.
+# Neurorecorder_pick allows the user to pick a file or directory. If the directory
+# or file name contains spaces, the routine generates a warning, but not an error.
 #
 proc Neurorecorder_pick {name {post 0}} {
 	upvar #0 Neurorecorder_config config
 	upvar #0 Neurorecorder_info info
 	global LWDAQ_Info
 
-	# If we call this routine from a button, we prefer to post
-	# its execution to the event queue, and this we can do by
-	# adding a parameter of 1 to the end of the call.
+	# If we call this routine from a button, we prefer to post its execution to
+	# the event queue, and this we can do by adding a parameter of 1 to the end
+	# of the call.
 	if {$post} {
 		LWDAQ_post [list Neurorecorder_pick $name]
 		return ""
@@ -329,6 +330,9 @@ proc Neurorecorder_pick {name {post 0}} {
 			Neurorecorder_print "WARNING: File \"$fn\" does not exist."
 			return $fn
 		}
+		if {[regexp { |\t} $fn]} {
+			Neurorecorder_print "WARNING: File name \"$fn\" contains white space."
+		}
 		set config($name) $fn
 		set info($name\_tail) [file tail $fn]
 		return $fn
@@ -338,6 +342,9 @@ proc Neurorecorder_pick {name {post 0}} {
 		if {![file exists $dn]} {
 			Neurorecorder_print "WARNING: Directory \"$dn\" does not exist."
 			return $dn
+		}
+		if {[regexp { |\t} $dn]} {
+			Neurorecorder_print "WARNING: Path name \"$dn\" contains spaces."
 		}
 		set config($name) $dn
 		return $dn

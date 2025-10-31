@@ -1169,21 +1169,26 @@ proc Stimulator_tp_run {} {
 	Stimulator_print $info(tp_text) "Assembly successful,\
 		uploading [llength $prog] code bytes."	
 	
-	# Get device number and initialize command list. Before we send the
-	# first byte of our program, we want to make sure the user program
-	# pointer in the IST is reset.
+	# Begin our first command with the instruction that resets the stimulator
+	# user program counter.
 	set commands [list $info(op_pgrst)]
 
+	# Divide the user program into segments of length tp_seg_len and transmit
+	# them separately, each as a separate command. The first command has a reset
+	# instruction followed by a program upload instruction. Subsequent commands
+	# have only the program upload instruction. The final command ends with a
+	# program-run instruction.
 	while {[llength $prog] > 0} {
 		
-		# Extract first few bytes.
+		# Extract first segment from the remaining user program.
 		set segment [lrange $prog 0 [expr $config(tp_seg_len)-1]]
 		set prog [lrange $prog $config(tp_seg_len) end]
 
-		# Add upload command and the number of program bytes.
+		# Add upload instruction with its operand, which is the number of 
+		# program bytes that are to follow.
 		lappend commands $info(op_pgld) [llength $segment]
 	
-		# Add all the program bytes.
+		# Add the program segment.
 		set commands [concat $commands $segment]
 	
 		# After the final chunk, we enable the program.

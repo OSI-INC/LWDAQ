@@ -21,7 +21,7 @@ proc DM_Check_init {} {
 #
 # Set up the tool within LWDAQ.
 #
-	LWDAQ_tool_init "DM_Check" "1.4"
+	LWDAQ_tool_init "DM_Check" "1.5"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Process control variabls.
@@ -49,7 +49,8 @@ proc DM_Check_init {} {
 	set config(freq_low) "880.000"
 	set config(freq_high) "950.000"
 #
-# Calibration constants of the A3008E we use to generate the fast sweep.
+# Calibration constants and target parameters for the A3008E we use to generate
+# the fast sweep.
 #
 	set config(A3008E_dwell_us) "4"
 	set config(A3008E_f_ref) "915.0"
@@ -58,13 +59,12 @@ proc DM_Check_init {} {
 	set info(A3008E_start_cmd) "81"
 	set info(A3008E_end_cmd) "82"
 	set info(A3008E_dwell_cmd) "83"
-	set config(A3008E_ip_addr) "192.168.1.11"
-	set config(A3008E_driver_socket) "3"
+	set config(A3008E_driver_socket) "2"
+	set config(driver_ip_addr) "192.168.1.11"
 #
-# Target parameters for our A3057B, which reads the P and D outputs from the detector
-# module.
+# Target parameters for the A2057B, which reads the P and D outputs from the detector
+# module. We assume the A2057B is attached to the same driver as the A3008E.
 #
-	set config(A2057B_ip_addr) "192.168.1.11"
 	set config(A2057B_driver_socket) "8"
 #
 # Power values for our measurement, to be applied for each frequency. Also, an
@@ -114,25 +114,11 @@ proc DM_Check_init {} {
 	set config(serial_number) "ABCD"
 	set config(data_dir) "/Users/kevan/Active/OSI/Electronics/A3042/Data"
 #
-# Extensions. We will add features to the DM_Check without changing its main
+# Extensions. We can add features to the DM_Check without changing its main
 # window significantly through adding buttons to the extensions row. We will
 # press the button to open a new window, which will be a child of the original.
 #
 	set info(extensions) [list]
-#
-# Variables for the TCB Power Calibration extension.
-#
-	set config(tcb_ip_addr) "10.0.0.112"
-	set config(tcb_sn) "Y71073"
-	set config(tcb_pwr_low) "-90"
-	set config(tcb_pwr_high) "-10"
-	set config(tcb_pwr_step) "5"
-	set config(tcb_freqs) "905 915 925"
-	set info(tcb_coordinates) "\
-		0 0  2 16  0 2 32  0 2 48  0 2 \
-		0 8  2 16  8 2 32  8 2 48  8 2 \
-		0 16 2 16 16 2 32 16 2 48 16 2 \
-		0 24 2 16 24 2 32 24 2 48 24 2"
 #
 # Look for a saved configuration file, and if we find one, load it.
 #
@@ -431,7 +417,7 @@ proc DM_Check_sweep_on {} {
 	LWDAQ_print $info(text) "DAC Start $low, DAC End $high, Dwell $dwell" green 
 
 	if {[catch {
-		set sock [LWDAQ_socket_open $config(A3008E_ip_addr)]
+		set sock [LWDAQ_socket_open $config(driver_ip_addr)]
 		LWDAQ_set_driver_mux $sock $config(A3008E_driver_socket) 0
 		LWDAQ_transmit_command_hex $sock "[format %02X $low]$info(A3008E_start_cmd)"
 		LWDAQ_transmit_command_hex $sock "[format %02X $high]$info(A3008E_end_cmd)"
@@ -456,7 +442,7 @@ proc DM_Check_sweep_off {} {
 	upvar #0 DM_Check_config config
 
 	if {[catch {
-		set sock [LWDAQ_socket_open $config(A3008E_ip_addr)]
+		set sock [LWDAQ_socket_open $config(driver_ip_addr)]
 		LWDAQ_set_driver_mux $sock $config(A3008E_driver_socket) 0
 		LWDAQ_transmit_command_hex $sock "00$info(A3008E_start_cmd)"
 		LWDAQ_transmit_command_hex $sock "00$info(A3008E_end_cmd)"
@@ -563,7 +549,7 @@ proc DM_Check_measure {{freq ""}} {
 		DM_Check_gen_read 0
 		set iconfig(analysis_auto_calib) "1"
 		set iconfig(daq_driver_socket) $config(A2057B_driver_socket)
-		set iconfig(daq_ip_addr) $config(A2057B_ip_addr)
+		set iconfig(daq_ip_addr) $config(driver_ip_addr)
 		set iconfig(daq_device_element) "1 2"
 		set iconfig(daq_hi_gain) "0"
 		set result [LWDAQ_acquire Voltmeter]
@@ -688,115 +674,7 @@ proc DM_Check_open {} {
 	return $w	
 }
 
-#
-# DM_Check_tcb_pwr_calib is an extension to standard DM_Check functionality. To
-# enable, add "TCB_Pwr_Calib" to the extensions list. The extension is not yet
-# functional. It assumes the TCB provides a background power measurement with
-# clock messages, but this is not the case. We need to feed in an SCT signal of
-# varying power to obtain a plot of eight-bit power measurement versus power in
-# dBm.
-#
-proc DM_Check_tcb_pwr_calib {{pwr "Open"}} {
-	upvar #0 DM_Check_info info
-	upvar #0 DM_Check_config config
-	upvar #0 LWDAQ_config_Receiver iconfig
 
-	if {$pwr == "Open"} {
-		set w $info(window)\.tcb_pwr_calib
-		if {[winfo exists $w]} {
-			raise $w
-			return $w
-		}
-		
-		toplevel $w
-		wm title $w "TCB Power Calibration, DM_Check $info(version)"
-		
-		set f [frame $w.tcpip]
-		pack $f -side top -fill x
-		
-		foreach {a width} {tcb_ip_addr 12 tcb_sn 8} {
-			label $f.l$a -text "$a:" -fg $config(label_color)
-			entry $f.e$a -textvariable DM_Check_config($a) -width $width
-			pack $f.l$a $f.e$a -side left -expand yes
-		}
-		
-		set f [frame $w.pwr]
-		pack $f -side top -fill x
-		
-		foreach {a width} {tcb_pwr_low 5 tcb_pwr_high 5 tcb_pwr_step 3} {
-			label $f.l$a -text "$a:" -fg $config(label_color)
-			entry $f.e$a -textvariable DM_Check_config($a) -width $width
-			pack $f.l$a $f.e$a -side left -expand yes
-		}
-		
-		set f [frame $w.freq]
-		pack $f -side top -fill x
-		
-		foreach {a width} {tcb_freqs 20} {
-			label $f.l$a -text "$a:" -fg $config(label_color)
-			entry $f.e$a -textvariable DM_Check_config($a) -width $width
-			pack $f.l$a $f.e$a -side left -expand yes
-		}
-		
-		set f [frame $w.go]
-		pack $f -side top -fill x
-		button $f.go -text "Run" -command "DM_Check_tcb_pwr_calib Calibrate"
-		pack $f.go -side left -expand yes
-		return $w
-	}
-	
-	if {$info(control) == "Stop"} {
-		catch {DM_Check_gen_off}
-		set info(control) "Idle"
-		LWDAQ_print $info(text) "Calibration Aborted" purple
-		DM_Check_command "CP0"
-		return ""
-	}
-
-	if {$pwr == "Calibrate"} {
-		if {$info(control) != "Idle"} {
-			LWDAQ_print $info(text) "WARNING: Must be idle to start a new calibration."
-			return ""
-		}
-		LWDAQ_print $info(text) "TCB Power Calibration Starting" purple
-		set info(control) "Calibrate"
-		DM_Check_clear
-		set pwr $config(tcb_pwr_low)
-		set header "Pwr "
-		foreach freq $config(tcb_freqs) {
-			append header "[format %.1f $freq] "
-		}
-		LWDAQ_print $info(text) $header 
-		set info(measurement_header) $header
-	} 
-	
-	set line "$pwr "
-	foreach freq $config(tcb_freqs) {
-		DM_Check_gen_on $freq [expr $pwr + $config(attenuator)]
-		LWDAQ_wait_ms $config(gen_wait_ms)
-		DM_Check_gen_read 0
-		set iconfig(daq_ip_addr) $config(tcb_ip_addr)
-		LWDAQ_reset_Receiver
-		set result [LWDAQ_acquire Receiver]
-		set signal [lwdaq_receiver $iconfig(memory_name) \
-			"-payload 2 reconstruct 0 256"]
-		set tcb_result [lwdaq_tcb $iconfig(memory_name) $info(tcb_coordinates) -slices 1]
-		LWDAQ_print $info(text) $tcb_result
-	}
-	LWDAQ_print $info(text) "$line"
-	lappend info(measurements) [string trim $line]
-	
-	if {$pwr < $config(tcb_pwr_high)} {
-		set pwr [format %.1f [expr $pwr + $config(tcb_pwr_step)]]
-		LWDAQ_post [list DM_Check_tcb_pwr_calib $pwr]
-	} else {
-		LWDAQ_print $info(text) "Calibration Complete" purple
-		DM_Check_command "CP0"
-		set info(control) "Idle"
-	}
-	
-	return "$freq"
-}
 
 #
 # DM_Check_help prints some example commands we can send to the RFX, and provides a 
