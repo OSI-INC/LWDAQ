@@ -799,7 +799,7 @@ return ""
 
 ----------Begin Help----------
 
-http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Analyzer
+https://www.bndhep.net/Electronics/LWDAQ/Manual.html#Analyzer
 
 ----------End Help----------
 

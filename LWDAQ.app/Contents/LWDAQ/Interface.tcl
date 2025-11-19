@@ -1,7 +1,7 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 #
 # Copyright (C) 2005-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 # 
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -64,7 +64,7 @@ proc LWDAQ_interface_init {} {
 			LWDAQ_preferences
 		}
 		proc ::tk::mac::ShowHelp {} {
-			LWDAQ_url_open http://www.bndhep.net/Electronics/LWDAQ/Manual.html		
+			LWDAQ_url_open "https://www.bndhep.net/Electronics/LWDAQ/Manual.html"
 		}
 		proc ::tk::mac::Quit {} {LWDAQ_quit}
 		proc tkAboutDialog {} {LWDAQ_about}

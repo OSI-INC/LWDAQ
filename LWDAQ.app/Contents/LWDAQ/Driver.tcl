@@ -5,7 +5,7 @@
 # sockeet-handling routines defined in Utils.tcl.
 #
 # Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2005-2023 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2005-2025 Kevan Hashemi, Open Source Instruments Inc.
 # 
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -341,7 +341,11 @@ proc LWDAQ_stream_delete {sock addr stream_length value} {
 # the stream read in reverse. The addr parameter is a string of characters that
 # represents a decimal number. The data parameter is a block of binary bytes
 # that will be transmitted without modification. The routine translates the addr
-# string into a four-byte integer before transmitting to the driver.
+# string into a four-byte integer before transmitting to the driver. The routine
+# recognises that the LWDAQ relay's incoming message buffer has a finite size,
+# as given by the server buffer size parameter. If the data we want to write
+# is larger than the buffer, we break down the data into chunks that will fit
+# in the buffer, and transmit the chunks until all the data has been written.
 #
 proc LWDAQ_stream_write {sock addr data} {
 	global LWDAQ_Driver

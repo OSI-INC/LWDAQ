@@ -228,7 +228,7 @@ return ""
 
 ----------Begin Help----------
 
-http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Configurator
+https://www.bndhep.net/Electronics/LWDAQ/Manual.html#Configurator
 
 ----------End Help----------
 
