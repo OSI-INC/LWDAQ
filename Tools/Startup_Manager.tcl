@@ -708,6 +708,6 @@ return ""
 
 ----------Begin Help----------
 
-http://www.bndhep.net/Electronics/LWDAQ/Startup_Manager.html
+https://www.bndhep.net/Electronics/LWDAQ/Startup_Manager.html
 
 ----------End Help----------

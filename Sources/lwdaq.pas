@@ -234,7 +234,7 @@ begin
 end;
 
 {
-<p>lwdaq_error_string returns the global error string into which our library routines record potentially fatal errors they encounter during execution. If we set the -append_errors flag with <a href="#lwdaq_config">lwdaq_config</a>, the string will contain all errors encountered, separated by line breaks. Otherwise, the string will contain only the most recent error. Each error line begins with the error prefix string, which is defined in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. If we pass the -value option, we provide a string that is to take the place of the current error string. If this string parameter is empty, the error string is cleared.</p>
+<p>lwdaq_error_string returns the global error string into which our library routines record potentially fatal errors they encounter during execution. If we set the -append_errors flag with <a href="#lwdaq_config">lwdaq_config</a>, the string will contain all errors encountered, separated by line breaks. Otherwise, the string will contain only the most recent error. Each error line begins with the error prefix string, which is defined in <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. If we pass the -value option, we provide a string that is to take the place of the current error string. If this string parameter is empty, the error string is cleared.</p>
 }
 function lwdaq_error_string(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -1822,7 +1822,7 @@ begin
 end;
 
 {
-<p>lwdaq_bcam finds spots in images. It is used by the <a href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM Instrument</a> to analyze BCAM images. The routine clears the image overlay for its own use. By default, lwdaq_bcam returns six numbers for each of the spots it finds. In the example below, we read a sample image and apply BCAM analysis, asking for the location of two spots.</p>
+<p>lwdaq_bcam finds spots in images. It is used by the <a href="https://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM Instrument</a> to analyze BCAM images. The routine clears the image overlay for its own use. By default, lwdaq_bcam returns six numbers for each of the spots it finds. In the example below, we read a sample image and apply BCAM analysis, asking for the location of two spots.</p>
 
 <pre>set img [LWDAQ_read_image_file Images/BCAM_tape.gif]
 lwdaq_bcam $img -num_spots 2 -threshold "10 #"
@@ -1858,7 +1858,7 @@ lwdaq_bcam $img -num_spots 2 -threshold "10 #"
 
 <p>The lwdaq_bcam routine identifies all distinct sets of contiguous pixels above threshold, eliminates those that do not meet the test criteria, determines the position and total net intensity of each remaining set, sorts them in order of decreasing total net intensity, and eliminates all but the first -num_spots sets. The <i>total net intensity</i> is the sum of the net intensities of all the pixels in the set. By default, the routine returns the position of each spot in microns with respect to the top-left corner of the image. To convert from pixels to microns, the routine uses -pixel_size_um, and assumes the pixels are square.</p>
 
-<p>There are several ways that lwdaq_bcam can analyze an image. We can manipulate the image before analysis, or we can operate on the original image. Regardless of what image the analysis works on, it still drawss the results of analysis in the overlay of the original image so that we will see the results when we display the image. We can find the weighted centroid of the pixels in the spot, fit an ellipse to the perimeter of the spot, or fit a straight line to the pixels in the spot. We specify a combination of manipulation and calculation with the analysis_type parameter, which correspond to the <i>spot_use</i> constants in <a href="http://www.bndhep.net/Software/Sources/spot.pas">spot.pas</a>.</p>
+<p>There are several ways that lwdaq_bcam can analyze an image. We can manipulate the image before analysis, or we can operate on the original image. Regardless of what image the analysis works on, it still drawss the results of analysis in the overlay of the original image so that we will see the results when we display the image. We can find the weighted centroid of the pixels in the spot, fit an ellipse to the perimeter of the spot, or fit a straight line to the pixels in the spot. We specify a combination of manipulation and calculation with the analysis_type parameter, which correspond to the <i>spot_use</i> constants in <a href="https://www.bndhep.net/Software/Sources/spot.pas">spot.pas</a>.</p>
 
 <center><table border=1>
 <tr><th>Value</th><th>Manipulation</th><th>Calculation</th><th>Description</th></tr>
@@ -1889,7 +1889,7 @@ spot_increasing_xy=8;</pre>
 
 <p>With show_pixels=0, which is the default value, the routine draws red boxes around the spots. These boxes are of the same size as the spots, or a little bigger if the spots are small. If num_spots=1 and the number of pixels in the spot is greater than min_pixels_for_cross, the routine draws a cross centered on the spot instead of a box around it. When show_pxels=1, the routine marks all the pixels in each spot, so you can see the pixels that are above threshold and contiguous.</p>
 
-<p>The color we use to mark the image with the results of analysis is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
+<p>The color we use to mark the image with the results of analysis is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
 }
 function lwdaq_bcam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2196,9 +2196,9 @@ end;
 
 <p>With subgract_gradient=0, the dosimeter analysis operates entirely upon the original image. But with subgract_gradient=1, the analysis obtains the intensity-slope with the original image, but then subtracts the average intensity gradient from the analysis bounds and continues with bright-pixel collection in the gradient-subtracted image.</p>
 
-<p>The color we use to outline bright pixels is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
+<p>The color we use to outline bright pixels is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
 
-<p>See the <a href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Dosimeter">Dosimeter Instrument</a> Manual for more information about the option values.</p>
+<p>See the <a href="https://www.bndhep.net/Electronics/LWDAQ/Manual.html#Dosimeter">Dosimeter Instrument</a> Manual for more information about the option values.</p>
 }
 function lwdaq_dosimeter(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2362,7 +2362,7 @@ end;
 <tr><td>-disable_skew</td><td>If 1, forces skew and slant values to zero, default 0.</td></tr>
 </table><small><b>Table:</b> Options for lwdaq_rasnik.</small></center>
 
-<p>See the <a href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#Rasnik">Rasnik Instrument</a> Manual for more information about the option values, in particular the reference and orientation code meanings.</p>
+<p>See the <a href="https://www.bndhep.net/Electronics/LWDAQ/Manual.html#Rasnik">Rasnik Instrument</a> Manual for more information about the option values, in particular the reference and orientation code meanings.</p>
 
 <p>The <i>rotation_mrad</i> option allows us to specify a large nominal rotation of the mask, positive is counter-clockwise. The rasnik routine will rotate the image so as to remove the large rotation, apply analysis, then un-rotate the image. The rotation takes place about the center of the analysis bounds.</p>
 
@@ -2965,7 +2965,7 @@ begin
 end;
 
 {
-<p>lwdaq_scam applies Silhouette Camera (SCAM) routines to SCAM images. The SCAM routines are defined in <a href="http://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. We pass lwdaq_scam an instruction, and one or more arguments required by the instruction.</p>
+<p>lwdaq_scam applies Silhouette Camera (SCAM) routines to SCAM images. The SCAM routines are defined in <a href="https://www.bndhep.net/Software/Sources/scam.pas">scam.pas</a>. We pass lwdaq_scam an instruction, and one or more arguments required by the instruction.</p>
 
 <center><table border cellspacing=2>
 <tr><th>Instruction</th><th>Function</th></tr>
@@ -2975,7 +2975,7 @@ end;
 
 <p>The <i>project</i> instruction takes three arguments: a <i>camera</i> calibration in the SCAM's mount coordinates, an <i>object</i> definition in the SCAM's mount coordinates, and a number of projection lines to use to fill the overlay in the silhouette image. The object must be one of those in the library provided by scam.pas. When we want to project more complex bodies, we build them out of multiple objects.</p>
 
-<p>The <i>camera</i> string contains nine elements. The first is the name of the camera. The following eight are the camera calibration constants, as described in the <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User Manual</a>. They are the xyz camera pivot position millimeters, the angle subtended by the camera axis with the x and y axis in milliradians, a numerical code to say if the axis is forward or backwards and to identify the image sensor, the distance from the pivot point to the center of the image sensor, and the rotation of the image sensor about the camera axis.</p>
+<p>The <i>camera</i> string contains nine elements. The first is the name of the camera. The following eight are the camera calibration constants, as described in the <a href="https://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User Manual</a>. They are the xyz camera pivot position millimeters, the angle subtended by the camera axis with the x and y axis in milliradians, a numerical code to say if the axis is forward or backwards and to identify the image sensor, the distance from the pivot point to the center of the image sensor, and the rotation of the image sensor about the camera axis.</p>
 
 <p>Prior to projecting any object, we must transform its location into mount coordinates. If the object is anything other than a sphere, it will have an orientation as well, and this we must transform this orientation into mount coordinates as well. The orientation of an object is three rotations about the x, y, and z axes that bring the object from its zero orienation to its modelled orientation.The modelled object itself we specify with its own string. Each object begins with a name, such as "sphere" or "shaft". Every object has a location, which is the translation of its zero point to obtain its modelled position. All objects other than the sphere have an orientation, which is the xyz rotation we apply to the object in its zero orientation to obtain its modelled oriention. The location and orientation together define the "pose" of the modelled object.</p>
 
@@ -3004,7 +3004,7 @@ end;
 
 <p>Following the location, and possibly the orientation, of the object are one or more values giving its dimensions. A <i>sphere</i> consists of a location and a diameter. A <i>shaft</i> consists of a location and orientation in the coordinate system of the body, followed by a pair of numbers for each face of the shaft. Each pair is a diameter and distance. The distance is measured along the shaft axis from the zero point, with negative values being in the direction opposite to the axis vector. A <i>cuboid</i> consists of a location, an orientation, a width, a height, and a depth. The width, height, and depth are parallel to the x, y, and z axes respectively when the cuboid is in its zero orientation.</p>
 
-<p>The <i>disagreement</i> instruction counts the number of pixels in the analysis boundaries for which the image and the overlay disagree about the location and extent of the silhouette. To determine which pixels are silhouette and which are background, the routine uses an intensity threshold. Pixels with intensity equal to or below the threshold are considered part of the silhouette. All others are background. To specify the threshold, we pass lwdaq_scam a "threshold string" immediately after the image name. The threshold string takes the same form as it does in the <a href="#lwdaq_bcam">lwdaq_bcam</a> routine, as illustrated in the <a href="http://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM Instrument</a> manual. A background pixel that is marked blue from a previous SCAM body projection will remain blue. A background pixel that is not marked will remain unmarked. A silhouette pixel that is marked blue will be unmarked. A silhouette pixel that is unmarked will be marked orange. In this way, a prefect match between a solid projection and a silhouette will be entirely unmarked, while imprefections are marked either orange for silhouette without projection or blue for projection without silhouette. The marked pixels are the disagreement pixels.</p>
+<p>The <i>disagreement</i> instruction counts the number of pixels in the analysis boundaries for which the image and the overlay disagree about the location and extent of the silhouette. To determine which pixels are silhouette and which are background, the routine uses an intensity threshold. Pixels with intensity equal to or below the threshold are considered part of the silhouette. All others are background. To specify the threshold, we pass lwdaq_scam a "threshold string" immediately after the image name. The threshold string takes the same form as it does in the <a href="#lwdaq_bcam">lwdaq_bcam</a> routine, as illustrated in the <a href="https://www.bndhep.net/Electronics/LWDAQ/Manual.html#BCAM">BCAM Instrument</a> manual. A background pixel that is marked blue from a previous SCAM body projection will remain blue. A background pixel that is not marked will remain unmarked. A silhouette pixel that is marked blue will be unmarked. A silhouette pixel that is unmarked will be marked orange. In this way, a prefect match between a solid projection and a silhouette will be entirely unmarked, while imprefections are marked either orange for silhouette without projection or blue for projection without silhouette. The marked pixels are the disagreement pixels.</p>
 
 <p>The <i>disagreement</i> instruction's result string begins with an integer giving the number of disagreement pixels in the image. If the analysis encountered an error, this value will be "-1". Following the count are the minimum and maximum intensities in the image, also integers, and the threshold intensity used to detect the silhouette. The threshold we return as a real number so that we can support thresholds half-way between two integer values.</p>
 
@@ -3133,7 +3133,7 @@ begin
 end;
 
 {
-<p>lwdaq_bcam_calib takes as input an apparatus measurement and a device calibration, and returns a parameter calculation. The routine calls parameter_calculation in the <a href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a>. This routine supports bcam cameras and bcam sources for all types of bcam and both j_plates and k_plates.</p>
+<p>lwdaq_bcam_calib takes as input an apparatus measurement and a device calibration, and returns a parameter calculation. The routine calls parameter_calculation in the <a href="https://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a>. This routine supports bcam cameras and bcam sources for all types of bcam and both j_plates and k_plates.</p>
 }
 function lwdaq_bcam_calib(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -3329,7 +3329,7 @@ end;
 
 <p>The lwdaq_voltmeter routine calls lwdaq_A2057_voltmeter to analyze the samples in the image. The image results string must contain some information about the samples that will allow the analysis to parse the voltages into reference samples and signal samples. The results string will contain 5 numbers. The first two are the bottom and top reference voltages available on the LWDAQ device. In the case of the A2057 these are 0 V and 5 V, but they could be some other value on another device. The third number is the gain applied to the signal. The fourth number is the data acquisition redundancy factor, which is the number of samples recorded divided by the width of the image. Because we will use a software trigger, we want to give the routine a chance to find a trigger and still have enough samples to plot one per image column. Suppose the image contains 200 columns, then we might record 600 samples so that any trigger occuring in the first 400 samples will leave us with 200 samples after the trigger to plot on the screen. In this case, our redundancy factor is 3. The fifth number is the number of channels from which we have recorded.</p>
 
-<p>The result string "0.0 5.0 10 3 2" indicates 0 V and 5 V references, a gain of 10, a redundancy factor of 3 and two channels. The channels will be plotted with the usual LWDAQ <a href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">colors</a>, with the first channel being color zero.</p>
+<p>The result string "0.0 5.0 10 3 2" indicates 0 V and 5 V references, a gain of 10, a redundancy factor of 3 and two channels. The channels will be plotted with the usual LWDAQ <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">colors</a>, with the first channel being color zero.</p>
 
 <p>The analysis assumes the samples are recorded as sixteen-bit numbers taking up two bytes, with the most significant byte first (big-endian short integer). The first byte of the recorded signal should be the first pixel in the second row of the image, which is pixel (0,1). If <i>n</i> is the image width and <i>r</i> is the redundancy factory, the first <i>n</i> samples (therefore 2<i>n</i> bytes) are samples of the bottom reference voltage. After that come <i>nr</i> samples from each channel recorded (therefore 2<i>nr</i> bytes from each channel). Last of all are <i>n</i> samples from the top reference.</p>
 
@@ -3542,7 +3542,7 @@ begin
 end;
 
 {
-<p>lwdaq_receiver steps through the data bytes of an image, looking for valid four-byte messages, such as those transmitted by a Subcutaneous Transmitter (<a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>) and received by an Octal Data Receiver (<a href="http://www.opensourceinstruments.com/Electronics/A3018/M3027.html">A3027</a>). The lwdaq_receiver command takes two arguments. The first is the name of the image that contains the message data. The second is a command string. The command string in turn contains an instruction and some parameters. The function of lwdaq_receiver we describe in detail, with examples, in the <a href="http://www.opensourceinstruments.com/Electronics/A3018/Receiver.html">Receiver Instrument</a> manual. The lwdaq_receiver command calls another routine <i>lwdaq_sct_receiver</i>, which is defined in <a href="http://www.bndhep.net/Software/Sources/electronics.pas">electronics.pas</a>. The paragraphs below are the comments from the head of this lwdaq_sct_receiver function, and describe how to compose the command string we pass through lwdaq_receiver to lwdaq_sct_receiver. (Note: lwdaq_sct_receiver was formerly called lwdaq_sct_recorder. The new name should be used in all code.)</p>
+<p>lwdaq_receiver steps through the data bytes of an image, looking for valid four-byte messages, such as those transmitted by a Subcutaneous Transmitter (<a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>) and received by an Octal Data Receiver (<a href="http://www.opensourceinstruments.com/Electronics/A3018/M3027.html">A3027</a>). The lwdaq_receiver command takes two arguments. The first is the name of the image that contains the message data. The second is a command string. The command string in turn contains an instruction and some parameters. The function of lwdaq_receiver we describe in detail, with examples, in the <a href="http://www.opensourceinstruments.com/Electronics/A3018/Receiver.html">Receiver Instrument</a> manual. The lwdaq_receiver command calls another routine <i>lwdaq_sct_receiver</i>, which is defined in <a href="https://www.bndhep.net/Software/Sources/electronics.pas">electronics.pas</a>. The paragraphs below are the comments from the head of this lwdaq_sct_receiver function, and describe how to compose the command string we pass through lwdaq_receiver to lwdaq_sct_receiver. (Note: lwdaq_sct_receiver was formerly called lwdaq_sct_recorder. The new name should be used in all code.)</p>
 
 <p>lwdaq_sct_receiver analyzes receiver messages. These messages have a four-byte core, and may be accompanied by one or more bytes of payload data. The routine assumes that the first byte of the second image row is the first byte of a message. Each message takes the following form: an eight-bit signal identifier, a sixteen-bit sample value, an eight-bit time stamp, and zero or more bytes of payload. The routine will return the sixteen-bit sample values, or various characteristics of the data block, depending upon the options passed in through the command string.</p>
 
@@ -3630,7 +3630,7 @@ begin
 end;
 
 {
-<p>lwdaq_alt extracts power measurements from data recorded by an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of telemetry devices such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), and Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver"> lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
+<p>lwdaq_alt extracts power measurements from data recorded by an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of telemetry devices such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), and Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="https://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver"> lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
 
 <p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements.</p>
 
@@ -3920,7 +3920,7 @@ end;
 
 <p>If we know where our antennas are located in our recording system, the top antenna number gives us an approximate measurement of the transmitter's location. Most likely, the transmitter is nearer to the top antenna than to any other. If the transmitter is half-way between two antennas, we may see the top antenna number varying from one received message to the next. The lwdaq_tcb routine returns the median antenna number and the median power. Our assumption is that these two median values correspond to one another. We convert the antenna number into a three-dimensional position with a string of three-dimensional points, each point representing the location of an antenna in an arbitrary three-dimensional coordinate system with arbitrary units. The lwdaq_tcb routine picks the point corresponding to the top antenna and returns its three coordinates <i>x</i>, <i>y</i>, and <i>z</i>. We must choose the coordinate system for the antennas such that all <i>z</i>-coordinates are positive and non-zero. By this means, we allow our analysis of animal movement, which we apply to a history of animal position, to use coordinate "0.0 0.0 0.0" as a marker for "no measurement in this interval".</p>
 
-<p>The routine takes two parameters and has a single option. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements. The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="http://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions. The second parameter is a list of locations of antennas, given as a sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces. The "slices" option tells the routine how many top antenna measurements to make within the playback interval covered by the data image.</p>
+<p>The routine takes two parameters and has a single option. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements. The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="https://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions. The second parameter is a list of locations of antennas, given as a sequence of numbers <i>x</i>, <i>y</i>, <i>z</i> separated by spaces. The "slices" option tells the routine how many top antenna measurements to make within the playback interval covered by the data image.</p>
 
 <center><table border>
 <tr><th>Option</th><th>Function</th></tr>
@@ -4457,9 +4457,9 @@ lwdaq_graph $profile imagname -x_only 1 -color 4</pre>
 
 <p>By default, the graph will be drawn in the overlay, so it can use colors and be accompanied by grid lines that do not interfere with the underlying image data. The overlay can be transparent or white, depending upon whether we have cleared or filled the overlay respectively before calling <i>lwdaq_graph</i>. But if <i>in_image</i> is 1, the color will be treated as a shade of gray and the graph will be drawn in the image itself. By this means, we can create images for two-dimensional analysis out of graphs. When <i>in_image</i> is set, the <i>x_div</i> and <i>y_div</i> options are ignored.</p>
 
-<p>The color codes for a graph in the overlay give 255 unique colors. You can try them out to see which ones you like. The colors 0 to 15 specify a set of distinct colors, as shown <a href="http://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>. The remaining colors are eight-bit RGB codes. If you don't specify a color, the plot will be red. The line will be one pixel wide unless we specify a larger  width with the -width option, which takes an integert value one or greater.</p>
+<p>The color codes for a graph in the overlay give 255 unique colors. You can try them out to see which ones you like. The colors 0 to 15 specify a set of distinct colors, as shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>. The remaining colors are eight-bit RGB codes. If you don't specify a color, the plot will be red. The line will be one pixel wide unless we specify a larger  width with the -width option, which takes an integert value one or greater.</p>
 
-<p>Some data contains occasional error samples, which we call <i>glitches</i>. The <i>lwdaq_graph</i> "-glitch <i>g</i>" option allows you to specify a threshold for glitch filtering. The <i>lwdaq_graph</i> routine calls the <i>glitch_filter_y</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a> to eliminate glitches from the sequence of <i>y</i>-coordinates. We provide the same glitch filter at the command line with the <a href="#glitch_filter_y">glitch_filter_y</a>.</p>
+<p>Some data contains occasional error samples, which we call <i>glitches</i>. The <i>lwdaq_graph</i> "-glitch <i>g</i>" option allows you to specify a threshold for glitch filtering. The <i>lwdaq_graph</i> routine calls the <i>glitch_filter_y</i> from <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a> to eliminate glitches from the sequence of <i>y</i>-coordinates. We provide the same glitch filter at the command line with the <a href="#glitch_filter_y">glitch_filter_y</a>.</p>
 }
 function lwdaq_graph(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4751,7 +4751,7 @@ end;
 
 <p>The 0'th component of the real-valued transform is an exception. It contains two numbers, but neither of them is a phase. One is the magnitude of the 0'th component, which is the DC component, and the <i>N</i>/2'th component, which is the Nyquist-frequency component.</p>
 
-<p>The <i>lwdaq_fft</i> routine insists upon <i>N</i> being a power of two so that the fast fourier transform algorithm can divide the problem in half repeatedly until it arrives at transforms of length 1. For the fast fourier transform algorithm itself, see the <i>fft</i> routine in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. For its real-valued wrapper see <i>fft_real</i>.</p>
+<p>The <i>lwdaq_fft</i> routine insists upon <i>N</i> being a power of two so that the fast fourier transform algorithm can divide the problem in half repeatedly until it arrives at transforms of length 1. For the fast fourier transform algorithm itself, see the <i>fft</i> routine in <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. For its real-valued wrapper see <i>fft_real</i>.</p>
 
 <pre>lwdaq_config -fsr 1 -fsd 2
 lwdaq_fft "1 1 1 1 1 1 1 0"
@@ -4791,7 +4791,7 @@ lwdaq_fft $dft -complex 1
 lwdaq_fft $dft -complex 1 -inverse 1
 1.00 0.00 0.99 -0.00 1.00 -0.00 0.99 -0.00 -1.00 0.00 -0.99 0.00 -1.00 0.00 -0.99 0.00 </pre>
 
-<p>The "-inverse 1" option reverses the order of the input components, which is a trick for getting the forward transform to act like an inverse transform, and then multiplies the resulting sample-values by <i>N</i> to account for the fact that our <i>lwdaq_fft</i> routine scales its frequency components by 1/<i>N</i> to make them correspond to sinusoidal amplitudes. The reversal of the input components and the scaling takes place in <i>fft_inverse</i> of <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
+<p>The "-inverse 1" option reverses the order of the input components, which is a trick for getting the forward transform to act like an inverse transform, and then multiplies the resulting sample-values by <i>N</i> to account for the fact that our <i>lwdaq_fft</i> routine scales its frequency components by 1/<i>N</i> to make them correspond to sinusoidal amplitudes. The reversal of the input components and the scaling takes place in <i>fft_inverse</i> of <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
 
 <p>We can also invert our compact magnitude-phase transforms, which we derive from real-valued inputs with the "-complex 0" option (the default).</p> 
 
@@ -4800,13 +4800,13 @@ lwdaq_fft $dft -complex 1 -inverse 1
 lwdaq_fft $dft -inverse 1
 1.00 1.00 1.01 1.00 -1.00 -1.00 -1.01 -1.00 </pre>
 
-<p>Note the rounding errors we see because we are using only two decimal places in our examples. For the real-valued inverse transform code, see <i>fft_real_inverse</i> in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
+<p>Note the rounding errors we see because we are using only two decimal places in our examples. For the real-valued inverse transform code, see <i>fft_real_inverse</i> in <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>.</p>
 
 <p>The fft, like all discrete fourier transforms, assumes that the <i>N</i> samples are the entire period of a repeating waveform. The <i>N</i> components of the transform, when inverted, give us an exact reproduction of the original <i>N</i> samples. As you are looking at the signal represented by the N samples, be aware that any difference between the 0'th sample and the (<i>N</i>-1)'th sample amounts to a discontinuity at the end of the repeating waveform. A ramp from 0 to 1000 during the <i>N</i> samples gives rise to a sudden drop of 1000. This sudden drop appears as power in all frequency components.</p>
 
 <p>One way to remove end steps is to apply a <a href="https://grokipedia.com/page/Window_function">window function</a> to the data before you take the fourier transform. We provide a linear window function with the "-window <i>w</i>" option, where we apply the window function to the first <i>w</i> samples and the final <i>w</i> samples. This window function is the same one we provide separately in our <a href="#window_function">window function</a> routine. We recommend you calculate <i>w</i> as a fraction of <i>N</i> when you call <i>lwdaq_fft</i>. We suggest starting <i>w</i> = <i>N</i>/10. We implement the window function only for real-valued samples passed to the forward transform. If you try to apply the window function during the inverse transform or when passing complex samples to the forward transform, <i>lwdaq_fft</i> returns an error. That's not to say that there is no point in applying a window function in these other circumstances, but our linear window function does not have any obvious utility or meaning when so applied.</p>
 
-<p>Some data contains occasional error samples, called <i>glitches</i>. At some point in our data analysis, we must eliminate these glitches. The <i>lwdaq_fft</i> "-glitch <i>g</i>" option allows you to specify a threshold for glitch filtering. The <i>lwdaq_fft</i> routine calls the one-dimensional <i>glitch_filter</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. We provide this routine at the command line with the <a href="#glitch_filter">glitch_filter</a> library command. The "-glitch" option is compatible only with real-valued data passed to the forward transform. A threshold value of 0 disables the filter.</p>
+<p>Some data contains occasional error samples, called <i>glitches</i>. At some point in our data analysis, we must eliminate these glitches. The <i>lwdaq_fft</i> "-glitch <i>g</i>" option allows you to specify a threshold for glitch filtering. The <i>lwdaq_fft</i> routine calls the one-dimensional <i>glitch_filter</i> from <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. We provide this routine at the command line with the <a href="#glitch_filter">glitch_filter</a> library command. The "-glitch" option is compatible only with real-valued data passed to the forward transform. A threshold value of 0 disables the filter.</p>
 }
 function lwdaq_fft(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -4905,7 +4905,7 @@ begin
 end;
 
 {
-<p>lwdaq_metrics takes a sequence of real numbers as input and returns a list of real-valued properties of the input sequence. The input sequence represent samples of a signal, such as an EEG recording, and the metrics represent properties of the signal, such as average value, standard deviation, maximum, minimum, coastline length, intermittency of high-frequency power, spikiness, asymmetry, and so on. The lwdaq_metrics routine is an interface with the <a href="http://www.bndhep.net/Software/Sources/metrics.pas">metrics.pas</a> library of metric-calculating routines. To select one of these routines, and control its output, we pass a command string into lwdaq_metrics following the data string.</p>
+<p>lwdaq_metrics takes a sequence of real numbers as input and returns a list of real-valued properties of the input sequence. The input sequence represent samples of a signal, such as an EEG recording, and the metrics represent properties of the signal, such as average value, standard deviation, maximum, minimum, coastline length, intermittency of high-frequency power, spikiness, asymmetry, and so on. The lwdaq_metrics routine is an interface with the <a href="https://www.bndhep.net/Software/Sources/metrics.pas">metrics.pas</a> library of metric-calculating routines. To select one of these routines, and control its output, we pass a command string into lwdaq_metrics following the data string.</p>
 }
 function lwdaq_metrics(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -5192,7 +5192,7 @@ begin
 <pre>lwdaq bcam_from_global_point "0 1 0" "0 1 0 -1 1 -1 1 1 -1"
 0.000000 0.000000 0.000000</pre>
 
-<p>For a description of the BCAM coordinate system, and how it is defined with respect to a BCAM's kinematic mounting balls, consult the BCAM <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>. We usually use millimeters to specify coordinates, because we use millimeters in our BCAM camera and source calibration constants. But the routine will work with any units of length, so long as we use the same units for both the point and the mount strings.</p>
+<p>For a description of the BCAM coordinate system, and how it is defined with respect to a BCAM's kinematic mounting balls, consult the BCAM <a href="https://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>. We usually use millimeters to specify coordinates, because we use millimeters in our BCAM camera and source calibration constants. But the routine will work with any units of length, so long as we use the same units for both the point and the mount strings.</p>
 }
 		if (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -5311,7 +5311,7 @@ its calibration constants in the <i>camera</i> string. The <i>camera</i> string
 contains nine elements. The first is the name of the camera, which might be its
 serial number. The following eight are the camera calibration constants, as
 described in the <a
-href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User
+href="https://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User
 Manual</a>.</p>
 
 <pre>lwdaq bcam_source_bearing "1.72 1.22" "P0001 1 0 0 0 0 1 75 0"
@@ -5422,9 +5422,9 @@ Camera (FVC). We pass the routine the global xyz-position of the three balls in
 the order cone, slot, flat. The routine returns the location and orientation of
 the mount coordinate system. We describe how the three balls define the mount
 coordinate system in the <a
-href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User Manual</a>.
+href="https://www.bndhep.net/Devices/BCAM/User_Manual.html">BCAM User Manual</a>.
 See <i>bcam_coordinates_from_mount</i> in <a
-href="http://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a> for the
+href="https://www.bndhep.net/Software/Sources/bcam.pas">bcam.pas</a> for the
 exact calculation. The mount coordinate system is defined in such a way that it
 is always in the same location and orientation with respect to the sensor
 chassis, regardless of small variations in the ball arrangements between one
@@ -5607,7 +5607,7 @@ that corresponds to the origin of global coordinates.</p>
 	end 
 	else if option='wps_wire_plane' then begin
 {
-<p>Calculates the plane that must contain the center-line of a wire given the position and rotation of a wire image in a WPS camera. The units for wire position are millimeters, and for rotation are milliradians. We use the camera's calibration constants to determine the plane. We specify the plane in WPS coordinates, which are defined in the same way as BCAM coordinates, using the positions of the WPS (or BCAM) mounting balls. For a description of the BCAM coordinate system, consult the BCAM <a href="http://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
+<p>Calculates the plane that must contain the center-line of a wire given the position and rotation of a wire image in a WPS camera. The units for wire position are millimeters, and for rotation are milliradians. We use the camera's calibration constants to determine the plane. We specify the plane in WPS coordinates, which are defined in the same way as BCAM coordinates, using the positions of the WPS (or BCAM) mounting balls. For a description of the BCAM coordinate system, consult the BCAM <a href="https://www.bndhep.net/Devices/BCAM/User_Manual.html">User Manual</a>.</p>
 
 <pre>lwdaq wps_wire_plane "1.720 1.220" "0.000" "Q0131_1 0 0 0 -10 0 0 0 0 0"
 0.000000 0.000000 0.000000 0.000000 0.000000 1.000000</pre>
@@ -6041,7 +6041,7 @@ C0562_1 -3.5814 88.8400 -4.9796 -12.6389 94.3849 -4.9598 -1558.772  -0.344 -566.
 	end 
 	else if option='frequency_components' then begin
 {
-<p>Calculates components of the <a href="https://grokipedia.com/page/Discrete_Fourier_transform">discrete fourier transform</a> of a real-valued waveform by repeated calls to <i>frequency_component</i> in <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. We specify the <i>M</i> components we want to calculate with a string of <i>M</i> frequencies, each of which is a multiple of the fundamental frequency of the waveform, 1/<i>NT</i>. The frequencies provided by a full discrete fourier transform of <i>N</i> real samples are <i>k</i>/<i>NT</i> for <i>k</i> such that 0&le;<i>k</i>&le;<i>N</i>&minus;1. If we want to obtain all <i>N</i>/2 components, we can use our <a href="#lwdaq_fft">lwdaq_fft</a> routine instead. The <i>frequency_components</i> routine is designed to provide a small number of components for real-valued input data.</p>
+<p>Calculates components of the <a href="https://grokipedia.com/page/Discrete_Fourier_transform">discrete fourier transform</a> of a real-valued waveform by repeated calls to <i>frequency_component</i> in <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. We specify the <i>M</i> components we want to calculate with a string of <i>M</i> frequencies, each of which is a multiple of the fundamental frequency of the waveform, 1/<i>NT</i>. The frequencies provided by a full discrete fourier transform of <i>N</i> real samples are <i>k</i>/<i>NT</i> for <i>k</i> such that 0&le;<i>k</i>&le;<i>N</i>&minus;1. If we want to obtain all <i>N</i>/2 components, we can use our <a href="#lwdaq_fft">lwdaq_fft</a> routine instead. The <i>frequency_components</i> routine is designed to provide a small number of components for real-valued input data.</p>
 
 <pre>lwdaq_config -fsr 1 -fsd 2
 lwdaq frequency_components "0 1 2 3 4 5" "0 0 0 0 1 1 1 1"
@@ -6117,7 +6117,7 @@ lwdaq window_function 5 "0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1"
 	end 
 	else if option='glitch_filter' then begin
 {
-<p>Applies a glitch filter to a sequence of real-valued samples. The glitch filter takes a real-valued threshold as its first parameter, followed by a list of real-valued samples. The routine calls <i>glitch_filter</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. A "glitch" is a corruption of one or more adjacent points in a signal. Our implementation of the glitch filter is designed to eliminate glitches that arise from missing samples being replaced by corrupt or interference samples in telemetry systems. When the absolute change in value from sample n-1 to sample n exceeds the threshold, we look to see if there is another threshold-exceeding change from sample n to n+1 in the opposite direction. If so, we replace sample n with sample n-1. Otherwise, we check to see if sample n+1 has exactly the same value as sample n, and if so, we replace sample n with sample n-1. Thus a jump up or down by more than the threshold, followed by any number of identical samples, will be treated as a glitch and eliminated entirely, replaced by the sample before the jump. A threshold of 0 disables the filter. As an example, we could have:</p>
+<p>Applies a glitch filter to a sequence of real-valued samples. The glitch filter takes a real-valued threshold as its first parameter, followed by a list of real-valued samples. The routine calls <i>glitch_filter</i> from <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. A "glitch" is a corruption of one or more adjacent points in a signal. Our implementation of the glitch filter is designed to eliminate glitches that arise from missing samples being replaced by corrupt or interference samples in telemetry systems. When the absolute change in value from sample n-1 to sample n exceeds the threshold, we look to see if there is another threshold-exceeding change from sample n to n+1 in the opposite direction. If so, we replace sample n with sample n-1. Otherwise, we check to see if sample n+1 has exactly the same value as sample n, and if so, we replace sample n with sample n-1. Thus a jump up or down by more than the threshold, followed by any number of identical samples, will be treated as a glitch and eliminated entirely, replaced by the sample before the jump. A threshold of 0 disables the filter. As an example, we could have:</p>
 
 <pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
@@ -6152,7 +6152,7 @@ lwdaq glitch_filter 3.0 "0 1 20 1 0 3 1 2 3 2 2 0 8 6 7 0 0"
 	end 
 	else if option='glitch_filter_y' then begin
 {
-<p>Applies a glitch filter to the y-values of a sequence of x-y points. The routine calls <i>glitch_filter_y</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The result is equivalent to taking the y-values, passing them through the one-dimensional <a href="#glitch_filter">glitch_filter</a> and re-combining the result with their x-values. We replace the glitch point in the data sequence with a point whose y-coordinate is the same as the previous point's y-coordinate. A threshold of 0 disables the filter. A negative threshold causes the number of glitches to be appended to the signal values.</p>
+<p>Applies a glitch filter to the y-values of a sequence of x-y points. The routine calls <i>glitch_filter_y</i> from <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The result is equivalent to taking the y-values, passing them through the one-dimensional <a href="#glitch_filter">glitch_filter</a> and re-combining the result with their x-values. We replace the glitch point in the data sequence with a point whose y-coordinate is the same as the previous point's y-coordinate. A threshold of 0 disables the filter. A negative threshold causes the number of glitches to be appended to the signal values.</p>
 
 <pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 13 0"
@@ -6182,7 +6182,7 @@ lwdaq glitch_filter_y -4.0 "1 0 2 0 3 10 4 0 5 0 6 0 7 5 8 5 9 0 10 0 11 0 12 0 
 	end 
 	else if option='glitch_filter_xy' then begin
 {
-<p>Applies a glitch filter to the a sequence of x-y points. The routine calls <i>glitch_filter_xy</i> from <a href="http://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The distance between consecutive points is their two-dimensional separation. The routine works in the same way as the one-dimensional <a href="#glitch_filter">glitch_filter</a> except it uses the separation of consecutive two-dimentional points rather than the absolute change in the value of a one-dimensional coordinate. A single-point glitch is a jump of length greater than the threshold followed by another jump of length greater than the threshold in a direction that is at least ninety degrees rotated with respect to the original jump. A threshold of 0 disables the filter.</p>
+<p>Applies a glitch filter to the a sequence of x-y points. The routine calls <i>glitch_filter_xy</i> from <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a>. The distance between consecutive points is their two-dimensional separation. The routine works in the same way as the one-dimensional <a href="#glitch_filter">glitch_filter</a> except it uses the separation of consecutive two-dimentional points rather than the absolute change in the value of a one-dimensional coordinate. A single-point glitch is a jump of length greater than the threshold followed by another jump of length greater than the threshold in a direction that is at least ninety degrees rotated with respect to the original jump. A threshold of 0 disables the filter.</p>
 
 <pre>lwdaq_config -fsd 0 -fsr 1
 lwdaq glitch_filter_xy 10 "0 0 1 0 0 2 3 2 50 2 2 2 1 4 3 3"

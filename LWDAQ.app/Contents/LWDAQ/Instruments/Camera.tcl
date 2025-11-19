@@ -1,7 +1,7 @@
 # Long-Wire Data Acquisition Software (LWDAQ)
 #
 # Copyright (C) 2005-2021 Kevan Hashemi, Brandeis University
-# Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 # 
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -31,10 +31,9 @@ proc LWDAQ_init_Camera {} {
 	array unset config
 	array unset info
 	
-	# The info array elements will not be displayed in the 
-	# instrument window. The only info variables set in the 
-	# LWDAQ_open_Instrument procedure are those which are checked
-	# only when the instrument window is open.
+	# The info array elements will not be displayed in the instrument window.
+	# The only info variables set in the LWDAQ_open_Instrument procedure are
+	# those which are checked only when the instrument window is open.
 	set info(name) "Camera"
 	set info(control) "Idle"
 	set info(window) [string tolower .$info(name)]
@@ -62,9 +61,9 @@ proc LWDAQ_init_Camera {} {
 		{Maximum Intensity (counts)} {Minimum Intensity (counts)} \
 		{Height (rows)} {Width (columns)}"
 	
-	# All elements of the config array will be displayed in the
-	# instrument window. No config array variables can be set in the
-	# LWDAQ_open_Instrument procedure
+	# All elements of the config array will be displayed in the instrument
+	# window. No config array variables can be set in the LWDAQ_open_Instrument
+	# procedure
 	set config(image_source) "daq"
 	set config(file_name) ./Images/$info(name)\*
 	set config(memory_name) "lwdaq_image_1"

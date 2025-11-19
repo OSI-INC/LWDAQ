@@ -27,7 +27,7 @@ proc SCT_Check_init {} {
 	LWDAQ_tool_init "SCT_Check" "2.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
-	package require LWFG
+	package require ASG
 
 	set info(control) "Idle"
 	set config(verbose) "0"
@@ -128,7 +128,7 @@ proc SCT_Check_set_frequencies {{print 0}} {
 proc SCT_Check_waveform_on {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
-	global LWFG
+	global ASG
 
 	if {$config(waveform_type) != "sweep"} {
 		LWDAQ_print $info(text) "Channel $config(gen_ch), $config(waveform_type),\
@@ -137,7 +137,7 @@ proc SCT_Check_waveform_on {} {
 			$config(waveform_offset) V offset." purple
 		set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
 		set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
-		set result [LWFG_configure $config(gen_ip) $config(gen_ch) \
+		set result [ASG_configure $config(gen_ip) $config(gen_ch) \
 			$config(waveform_type) \
 			$config(waveform_frequency) \
 			$v_lo $v_hi]
@@ -151,7 +151,7 @@ proc SCT_Check_waveform_on {} {
 			}
 			LWDAQ_print $info(text) "rc = [format %3.f [expr 0.001*[lindex $result 0]]] us"
 			LWDAQ_print $info(text) "att = [lindex $result 1]"
-			set actual [expr $LWFG(clock_hz)*$num_cycles/$num_pts/$divisor]
+			set actual [expr $ASG(clock_hz)*$num_cycles/$num_pts/$divisor]
 			LWDAQ_print $info(text) "actual = [format %.3f $actual] Hz"
 			LWDAQ_print $info(text) "requested = [format %.3f $config(waveform_frequency)] Hz"
 		}
@@ -163,7 +163,7 @@ proc SCT_Check_waveform_on {} {
 			$config(waveform_offset) V offset." purple
 		set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
 		set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
-		set result [LWFG_sweep_sine $config(gen_ip) $config(gen_ch) \
+		set result [ASG_sweep_sine $config(gen_ip) $config(gen_ch) \
 			$config(sweep_flo) $config(sweep_fhi) $v_lo $v_hi \
 			$config(sweep_time) 1]
 		if {[LWDAQ_is_error_result $result]} {
@@ -187,7 +187,7 @@ proc SCT_Check_waveform_off {} {
 	upvar #0 SCT_Check_config config
 
 	LWDAQ_print $info(text) "Channel $config(gen_ch), 0 V amplitude, 0 V offset." purple
-	set result [LWFG_off $config(gen_ip) $config(gen_ch)]
+	set result [ASG_off $config(gen_ip) $config(gen_ch)]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
 	}
@@ -523,7 +523,7 @@ detailed records of the frequency response. The function generator is the
 Function Generator (A3050) or other compatible PoE generator. The receiver must
 be one of our LWDAQ telemetry receivers, such as the Octal Data Receiver
 (A3027E), Animal Location Tracker, (ALT), or Telemetry Control Box (TCB). The
-tool uses the LWFG package, included with LWDAQ, to configure the function
+tool uses the ASG package, included with LWDAQ, to configure the analog signal
 generator. It uses the Receiver Instrument, included with LWDAQ, to download
 telemetry signals from the receiver.
 

@@ -24,7 +24,7 @@
 	
 	For a web page describing this code, see:
 	
-	http://www.bndhep.net/Devices/RASNIK/
+	https://www.bndhep.net/Devices/RASNIK/
 }
 
 unit rasnik;

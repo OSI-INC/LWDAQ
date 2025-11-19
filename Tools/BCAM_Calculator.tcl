@@ -673,7 +673,7 @@ call the calibration database, and the second is the apparatus database.
 You can fetch the latest versions of our databases from the following
 web site.
 
-http://www.bndhep.net/Devices/BCAM/
+https://www.bndhep.net/Devices/BCAM/
 
 Select the files using the "Select Calibration Database" and "Select
 Apparatus Databse" buttons.
