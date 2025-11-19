@@ -1,6 +1,6 @@
 # Startup_Manager, a LWDAQ Tool
 #
-# Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # The Startup Manager opens, configures, and launches multiple LWDAQ tools so as
 # to simplify re-starting an experiment. The program is similar to the
