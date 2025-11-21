@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "175"
+	LWDAQ_tool_init "Neuroplayer" "176"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -406,7 +406,7 @@ proc Neuroplayer_init {} {
 #
 	set config(slow_play) 0
 	set config(slow_play_ms) 1000
-	set info(fast_play_ms) $LWDAQ_Info(queue_ms)
+	set config(fast_play_ms) 50
 #
 # By default, the player moves from one file to the next automatically, or
 # waits for data to be added to a file if there is no other later file. But
@@ -7001,7 +7001,7 @@ proc Neuroplayer_play {{command ""}} {
 	if {$config(slow_play)} {
 		set LWDAQ_Info(queue_ms) $config(slow_play_ms)
 	} {
-		set LWDAQ_Info(queue_ms) $info(fast_play_ms)
+		set LWDAQ_Info(queue_ms) $config(fast_play_ms)
 	}
 
 	# Consider various ways in which we will do nothing and return.
