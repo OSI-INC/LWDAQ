@@ -71,7 +71,9 @@ then
 	echo "ERROR: could not find version number in Init.tcl."
 	exit
 fi
-echo "Software Version: $VERSION"
+echo "VERSION: $VERSION"
+ARCHIVE=LWDAQ_$VERSION.zip
+echo "ARCHIVE: $ARCHIVE"
 
 # Return to build directory and clean.
 cd $BUILD_DIR
@@ -100,7 +102,7 @@ then
 	  --exclude='LWDAQ.app/Contents/LWDAQ/Temporary/*.tcl' \
 	  "LWDAQ/" Distribution/LWDAQ_$VERSION
 	cd Distribution
-	ditto -c -k --sequesterRsrc --keepParent LWDAQ_$VERSION ../LWDAQ_$VERSION.zip
+	ditto -c -k --sequesterRsrc --keepParent LWDAQ_$VERSION ../$ARCHIVE
 	cd ..
 	rm -rf Distribution
 else
@@ -109,7 +111,7 @@ else
 # with the X option.
 	echo "Creating LWDAQ_$VERSION.zip with zip compression utility..."
 	mv LWDAQ LWDAQ_$VERSION
-	zip -rqX LWDAQ_$VERSION.zip LWDAQ_$VERSION \
+	zip -rqX $ARCHIVE LWDAQ_$VERSION \
 		-x "LWDAQ_$VERSION/.git" \
 		"LWDAQ_$VERSION/.gitignore" \
 		"LWDAQ_$VERSION/Tools/Data/*" \
@@ -159,12 +161,12 @@ then
 	echo "FOUND: Remote software download directory."
 	if [ -d "$SITE/$ARCHIVE" ] 
 	then
-		echo "Deleting pre-existing $SITE/$ARCHIVE..."
-		rm $SITE/$ARCHIVE
+		echo "Deleting pre-existing $ARCHIVE..."
+		rm $SITE/LWDAQ_$VERSION.zip
 	fi
 	echo "Uploading new $ARCHIVE..."
 	cp $ARCHIVE $SITE/$ARCHIVE
-	echo "Deleting local copy of archive..."
+	echo "Deleting local copy of $ARCHIVE..."
 	rm $ARCHIVE
 else
 	echo "WARNING: Cannot find remote download directory."

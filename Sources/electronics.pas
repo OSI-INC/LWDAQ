@@ -1379,7 +1379,7 @@ begin
 
 		writestr(message_string,
 			'Messages ',start_index:1,
-			' to ',end_index:1,' (index id value timestamp $hex):',eol);
+			' to ',end_index:1,' (index id value timestamp hex):',eol);
 		insert(message_string,result,length(result)+1);
 		message_index:=start_index;
 		while (message_index<=end_index) do begin

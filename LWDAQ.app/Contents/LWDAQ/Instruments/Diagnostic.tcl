@@ -201,6 +201,8 @@ proc LWDAQ_reboot_Diagnostic {sock} {
 	global LWDAQ_Driver LWDAQ_Info
 	LWDAQ_print -nonewline $info(text) "Sending reboot command to relay..."
 	LWDAQ_relay_reboot $sock
+	LWDAQ_socket_flush $sock
+	LWDAQ_wait_ms 500
 	LWDAQ_print $info(text) "done."
 	return ""
 }

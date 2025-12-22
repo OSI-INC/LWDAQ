@@ -1,39 +1,40 @@
 unit shadow;
 {
-Routines for for Detecting One-Dimensional Shadows in Images.
-Copyright (C) 2002-2021 Kevan Hashemi, Brandeis University
-Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
+	Routines for for Detecting One-Dimensional Shadows in Images.
+	Copyright (C) 2002-2021 Kevan Hashemi, Brandeis University
+	Copyright (C) 2022-2023 Kevan Hashemi, Open Source Instruments Inc.
+	
+	These routines are effective at finding wire shadows or dark images of wires
+	against bright backgrounds, provided that the shadows are not sharp.
+	Sharp-edged shadows have uniform darkness from one edge to the other, and
+	these routines rely upon there being a minimum of intensity near the center
+	of the shadow or image. We used them to good effect with dim x-ray images of
+	muon tubes for the ATLAS experiment. They performed well with severely
+	out-of-focus images we obtained from an optical Wire Position Sensor. But
+	they do not perform well with image from a well-focused Wire Position
+	Sensor. We detect poor performance by varying the min_separation parameter
+	and watching how the measured wire position changes. Suppose the wire shadow
+	is 200 um wide, and we set the minimum separation to 400 um. The
+	shadow-finding routines will put a box 400 um wide around the wire shadow
+	and fit a notch profile to the shadow. The notch is 200 um wide (half the
+	width of the box). The shadow-finding performs well if the measured position
+	does not move by more than a pixel as we incrase the minimum separation from
+	400 um to 1000 um. This is the case for de-fucused images with uniform
+	background intensity, but not true for sharp images with varying background
+	intensity.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; either version 2 of the License, or (at your option) any later
-version.
+	This program is free software: you can redistribute it and/or modify it
+	under the terms of the GNU General Public License as published by the Free
+	Software Foundation, either version 3 of the License, or (at your option)
+	any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the GNU General Public License for more details.
+	This program is distributed in the hope that it will be useful, but WITHOUT
+	ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+	FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+	more details.
 
-You should have received a copy of the GNU General Public License along with
-this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-Place - Suite 330, Boston, MA  02111-1307, USA.
-
-These routines are effective at finding wire shadows or dark images of wires
-against bright backgrounds, provided that the shadows are not sharp. Sharp-edged
-shadows have uniform darkness from one edge to the other, and these routines
-rely upon there being a minimum of intensity near the center of the shadow or
-image. We used them to good effect with dim x-ray images of muon tubes for the
-ATLAS experiment. They performed well with severely out-of-focus images we
-obtained from an optical Wire Position Sensor. But they do not perform well with
-image from a well-focused Wire Position Sensor. We detect poor performance by
-varying the min_separation parameter and watching how the measured wire position
-changes. Suppose the wire shadow is 200 um wide, and we set the minimum
-separation to 400 um. The shadow-finding routines will put a box 400 um wide
-around the wire shadow and fit a notch profile to the shadow. The notch is 200
-um wide (half the width of the box). The shadow-finding performs well if the
-measured position does not move by more than a pixel as we incrase the minimum
-separation from 400 um to 1000 um. This is the case for de-fucused images with
-uniform background intensity, but not true for sharp images with varying
-background intensity.
+	You should have received a copy of the GNU General Public License along with
+	this program.  If not, see <https://www.gnu.org/licenses/>.
 }
 
 interface
