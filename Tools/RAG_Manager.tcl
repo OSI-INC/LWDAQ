@@ -103,6 +103,7 @@ https://www.opensourceinstruments.com/Electronics/A3048/M3048.html
 https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
 https://www.opensourceinstruments.com/Electronics/A3051/M3051.html
 https://www.opensourceinstruments.com/Electronics/A3052/M3052.html
+https://www.opensourceinstruments.com/Electronics/A3053/M3053.html
 https://www.opensourceinstruments.com/ACC/ACC.php
 https://www.opensourceinstruments.com/ACC/Overview.html
 https://www.opensourceinstruments.com/ALT/ALT.php
