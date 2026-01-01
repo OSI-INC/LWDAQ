@@ -266,7 +266,7 @@ proc Neuroplayer_init {} {
 	set config(glitch_threshold) 500
 	set config(glitch_count) 0
 	set info(max_window_fraction) 0.5
-	set config(extra_fraction) 1.1
+	set config(extra_fraction) 1.2
 	set config(calibration_include) "Okay Loss Extra"
 	set info(calibration_selected) ""
 	set config(activity_include) "Okay Loss Extra Off"
