@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "170"
+	LWDAQ_tool_init "Neurorecorder" "171"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -949,6 +949,13 @@ proc Neurorecorder_record {{command ""}} {
 			set message_length \
 				[expr $info(core_message_length) + $iconfig(payload_length)]
 			if {[lwdaq_image_exists $iconfig(memory_name)] != ""} {
+				scan [lwdaq_receiver $iconfig(memory_name) \
+					"-payload $iconfig(payload_length) clocks 0"] %d%d%d%d \
+					num_errors num_clocks num_messages first_index
+				if {$num_errors > 0} {
+					Neurorecorder_print "WARNING: Encountered $num_errors errors\
+						in received interval."
+				}
 				set new [lwdaq_image_contents $iconfig(memory_name) \
 						-truncate 1 -data_only 1 -record_size $message_length]
 				if {[string length $info(rbuff)] < $config(max_rbuff)} {
@@ -966,13 +973,6 @@ proc Neurorecorder_record {{command ""}} {
 			}
 			Neurorecorder_print "Received [string length $new] bytes,\
 				buffer contains [string length $info(rbuff)] bytes." verbose
-			scan [lwdaq_receiver $iconfig(memory_name) \
-				"-payload $iconfig(payload_length) clocks 0"] %d%d%d%d \
-				num_errors num_clocks num_messages first_index
-			if {$num_errors > 0} {
-				Neurorecorder_print "WARNING: Encountered $num_errors errors\
-					in received interval."
-			}
 		}
 		
 		# If our recording buffer is not empty, try to write the data to disk. If our
