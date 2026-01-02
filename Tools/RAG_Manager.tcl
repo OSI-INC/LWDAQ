@@ -2231,8 +2231,8 @@ proc RAG_Manager_relevant_chunks {question api_key} {
 			-retrieve_len $info(retrieve_len) \
 			-vector $q_vector]
 	} else {
-		RAG_Manager_print "No embed library loaded, looking for\
-			retrieval engine in $info(log_dir)..." brown
+		RAG_Manager_print "No embed library loaded,\
+			looking for retrieval engine in $info(log_dir)..." brown
 		if {[catch {
 			if {[file exists $info(signal_file)] \
 					&& (([clock seconds]-[file mtime $info(signal_file)]) \
@@ -2262,6 +2262,9 @@ proc RAG_Manager_relevant_chunks {question api_key} {
 						break
 					}
 				}
+			} else {
+				RAG_Manager_print \
+					"No sign of retrieval engine in $info(log_dir)..." brown
 			}
 		} error_result]} {
 			RAG_Manager_print "ERROR: $error_result"
@@ -2332,6 +2335,13 @@ proc RAG_Manager_retrieve {} {
 		RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
 		return "ERROR"
 	}
+	if {[string length $question]/$info(word_size) \
+			> $config(max_question_words)} {
+		RAG_Manager_print "ERROR: Question is longer than\
+			[expr $config(max_question_words)*$info(word_size)] characters."
+		return "ERROR"
+	}
+
 		
 	set info(control) "Retrieve"
 	RAG_Manager_print "Retrieval for $info(ip) [RAG_Manager_time]" purple
@@ -2562,8 +2572,10 @@ proc RAG_Manager_submit {} {
 	}
 	if {[string length $question]/$info(word_size) \
 			> $config(max_question_words)} {
-		return "ERROR: Question is longer than\
+		set answer "ERROR: Question is longer than\
 			[expr $config(max_question_words)*$info(word_size)] characters."
+		RAG_Manager_print $answer
+		return $answer
 	}
 
 	if {[file exists $info(offline_file)]} {
