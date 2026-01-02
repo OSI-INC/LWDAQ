@@ -4947,19 +4947,29 @@ begin
 end;
 
 {
-<p>lwdaq_rag provides routines to support retrieval-assisted generation (RAG). It creates and maintains a library of embedding vectors in memory. It allows us to compare a new vector to every vector in the library and obtain a list of the most relevant library entries, a process we call <i>retrieval</i>. Each embed in the library has a name, a relevance, and an n-dimensional vector. The name is a string of characters that identify a document chunk, although lwdaq_rag at no point handles anything but embedding vectors, nor does it read embedding vectors from disk or write them to disk. The vector itself, as delivered to the library, can have integer or real-valued components, but all components will be saved as real numbers. All vectors in the library must have the same length so that the dot product of a test vector with each vector will be proportional to the cosine of the angle between each vector and the test vector.  The relevance stored with each embed is the dot product we obtained from the most recent comparison. The lwdaq_rag guarantees that all vectors have unit length by calcualting the length of each vector it receives, and dividing all its coordinates by the length.</p>
+<p>lwdaq_rag provides routines to support retrieval-assisted generation (RAG). It creates and maintains a library of embed vectors in memory. It allows us to compare a new vector to every vector in the library and obtain a list of the most relevant library entries, a process we call <i>retrieval</i>. Each embed in the library has a name, a relevance, and an n-dimensional vector. The name is a string of characters that identify a document chunk, although lwdaq_rag at no point handles anything but embed vectors, nor does it read embed vectors from disk or write them to disk. The vector itself, as delivered to the library, can have integer or real-valued components, but all components will be saved as real numbers. All vectors in the library must have the same length so that the dot product of a test vector with each vector will be proportional to the cosine of the angle between each vector and the test vector.  The relevance stored with each embed is the dot product we obtained from the most recent comparison. The lwdaq_rag guarantees that all vectors have unit length by calcualting the length of each vector it receives, and dividing all its coordinates by the length.</p>
 
-<p>The lwdaq_rag command is used by the RAG Manager tool to load a library of embedding vectors into memory, and subsequently to compare a question vector to all library entries. Embedding vectors provided by services such as OpenAI's text-embedding-3-small have real-valued components and are normalized to unit length. The RAG Manager calls lwdaq_rag to manage its embed library. To obtain 0.1% precision in relevance measurement, while at the same time reducing the size of the embeds on disk, the RAG Manager scales the vectors by &times;100k and rounds the coordinates to integers before storing to disk. These integer-coordinate vectors all have length 100k. We pass them directly into the embed directory, and the embed library automatically normalizes them to unit length.</p>
+<center><table border>
+<tr><th>Instruction</th><th>Function</th></tr>
+<tr><td>create</td><td>Create a new embed vector library, delete old library.</td></tr>
+<tr><td>add</td><td>Add an embed vector to the library.</td></tr>
+<tr><td>dump</td><td>Print out all embed vector names and components.</td></tr>
+<tr><td>config</td><td>Return the embed vector library dimensions.</td></tr>
+<tr><td>retrieve</td><td>Retrieve names of vectors closest to a query vector.</td></tr>
+</table><small><b>Table:</b> Instructions for lwdaq_rag.</small></center>
 
-<p>The lwdaq_rag command operates on a persitent embedding library. This library can be replaced, but unless replaced, it persists so long as the LWDAQ instance that created it persists. We create a new library with the <i>create</i> operation. Here is an example library creation command, one that creates a library of 925 embeds, each with 1536-dimensional vectors.</p>
+<p>The lwdaq_rag command is used by the RAG Manager tool to load a library of embed vectors into memory, and subsequently to compare a question vector to all library entries. Embed vectors provided by services such as OpenAI's text-embedding-3-small have real-valued components and are normalized to unit length. The RAG Manager calls lwdaq_rag to manage its embed library. To obtain 0.1% precision in relevance measurement, while at the same time reducing the size of the embeds on disk, the RAG Manager scales the vectors by &times;100k and rounds the coordinates to integers before storing to disk. These integer-coordinate vectors all have length 100k. We pass them directly into the embed directory, and the embed library automatically normalizes them to unit length.</p>
+
+<p>The lwdaq_rag command operates on a persitent embed library. This library can be replaced, but unless replaced, it persists so long as the LWDAQ instance that created it persists. We create a new library with the <i>create</i> operation. Here is an example library creation command, one that creates a library of 925 embeds, each with 1536-dimensional vectors.</p>
 
 <pre>lwdaq_rag create -lib_len 925 -vec_len 1536</pre>
 
-<p>Here we specify the number of entries in the library with the -lib_len option and the number of dimensions to each vector with -vec_len. These two options are both mandatory if we want to be sure the library fits our embedding vectors, but lwdaq_rag initializes both parameters from the existing library, so it will not raise an error if we fail to specify one or both.</p> 
+<p>Here we specify the number of entries in the library with the -lib_len option and the number of dimensions to each vector with -vec_len. These two options are both mandatory if we want to be sure the library fits our embed vectors, but lwdaq_rag initializes both parameters from the existing library, so it will not raise an error if we fail to specify one or both.</p> 
+
 <center><table border>
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-lib_len</td><td>Number of embeds in the library, default 1.</td></tr>
-<tr><td>-vec_len</td><td>Number of coordinates in embedding vectors, default 1.</td></tr>
+<tr><td>-vec_len</td><td>Number of coordinates in embed vectors, default 1.</td></tr>
 <tr><td>-retrieve_len</td><td>Number of chunks returned by comparison, default 10.</td></tr>
 <tr><td>-name</td><td>A name for a new vector, default "Empty".</td></tr>
 <tr><td>-vector</td><td>A list of integers specifying a vector, devault "0".</td></tr>
@@ -5001,7 +5011,7 @@ v2 28 v1 26</pre>
 <tr><td>10000</td><td>13</td><td>5.2</td><td>51.8</td><td>49.6</td></tr>
 </table><small><b>Table:</b> Execution Time of lwdaq_rag Operations for 1536-Dimensional Vectors.</small></center>
 
-<p>The "load" time is the total time taken to load the entire library with random integer-valued vectors generated in Tcl and passed into lwdaq_rag as strings. We choose 1536-dimensional vectors because this is the size of contemporary large language model (LLM) embedding vectors. Each vector takes 1536 integer locations in memory, each of which is 8 bytes on a 64-bit machine, so each embed is 12 KByte and a ten-thousand embed library will take up 123 MByte of RAM. Once loaded into memory, however, identifying relevant is fast compared to the several seconds it takes to obtain an answer from an LLM completion endpoint.</p>
+<p>The "load" time is the total time taken to load the entire library with random integer-valued vectors generated in Tcl and passed into lwdaq_rag as strings. We choose 1536-dimensional vectors because this is the size of the large language model (LLM) embed vector we are using in the current OSI Chatbot. Each vector takes 1536 integer locations in memory, each of which is 8 bytes on a 64-bit machine, so each embed is 12 KByte and a ten-thousand embed library will take up 123 MByte of RAM. Once loaded into memory, however, identifying relevant is fast compared to the several seconds it takes to obtain an answer from an LLM completion endpoint.</p>
 
 }
 function lwdaq_rag(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;

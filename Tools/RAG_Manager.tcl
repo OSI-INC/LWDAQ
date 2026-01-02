@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.2"
+	LWDAQ_tool_init "RAG_Manager" "6.3"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -1675,7 +1675,8 @@ proc RAG_Manager_vector_from_embed {embed} {
 		regsub -all {,} $vector " " vector
 		regsub -all {[\n\t ]+} $vector " " vector
 	} else {
-		return "ERROR: Failed to extract vector from embed."
+		RAG_Manager_print "ERROR: Could not find vector in embed."
+		set vector ""
 	}
 
 	set new_vector ""
@@ -2110,15 +2111,15 @@ proc RAG_Manager_engine {{cmd ""}} {
 			[RAG_Manager_time]."
 	}
 	
-	set lfl [glob -nocomplain [file join $info(log_dir) *.txt]]
-	foreach lfn $lfl {
-		set name [file root [file tail $lfn]]
+	set qfl [glob -nocomplain [file join $info(log_dir) "Q*.txt"]]
+	foreach qfn $qfl {
+		set name [file root [file tail $qfn]]
 		if {[regexp {Q([0-9a-f]+)} $name -> name]} {
-			RAG_Manager_print "Engine: Grabbing question embed\
-				[file tail $lfn], [RAG_Manager_time]."
+			RAG_Manager_print "Engine: Grabbing question embed [file tail $qfn],\
+				[RAG_Manager_time]."
 			set start_ms [clock milliseconds]
 			set tfn [file join $info(log_dir) "T$name\.txt"]
-			file rename $lfn $tfn
+			file rename $qfn $tfn
 			
 			set f [open $tfn r]
 			set q_vector [read $f]
@@ -2127,34 +2128,40 @@ proc RAG_Manager_engine {{cmd ""}} {
 			set good 1
 			foreach x $q_vector {
 				if {![string is double $x]} {
-					RAG_Manager_print "ERROR: Bad component in vector [file tail $lfn],\
-						in Retrieval Engine."
+					RAG_Manager_print "ERROR: Bad component in vector [file tail $qfn],\
+						Retrieval Engine."
 					set good 0
 					break
 				}
 			}
-			set rc [lwdaq_rag config]
-			if {[regexp -- {-vec_len ([0-9]*)} $rc -> n]} {
-				if {$n != [llength $q_vector]} {
-					RAG_Manager_print "ERROR: Question and library vector\
-						length mismatch, $n<>[llength $vector],\
-						in Retrieval Engine."
+			if {$good} {
+				set rc [lwdaq_rag config]
+				if {[regexp -- {-vec_len ([0-9]*)} $rc -> n]} {
+					if {$n != [llength $q_vector]} {
+						RAG_Manager_print "ERROR: Question and library vector\
+							mismatch, $n<>[llength $vector], in Retrieval Engine."
+						set good 0
+					}
+				} else {
+					RAG_Manager_print "ERROR: Unexpected configuration \"$rc\" in\
+						Retrieval Engine."
 					set good 0
 				}
-			} else {
-				RAG_Manager_print "ERROR: Unexpected lwdaq_rag configuration \"$rc\",\
-					in Retrieval Engine."
-				set good 0
 			}
-			if {!$good} {break}
 			
-			RAG_Manager_print "Engine: Retrieving embeds\
-				relevant to question $name..." brown
 			set start_time [clock milliseconds]
 			if {[catch {
-				set retrieval [lwdaq_rag retrieve -retrieve_len \
-					$info(retrieve_len) -vector $q_vector]
-				RAG_Manager_print "Engine: [lrange $retrieval 0 3]" brown
+				if {$good} {
+					RAG_Manager_print "Engine: Retrieving embeds for $name..." brown
+					set retrieval [lwdaq_rag retrieve \
+						-retrieve_len $info(retrieve_len) \
+						-vector $q_vector]
+					RAG_Manager_print "Engine: [lrange $retrieval 0 3]" brown
+				} else {
+					RAG_Manager_print "Engine: Generating dummy retrieval for\
+						question $name..."
+					set retrieval "NONE 0"
+				}
 				set f [open $tfn w]
 				puts $f $retrieval
 				close $f
@@ -2165,9 +2172,9 @@ proc RAG_Manager_engine {{cmd ""}} {
 					[expr [clock milliseconds]-$start_ms] ms,\
 					[RAG_Manager_time]."
 			} error_result]} {
-				RAG_Manager_print "ERROR: $error_result"
-				set info(control) "Idle"
-				return "0"
+				RAG_Manager_print "ERROR: $error_result in Retrieval Engine."
+				set info(engine_ctrl) "Idle"
+				return "ERROR"
 			}		
 		}
 	}
@@ -2201,6 +2208,8 @@ proc RAG_Manager_engine {{cmd ""}} {
 # been removed from the list, all remaining embeds have existing content chunks.
 # We return the list of relevant chunks. Each element in the list consists of
 # two sub-elements: the name of the chunk and its relevance to the question.
+# If the embed vector we obtain from the embedding endpoint is invalid, we
+# return a list of only one chunk: a dummy name and zero relevance.
 #
 proc RAG_Manager_relevant_chunks {question api_key} {
 	upvar #0 RAG_Manager_config config
@@ -2210,6 +2219,7 @@ proc RAG_Manager_relevant_chunks {question api_key} {
 	set start_time [clock milliseconds]
 	set q_embed [RAG_Manager_embed_string $question $api_key]
 	set q_vector [RAG_Manager_vector_from_embed $q_embed]
+	if {$q_vector == ""} {return "NONE 0"}
 
 	RAG_Manager_print "Question embed obtained in\
 		[expr [clock milliseconds] - $start_time] ms."
@@ -2282,8 +2292,7 @@ proc RAG_Manager_relevant_chunks {question api_key} {
 	set retrieval $new_retrieval
 	if {$valid_count == 0} {
 		RAG_Manager_print "ERROR: No content strings exist for retrieved embeds."
-		set info(control) "Idle"
-		return "0"
+		return "NONE 0"
 	} 
 	RAG_Manager_print "Have $valid_count valid embeds,\
 		ignoring $obsolete_count obsolete embeds." brown
@@ -2292,16 +2301,16 @@ proc RAG_Manager_relevant_chunks {question api_key} {
 }
 
 #
-# RAG_Manager_retrieve calls the Relevant Chunks routine to obtain a list of
-# chunks relevant to the current question. We use the relevance of the first
-# chunk in the list as a measure of the relevance of the question, and classify
-# the question as high, mid, or low-relevance. We construct the retrieved
-# content based upon this classification. We read content strings from disk and
-# add them to list. When we exceed the word limit for the question relevance, we
-# stop. We return the number of content strings added to our list, and we store
-# them in the info(contents) list. In order to embed the question, this routine
-# must read a valid API key from disk. If a file called offline.txt exists in
-# the log directory, this routine will exit without doing anything.
+# RAG_Manager_retrieve calls Relevant Chunks to obtain a list of chunks relevant
+# to the current question. We use the relevance of the first chunk in the list
+# as a measure of the relevance of the question, and classify the question as
+# high, mid, or low-relevance. We construct the retrieved content based upon
+# this classification. We read content strings from disk and add them to list.
+# When we exceed the word limit for the question relevance, we stop. We return
+# the number of content strings added to our list, and we store them in the
+# info(contents) list. In order to embed the question, this routine must read a
+# valid API key from disk. If a file called offline.txt exists in the log
+# directory, this routine will exit without doing anything.
 #
 proc RAG_Manager_retrieve {} {
 	upvar #0 RAG_Manager_config config
@@ -2315,13 +2324,13 @@ proc RAG_Manager_retrieve {} {
 		close $f
 		set run_min [expr round(([clock seconds]-$start_time)/60.0)]		
 		RAG_Manager_print "Chatbot has been offline for $run_min minutes."
-		return "0"
+		return "ERROR"
 	}
 
 	set question [string trim $config(question)]
 	if {$question == ""} {
 		RAG_Manager_print "ERROR: Empty question, abandoning retrieval."
-		return "0"
+		return "ERROR"
 	}
 		
 	set info(control) "Retrieve"
@@ -2330,7 +2339,7 @@ proc RAG_Manager_retrieve {} {
 	if {![file exists $config(key_file)]} {
 		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
 		set info(control) "Idle"
-		return "0"
+		return "ERROR"
 	}
 	set f [open $config(key_file) r]
 	set api_key [read $f]
@@ -2553,9 +2562,8 @@ proc RAG_Manager_submit {} {
 	}
 	if {[string length $question]/$info(word_size) \
 			> $config(max_question_words)} {
-		set answer "ERROR: Question is longer than\
+		return "ERROR: Question is longer than\
 			[expr $config(max_question_words)*$info(word_size)] characters."
-		return $answer
 	}
 
 	if {[file exists $info(offline_file)]} {
