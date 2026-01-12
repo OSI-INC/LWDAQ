@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "4.4"
+	LWDAQ_tool_init "Stimulator" "4.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -509,18 +509,26 @@ proc Stimulator_clear {n} {
 # Stimulator_monitor captures auxiliary messages from stimulators and keeps track
 # of when stimuli end, so it can change the state label colors. The routine looks
 # for auxiliary messages first in the Neuroplayer Tool, if one exists, and second
-# in the Receiver Instrument.
+# in the Receiver Instrument. While the monitor is running, it enables analysis
+# in the Receiver Instrument so that we can get auxiliary messages. Right now
+# the Stimulator Tool operates only with a graphical user interface, so we use
+# the existence of its window to determine if the monitor should shut down.
 #
 proc Stimulator_monitor {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
+	upvar #0 LWDAQ_info_Receiver rconfig
 	upvar #0 LWDAQ_info_Receiver rinfo
 	upvar #0 Neuroplayer_info ninfo
 	upvar #0 Neuroplayer_config nconfig
 	global LWDAQ_Info
 	
-	if {![winfo exists $info(window)]} {return ""}
-	if {$LWDAQ_Info(reset)} {return ""}
+	if {![winfo exists $info(window)] || $LWDAQ_Info(reset)} {
+		set rconfig(analysis_enable) "0"
+		return ""
+	} else {
+		set rconfig(analysis_enable) "1"
+	}
 	set f $info(window).state
 
 	# Note the time for stimulation tracking.

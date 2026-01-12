@@ -830,8 +830,8 @@ proc LWDAQ_daq_Receiver {} {
 				"-payload $config(payload_length) clocks"] %d%d%d \
 				num_errors num_new_clocks num_new_messages
 
-			# We use the show_errors and show_error_extent parameters to control
-			# the display of raw message blocks that contain errors.
+			# We use the show_errors to control the display of raw message
+			# blocks that contain errors.
 			if {($num_errors > 0) && $info(show_errors)} {
 				set result [lwdaq_receiver $info(scratch_image) \
 					"-payload $config(payload_length) print 0 1"]
