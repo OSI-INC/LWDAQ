@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "2.5"
+	LWDAQ_tool_init "SCT_Check" "2.6"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require ASG
@@ -237,10 +237,10 @@ proc SCT_Check_detect {} {
 
 	LWDAQ_print $info(text) "Detecting available telemetry signals." purple
 	set detect ""
-	LWDAQ_reset_Receiver
 	set iconfig(daq_num_clocks) 128
 	set iconfig(analysis_channels) "*"
 	set iconfig(daq_ip_addr) $config(rx_ip)
+	LWDAQ_reset_Receiver
 	set result [LWDAQ_acquire Receiver]
 	if {[LWDAQ_is_error_result $result]} {
 		LWDAQ_print $info(text) $result
@@ -616,7 +616,7 @@ the corner frequency of SCT filters with various sample rates. When we check the
 the SCT's low-pass filter near its corner frequency of 80 Hz. Check multiple
 boxes to measure in detail around multiple corner frequencies.
 
-Copyright (C) 2025, Kevan Hashemi, Open Source Instruments Inc.
+Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
 
 ----------End Help----------
 

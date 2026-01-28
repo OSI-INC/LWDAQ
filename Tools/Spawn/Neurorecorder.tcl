@@ -1,6 +1,6 @@
 # Neurorecorder.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2007-2025 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2026 Kevan Hashemi, Open Source Instruments Inc.
 
 # The Neurorecorder records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "171"
+	LWDAQ_tool_init "Neurorecorder" "172"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -91,7 +91,7 @@ proc Neurorecorder_init {} {
 #
 # The recorder buffer variable holds data that we download from the 
 # receiver but are unable to write to disk because the recording file
-# is locked. 
+# is locked.
 #
 	set info(rbuff) ""
 	set config(max_rbuff) "20000000"
@@ -179,12 +179,18 @@ proc Neurorecorder_init {} {
 	set info(clocks_per_second) 128
 #
 # The Neurorecorder will record events to a log, in particular warnings and
-# errors generated during playback and recording.
+# errors generated during playback and recording. If the log file is locked, we
+# buffer messages until we are able to write again. We have a message we print
+# when we resume writing to the log file.
 #
 	set config(log_warnings) 0
 	set config(log_file) [file join \
 		[file dirname $info(settings_file_name)] Neurorecorder_log.txt]
 	set config(datetime_format) {%d-%b-%Y %H:%M:%S}
+	set info(lbuff) [list]
+	set info(max_lbuff) "100"
+	set info(log_stall_message) "WARNING: Log file locked, buffering messages."
+	set info(log_resume_message) "WARNING: Resumed writing to log file."
 # 
 # Some errors we don't want to write more than once to the text window, so
 # we keep a copy of the most recent error to compare to.
@@ -279,7 +285,10 @@ proc Neurorecorder_configure {} {
 # color to the key word "norepeat". The routine always stores the previous line
 # it writes, so as to compare in the case of a norepeat requirement. Note that
 # the final print to a text window uses LWDAQ_print, which will not try to print
-# to a target with a widget-style name when graphics are disabled.
+# to a target with a widget-style name when graphics are disabled. If the log
+# file is locked, the routine buffers the log messages until it is unlocked. It
+# generates its own warning when the file is locked and another when the file
+# becomes unlocked.
 #
 proc Neurorecorder_print {line {color "black"}} {
 	upvar #0 Neurorecorder_config config
@@ -292,11 +301,44 @@ proc Neurorecorder_print {line {color "black"}} {
 	set info(previous_line) $line
 	
 	if {[regexp "^WARNING: " $line] || [regexp "^ERROR: " $line]} {
+		if {$line == $info(log_resume_message)} {
+			set resume "1"
+		} {
+			set resume "0"
+		}
 		append line " ([Neurorecorder_clock_convert [clock seconds]]\)"
+		
 		if {$config(log_warnings)} {
-			LWDAQ_print $config(log_file) "$line"
+			if {[catch {
+				set f [open $config(log_file) a]
+				if {[llength $info(lbuff)] > 0} {
+					foreach buffered_line $info(lbuff) {
+						puts $f $buffered_line
+					}
+					set info(lbuff) [list]
+				}
+				puts $f $line
+				close $f
+			} error_message]} {
+				if {[llength $info(lbuff)] == 0} {
+					set message "$info(log_stall_message)\
+						([Neurorecorder_clock_convert [clock seconds]]\)"	
+					LWDAQ_print $info(text) $message
+					set info(lbuff) [list $message $line]
+				} {
+					if {!$resume} {
+						lappend info(lbuff) $line
+						if {[llength $info(lbuff)] > $info(max_lbuff)} {
+							set info(lbuff) [lreplace $info(lbuff) 0 0]
+						}
+					} {
+						return ""
+					}
+				}
+			}
 		}
 	}
+	
 	if {$config(verbose) \
 			|| [regexp "^WARNING: " $line] \
 			|| [regexp "^ERROR: " $line] \
@@ -304,6 +346,7 @@ proc Neurorecorder_print {line {color "black"}} {
 		if {$color == "verbose"} {set color black}
 		LWDAQ_print $info(text) $line $color
 	}
+	
 	return ""
 }
 
@@ -687,6 +730,12 @@ proc Neurorecorder_record {{command ""}} {
 		return ""
 	}
 	
+	# We may be waiting for the log file to be free. If so, try to write the 
+	# buffered messages to disk now.
+	if {$config(log_warnings) && ([llength $info(lbuff)] > 0)} {
+		Neurorecorder_print $info(log_resume_message)
+	}
+	
 	# If Stop, we move to Idle and return.
 	if {$info(record_control) == "Stop"} {
 		Neurorecorder_print "Stopped recording at\
@@ -736,7 +785,7 @@ proc Neurorecorder_record {{command ""}} {
 		# Turn the recording label to the start color.
 		LWDAQ_set_bg $info(record_control_label) $info(start_color)
 		
-		# Clear the buffer.
+		# Clear the data buffers.
 		set info(rbuff) ""
 
 		# If the synchronization flag is set, or if we are starting a new
@@ -1028,7 +1077,7 @@ proc Neurorecorder_record {{command ""}} {
 		LWDAQ_post Neurorecorder_record end
 		return ""
 	}
-
+	
 	# We are done and Idle.
 	set info(record_control) "Idle"
 	return ""
@@ -1087,8 +1136,8 @@ proc Neurorecorder_open {} {
 	pack $f.conf -side left -expand yes
 	button $f.help -text "Help" -command "LWDAQ_tool_help Neurorecorder"
 	pack $f.help -side left -expand yes
-	checkbutton $f.synch -variable \
-		Neurorecorder_config(synchronize) -text "Synchronize"
+	checkbutton $f.synch -variable Neurorecorder_config(synchronize) \
+		-text "Synchronize"
 	pack $f.synch -side left -expand yes
 
 	set f $w.record.b
@@ -1143,6 +1192,10 @@ proc Neurorecorder_open {} {
 	pack $f.le -side left -expand yes
 	entry $f.ee -textvariable Neurorecorder_config(autocreate) -width 6
 	pack $f.ee -side left -expand yes
+
+	checkbutton $f.log -variable Neurorecorder_config(log_warnings) \
+		-text "Log Warnings"
+	pack $f.log -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 90 7 1 1]
 	
