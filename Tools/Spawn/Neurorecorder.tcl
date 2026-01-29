@@ -310,6 +310,9 @@ proc Neurorecorder_print {line {color "black"}} {
 		
 		if {$config(log_warnings)} {
 			if {[catch {
+				# un-comment the following line and use a global lock flag to test
+				# buffering of log messages.
+				# global lockit; if {$lockit} {error}
 				set f [open $config(log_file) a]
 				if {[llength $info(lbuff)] > 0} {
 					foreach buffered_line $info(lbuff) {
