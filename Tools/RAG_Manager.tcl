@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.3"
+	LWDAQ_tool_init "RAG_Manager" "6.4"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -92,6 +92,8 @@ https://www.opensourceinstruments.com/Electronics/A3027/M3027.html
 https://www.opensourceinstruments.com/Electronics/A3029/M3029.html
 https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
 https://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
+https://www.opensourceinstruments.com/Electronics/A3035/M3035.html
+https://www.opensourceinstruments.com/Electronics/A3035/OSR8.html
 https://www.opensourceinstruments.com/Electronics/A3036/M3036.html
 https://www.opensourceinstruments.com/Electronics/A3038/M3038.html
 https://www.opensourceinstruments.com/Electronics/A3040/M3040.html
@@ -2008,7 +2010,11 @@ proc RAG_Manager_load {} {
 		set vector [read $f]
 		close $f
 		set name [file root [file tail $efn]]
-		lwdaq_rag add -name $name -vector $vector
+		if {[catch {
+			lwdaq_rag add -name $name -vector $vector
+		} error_result]} {
+			RAG_Manager_print "$error_result $name"
+		}
 		if {$config(verbose)} {
 			if {($count % (round([llength $efl]*$config(progress_frac))+1) == 1) \
 				|| ($count == [llength $efl])} {
