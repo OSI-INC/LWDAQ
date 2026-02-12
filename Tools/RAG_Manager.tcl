@@ -1660,11 +1660,13 @@ proc RAG_Manager_embed_string {match api_key} {
 		-d $json_body]
 	
 	if {[catch {
-		set result [eval exec $cmd]
+		set embed [eval exec $cmd]
 	} error_result]} {
-		return "ERROR: $error_result"
+		RAG_Manager_print "ERROR: $error_result"
+		set embed ""
 	}
-	return $result
+	
+	return [string trim $embed]
 }
 
 #
@@ -1680,7 +1682,11 @@ proc RAG_Manager_vector_from_embed {embed} {
 		regsub -all {[\n\t ]+} $vector " " vector
 	} else {
 		RAG_Manager_print "ERROR: Could not find vector in embed, json prefix below."
-		RAG_Manager_print "[string range $embed 0 200]"
+		if {[regexp {"message"\s*:\s* \[([^\]]*)} $embed -> message]} {
+			RAG_Manager_print "MESSAGE: $message"
+		} else {
+			RAG_Manager_print "PREAMBLE: [string range $message 0 200]"
+		}
 		set vector ""
 	}
 
@@ -1713,6 +1719,7 @@ proc RAG_Manager_fetch_embeds {api_key} {
 	set new_count 0
 	set old_count 0
 	set count 0
+	set missing_count 0
 	RAG_Manager_print "Creating embeds for new match strings..."
 	foreach mfn $mfl {
 		incr count
@@ -1724,14 +1731,14 @@ proc RAG_Manager_fetch_embeds {api_key} {
 			RAG_Manager_print "[format %5d $count]:\
 				[file tail $mfn] fetching embed..." orange
 			set embed [RAG_Manager_embed_string $match $api_key]
-			if {[LWDAQ_is_error_result $embed]} {
-				RAG_Manager_print "ERROR: $embed"
-				break
+			if {$embed == ""} {
+				incr missing_count
+				continue
 			}
 			set vector [RAG_Manager_vector_from_embed $embed]
-			if {[LWDAQ_is_error_result $vector]} {
-				RAG_Manager_print "ERROR: $vector"
-				break
+			if {$vector == ""} {
+				incr missing_count
+				continue
 			}
 			set efn [file join $info(embed_dir) $root\.txt]
 			set f [open $efn w]
@@ -1763,7 +1770,8 @@ proc RAG_Manager_fetch_embeds {api_key} {
 	RAG_Manager_print "Checked $count chunks,\
 		found $old_count embeds,\
 		fetched $new_count embeds,\
-		$obsolete_count obsolete embeds."
+		detected $obsolete_count obsolete embeds,\
+		counted $missing_count missing embeds."
 		
 	return $new_count
 }
@@ -1940,10 +1948,10 @@ proc RAG_Manager_embed {} {
 #
 # RAG_Manager_purge makes a list of all content strings in a match directory and
 # another list of all the embeds in the embed directory. It deletes any embed
-# for which there is not corresponding match string. If we set the offline flag,
+# for which there is no corresponding match string. If we set the offline flag,
 # the routine will take the chatbot and retrieval engine offline while it
 # operates. By default, however, the routine does not create or delete an
-# offline flag file.
+# offline flag file. 
 #
 proc RAG_Manager_purge {} {
 	upvar #0 RAG_Manager_info info
