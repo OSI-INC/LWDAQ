@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.4"
+	LWDAQ_tool_init "RAG_Manager" "6.5"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -107,6 +107,7 @@ https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
 https://www.opensourceinstruments.com/Electronics/A3051/M3051.html
 https://www.opensourceinstruments.com/Electronics/A3052/M3052.html
 https://www.opensourceinstruments.com/Electronics/A3053/M3053.html
+https://www.opensourceinstruments.com/Electronics/A3054/M3054.html
 https://www.opensourceinstruments.com/ACC/ACC.php
 https://www.opensourceinstruments.com/ACC/Overview.html
 https://www.opensourceinstruments.com/ALT/ALT.php
@@ -1674,11 +1675,12 @@ proc RAG_Manager_vector_from_embed {embed} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 		
-	if {[regexp {"embedding": \[([^\]]*)} $embed -> vector]} {
+	if {[regexp {"embedding"\s*:\s* \[([^\]]*)} $embed -> vector]} {
 		regsub -all {,} $vector " " vector
 		regsub -all {[\n\t ]+} $vector " " vector
 	} else {
-		RAG_Manager_print "ERROR: Could not find vector in embed."
+		RAG_Manager_print "ERROR: Could not find vector in embed, json prefix below."
+		RAG_Manager_print "[string range $embed 0 200]"
 		set vector ""
 	}
 
