@@ -1685,7 +1685,7 @@ proc RAG_Manager_vector_from_embed {embed} {
 		if {[regexp {"message"\s*:\s* \[([^\]]*)} $embed -> message]} {
 			RAG_Manager_print "MESSAGE: $message"
 		} else {
-			RAG_Manager_print "PREAMBLE: [string range $message 0 200]"
+			RAG_Manager_print "PREAMBLE: [string range $embed 0 200]"
 		}
 		set vector ""
 	}
