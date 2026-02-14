@@ -148,8 +148,8 @@ set config(userpass) "username:password"
 #	
 	set config(high_rel_thr) "0.55"
 	set config(mid_rel_thr) "0.30"
-	set config(high_rel_model) "gpt-4o"
-	set config(mid_rel_model) "gpt-4o"
+	set config(high_rel_model) "gpt-5-mini"
+	set config(mid_rel_model) "gpt-5-mini"
 	set config(low_rel_model) "gpt-4o-mini"
 	set config(high_rel_words) "5000"
 	set config(mid_rel_words) "5000"
@@ -159,7 +159,6 @@ set config(userpass) "username:password"
 	set config(low_rel_chat_words) "10000"
 	set config(max_question_words) "1000"
 	set config(embed_model) "text-embedding-3-small"
-	set config(temperature) "0.0"
 #
 # Behavior of the chat handler.
 #
@@ -2510,7 +2509,6 @@ proc RAG_Manager_get_answer {model assistant contents question api_key} {
 	set assistant [RAG_Manager_json_format $assistant]
  	set json_body "\{\n\
 		\"model\": \"$model\",\n\
-		\"temperature\": $config(temperature),\n\
 		\"messages\": \[\n"
 	append json_body "    \{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
 	foreach content $contents {
