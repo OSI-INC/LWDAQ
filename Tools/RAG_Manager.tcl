@@ -162,7 +162,7 @@ set config(userpass) "username:password"
 #
 # Behavior of the chat handler.
 #
-	set config(answer_timeout_s) "30" 
+	set config(answer_timeout_s) "40" 
 	set config(offline_min) "4"
 #
 # Completion assistant instructions for the three tiers of relevance. Can be
