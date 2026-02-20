@@ -26,7 +26,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "1.11"
+	LWDAQ_tool_init "OSR8_Assembler" "3.1"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return ""
@@ -52,7 +52,7 @@ proc OSR8_Assembler_init {} {
 	set data [split $data \n]
 	set info(instructions) [list]
 	foreach d $data {
-		if {[regexp {16#([0-9A-Fa-f]*)[^-]*-- *(.*)} $d dummy opcode syntax]} {
+		if {[regexp { +-- +([0-9A-Fa-f]{2}) +(.*)} $d dummy opcode syntax]} {
 			lappend info(instructions) [list $syntax $opcode]
 		}
 	}	
@@ -710,105 +710,98 @@ http://www.opensourceinstruments.com/Electronics/A3035/OSR8.html#Assembler
 
 ----------Begin Data----------
 
-	constant nop      : integer := 16#00#; -- nop
-	constant jp_nn    : integer := 16#01#; -- jp nn
-	constant jp_nz_nn : integer := 16#02#; -- jp nz,nn
-	constant jp_z_nn  : integer := 16#03#; -- jp z,nn
-	constant jp_nc_nn : integer := 16#04#; -- jp nc,nn
-	constant jp_c_nn  : integer := 16#05#; -- jp c,nn
-	constant jp_np_nn : integer := 16#06#; -- jp np,nn
-	constant jp_p_nn  : integer := 16#07#; -- jp p,nn
-	constant call_nn  : integer := 16#08#; -- call nn
-	constant sw_int   : integer := 16#09#; -- int
-	constant ret_cll  : integer := 16#0A#; -- ret
-	constant ret_int  : integer := 16#0B#; -- rti
-	constant cpu_wt   : integer := 16#0C#; -- wait
-	constant clr_iflg : integer := 16#0D#; -- clri
-	constant set_iflg : integer := 16#0E#; -- seti
-	
-	constant ld_A_n   : integer := 16#10#; -- ld A,n
-	constant ld_IX_nn : integer := 16#11#; -- ld IX,nn
-	constant ld_IY_nn : integer := 16#12#; -- ld IY,nn
-	constant ld_HL_nn : integer := 16#13#; -- ld HL,nn
-	constant ld_A_mm  : integer := 16#14#; -- ld A,(nn)
-	constant ld_mm_A  : integer := 16#15#; -- ld (nn),A
-	constant ld_A_ix  : integer := 16#16#; -- ld A,(IX)
-	constant ld_A_iy  : integer := 16#17#; -- ld A,(IY)
-	constant ld_ix_A  : integer := 16#18#; -- ld (IX),A
-	constant ld_iy_A  : integer := 16#19#; -- ld (IY),A
-	constant ld_HL_SP : integer := 16#1A#; -- ld HL,SP
-	constant ld_SP_HL : integer := 16#1B#; -- ld SP,HL
-	constant ld_HL_PC : integer := 16#1C#; -- ld HL,PC
-	constant ld_PC_HL : integer := 16#1D#; -- ld PC,HL
-			
-	constant push_A   : integer := 16#20#; -- push A
-	constant push_B   : integer := 16#21#; -- push B
-	constant push_C   : integer := 16#22#; -- push C
-	constant push_D   : integer := 16#23#; -- push D
-	constant push_E   : integer := 16#24#; -- push E
-	constant push_H   : integer := 16#25#; -- push H
-	constant push_L   : integer := 16#26#; -- push L
-	constant push_F   : integer := 16#27#; -- push F
-	constant push_IX  : integer := 16#28#; -- push IX
-	constant push_IY  : integer := 16#29#; -- push IY
-	
-	constant pop_A    : integer := 16#30#; -- pop A
-	constant pop_B    : integer := 16#31#; -- pop B
-	constant pop_C    : integer := 16#32#; -- pop C
-	constant pop_D    : integer := 16#33#; -- pop D
-	constant pop_E    : integer := 16#34#; -- pop E
-	constant pop_H    : integer := 16#35#; -- pop H
-	constant pop_L    : integer := 16#36#; -- pop L
-	constant pop_F    : integer := 16#37#; -- pop F
-	constant pop_IX   : integer := 16#38#; -- pop IX
-	constant pop_IY   : integer := 16#39#; -- pop IY
+constant nop      : opcode_type := "0000000"; -- 00 nop
+constant jp_nn    : opcode_type := "0000001"; -- 01 jp nn
+constant jp_nz_nn : opcode_type := "0000010"; -- 02 jp nz,nn
+constant jp_z_nn  : opcode_type := "0000011"; -- 03 jp z,nn
+constant jp_nc_nn : opcode_type := "0000100"; -- 04 jp nc,nn
+constant jp_c_nn  : opcode_type := "0000101"; -- 05 jp c,nn
+constant jp_np_nn : opcode_type := "0000110"; -- 06 jp np,nn
+constant jp_p_nn  : opcode_type := "0000111"; -- 07 jp p,nn
+constant call_nn  : opcode_type := "0001000"; -- 08 call nn
+constant sw_int   : opcode_type := "0001001"; -- 09 int
+constant ret_cll  : opcode_type := "0001010"; -- 0A ret
+constant ret_int  : opcode_type := "0001011"; -- 0B rti
+constant cpu_wt   : opcode_type := "0001100"; -- 0C wait
+constant clr_iflg : opcode_type := "0001101"; -- 0D clri
+constant set_iflg : opcode_type := "0001110"; -- 0E seti
 
-	constant add_A_B  : integer := 16#40#; -- add A,B
-	constant add_A_n  : integer := 16#41#; -- add A,n
-	constant adc_A_B  : integer := 16#42#; -- adc A,B
-	constant adc_A_n  : integer := 16#43#; -- adc A,n
-	constant sub_A_B  : integer := 16#44#; -- sub A,B
-	constant sub_A_n  : integer := 16#45#; -- sub A,n
-	constant sbc_A_B  : integer := 16#46#; -- sbc A,B
-	constant sbc_A_n  : integer := 16#47#; -- sbc A,n
-	constant clr_aflg : integer := 16#4F#; -- clrf
-	
-	constant inc_A    : integer := 16#50#; -- inc A
-	constant inc_B    : integer := 16#51#; -- inc B
-	constant inc_C    : integer := 16#52#; -- inc C
-	constant inc_D    : integer := 16#53#; -- inc D
-	constant inc_E    : integer := 16#54#; -- inc E
-	constant inc_H    : integer := 16#55#; -- inc H
-	constant inc_L    : integer := 16#56#; -- inc L
-	constant inc_SP   : integer := 16#57#; -- inc SP
-	constant inc_IX   : integer := 16#59#; -- inc IX
-	constant inc_IY   : integer := 16#5A#; -- inc IY
+constant ld_A_n   : opcode_type := "0010000"; -- 10 ld A,n
+constant ld_IX_nn : opcode_type := "0010001"; -- 11 ld IX,nn
+constant ld_IY_nn : opcode_type := "0010010"; -- 12 ld IY,nn
+constant ld_HL_nn : opcode_type := "0010011"; -- 13 ld HL,nn
+constant ld_A_mm  : opcode_type := "0010100"; -- 14 ld A,(nn)
+constant ld_mm_A  : opcode_type := "0010101"; -- 15 ld (nn),A
+constant ld_A_ix  : opcode_type := "0010110"; -- 16 ld A,(IX)
+constant ld_A_iy  : opcode_type := "0010111"; -- 17 ld A,(IY)
+constant ld_ix_A  : opcode_type := "0011000"; -- 18 ld (IX),A
+constant ld_iy_A  : opcode_type := "0011001"; -- 19 ld (IY),A
+constant ld_HL_SP : opcode_type := "0011010"; -- 1A ld HL,SP
+constant ld_SP_HL : opcode_type := "0011011"; -- 1B ld SP,HL
+constant ld_HL_PC : opcode_type := "0011100"; -- 1C ld HL,PC
+constant ld_PC_HL : opcode_type := "0011101"; -- 1D ld PC,HL
 
-	constant dec_A    : integer := 16#60#; -- dec A
-	constant dec_B    : integer := 16#61#; -- dec B
-	constant dec_C    : integer := 16#62#; -- dec C
-	constant dec_D    : integer := 16#63#; -- dec D
-	constant dec_E    : integer := 16#64#; -- dec E
-	constant dec_H    : integer := 16#65#; -- dec H
-	constant dec_L    : integer := 16#66#; -- dec L
-	constant dly_A    : integer := 16#67#; -- dly A
-	constant dec_SP   : integer := 16#68#; -- dec SP
-	constant dec_IX   : integer := 16#69#; -- dec IX
-	constant dec_IY   : integer := 16#6A#; -- dec IY
-	
-	constant and_A_B  : integer := 16#70#; -- and A,B
-	constant and_A_n  : integer := 16#71#; -- and A,n
-	constant or_A_B   : integer := 16#72#; -- or A,B
-	constant or_A_n   : integer := 16#73#; -- or A,n
-	constant xor_A_B  : integer := 16#74#; -- xor A,B
-	constant xor_A_n  : integer := 16#75#; -- xor A,n
-	
-	constant rl_A     : integer := 16#78#; -- rl A
-	constant rlc_A    : integer := 16#79#; -- rlc A
-	constant rr_A     : integer := 16#7A#; -- rr A
-	constant rrc_A    : integer := 16#7B#; -- rrc A
-	constant sla_A    : integer := 16#7C#; -- sla A
-	constant sra_A    : integer := 16#7D#; -- sra A
-	constant srl_A    : integer := 16#7E#; -- srl A
+constant push_A   : opcode_type := "0100000"; -- 20 push A
+constant push_B   : opcode_type := "0100001"; -- 21 push B
+constant push_C   : opcode_type := "0100010"; -- 22 push C
+constant push_D   : opcode_type := "0100011"; -- 23 push D
+constant push_E   : opcode_type := "0100100"; -- 24 push E
+constant push_H   : opcode_type := "0100101"; -- 25 push H
+constant push_L   : opcode_type := "0100110"; -- 26 push L
+constant push_F   : opcode_type := "0100111"; -- 27 push F
+constant push_IX  : opcode_type := "0101000"; -- 28 push IX
+constant push_IY  : opcode_type := "0101001"; -- 29 push IY
+
+constant pop_A    : opcode_type := "0110000"; -- 30 pop A
+constant pop_B    : opcode_type := "0110001"; -- 31 pop B
+constant pop_C    : opcode_type := "0110010"; -- 32 pop C
+constant pop_D    : opcode_type := "0110011"; -- 33 pop D
+constant pop_E    : opcode_type := "0110100"; -- 34 pop E
+constant pop_H    : opcode_type := "0110101"; -- 35 pop H
+constant pop_L    : opcode_type := "0110110"; -- 36 pop L
+constant pop_F    : opcode_type := "0110111"; -- 37 pop F
+constant pop_IX   : opcode_type := "0111000"; -- 38 pop IX
+constant pop_IY   : opcode_type := "0111001"; -- 39 pop IY
+
+constant add_A_B  : opcode_type := "1000000"; -- 40 add A,B
+constant add_A_n  : opcode_type := "1000001"; -- 41 add A,n
+constant adc_A_B  : opcode_type := "1000010"; -- 42 adc A,B
+constant adc_A_n  : opcode_type := "1000011"; -- 43 adc A,n
+constant sub_A_B  : opcode_type := "1000100"; -- 44 sub A,B
+constant sub_A_n  : opcode_type := "1000101"; -- 45 sub A,n
+constant sbc_A_B  : opcode_type := "1000110"; -- 46 sbc A,B
+constant sbc_A_n  : opcode_type := "1000111"; -- 47 sbc A,n
+constant clr_aflg : opcode_type := "1001111"; -- 4F clrf
+
+constant inc_A    : opcode_type := "1010000"; -- 50 inc A
+constant inc_B    : opcode_type := "1010001"; -- 51 inc B
+constant inc_C    : opcode_type := "1010010"; -- 52 inc C
+constant inc_D    : opcode_type := "1010011"; -- 53 inc D
+constant inc_IX   : opcode_type := "1011001"; -- 59 inc IX
+constant inc_IY   : opcode_type := "1011010"; -- 5A inc IY
+
+constant dec_A    : opcode_type := "1100000"; -- 60 dec A
+constant dec_B    : opcode_type := "1100001"; -- 61 dec B
+constant dec_C    : opcode_type := "1100010"; -- 62 dec C
+constant dec_D    : opcode_type := "1100011"; -- 63 dec D
+constant dly_A    : opcode_type := "1100111"; -- 67 dly A
+constant dec_IX   : opcode_type := "1101001"; -- 69 dec IX
+constant dec_IY   : opcode_type := "1101010"; -- 6A dec IY
+
+constant and_A_B  : opcode_type := "1110000"; -- 70 and A,B
+constant and_A_n  : opcode_type := "1110001"; -- 71 and A,n
+constant or_A_B   : opcode_type := "1110010"; -- 72 or A,B
+constant or_A_n   : opcode_type := "1110011"; -- 73 or A,n
+constant xor_A_B  : opcode_type := "1110100"; -- 74 xor A,B
+constant xor_A_n  : opcode_type := "1110101"; -- 75 xor A,n
+
+constant rl_A     : opcode_type := "1111000"; -- 78 rl A
+constant rlc_A    : opcode_type := "1111001"; -- 79 rlc A
+constant rr_A     : opcode_type := "1111010"; -- 7A rr A
+constant rrc_A    : opcode_type := "1111011"; -- 7B rrc A
+constant sla_A    : opcode_type := "1111100"; -- 7C sla A
+constant sra_A    : opcode_type := "1111101"; -- 7D sra A
+constant srl_A    : opcode_type := "1111110"; -- 7E srl A
+
 	
 ----------End Data----------

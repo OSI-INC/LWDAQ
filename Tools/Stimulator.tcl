@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "4.5"
+	LWDAQ_tool_init "Stimulator" "4.6"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -1152,12 +1152,12 @@ proc Stimulator_tp_run {} {
 	
 	# Read program from file.
 	if {[file exists $config(tp_program)]} {
-		Stimulator_print $info(tp_text) "Reading and assembling $config(tp_program)."
+		LWDAQ_print $info(tp_text) "Reading and assembling $config(tp_program)."
 		set f [open $config(tp_program)]
 		set program [read $f]
 		close $f
 	} else {
-		Stimulator_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
+		LWDAQ_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
 		return ""
 	} 
 	
@@ -1171,10 +1171,10 @@ proc Stimulator_tp_run {} {
 		set prog [OSR8_Assembler_assemble $program]
 		set ainfo(text) $saved_text
 	} error_message]} {
-		Stimulator_print $info(tp_text) "ERROR: $error_message\."
+		LWDAQ_print $info(tp_text) "ERROR: $error_message\."
 		return ""
 	}
-	Stimulator_print $info(tp_text) "Assembly successful,\
+	LWDAQ_print $info(tp_text) "Assembly successful,\
 		uploading [llength $prog] code bytes."	
 	
 	# Begin our first command with the instruction that resets the stimulator
