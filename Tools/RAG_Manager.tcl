@@ -150,8 +150,8 @@ set config(userpass) "username:password"
 #	
 	set config(high_rel_thr) "0.55"
 	set config(mid_rel_thr) "0.30"
-	set config(high_rel_model) "gpt-4o"
-	set config(mid_rel_model) "gpt-4o"
+	set config(high_rel_model) "gpt-5-mini"
+	set config(mid_rel_model) "gpt-5-mini"
 	set config(low_rel_model) "gpt-4o-mini"
 	set config(high_rel_words) "5000"
 	set config(mid_rel_words) "5000"
@@ -177,11 +177,14 @@ You are a helpful technical assistant for a support chatbot. The user’s questi
 When answering the user's question:
   - Summarize and explain technical documentation.
   - Complete mathematical calculations whenever possible.
-  - If the question asks for a figure, graph, or image, and a relevant figure is available in the provided content, include the figure in your response like this: `![Figure Caption](image_url)`  
   - Do not say "I cannot search the web" or "I cannot find images" if a relevant figure is available in the provided content.
-  - Provide at least one hyperlink to original documentation.
   - Respond using Markdown formatting.
+  - If the question asks for a figure, graph, or image, and a relevant figure is available in the provided content, include the figure in your response like this: `![Figure Caption](image_url)`  
+  - Provide at least one hyperlink to original documentation. 
+  - All hyperlinks must use Markdown link syntax: [Descriptive Title](full_url)
+  - Never output bare URLs. The link text must be human-readable and descriptive.
   - Use LaTeX formatting within Markdown for mathematical expressions.
+  - When including configuration blocks, code samples, or structured text, always enclose them in triple backtick Markdown code fences. Do not output raw structured text outside of code blocks.
   - Use the minimal escaping required to represent valid LaTeX.
   
     }
