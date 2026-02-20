@@ -69,10 +69,10 @@ proc RAG_Manager_init {} {
 #
 	set config(sources) {
 
-https://www.bndhep.net/Electronics/A2071/M2071.html
-https://www.bndhep.net/Electronics/LWDAQ/LWDAQ.html
-https://www.bndhep.net/Electronics/LWDAQ/Cables.html
-https://www.bndhep.net/Devices/BCAM/User_Manual.html
+https://www.opensourceinstruments.com/bndhep/Electronics/A2071/M2071.html
+https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/LWDAQ.html
+https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/Cables.html
+https://www.opensourceinstruments.com/bndhep/Devices/BCAM/User_Manual.html
 https://www.opensourceinstruments.com/Electronics/A3013/Flexible_Wires.html
 https://www.opensourceinstruments.com/Electronics/A3013/Hum.html
 https://www.opensourceinstruments.com/Electronics/A3015/M3015.html
@@ -132,6 +132,8 @@ https://www.opensourceinstruments.com/Resources/Surgery/electrode_sp.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Commands.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Toolmaker_Library.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Acquisifier.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Startup_Manager.html
 https://www.opensourceinstruments.com/Prices.html
 https://www.opensourceinstruments.com/Chat/Manual.html
 
