@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.7"
+	LWDAQ_tool_init "RAG_Manager" "6.8"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -139,7 +139,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 
 	}
 #
-# Of we need to send a password to get access to our URLs, we set the password
+# If we need to send a password to get access to our URLs, we set the password
 # here, in the format "username:password".
 #
 set config(userpass) "username:password"
@@ -204,12 +204,11 @@ When answering the user's question:
 	
 	set config(low_rel_assistant) {
 
-You are a helpful assistant for a technical support chatbot. You have been asked a question that is not relevant to the documentation available to the chatbot. Use your own knowledge combined with the chat history to provide a polite and concise answer to the question. Do not make up facts or fabricate plausible-sounding answers. If you are uncertain of your answer, tell the user that you do not know the answer.
+You are a helpful assistant for a general-knowledge chatbot. When a user asks you a question, you will attempt to answer the question using your general knowledge. You will use the chat history to better understand the current question. Do not make up facts or fabricate plausible-sounding answers. If you are uncertain of your answer, tell the user that you do not know the answer.
 
 When answering the user's question:
   - Complete mathematical calculations whenever possible.
   - Respond using Markdown formatting.
-  - When including configuration blocks, code samples, or structured text, always enclose them in triple backtick Markdown code fences. Do not output raw structured text outside of code fences.
   - Use LaTeX formatting within Markdown for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
 
