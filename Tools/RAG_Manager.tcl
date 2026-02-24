@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.6"
+	LWDAQ_tool_init "RAG_Manager" "6.7"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -150,8 +150,8 @@ set config(userpass) "username:password"
 #	
 	set config(high_rel_thr) "0.55"
 	set config(mid_rel_thr) "0.30"
-	set config(high_rel_model) "gpt-5-mini"
-	set config(mid_rel_model) "gpt-5-mini"
+	set config(high_rel_model) "gpt-4o"
+	set config(mid_rel_model) "gpt-4o"
 	set config(low_rel_model) "gpt-4o-mini"
 	set config(high_rel_words) "5000"
 	set config(mid_rel_words) "5000"
