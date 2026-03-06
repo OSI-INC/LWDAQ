@@ -145,7 +145,7 @@ proc Neurorecorder_init {} {
 	set info(metadata_header_window) "$info(window)\.metadataheader"
 #
 # The recorder_customization string allows us to override default values for
-# data receiver parameters such as coil coordinates.
+# telemetry receiver parameters such as coil coordinates.
 #
 	set config(recorder_customization) ""
 	set info(customization_window) "$info(window)\.customization"
@@ -198,7 +198,7 @@ proc Neurorecorder_init {} {
 	set info(previous_line) ""
 #
 # The recorder_error_time parameter gives us the time when the Neurorecorder
-# first failed to download from the Data Receiver. A zero value means all is
+# first failed to download from the telemetry receiver. A zero value means all is
 # well. The message interval gives us the length of time between error reports
 # to the text window.
 #
@@ -768,7 +768,7 @@ proc Neurorecorder_record {{command ""}} {
 		set info(record_control) "Record"
 	}
 	
-	# If we are going to interact with the data receiver at all, apply the
+	# If we are going to interact with the telemetry receiver at all, apply the
 	# Neurorecorder's receiver settings.
 	if {($info(record_control) == "Start") \
 		|| ($info(record_control) == "Record")} {
@@ -793,7 +793,7 @@ proc Neurorecorder_record {{command ""}} {
 
 		# If the synchronization flag is set, or if we are starting a new
 		# recording, we wait until a new second begins so as to make the file
-		# time match the time we reset the data receiver. When we are
+		# time match the time we reset the telemetry receiver. When we are
 		# automatically creating the next archive in a recording, and the
 		# synchronize flag is clear, we will not wait, nor will we be resetting
 		# the receiver.
@@ -821,7 +821,7 @@ proc Neurorecorder_record {{command ""}} {
 		set config(record_start_clock) [clock seconds]
 		
 		# If the synchronize flag is set, or if we are starting a new recording,
-		# reset the data receiver. We will not reset if this is an autocreation
+		# reset the telemetry receiver. We will not reset if this is an autocreation
 		# and the synchronize flag is cleared.
 		if {($info(record_control) == "Start") || $config(synchronize)} {
 			set info(recorder_error_time) 0
@@ -890,7 +890,7 @@ proc Neurorecorder_record {{command ""}} {
 		set info(record_control) "Record"
 	}
 
-	# If Record, we attempt to download data from the data receiver and record
+	# If Record, we attempt to download data from the telemetry receiver and record
 	# it to disk. If the download attempt fails, we will still try to write any
 	# buffered data to disk. If the download succeeds, but the write failes, we
 	# buffer the downloaded data.
@@ -920,7 +920,7 @@ proc Neurorecorder_record {{command ""}} {
 		set iconfig(daq_num_clocks) \
 			[expr round($config(record_interval) * $info(clocks_per_second))]
 
-		# We are going to make single attempts to contact the data receiver and
+		# We are going to make single attempts to contact the telemetry receiver and
 		# download a block of messages, regardless of the value of
 		# LWDAQ_Info(max_daq_attempts).
 		set saved_max_daq_attempts $LWDAQ_Info(max_daq_attempts)
@@ -934,7 +934,7 @@ proc Neurorecorder_record {{command ""}} {
 			set iconfig(analysis_enable) 0
 		}
 		
-		# Download a block of messages from the data receiver into a LWDAQ
+		# Download a block of messages from the telemetry receiver into a LWDAQ
 		# image, the name of which is $iconfig(memory_name). The Receiver
 		# Instrument returns a string that describes the data block, or reports
 		# an error.
@@ -946,7 +946,7 @@ proc Neurorecorder_record {{command ""}} {
 		# If the attempt to download encountered an error, we keep track of when
 		# we last dealt with an error, so that we do not attempt to correct the
 		# error too often. If the error is corrupted data, we are going to be
-		# resetting the data receiver.
+		# resetting the telemetry receiver.
 		if {[LWDAQ_is_error_result $daq_result]} {
 			set print_error_and_reset 0
 			if {($info(recorder_error_time) == 0)} {

@@ -575,7 +575,7 @@ Sweep_Time: The duration of a "sweep" type waveform, in seconds.
 
 FGIP: The function generator IP address.
 
-RXIP: The data receiver IP address. If we are using an ODR, we must also specify
+RXIP: The telemetry receiver IP address. If we are using an ODR, we must also specify
 the driver socket into which we have plugged the ODR. By default we use socket
 one (1). We can specify another socket by opening the Receiver Instrument with
 the Receiver button and setting daq_driver_socket to our chosen value. The SCT

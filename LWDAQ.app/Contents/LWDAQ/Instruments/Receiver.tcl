@@ -255,7 +255,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			# value of the first clock message in the data, which should be the
 			# first message in the data. This time is a sixteen-bit value that has
 			# counted the number of times a 32.768 kHz clock has counted to 256
-			# since the data receiver clock was last reset, wrapping around to zero
+			# since the telemetry receiver clock was last reset, wrapping around to zero
 			# every time it overflows.
 			scan [lwdaq_receiver $image_name \
 				"-payload $config(payload_length) get 0"] %d%d%d cid bts fvn
@@ -336,7 +336,7 @@ proc LWDAQ_refresh_Receiver {} {
 }
 
 #
-# LWDAQ_reset_Receiver resets and configures a data receiver. It resets the data
+# LWDAQ_reset_Receiver resets and configures a telemetry receiver. It resets the data
 # receiver address and timestamp registers, thus emptying its message buffer and
 # resetting its clock. It destroys the receiver instrument's data buffer and
 # working image. It resets the acquired data time, a parameter we use to stop
@@ -363,7 +363,7 @@ proc LWDAQ_reset_Receiver {} {
 		set sock [LWDAQ_socket_open $config(daq_ip_addr)]
 		LWDAQ_login $sock $info(daq_password)
 		
-		# Select the data receiver with its device type, driver and multiplexer
+		# Select the telemetry receiver with its device type, driver and multiplexer
 		# sockets, and internal device element number.
 		LWDAQ_set_device_type $sock $info(daq_device_type)
 		LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
@@ -385,7 +385,7 @@ proc LWDAQ_reset_Receiver {} {
 		LWDAQ_wait_for_driver $sock
 		set data [LWDAQ_ram_read $sock 0 $info(config_size)]
 		
-		# Reset the data receiver again.
+		# Reset the telemetry receiver again.
 		LWDAQ_transmit_command_hex $sock $info(reset_cmd)
 		LWDAQ_wait_for_driver $sock		
 
@@ -460,7 +460,7 @@ proc LWDAQ_reset_Receiver {} {
 		}
 		lwdaq_image_destroy $img
 		if {$info(receiver_type) == "?"} {
-			error "Failed to identify data receiver."
+			error "Failed to identify telemetry receiver."
 		}
 		
 		# For backward-compatibility with Octal Data Receivers (ODR, assembly
@@ -471,7 +471,7 @@ proc LWDAQ_reset_Receiver {} {
 			LWDAQ_transmit_command_hex $sock $info(all_sets_cmd)
 		}
 	
-		# Provided that channel selection is available with this data receiver,
+		# Provided that channel selection is available with this telemetry receiver,
 		# send a list of channels to select for recording. If the list is simply
 		# a wildcard, we configure the receiver to record all channels. If the
 		# list contains only integers, we first instruct the receiver to accept
@@ -517,8 +517,8 @@ proc LWDAQ_reset_Receiver {} {
 		lwdaq_image_destroy $config(memory_name)
 		
 		# Reset the acquired data time. We will use this end time to avoid 
-		# over-drawing from the data receiver. When we ask for more data than 
-		# is currently available in the data receiver, we occupy the driver 
+		# over-drawing from the telemetry receiver. When we ask for more data than 
+		# is currently available in the telemetry receiver, we occupy the driver 
 		# until the data becomes available, which stops other clients using 
 		# the driver to download their own data.
 		set info(acquire_end_ms) [clock milliseconds]
@@ -657,9 +657,9 @@ proc LWDAQ_controls_Receiver {} {
 # receiver. The routine also maintains an estimate of the number of messages per
 # clock message in the recording. It multiplies this ratio by the available time
 # and the clock frequency to get its estimate of the number of messages
-# avaialable in the data receiver. The routine reports errors with the key word
-# "corrupted" to indicate an error that merits resetting the data receiver. but
-# the routine does not reset the data receiver itself.
+# avaialable in the telemetry receiver. The routine reports errors with the key
+# word "corrupted" to indicate an error that merits resetting the telemetry
+# receiver. but the routine does not reset the telemetry receiver itself.
 #
 proc LWDAQ_daq_Receiver {} {
 	global LWDAQ_Driver LWDAQ_Info
@@ -688,7 +688,7 @@ proc LWDAQ_daq_Receiver {} {
 	}
 	set message_length [expr $info(core_message_length) + $config(payload_length)]
 	
-	# Check the buffer contents. If we have just reset the data receiver, this 
+	# Check the buffer contents. If we have just reset the telemetry receiver, this 
 	# buffer will be empty, and no error will be caused by having the wrong
 	# payload length.
 	scan [lwdaq_receiver $info(buffer_image) \
@@ -735,7 +735,7 @@ proc LWDAQ_daq_Receiver {} {
 			# element number is ignored. But in the Telemetry Control Box (TCB,
 			# A3042), the element number is used to direct commands to the
 			# receiver, stimulator, and interface controllers. We make sure that
-			# the element number selects the data receiver on the TCB.
+			# the element number selects the telemetry receiver on the TCB.
 			LWDAQ_set_device_type $sock $info(daq_device_type)
 			LWDAQ_set_driver_mux $sock $config(daq_driver_socket) $config(daq_mux_socket)
 			LWDAQ_set_device_element $sock $info(daq_receiver_element)
@@ -752,12 +752,12 @@ proc LWDAQ_daq_Receiver {} {
 			
 			
 			# If we don't have a block counter, estimate the number of seconds of
-			# data available in the data receiver. If we think there are few or
+			# data available in the telemetry receiver. If we think there are few or
 			# no seconds of data, we download a minimum duration. This minimum
 			# download, combined with the acquire lag we introduce when we
 			# update our acquire time, allows us to overcome a systematic error
 			# in our acquire time estimate, in which we think we have advanced
-			# farther in the data receiver buffer than is actually the case.
+			# farther in the telemetry receiver buffer than is actually the case.
 			if {!$info(daq_avail_cntr)} {
 				set time_fetch [expr 0.001 * ([clock milliseconds] - $info(acquire_end_ms))]
 				if {$time_fetch < $info(min_time_fetch)} {
@@ -768,7 +768,7 @@ proc LWDAQ_daq_Receiver {} {
 				}
 			
 				# Calculate the length of the block of data we are going to attempt
-				# to download from the data receiver.			
+				# to download from the telemetry receiver.			
 				set block_length [expr $message_length \
 					* round( $time_fetch * $info(clock_frequency) ) \
 					* $info(msg_per_clock)]
@@ -783,7 +783,7 @@ proc LWDAQ_daq_Receiver {} {
 			LWDAQ_wait_for_driver $sock
 			set block_start_ms [clock milliseconds]
 
-			# Configure the data receiver for data download.
+			# Configure the telemetry receiver for data download.
 			LWDAQ_transmit_command_hex $sock $info(upload_cmd)
 
 			# Transfer bytes from receiver to the driver.
@@ -791,22 +791,22 @@ proc LWDAQ_daq_Receiver {} {
 			LWDAQ_set_repeat_counter $sock [expr $block_length - 1]			
 			LWDAQ_execute_job $sock $LWDAQ_Driver(read_job)
 			
-			# Move data receiver out of download state.
+			# Move telemetry receiver out of download state.
 			LWDAQ_wake $sock
 			
 			# Wait for the driver to complete the transfer. If we have asked for
 			# too much data, we will get a TCPIP timeout. This error occurs when
-			# our data receiver does not provide an available block counter, we
+			# our telemetry receiver does not provide an available block counter, we
 			# are recording from a large number of transmitters with a single
 			# antenna, and we disconnect this antenna from our receiver. The
 			# error can also occur when we disconnect the cable between a data
 			# receiver and a LWDAQ driver. We are waiting for ten thousand
 			# messages, which is what we estimated will arrive in the next
-			# second, but instead the data receiver generates only one hundred
+			# second, but instead the telemetry receiver generates only one hundred
 			# and twenty eight messages, so we are left hanging. We close any
 			# residual socket to the driver and return an error message.
 			if {[catch {LWDAQ_wait_for_driver $sock} read_error]} {
-				error "Timeout during transfer from data receiver."
+				error "Timeout during transfer from telemetry receiver."
 			}
 			
 			# Calculate the block transfer time. If the data was waiting in the
@@ -879,22 +879,22 @@ proc LWDAQ_daq_Receiver {} {
 			
 			# Adjust the acquire time using the number of new clock messages and
 			# the block transfer time. If the block transfer time was comparable
-			# to the interval time, we can assume the data receiver buffer is
+			# to the interval time, we can assume the telemetry receiver buffer is
 			# empty, which means the acquire time is equal to the current time.
 			# Otherwise, we add to the acquire time the time spanned by the
 			# messages in the block we downloaded, which we calculate from the
 			# number of clocks it contains and the clock frequency. If the clock
-			# on the data receiver is faster than the clock in our computer, we
+			# on the telemetry receiver is faster than the clock in our computer, we
 			# will download one second of data and think it spans more than one
 			# second. Our acquire time will be wrong: we think we have
-			# downloaded all the messages in the data receiver up to the acquire
+			# downloaded all the messages in the telemetry receiver up to the acquire
 			# time, but we have failed to do so. As hours go by, we lag farther
-			# and farther behind the data in the data receiver until its buffer
+			# and farther behind the data in the telemetry receiver until its buffer
 			# overflows. The acquire_lag is the number of clocks we subtract
 			# from the numer we have just acquired, so that our estimate of the
 			# time spanned by the data we download will always be lower than the
 			# actual time it spans. Occasionally we will reach the end of the
-			# buffer on the data receiver because it occurs earlier than our
+			# buffer on the telemetry receiver because it occurs earlier than our
 			# acquire time suggests. At that point, we will reset the acquire
 			# time to the current time because we detect the empty buffer with
 			# the block transfer time.
@@ -942,7 +942,7 @@ proc LWDAQ_daq_Receiver {} {
 				error "Data corrupted, cannot parse messages, check payload length."
 			}
 
-			# Disable data upload from data receiver and close socket.
+			# Disable data upload from telemetry receiver and close socket.
 			LWDAQ_wait_for_driver $sock
 			LWDAQ_socket_close $sock
 		}
@@ -950,7 +950,7 @@ proc LWDAQ_daq_Receiver {} {
 		# To get here, we have encountered an error that causes us to abandon
 		# our acquisition. We reset the number of messages we expect per clock
 		# to its minimum, and if the socket is still open, we close it. We will
-		# not reset the data receiver unless we are looping, and even then, only
+		# not reset the telemetry receiver unless we are looping, and even then, only
 		# if the loop_on_error flag is set and the error contains the key word
 		# "corrupted". If we are looping and this flag is not set, we will stop
 		# looping.

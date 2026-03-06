@@ -2,7 +2,7 @@
 	Routines for Analysis of Data Retrieved from Miscellaneous LWDAQ Devices
 
 	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-	Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2022-2026 Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -816,14 +816,14 @@ end;
 	sample values. But default x is zero and the filter is disabled.
 	
 	The "-divergent b" option enables tolerance of a sample clock that diverges
-	significantly from that of the data receiver. This option affects the
+	significantly from that of the telemetry receiver. This option affects the
 	reconstruction instruction only. We use zero and one to indicate false and
 	true.
 
 	The "-activity n" option sets the minimum number of samples a signal channel
 	must contain for either plotting or listing.
 
-	Because of limitations in their logic, some data receivers may be unable to
+	Because of limitations in their logic, some telemetry receivers may be unable to
 	eliminate duplicate messages from their data stream. The same signal message
 	received on two or more antennas may appear two or more times in the data.
 	This routine eliminates these duplicates when it copies the messages from
@@ -1211,7 +1211,7 @@ begin
 	failure.
 
 	When it appears that a message is valid, we check to see if it is a
-	duplicate. Sometimes the data receiver does not eliminate duplicate messages
+	duplicate. Sometimes the telemetry receiver does not eliminate duplicate messages
 	itself, because of the large number of possible channels upon which
 	duplication can occur, and the limited logic resources in its firmware. The
 	id_previous list contains for all channels the index of the previous message
@@ -1407,7 +1407,7 @@ begin
 			end;
 		end;
 		writestr(message_string,
-			'Data Receiver Version ',receiver_version:1,'.');
+			'Telemetry Receiver Version ',receiver_version:1,'.');
 		insert(message_string,result,length(result)+1);
 	end;
 {

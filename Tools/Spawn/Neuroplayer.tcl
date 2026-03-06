@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "176"
+	LWDAQ_tool_init "Neuroplayer" "177"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -8928,18 +8928,22 @@ proc Neuroplayer_open {} {
 	frame $f -bd 1
 	pack $f -side top -fill x
 	
-	label $f.e -text "Processing:" -anchor w -fg $info(label_color)
-	pack $f.e -side left 
-	label $f.f -textvariable Neuroplayer_info(processor_file_tail) \
+	label $f.title -text "Processing:" -anchor w -fg $info(label_color)
+	pack $f.title -side left 
+	label $f.file -textvariable Neuroplayer_info(processor_file_tail) \
 		-width 16 -bg $info(variable_bg)
-	button $f.g -text "Pick" -command "Neuroplayer_pick processor_file 1"
+	button $f.pick -text "Pick" -command "Neuroplayer_pick processor_file 1"
+	button $f.edit -text "Edit" -command {
+		LWDAQ_edit_script Open $Neuroplayer_config(processor_file)
+	}
 	checkbutton $f.enable -variable \
 		Neuroplayer_config(enable_processing) -text "Enable"
 	checkbutton $f.save -variable \
 		Neuroplayer_config(save_processing) -text "Save"
 	checkbutton $f.quiet -variable \
 		Neuroplayer_config(quiet_processing) -text "Quiet"
-	pack $f.f $f.g $f.enable $f.save $f.quiet -side left -expand yes
+	pack $f.title $f.pick $f.edit $f.enable $f.save $f.quiet -side left -expand yes
+	
 	label $f.lchannels -text "Select:" -anchor e -fg $info(label_color)
 	switch $LWDAQ_Info(os) {
 		"MacOS" {set width 50}
