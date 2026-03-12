@@ -38,33 +38,28 @@ const {for eight-bit intensity values}
 	black_intensity=min_intensity;
 	white_intensity=max_intensity;
 
-const {overlay colors}
-	red_mask=$E0;
-	green_mask=$1C;
-	blue_mask=$03;
-	
-	black_color=0; {black}
-	clear_color=254; {transparent, so you see image beneath}
-	white_color=255; {white}
-
-	dark_brown_color=96;
-	dark_red_color=160;
-	red_color=224;
-	vdark_green_color=8;
-	dark_green_color=20;
-	green_color=28;
+const {named overlay colors}
+	black_color=0; 
 	vdark_blue_color=1;
 	dark_blue_color=2;
 	blue_color=3;
-	sky_blue_color=147;
-	orange_color=236;
-	yellow_color=216;
-	salmon_color=242;
-	magenta_color=227;
-	brown_color=140;
+	vdark_green_color=8;
+	dark_green_color=20;
+	green_color=28;
 	dark_gray_color=73;
+	dark_brown_color=96;
+	brown_color=140;
 	gray_color=146;
+	sky_blue_color=147;
+	dark_red_color=160;
 	light_gray_color=182;
+	yellow_color=216;
+	red_color=224;
+	magenta_color=227;
+	orange_color=236;
+	salmon_color=242;
+	clear_color=254;
+	white_color=255;
 
 const {for four-byte screen pixels}
 	opaque_alpha=max_byte;
@@ -99,7 +94,10 @@ type {for drawing space}
 	drawing_space_pixel_type=packed record
 		red,green,blue,alpha:byte;
 	end;
-	color_table_type=array of drawing_space_pixel_type;
+	drawing_space_color_table_type=array [0..max_byte] of drawing_space_pixel_type;
+	
+var {for drawing space}
+	overlay_color_palette:drawing_space_color_table_type;
 
 type {for image headers}
 	image_header_type=packed record
@@ -154,7 +152,7 @@ function image_median(ip:image_ptr_type):real;
 function image_maximum(ip:image_ptr_type):real;
 function image_minimum(ip:image_ptr_type):real;
 function image_sum(ip:image_ptr_type; threshold:integer):integer;
-function overlay_color(i:integer):integer;
+function color_from_integer(i:integer):integer;
 procedure spread_overlay(ip:image_ptr_type;spread:integer);
 procedure paint_overlay_bounds(ip:image_ptr_type;color:integer);
 function new_image(height,width:integer):image_ptr_type;
@@ -167,11 +165,16 @@ procedure write_image_list(var f:string;key:string;verbose:boolean);
 
 implementation
 	
-var
-	image_color_table:color_table_type;
-	overlay_color_table:color_table_type;
-	color_index,image_index:integer;
+const {for overlay colors}
+	red_mask=$E0;
+	green_mask=$1C;
+	blue_mask=$03;
+	max_brightness=600;
+	brightness_downshift=113;
 
+var
+	image_color_table:drawing_space_color_table_type;
+	color_index,image_index:integer;
 
 {
 	get_px returns the value of the i'th pixel in the j'th row of the intensity
@@ -488,31 +491,36 @@ begin
 end;
 
 {
-	overlay_color takes an integer and returns a unique color using the integer
-	input. We use the routine to provide colors for indexed arrays of lines,
-	graphs, or shapes on a white background. The color returned will not be
-	white, nor will it be the clear color, but it can be black.
+	color_from_integer takes an integer and returns an index into the overlay
+	color palette in such a way that neighboring integers almost always have
+	distinct colors. The color palette contains only max_byte entries, and we
+	want to avoid the colors clear_color and white_color for plotting on a white
+	background. The color palette itself is designed for plotting on a white
+	background. The brightest colors in the complete max_byte palette have been
+	dimmed so they will be useful for plotting. The first num_def_colors are a
+	fixed sequence so that they will be predictable and consistent from one
+	version of the palette to the next. Outside these initial colors, we reserve
+	the option of adjusting the remaining colors if we believe we can improve
+	their visibility on white backgrounds.
 }
-function overlay_color(i:integer):integer;
+function color_from_integer(i:integer):integer;
 
 const
-	num_predefined_colors=18;
-	colors: array [0..num_predefined_colors-1] of overlay_pixel_type =
-		(red_color,green_color,blue_color,
-		orange_color,yellow_color,magenta_color,
-		brown_color,salmon_color,sky_blue_color,
-		black_color,gray_color,light_gray_color,
-		dark_red_color,dark_green_color,dark_blue_color,
-		dark_brown_color,vdark_green_color,vdark_blue_color);
+	num_def_colors=18;
+	colors: array [0..num_def_colors-1] of overlay_pixel_type =
+		(red_color, green_color, blue_color, orange_color, yellow_color,
+		magenta_color, brown_color, salmon_color, sky_blue_color, black_color,
+		gray_color, light_gray_color, dark_red_color, dark_green_color,
+		dark_blue_color, dark_brown_color, vdark_green_color, vdark_blue_color);
 	prime=67;
 
 var
 	c:integer;
 	
 begin
-	if (i>=0) and (i<num_predefined_colors) then c:=colors[i]
+	if (i>=0) and (i<num_def_colors) then c:=colors[i]
 	else c:= (i*prime) mod clear_color;
-	overlay_color:=c;
+	color_from_integer:=c;
 end;
 
 {
@@ -550,6 +558,7 @@ end;
 	valid_image_analysis_point returns true iff the point is in the analysis bounds.
 }
 function valid_image_analysis_point(point:ij_point_type;ip:image_ptr_type):boolean;	
+
 begin 
 	with point,ip^.analysis_bounds do
 		valid_image_analysis_point:=
@@ -1230,7 +1239,7 @@ begin
 		if ip^.overlay[k]=clear_color then 
 			drawing_space[k]:=image_color_table[ip^.intensity[k]]
 		else 
-			drawing_space[k]:=overlay_color_table[ip^.overlay[k]];
+			drawing_space[k]:=overlay_color_palette[ip^.overlay[k]];
 	end;
 end;
 
@@ -1403,7 +1412,7 @@ begin
 						d_ptr^.alpha:=opaque_alpha;
 					end;
 				end;
-			end else d_ptr^:=overlay_color_table[get_ov(ip,j,i)];
+			end else d_ptr^:=overlay_color_palette[get_ov(ip,j,i)];
 			inc(d_ptr);
 		end;
 		inc(d_ptr);
@@ -1578,7 +1587,7 @@ begin
 						d_ptr^.alpha:=opaque_alpha;
 					end;
 				end;
-			end else d_ptr^:=overlay_color_table[get_ov(ip,j,i)];
+			end else d_ptr^:=overlay_color_palette[get_ov(ip,j,i)];
 			inc(d_ptr);
 		end;
 		inc(d_ptr);
@@ -1625,19 +1634,26 @@ end;
 }
 initialization 
 
-setlength(image_color_table,max_byte+1);
-setlength(overlay_color_table,max_byte+1);
-
-for color_index:=0 to max_byte-1 do begin
-	with overlay_color_table[color_index] do begin
+with overlay_color_palette[0] do begin
+	red:=0;
+	green:=0;
+	blue:=0;
+	alpha:=opaque_alpha;
+end;
+for color_index:=1 to max_byte-1 do begin
+	with overlay_color_palette[color_index] do begin
 		red:=round(max_byte * (color_index and red_mask) / red_mask);
 		green:=round(max_byte * (color_index and green_mask) / green_mask);
 		blue:=round(max_byte * (color_index and blue_mask) / blue_mask);
 		alpha:=opaque_alpha;
+		if (red+green+blue) > max_brightness then begin
+			if blue>brightness_downshift then blue:=blue-brightness_downshift;
+			if red>brightness_downshift then red:=red-brightness_downshift;
+			if green>brightness_downshift then green:=green-brightness_downshift;
+		end;		
 	end;
 end;
-
-with overlay_color_table[max_byte] do begin
+with overlay_color_palette[max_byte] do begin
 	red:=max_byte;
 	green:=max_byte;
 	blue:=max_byte;

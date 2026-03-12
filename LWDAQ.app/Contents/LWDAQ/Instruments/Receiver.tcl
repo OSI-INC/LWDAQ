@@ -571,7 +571,6 @@ proc LWDAQ_activity_Receiver {} {
 			label $f.csps -text "Qty" -fg purple
 			grid $f.id $f.cc $f.csps -sticky ew
 		}
-
 		label $f.id_$id -text $id -anchor w
 		set color [lwdaq tkcolor $id]
 		label $f.cc_$id -text " " -bg $color

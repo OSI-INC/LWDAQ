@@ -1410,7 +1410,7 @@ end;
 
 <p>With -replace 0, the manipulation creates a new image and returns its name. With -replace 1, the manipulation over-writes data in the old image and returns the old image name.</p>
 
-<p>The -paint option instructs lwdaq_image_manipulate to paint the entire area within the analysis bounds with the color given by <i>value</i>. This value should be a number between 0 and 255. The value 0 is for transparant. Other than the 0-value, the number will be treated like an eight-bit RGB code, with the top three bits for red, the middle three for green, and the bottom three for blue. Thus $E0 (hex E0) is red, $1C is green, and $03 is blue. Note that paint does not convert value into one of LWDAQ's standard graph-plotting colors, as defined in the overlay_color routine of images.pas, and used in <a href="#lwdaq_graph">lwdaq_graph</a>.</p>
+<p>The -paint option instructs lwdaq_image_manipulate to paint the entire area within the analysis bounds with the color given by <i>value</i>. This value should be a number between 0 and 255. The value 0 is for transparant. Other than the 0-value, the number will be treated like an eight-bit RGB code, with the top three bits for red, the middle three for green, and the bottom three for blue. Thus $E0 (hex E0) is red, $1C is green, and $03 is blue. Note that paint does not convert value into one of LWDAQ's standard graph-plotting colors, as defined in the color_from_integer routine of images.pas, and used in <a href="#lwdaq_graph">lwdaq_graph</a>.</p>
 
 <p>In addition to the pixel manipulations, we also have options to change other secondary properties of the image. The table above shows the available manipulation options, each of which is followed by a value in the command line, in the format ?option value?.</p>
 
@@ -2091,12 +2091,12 @@ begin
 	end;
 	case analysis_type of 
 		spot_use_ellipse,spot_use_ellipse_shadow:
-			spot_list_display_ellipses(ip,slp,overlay_color(color));
+			spot_list_display_ellipses(ip,slp,color_from_integer(color));
 		spot_use_vertical_stripe,
 		spot_use_vertical_shadow: begin
 			pp:=image_profile_row(ip);
 			display_profile_row(ip,pp,green_color);
-			spot_list_display_vertical_lines(ip,slp,overlay_color(color));
+			spot_list_display_vertical_lines(ip,slp,color_from_integer(color));
 		end;
 		spot_use_vertical_edge: begin
 			if not show_pixels then begin
@@ -2115,16 +2115,16 @@ begin
 			ref_line.b.j:=round(reference_um/pixel_size_um);
 			display_ccd_line(ip,ref_line,blue_color);	
 
-			spot_list_display_vertical_lines(ip,slp,overlay_color(color));
+			spot_list_display_vertical_lines(ip,slp,color_from_integer(color));
 		end;
 		otherwise begin
 			if num_spots>1 then 
-				spot_list_display_bounds(ip,slp,overlay_color(color));
+				spot_list_display_bounds(ip,slp,color_from_integer(color));
 			if num_spots=1 then 
 				if slp^.spots[1].num_pixels>=min_pixels_for_cross then
-					spot_list_display_crosses(ip,slp,overlay_color(color))
+					spot_list_display_crosses(ip,slp,color_from_integer(color))
 				else
-					spot_list_display_bounds(ip,slp,overlay_color(color));
+					spot_list_display_bounds(ip,slp,color_from_integer(color));
 		end;
 	end;
 {
@@ -2301,7 +2301,7 @@ begin
 	
 	mark_time('displaying positions','lwdaq_dosimeter');
 	if not show_pixels then clear_overlay(wip);
-	spot_list_display_bounds(wip,slp,overlay_color(color));
+	spot_list_display_bounds(wip,slp,color_from_integer(color));
 
 	mark_time('calculating stdev and density','lwdaq_dosimeter');
 	stdev:=image_amplitude(wip);
@@ -4457,7 +4457,7 @@ lwdaq_graph $profile imagname -x_only 1 -color 4</pre>
 
 <p>By default, the graph will be drawn in the overlay, so it can use colors and be accompanied by grid lines that do not interfere with the underlying image data. The overlay can be transparent or white, depending upon whether we have cleared or filled the overlay respectively before calling <i>lwdaq_graph</i>. But if <i>in_image</i> is 1, the color will be treated as a shade of gray and the graph will be drawn in the image itself. By this means, we can create images for two-dimensional analysis out of graphs. When <i>in_image</i> is set, the <i>x_div</i> and <i>y_div</i> options are ignored.</p>
 
-<p>The color codes for a graph in the overlay give 255 unique colors. You can try them out to see which ones you like. The colors 0 to 15 specify a set of distinct colors, as shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>. The remaining colors are eight-bit RGB codes. If you don't specify a color, the plot will be red. The line will be one pixel wide unless we specify a larger  width with the -width option, which takes an integert value one or greater.</p>
+<p>The color codes for a graph in the overlay give 255 unique colors. You can try them out to see which ones you like. If you don't specify a color, the plot will be red. The line will be one pixel wide unless we specify a larger width with the -width option, which takes an integert value one or greater.</p>
 
 <p>Some data contains occasional error samples, which we call <i>glitches</i>. The <i>lwdaq_graph</i> "-glitch <i>g</i>" option allows you to specify a threshold for glitch filtering. The <i>lwdaq_graph</i> routine calls the <i>glitch_filter_y</i> from <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a> to eliminate glitches from the sequence of <i>y</i>-coordinates. We provide the same glitch filter at the command line with the <a href="#glitch_filter_y">glitch_filter_y</a>.</p>
 }
@@ -4580,7 +4580,7 @@ begin
 
 	if glitch>0 then glitch_filter_y(gxy,glitch);
 
-	color:=byte_shift*(width-1)+overlay_color(color);
+	color:=byte_shift*(width-1)+color_from_integer(color);
 	shade:=byte_shift*(width-1)+color;	
 	
 	if ac_couple then begin
@@ -5176,7 +5176,7 @@ var
 	M,N:matrix_type;
 	num_rows,num_elements,num_columns:integer;
 	num_glitches:integer=0;
-	i,extent,color,red,blue,green:integer;
+	i,extent,color:integer;
 	x_axis,y_axis,z_axis:xyz_point_type;
 	
 begin
@@ -6348,15 +6348,11 @@ lwdaq spikes_x "0 0 0 0 2 9 1 0 0 7 0 7 0 9 0 0 0 0" 2 4
 				+'"lwdaq '+option+' color_value".');
 			exit;
 		end;
-		color:=Tcl_ObjInteger(argv[2]);
-		color:=overlay_color(color);
-		red:=round(max_byte * (color and red_mask) / red_mask);
-		green:=round(max_byte * (color and green_mask) / green_mask);
-		blue:=round(max_byte * (color and blue_mask) / blue_mask);
+		color:=color_from_integer(Tcl_ObjInteger(argv[2]));
 		writestr(result,'#',
-			string_from_decimal(red,16,2),
-			string_from_decimal(green,16,2),
-			string_from_decimal(blue,16,2));
+			string_from_decimal(overlay_color_palette[color].red,16,2),
+			string_from_decimal(overlay_color_palette[color].green,16,2),
+			string_from_decimal(overlay_color_palette[color].blue,16,2));
 		Tcl_SetReturnString(interp,result);
 	end 
 {
