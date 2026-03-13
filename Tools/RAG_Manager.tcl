@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.8"
+	LWDAQ_tool_init "RAG_Manager" "6.9"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -40,6 +40,7 @@ proc RAG_Manager_init {} {
 # Internal flags, lists, and control variables.
 #
 	set info(control) "Idle"
+	set info(abort) "0"
 	set info(engine_ctrl) "Idle"
 	set info(chat) ""
 	set info(ip) "127.0.0.1"
@@ -1561,6 +1562,25 @@ proc RAG_Manager_chunk_page {url} {
 }
 
 #
+# RAG_Manager_support calls the LWDAQ support routine to maintain background and
+# graphics processes, and also checks the global abort flag. If this flag is checked,
+# the routine returns a zero, otherwise it returns a one. All long-running RAG Manager 
+# processes should call this routine regularly and abort and return when they see
+# a zero. The support routine clears the abort flag.
+#
+proc RAG_Manager_support {} {
+	upvar #0 RAG_Manager_info info
+	
+	LWDAQ_support
+	if {$info(abort)} {
+		set info(abort) 0
+		return 0
+	} else {
+		return 1
+	}
+}
+
+#
 # RAG_Manager_store_chunks stores the match and content strings of a chunk list
 # to disk. It stores the content strings in the contents_dir and the match
 # strings in the matches_dir. It takes each match string and uses its contents
@@ -1629,7 +1649,10 @@ proc RAG_Manager_store_chunks {chunks} {
 			}
 		}
 		
-		LWDAQ_support
+		if {![RAG_Manager_support]} {
+			RAG_Manager_print "Aborting in response to abort flag."
+			break
+		}
 	}
 	RAG_Manager_print "Stored $count chunks, of which $duplicates duplicates,\
 		yielding [expr $count - $duplicates] chunks on disk." 
@@ -1678,7 +1701,7 @@ proc RAG_Manager_vector_from_embed {embed} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 		
-	if {[regexp {"embedding"\s*:\s* \[([^\]]*)} $embed -> vector]} {
+	if {[regexp {"embedding"\s*:\s*\[([^\]]*)} $embed -> vector]} {
 		regsub -all {,} $vector " " vector
 		regsub -all {[\n\t ]+} $vector " " vector
 	} else {
@@ -1756,7 +1779,10 @@ proc RAG_Manager_fetch_embeds {api_key} {
 				}
 			}
 		} 
-		LWDAQ_update
+		if {![RAG_Manager_support]} {
+			RAG_Manager_print "Aborting in response to abort flag."
+			return
+		}
 	}
 
 	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
@@ -1848,7 +1874,10 @@ proc RAG_Manager_delete {} {
 	foreach cfn $cfl {
 		file delete $cfn
 		incr count
-		LWDAQ_support
+		if {![RAG_Manager_support]} {
+			RAG_Manager_print "Aborting in response to abort flag."
+			return
+		}
 	}
 	RAG_Manager_print "Deleted $count content strings."
 
@@ -1858,7 +1887,10 @@ proc RAG_Manager_delete {} {
 	foreach mfn $mfl {
 		file delete $mfn
 		incr count
-		LWDAQ_support
+		if {![RAG_Manager_support]} {
+			RAG_Manager_print "Aborting in response to abort flag."
+			return
+		}
 	}
 	RAG_Manager_print "Deleted $count match strings."
 
@@ -1887,6 +1919,10 @@ proc RAG_Manager_chunk {} {
 		if {[llength $new_chunks] > 0} {
 			set chunks [concat $chunks $new_chunks]
 		}
+		if {![RAG_Manager_support]} {
+			RAG_Manager_print "Aborting in response to abort flag."
+			return
+		}
 	}
 	
 	if {[file exists $info(dump_file)]} {file delete $info(dump_file)}
@@ -1903,6 +1939,10 @@ proc RAG_Manager_chunk {} {
 			LWDAQ_print $info(dump_file) [lindex $chunk 1]
 			LWDAQ_print $info(dump_file) \
 				"----------- END ------------\n"
+			if {![RAG_Manager_support]} {
+				RAG_Manager_print "Aborting in response to abort flag."
+				return
+			}
 		}
 		RAG_Manager_print "Dump file complete." 
 	}
@@ -2755,6 +2795,12 @@ proc RAG_Manager_open {} {
 	foreach a {Delete Chunk Embed Purge Retrieve Submit History Clear} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
+		pack $f.$b -side left -expand yes
+	}
+
+	foreach a {Abort} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command "set RAG_Manager_info(abort) 1"
 		pack $f.$b -side left -expand yes
 	}
 	
