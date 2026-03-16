@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "177"
+	LWDAQ_tool_init "Neuroplayer" "178"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -2105,12 +2105,15 @@ proc Neuroplayer_overview {{fn ""} } {
 		pack $f.tfn $f.lfn -side left -expand yes
 		label $f.lt_min -text "t_min"
 		entry $f.et_min -textvariable Neuroplayer_overview(t_min) -width 6
+		bind $f.et_min <Return> [list LWDAQ_post Neuroplayer_overview_plot]
 		label $f.lt_max -text "t_max"
 		entry $f.et_max -textvariable Neuroplayer_overview(t_max) -width 6
+		bind $f.et_max <Return> [list LWDAQ_post Neuroplayer_overview_plot]
 		label $f.lt_end -text "t_end"
 		label $f.et_end -textvariable Neuroplayer_overview(t_end) -width 6
 		label $f.ls -text "Select:" -anchor e
 		entry $f.es -textvariable Neuroplayer_config(channel_selector) -width 30
+		bind $f.es <Return> [list LWDAQ_post Neuroplayer_overview_plot]
 		pack $f.lt_min $f.et_min $f.lt_max $f.et_max \
 			$f.lt_end $f.et_end $f.ls $f.es -side left -expand yes
 
