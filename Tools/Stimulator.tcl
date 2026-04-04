@@ -1141,8 +1141,7 @@ proc Stimulator_tp_transmit {} {
 
 #
 # Stimulator_tp_run assembles and uploads user code in chunks. After the final
-# chunk, it enables the program. If acknowledgements are enabled, the routine
-# asks for an acknowledgement for every chunk.
+# chunk, it enables the program.
 #
 proc Stimulator_tp_run {} {
 	upvar #0 Stimulator_config config

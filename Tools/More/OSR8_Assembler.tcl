@@ -26,7 +26,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "3.1"
+	LWDAQ_tool_init "OSR8_Assembler" "3.2"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return ""
@@ -119,7 +119,7 @@ proc OSR8_Assembler_error {message} {
 	upvar #0 OSR8_Assembler_config config
 	upvar #0 OSR8_Assembler_info info
 
-	LWDAQ_print $info(text) "ERROR: $message\."
+	LWDAQ_print $info(text) "ERROR: $message"
 	error $message
 }
 
@@ -133,9 +133,26 @@ proc OSR8_Assembler_find_symbol {line} {
 		} elseif {[regexp {^[0-9]+$} $value]} {
 			set value $value
 		} else {
-			OSR8_Assembler_error "Bad value \"$value\" for \"$symbol\""
+			OSR8_Assembler_error "Bad value \"$value\" for \"$symbol\"."
 		}
 		return [list $symbol $value]
+	} else {
+		return ""
+	}
+}
+
+proc OSR8_Assembler_find_include {line} {
+	upvar #0 OSR8_Assembler_config config
+	upvar #0 OSR8_Assembler_info info
+
+	if {[regexp -nocase {^\s*include\s*"(.*?)"} $line dummy fn]} {
+		set fn [file join [file dirname $config(ifn)] $fn]
+		set fn [file normalize $fn]
+		if {[file exists $fn]} {
+			return $fn		
+		} else {
+			OSR8_Assembler_error "Cannot find include file \"$fn\"."
+		}
 	} else {
 		return ""
 	}
@@ -158,6 +175,20 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	}
 	LWDAQ_print $info(text) "Assembling [llength $asm] lines of code." purple
 	
+	# Include files, supporting recursive inclusion.
+	set basm [list]
+	foreach line $asm {
+		set fn [OSR8_Assembler_find_include $line]
+		if {$fn != ""} {
+			LWDAQ_print $info(text) "Including file \"$fn\"."
+			set f [open $fn r]
+			set iasm [split [read $f] \n]
+			set basm [concat $basm $iasm]
+		} else {
+			lappend basm $line
+		}
+	}
+	set asm $basm
 	
 	# Refresh error, warning, symbol, and label lists.
 	set symbol_list [list]
@@ -421,7 +452,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			set val [lindex $sym_val 1]
 			if {[lsearch -index 0 $symbol_list $sym] >= 0} {
 				OSR8_Assembler_error "Symbol \"$sym\" already defined\
-					at line $line_index\:\n$line"
+					at line $line_index\:\n$line\."
 			}
 			set match 1
 			lappend symbol_list $sym_val
@@ -444,7 +475,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		# Any other characters are an error.
 		if {[regexp {\w+} $line dummy]} {
 			OSR8_Assembler_error "Unrecognised pneumoic\
-				at line $line_index\: \"$line\""
+				at line $line_index\: \"$line\"."
 		}
 	}
 	
@@ -554,7 +585,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 			close $f
 			LWDAQ_print $info(text) "Read [llength $mem] instruction bytes." purple
 		} else {
-			OSR8_Assembler_error "Cannot find file $config(ofn)"
+			OSR8_Assembler_error "Cannot find file $config(ofn)."
 		}
 	} else {
 		LWDAQ_print $info(text) "Received object code from input string." purple
@@ -583,7 +614,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 1]]} {
 					if {$index >= [llength $mem] - 2} {
 						OSR8_Assembler_error "Missing operand bytes for\
-							final instruction $prototype"
+							final instruction $prototype\."
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					set n2 [lindex $mem [expr $index + 2]]
@@ -593,7 +624,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 				} elseif {[regexp -nocase {^n$} [lindex $prototype 1]]} {
 					if {$index >= [llength $mem] - 1} {
 						OSR8_Assembler_error "Missing operand bytes for\
-							final instruction $prototype"
+							final instruction $prototype\."
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					lset prototype 1 [regsub {n} [lindex $prototype 1] \
@@ -608,7 +639,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 2]]} {
 					if {$index >= [llength $mem] - 2} {
 						OSR8_Assembler_error "Missing operand bytes\
-							for final instruction $prototype"
+							for final instruction $prototype\."
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					set n2 [lindex $mem [expr $index + 2]]
@@ -618,7 +649,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 				} elseif {[regexp -nocase {^n$} [lindex $prototype 2]]} {
 					if {$index >= [llength $mem] - 1} {
 						OSR8_Assembler_error "Missing operand bytes\
-							for final instruction $prototype"
+							for final instruction $prototype\."
 						break
 					}
 					set n1 [lindex $mem [expr $index + 1]]
@@ -632,7 +663,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 		}
 
 		if {!$match} {
-			OSR8_Assembler_error "Unrecognized opcode \"$byte\""
+			OSR8_Assembler_error "Unrecognized opcode \"$byte\"."
 		} else {
 			LWDAQ_print -nonewline $info(text) "0x[format %04X $index]: "
 			LWDAQ_print -nonewline $info(text) \
