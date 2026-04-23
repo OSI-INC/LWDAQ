@@ -151,8 +151,8 @@ set config(userpass) "username:password"
 #	
 	set config(high_rel_thr) "0.55"
 	set config(mid_rel_thr) "0.30"
-	set config(high_rel_model) "gpt-4o"
-	set config(mid_rel_model) "gpt-4o"
+	set config(high_rel_model) "gpt-5.4"
+	set config(mid_rel_model) "gpt-5.4"
 	set config(low_rel_model) "gpt-4o-mini"
 	set config(high_rel_words) "5000"
 	set config(mid_rel_words) "5000"
@@ -165,7 +165,7 @@ set config(userpass) "username:password"
 #
 # Behavior of the chat handler.
 #
-	set config(answer_timeout_s) "40" 
+	set config(answer_timeout_s) "60" 
 	set config(offline_min) "4"
 #
 # Completion assistant instructions for the three tiers of relevance. Can be
@@ -182,8 +182,9 @@ When answering the user's question:
   - If the question asks for a figure, graph, or image, and a relevant figure, graph, or image is available in the provided content, include the figure, graph, or image in your response using the format `![Figure Caption](image_url)`.
   - Provide at least one hyperlink to original documentation, and provide all hyperlinks using the format `[Descriptive Title](full_url)`.
   - When including configuration blocks, code samples, or structured text, always enclose them in triple backtick Markdown code fences. Do not output raw structured text outside of code fences.
-  - Use LaTeX formatting within Markdown for mathematical expressions.
+  - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
+  - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
   
     }
     
@@ -198,8 +199,9 @@ When answering the user's question:
   - If the question asks for a figure, graph, or image, and a relevant figure, graph, or image is available in the provided content, include the figure, graph, or image in your response using the format `![Figure Caption](image_url)`.
   - Provide at least one hyperlink to original documentation, and provide all hyperlinks using the format `[Descriptive Title](full_url)`.
   - When including configuration blocks, code samples, or structured text, always enclose them in triple backtick Markdown code fences. Do not output raw structured text outside of code fences.
-  - Use LaTeX formatting within Markdown for mathematical expressions.
+  - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
+  - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
   
 	}
 	
@@ -210,8 +212,9 @@ You are a helpful assistant for a general-knowledge chatbot. When a user asks yo
 When answering the user's question:
   - Complete mathematical calculations whenever possible.
   - Respond using Markdown formatting.
-  - Use LaTeX formatting within Markdown for mathematical expressions.
+  - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
+  - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
 
 	}
 #

@@ -1,6 +1,6 @@
 # SCT Check, a LWDAQ Tool.
 #
-# Copyright (C) 2024-2025 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2024-2026 Kevan Hashemi, Open Source Instruments Inc.
 #
 # SCT Check measures the frequency response of subcutaneous transmitters (SCTs).
 # It operates a LWDAQ Function Generator (A3050) to deliver increasing
@@ -24,7 +24,7 @@ proc SCT_Check_init {} {
 	upvar #0 SCT_Check_info info
 	upvar #0 SCT_Check_config config
 	
-	LWDAQ_tool_init "SCT_Check" "2.6"
+	LWDAQ_tool_init "SCT_Check" "2.7"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	package require ASG
@@ -135,8 +135,8 @@ proc SCT_Check_waveform_on {} {
 			$config(waveform_frequency) Hz,\
 			$config(waveform_amplitude) V amplitude,\
 			$config(waveform_offset) V offset." purple
-		set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
-		set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
+		set v_lo [expr (2*$config(waveform_offset)) - $config(waveform_amplitude)]
+		set v_hi [expr (2*$config(waveform_offset)) + $config(waveform_amplitude)]
 		set result [ASG_configure $config(gen_ip) $config(gen_ch) \
 			$config(waveform_type) \
 			$config(waveform_frequency) \
@@ -161,8 +161,8 @@ proc SCT_Check_waveform_on {} {
 			$config(sweep_time) s,\
 			$config(waveform_amplitude) V amplitude,\
 			$config(waveform_offset) V offset." purple
-		set v_lo [expr $config(waveform_offset) - $config(waveform_amplitude)]
-		set v_hi [expr $config(waveform_offset) + $config(waveform_amplitude)]
+		set v_lo [expr (2*$config(waveform_offset)) - $config(waveform_amplitude)]
+		set v_hi [expr (2*$config(waveform_offset)) + $config(waveform_amplitude)]
 		set result [ASG_sweep_sine $config(gen_ip) $config(gen_ch) \
 			$config(sweep_flo) $config(sweep_fhi) $v_lo $v_hi \
 			$config(sweep_time) 1]
@@ -312,7 +312,7 @@ proc SCT_Check_measure {{index "-1"}} {
 		set result [lrange $result 1 end]
 		set output_line "$frequency "
 		foreach c [lsort -increasing $config(signals)] {
-			set amplitude [format %.1f [expr sqrt(2)*[lindex $result 3]]]
+			set amplitude [format %.1f [expr 2*sqrt(2)*[lindex $result 3]]]
 			set result [lrange $result 4 end]
 			append output_line "$c $amplitude "
 		}
@@ -513,25 +513,36 @@ return ""
 
 ----------Begin Help----------
 
-The Subcutaneous Transmitter (SCT) Check tool uses a telemetry receiver and a
-function generator to measure the frequency response and battery voltages of
-SCTs during and after assembly and encapsulation. We use the tool to produce
+The Subcutaneous Transmitter (SCT) Check tool uses a telemetry receiver and an
+analog signal generator to measure the frequency response and battery voltages
+of SCTs during and after assembly and encapsulation. We use the tool to produce
 rapid frequency sweeps that allow us to see the approximate frequency response
 of a transmitter prior to encapsulation or during accelerated aging. We use the
 Measure button to produce plots of gain versus frequency for permanent and
-detailed records of the frequency response. The function generator is the
-Function Generator (A3050) or other compatible PoE generator. The receiver must
-be one of our LWDAQ telemetry receivers, such as the Octal Data Receiver
-(A3027E), Animal Location Tracker, (ALT), or Telemetry Control Box (TCB). The
-tool uses the ASG package, included with LWDAQ, to configure the analog signal
-generator. It uses the Receiver Instrument, included with LWDAQ, to download
+detailed records of the frequency response. The signal generator is either a
+Function Generator (A3050) or an Analog Signal Generator (A3052). The receiver
+must be one of our LWDAQ telemetry receivers, such as the A3027E Octal Data
+Receiver, A3038C Animal Location Tracker (ALT), or A3042-A16 Telemetry Control
+Box (TCB). The tool uses the ASG (Analog Signal Generator) package to configure
+the analog signal generator. The tool uses the Receiver Instrument to download
 telemetry signals from the receiver.
+
+NOTE: The SCT Check tool assumes that we have terminated the coaxial cables
+carrying the analog signals with fifty-Ohm resistors.
 
 Measure: Start a detailed measurement of frequency response. We will go through
 all the frequencies defined for the measurement, starting with the lowest
 frequency. We assert this frequency and measure the amplitude of the response
 from all transmitters listed in the signals string. We move to the next
-frequency, and so on, recording the amplitudes of all signals as we go.
+frequency, and so on, recording the peak-to-peak amplitudes of all signals as we
+go, in units of ADC counts. The measurement calculates the peak-to-peak
+amplitude by starting with the standard deviation of the signal as calculated by
+the Receiver Instrument, multiplying by the square root of two to get the
+amplitude, and multiplying by two after that to get the peak-to-peak amplitude.
+The measurement procedure assumes that the signal is sinusoidal. If we perform
+the sweep with a square wave, our peak-to-peak calculation will be too large by
+a factor of root-two because the standard deviation of a square wave is equal to
+half its amplitude.
 
 Stop: Abort a sweep.
 
@@ -559,11 +570,16 @@ Channel: The function generator channel we want to produce our waveform.
 
 Frequency: The waveform frequency, anything from 1 mHz to 1 MHz.
 
-Amplitude: The amplitude of the symmetric waveform, which is half the peak to
-peak amplitude. Can be anything from 0 to 10 V.
+Amplitude: The peak-to-peak amplitude of the symmetric waveform when the generator
+output is terminated by a fifty-Ohm resistor. Can be anything from 0 to 10 Vpp.
 
-Offset: The offset of the waveform average from zero. Subject to a signal range
-of -10 V to +10 V, the offset can be anything from -10 V to + 10 V.
+Offset: The offset of the waveform average from zero assuming the generator
+output is terminated by a fifty-Ohm resistor. Can be anything from -5 V to +5 V,
+but subject to the restriction that the waveform itself plus the offset cannot
+exceed the range -5 V to +5 V when added together. The signal generator cannot
+apply more than +10 V or less than -10V to its fifty-Ohm output resistor, and
+when we terminate with fifty Ohms, this voltage is divided by two. So we can
+generate a 2 Vpp sinusoid with a +3 V offset, but not a -4 V offset.
 
 Sweep_Lo: The low frequency we generate when the waveform type is "sweep", in
 Hertz.
@@ -616,7 +632,7 @@ the corner frequency of SCT filters with various sample rates. When we check the
 the SCT's low-pass filter near its corner frequency of 80 Hz. Check multiple
 boxes to measure in detail around multiple corner frequencies.
 
-Copyright (C) 2025-2026, Kevan Hashemi, Open Source Instruments Inc.
+Copyright (C) 2024-2026, Kevan Hashemi, Open Source Instruments Inc.
 
 ----------End Help----------
 
