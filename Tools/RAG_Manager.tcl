@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.9"
+	LWDAQ_tool_init "RAG_Manager" "7.1"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Directory locations for key, chunks, embeds.
@@ -69,7 +69,6 @@ proc RAG_Manager_init {} {
 # settings file.
 #
 	set config(sources) {
-
 https://www.opensourceinstruments.com/bndhep/Electronics/A2071/M2071.html
 https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/LWDAQ.html
 https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/Cables.html
@@ -137,13 +136,12 @@ https://www.opensourceinstruments.com/Software/LWDAQ/Acquisifier.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Startup_Manager.html
 https://www.opensourceinstruments.com/Prices.html
 https://www.opensourceinstruments.com/Chat/Manual.html
-
 	}
 #
 # If we need to send a password to get access to our URLs, we set the password
 # here, in the format "username:password".
 #
-set config(userpass) "username:password"
+	set config(userpass) "username:password"
 
 #
 # Configuration for retrieval and submission based upon relevance of the question
@@ -171,8 +169,7 @@ set config(userpass) "username:password"
 # Completion assistant instructions for the three tiers of relevance. Can be
 # edited with a dedicated window and saved to settings file.
 #
-	set config(high_rel_assistant) {
-	
+	set config(high_rel_prompt) {
 You are a helpful assistant for a technical support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. Otherwise, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
 
 When answering the user's question:
@@ -185,11 +182,9 @@ When answering the user's question:
   - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
   - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
-  
     }
     
-	set config(mid_rel_assistant) {
-
+	set config(mid_rel_prompt) {
 You are a helpful assistant for a technical support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. Otherwise, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
 
 When answering the user's question:
@@ -202,11 +197,9 @@ When answering the user's question:
   - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
   - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
-  
 	}
 	
-	set config(low_rel_assistant) {
-
+	set config(low_rel_prompt) {
 You are a helpful assistant for a general-knowledge chatbot. When a user asks you a question, you will attempt to answer the question using your general knowledge. You will use the chat history to better understand the current question. Do not make up facts or fabricate plausible-sounding answers. If you are uncertain of your answer, tell the user that you do not know the answer.
 
 When answering the user's question:
@@ -215,8 +208,14 @@ When answering the user's question:
   - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
   - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
-
-	}
+	}	
+#
+# When debugging the manager's formatting of the answers it gets from the end-points, 
+# we insert our own answer into the manager instead of getting one from the end 
+# point. When the diagnostic answer string is not empty, the manager will refrain from
+# contacting the completion end point and instead return the diagnostic string.
+#
+	set config(diag_answer) {}
 #
 # A list of html entities and the unicode characters we want to replace them
 # with.
@@ -294,7 +293,7 @@ When answering the user's question:
 #
 # Tags we convert only after we perform chunking.
 #	
-set info(entities_final_convert) {
+	set info(entities_final_convert) {
 		&lt;        "<"
 		&gt;        ">"
 }
@@ -417,99 +416,52 @@ proc RAG_Manager_snippet {page index} {
 }
 
 #
-# RAG_Manager_apply reads the contents of a text window and executes them as a
-# Tcl script at the global scope. We can use this routine to reconfigure long
-# string parameters such as our assistant instructions. Within the scripts we
-# can refer to the RAG Manager configuration and information arrays as "config"
-# and "info".
+# RAG_Manager_apply reads the contents of a text window, trims whitespace, and
+# assigns the resulting string to a configuration parameter.
 #
-proc RAG_Manager_apply {w} {
+proc RAG_Manager_apply {w pname} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-	set commands {
-		upvar #0 RAG_Manager_info info
-		upvar #0 RAG_Manager_config config	
-	}
-	append commands [string trim [$w.text get 1.0 end]]
-	if {[catch {eval $commands} error_result]} {
-		RAG_Manager_print "ERROR: $error_result"
-	}
-	
+	set config($pname) [string trim [$w.text get 1.0 end]]
 	return ""
 }
 
 #
-# RAG_Manager_assistant_prompts opens a text window and prints out the declarations of
-# the three assistant instructions. We can edit and then apply with an Apply
-# button.
+# RAG_Manager_edit_param opens a text window, prints the value of a parameter
+# in the window and creates an Apply button that, when pressed, saves the
+# edited contents of the window to the same parameter.
 #
-proc RAG_Manager_assistant_prompts {} {
+proc RAG_Manager_edit_param {pname} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	# If the assistant viewing panel exists, destroy it. We are going to make a
-	# new one.
-	set w $info(window)\.assistant
+	# If the editing panel for this parameter already exists, destroy it. We are
+	# going to make a new one.
+	set w $info(window).$pname
 	if {[winfo exists $w]} {destroy $w}
 	
 	# Create a new top-level text window that is a child of the main tool
-	# window. Bind the Command-a key to save the metadata.
+	# window. 
 	toplevel $w
-	wm title $w "Assistant Prompts, RAG_Manager $info(version)"
+	wm title $w "Editor for \"$pname\", RAG_Manager $info(version)"
 	LWDAQ_text_widget $w 100 40
 	LWDAQ_enable_text_undo $w.text
-	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
 	
-	# Create the Applpy button.
+	# Create the Apply button.
 	frame $w.f
 	pack $w.f -side top
-	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
+	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w $pname]
 	pack $w.f.apply -side left
-	
-	# Print the assistant prompts for all relevance levels.
-	foreach level {high_rel mid_rel low_rel} {
-		LWDAQ_print $w.text "set config($level\_assistant) \{\n" blue
-		LWDAQ_print $w.text "[string trim $config($level\_assistant)]"
-		LWDAQ_print $w.text "\n\}\n" blue
-	}
-	
-	return ""
-}
 
-#
-# RAG_Manager_source_urls opens a text window and prints out the source list. We can
-# edit and then apply with an Apply button.
-#
-proc RAG_Manager_source_urls {} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
+	# Bind command-a to the same apply command.
+	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w $pname]
 	
-	# If the source viewing panel exists, destroy it. We are going to make a
-	# new one.
-	set w $info(window)\.sources
-	if {[winfo exists $w]} {destroy $w}
+	# Print the parameter value.
+	LWDAQ_print $w.text "[set config($pname)]"
 	
-	# Create a new top-level text window that is a child of the main tool
-	# window. Bind the Command-a key to save the metadata.
-	toplevel $w
-	wm title $w "Source Documents, RAG_Manager $info(version)"
-	LWDAQ_text_widget $w 100 20
-	LWDAQ_enable_text_undo $w.text
-	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
-	
-	# Create the Applpy button.
-	frame $w.f
-	pack $w.f -side top
-	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
-	pack $w.f.apply -side left
-	
-	# Print the sources list in the window.
-	LWDAQ_print $w.text "set config(sources) \{\n" blue
-	LWDAQ_print $w.text "[string trim $config(sources)]"
-	LWDAQ_print $w.text "\n\}\n" blue
-	
-	return ""
+	# Return the window name.
+	return $w
 }
 
 #
@@ -598,7 +550,8 @@ proc RAG_Manager_set_key {{kfn ""}} {
 #
 # RAG_Manager_configure opens the tool configuration window, which allows us to
 # edit the configuration parameters. Additional buttons give access to multi-line
-# parameters, like the source url list and the assistant prompts.
+# parameters, like the source url list, assistant prompts, and the diagnostic 
+# answer we use to test chatbot answer rendering.
 #
 proc RAG_Manager_configure {} {
 	upvar #0 RAG_Manager_config config
@@ -606,9 +559,15 @@ proc RAG_Manager_configure {} {
 
 	set f [LWDAQ_tool_configure RAG_Manager 3]
 
-	foreach a {Set_Root Set_Key Source_URLs Assistant_Prompts} {
+	foreach a {Set_Root Set_Key} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
+		pack $f.$b -side left -expand yes
+	}
+	foreach a {Sources High_Rel_Prompt Mid_Rel_Prompt Low_Rel_Prompt Diag_Answer} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command \
+			[list LWDAQ_post "RAG_Manager_edit_param $b"]
 		pack $f.$b -side left -expand yes
 	}
 		
@@ -2542,20 +2501,26 @@ proc RAG_Manager_retrieve {} {
 #
 # RAG_Manager_get_answer submits a list of chunks and a question to the chat
 # completion end point and returns the answer it obtains. It takes as in put
-# five parameters: the completion model name, the assistant instructions, the
+# five parameters: the completion model name, the assistant prompt, the
 # documentation and chat history content, the question, and an api key location.
 # It returns the entire result from the end point, as a json record, and leaves
-# it to the calling procedure to extract the answer.
+# it to the calling procedure to extract the answer. In order to help us debug
+# our chatbot's presentation of answers, the get-answer procedure examines
+# the diag_answer string, and if this string is not empty, the procedure
+# returns its contents instead of fetching an answer from the completion end
+# point. Now this answer passes through the formatting of the manager and
+# chatbot. The manager's configuration panel allows us to edit the diagnostic
+# string.
 #
-proc RAG_Manager_get_answer {model assistant contents question api_key} {
+proc RAG_Manager_get_answer {model prompt contents question api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	set assistant [RAG_Manager_json_format $assistant]
+	set prompt [RAG_Manager_json_format $prompt]
  	set json_body "\{\n\
 		\"model\": \"$model\",\n\
 		\"messages\": \[\n"
-	append json_body "    \{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
+	append json_body "    \{ \"role\": \"system\", \"content\": \"$prompt\" \},\n"
 	foreach content $contents {
 		if {[regexp {^Question: (.*)} $content match chat]} {
 			set chat [RAG_Manager_json_format $chat]
@@ -2579,6 +2544,11 @@ proc RAG_Manager_get_answer {model assistant contents question api_key} {
 	  -H "Content-Type: application/json" \
 	  -H "Authorization: Bearer $api_key" \
 	  -d $json_body] 
+
+	if {[string length [string trim $config(diag_answer)]] > 0} {
+		RAG_Manager_print "Using diagnostic answer string instead of end point."
+		return "\"content\": \"$config(diag_answer)\""
+	}
 
 	set ch [open $cmd]
 	fconfigure $ch -blocking 0 -buffering line
@@ -2666,22 +2636,22 @@ proc RAG_Manager_submit {} {
 	set r $info(relevance)
 	if {$r >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
-		set assistant [string trim $config(high_rel_assistant)]
+		set prompt [string trim $config(high_rel_prompt)]
 		RAG_Manager_print "High-relevance question, relevance=$r,\
 			use $model and high-relevance completion prompt." brown
 	} elseif {$r >= $config(mid_rel_thr)} {
-		set assistant [string trim $config(mid_rel_assistant)]
+		set prompt [string trim $config(mid_rel_prompt)]
 		set model $config(mid_rel_model)
 		RAG_Manager_print "Mid-relevance question, relevance=$r,\
 			use $model and mid-relevance completion prompt." brown
 	} else {
 		set model $config(low_rel_model)
-		set assistant [string trim $config(low_rel_assistant)]
+		set prompt [string trim $config(low_rel_prompt)]
 		RAG_Manager_print "Low-relevance question, relevance=$r,\
 		 	use $model and low-relevance completion prompt." brown
 	}
 	RAG_Manager_print "Assistant prompt being submitted with this question:" brown
-	RAG_Manager_print "$assistant" green
+	RAG_Manager_print "$prompt" green
 
 	if {![file exists $config(key_file)]} {
 		set answer "ERROR: Cannot find key file $config(key_file)."
@@ -2693,7 +2663,7 @@ proc RAG_Manager_submit {} {
 	close $f 
 	RAG_Manager_print "Read api key from $config(key_file)\." brown
 	
-	set size [string length $assistant]
+	set size [string length $prompt]
 	foreach content $info(contents) {
 		set size [expr $size + [string length $content]]
 	}
@@ -2704,7 +2674,7 @@ proc RAG_Manager_submit {} {
 	set start_ms [clock milliseconds]
 	set info(result) [RAG_Manager_get_answer \
 		 $model \
-		 $assistant \
+		 $prompt \
 		 $info(contents) \
 		 $question \
 		 $api_key]
@@ -2722,16 +2692,21 @@ proc RAG_Manager_submit {} {
 		set answer "ERROR: Could not find answer or error message in result."
 	}
 	
-	# Print the answer to the console or log file. We perform minimal formatting
-	# on the json answer: we replace escaped newline characters with newlines so
-	# that we can see the answer clearly. But we do not replace escaped
-	# backslashes nor make any attempt to clean up LaTeX. We want to know what
-	# the endpoint returned when we look in our log file. Any newline must have
-	# come from an escaped newline because the json string will never contains
-	# newlines.
-	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
-	RAG_Manager_print "$answer_txt"
-	append info(chat) "Answer: $answer_txt\n\n"
+	# Print the answer to the console or log file. We want to know what the
+	# endpoint returned when we look in our log file. We perform minimal
+	# formatting on the json answer so we can print it as text. We replace
+	# escaped newline characters with newlines. We avoid replacing
+	# double-escaped characters and we do not make any attempt to clean up
+	# LaTeX. If we see a backslash followed by a literal newline, we deem this
+	# to be an error of interpretation on the part of Tcl, and replace with a
+	# double backslash and an "n" character.
+	set s $answer
+	regsub -all {\\r\\n|\\r|\\n} $s "\n" s
+	regsub -all {(^|[^\\])\\r} $s "\\1\n" s
+	regsub -all {(^|[^\\])\\n} $s "\\1\n" s
+	regsub -all {\\\n} $s {\\\\n} s
+	RAG_Manager_print $s
+	append info(chat) "Answer: $s\n\n"
 	RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
 	
 	set info(control) "Idle"
