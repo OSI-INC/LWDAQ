@@ -142,7 +142,6 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 # here, in the format "username:password".
 #
 	set config(userpass) "username:password"
-
 #
 # Configuration for retrieval and submission based upon relevance of the question
 # to the chunk library. We have three tiers of relevance: high, mid, and low.
@@ -150,10 +149,10 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(high_rel_thr) "0.55"
 	set config(mid_rel_thr) "0.30"
 	set config(high_rel_model) "gpt-5.4"
-	set config(mid_rel_model) "gpt-5.4"
+	set config(mid_rel_model) "gpt-5.4-mini"
 	set config(low_rel_model) "gpt-4o-mini"
 	set config(high_rel_words) "5000"
-	set config(mid_rel_words) "5000"
+	set config(mid_rel_words) "10000"
 	set config(low_rel_words) "0"
 	set config(high_rel_chat_words) "3000"
 	set config(mid_rel_chat_words) "3000"
