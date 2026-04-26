@@ -156,7 +156,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(low_rel_words) "0"
 	set config(high_rel_chat_words) "3000"
 	set config(mid_rel_chat_words) "3000"
-	set config(low_rel_chat_words) "10000"
+	set config(low_rel_chat_words) "3000"
 	set config(max_question_words) "1000"
 	set config(embed_model) "text-embedding-3-small"
 #
