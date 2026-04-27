@@ -129,7 +129,6 @@ proc Tapermaker_xmit {cmd {rxen "0"}} {
 	}
 
 	LWDAQ_print $info(text) $cmd $info(tx_color)
-return ""
 	set result [LWDAQ_acquire Terminal]
 	if {$rxen} {
 		if {![LWDAQ_is_error_result $result]} {
