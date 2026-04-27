@@ -26,7 +26,7 @@ proc Tapermaker_init {} {
 	upvar #0 Tapermaker_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tapermaker" "2.12"
+	LWDAQ_tool_init "Tapermaker" "3.1"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Conversion constants.
@@ -62,6 +62,14 @@ proc Tapermaker_init {} {
 	set config(right_stretch_delay_s) "2.0"
 	set config(right_stretch_distance_mm) "12.0"
 	set config(right_stretch_speed_mmps) "2.0"
+
+	# The blunting algorithm is one in which we move the end of a fiber into
+	# the heating coil, leave it for a while, and pull it back out again. We
+	# use this procedure after breaking off the tip of a tapered fiber, and so
+	# create a blunt fiber.
+	set config(blunting_distance_mm) "30.0"
+	set config(blunting_speed_mmps) "2.0"
+	set config(blunting_delay_s) "2.0"
 	
 	# The Terminal Instrument settings that allow communication with the
 	# indexer. We have a transmit string header consisting of an XOFF command,
@@ -78,6 +86,9 @@ proc Tapermaker_init {} {
 	set config(xmit_cmd) "$config(sel_right) H01"
 	set config(analysis_enable) "5"
 	set config(xmit_rx) "0"
+	
+	# Display parameters.
+	set info(tx_color) "brown"
 
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
@@ -117,7 +128,8 @@ proc Tapermaker_xmit {cmd {rxen "0"}} {
 		}
 	}
 
-	LWDAQ_print $info(text) $cmd brown
+	LWDAQ_print $info(text) $cmd $info(tx_color)
+return ""
 	set result [LWDAQ_acquire Terminal]
 	if {$rxen} {
 		if {![LWDAQ_is_error_result $result]} {
@@ -283,33 +295,30 @@ proc Tapermaker_reset {} {
 }
 
 #
-# Tapermaker_program writes the stretching program to the program memories of
-# the two indexers. The distances and speeds used in the program are derived
-# from the parameters displayed in the Tapermaker window.
+# Tapermaker_taper programs the indexer for tapering, then initiates the
+# tapering process. The left motor moves the left portion of the fiber up and
+# away, while the right motor first pauses and then moves the right portion of
+# the fiber down and away. Tapers are created at the break made by the heating
+# coil as the two fiber ends pull apart. The taper we want to keep is the one on
+# the right portion.
 # 
-proc Tapermaker_program {} {
+proc Tapermaker_taper {} {
 	upvar #0 Tapermaker_info info
 	upvar #0 Tapermaker_config config
 	
-	LWDAQ_print $info(text) "Loading tapering programs into indexers."
-	
-	# The left motor moves the left portion of the fiber up and away, while the
-	# right motor first pauses and then moves the right portion of the fiber
-	# down and away. Tapers are created at the break made by the heating coil as
-	# the two fiber ends pull apart. The taper we want to keep is the one on the
-	# right portion.
-	
+	# We make one announcement in black. The other announcements will be in from
+	# the transmit routine, which will print all commands in the transmit color.
+	LWDAQ_print $info(text) "Programming both indexers for tapering."
+		
 	# Select the right-hand indexer and clear all program lines. "L48 0"
 	# specifies that the "H12" clear instruction should clear all lines. 
 	Tapermaker_xmit "$config(sel_right) L48 0 H12"
 
 	# Program the right motor to bring the target region of the fiber into the
 	# heating coil. 
-	set right_approach_distance \
-		[expr round($config(approach_distance_mm) * $info(steps_per_mm))]
-	set right_approach_speed \
-		[expr round($config(approach_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "$config(sel_right) N1 X+$right_approach_distance F$right_approach_speed"
+	set rad [expr round($config(approach_distance_mm) * $info(steps_per_mm))]
+	set ras [expr round($config(approach_speed_mmps) * $info(steps_per_mm))]
+	Tapermaker_xmit "$config(sel_right) N1 X+$rad F$+"
 
 	# The right motor pauses before it moves down.
 	set delay [expr round($config(right_stretch_delay_s)*1000)]
@@ -317,54 +326,67 @@ proc Tapermaker_program {} {
 	
 	# The right motor moves right by the right stretch distance at the right
 	# stretch speed.
-	set stretch_distance [expr round($config(right_stretch_distance_mm) * $info(steps_per_mm))]
-	set stretch_speed [expr round($config(right_stretch_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "$config(sel_right) N3 X-$stretch_distance F$stretch_speed"
+	set sd [expr round($config(right_stretch_distance_mm) * $info(steps_per_mm))]
+	set ss [expr round($config(right_stretch_speed_mmps) * $info(steps_per_mm))]
+	Tapermaker_xmit "$config(sel_right) N3 X-$sd F$ss"
 	
 	# Select the left-hand indexer and clear all program lines.
 	Tapermaker_xmit "$config(sel_left) L48 0 H12"
 
 	# The left stage is the one that moves slightly faster and farther.
-	set left_approach_distance [expr round($right_approach_distance \
-		* $config(approach_differential_mmpmm))]
-	set left_approach_speed [expr round($right_approach_speed \
-		* $config(approach_differential_mmpmm))]
-	Tapermaker_xmit "$config(sel_left) N1 X+$left_approach_distance F$left_approach_speed"
+	set lad [expr round($rad * $config(approach_differential_mmpmm))]
+	set las [expr round($ras * $config(approach_differential_mmpmm))]
+	Tapermaker_xmit "$config(sel_left) N1 X+$lad F$las"
 
 	# The left motor pauses before it moves up.
 	set delay [expr round($config(left_stretch_delay_s)*1000)]
 	Tapermaker_xmit "$config(sel_left) N2 G04 X$delay"
 		
 	# The left motor moves up by the left stretch distance at the left stretch speed.
-	set stretch_distance [expr round($config(left_stretch_distance_mm) * $info(steps_per_mm))]
-	set stretch_speed [expr round($config(left_stretch_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "$config(sel_left) N3 X+$stretch_distance F$stretch_speed"
-	
-	# The indexers are now programmed.
-	LWDAQ_print $info(text) "Motor indexers programmed.\n"
-
-	return ""
-}
-
-#
-# Tapermaker_taper programs the indexer for tapering, then initiates the
-# tapering process.
-# 
-proc Tapermaker_taper {} {
-	upvar #0 Tapermaker_info info
-	upvar #0 Tapermaker_config config
-	
-	# Load the program.
-	Tapermaker_program
+	set sd [expr round($config(left_stretch_distance_mm) * $info(steps_per_mm))]
+	set ss [expr round($config(left_stretch_speed_mmps) * $info(steps_per_mm))]
+	Tapermaker_xmit "$config(sel_left) N3 X+$sd F$ss"
 	
 	# Turn on the motor windings with "H35". Transmit simultaneous program
 	# start to all indexers.
-	LWDAQ_print $info(text) "Turning on windings and starting program."
 	Tapermaker_xmit "<00 H35 N1 H01"
+
+	# The tapering should start. The indexers will execute their programs
+	# independently but in time with one another.
 	LWDAQ_print $info(text) "Tapering in progress.\n"
 	return ""
 }
 
+#
+# Tapermaker_blunt programs the indexer for blunting, then initiates the
+# blunting process.
+# 
+proc Tapermaker_blunt {} {
+	upvar #0 Tapermaker_info info
+	upvar #0 Tapermaker_config config
+	
+	# Select the right-hand indexer and clear all program lines.
+	LWDAQ_print $info(text) "Programming right-hand indexer for blunting."
+	Tapermaker_xmit "$config(sel_right) L48 0 H12"
+
+	# Load the first program line. Move the proscribed blunting distance from the
+	# current position, at the blunting speed.
+	set distance [expr round($config(blunting_distance_mm) * $info(steps_per_mm))]
+	set speed [expr round($config(blunting_speed_mmps) * $info(steps_per_mm))]
+	Tapermaker_xmit "$config(sel_right) N1 X+$distance F$speed"
+
+	# Waith for the blunting delay in seconds.
+	set delay [expr round($config(blunting_delay_s)*1000)]
+	Tapermaker_xmit "$config(sel_right) N2 G04 X$delay"
+
+	# Move back to starting position at the same speed.
+	Tapermaker_xmit "$config(sel_right) N3 X-$distance F$speed"
+
+	# Turn on the motors and start the blunting process.
+	Tapermaker_xmit "$config(sel_right) H35 N1 H01"
+	LWDAQ_print $info(text) "Blunting in progress.\n"
+	return ""
+}
 #
 # Tapermaker_homr takes the stages back to the home positions after a taper
 # process.
@@ -372,12 +394,9 @@ proc Tapermaker_taper {} {
 proc Tapermaker_home {} {
 	upvar #0 Tapermaker_info info
 	upvar #0 Tapermaker_config config
-	
+		
 	LWDAQ_print $info(text) "Sending home commands."
-	
-	# Return to electrical home position.
-	Tapermaker_xmit "<00 H08"
-	
+	Tapermaker_xmit "<00 H08"	
 	LWDAQ_print $info(text) "Moving to home position.\n"
 	return ""
 }
@@ -399,7 +418,9 @@ proc Tapermaker_open {} {
 		-command [list LWDAQ_post Tapermaker_reset]
 	button $f.taper -text "Taper" -fg green \
 		-command [list LWDAQ_post Tapermaker_taper]
-	button $f.home -text "Home" -fg orange \
+	button $f.blunt -text "Blunt" -fg green \
+		-command [list LWDAQ_post Tapermaker_blunt]
+	button $f.home -text "Home" -fg green \
 		-command [list LWDAQ_post Tapermaker_home]
 	button $f.stop -text "Stop" -fg red \
 		-command [list LWDAQ_post Tapermaker_stop front]
@@ -410,7 +431,7 @@ proc Tapermaker_open {} {
     button $f.help -text "Help" \
     	-command "LWDAQ_tool_help $info(name)"
     	
-    pack $f.reset $f.home $f.taper $f.stop $f.off \
+    pack $f.reset $f.home $f.taper $f.blunt $f.stop $f.off \
     	$f.configure $f.help -side left -expand 1
 	
 	set ff [frame $w.middle]
@@ -419,7 +440,8 @@ proc Tapermaker_open {} {
 	set f [frame $ff.left]
 	pack $f -side left -fill y
 
-	foreach a {right_home_position_mm \
+	foreach a {reset_speed_mmps \
+		right_home_position_mm \
 		left_home_position_mm \
 		approach_distance_mm \
 		approach_speed_mmps \
@@ -452,8 +474,10 @@ proc Tapermaker_open {} {
 	foreach a {left_stretch_delay_s \
 		left_stretch_distance_mm \
 		left_stretch_speed_mmps \
-		reset_speed_mmps \
-		acceleration_mmpss} {
+		acceleration_mmpss \
+		blunting_distance_mm \
+		blunting_speed_mmps \
+		blunting_delay_s} {
 		
 		set word_list [split $a _] 
 		set name ""
