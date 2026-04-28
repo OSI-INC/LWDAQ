@@ -26,7 +26,7 @@ proc Tapermaker_init {} {
 	upvar #0 Tapermaker_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Tapermaker" "3.1"
+	LWDAQ_tool_init "Tapermaker" "3.2"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	# Conversion constants.
@@ -67,7 +67,7 @@ proc Tapermaker_init {} {
 	# the heating coil, leave it for a while, and pull it back out again. We
 	# use this procedure after breaking off the tip of a tapered fiber, and so
 	# create a blunt fiber.
-	set config(blunting_distance_mm) "30.0"
+	set config(blunting_distance_mm) "12.0"
 	set config(blunting_speed_mmps) "2.0"
 	set config(blunting_delay_s) "2.0"
 	
@@ -317,7 +317,7 @@ proc Tapermaker_taper {} {
 	# heating coil. 
 	set rad [expr round($config(approach_distance_mm) * $info(steps_per_mm))]
 	set ras [expr round($config(approach_speed_mmps) * $info(steps_per_mm))]
-	Tapermaker_xmit "$config(sel_right) N1 X+$rad F$+"
+	Tapermaker_xmit "$config(sel_right) N1 X+$rad F$ras"
 
 	# The right motor pauses before it moves down.
 	set delay [expr round($config(right_stretch_delay_s)*1000)]

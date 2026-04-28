@@ -103,8 +103,8 @@ proc Spectrometer_init {} {
 	set config(f_color) "2"
 	set config(f_lines) "900 915 930"
 	set config(step) "0"
-	set config(active_width) "5"
-	set config(inactive_width) "2"
+	set config(active_width) "6"
+	set config(inactive_width) "3"
 	
 	# Calibration constants for the Sepctrometer A3008 circuit.
 	set config(f_ref) "915"
