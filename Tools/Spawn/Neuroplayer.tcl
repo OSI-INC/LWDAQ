@@ -219,11 +219,11 @@ proc Neuroplayer_init {} {
 #
 	set info(active_channels) ""
 #
-# When we determine a channel's expected message frequency in one routine,
-# we want to save the frequency in a place that other routines can read it.
-# The default frequency is 512.
+# When we determine a channel's expected sample rate in one routine,
+# we want to save the sample rate in a place that other routines can read it.
+# The default sample rate is 512.
 #
-	set info(frequency) "512"
+	set info(sps) "512"
 #
 # The separation of the components of the fourier transform is related to
 # the playback interval. We set it to 1 Hz by default.
@@ -250,7 +250,7 @@ proc Neuroplayer_init {} {
 #
 # We set the array of selected frequencies for reconstruction to an empty
 # string. During reconstruction, we will set them to a value picked from the
-# default frequency string. We also have a f_alert parameter for each channel,
+# default sample rate string. We also have a f_alert parameter for each channel,
 # that we set to "Extra" if we have too many, "Poor" if we have too few, "None"
 # if the channel has not been active yet, "Okay" if we have the correct number,
 # and "Gone" if it was active once, but has since vanished. Once the channel
@@ -448,11 +448,11 @@ proc Neuroplayer_init {} {
 # which eliminates bad messages and replaces missing messages, we must specify
 # the correct message frequency and the extent of the transmission scatter
 # implemented by the tranmsitter. The phrase "5:512:8" specifies channel 5 with
-# frequency 512 and scatter 8. We have default values for frequency, which will
+# sample rate 512 and scatter 8. We have default values for frequency, which will
 # be used if we do not specify values.
 #
 	set config(channel_selector) "*"
-	set config(default_frequencies) "64 128 256 512 1024 2048 4096"
+	set config(default_sps) "64 128 256 512 1024 2048 4096"
 	set info(standing_values) ""
 #
 # We save the last clock message value in each message block so we can compare it 
@@ -519,10 +519,11 @@ proc Neuroplayer_init {} {
 	set config(log_frequency) 0
 	set config(log_amplitude) 0
 #
-# Colors for windows.
+# Appearances of widgets.
 #
 	set info(label_color) "darkgreen"
 	set info(variable_bg) "lightgray"
+	set info(file_tail_width) "16"
 #
 # We apply a window function to the signal before we take the fourier transform.
 # This function smooths the signal to its average value starting
@@ -1684,21 +1685,21 @@ proc Neuroplayer_command {action} {
 
 #
 # Neuroplayer_signal extracts or reconstructs the signal from one channel in the
-# data image. It updates info(num_received) and info(standing_values). It
-# info(frequency) and info(num_messages). It returns the extracted or
-# reconstructed signal. The returned signal format is a space-delimited string
-# giving a sequence of messages. Each message is a timestamp followed by a
-# sample value. The timestamp is an integer number of clock ticks from the
-# beginning of the playback interval. The timestamps and vsample alues alternate
-# in the return string, separated by single spaces. The "extracted" signal is a
-# list of messages that exist in the data image. The "reconstructed" signal is
-# the extracted signal with substitute messages inserted and bad messages
-# removed, so as to create a signal with info(frequency) messages. To perform
-# extraction and reconstruction, the routine calls lwdaq_receiver from the lwdaq
-# library. See the Receiver Manual for more information, and also the LWDAQ
-# Command Reference. The routine takes a single parameter: a channel code, which
-# is of the form "id" or "id:f" or "id:f" where "id" is the channel number and
-# "f" is its nominal message rate per second. If status_only is set, we don't
+# data image. It updates info(num_received) and info(standing_values). It sets
+# info(sps) and info(num_messages). It returns the extracted or reconstructed
+# signal. The returned signal format is a space-delimited string giving a
+# sequence of messages. Each message is a timestamp followed by a sample value.
+# The timestamp is an integer number of clock ticks from the beginning of the
+# playback interval. The timestamps and vsample alues alternate in the return
+# string, separated by single spaces. The "extracted" signal is a list of
+# messages that exist in the data image. The "reconstructed" signal is the
+# extracted signal with substitute messages inserted and bad messages removed,
+# so as to create a signal with info(sps) messages. To perform extraction and
+# reconstruction, the routine calls lwdaq_receiver from the lwdaq library. See
+# the Receiver Manual for more information, and also the LWDAQ Command
+# Reference. The routine takes a single parameter: a channel code, which is of
+# the form "id" or "id:f" or "id:f" where "id" is the channel number and "f" is
+# its nominal message rate per second. If status_only is set, we don't
 # reconstruct, but return after determining if there is loss, extra, or okay
 # reception.
 # 
@@ -1710,7 +1711,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	# to know there's no signal.
 	set info(loss) 100.0
 
-	# We split the channel code into id and frequency.
+	# We split the channel code into id and sample rate.
 	if {$channel_code == ""} {set channel_code $info(channel_code)}
 	set parameters [split $channel_code ":"] 
 	set id [lindex $parameters 0]
@@ -1725,31 +1726,31 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set num_received $a 
 	}
 	
-	# The frequency may be set by the channel code. If not, we look at the
-	# expected frequency value that may be defined through the activity panel.
-	set frequency [lindex $parameters 1]
+	# The sample rate may be set by the channel code. If not, we look at the
+	# expected sample rate value that may be defined through the activity panel.
+	set sps [lindex $parameters 1]
 
-	# We guess the frequency if it is not already set to a integer value. The
-	# default frequency can be a single frequency or a list of frequencies, the
-	# closest of which to the number of messages received is the one that will
-	# be picked. If our search for a good frequency fails because there are too
-	# many messages, we use the highest frequency in the default list.
-	if {![string is integer -strict $frequency]} {
-		set fl [lsort -integer -decreasing [string trim $config(default_frequencies)]]
-		set frequency [lindex $fl 0]
+	# We guess the sample rate if it is not already set to a integer value. The
+	# default sample rate can be a single value or a list of values, the closest
+	# of which to the number of messages received is the one that will be
+	# picked. If our search for the correct sample rate fails because there are
+	# too many messages, we use the highest value in the default list.
+	if {![string is integer -strict $sps]} {
+		set fl [lsort -integer -decreasing [string trim $config(default_sps)]]
+		set sps [lindex $fl 0]
 		foreach f $fl {
 			if {![string is integer -strict $f]} {
-				Neuroplayer_print "ERROR: Invalid frequency \"$f\" in default list."
+				Neuroplayer_print "ERROR: Invalid sample rate \"$f\" in default list."
 				return "0 0"	
 			}
 			if {$num_received < [expr $config(extra_fraction) \
 				* $f * $info(play_interval_copy)]} {
-				set frequency $f
+				set sps $f
 			}
 		}
 	}
 	if {$num_received > [expr $config(extra_fraction) \
-			* $frequency * $info(play_interval_copy)]} {
+			* $sps * $info(play_interval_copy)]} {
 		if {$info(status_$id) != "Extra"} {
 			Neuroplayer_print \
 				"WARNING: Extra samples on channel $id\
@@ -1757,12 +1758,12 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			set info(status_$id) "Extra"
 		}
 	} elseif {$num_received < [expr $config(min_reception) \
-			* $frequency * $info(play_interval_copy)]} {
+			* $sps * $info(play_interval_copy)]} {
 		set info(status_$id) "Loss"
 	} else {
 		set info(status_$id) "Okay"
 	}
-	set info(sps_$id) $frequency
+	set info(sps_$id) $sps
 	
 	# If we are here only to determine the status and nominal sample rate of the
 	# transmitter, we return now with an empty signal string.
@@ -1772,13 +1773,13 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	
 	# Set global parameters.
 	set info(num_received) $num_received
-	set info(frequency) $frequency
+	set info(sps) $sps
 
 	# We calculate the number of messages expected and the period
 	# of the nominal sample rate in clock ticks.
-	set num_expected [expr $frequency * $info(play_interval_copy)]
+	set num_expected [expr $sps * $info(play_interval_copy)]
 	set period [expr round(1.0 * $info(ticks_per_clock) \
-		* $info(clocks_per_second) / $frequency)]
+		* $info(clocks_per_second) / $sps)]
 	
 	# Determine the standing value of the signal from its previous interval. If
 	# the first message in the interval is missing, we will use this standing
@@ -1819,10 +1820,10 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			return $signal
 		}
 		
-		# Reconstruction can fail if the transmit frequency is slightly too high
-		# or too low as a result of a fault in the on-board oscillator. We check
-		# for this mode of failure now, and if we find it, we reconstruct once 
-		# again, but this time with the "divergent_clocks" option set true.
+		# Reconstruction can fail if the transmit sample rate is slightly too
+		# high or too low as a result of a fault in the on-board oscillator. We
+		# check for this mode of failure now, and if we find it, we reconstruct
+		# once again, but this time with the "divergent_clocks" option set true.
 		scan [lwdaq_image_results $info(data_image)] %d%d%d%d%d%d \
 			num_clocks num_ideal num_bad num_missing standing_value num_glitches
 		if {$num_received + $num_missing > ($config(max_rejection)+1)*$num_ideal} {
@@ -1897,7 +1898,7 @@ proc Neuroplayer_values {{signal ""}} {
 	foreach {t v} $info(signal) {append values "$v "}
 	
 	if {!$config(enable_reconstruct)} {
-		set missing [expr round($info(frequency) * $info(play_interval_copy) \
+		set missing [expr round($info(sps) * $info(play_interval_copy) \
 			- [llength $values])]
 		for {set m 1} {$m <= $missing} {incr m} {
 			append values "[lindex $values end] "
@@ -5250,7 +5251,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					LWDAQ_post "Neuroexporter_export Abort"
 					return ""
 				}
-				if {[lsearch $config(default_frequencies) $sps] < 0} {
+				if {[lsearch $config(default_sps) $sps] < 0} {
 					LWDAQ_print $t \
 						"ERROR: Invalid sample rate \"$sps\", aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
@@ -6287,10 +6288,11 @@ proc Neuroplayer_calibration {{name ""}} {
 		}
 	}
 
-	# Determine which channels we should display, by consulting their channel 
-	# alerts. We create frames to display the channels, their frequency values
-	# and their alerts and baseline powers as we go along. We show the channel
-	# number in the color it will be plotted in the Neuroplayer and Neurotracker.
+	# Determine which channels we should display, by consulting their channel
+	# alerts. We create frames to display the channels, their sample rates and
+	# their alerts and baseline powers as we go along. We show the channel
+	# number in the color it will be plotted in the Neuroplayer and
+	# Neurotracker.
 	set count 0
 	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
 		if {$id % $info(set_size) == $info(set_size) - 1} {continue}
@@ -6450,7 +6452,7 @@ proc Neuroplayer_baselines_read {name} {
 
 # The activity displays the frequencies used for reconstruction, which may have
 # been specified by the user, or may have been picked from a list of possible
-# frequencies in the default frequency parameter. 
+# frequencies in the default sample rate parameter. 
 proc Neuroplayer_activity {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info	
@@ -6519,7 +6521,7 @@ proc Neuroplayer_activity {} {
 	}
 
 	# Determine which channels we should display, by consulting their channel 
-	# alerts. We create frames to display the channels, their frequency values
+	# alerts. We create frames to display the channels, their sample rates
 	# and their alerts and baseline powers as we go along. We show the channel
 	# number in the color it will be plotted in the Neuroplayer and Neurotracker.
 	set count 0
@@ -6594,10 +6596,10 @@ proc Neuroplayer_color_swap {id w e x y} {
 }
 
 #
-# Neuroplayer_frequency_reset sets all the frequency and frequency alerts to
+# Neuroplayer_sps_reset sets all the sample rate and sample rate alerts to
 # zero and N.
 #
-proc Neuroplayer_frequency_reset {} {
+proc Neuroplayer_sps_reset {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info	
 
@@ -6738,8 +6740,8 @@ proc Neuroplayer_magnified_view {figure} {
 	}
 	
 	set f [frame $w.controls] 
-	label $f.b -textvariable Neuroplayer_info(play_file_tail) \
-		-width 20 -bg $info(variable_bg)
+	entry $f.b -textvariable Neuroplayer_info(play_file_tail) \
+		-width $info(file_tail_width)
 	pack $f.b -side left -expand yes
 	button $f.pick -text "Pick" -command "Neuroplayer_command Pick"
 	pack $f.pick -side left -expand yes
@@ -8236,8 +8238,6 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 	# Otherwise, make sure the file name background is gray.
 	if {$repeat} {
 		LWDAQ_post [list Neuroplayer_jump "Play"]
-	} {
-		LWDAQ_set_bg $info(event_file_label) lightgray
 	}
 	
 	# We return the event.
@@ -8902,8 +8902,8 @@ proc Neuroplayer_open {} {
 
 	label $f.a -text "Archive:" -anchor w -fg $info(label_color)
 	pack $f.a -side left 
-	label $f.b -textvariable Neuroplayer_info(play_file_tail) \
-		-width 20 -bg $info(variable_bg)
+	entry $f.b -textvariable Neuroplayer_info(play_file_tail) \
+		-width $info(file_tail_width)
 	button $f.pick -text "Pick" -command "Neuroplayer_command Pick"
 	button $f.pickd -text "PickDir" -command "Neuroplayer_command PickDir"
 	button $f.first -text "First" -command "Neuroplayer_command First"
@@ -8973,11 +8973,8 @@ proc Neuroplayer_open {} {
 	
 	label $f.e -text "Events:" -anchor w -fg $info(label_color)
 	pack $f.e -side left
-	label $f.f -textvariable Neuroplayer_info(event_file_tail) \
-		-width 24 -bg $info(variable_bg)
-	set info(event_file_label) $f.f
 	button $f.g -text "Pick" -command "Neuroplayer_pick event_file 1"
-	pack $f.f $f.g -side left -expand yes
+	pack $f.g -side left -expand yes
 	foreach a {Hop Play Back Go Step Stop} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command [list LWDAQ_post "Neuroplayer_jump $a"]
@@ -8989,6 +8986,8 @@ proc Neuroplayer_open {} {
 	label $f.le -textvariable Neuroplayer_info(num_events) -width 5
 	button $f.mark -text Mark -command [list LWDAQ_post "Neuroplayer_print_event"]
 	pack $f.il $f.ie $f.ll $f.le $f.mark -side left -expand yes
+	checkbutton $f.verbose -variable Neuroplayer_config(verbose) -text "Verbose"
+	pack $f.verbose -side left -expand yes
 
 	set f $w.play.e
 	frame $f -bd 1
@@ -9010,8 +9009,6 @@ proc Neuroplayer_open {} {
 		LWDAQ_post "LWDAQ_run_tool Stimulator"
 	}
 	pack $f.stimb -side left -expand yes
-	checkbutton $f.verbose -variable Neuroplayer_config(verbose) -text "Verbose"
-	pack $f.verbose -side left -expand yes
 	button $f.conf -text "Configure" -command "Neuroplayer_configure"
 	pack $f.conf -side left -expand yes
 	button $f.help -text "Help" -command "LWDAQ_tool_help Neuroplayer"
