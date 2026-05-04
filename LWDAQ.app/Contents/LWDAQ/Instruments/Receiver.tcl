@@ -1,6 +1,6 @@
 # Receiver Instrument, Long-Wire Data Acquisition Software (LWDAQ)
 #
-# Copyright (C) 2006-2025 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2006-2026 Kevan Hashemi, Open Source Instruments Inc.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -305,7 +305,7 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			if {!$info(loop_on_error) && ($info(control) == "Loop")} {
 				set info(control) "Stop"
 			}
-			error "Data corrupted, timestamp errors found by analysis."
+			error "Receiver analysis found $num_errors errors in data block\."
 		}		
 	} error_result]} {
 		return "ERROR: $error_result"
