@@ -336,14 +336,14 @@ proc LWDAQ_refresh_Receiver {} {
 }
 
 #
-# LWDAQ_reset_Receiver resets and configures a telemetry receiver. It resets the data
-# receiver address and timestamp registers, thus emptying its message buffer and
-# resetting its clock. It destroys the receiver instrument's data buffer and
-# working image. It resets the acquired data time, a parameter we use to stop
-# the Receiver Instrument attempting download too many messages from the data
-# receiver. If the receiver is capable of saving a list of enabled channels that
-# it should select for recording, the reset routine sends the daq_channels list
-# to the receiver so as to select them.
+# LWDAQ_reset_Receiver resets and configures a telemetry receiver. It resets the
+# data receiver address and timestamp registers, thus emptying its message
+# buffer and resetting its clock. It destroys the receiver instrument's data
+# buffer and working image. It resets the acquired data time, a parameter we use
+# to stop the Receiver Instrument attempting download too many messages from the
+# data receiver. If the receiver is capable of saving a list of enabled channels
+# that it should select for recording, the reset routine sends the daq_channels
+# list to the receiver so as to select them.
 #
 proc LWDAQ_reset_Receiver {} {
 	upvar #0 LWDAQ_config_Receiver config
@@ -658,7 +658,7 @@ proc LWDAQ_controls_Receiver {} {
 # and the clock frequency to get its estimate of the number of messages
 # avaialable in the telemetry receiver. The routine reports errors with the key
 # word "corrupted" to indicate an error that merits resetting the telemetry
-# receiver. but the routine does not reset the telemetry receiver itself.
+# receiver. But the routine does not reset the telemetry receiver itself.
 #
 proc LWDAQ_daq_Receiver {} {
 	global LWDAQ_Driver LWDAQ_Info

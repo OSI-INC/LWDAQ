@@ -814,10 +814,10 @@ proc Neurorecorder_record {{command ""}} {
 		
 		# Set the timestamp for the new file using the computer clock, with
 		# resolution one second. If the computer and receiver clocks are in
-		# exact agreement, we turn off the synchronization option, and there is
-		# no data loss during the recording archive A, the timestamp of the next
-		# archive, B, will be equal to the timestamp of A plus the requested
-		# duration of A. 
+		# exact agreement and we turn off the synchronization option, and there
+		# is no data loss during the recording archive A, the timestamp of the
+		# next archive, B, will be equal to the timestamp of A plus the
+		# requested duration of A. 
 		set config(record_start_clock) [clock seconds]
 		
 		# If the synchronize flag is set, or if we are starting a new recording,
@@ -904,8 +904,8 @@ proc Neurorecorder_record {{command ""}} {
 			return ""
 		}
 
-		# If we are not dealing with no errors, set the record label to the
-		# active color.
+		# If we are not dealing with errors, set the record label to the active
+		# color.
 		if {($info(recorder_error_time) == 0) \
 				&& ([string length $info(rbuff)] == 0)} {
 			LWDAQ_set_bg $info(record_control_label) $info(active_color)
@@ -915,7 +915,7 @@ proc Neurorecorder_record {{command ""}} {
 		if {$iinfo(control) == "Loop"} {set iinfo(control) "Stop"}
 
 		# Set the number of clocks we want to download using the Receiver
-		# Instrument. The Receiver Instrument will giveus exactly this number of
+		# Instrument. The Receiver Instrument will gives exactly this number of
 		# clocks, unless there is an error.
 		set iconfig(daq_num_clocks) \
 			[expr round($config(record_interval) * $info(clocks_per_second))]
