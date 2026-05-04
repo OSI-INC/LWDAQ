@@ -264,15 +264,15 @@ proc LWDAQ_instrument_analyze {instrument {id ""}} {
 	upvar #0 LWDAQ_info_$instrument info
 	upvar #0 LWDAQ_config_$instrument config
 
-	if {![string is integer -strict $config(analysis_enable)]} {
+	if {[string is integer -strict $config(analysis_enable)]} {
+		set result ""
+		set analyze $config(analysis_enable)
+	} {
 		set result "ERROR: Expected integer for analysis_enable,\
 			got \"$config(analysis_enable)\"."
 		LWDAQ_instrument_print $info(name) $result
 		set analyze 0
-	} {
-		set result ""
-		set analyze $config(analysis_enable)
-	}
+	} 
 
 	# If the instrument's analyze flag is set, analyze the image using the
 	# instrument's own analysis routine. Append a prefix to the result tring:
