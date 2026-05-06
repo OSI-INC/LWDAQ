@@ -1,6 +1,6 @@
 # Neuroplayer.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2007-2025 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2026 Kevan Hashemi, Open Source Instruments Inc.
 #
 # The Neuroplayer records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
@@ -406,7 +406,7 @@ proc Neuroplayer_init {} {
 #
 	set config(slow_play) 0
 	set config(slow_play_ms) 1000
-	set config(fast_play_ms) 50
+	set config(fast_play_ms) 5
 #
 # By default, the player moves from one file to the next automatically, or
 # waits for data to be added to a file if there is no other later file. But
@@ -8760,8 +8760,8 @@ proc Neuroplayer_open {} {
 			Neuroplayer_video_close
 			exit
 		}
-	}	
-
+	}
+	
 	# Get on with creating the display in the tool's frame or window.
 	set f $w.displays
 	frame $f -border 2

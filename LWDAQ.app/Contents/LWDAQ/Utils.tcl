@@ -33,7 +33,7 @@ proc LWDAQ_utils_init {} {
 	upvar #0 LWDAQ_Info info
 	set info(quit) 0
 	set info(queue_run) 0
-	set info(queue_ms) 20
+	set info(queue_ms) 5
 	set info(queue_events) [list]
 	set info(current_event) "Stopped"
 	
@@ -618,6 +618,7 @@ proc LWDAQ_queue_step {} {
 	# Run this routine again in queue_ms, or stop and set the current event
 	# to the reserved word Stop.
 	if {$LWDAQ_Info(queue_run)} {
+		update
 		after $LWDAQ_Info(queue_ms) LWDAQ_queue_step
 	} {
 		set LWDAQ_Info(current_event) "Stop"
