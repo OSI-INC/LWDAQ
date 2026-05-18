@@ -24,18 +24,25 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "7.1"
+	LWDAQ_tool_init "RAG_Manager" "7.3"
 	if {[winfo exists $info(window)]} {return ""}
 #
-# Directory locations for key, chunks, embeds.
+# Configure the file locations based upon the root.
 #
-	set config(root_dir) "~/Active/RAG"
-	set config(key_file) [file join $config(root_dir) "Key/OpenAI_API.txt"]
+	set config(root_dir) "~/Active/RAG/OSI"
+	set info(key_file) [file join $config(root_dir) "Key.txt"]
+	set info(content_dir) [file join $config(root_dir) "Content"]
+	set info(match_dir) [file join $config(root_dir) "Match"]
+	set info(embed_dir) [file join $config(root_dir) "Embed"]
+	set info(log_dir) [file join $config(root_dir) "Log"]
+	set info(signal_file) [file join $info(log_dir) "signal.txt"]
+	set info(offline_file) [file join $info(log_dir) "offline.txt"]
+	set info(dump_file) [file join $info(log_dir) "dump.txt"]
 #
 # The default question.
 #
-	set config(question) "What is the operating life of an SCT\
-		with 160-Hz bandwidth and mass 2 g."
+	set config(question) "What is the minimum mass of SCT that can record EEG\
+		with bandwidth 80 Hz for three weeks?"
 #
 # Internal flags, lists, and control variables.
 #
@@ -169,7 +176,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 # edited with a dedicated window and saved to settings file.
 #
 	set config(high_rel_prompt) {
-You are a helpful assistant for a technical support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. Otherwise, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
+You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-assisted generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
 
 When answering the user's question:
   - Respond using Markdown formatting.
@@ -184,7 +191,7 @@ When answering the user's question:
     }
     
 	set config(mid_rel_prompt) {
-You are a helpful assistant for a technical support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. Otherwise, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
+You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-assisted generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
 
 When answering the user's question:
   - Respond using Markdown formatting.
@@ -331,7 +338,7 @@ When answering the user's question:
 #
 # The fragment delimiting tags.
 #
-	set info(frag_tags) {p center pre equation figure ul ol title h1 h2 h3}
+	set info(frag_tags) {p center pre equation script form figure ul ol title h1 h2 h3}
 #
 # Input-output parameters.
 #	
@@ -355,16 +362,6 @@ When answering the user's question:
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 #
-# Configure the file locations based upon the root.
-#
-	set info(content_dir) [file join $config(root_dir) "Content"]
-	set info(match_dir) [file join $config(root_dir) "Match"]
-	set info(embed_dir) [file join $config(root_dir) "Embed"]
-	set info(log_dir) [file join $config(root_dir) "Log"]
-	set info(signal_file) [file join $info(log_dir) "signal.txt"]
-	set info(offline_file) [file join $info(log_dir) "offline.txt"]
-	set info(dump_file) [file join $info(log_dir) "dump.txt"]
-#
 # Empty string return means all well.
 #
 	return ""	
@@ -387,7 +384,7 @@ proc RAG_Manager_time {{ts ""}} {
 # $info(text) is a text widget, the text will be printed there with colors. If
 # it is stdout, the text will go to the console, or wherever stdout is directed.
 # If it is a valid file name in a directory in which the RAG Manager has write
-# priviledge, the output will be appended to the file.
+# privilege, the output will be appended to the file.
 #
 proc RAG_Manager_print {s {color "black"}} {
 	upvar #0 RAG_Manager_info info
@@ -511,39 +508,11 @@ proc RAG_Manager_set_root {{rdn ""}} {
 	set info(match_dir) [file join $config(root_dir) "Match"]
 	set info(embed_dir) [file join $config(root_dir) "Embed"]
 	set info(log_dir) [file join $config(root_dir) "Log"]
-	
+	set info(key_file) [file join $config(root_dir) "Key.txt"]
+
 	RAG_Manager_print "New root directory established [RAG_Manager_time]" purple
 	set info(control) "Idle"
 	return $rdn
-}
-
-#
-# RAG_Manager_set_key selects the key file we need to access endpoints.
-#
-proc RAG_Manager_set_key {{kfn ""}} {
-	upvar #0 RAG_Manager_config config
-	upvar #0 RAG_Manager_info info
-
-	if {$info(control) != "Idle"} {return ""}
-	set info(control) "Key_File"
-	RAG_Manager_print "Choosing Key File [RAG_Manager_time]" purple
-
-	if {$kfn == ""} {
-		set kfn [LWDAQ_get_file_name]
-	}
-	
-	if {![file exists $kfn]} {
-		RAG_Manager_print "ERROR: File \"$kfn\" does not exist."
-		set info(control) "Idle"
-		return $config(key_file)
-	}
-	
-	set config(key_file) $kfn
-	RAG_Manager_print "Key File: $kfn"
-
-	RAG_Manager_print "New key file chosen [RAG_Manager_time]" purple
-	set info(control) "Idle"
-	return $kfn
 }
 
 #
@@ -558,7 +527,7 @@ proc RAG_Manager_configure {} {
 
 	set f [LWDAQ_tool_configure RAG_Manager 3]
 
-	foreach a {Set_Root Set_Key} {
+	foreach a {Set_Root} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
@@ -893,7 +862,7 @@ proc RAG_Manager_extract_date {frag} {
 }
 
 #
-# RAG_Manager_catalog_frags takes an html page and makes a list of fragments
+# RAG_Manager_catalog_frags takes an html page and makes a list of fragment
 # descriptors. Each descriptor consists of a start and end index for the content
 # of the fragment and the fragment type. The indices point to the first and last
 # characters within the fragment, not including whatever delimiters we used to find
@@ -1040,8 +1009,6 @@ proc RAG_Manager_construct_chunks {page frags} {
 	set section "NONE"
 	set prev_section "NONE"
 	set prev_name "NONE"
-	set empty_match 0
-	set empty_content 0
 	set contaminated 0
 	set chunks [list]
 	foreach frag_id $frags {
@@ -1105,6 +1072,12 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set content "$caption\n\n$figures"
 				set match "$caption"
 			}
+			"form" {
+				set match $content
+			}
+			"script" {
+				set match $content
+			}
 			"equation" {
 				set match $content
 			}
@@ -1123,7 +1096,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set document [string trim $content]
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
-					[format %6s $name]\
+					[format %9s $name]\
 					\"$document\"" brown
 				continue
 			}
@@ -1135,7 +1108,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set prev_name $name
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
-					[format %6s $name]\
+					[format %9s $name]\
 					\"$chapter\"" brown	
 				continue
 			}
@@ -1145,7 +1118,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set prev_name $name
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
-					[format %6s $name]\
+					[format %9s $name]\
 					\"$section\"" brown
 				continue
 			}
@@ -1164,15 +1137,6 @@ proc RAG_Manager_construct_chunks {page frags} {
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
 		
-		if {([string length $content] == 0)} {
-			incr empty_content
-			if {$name != "center"} {
-				RAG_Manager_print "WARNING: Empty $name content\
-					\"[RAG_Manager_snippet $page $i_start]\""
-			}
-			continue
-		}
-
 		if {$match_prompts_only} {
 			set prompts [RAG_Manager_list_bodies $match "prompt"]
 			set prompts [join $prompts "\n"]
@@ -1186,7 +1150,6 @@ proc RAG_Manager_construct_chunks {page frags} {
 		}
 		if {$match == ""} {
 			if {!$page_chunk && !$chapter_chunk && !$section_chunk} {
-				incr empty_match
 				continue
 			}
 		}
@@ -1194,7 +1157,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		if {$config(verbose)} {
 			RAG_Manager_print "[format %7.0f $i_start]\
 				[format %7.0f $i_end]\
-				[format %6s $name]\
+				[format %9s $name]\
 				\"[RAG_Manager_snippet $content 0]\"" green	
 		}
 
@@ -1230,40 +1193,33 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"ul" -
 			"pre" {
 				if {$prev_name == "p"} {
-					if {$match != ""} {
-						lset chunks end 0 \
-							"[string trim [lindex $chunks end 0]\n\n$match]"
-					}
-					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
+					lset chunks end 0 \
+						"[string trim [lindex $chunks end 0]\n\n$match]"
+					lset chunks end 1 \
+						"[string trim [lindex $chunks end 1]\n\n$content]"
 				} else {
 					set append_chunk 1
 				}
 			}
 			
-			"equation" {
-				switch -- $prev_name {
-					"equation" {
-						if {$match != ""} {
-							set match \
-								"[string trim [lindex $chunks end 0]\n\n$match]"
-						}
-						set content "[lindex $chunks end 1]\n\n$content"
-						lset chunks end [list $match $content]
-					}
-					default {
-						set content_heading ""
-						set match_heading ""
-						set append_chunk 1
-					}
+			"equation" -
+			"script" {
+				if {[llength $chunks] > 0} {
+					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
+				} else {
+					set append_chunk 1
 				} 
+			}
+			
+			"form" {
+
 			}
 			
 			default {
 				switch -- $prev_name {
 					"equation" {
-						set match "$match"
-						set content "[lindex $chunks end 1]\n\n$content"
-						set chunks [lreplace $chunks end end [list $match $content]]
+						lset chunks end 0 "$match"
+						lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
 					}
 					default {
 						set append_chunk 1	
@@ -1309,11 +1265,8 @@ proc RAG_Manager_construct_chunks {page frags} {
 	
 	RAG_Manager_print "Final document title \"$document\"."
 	RAG_Manager_print "Generated [llength $chunks] chunks\
-		from [llength $frags] fragments,\
-		[expr $contaminated+$empty_match+$empty_content] rejects,\
-		$contaminated contaminated,\
-		$empty_match empty match,\
-		$empty_content empty content."
+		from [llength $frags] fragments\
+		with $contaminated contaminated fragments."
 	
 	return $chunks
 }
@@ -1929,15 +1882,15 @@ proc RAG_Manager_embed {} {
 	RAG_Manager_print "Embed Match Strings [RAG_Manager_time]" purple	
 	set info(library_loaded) 0
 
-	if {![file exists $config(key_file)]} {
-		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
+	if {![file exists $info(key_file)]} {
+		RAG_Manager_print "ERROR: Cannot find key file $info(key_file)."
 		set info(control) "Idle"
 		return ""
 	}
-	set f [open $config(key_file) r]
+	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $config(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\." brown
 
 	RAG_Manager_print "Building embedding vector library..."	
 	RAG_Manager_fetch_embeds $api_key
@@ -2365,15 +2318,15 @@ proc RAG_Manager_retrieve {} {
 	set info(control) "Retrieve"
 	RAG_Manager_print "Retrieval for $info(ip) [RAG_Manager_time]" purple
 	RAG_Manager_print "Question: $question"
-	if {![file exists $config(key_file)]} {
-		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
+	if {![file exists $info(key_file)]} {
+		RAG_Manager_print "ERROR: Cannot find key file $info(key_file)."
 		set info(control) "Idle"
 		return "ERROR"
 	}
-	set f [open $config(key_file) r]
+	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $config(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\." brown
 	
 	set chat_boundaries [regexp -all -inline -indices \
 		{\nQuestion: .*?(?=\nQuestion: |$)} \
@@ -2652,15 +2605,15 @@ proc RAG_Manager_submit {} {
 	RAG_Manager_print "Assistant prompt being submitted with this question:" brown
 	RAG_Manager_print "$prompt" green
 
-	if {![file exists $config(key_file)]} {
-		set answer "ERROR: Cannot find key file $config(key_file)."
+	if {![file exists $info(key_file)]} {
+		set answer "ERROR: Cannot find key file $info(key_file)."
 		set info(control) "Idle"
 		return $answer
 	}
-	set f [open $config(key_file) r]
+	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $config(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\." brown
 	
 	set size [string length $prompt]
 	foreach content $info(contents) {
