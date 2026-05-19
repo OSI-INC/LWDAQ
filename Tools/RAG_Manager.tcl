@@ -1488,6 +1488,7 @@ proc RAG_Manager_support {} {
 	LWDAQ_support
 	if {$info(abort)} {
 		set info(abort) 0
+		set info(control) "Idle"
 		return 0
 	} else {
 		return 1

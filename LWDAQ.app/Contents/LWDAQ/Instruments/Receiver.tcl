@@ -460,7 +460,7 @@ proc LWDAQ_reset_Receiver {} {
 		}
 		lwdaq_image_destroy $img
 		if {$info(receiver_type) == "?"} {
-			error "Failed to identify telemetry receiver."
+			error "Unknown receiver firmware version \"$fv\"."
 		}
 		
 		# For backward-compatibility with Octal Data Receivers (ODR, assembly
