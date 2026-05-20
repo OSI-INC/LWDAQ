@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "7.3"
+	LWDAQ_tool_init "RAG_Manager" "7.4"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Configure the file locations based upon the root.
@@ -1177,7 +1177,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		}
 		if {$section != "NONE"} {
 			append content_heading "%%%%Section: $section\n"
-			append match_heading ",$section section"
+			append match_heading ", $section section"
 		}
 		if {$match_heading != ""} {
 			append match_heading "."
