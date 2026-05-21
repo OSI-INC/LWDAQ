@@ -100,7 +100,7 @@ proc Neuroplayer_init {} {
 		-height $info(af_plot_height) 
 #
 # Here we specify names for the windows that open up when we click on the
-# voltage-time or amplitude-frequency plots.
+# value-time or amplitude-frequency plots.
 #
 	set info(vt_view) $info(window)\.vt_view_window
 	set info(af_view) $info(window)\.af_view_window
@@ -320,7 +320,7 @@ proc Neuroplayer_init {} {
 		20000 30000 40000 50000 60000 70000 80000 90000 100000"
 	set info(log_color) 11
 #
-# Here we provide a list of color codes we want to use for the voltage-
+# Here we provide a list of color codes we want to use for the value-
 # time and amplitude-frequency plots. The list specifies deviations from
 # the standard color table, giving an identifier and alternate color
 # number for any such change. There are times when you may wish
@@ -1883,7 +1883,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 }
 
 #
-# Neuroplayer_values extracts only the voltage values from the Neuroplayer
+# Neuroplayer_values extracts only the value values from the Neuroplayer
 # signal. If there are values missing, it adds values so that we have a power
 # of two number of values to pass to the fft later. If there are too many values,
 # we remove some until the number is correct.
@@ -6705,7 +6705,7 @@ proc Neuroplayer_draw_graphs {} {
 
 #
 # Neuroplayer_magnified_view opens a new window with a larger, or at lease
-# separate, plot of the voltage-time or amplitude-frequency graph. The size of
+# separate, plot of the value-time or amplitude-frequency graph. The size of
 # the window is set by the vt_view_zoom and af_view_zoom parameters.
 #
 proc Neuroplayer_magnified_view {figure} {
@@ -6719,7 +6719,7 @@ proc Neuroplayer_magnified_view {figure} {
 			return ""
 		}
 		toplevel $w
-		wm title $w "Voltage vs. Time Magnified View, Neuroplayer $info(version)"
+		wm title $w "Value vs. Time Magnified View, Neuroplayer $info(version)"
    		set info(vt_view_photo) [image create photo "_Neuroplayer_vt_view_photo_"]
    		set l $w.plot
    		label $l -image $info(vt_view_photo)
@@ -7089,7 +7089,7 @@ proc Neuroplayer_play {{command ""}} {
 	}
 
 	# If First or Last we find the first or last NDF file in the playback
-	# directory tree. We set the play time to zero and refresh the voltage and
+	# directory tree. We set the play time to zero and refresh the value and
 	# amplitude plots.
 	if {($info(play_control) == "First") || ($info(play_control) == "Last")} {
 		set play_list [LWDAQ_find_files $config(play_dir) *.ndf]

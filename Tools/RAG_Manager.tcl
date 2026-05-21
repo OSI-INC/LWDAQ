@@ -481,7 +481,7 @@ proc RAG_Manager_set_root {{rdn ""}} {
 	}
 	
 	if {![file exists $rdn]} {
-		RAG_Manager_print "ERROR: Directory \"$rdn\" does not exist."
+		RAG_Manager_print "ERROR: Root directory \"$rdn\" does not exist."
 		set info(control) "Idle"
 		return $config(root_dir)
 	}
@@ -2782,6 +2782,7 @@ proc RAG_Manager_open {} {
 
 RAG_Manager_init
 RAG_Manager_open
+RAG_Manager_set_root $RAG_Manager_config(root_dir)
 
 return ""
 
