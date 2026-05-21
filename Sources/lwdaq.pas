@@ -1399,7 +1399,7 @@ end;
 <tr><td>-replace value</td><td>If value is 1, delete the original image and replace with new image, default.</td></tr>
 <tr><td>-clear value</td><td>If value is 1, clear overlay of final image, default 0.</td></tr>
 <tr><td>-fill value</td><td>If value is 1, fill overlay of final image with white, default 0.</td></tr>
-<tr><td>-paint value</td><td>Paint the overlay within the analysis bounds with eight-bit color value, default 0.</td></tr>
+<tr><td>-paint value</td><td>Paint the overlay within the analysis bounds with eight-bit RGB color value, default 0.</td></tr>
 <tr><td>-bottom value</td><td>Set the bottom of the analysis bounds to value.</td></tr>
 <tr><td>-top value</td><td>Set the top of the analysis bounds to value.</td></tr>
 <tr><td>-left value</td><td>Set the left of the analysis bounds to value.</td></tr>
@@ -1410,7 +1410,7 @@ end;
 
 <p>With -replace 0, the manipulation creates a new image and returns its name. With -replace 1, the manipulation over-writes data in the old image and returns the old image name.</p>
 
-<p>The -paint option instructs lwdaq_image_manipulate to paint the entire area within the analysis bounds with the color given by <i>value</i>. This value should be a number between 0 and 255. The value 0 is for transparant. Other than the 0-value, the number will be treated like an eight-bit RGB code, with the top three bits for red, the middle three for green, and the bottom three for blue. Thus $E0 (hex E0) is red, $1C is green, and $03 is blue. Note that paint does not convert value into one of LWDAQ's standard graph-plotting colors, as defined in the color_from_integer routine of images.pas, and used in <a href="#lwdaq_graph">lwdaq_graph</a>.</p>
+<p>The -paint option instructs lwdaq_image_manipulate to paint the entire area within the analysis bounds with the color given by <i>value</i>. This value should be a number between 0 and 255. The value 0 is for transparant. Other than the 0-value, the number will be treated like an eight-bit RGB code, with the top three bits for red, the middle three for green, and the bottom three for blue. Thus $E0 (hex E0) is red, $1C is green, and $03 is blue.</p>
 
 <p>In addition to the pixel manipulations, we also have options to change other secondary properties of the image. The table above shows the available manipulation options, each of which is followed by a value in the command line, in the format ?option value?.</p>
 
@@ -1834,7 +1834,7 @@ lwdaq_bcam $img -num_spots 2 -threshold "10 #"
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-num_spots</td><td>The number of spots the analysis should find.</td></tr>
 <tr><td>-threshold</td><td>String specifying threshold intensity and spot size.</td></tr>
-<tr><td>-color</td><td>Color for spot outlining in overlay, default red.</td></tr>
+<tr><td>-color</td><td>Color code for spot outlining in overlay, default red.</td></tr>
 <tr><td>-pixel_size_um</td><td>Tells the analysis the pixel size (assumed square)</td></tr>
 <tr><td>-show_timinig</td><td>If 1, print timing report to gui text window.</td></tr>
 <tr><td>-show_pixels</td><td>If 1, mark pixels above threshold.</td></tr>
@@ -1889,7 +1889,8 @@ spot_increasing_xy=8;</pre>
 
 <p>With show_pixels=0, which is the default value, the routine draws red boxes around the spots. These boxes are of the same size as the spots, or a little bigger if the spots are small. If num_spots=1 and the number of pixels in the spot is greater than min_pixels_for_cross, the routine draws a cross centered on the spot instead of a box around it. When show_pxels=1, the routine marks all the pixels in each spot, so you can see the pixels that are above threshold and contiguous.</p>
 
-<p>The color we use to mark the image with the results of analysis is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
+<p>We specify the color we use to mark the image using an integer code that we later translate into
+a color. The mapping between the color code and actual colors is shown in <a href="https://www.opensourceinstruments.com/Electronics/A3018/HTML/Receiver_Activity.gif">here</a>.</p>
 }
 function lwdaq_bcam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2091,12 +2092,12 @@ begin
 	end;
 	case analysis_type of 
 		spot_use_ellipse,spot_use_ellipse_shadow:
-			spot_list_display_ellipses(ip,slp,color_from_integer(color));
+			spot_list_display_ellipses(ip,slp,pick_plot_color(color));
 		spot_use_vertical_stripe,
 		spot_use_vertical_shadow: begin
 			pp:=image_profile_row(ip);
 			display_profile_row(ip,pp,green_color);
-			spot_list_display_vertical_lines(ip,slp,color_from_integer(color));
+			spot_list_display_vertical_lines(ip,slp,pick_plot_color(color));
 		end;
 		spot_use_vertical_edge: begin
 			if not show_pixels then begin
@@ -2115,16 +2116,16 @@ begin
 			ref_line.b.j:=round(reference_um/pixel_size_um);
 			display_ccd_line(ip,ref_line,blue_color);	
 
-			spot_list_display_vertical_lines(ip,slp,color_from_integer(color));
+			spot_list_display_vertical_lines(ip,slp,pick_plot_color(color));
 		end;
 		otherwise begin
 			if num_spots>1 then 
-				spot_list_display_bounds(ip,slp,color_from_integer(color));
+				spot_list_display_bounds(ip,slp,pick_plot_color(color));
 			if num_spots=1 then 
 				if slp^.spots[1].num_pixels>=min_pixels_for_cross then
-					spot_list_display_crosses(ip,slp,color_from_integer(color))
+					spot_list_display_crosses(ip,slp,pick_plot_color(color))
 				else
-					spot_list_display_bounds(ip,slp,color_from_integer(color));
+					spot_list_display_bounds(ip,slp,pick_plot_color(color));
 		end;
 	end;
 {
@@ -2183,7 +2184,7 @@ end;
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-num_hits</td><td>The number of hits the analysis should find, default 0.</td></tr>
 <tr><td>-threshold</td><td>String specifying threshold intensity and hit size limits.</td></tr>
-<tr><td>-color</td><td>Color for hit outlining in overlay, default green.</td></tr>
+<tr><td>-color</td><td>Integer color code for hit outlining in overlay, default 0.</td></tr>
 <tr><td>-show_timinig</td><td>If 1, print timing report to gui text window, default 0.</td></tr>
 <tr><td>-show_pixels</td><td>If 1, mark pixels above threshold, default 0.</td></tr>
 <tr><td>-subtract_gradient</td><td>If 1, subtract the image gradient before finding hits, default 0.</td></tr>
@@ -2196,7 +2197,7 @@ end;
 
 <p>With subgract_gradient=0, the dosimeter analysis operates entirely upon the original image. But with subgract_gradient=1, the analysis obtains the intensity-slope with the original image, but then subtracts the average intensity gradient from the analysis bounds and continues with bright-pixel collection in the gradient-subtracted image.</p>
 
-<p>The color we use to outline bright pixels is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
+<p>We can specify the color we use to outline bright pixels with an integer code after the <i>-color</i> option. The default value for this code is zero, which selects red. The correspondance between color code and colors is shown <a href="https://www.opensourceinstruments.com/Electronics/A3018/HTML/Receiver_Activity.gif">here</a>.</p>
 
 <p>See the <a href="https://www.bndhep.net/Electronics/LWDAQ/Manual.html#Dosimeter">Dosimeter Instrument</a> Manual for more information about the option values.</p>
 }
@@ -2301,7 +2302,7 @@ begin
 	
 	mark_time('displaying positions','lwdaq_dosimeter');
 	if not show_pixels then clear_overlay(wip);
-	spot_list_display_bounds(wip,slp,color_from_integer(color));
+	spot_list_display_bounds(wip,slp,pick_plot_color(color));
 
 	mark_time('calculating stdev and density','lwdaq_dosimeter');
 	stdev:=image_amplitude(wip);
@@ -3329,7 +3330,7 @@ end;
 
 <p>The lwdaq_voltmeter routine calls lwdaq_A2057_voltmeter to analyze the samples in the image. The image results string must contain some information about the samples that will allow the analysis to parse the voltages into reference samples and signal samples. The results string will contain 5 numbers. The first two are the bottom and top reference voltages available on the LWDAQ device. In the case of the A2057 these are 0 V and 5 V, but they could be some other value on another device. The third number is the gain applied to the signal. The fourth number is the data acquisition redundancy factor, which is the number of samples recorded divided by the width of the image. Because we will use a software trigger, we want to give the routine a chance to find a trigger and still have enough samples to plot one per image column. Suppose the image contains 200 columns, then we might record 600 samples so that any trigger occuring in the first 400 samples will leave us with 200 samples after the trigger to plot on the screen. In this case, our redundancy factor is 3. The fifth number is the number of channels from which we have recorded.</p>
 
-<p>The result string "0.0 5.0 10 3 2" indicates 0 V and 5 V references, a gain of 10, a redundancy factor of 3 and two channels. The channels will be plotted with the usual LWDAQ <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">colors</a>, with the first channel being color zero.</p>
+<p>The result string "0.0 5.0 10 3 2" indicates 0 V and 5 V references, a gain of 10, a redundancy factor of 3 and two channels. The channels will be plotted with the LWDAQ <a href="https://www.opensourceinstruments.com/Electronics/A3018/HTML/Receiver_Activity.gif">plot colors</a>, with the first channel being color zero, which comes out as red.</p>
 
 <p>The analysis assumes the samples are recorded as sixteen-bit numbers taking up two bytes, with the most significant byte first (big-endian short integer). The first byte of the recorded signal should be the first pixel in the second row of the image, which is pixel (0,1). If <i>n</i> is the image width and <i>r</i> is the redundancy factory, the first <i>n</i> samples (therefore 2<i>n</i> bytes) are samples of the bottom reference voltage. After that come <i>nr</i> samples from each channel recorded (therefore 2<i>nr</i> bytes from each channel). Last of all are <i>n</i> samples from the top reference.</p>
 
@@ -4580,7 +4581,7 @@ begin
 
 	if glitch>0 then glitch_filter_y(gxy,glitch);
 
-	color:=byte_shift*(width-1)+color_from_integer(color);
+	color:=byte_shift*(width-1)+pick_plot_color(color);
 	shade:=byte_shift*(width-1)+color;	
 	
 	if ac_couple then begin
@@ -6340,19 +6341,21 @@ lwdaq spikes_x "0 0 0 0 2 9 1 0 0 7 0 7 0 9 0 0 0 0" 2 4
 	end
 	else if option='tkcolor' then begin
 {
-<p>Returns the Tk color that matches an internal lwdaq color value. The TK color is returned as a string of the form #RRGGBB, where R, G, and B are each hexadecimal digits specifying the intensity of red, blue, and green.</p>
+<p>Maps a color code to a Tk color in the same way we do with internal lwdaq plotting and drawing functions. The color code is an index that we assume corresponds to a channel number or a plot identifier. It is not itself an eight-bit RGB color value, but rather an integer we are supposed
+to use to pick an RGB value for so that we can draw or mark an image with a color associated with the color code. We take this code and translate it into an eight-bit RGB code in such a manner as to produce distinct RGB colors for sequential color codes. We then take this RGB code and translate it into a twenty-four bit RGB code using our overlay color palett. The TK color is returned as a string of the form #RRGGBB, where R, G, and B are each hexadecimal digits specifying the intensity of red, blue, and green. Now we can draw in Tk widgets the same color as our lwdaq routines plot for the same color codes.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' color_value".');
+				+'"lwdaq '+option+' color_code".');
 			exit;
 		end;
-		color:=color_from_integer(Tcl_ObjInteger(argv[2]));
-		writestr(result,'#',
-			string_from_decimal(overlay_color_palette[color].red,16,2),
-			string_from_decimal(overlay_color_palette[color].green,16,2),
-			string_from_decimal(overlay_color_palette[color].blue,16,2));
+		color:=pick_plot_color(Tcl_ObjInteger(argv[2]));
+		with overlay_color_palette[color] do
+			writestr(result,'#',
+				string_from_decimal(red,16,2),
+				string_from_decimal(green,16,2),
+				string_from_decimal(blue,16,2));
 		Tcl_SetReturnString(interp,result);
 	end 
 {

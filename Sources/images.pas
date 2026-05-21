@@ -1,7 +1,7 @@
 {
 	Routines for Image Handling
 	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-	Copyright (C) 2022-2024 Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2022-2026 Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
@@ -60,9 +60,6 @@ const {named overlay colors}
 	salmon_color=242;
 	clear_color=254;
 	white_color=255;
-
-const {for four-byte screen pixels}
-	opaque_alpha=max_byte;
 
 const {for array sizes}
 	max_num_image_pixels=10000000;
@@ -152,7 +149,7 @@ function image_median(ip:image_ptr_type):real;
 function image_maximum(ip:image_ptr_type):real;
 function image_minimum(ip:image_ptr_type):real;
 function image_sum(ip:image_ptr_type; threshold:integer):integer;
-function color_from_integer(i:integer):integer;
+function pick_plot_color(code:integer):integer;
 procedure spread_overlay(ip:image_ptr_type;spread:integer);
 procedure paint_overlay_bounds(ip:image_ptr_type;color:integer);
 function new_image(height,width:integer):image_ptr_type;
@@ -169,8 +166,11 @@ const {for overlay colors}
 	red_mask=$E0;
 	green_mask=$1C;
 	blue_mask=$03;
-	max_brightness=600;
+	max_brightness=220;
 	brightness_downshift=113;
+	green_weight=0.59;
+	red_weight=0.30;
+	blue_weight=0.11;
 
 var
 	image_color_table:drawing_space_color_table_type;
@@ -206,7 +206,9 @@ end;
 {
 	set_ov sets the i'th pixel in the j'th row of the overlay of an image to
 	value. We take only the lowest byte of the value we pass in, and use this
-	byte for our color.
+	byte for our color. The overlay pixels are eight-bit RGB colors. The top
+	three bits are the red intensity, the middle three bits are the green
+	intensity, and the bottom two bits are the blue intensity.
 }
 procedure set_ov(ip:image_ptr_type;j,i:integer;value:integer);
 begin
@@ -416,7 +418,9 @@ begin
 end;
 
 {
-	paint_overlay fills an image's overlay with the specified color.
+	paint_overlay fills an image's overlay with the specified color. The color is 
+	an eight-bit RGB value with the top three bits for red, the middle three bits
+	for green, and the bottom two bits for the blue intensity.
 }
 procedure paint_overlay(ip:image_ptr_type;color:integer);
 var i,j:integer;
@@ -445,7 +449,9 @@ end;
 
 {
 	paint_overlay_bounds fills an image's overlay with the specified color
-	within its analysis bounds.
+	within its analysis bounds. The color take the form of an eight-bit color
+	value, where the top three bits are the red intensity, the middle three are
+	green intensity, and the bottom two are blue intensity.
 }
 procedure paint_overlay_bounds(ip:image_ptr_type;color:integer);
 var i,j:integer;
@@ -491,19 +497,23 @@ begin
 end;
 
 {
-	color_from_integer takes an integer and returns an index into the overlay
-	color palette in such a way that neighboring integers almost always have
-	distinct colors. The color palette contains only max_byte entries, and we
-	want to avoid the colors clear_color and white_color for plotting on a white
-	background. The color palette itself is designed for plotting on a white
-	background. The brightest colors in the complete max_byte palette have been
-	dimmed so they will be useful for plotting. The first num_def_colors are a
-	fixed sequence so that they will be predictable and consistent from one
-	version of the palette to the next. Outside these initial colors, we reserve
-	the option of adjusting the remaining colors if we believe we can improve
-	their visibility on white backgrounds.
+	pick_plot_color takes a color code and returns a color suitable for plotting
+	on a white background. The color it returns takes the form of an eight-bit
+	RGB code. We will later use this RGB code to look up a value in our overlay
+	color palette, which is a table of twenty-four bit RGB codes. If we plot
+	graphs with sequential identifiers, we want their colors to be distinct. The
+	pick_plot_color procedure takes sequential color codes and returns distinct
+	eight-bit RGB codes. Later, when we use these eight-bit RGB codes to look up
+	a twenty-four bnit RGB code using the overlay color palette, we will perform
+	some further manipulations that ensure the color we select is not so bright
+	that it cannot be seen on a white background. The first num_def_colors are a
+	fixed sequence of colors for plot indeces and channle numbers, so that they
+	will be predictable and consistent from one version of the palette to the
+	next. Outside these initial colors, we reserve the option of adjusting the
+	remaining colors if we believe we can improve their visibility on white
+	backgrounds.
 }
-function color_from_integer(i:integer):integer;
+function pick_plot_color(code:integer):integer;
 
 const
 	num_def_colors=18;
@@ -518,9 +528,11 @@ var
 	c:integer;
 	
 begin
-	if (i>=0) and (i<num_def_colors) then c:=colors[i]
-	else c:= (i*prime) mod clear_color;
-	color_from_integer:=c;
+	if (code>=0) and (code<num_def_colors) then 
+		c:=colors[code]
+	else 
+		c:=(code*prime) mod clear_color;
+	pick_plot_color:=c;
 end;
 
 {
@@ -748,7 +760,7 @@ end;
 {
 	draw_overlay_pixel colors a pixel from ij space into the image overlay,
 	provided the pixel lies between the image analysis boundries in ij
-	space.
+	space. The color is an eight-bit RGB value.
 }
 procedure draw_overlay_pixel(ip:image_ptr_type;pixel:ij_point_type;color:integer);
 	
@@ -765,8 +777,9 @@ end;
 	specified color, and clips it to the analysis bounds. The routine takes a
 	line with real-valued coordinates so as to avoid rounding errors in the
 	start and end of the line it draws. The "color" parameter specifies not only
-	the color of the line but also its width. Byte zero is the color, byte one
-	is the width minus one. We reserve bytes two and three for future use. 
+	the color of the line but also its width. Byte zero is the color, specified
+	as an eight bit RGB value, and byte one is the width minus one. We reserve
+	bytes two and three for future use. 
 }
 procedure draw_overlay_xy_line(ip:image_ptr_type;line:xy_line_type;
 	color:integer);
@@ -1231,7 +1244,7 @@ begin
 			red:=gamma_corrected_shade;
 			green:=gamma_corrected_shade;
 			blue:=gamma_corrected_shade;
-			alpha:=opaque_alpha;
+			alpha:=max_byte;
 		end;
 	end;
 	
@@ -1333,7 +1346,7 @@ begin
 			if shade<black_intensity then shade:=black_intensity;
 			blue:=shade;
 
-			alpha:=opaque_alpha;
+			alpha:=max_byte;
 		end;
 	end;
 		
@@ -1373,7 +1386,7 @@ begin
 							+get_px(ip,j+1,i-1)
 							+get_px(ip,j-1,i+1)
 							+get_px(ip,j-1,i-1)))].blue;
-						d_ptr^.alpha:=opaque_alpha;
+						d_ptr^.alpha:=max_byte;
 					end else begin
 						{Green Pixels On Even-Numbered Rows}
 						d_ptr^.red:=image_color_table[round(one_half*
@@ -1383,7 +1396,7 @@ begin
 						d_ptr^.blue:=image_color_table[round(one_half*
 							(get_px(ip,j+1,i)
 							+get_px(ip,j-1,i)))].blue;
-						d_ptr^.alpha:=opaque_alpha;
+						d_ptr^.alpha:=max_byte;
 					end;
 				end else begin
 					if not odd(i) then begin
@@ -1395,7 +1408,7 @@ begin
 						d_ptr^.blue:=image_color_table[round(one_half*
 							(get_px(ip,j,i+1)
 							+get_px(ip,j,i-1)))].blue;
-						d_ptr^.alpha:=opaque_alpha;
+						d_ptr^.alpha:=max_byte;
 					end else begin
 						{Blue Pixels on Odd-Numbered Rows}
 						d_ptr^.red:=image_color_table[round(one_quarter*
@@ -1409,7 +1422,7 @@ begin
 							+get_px(ip,j+1,i)
 							+get_px(ip,j-1,i)))].green;
 						d_ptr^.blue:=image_color_table[get_px(ip,j,i)].blue;
-						d_ptr^.alpha:=opaque_alpha;
+						d_ptr^.alpha:=max_byte;
 					end;
 				end;
 			end else d_ptr^:=overlay_color_palette[get_ov(ip,j,i)];
@@ -1509,7 +1522,7 @@ begin
 			if shade<black_intensity then shade:=black_intensity;
 			blue:=shade;
 
-			alpha:=opaque_alpha;
+			alpha:=max_byte;
 		end;
 	end;
 		
@@ -1548,7 +1561,7 @@ begin
 							+get_px(ip,j+1,i-1)
 							+get_px(ip,j-1,i+1)
 							+get_px(ip,j-1,i-1)))].blue;
-						d_ptr^.alpha:=opaque_alpha;
+						d_ptr^.alpha:=max_byte;
 					end else begin
 						{Green Pixels On Odd-Numbered Rows}
 						d_ptr^.red:=image_color_table[round(one_half*
@@ -1558,7 +1571,7 @@ begin
 						d_ptr^.blue:=image_color_table[round(one_half*
 							(get_px(ip,j+1,i)
 							+get_px(ip,j-1,i)))].blue;
-						d_ptr^.alpha:=opaque_alpha;
+						d_ptr^.alpha:=max_byte;
 					end;
 				end else begin
 					if not odd(i) then begin
@@ -1570,7 +1583,7 @@ begin
 						d_ptr^.blue:=image_color_table[round(one_half*
 							(get_px(ip,j,i+1)
 							+get_px(ip,j,i-1)))].blue;
-						d_ptr^.alpha:=opaque_alpha;
+						d_ptr^.alpha:=max_byte;
 					end else begin
 						{Blue Pixels on Even-Numbered Rows}
 						d_ptr^.red:=image_color_table[round(one_quarter*
@@ -1584,7 +1597,7 @@ begin
 							+get_px(ip,j+1,i)
 							+get_px(ip,j-1,i)))].green;
 						d_ptr^.blue:=image_color_table[get_px(ip,j,i)].blue;
-						d_ptr^.alpha:=opaque_alpha;
+						d_ptr^.alpha:=max_byte;
 					end;
 				end;
 			end else d_ptr^:=overlay_color_palette[get_ov(ip,j,i)];
@@ -1634,22 +1647,36 @@ end;
 }
 initialization 
 
+
+{
+	The overlay color palette translates eight-bit RGB values into twenty-four
+	bit RGB values. The transformation is done in such a way that we stop the
+	transformed color from being so bright that it cannot be seen on a white
+	background, because we want to be able to use all colors for plotting
+	indexed data. So we do not always get exactly the same twenty-four bit color
+	as eight-bit color. Some of the raw eight-bit colors are too close to white
+	to be seen. If we use the index of the color palette directly, we obtain a
+	sequence of colors arranged by hue. When we plot graphs on a white
+	background, we prefer to have the plots be assigned distinct colors, so
+	before selecting a color from the palette, we take the plot index and run it
+	through our pick_plot_color routine to obtain a likely overlay color.
+}
 with overlay_color_palette[0] do begin
 	red:=0;
 	green:=0;
 	blue:=0;
-	alpha:=opaque_alpha;
+	alpha:=max_byte;
 end;
 for color_index:=1 to max_byte-1 do begin
 	with overlay_color_palette[color_index] do begin
 		red:=round(max_byte * (color_index and red_mask) / red_mask);
 		green:=round(max_byte * (color_index and green_mask) / green_mask);
 		blue:=round(max_byte * (color_index and blue_mask) / blue_mask);
-		alpha:=opaque_alpha;
-		if (red+green+blue) > max_brightness then begin
-			if blue>brightness_downshift then blue:=blue-brightness_downshift;
-			if red>brightness_downshift then red:=red-brightness_downshift;
-			if green>brightness_downshift then green:=green-brightness_downshift;
+		alpha:=max_byte;
+		if (red*red_weight+green*green_weight+blue*blue_weight) > max_brightness then begin
+			blue:=round(blue*max_brightness/max_byte);
+			green:=round(green*max_brightness/max_byte);
+			red:=round(red*max_brightness/max_byte);
 		end;		
 	end;
 end;
@@ -1657,7 +1684,7 @@ with overlay_color_palette[max_byte] do begin
 	red:=max_byte;
 	green:=max_byte;
 	blue:=max_byte;
-	alpha:=opaque_alpha;
+	alpha:=max_byte;
 end;
 
 for image_index:=0 to length(master_image_list)-1 do begin
