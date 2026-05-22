@@ -24,7 +24,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "7.4"
+	LWDAQ_tool_init "RAG_Manager" "7.5"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Configure the file locations based upon the root.
@@ -543,6 +543,26 @@ proc RAG_Manager_configure {} {
 }
 
 #
+# RAG_Manager_support calls the LWDAQ support routine to maintain background and
+# graphics processes, and also checks the global abort flag. If this flag is checked,
+# the routine returns a zero, otherwise it returns a one. All long-running RAG Manager 
+# processes should call this routine regularly and abort and return when they see
+# a zero. The support routine clears the abort flag.
+#
+proc RAG_Manager_support {} {
+	upvar #0 RAG_Manager_info info
+	
+	LWDAQ_support
+	if {$info(abort)} {
+		set info(abort) 0
+		set info(control) "Idle"
+		return 0
+	} else {
+		return 1
+	}
+}
+
+#
 # RAG_Manager_read_url fetches the source html code at a url and returns it as a
 # single text string. The routine uses the config(userpass) parameter to send a
 # username and password to the source. If the the source requires
@@ -880,7 +900,6 @@ proc RAG_Manager_catalog_frags {page} {
 	foreach {tag} $info(frag_tags) {
 		set index 0
 		while {$index < [string length $page]} {
-			LWDAQ_support
 			set indices [RAG_Manager_locate_field $page $index $tag]
 			scan $indices %d%d%d%d i_body_begin i_body_end i_field_begin i_field_end
 			if {$i_body_end > $i_body_begin} {
@@ -888,6 +907,9 @@ proc RAG_Manager_catalog_frags {page} {
 				lappend catalog $descriptor
 			}
 			set index [expr $i_field_end + 1]
+			if {![RAG_Manager_support]} {
+				return ""
+			}
 		}
 	}
 	
@@ -1261,6 +1283,10 @@ proc RAG_Manager_construct_chunks {page frags} {
 		}
 		
 		set prev_name $name
+		
+		if {![RAG_Manager_support]} {
+			return ""
+		}
 	}
 	
 	RAG_Manager_print "Final document title \"$document\"."
@@ -1473,26 +1499,6 @@ proc RAG_Manager_chunk_page {url} {
 	RAG_Manager_print "Chunk list complete." 
 
 	return $chunks
-}
-
-#
-# RAG_Manager_support calls the LWDAQ support routine to maintain background and
-# graphics processes, and also checks the global abort flag. If this flag is checked,
-# the routine returns a zero, otherwise it returns a one. All long-running RAG Manager 
-# processes should call this routine regularly and abort and return when they see
-# a zero. The support routine clears the abort flag.
-#
-proc RAG_Manager_support {} {
-	upvar #0 RAG_Manager_info info
-	
-	LWDAQ_support
-	if {$info(abort)} {
-		set info(abort) 0
-		set info(control) "Idle"
-		return 0
-	} else {
-		return 1
-	}
 }
 
 #
