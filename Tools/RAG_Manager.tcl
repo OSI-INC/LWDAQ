@@ -166,6 +166,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(low_rel_chat_words) "3000"
 	set config(max_question_words) "1000"
 	set config(embed_model) "text-embedding-3-small"
+	set config(summarize_model) "gpt-4o-mini"
 #
 # Behavior of the chat handler.
 #
@@ -214,6 +215,66 @@ When answering the user's question:
   - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
   - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
+	}	
+	
+	set config(summarize_prompt) {
+ou are generating retrieval metadata for a fantasy role-playing campaign historian chatbot.
+
+Your output will be embedded for semantic search and used to retrieve full diary chapters.
+
+The output is NOT intended for human reading as prose literature.
+The output IS intended to maximize retrieval accuracy for:
+- character names
+- locations
+- organizations and groups
+- events
+- relationships
+- conflicts
+- recurring topics
+- memorable incidents
+
+Write compactly and densely.
+Prefer factual phrasing over literary narration.
+Do not omit named entities.
+Do not explain or analyze themes.
+Do not speculate.
+Do not invent information.
+
+Output EXACTLY the following markdown structure and headings:
+
+Summary:
+<One compact paragraph of 80-250 words summarizing the chapter's major events, interactions, conflicts, discoveries, movements, and outcomes. Mention all major named characters, locations, groups, and important events naturally in the prose. Maximize semantic density.>
+
+Characters:
+ - <character>
+ - <character>
+
+Locations:
+ - <location>
+ - <location>
+
+Groups:
+ - <group or faction>
+ - <group or faction>
+
+Topics:
+ - <important topic>
+ - <important topic>
+
+Rules:
+- Preserve exact spelling of names and places from the source text.
+- Include all characters who speak, travel, fight, investigate, negotiate, perform, lead, betray, assist, or otherwise significantly participate.
+- Include inns, cities, regions, forests, buildings, landmarks, and destinations in Locations.
+- Include bands, factions, military units, tribes, guilds, tavern groups, cults, performing troupes, and other named collectives in Groups.
+- Topics should be short noun phrases, not sentences.
+- Do not include dates.
+- Do not include Page or Chapter titles.
+- Do not include explanations outside the required structure.
+- Avoid duplicate entries.
+- Keep Topics semantically broad enough to match user questions, but specific enough to distinguish this chapter from nearby chapters.
+	}	
+	set config(summarize_question) {
+Provide a summary in accordance with your instructions.	
 	}	
 #
 # When debugging the manager's formatting of the answers it gets from the end-points, 
@@ -540,26 +601,6 @@ proc RAG_Manager_configure {} {
 	}
 		
 	return ""
-}
-
-#
-# RAG_Manager_support calls the LWDAQ support routine to maintain background and
-# graphics processes, and also checks the global abort flag. If this flag is checked,
-# the routine returns a zero, otherwise it returns a one. All long-running RAG Manager 
-# processes should call this routine regularly and abort and return when they see
-# a zero. The support routine clears the abort flag.
-#
-proc RAG_Manager_support {} {
-	upvar #0 RAG_Manager_info info
-	
-	LWDAQ_support
-	if {$info(abort)} {
-		set info(abort) 0
-		set info(control) "Idle"
-		return 0
-	} else {
-		return 1
-	}
 }
 
 #
@@ -907,9 +948,13 @@ proc RAG_Manager_catalog_frags {page} {
 				lappend catalog $descriptor
 			}
 			set index [expr $i_field_end + 1]
-			if {![RAG_Manager_support]} {
+			
+			LWDAQ_support
+			if {$info(abort)} {
+				set info(abort) 0
+				set info(control) "Idle"
 				return ""
-			}
+			} 
 		}
 	}
 	
@@ -993,6 +1038,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 	set section_chunk 0
 	set match_prompts_only 0
 	set omit_lists 0
+	set summary_match 0
 	set commands [RAG_Manager_list_bodies $page "rag"]
 	foreach cmd $commands {
 		switch -- $cmd {
@@ -1011,6 +1057,9 @@ proc RAG_Manager_construct_chunks {page frags} {
 			}
 			"omit-lists" {
 				set omit_lists 1
+			}
+			"summary-match" {
+				set summary_match 1
 			}
 			default {
 				RAG_Manager_print "WARNING: Unrecognised directive \"$cmd\""
@@ -1185,6 +1234,9 @@ proc RAG_Manager_construct_chunks {page frags} {
 
 		set content_heading ""
 		set match_heading ""
+		if {$summary_match} {
+			append match_heading "%%%%Summarize\n"
+		}
 		append content_heading "%%%%Document: $document\n"
 		if {[regexp \
 				{Manual$|Guide$|^Guide|Tutorial$|Protocol$|Reference$|Overview$} \
@@ -1284,9 +1336,12 @@ proc RAG_Manager_construct_chunks {page frags} {
 		
 		set prev_name $name
 		
-		if {![RAG_Manager_support]} {
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
 			return ""
-		}
+		} 
 	}
 	
 	RAG_Manager_print "Final document title \"$document\"."
@@ -1441,6 +1496,57 @@ proc RAG_Manager_chapter_urls {chunks base_url} {
 }
 
 #
+# RAG_Manager_summarize_matches
+#
+proc RAG_Manager_summarize_matches {chunks} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	set api_key ""
+	set new_chunks [list]
+	foreach chunk $chunks {
+		set match [lindex $chunk 0]
+		set content [lindex $chunk 1]
+		if {[regexp {%%%%Summarize\n} $match]} {
+			set match [regsub {%%%%Summarize\n} $match ""]
+			RAG_Manager_print "Summarizing [string length $match] words using\
+				$config(summarize_model)..." brown
+			if {$api_key == ""} {
+				set f [open $info(key_file) r]
+				set api_key [read $f]
+				close $f 
+			}
+			set json [RAG_Manager_get_answer \
+				$config(summarize_model) \
+				$config(summarize_prompt) \
+				[list $match] \
+				$config(summarize_question) \
+				$api_key]
+			if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $json -> answer]} {
+				set s $answer
+				regsub -all {\\r\\n|\\r|\\n} $s "\n" s
+				regsub -all {\\"} $s {"} s
+				RAG_Manager_print "$s" green
+				set match $s
+			} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $json -> message]} {
+				set answer "ERROR: $message"
+			} else {
+				set answer "ERROR: Could not find answer or error message in result."
+			}
+		} 
+		lappend new_chunks [list $match $content]
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
+	}
+	return $new_chunks
+}
+
+
+#
 # RAG_Manager_convert_entities converts html entities in a page to unicode
 # characters and returns the converted page. It also replaces tabs with
 # double-spaces. The list of entities to convert is in entitylist. Each element
@@ -1496,6 +1602,10 @@ proc RAG_Manager_chunk_page {url} {
 	
 	RAG_Manager_print "Inserting chapter urls in all chunks..." 
 	set chunks [RAG_Manager_chapter_urls $chunks $url]
+	
+	RAG_Manager_print "Summarizing match strings where requested..."
+	set chunks [RAG_Manager_summarize_matches $chunks]
+	
 	RAG_Manager_print "Chunk list complete." 
 
 	return $chunks
@@ -1570,10 +1680,12 @@ proc RAG_Manager_store_chunks {chunks} {
 			}
 		}
 		
-		if {![RAG_Manager_support]} {
-			RAG_Manager_print "Aborting in response to abort flag."
-			break
-		}
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return 0
+		} 
 	}
 	RAG_Manager_print "Stored $count chunks, of which $duplicates duplicates,\
 		yielding [expr $count - $duplicates] chunks on disk." 
@@ -1700,10 +1812,12 @@ proc RAG_Manager_fetch_embeds {api_key} {
 				}
 			}
 		} 
-		if {![RAG_Manager_support]} {
-			RAG_Manager_print "Aborting in response to abort flag."
-			return
-		}
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return 0
+		} 
 	}
 
 	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
@@ -1795,10 +1909,12 @@ proc RAG_Manager_delete {} {
 	foreach cfn $cfl {
 		file delete $cfn
 		incr count
-		if {![RAG_Manager_support]} {
-			RAG_Manager_print "Aborting in response to abort flag."
-			return
-		}
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
 	}
 	RAG_Manager_print "Deleted $count content strings."
 
@@ -1808,10 +1924,12 @@ proc RAG_Manager_delete {} {
 	foreach mfn $mfl {
 		file delete $mfn
 		incr count
-		if {![RAG_Manager_support]} {
-			RAG_Manager_print "Aborting in response to abort flag."
-			return
-		}
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
 	}
 	RAG_Manager_print "Deleted $count match strings."
 
@@ -1840,10 +1958,12 @@ proc RAG_Manager_chunk {} {
 		if {[llength $new_chunks] > 0} {
 			set chunks [concat $chunks $new_chunks]
 		}
-		if {![RAG_Manager_support]} {
-			RAG_Manager_print "Aborting in response to abort flag."
-			return
-		}
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return 0
+		} 
 	}
 	
 	if {[file exists $info(dump_file)]} {file delete $info(dump_file)}
@@ -1860,10 +1980,12 @@ proc RAG_Manager_chunk {} {
 			LWDAQ_print $info(dump_file) [lindex $chunk 1]
 			LWDAQ_print $info(dump_file) \
 				"----------- END ------------\n"
-			if {![RAG_Manager_support]} {
-				RAG_Manager_print "Aborting in response to abort flag."
-				return
-			}
+			LWDAQ_support
+			if {$info(abort)} {
+				set info(abort) 0
+				set info(control) "Idle"
+				return 0
+			} 
 		}
 		RAG_Manager_print "Dump file complete." 
 	}
@@ -2735,11 +2857,15 @@ proc RAG_Manager_open {} {
 		pack $f.$b -side left -expand yes
 	}
 
-	foreach a {Abort} {
-		set b [string tolower $a]
-		button $f.$b -text "$a" -command "set RAG_Manager_info(abort) 1"
-		pack $f.$b -side left -expand yes
+	button $f.abort -text "Abort" -command {
+		if {$RAG_Manager_info(control) != "Idle"} {
+			RAG_Manager_print "WARNING: Abort requested, exiting current tasks."
+			set RAG_Manager_info(abort) 1
+		} else {
+			RAG_Manager_print "ERROR: Cannot abort when idle."
+		}
 	}
+	pack $f.abort -side left -expand yes
 	
 	set f [frame $w.more]
 	pack $f -side top -fill x
