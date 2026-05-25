@@ -1074,7 +1074,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 	RAG_Manager_print "Generation rules:\
 		page_chunk=$page_chunk,\
 		chapter_chunk=$chapter_chunk,\
-		section-chunk=$section_chunk,\n\
+		\nsection-chunk=$section_chunk,\
 		match-prompts-only=$match_prompts_only,\
 		omit-lists=$omit_lists."
 	
