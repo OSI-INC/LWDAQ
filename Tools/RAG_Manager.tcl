@@ -540,8 +540,9 @@ proc RAG_Manager_edit_param {pname} {
 
 #
 # RAG_Manager_set_root takes a directory name as input and calculates all the
-# file names for RAG management. If the rood directory name is empty, the routine
-# opens a browser for the user to select a directory.
+# file names for RAG management. If the root directory does not exist, the
+# routine aborts peacefully. If the root directory does exist, the routine 
+# ensures that the required subdirectories are present.
 #
 proc RAG_Manager_set_root {{rdn ""}} {
 	upvar #0 RAG_Manager_config config
@@ -557,10 +558,9 @@ proc RAG_Manager_set_root {{rdn ""}} {
 		RAG_Manager_print "Selected directory \"$rdn\"."
 	}
 	if {![file exists $rdn]} {
-		error "Root directory \"$rdn\" does not exist."
+		return $config(root_dir)
 	}	
-	set config(root_dir) $rdn
-
+	
 	foreach sdn {Content Match Embed Log} {
 		set sdn [file join $config(root_dir) $sdn]
 		if {![file exists $sdn]} {
