@@ -1,22 +1,29 @@
 # Retrieval-Assisted Generation Manager, a LWDAQ Tool.
 #
-# Copyright (C) 2025 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2025-2026 Kevan Hashemi, Open Source Instruments Inc.
+#
+# The RAG Manager provides Retrieval Access Generation (RAG) for a Chatbot.
+#
 
-# RAG Check provides an interface for our Retrieval Access Generation (RAG)
-# routines, provided by our RAG package.
-
+#
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
+#
 
+#
+# RAG_Manager_init initializes the RAG Manager. Towards the end, it looks for an
+# attempts to execute any saved settings file. Any code that modifies the RAG
+# Manager parameters should be executed after the initialization has completed.
+#
 proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
@@ -24,10 +31,14 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "7.5"
+	LWDAQ_tool_init "RAG_Manager" "8.1"
 	if {[winfo exists $info(window)]} {return ""}
 #
-# Configure the file locations based upon the root.
+# Set the default directory root for the RAG library and initialize file names.
+# If we change the root directory, we must set all these file names again,
+# either with our own configuration code after opening the RAG Manager, or by
+# calling RAG_Manager_set_root and passing in the new value for the root
+# directory.
 #
 	set config(root_dir) "~/Active/RAG/OSI"
 	set info(key_file) [file join $config(root_dir) "Key.txt"]
@@ -38,11 +49,11 @@ proc RAG_Manager_init {} {
 	set info(signal_file) [file join $info(log_dir) "signal.txt"]
 	set info(offline_file) [file join $info(log_dir) "offline.txt"]
 	set info(dump_file) [file join $info(log_dir) "dump.txt"]
+	set info(summary_file) [file join $info(log_dir) "summary.txt"]
 #
 # The default question.
 #
-	set config(question) "What is the minimum mass of SCT that can record EEG\
-		with bandwidth 80 Hz for three weeks?"
+	set config(question) "How do you set up one of OSI's telemetry systems?"
 #
 # Internal flags, lists, and control variables.
 #
@@ -69,8 +80,10 @@ proc RAG_Manager_init {} {
 	set config(verbose) "0"
 	set config(dump) "0"
 	set config(show_match) "0"
+	set config(show_content_len) "300"
 	set config(snippet_len) "45"
 	set config(progress_frac) "0.1"
+	set config(log_summaries) "1"
 #
 # The source documents. Can be edited with a dedicated window and saved to
 # settings file.
@@ -166,11 +179,15 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(low_rel_chat_words) "3000"
 	set config(max_question_words) "1000"
 	set config(embed_model) "text-embedding-3-small"
-	set config(summarize_model) "gpt-4o-mini"
+	set config(summarize_model) "gpt-5.4-mini"
+	set config(completion_endpoint) "https://api.openai.com/v1/chat/completions"
+	set config(embedding_endpoint) "https://api.openai.com/v1/embeddings"
 #
 # Behavior of the chat handler.
 #
 	set config(answer_timeout_s) "60" 
+	set config(timeout_message) "Hello? Oh dear, I lost my train of thought.\
+		I do apologise. It happens sometimes. Please ask your question again."
 	set config(offline_min) "4"
 #
 # Completion assistant instructions for the three tiers of relevance. Can be
@@ -522,57 +539,45 @@ proc RAG_Manager_edit_param {pname} {
 }
 
 #
-# RAG_Manager_set_root takes a directory name as input. If this name is an empty
-# string or omitted, it opens a browser window to allow us to pick a directory
-# to act as the RAG Manager's root directory. If this directory contains the
-# Content, Match, Embed, and Log directories, so much the better, but if not,
-# this procedure will create them. The procedure returns the current root
-# directory, whether it has been changed or not.
+# RAG_Manager_set_root takes a directory name as input and calculates all the
+# file names for RAG management. If the rood directory name is empty, the routine
+# opens a browser for the user to select a directory.
 #
 proc RAG_Manager_set_root {{rdn ""}} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
-	if {$info(control) != "Idle"} {return ""}
-	set info(control) "Root_Dir"
-	RAG_Manager_print "Choosing Root Directory [RAG_Manager_time]" purple
-
 	if {$rdn == ""} {
+		RAG_Manager_print "Selecting Root Directory" purple
 		set rdn [LWDAQ_get_dir_name $config(root_dir)]
-	}
-	
-	if {![file exists $rdn]} {
-		RAG_Manager_print "ERROR: Root directory \"$rdn\" does not exist."
-		set info(control) "Idle"
-		return $config(root_dir)
-	}
-	
-	set config(root_dir) $rdn
-	RAG_Manager_print "Root Directory: $rdn"
-	if {[catch {
-		foreach sdn {Content Match Embed Log} {
-			set sdn [file join $config(root_dir) $sdn]
-			if {[file exists $sdn]} {
-				RAG_Manager_print "Found $sdn"
-			} else {
-				file mkdir $sdn
-				RAG_Manager_print "Created $sdn"
-			}
+		if {$rdn == ""} {
+			RAG_Manager_print "No new root directory selected."
+			return $config(root_dir)
 		}
-	} error_message]} {
-		RAG_Manager_print "ERROR: $error_message"
-		set info(control) "Idle"
-		return $rdn
+		RAG_Manager_print "Selected directory \"$rdn\"."
+	}
+	if {![file exists $rdn]} {
+		error "Root directory \"$rdn\" does not exist."
+	}	
+	set config(root_dir) $rdn
+
+	foreach sdn {Content Match Embed Log} {
+		set sdn [file join $config(root_dir) $sdn]
+		if {![file exists $sdn]} {
+			file mkdir $sdn
+		}
 	}
 	
+	set info(key_file) [file join $config(root_dir) "Key.txt"]
 	set info(content_dir) [file join $config(root_dir) "Content"]
 	set info(match_dir) [file join $config(root_dir) "Match"]
 	set info(embed_dir) [file join $config(root_dir) "Embed"]
 	set info(log_dir) [file join $config(root_dir) "Log"]
-	set info(key_file) [file join $config(root_dir) "Key.txt"]
+	set info(signal_file) [file join $info(log_dir) "signal.txt"]
+	set info(offline_file) [file join $info(log_dir) "offline.txt"]
+	set info(dump_file) [file join $info(log_dir) "dump.txt"]
+	set info(summary_file) [file join $info(log_dir) "summary.txt"]
 
-	RAG_Manager_print "New root directory established [RAG_Manager_time]" purple
-	set info(control) "Idle"
 	return $rdn
 }
 
@@ -1069,7 +1074,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 	RAG_Manager_print "Generation rules:\
 		page_chunk=$page_chunk,\
 		chapter_chunk=$chapter_chunk,\
-		section-chunk=$section_chunk,\
+		section-chunk=$section_chunk,\n\
 		match-prompts-only=$match_prompts_only,\
 		omit-lists=$omit_lists."
 	
@@ -1132,6 +1137,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 					set match "$caption"
 					set name "video"
 				} else {
+					if {$caption == ""} {continue}
 					set content "$caption"
 					set match "$caption"
 					set name "center"
@@ -1509,8 +1515,11 @@ proc RAG_Manager_summarize_matches {chunks} {
 		set content [lindex $chunk 1]
 		if {[regexp {%%%%Summarize\n} $match]} {
 			set match [regsub {%%%%Summarize\n} $match ""]
-			RAG_Manager_print "Summarizing [string length $match] words using\
-				$config(summarize_model)..." brown
+			if {![regexp {^.*?\n\n} $match header]} {
+				set header ""
+			}
+			set len [expr round([string length $match] / $info(word_size))]
+			RAG_Manager_print "Summarizing $len words using $config(summarize_model)..."
 			if {$api_key == ""} {
 				set f [open $info(key_file) r]
 				set api_key [read $f]
@@ -1522,16 +1531,20 @@ proc RAG_Manager_summarize_matches {chunks} {
 				[list $match] \
 				$config(summarize_question) \
 				$api_key]
-			if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $json -> answer]} {
-				set s $answer
+			if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $json -> s]} {
 				regsub -all {\\r\\n|\\r|\\n} $s "\n" s
 				regsub -all {\\"} $s {"} s
-				RAG_Manager_print "$s" green
-				set match $s
+				set match "$header"
+				append match $s
+				RAG_Manager_print "$match" green
+				if {$config(log_summaries)} {
+					LWDAQ_print $info(summary_file) $match
+					LWDAQ_print $info(summary_file) "\n-------------------------------"
+				}
 			} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $json -> message]} {
-				set answer "ERROR: $message"
+				RAG_Manager_print "ERROR: $message"
 			} else {
-				set answer "ERROR: Could not find answer or error message in result."
+				RAG_Manager_print "ERROR: Could not find any message in response."
 			}
 		} 
 		lappend new_chunks [list $match $content]
@@ -1711,7 +1724,7 @@ proc RAG_Manager_embed_string {match api_key} {
 	set json_body " \{\n \
 		\"model\": \"$config(embed_model)\",\n \
 		\"input\": \"$match\"\n \}"
-	set cmd [list curl -sS -X POST https://api.openai.com/v1/embeddings \
+	set cmd [list curl -sS -X POST $config(embedding_endpoint) \
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $api_key" \
 		-d $json_body]
@@ -1953,6 +1966,7 @@ proc RAG_Manager_chunk {} {
 	RAG_Manager_print "Download Sources and Chunk [RAG_Manager_time]" purple
 	
 	set chunks [list]
+	if {[file exists $info(summary_file)]} {file delete $info(summary_file)}	
 	foreach url [string trim $config(sources)] {
 		set new_chunks [RAG_Manager_chunk_page $url]
 		if {[llength $new_chunks] > 0} {
@@ -1962,11 +1976,13 @@ proc RAG_Manager_chunk {} {
 		if {$info(abort)} {
 			set info(abort) 0
 			set info(control) "Idle"
-			return 0
 		} 
+		if {$info(control) == "Idle"} {
+			return 0
+		}
 	}
 	
-	if {[file exists $info(dump_file)]} {file delete $info(dump_file)}
+	if {[file exists $info(dump_file)]} {file delete $info(dump_file)}	
 	if {$config(dump)} {
 		RAG_Manager_print "Writing chunks to dump file..." 
 		set count 0
@@ -2539,11 +2555,11 @@ proc RAG_Manager_retrieve {} {
 			close $f
 			RAG_Manager_print "[llength $contents]\:\
 				Match String with Relevance $rel:" brown
-			RAG_Manager_print $match darkgreen
+			RAG_Manager_print [string range $match 0 $config(show_content_len) darkgreen
 		} else {
 			RAG_Manager_print "[llength $contents]\:\
 				Content String with Relevance $rel:" brown
-			RAG_Manager_print $content green
+			RAG_Manager_print [string range $content 0 $config(show_content_len)] green
 		}
 	}
 
@@ -2621,7 +2637,7 @@ proc RAG_Manager_get_answer {model prompt contents question api_key} {
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \}\n"
 	append json_body "  \]\n\}"
 	
-	set cmd [list | curl -sS -X POST https://api.openai.com/v1/chat/completions \
+	set cmd [list | curl -sS -X POST $config(completion_endpoint) \
 	  -H "Content-Type: application/json" \
 	  -H "Authorization: Bearer $api_key" \
 	  -d $json_body] 
@@ -2643,9 +2659,7 @@ proc RAG_Manager_get_answer {model prompt contents question api_key} {
 			append result "$line\n"
 		}
 		if {[clock seconds] - $start_time > $config(answer_timeout_s)} {
-			set result "\"content\": \"Hello? Oh dear, I lost my train of thought.\
-				I do apologise. It happens sometimes. Please ask your question\
-				again.\""
+			set result "\"content\": \"$config(timeout_message)\""
 			close $ch
 			break
 		}
