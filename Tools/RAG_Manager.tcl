@@ -559,7 +559,9 @@ proc RAG_Manager_set_root {{rdn ""}} {
 	}
 	if {![file exists $rdn]} {
 		return $config(root_dir)
-	}	
+	} else {
+		set config(root_dir) $rdn
+	}
 	
 	foreach sdn {Content Match Embed Log} {
 		set sdn [file join $config(root_dir) $sdn]
@@ -568,11 +570,11 @@ proc RAG_Manager_set_root {{rdn ""}} {
 		}
 	}
 	
-	set info(key_file) [file join $config(root_dir) "Key.txt"]
-	set info(content_dir) [file join $config(root_dir) "Content"]
-	set info(match_dir) [file join $config(root_dir) "Match"]
-	set info(embed_dir) [file join $config(root_dir) "Embed"]
-	set info(log_dir) [file join $config(root_dir) "Log"]
+	set info(key_file) [file join $rdn "Key.txt"]
+	set info(content_dir) [file join $rdn "Content"]
+	set info(match_dir) [file join $rdn "Match"]
+	set info(embed_dir) [file join $rdn "Embed"]
+	set info(log_dir) [file join $rdn "Log"]
 	set info(signal_file) [file join $info(log_dir) "signal.txt"]
 	set info(offline_file) [file join $info(log_dir) "offline.txt"]
 	set info(dump_file) [file join $info(log_dir) "dump.txt"]
