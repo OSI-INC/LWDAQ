@@ -1,6 +1,6 @@
 # Stimulator, a LWDAQ Tool
 #
-# Copyright (C) 2014-2025 Kevan Hashemi, Open Source Instruments
+# Copyright (C) 2014-2026 Kevan Hashemi, Open Source Instruments
 #
 # The Stimulator controls implantable stimulator-transponders (ISTs).
 #

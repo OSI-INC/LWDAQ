@@ -552,7 +552,7 @@ proc RAG_Manager_set_root {{rdn ""}} {
 		RAG_Manager_print "Selecting Root Directory" purple
 		set rdn [LWDAQ_get_dir_name $config(root_dir)]
 		if {$rdn == ""} {
-			RAG_Manager_print "No new root directory selected."
+			RAG_Manager_print "No new root directory \"$rdn\"."
 			return $config(root_dir)
 		}
 		RAG_Manager_print "Selected directory \"$rdn\"."
@@ -1504,64 +1504,6 @@ proc RAG_Manager_chapter_urls {chunks base_url} {
 }
 
 #
-# RAG_Manager_summarize_matches
-#
-proc RAG_Manager_summarize_matches {chunks} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-	
-	set api_key ""
-	set new_chunks [list]
-	foreach chunk $chunks {
-		set match [lindex $chunk 0]
-		set content [lindex $chunk 1]
-		if {[regexp {%%%%Summarize\n} $match]} {
-			set match [regsub {%%%%Summarize\n} $match ""]
-			if {![regexp {^.*?\n\n} $match header]} {
-				set header ""
-			}
-			set len [expr round([string length $match] / $info(word_size))]
-			RAG_Manager_print "Summarizing $len words using $config(summarize_model)..."
-			if {$api_key == ""} {
-				set f [open $info(key_file) r]
-				set api_key [read $f]
-				close $f 
-			}
-			set json [RAG_Manager_get_answer \
-				$config(summarize_model) \
-				$config(summarize_prompt) \
-				[list $match] \
-				$config(summarize_question) \
-				$api_key]
-			if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $json -> s]} {
-				regsub -all {\\r\\n|\\r|\\n} $s "\n" s
-				regsub -all {\\"} $s {"} s
-				set match "$header"
-				append match $s
-				RAG_Manager_print "$match" green
-				if {$config(log_summaries)} {
-					LWDAQ_print $info(summary_file) $match
-					LWDAQ_print $info(summary_file) "\n-------------------------------"
-				}
-			} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $json -> message]} {
-				RAG_Manager_print "ERROR: $message"
-			} else {
-				RAG_Manager_print "ERROR: Could not find any message in response."
-			}
-		} 
-		lappend new_chunks [list $match $content]
-		LWDAQ_support
-		if {$info(abort)} {
-			set info(abort) 0
-			set info(control) "Idle"
-			return ""
-		} 
-	}
-	return $new_chunks
-}
-
-
-#
 # RAG_Manager_convert_entities converts html entities in a page to unicode
 # characters and returns the converted page. It also replaces tabs with
 # double-spaces. The list of entities to convert is in entitylist. Each element
@@ -1574,6 +1516,123 @@ proc RAG_Manager_convert_entities {page entitylist} {
     }
     regsub -all {\t} $page {    } page
     return $page
+}
+
+#
+# RAG_Manager_add_names takes a chunk list, in which each chunk consists of a
+# match and content string, in that order, and returns a list in which each
+# chunk consists of a match, content, and name string, in that order. To
+# generate the name string, the routine takes each match string and uses its
+# contents to obtain a unique hash name for the chunk. We will use this name to
+# form the content, match, and embed names, which will in fact all be the same
+# "hashstring.txt" in each of the three directories. 
+#
+proc RAG_Manager_add_names {chunks} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+
+	set new_chunks [list]
+	foreach chunk $chunks {
+		set match [lindex $chunk 0]
+		set content [lindex $chunk 1]
+		set name [lindex $chunk 2]
+		set cmd [list echo -n $match | openssl dgst -sha1]
+		if {[catch {
+			set result [eval exec $cmd]
+		} error_result]} {
+			RAG_Manager_print "ERROR: $error_result"
+			RAG_Manager_print $content green
+			break
+		}
+		if {[regexp {[a-f0-9]{40}} $result hash]} {
+			set hash [string range $hash 1 $info(hash_len)]
+		} else {
+			RAG_Manager_print "ERROR: No hash string found in openssl result."
+			RAG_Manager_print "RESULT: $result"
+			break
+		}
+		lappend new_chunks [list $match $content $hash]
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
+	}
+	return $new_chunks
+}
+
+#
+# RAG_Manager_summarize_matches submits each match string to a completion engine
+# to obtain a summary that replaces the match string. The name of the match
+# string does not change. The routine checks to see if the original match string
+# already exists on disk. If it does, the routine refrains from summarizing.
+# Summarizing is time-consuming, so we apply it only to new chunks.
+#
+proc RAG_Manager_summarize_matches {chunks} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	set api_key ""
+	set new_chunks [list]
+	set existing_summaries 0
+	set new_summaries 0
+	foreach chunk $chunks {
+		set match [lindex $chunk 0]
+		set content [lindex $chunk 1]
+		set name [lindex $chunk 2]
+		if {[regexp {%%%%Summarize\n} $match]} {
+			set match [regsub {%%%%Summarize\n} $match ""]
+			set match_file [file join $info(match_dir) $name.txt]
+			if {[file exists $match_file]} {
+				incr existing_summaries
+			} else {
+				if {![regexp {^.*?\n\n} $match header]} {
+					set header ""
+				}
+				set len [expr round([string length $match] / $info(word_size))]
+				RAG_Manager_print "Summarizing $len words for chunk $name\
+					using $config(summarize_model)..."
+				if {$api_key == ""} {
+					set f [open $info(key_file) r]
+					set api_key [read $f]
+					close $f 
+				}
+				set json [RAG_Manager_get_answer \
+					$config(summarize_model) \
+					$config(summarize_prompt) \
+					[list $match] \
+					$config(summarize_question) \
+					$api_key]
+				if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $json -> s]} {
+					regsub -all {\\r\\n|\\r|\\n} $s "\n" s
+					regsub -all {\\"} $s {"} s
+					set match "$header"
+					append match $s
+					RAG_Manager_print "$match" green
+					if {$config(log_summaries)} {
+						LWDAQ_print $info(summary_file) $match
+						LWDAQ_print $info(summary_file) "\n-----------------------------"
+					}
+				} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $json -> message]} {
+					RAG_Manager_print "ERROR: $message"
+				} else {
+					RAG_Manager_print "ERROR: Could not find any message in response."
+				}
+				incr new_summaries
+			} 
+		} 
+		lappend new_chunks [list $match $content $name]
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
+	}
+	RAG_Manager_print "Found $existing_summaries existing summaries,\
+		created $new_summaries new summaries."
+	return $new_chunks
 }
 
 #
@@ -1618,7 +1677,10 @@ proc RAG_Manager_chunk_page {url} {
 	RAG_Manager_print "Inserting chapter urls in all chunks..." 
 	set chunks [RAG_Manager_chapter_urls $chunks $url]
 	
-	RAG_Manager_print "Summarizing match strings where requested..."
+	RAG_Manager_print "Generating chunk names from match strings..."
+	set chunks [RAG_Manager_add_names $chunks]
+	
+	RAG_Manager_print "Summarizing match strings wherever requested..."
 	set chunks [RAG_Manager_summarize_matches $chunks]
 	
 	RAG_Manager_print "Chunk list complete." 
@@ -1628,61 +1690,43 @@ proc RAG_Manager_chunk_page {url} {
 
 #
 # RAG_Manager_store_chunks stores the match and content strings of a chunk list
-# to disk. It stores the content strings in the contents_dir and the match
-# strings in the matches_dir. It takes each match string and uses its contents
-# to obtain a unique hash name for the chunk. We will use this name to form the
-# content, match, and embed names, which will in fact all be the same: hash.txt.
-# With this routine, we store the content string with as hash.txt in the
-# contents_dir, the match string as hash.txt in the match_dir. The routine takes
-# as input a chunk list, in which each chunk consists of a match string and a
-# content string.
+# to disk using their names, which are part of the chunk array. It stores the
+# content strings in the contents_dir and the match strings in the matches_dir.
+# The routine takes as input a chunk list, in which each chunk consists of a
+# match string, a content string, and a hash name for the chunk, which was
+# previously generated from its original match string, prior to any summarizing
+# of the match string that may have taken place. Once the procedure finishes
+# storing all the new chunks to disk, it purges any chunks that it did not
+# write to disk.
 #
 proc RAG_Manager_store_chunks {chunks} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	RAG_Manager_print "Storing [llength $chunks] chunks\
-		in content and match directories..." 
-	set count 0
-	set duplicates 0
+	RAG_Manager_print "Storing new chunks to disk..." 
+	set new_count 0
+	set old_count 0
 	foreach chunk $chunks {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
-
-		set cmd [list echo -n $match | openssl dgst -sha1]
-		if {[catch {
-			set result [eval exec $cmd]
-		} error_result]} {
-			RAG_Manager_print "ERROR: $error_result"
-			RAG_Manager_print $content green
-			continue
-		}
-		if {[regexp {[a-f0-9]{40}} $result hash]} {
-			set hash [string range $hash 1 $info(hash_len)]
-		} else {
-			RAG_Manager_print "ERROR: Cannot find hash string in openssl result."
-			RAG_Manager_print "RESULT: $result"
-			break
-		}
+		set name [lindex $chunk 2]
 		
 		if {[catch {
-			set mfn [file join $info(match_dir) $hash\.txt]
-			if {[file exists $mfn]} {
-				RAG_Manager_print "[format %5d $count]: [file tail $mfn]\
-					\"[RAG_Manager_snippet [regsub {^.*?\n\n} $match ""] 0]\"" brown
-				incr duplicates
+			set mfn [file join $info(match_dir) $name\.txt]
+			set cfn [file join $info(content_dir) $name\.txt]
+			if {![file exists $mfn]} {
+				set f [open $mfn w]
+				puts -nonewline $f $match
+				close $f
+				set f [open $cfn w]
+				puts -nonewline $f $content
+				close $f
+				incr new_count
+			} else {
+				incr old_count
 			}
-			set f [open $mfn w]
-			puts -nonewline $f $match
-			close $f
-
-			set cfn [file join $info(content_dir) $hash\.txt]
-			set f [open $cfn w]
-			puts -nonewline $f $content
-			close $f
 		} error_message]} {
-			RAG_Manager_print "ERROR: $error_result"
-			RAG_Manager_print "SUGGESTION: Use Set_Root in the Configuration Panel."
+			RAG_Manager_print "ERROR: $error_message"
 			break
 		}
 		
@@ -1702,8 +1746,33 @@ proc RAG_Manager_store_chunks {chunks} {
 			return 0
 		} 
 	}
-	RAG_Manager_print "Stored $count chunks, of which $duplicates duplicates,\
-		yielding [expr $count - $duplicates] chunks on disk." 
+	RAG_Manager_print "Of $count chunks generated,\
+		$new_count were new, now stored,\
+		$old_count were pre-existing."
+	
+	RAG_Manager_print "Purging obsolete chunks..."
+	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
+	set purge_count 0
+	set retain_count 0
+	if {[catch {
+		foreach cfn $cfl {
+			set root [file root [file tail $cfn]]
+			if {[lsearch -index 2 $chunks $root] < 0} {
+				file delete $cfn
+				file delete [file join $info(match_dir) $root.txt]
+				incr purge_count
+			} else {
+				incr retain_count
+			}
+		}
+	} error_message]} {
+		RAG_Manager_print "ERROR: $error_message"
+		break
+	}
+	RAG_Manager_print "Found [llength $cfl] chunks,\
+		purged $purge_count obsolete chunks,\
+		retained $retain_count chunks."
+
 	return $count
 }
 
@@ -1907,8 +1976,8 @@ proc RAG_Manager_offline {offline} {
 
 #
 # RAG_Manager_delete deletes all chunks from the chunk directory. It does not
-# delete embeddings in the embed directory. Unused embedding vectors are culled
-# during generation.
+# delete embeddings in the embed directory. Unused embedding vectors are can be
+# culled with the purge routine.
 #
 proc RAG_Manager_delete {} {
 	upvar #0 RAG_Manager_config config
@@ -1966,7 +2035,7 @@ proc RAG_Manager_chunk {} {
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Chunk"
 	RAG_Manager_print "Download Sources and Chunk [RAG_Manager_time]" purple
-	
+	RAG_Manager_print "Root directory \"$config(root_dir)\"."
 	set chunks [list]
 	if {[file exists $info(summary_file)]} {file delete $info(summary_file)}	
 	foreach url [string trim $config(sources)] {
@@ -1989,15 +2058,17 @@ proc RAG_Manager_chunk {} {
 		RAG_Manager_print "Writing chunks to dump file..." 
 		set count 0
 		foreach chunk $chunks {
+			set match [lindex $chunk 0]
+			set content [lindex $chunk 1]
+			set name [lindex $chunk 2]
 			incr count
-			LWDAQ_print $info(dump_file) \
-				"---------- MATCH -----------"
-			LWDAQ_print $info(dump_file) [lindex $chunk 0]
-			LWDAQ_print $info(dump_file) \
-				"--------- CONTENT ----------"
-			LWDAQ_print $info(dump_file) [lindex $chunk 1]
-			LWDAQ_print $info(dump_file) \
-				"----------- END ------------\n"
+			LWDAQ_print $info(dump_file) "---------- MATCH -----------"
+			LWDAQ_print $info(dump_file) $match
+			LWDAQ_print $info(dump_file) "--------- CONTENT ----------"
+			LWDAQ_print $info(dump_file) $content
+			LWDAQ_print $info(dump_file) "----------- NAME -----------"
+			LWDAQ_print $info(dump_file) $name
+			LWDAQ_print $info(dump_file) "----------- END ------------\n"
 			LWDAQ_support
 			if {$info(abort)} {
 				set info(abort) 0
@@ -2017,7 +2088,7 @@ proc RAG_Manager_chunk {} {
 
 #
 # RAG_Manager_embed identifies match strings for which no embedding vector
-# exists and submits them to the embedding endpoing. This routine needs a valid
+# exists and submits them to the embedding endpoint. This routine needs a valid
 # API key from disk. It clears the libarary-loaded flag.
 #
 proc RAG_Manager_embed {} {
@@ -2037,7 +2108,7 @@ proc RAG_Manager_embed {} {
 	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $info(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\." 
 
 	RAG_Manager_print "Building embedding vector library..."	
 	RAG_Manager_fetch_embeds $api_key
@@ -2050,7 +2121,7 @@ proc RAG_Manager_embed {} {
 #
 # RAG_Manager_purge makes a list of all content strings in a match directory and
 # another list of all the embeds in the embed directory. It deletes any embed
-# for which there is no corresponding match string. If we set the offline flag,
+# for which there is no corresponding content string. If we set the offline flag,
 # the routine will take the chatbot and retrieval engine offline while it
 # operates. By default, however, the routine does not create or delete an
 # offline flag file. 
@@ -2473,7 +2544,7 @@ proc RAG_Manager_retrieve {} {
 	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $info(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\."
 	
 	set chat_boundaries [regexp -all -inline -indices \
 		{\nQuestion: .*?(?=\nQuestion: |$)} \
@@ -2758,7 +2829,7 @@ proc RAG_Manager_submit {} {
 	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $info(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\."
 	
 	set size [string length $prompt]
 	foreach content $info(contents) {
