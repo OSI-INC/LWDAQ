@@ -170,7 +170,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(mid_rel_thr) "0.30"
 	set config(high_rel_model) "gpt-5.4"
 	set config(mid_rel_model) "gpt-5.4-mini"
-	set config(low_rel_model) "gpt-4o-mini"
+	set config(low_rel_model) "gpt-5.4-mini"
 	set config(high_rel_words) "5000"
 	set config(mid_rel_words) "10000"
 	set config(low_rel_words) "0"
@@ -1750,8 +1750,7 @@ proc RAG_Manager_store_chunks {chunks} {
 		} 
 	}
 	RAG_Manager_print "Of $count chunks generated,\
-		$new_count were new, now stored,\
-		$old_count were pre-existing."
+		$new_count were new, $old_count were pre-existing."
 	
 	RAG_Manager_print "Purging obsolete chunks..."
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
