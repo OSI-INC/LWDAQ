@@ -1577,11 +1577,13 @@ proc RAG_Manager_summarize_matches {chunks} {
 	set new_chunks [list]
 	set existing_summaries 0
 	set new_summaries 0
+	set requested_summaries 0
 	foreach chunk $chunks {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
 		set name [lindex $chunk 2]
 		if {[regexp {%%%%Summarize\n} $match]} {
+			incr requested_summaries
 			set match [regsub {%%%%Summarize\n} $match ""]
 			set match_file [file join $info(match_dir) $name.txt]
 			if {[file exists $match_file]} {
@@ -1630,7 +1632,8 @@ proc RAG_Manager_summarize_matches {chunks} {
 			return ""
 		} 
 	}
-	RAG_Manager_print "Found $existing_summaries existing summaries,\
+	RAG_Manager_print "Detected $requested_summaries requests for summaries,\
+		found $existing_summaries existing summaries,\
 		created $new_summaries new summaries."
 	return $new_chunks
 }
