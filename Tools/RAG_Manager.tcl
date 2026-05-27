@@ -2692,12 +2692,18 @@ proc RAG_Manager_retrieve {} {
 # documentation and chat history content, the question, and an api key location.
 # It returns the entire result from the end point, as a json record, and leaves
 # it to the calling procedure to extract the answer. In order to help us debug
-# our chatbot's presentation of answers, the get-answer procedure examines
-# the diag_answer string, and if this string is not empty, the procedure
-# returns its contents instead of fetching an answer from the completion end
-# point. Now this answer passes through the formatting of the manager and
-# chatbot. The manager's configuration panel allows us to edit the diagnostic
-# string.
+# our chatbot's presentation of answers, the get-answer procedure examines the
+# diag_answer string, and if this string is not empty, the procedure returns its
+# contents instead of fetching an answer from the completion endpoint. The
+# diagnostic answer passes through the formatting of the manager and chatbot.
+# The RAG Manager's configuration panel allows us to edit the diagnostic string.
+# The get-answer routine combines its supporting documentation into a single
+# json string, which it writes to disk using a random file name. To connect to
+# the endpoint, the routine uses the command-line "curl" utility, telling the
+# utility to read the contents of the post command from the json file. By this
+# means, we do not pass on the commmand line thousands of tokens of
+# documentation, nor do we risk some character in the documentation upsetting
+# the parsing of the curl command line.
 #
 proc RAG_Manager_get_answer {model prompt contents question api_key} {
 	upvar #0 RAG_Manager_info info
@@ -2727,13 +2733,19 @@ proc RAG_Manager_get_answer {model prompt contents question api_key} {
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \}\n"
 	append json_body "  \]\n\}"
 	
+	set name [expr round(rand()*$info(rand_fn_scale))]
+	set jfn [file join $info(log_dir) "J$name\.json"] 
+	set f [open $jfn w]
+	puts $f $json_body
+	close $f
+	
 	set cmd [list | curl -sS -X POST $config(completion_endpoint) \
 	  -H "Content-Type: application/json" \
 	  -H "Authorization: Bearer $api_key" \
-	  -d $json_body] 
+	  -d "@$jfn"] 
 
 	if {[string length [string trim $config(diag_answer)]] > 0} {
-		RAG_Manager_print "Using diagnostic answer string instead of end point."
+		RAG_Manager_print "WARNING: Diagnostic answer, no completion, json on disk."
 		return "\"content\": \"$config(diag_answer)\""
 	}
 
@@ -2755,6 +2767,8 @@ proc RAG_Manager_get_answer {model prompt contents question api_key} {
 		}
 		LWDAQ_update
 	}		  
+	
+	catch {[file delete $jfn]}
 	return $result
 }
 
