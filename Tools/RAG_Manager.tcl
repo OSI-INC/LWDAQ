@@ -1646,9 +1646,10 @@ proc RAG_Manager_summarize_matches {chunks} {
 			return ""
 		} 
 	}
-	RAG_Manager_print "Detected $requested_summaries requests,\
-		found $existing_summaries existing,\
-		created $new_summaries new summaries."
+	RAG_Manager_print "Requested $requested_summaries summaries,\
+		found $existing_summaries,\
+		created $new_summaries,\
+		missing [expr $requested_summaries - $existing_summaries - $new_summaries]."
 	return $new_chunks
 }
 
