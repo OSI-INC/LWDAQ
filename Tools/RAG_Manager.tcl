@@ -49,7 +49,7 @@ proc RAG_Manager_init {} {
 	set info(signal_file) [file join $info(log_dir) "signal.txt"]
 	set info(offline_file) [file join $info(log_dir) "offline.txt"]
 	set info(dump_file) [file join $info(log_dir) "dump.txt"]
-	set info(summary_file) [file join $info(log_dir) "summary.txt"]
+	set info(summary_file) [file join $info(log_dir) "summaries.txt"]
 #
 # The default question.
 #
