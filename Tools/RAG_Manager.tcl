@@ -1567,7 +1567,11 @@ proc RAG_Manager_add_names {chunks} {
 # to obtain a summary that replaces the match string. The name of the match
 # string does not change. The routine checks to see if the original match string
 # already exists on disk. If it does, the routine refrains from summarizing.
-# Summarizing is time-consuming, so we apply it only to new chunks.
+# Summarizing is time-consuming, so we apply it only to new chunks. If
+# summarization failes, we print an error and discard the chunk. Sometimes the
+# summarizing endpoint fails to return a summary. By discarding the chunk, we
+# make sure no match string will be written to disk in place of the summary, so
+# that when we run this routine again, it will create the summary. 
 #
 proc RAG_Manager_summarize_matches {chunks} {
 	upvar #0 RAG_Manager_info info
@@ -1616,6 +1620,7 @@ proc RAG_Manager_summarize_matches {chunks} {
 						LWDAQ_print $info(summary_file) $match
 						LWDAQ_print $info(summary_file) "\n-----------------------------"
 					}
+					lappend new_chunks [list $match $content $name]
 				} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $json -> message]} {
 					RAG_Manager_print "ERROR: $message"
 				} else {
@@ -1623,8 +1628,9 @@ proc RAG_Manager_summarize_matches {chunks} {
 				}
 				incr new_summaries
 			} 
-		} 
-		lappend new_chunks [list $match $content $name]
+		} else {
+			lappend new_chunks $chunk
+		}
 		LWDAQ_support
 		if {$info(abort)} {
 			set info(abort) 0
@@ -1632,8 +1638,8 @@ proc RAG_Manager_summarize_matches {chunks} {
 			return ""
 		} 
 	}
-	RAG_Manager_print "Detected $requested_summaries requests for summaries,\
-		found $existing_summaries existing summaries,\
+	RAG_Manager_print "Detected $requested_summaries requests,\
+		found $existing_summaries existing,\
 		created $new_summaries new summaries."
 	return $new_chunks
 }
