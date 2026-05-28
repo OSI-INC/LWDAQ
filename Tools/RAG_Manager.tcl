@@ -172,7 +172,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 	set config(mid_rel_model) "gpt-5.4-mini"
 	set config(low_rel_model) "gpt-5.4-mini"
 	set config(high_rel_words) "5000"
-	set config(mid_rel_words) "10000"
+	set config(mid_rel_words) "40000"
 	set config(low_rel_words) "0"
 	set config(high_rel_chat_words) "3000"
 	set config(mid_rel_chat_words) "3000"
