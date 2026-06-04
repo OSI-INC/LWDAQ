@@ -258,11 +258,13 @@ proc LWDAQ_instrument_print {instrument print_str {color black}} {
 # assumes that the image it is to analyze is the image named in the instrument's
 # memory_name parameter. The routine places an identifier in the result, as
 # provided by the id parameter. By default, id becomes the memory name. The
-# routine also prints the result to the panel text window.
+# routine prints the result to the panel text window and saves the result in a
+# global variable "LWDAQ_result_name", where "name" is the instrument name.
 #
 proc LWDAQ_instrument_analyze {instrument {id ""}} {
 	upvar #0 LWDAQ_info_$instrument info
 	upvar #0 LWDAQ_config_$instrument config
+	upvar #0 LWDAQ_result_$instrument result
 
 	if {[string is integer -strict $config(analysis_enable)]} {
 		set result ""
