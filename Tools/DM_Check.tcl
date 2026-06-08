@@ -21,7 +21,7 @@ proc DM_Check_init {} {
 #
 # Set up the tool within LWDAQ.
 #
-	LWDAQ_tool_init "DM_Check" "1.5"
+	LWDAQ_tool_init "DM_Check" "1.6"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Process control variabls.
@@ -79,8 +79,8 @@ proc DM_Check_init {} {
 #
 	set info(text) "stdout"
 	set info(usb_text) "stdout"
-	set info(plot_height) "450"
-	set info(plot_width) "550"
+	set config(plot_height) "450"
+	set config(plot_width) "550"
 	set config(plot_y_min) "0.0"
 	set config(plot_y_max) "2.2"
 	set config(plot_x_div) "10.0"
@@ -88,24 +88,6 @@ proc DM_Check_init {} {
 	set config(plot_line_width) "2"
 	set config(plot_first_color) "1"
 	set config(label_color) "orange"
-#
-# Display initialization.
-#
-	foreach d {power demod} {
-		set info($d\_photo) "_dmt_$d\_photo_"
-		set info($d\_image) "_dmt_$d\_img_"
-		lwdaq_image_destroy $info($d\_image)
-		lwdaq_image_create -name $info($d\_image) \
-			-width $info(plot_width) \
-			-height $info(plot_height)
-		lwdaq_graph "0 0" $info($d\_image) -fill 1 \
-			-x_min $config(freq_low) \
-			-x_max $config(freq_high) \
-			-x_div $config(plot_x_div) \
-			-y_min $config(plot_y_min) \
-			-y_max $config(plot_y_max) \
-			-y_div $config(plot_y_div)
-	}
 #
 # Measurement storage.
 #
@@ -125,6 +107,24 @@ proc DM_Check_init {} {
 	if {[file exists $info(settings_file_name)]} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
+#
+# Display initialization.
+#
+	foreach d {power demod} {
+		set info($d\_photo) "_dmt_$d\_photo_"
+		set info($d\_image) "_dmt_$d\_img_"
+		lwdaq_image_destroy $info($d\_image)
+		lwdaq_image_create -name $info($d\_image) \
+			-width $config(plot_width) \
+			-height $config(plot_height)
+		lwdaq_graph "0 0" $info($d\_image) -fill 1 \
+			-x_min $config(freq_low) \
+			-x_max $config(freq_high) \
+			-x_div $config(plot_x_div) \
+			-y_min $config(plot_y_min) \
+			-y_max $config(plot_y_max) \
+			-y_div $config(plot_y_div)
+	}
 #
 # Empty string return means all well.
 #
@@ -686,14 +686,15 @@ proc DM_Check_help {} {
 	
 	LWDAQ_print $info(text) {
 	
-This tool will run on Windows, MacOS, Linux, and Rasbian. On all three
-platforms, it will connect over USB to an RF Explorer signal generator, connect
-over TCP/IP to a LWDAQ Driver to read out an Input-Output Head (A2057B) and
-control a Radio-Frequency Spectrometer (A3008E), and connect over TCP/IP to an
-ALT or TCB to calibrate its detector coils or antrenna inputs respectively.
+The Detector Module Check (DM_Check) tool will run on Windows, MacOS, Linux, and
+Rasbian. On all three platforms, it will connect over USB to an RF Explorer
+signal generator, connect over TCP/IP to a LWDAQ Driver to read out an
+Input-Output Head (A2057B) and control a Radio-Frequency Spectrometer (A3008E),
+and connect over TCP/IP to an ALT or TCB to calibrate its detector coils or
+antrenna inputs respectively.
 
-The only thing that varies from one platform to another is the USB mount point
-of your RF Explorer once you plug it into your computer. On MacOS, use something
+One thing that varies from one platform to another is the USB mount point of
+your RF Explorer once you plug it into your computer. On MacOS, use something
 matching "/dev/cu.*". On Windows, it will be something like "\\.\COM13", or for
 COM1-COM9, just "COM1" to "COM9". On Linux it will be another "/dev"-like value.
 On MacOS, USB devices appear in two places, one is a /dev/tty.*" and the other
@@ -701,7 +702,12 @@ is /dev/cu.*. Use the "cu" one. There may be similar dual-entries on Windows and
 Linux. One entry is for an stty interface, the other for a more generic
 interface such as the one provided by Tcl's channel routines.
 
-[09-OCT-25] Kevan Hashemi, Open Source Instruments Inc.
+If the plot images are too small on your screen, or too large, adjust the two
+parameters plot_width and plot_height in the configuration panel and save the
+configuration to disk. Now re-open the DM Check tool and you should see the new
+sizes.
+
+[08-JUN-26] Kevan Hashemi, Open Source Instruments Inc.
 	} brown
 }
 
