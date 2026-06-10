@@ -26,7 +26,7 @@ proc Startup_Manager_init {} {
 	upvar #0 Startup_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 
-	LWDAQ_tool_init "Startup_Manager" "1.7"
+	LWDAQ_tool_init "Startup_Manager" "1.8"
 	if {[winfo exists $info(window)]} {return ""}
 
 	set info(dummy_step) "dummy: end.\n"
@@ -393,14 +393,6 @@ proc Startup_Manager_execute {} {
 	set step_type [string replace [lindex $info(steps) $info(step) 0] end end ""]
 	if {[lsearch {default standalone communal startup} $step_type] < 0} {
 		LWDAQ_print $info(text) "ERROR: Unrecognised step type \"$step_type\"."
-		if {$step_type == "spawn"} {
-			LWDAQ_print $info(text) "SUGGESTION: Type \"spawn\"\
-				has been replaced by \"standalone\"."
-		}
-		if {$step_type == "run"} {
-			LWDAQ_print $info(text) "SUGGESTION: Type \"run\"\
-				has been replaced by \"communal\"."
-		}
 		set info(control) "Idle"
 		return ""
 	}
@@ -552,16 +544,18 @@ proc Startup_Manager_execute {} {
 			append commands "set tconfig($p) \"$v\"\n"				
 		}
 		
-		# Append default startup commands.
+		# Append default startup commands. We will execute these commands within
+		# the LWDAQ event queue because they may involve TCP/IP communication.
 		if {[info exists info($tool\_commands)]} {
-			append commands [string trim [set info($tool\_commands)]]
+			append commands [list LWDAQ_post [string trim [set info($tool\_commands)]]]
 			append commands "\n"
 		}
 				
-		# Append the startup commands defined by this step.
+		# Append the startup commands defined by this step. We execute each in the
+		# LWDAQ event queue.
 		set cmd [Startup_Manager_get_field $info(step) "commands"]
 		if {$cmd != ""} {
-			append commands [string trim $cmd]
+			append commands [list LWDAQ_post [string trim $cmd]]
 			append commands "\n"
 		}
 		
@@ -571,7 +565,8 @@ proc Startup_Manager_execute {} {
 		}
 		
 		# Append the configuration file deletion command.
-		append commands "file delete $cfn\n"
+		append commands [list LWDAQ_post "file delete $cfn"]
+		append commands "\n"
 		
 		# Spawn the tool with configuration file.
 		LWDAQ_spawn_tool $tool $commands $cfn

@@ -716,7 +716,7 @@ proc Neurorecorder_record {{command ""}} {
 	# Check if we have an overriding command passed with the call to this
 	# procedure, as we might from a LWDAQ configuration script.
 	if {$command != ""} {set info(record_control) $command}
-	
+		
 	# If a global reset is going on, go to idle state.
 	if {$LWDAQ_Info(reset)} {
 		set info(record_control) "Idle"
@@ -836,6 +836,7 @@ proc Neurorecorder_record {{command ""}} {
 			}
 			Neurorecorder_set_receiver $iinfo(receiver_type)
 		}
+
 
 		# Restore the recording label to the inactive color.
 		LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
