@@ -470,7 +470,6 @@ proc LWDAQ_reset_Receiver {} {
 		if {$send_all_sets_cmd} {
 			LWDAQ_transmit_command_hex $sock $info(all_sets_cmd)
 		}
-LWDAQ_print $info(text) "Greeings 5" green
 	
 		# Provided that channel selection is available with this telemetry receiver,
 		# send a list of channels to select for recording. If the list is simply
