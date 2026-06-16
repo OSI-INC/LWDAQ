@@ -66,8 +66,8 @@ proc Spectrometer_init {} {
 	set info(control) "Idle"
 	set info(instrument) "RFPM"
 	set config(ip_addr) "10.0.0.37"
-	set info(graph_width) 900
-	set info(graph_height) 300
+	set info(graph_width) "900"
+	set info(graph_height) "300"
 	set info(measurement_names) "SCT Peak Average"
 	set info(cursor_y) "0"
 	set info(image_name) spectrometer

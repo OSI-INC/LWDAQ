@@ -422,7 +422,7 @@ proc Neuroplayer_init {} {
 # belongs. The channel select string is the third element in the event
 # description. We isolate events with the following variable set to 1.
 #
-	set config(isolate_events) 1
+	set config(isolate_events) 0
 	set info(num_events) 0
 	set config(event_index) 1
 	set info(event_id) 0
@@ -2568,26 +2568,27 @@ proc Neuroplayer_overview_newndf {step} {
 }
 
 #
-# Neuroclassifier allows us to view, jump to, and manipulate a list 
-# of reference events with which new events may be compared for
-# classification. The event classifier lists events like this:
+# Neuroclassifier_open opens the Event Classifier panel, which provides access
+# to all Event Classifier functions, including the Batch Classifier. All
+# routines with names beginning with "Neuroclassifier" are providing services to
+# the Event Classifier and Batch Classifier. The Event Classifier allows us to
+# view, jump to, and manipulate a library of events. The Batch Classifier allows
+# us to classify signal intervals using the library. The Event Classifier lists
+# events like this:
 #
 # archive.ndf time channel event_type baseline_power m1 m2...
 #
-# It expects the Neuroplayer's processor to produce characteristics
-# lines in the same format, except the line can contain characteristics
-# for multiple channels. The baseline power should be in units of kilo
-# square ADC counts. The remaining characteristics are "metrics", which
-# each indicated something about the shape of the interval signal, and
-# which vary between 0 to 1, with 0.5 being roughly in the middle of 
-# the expected range for recorded data. In particular, the Classifier
-# assumes that a value of 0.5 or greater in the metric1 characteristic
-# indicates an event worthy of classification has occurred. We reserve 
-# three event type words for the processor to allocate to each interval
-# before classification, "N" for "Normal", meaning no event has occurred,
-# "U" for "Unclassified", meaning the event has not yet been compared to
-# a set of reference events for classification, and "L" for "Loss", meaning
-# reception is poor.
+# The Event Classifier expects an interval processor to produce characteristics
+# lines in the same format, except the line can contain characteristics for
+# multiple channels. The baseline power should be in units of kilo-square
+# counts. The remaining characteristics are "metrics", each of which represent
+# some property of the signal in the current playback interval, and which vary
+# between 0 to 1, with 0.5 being roughly in the middle of the expected range. We
+# reserve three event type words for the processor to allocate to each interval
+# before classification, "N" for "Normal", meaning no event has occurred, "U"
+# for "Unclassified", meaning the event has not yet been compared to a set of
+# reference events for classification, and "L" for "Loss", meaning reception is
+# poor.
 #
 proc Neuroclassifier_open {} {
 	upvar #0 Neuroplayer_info info
@@ -3203,14 +3204,13 @@ proc Neuroclassifier_classify {metrics setup} {
 #
 # Neuroclassifier_processing accepts a characteristics line as input. If there
 # are mutliple channels recorded in this line, the routine separates the
-# characteristics of each channel and forms a list of events, one for each
-# channel. It searches the event library for each event, in case the event is a
-# repeat of one that already exists in the library. If so, it hilites the event
-# in the library and makes it visible in the text window. Otherwise, the routine
-# checks to see if the event qualifies as unusual. The first metric should be
-# greater than the classifier threshold. If the event is unusual, the routine
-# finds the closest match to the event in the library and classifies the event
-# as being of the same type. In either case, the routine plots the
+# characteristics of each channel, producing one event per channel. It searches
+# the event library for each event, and if it find the event, it hilites the
+# event in the library and makes it visible in the text window. Otherwise, the
+# routine checks to see if the event qualifies as unusual. The first metric
+# should be greater than the classifier threshold. If the event is unusual, the
+# routine finds the closest match to the event in the library and classifies the
+# event as being of the same type. In either case, the routine plots the
 # characteristics of the event upon the map. In the special case where we are
 # re-processing the event libarary to obtain new metrics, the routine replaces
 # the existing baseline power and metrics for each library event with the
@@ -7862,10 +7862,11 @@ proc Neuroplayer_play {{command ""}} {
 	}
 	
 	# We check the processing result for errors, report to the screen, and write
-	# to characteristics file. We also hand control over to the Neuroclassifier
-	# if it's running. All the Neuroclassifier needs to plot and classify the
-	# most recent interval is the results of processing, which will, we assume,
-	# contain the metrics the Neuroarclassifier is expecting to receive.
+	# to characteristics file. We also hand control over to the Event
+	# Classifier, if it's running. All the Event Classifier needs to plot and
+	# classify the most recent interval is the results of processing, which
+	# will, we assume, contain the metrics the Event Classifier is expecting to
+	# receive.
 	if {$result != ""} {
 		if {![LWDAQ_is_error_result $result]} {
 			set result "[file tail $config(play_file)] $config(play_time) $result"
@@ -8984,10 +8985,10 @@ proc Neuroplayer_open {} {
 	entry $f.ie -textvariable Neuroplayer_config(event_index) -width 5
 	label $f.ll -text "Length:"  -fg $info(label_color)
 	label $f.le -textvariable Neuroplayer_info(num_events) -width 5
-	button $f.mark -text Mark -command [list LWDAQ_post "Neuroplayer_print_event"]
+	button $f.mark -text "Mark" -command [list LWDAQ_post "Neuroplayer_print_event"]
 	pack $f.il $f.ie $f.ll $f.le $f.mark -side left -expand yes
-	checkbutton $f.verbose -variable Neuroplayer_config(verbose) -text "Verbose"
-	pack $f.verbose -side left -expand yes
+	checkbutton $f.isolate -variable Neuroplayer_config(isolate_events) -text "Isolate"
+	pack $f.isolate -side left -expand yes
 
 	set f $w.play.e
 	frame $f -bd 1
@@ -9013,6 +9014,8 @@ proc Neuroplayer_open {} {
 	pack $f.conf -side left -expand yes
 	button $f.help -text "Help" -command "LWDAQ_tool_help Neuroplayer"
 	pack $f.help -side left -expand yes
+	checkbutton $f.verbose -variable Neuroplayer_config(verbose) -text "Verbose"
+	pack $f.verbose -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 100 10 1 1]
 	

@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "4.6"
+	LWDAQ_tool_init "Stimulator" "4.7"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -69,10 +69,10 @@ proc Stimulator_init {} {
 	set config(aux_color) "orange"
 	set info(time_format) {%d-%b-%Y %H:%M:%S}
 	
-	set info(transmit_ms) 0
+	set info(transmit_ms) "0"
 	set config(default_id) "1234"
 	set config(multicast_id) "FFFF"
-	set config(max_tx_sps) "1024"
+	set config(max_tx_sps) "2048"
 	
 	set config(pulse_ms) "10"
 	set config(period_ms) "100"
