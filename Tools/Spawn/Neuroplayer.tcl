@@ -552,6 +552,7 @@ proc Neuroplayer_init {} {
 	set info(classifier_match) "0.0"	
 	set config(classifier_match_limit) "0.1"
 	set config(classifier_threshold) "0.0"
+	set config(classifier_tmi) "1"
 	set config(enable_handler) "0"
 	set info(handler_script) ""
 	set config(classifier_library) ""
@@ -2636,19 +2637,23 @@ proc Neuroclassifier_open {} {
 	set info(classification_label) $f.cv
 	pack $f.cv -side left -expand yes
 
-	label $f.rl -text "Match:" 
+	label $f.rl -text "Match:" -fg $info(label_color)
 	label $f.rv -textvariable Neuroplayer_info(classifier_match) -width 5 
 	pack $f.rl $f.rv -side left -expand yes
 
-	label $f.mrl -text "Limit:" 
-	entry $f.mre -textvariable Neuroplayer_config(classifier_match_limit) -width 5
+	label $f.mrl -text "Limit:" -fg $info(label_color)
+	entry $f.mre -textvariable Neuroplayer_config(classifier_match_limit) -width 4
 	pack $f.mrl $f.mre -side left -expand yes
 
-	label $f.etl -text "Threshold:" 
-	entry $f.ete -textvariable Neuroplayer_config(classifier_threshold) -width 5
+	label $f.etl -text "Threshold:" -fg $info(label_color)
+	entry $f.ete -textvariable Neuroplayer_config(classifier_threshold) -width 4
 	pack $f.etl $f.ete -side left -expand yes
 
-	foreach a {Add Continue Stop Step Back Batch_Classification} {
+	label $f.tmil -text "Index:" -fg $info(label_color)
+	entry $f.tmie -textvariable Neuroplayer_config(classifier_tmi) -width 2
+	pack $f.tmil $f.tmie -side left -expand yes
+
+	foreach a {Continue Stop Step Back Batch_Classification} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Neuroclassifier_$b"
 		pack $f.$b -side left -expand yes
@@ -2659,7 +2664,7 @@ proc Neuroclassifier_open {} {
 	set f $w.controls2
 	
 	foreach a {x y} {
-		label $f.$a\ml -text "$a\:"
+		label $f.$a\ml -text "$a\:" -fg $info(label_color)
 		menubutton $f.$a\m -menu $f.$a\m.m -textvariable \
 			Neuroplayer_config(classifier_$a\_metric) \
 			-relief raised -indicatoron 1
@@ -2671,7 +2676,7 @@ proc Neuroclassifier_open {} {
 		-variable Neuroplayer_config(enable_handler)
 	pack $f.handler -side left -expand yes
 	
-	foreach a {Refresh Load Save Reprocess Compare} {
+	foreach a {Add Refresh Load Save Reprocess Compare} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Neuroclassifier_$b"
 		pack $f.$b -side left -expand yes
@@ -3283,6 +3288,12 @@ proc Neuroclassifier_processing {characteristics} {
 		# Extract the signal idenfier and look for the event in the library.
 		set id [lindex $idc 0]
 		set index [$t search "$fn $pt $id" 1.0]
+	
+		# Obtain the threshold metric index, the sign of which tells us if our
+		# metric threshold will be an upper or lower bound, and obtain the
+		# threshold metric value from the event metrics using the ineex.
+		set tmi $config(classifier_tmi)
+		set tmv [lindex $idc [expr $info(cbo)+abs($tmi)]]
 
 		if {$index != ""} {
 			# Get the library event from the text window.
@@ -3316,10 +3327,12 @@ proc Neuroclassifier_processing {characteristics} {
 			
 			# Because we have already identified the type of this event by eye,
 			# and stored it as such in the event list, we can be certain of its
-			# type. But even if we know the type, if the power metric is below
-			# the event threshold, we will call the interval Normal, and we
-			# over-write its type in the event string we will display.
-			if {[lindex $idc [expr $info(cbo)+1]] >= $config(classifier_threshold)} {
+			# type. But even if we know the type, if the threshold metric is
+			# below a lower threshold, or above an upper threshold, we will call
+			# the interval normal, and we over-write its type in the event
+			# string we will display.
+			if {(($tmv >= $config(classifier_threshold)) && ($tmi > 0)) \
+				|| (($tmv < $config(classifier_threshold)) && ($tmi < 0))} {
 				set type [lindex $event [expr $info(sii) + $info(cto)]]
 			} {
 				set type "Normal"
@@ -3339,7 +3352,8 @@ proc Neuroclassifier_processing {characteristics} {
 			# which is the one that marks the occurance of an event, to see
 			# if the interval is normal, loss, or event. If it's an event, we
 			# classify it by finding the closest match in the event list. 
-			if {[lindex $idc [expr $info(cbo)+1]] >= $config(classifier_threshold)} {
+			if {(($tmv >= $config(classifier_threshold)) && ($tmi > 0)) \
+				|| (($tmv < $config(classifier_threshold)) && ($tmi < 0))} {
 				
 				# If the event is a loss, we set the type to loss now, and avoid
 				# performing any matching.
@@ -3372,8 +3386,9 @@ proc Neuroclassifier_processing {characteristics} {
 					}
 				}
 			} {
-				# A low-power event is Normal only if there is sufficient signal 
-				# reception to be sure that it has lower power. Otherwise it's a 
+				# An event with threshold metric that does not pass the
+				# threshold test is Normal only if there is sufficient signal
+				# reception to be sure that it has lower power. Otherwise it's a
 				# Loss.
 				set closest ""
 				if {[lindex $idc [expr $info(cbo)+1]] > 0.0} {
@@ -3403,14 +3418,8 @@ proc Neuroclassifier_processing {characteristics} {
 			}
 		}
 
-		# If we are continuing only to the next unusual event, rather than
-		# playing indefinitely, we check to see if this event was unsusual,
-		# or if it is unknown and the power metric is zero, and if so we 
-		# stop playback.
-		if {$info(classifier_continue) \
-			&& ((($type != "Normal") && ($config(classifier_threshold) > 0.0))\
-				|| (($type == "Unknown") && ($config(classifier_threshold) == 0.0))) \
-			&& ($type != "Loss")} {
+		# If we are continuing, we stop only when we come to an unknown event.
+		if {$info(classifier_continue) && ($type == "Unknown")} {
 			Neuroplayer_command "Stop"
 			set info(classifier_continue) 0
 		}
