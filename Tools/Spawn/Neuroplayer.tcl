@@ -2950,17 +2950,23 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 		incr info(classifier_index)
 	}
 	if {$event == ""} {
-		set id [lindex $config(channel_selector) 0]
-		if {([llength $id]>1) || ($id == "*")} {
+		if {[string trim $config(channel_selector)] == "*"} {
 			if {$info(window) == ""} {raise "."} {raise $info(window)}
-			Neuroplayer_print "ERROR: Select a single channel to add to the library."
+			Neuroplayer_print "ERROR: All event channel numbers must be\
+				specified in channel selector."
+			return ""
+		} elseif {[llength $config(channel_selector)] \
+				!= [llength $config(classifier_escope)]} {
+			if {$info(window) == ""} {raise "."} {raise $info(window)}
+			Neuroplayer_print "ERROR: Channel selector must show\
+				all event channel numbers and none others."
 			return ""
 		}
+		set id [lindex [split [lindex $config(channel_selector) 0] :] 0]
 		set event "[file tail $config(play_file)]\
 			[Neuroplayer_play_time_format \
 				[expr $config(play_time) - $config(play_interval)]]\
-			$id\
-			Added"
+			$id Added"
 		set jump 1
 	} {
 		set jump 0
