@@ -28,13 +28,16 @@ proc Telemetry_Manager_init {} {
 	upvar #0 Telemetry_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Telemetry_Manager" "1.0"
+	LWDAQ_tool_init "Telemetry_Manager" "1.1"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
 	set config(driver_socket) "8"
 	set config(mux_socket) "1"
 	
+	set config(rck_khz) "32.768"
+	set config(rck_divisor) "32"
+
 	set config(initiate_delay) "0.005"
 	set config(spacing_delay_A2037E) "0.0000"
 	set config(spacing_delay_A2071E) "0.0014"
@@ -50,8 +53,8 @@ proc Telemetry_Manager_init {} {
 	
 	set config(xon_color) "red"
 	set config(xoff_color) "black"
-	set config(son_color) "lightgreen"
-	set config(soff_color) "lightgray"	
+	set config(lon_color) "lightgreen"
+	set config(loff_color) "lightgray"	
 	set config(label_color) "brown"
 	
 	set config(conf_delay) "3"
@@ -98,6 +101,8 @@ proc Telemetry_Manager_init {} {
 	set info(op_ver) "11"
 	set info(op_lon) "12"
 	set info(op_loff) "13"
+	set info(op_zon) "14"
+	set info(op_zoff) "15"
 	
 	set info(state) "Idle"
 	set info(monitor_ms) "0"
@@ -267,7 +272,7 @@ proc Telemetry_Manager_lon {n} {
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Start"
+	set info(state) "Lon"
 
 	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
@@ -292,7 +297,7 @@ proc Telemetry_Manager_loff {n} {
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Stop"
+	set info(state) "Loff"
 
 	# Measure battery voltage, check version, and stop stimulus.
 	set commands [list $info(op_batt) $info(op_ver) $info(op_loff)]
@@ -300,6 +305,56 @@ proc Telemetry_Manager_loff {n} {
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
 	
+	# Set state variables.
+	set info(state) "Idle"
+	
+	return ""
+}
+
+#
+# Telemetry_Manager_zon transmits a command to close the sensor's impedance
+# measurement switch.
+#
+proc Telemetry_Manager_zon {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
+
+	# Set the tool state variable.
+	if {$info(state) != "Idle"} {return}
+	set info(state) "Zon"
+
+	# Combose command with a battery measurement and version number check, 
+	# then begin the start instruction.
+	set commands [list $info(op_batt) $info(op_ver) $info(op_zon)]
+	
+	# Transmit the commands.
+	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
+
+	# Set state variables.
+	set info(state) "Idle"
+	
+	return ""
+}
+
+#
+# Telemetry_Manager_zoff transmits a command to open the sensor's impedance
+# measurement switch.
+#
+proc Telemetry_Manager_zoff {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
+
+	# Set the tool state variable.
+	if {$info(state) != "Idle"} {return}
+	set info(state) "Zoff"
+
+	# Combose command with a battery measurement and version number check, 
+	# then begin the start instruction.
+	set commands [list $info(op_batt) $info(op_ver) $info(op_zoff)]
+	
+	# Transmit the commands.
+	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
+
 	# Set state variables.
 	set info(state) "Idle"
 	
@@ -331,7 +386,7 @@ proc Telemetry_Manager_xon {n} {
 	}
 	set tx_p [expr round($config(rck_khz)*1000/$config(sps))-1]
 	
-	# Add the XON instruction.
+	# Add the Xon instruction.
 	set ch $info(dev$n\_channel)
 	if {[string is integer -strict $ch] \
 		&& ($ch > 0) && ($ch < 255) \
@@ -437,7 +492,7 @@ proc Telemetry_Manager_clear {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
-	LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+	LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 	set info(dev$n\_battery) "?"	
 
@@ -552,11 +607,11 @@ proc Telemetry_Manager_monitor {} {
 			switch $db \
 				$info(op_stop) {
 					set type "stop"
-					LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+					LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 				} \
 				$info(op_start) {
 					set type "start"
-					LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
+					LWDAQ_set_bg $info(dev$n\_state) $config(lon_color)
 				} \
 				$info(op_xon) {
 					set type "xon"
@@ -583,7 +638,7 @@ proc Telemetry_Manager_monitor {} {
 				} \
 				$info(op_shdn) {
 					set type "shdn"
-					LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+					LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 				} \
 				default {
@@ -693,16 +748,9 @@ proc Telemetry_Manager_draw_list {} {
 		pack $ff.id -side left -expand 1
 		set info(dev$n\_state) $ff.id
 		LWDAQ_set_bg $info(dev$n\_state) $config(xoff_color)
-		LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+		LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 		
-		foreach {a c} {Lon green Loff black} {
-			set b [string tolower $a]
-			button $ff.$b -text $a -padx $padx -fg $c -command \
-				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
-			pack $ff.$b -side left -expand 1
-		}
-
-		foreach {a c} {Xon green Xoff black} {
+		foreach {a c} {Lon green Loff black Xon green Xoff black Zon green Zoff black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
@@ -881,7 +929,7 @@ proc Telemetry_Manager_load_list {{fn ""}} {
 		uplevel #0 [list source $fn]
 		Telemetry_Manager_draw_list
 		foreach n $info(dev_list) {
-			LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+			LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 			LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 			set info(dev$n\_battery) "?"
 		}
@@ -1220,7 +1268,7 @@ proc Telemetry_Manager_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
-	foreach {a c} {Start green Stop black Xon green Xoff black} {
+	foreach {a c} {Xon green Xoff black} {
 		set b [string tolower $a]
 		button $f.$b -text "$a\_All" -fg $c -command [list LWDAQ_post "Telemetry_Manager_all $b"]
 		pack $f.$b -side left -expand 1
@@ -1231,20 +1279,6 @@ proc Telemetry_Manager_open {} {
 		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_$b"
 		pack $f.$b -side left -expand 1
 	}
-	
-	set f $w.params
-	frame $f
-	pack $f -side top -fill x
-	
-	foreach {a c} {pulse_ms 5 period_ms 5 num_pulses 5 current 3} {
-		label $f.l$a -text "$a\:" -fg $config(label_color)
-		entry $f.$a -textvariable Telemetry_Manager_config($a) -width $c
-		pack $f.l$a $f.$a -side left -expand 1
-	}
-
-	checkbutton $f.random -text "Random" \
-		-variable Telemetry_Manager_config(random)
-	pack $f.random -side left -expand 1
 	
 	foreach {a c} {sps 5} {
 		label $f.l$a -text "$a\:" -fg $config(label_color)
