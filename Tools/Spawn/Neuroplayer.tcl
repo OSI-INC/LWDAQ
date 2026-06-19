@@ -6375,6 +6375,7 @@ proc Neuroplayer_baseline_reset {} {
 		set info(bp_$i) $info(bp_reset)
 	}
 	return ""
+	Neuroplayer_print "Set baselines for all active channels to $config(bp_reset)." 
 }
 
 #
@@ -6388,6 +6389,7 @@ proc Neuroplayer_baselines_set {} {
 	for {set i $info(min_id)} {$i <= $info(max_id)} {incr i} {
 		set info(bp_$i) $config(bp_set)
 	}
+	Neuroplayer_print "Set baselines for all active channels to $config(bp_set)." 
 	return ""
 }
 
@@ -6430,14 +6432,9 @@ proc Neuroplayer_baselines_write {name} {
 			append metadata "$id $info(bp_$id)\n"
 		}
 	}
-	
 	append metadata "</baseline>\n"
-	
 	LWDAQ_ndf_string_write $config(play_file) [string trim $metadata]\n
-
-	Neuroplayer_print "Wrote baselines \"$name\" to\
-		[file tail $config(play_file)]." verbose
-
+	Neuroplayer_print "Wrote baselines \"$name\" to [file tail $config(play_file)]." 
 	return ""
 }
 
@@ -6478,8 +6475,7 @@ proc Neuroplayer_baselines_read {name} {
 			[file tail $config(play_file)]."
 		return ""
 	}
-	Neuroplayer_print "Read baselines \"$name\" from [file tail\
-		$config(play_file)]." verbose
+	Neuroplayer_print "Read baselines \"$name\" from [file tail $config(play_file)]."
 	return ""
 }
 
