@@ -1,8 +1,11 @@
-# Stimulator, a LWDAQ Tool
+# Telemetry Manager, a LWDAQ Tool
 #
-# Copyright (C) 2014-2026 Kevan Hashemi, Open Source Instruments
+# Copyright (C) 2026 Kevan Hashemi, Open Source Instruments
 #
-# The Stimulator controls implantable stimulator-transponders (ISTs).
+# The Telemetry Manager controls and configures telemetry sensors equipped with
+# crystal radio receivers. These include the existing A3054 Intraperitoneal
+# Transmitter (IPT) and other planned second-generation Subcutaneous
+# Transmitters (SCTs).
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -18,29 +21,20 @@
 # this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #
-# Stimulator_init initializes the Stimulator Tool.
+# Telemetry_Manager_init initializes the Telemetry_Manager Tool.
 #
-proc Stimulator_init {} {
-	upvar #0 Stimulator_info info
-	upvar #0 Stimulator_config config
+proc Telemetry_Manager_init {} {
+	upvar #0 Telemetry_Manager_info info
+	upvar #0 Telemetry_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "4.7"
+	LWDAQ_tool_init "Telemetry_Manager" "1.0"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
 	set config(driver_socket) "8"
 	set config(mux_socket) "1"
 	
-	set config(rck_khz) "32.768"
-	set config(rck_divisor) "32"
-	set config(max_pulse_len) [expr (256 * 256) - 1]
-	set config(min_pulse_len) "2"
-	set config(max_interval_len) [expr (256 * 256) - 1]
-	set config(min_interval_len) "4"
-	set config(max_stimulus_len) [expr (256 * 256) - 1]
-	set config(min_current) "0"
-	set config(max_current) "15"
 	set config(initiate_delay) "0.005"
 	set config(spacing_delay_A2037E) "0.0000"
 	set config(spacing_delay_A2071E) "0.0014"
@@ -49,19 +43,15 @@ proc Stimulator_init {} {
 	set config(rf_off_op) "0080"
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
-	set config(stimulator_element) "2"
+	set config(Telemetry_Manager_element) "2"
 	set config(checksum_preload) "1111111111111111"
 	set config(log_enable) "0"
-	set config(log_file) "~/Desktop/Stimulator_Log.txt"
+	set config(log_file) "~/Desktop/Telemetry_Manager_Log.txt"
 	
 	set config(xon_color) "red"
-	set config(xtimeout_color) "orange"
 	set config(xoff_color) "black"
 	set config(son_color) "lightgreen"
-	set config(stimeout_color) "orange"
 	set config(soff_color) "lightgray"	
-	set config(ack_received_color) "black"
-	set config(ack_lost_color) "darkorange"
 	set config(label_color) "brown"
 	
 	set config(conf_delay) "3"
@@ -74,12 +64,7 @@ proc Stimulator_init {} {
 	set config(multicast_id) "FFFF"
 	set config(max_tx_sps) "2048"
 	
-	set config(pulse_ms) "10"
-	set config(period_ms) "100"
-	set config(num_pulses) "10"
-	set config(current) "8"
 	set config(sps) "512"
-	set config(random) "0"
 	
 	# Transmit Panel Parameters
 	set config(tp_id) "FFFF"
@@ -97,7 +82,7 @@ proc Stimulator_init {} {
 	set info(at_conf) "4"
 	set info(at_ver) "5"
 	
-	# Stimulator operation codes, which we use to construct instructions, which
+	# Operation codes, which we use to construct instructions, which
 	# we in turn combine to form commands.
 	set info(op_stop) "0"
 	set info(op_start) "1"
@@ -111,6 +96,8 @@ proc Stimulator_init {} {
 	set info(op_pgrst) "9"
 	set info(op_shdn) "10"
 	set info(op_ver) "11"
+	set info(op_lon) "12"
+	set info(op_loff) "13"
 	
 	set info(state) "Idle"
 	set info(monitor_ms) "0"
@@ -127,14 +114,14 @@ proc Stimulator_init {} {
 }
 
 #
-# Stimulator_print writes a line to the text window. In addition, if the
+# Telemetry_Manager_print writes a line to the text window. In addition, if the
 # log_enable is set, the routine writes all messages to a log file. The routine
 # does not keep an infinite number of lines but instead limits the number of
 # lines in the text window to the global num_lines_keep value.
 #
-proc Stimulator_print {line {color black}} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_print {line {color black}} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 	global LWDAQ_Info
 
 	LWDAQ_print $info(text) $line $color
@@ -152,21 +139,21 @@ proc Stimulator_print {line {color black}} {
 }
 
 #
-# Stimulator_transmit takes a device identifier and a list of command bytes and
-# transmits them through a Command Transmitter such as the A3029A. The device
-# identifier must be a four-digit hex value. The bytes must be decimal values
-# 0..255. The routine appends a sixteen-bit checksum. The checksum is the two
-# bytes necessary to return a sixteen-bit linear feedback shift register to all
-# zeros, thus performing a sixteen-bit cyclic redundancy check. We assume the
-# destination shift register is preloaded with the checksum_preload value. The
-# shift register has taps at locations 16, 14, 13, and 11. The routine prints
-# the identifier, the commands, and the checksum at the end. The identifier and
-# checksum are given as four-digit hex strings. The other bytes are decimal
-# numbers 0..255.
+# Telemetry_Manager_transmit takes a device identifier and a list of command
+# bytes and transmits them through a Command Transmitter such as the A3029A. The
+# device identifier must be a four-digit hex value. The bytes must be decimal
+# values 0..255. The routine appends a sixteen-bit checksum. The checksum is the
+# two bytes necessary to return a sixteen-bit linear feedback shift register to
+# all zeros, thus performing a sixteen-bit cyclic redundancy check. We assume
+# the destination shift register is preloaded with the checksum_preload value.
+# The shift register has taps at locations 16, 14, 13, and 11. The routine
+# prints the identifier, the commands, and the checksum at the end. The
+# identifier and checksum are given as four-digit hex strings. The other bytes
+# are decimal numbers 0..255.
 #
-proc Stimulator_transmit {id commands} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_transmit {id commands} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 	global LWDAQ_Driver
 	
 	# Take the four-digit hex code for an identifier, or a wild card character,
@@ -177,7 +164,7 @@ proc Stimulator_transmit {id commands} {
 	if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $id match b1 b2]} {
 		set commands "[expr 0x$b1] [expr 0x$b2] $commands"
 	} else {
-		Stimulator_print "ERROR: Bad device identifier \"$id\", using 0x000."
+		Telemetry_Manager_print "ERROR: Bad device identifier \"$id\", using 0x000."
 		set id "0000"
 		set commands "0 0 $commands"
 	}
@@ -203,7 +190,7 @@ proc Stimulator_transmit {id commands} {
 
 	# Print the commands to the text window before appending checksum, and show
 	# checksum in hex.
-	Stimulator_print "Transmit: 0x[format %4s $id] $commands\
+	Telemetry_Manager_print "Transmit: 0x[format %4s $id] $commands\
 		0x[format %04X [expr $d22*255+$d21]]" green
 
 	# Append checksum as two bytes.	
@@ -220,7 +207,7 @@ proc Stimulator_transmit {id commands} {
 			set sd $config(spacing_delay_A2071E)
 		}
 		LWDAQ_set_driver_mux $sock $config(driver_socket) $config(mux_socket)
-		LWDAQ_set_device_element $sock $config(stimulator_element)
+		LWDAQ_set_device_element $sock $config(Telemetry_Manager_element)
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		LWDAQ_transmit_command_hex $sock $config(rf_off_op)
@@ -235,108 +222,59 @@ proc Stimulator_transmit {id commands} {
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 	} error_result]} {
-		Stimulator_print "ERROR: Transmit failed, [string tolower $error_result]"
+		Telemetry_Manager_print "ERROR: Transmit failed, [string tolower $error_result]"
 		if {[info exists sock]} {LWDAQ_socket_close $sock}
 		return ""
 	}
 	
 	# If we get here, we have no reason to believe the transmission failed, although
-	# we could have instructed an empty driver socket or the stimulator could have
+	# we could have instructed an empty driver socket or the Telemetry_Manager could have
 	# failed to receive the command.
 	set info(transmit_ms) [clock milliseconds]
 	return ""
 }
 
 #
-# Stimulator_id takes either a device list index or a four-digit hexadecimal
-# value and returns a four-digit hexadecimal value. If first looks to see if
-# the value it is passed is an element in the device list. If so, it returns
-# the identifier of this device. If not, it checks to see if the value is
-# a four-digit hex string, and if so returns the value. Otherwise, it returns
-# the default identifier and prints a warning to the stimulator window.
+# Telemetry_Manager_id takes either a device list index or a four-digit
+# hexadecimal value and returns a four-digit hexadecimal value. If first looks
+# to see if the value it is passed is an element in the device list. If so, it
+# returns the identifier of this device. If not, it checks to see if the value
+# is a four-digit hex string, and if so returns the value. Otherwise, it returns
+# the default identifier and prints a warning to the Telemetry_Manager window.
 #
-proc Stimulator_id {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_id {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	if {[lsearch $info(dev_list) $n] >= 0} {
 		return $info(dev$n\_id)
 	} elseif {[regexp {[0-9A-Fa-f]{4}} $n]} {
 		return $n
 	} else {
-		Stimulator_print "WARNING: Invalid device identifier \"$n\",\
+		Telemetry_Manager_print "WARNING: Invalid device identifier \"$n\",\
 			using $config(default_id) instead."
 		return "$config(default_id)"
 	}
 }
 
 #
-# Stimulator_start transmits the stimulation commands defined in the tool
-# window to a specific device. We can identify the device either by its
-# list index or by its identifier.
+# Telemetry_Manager_lon transmits a command to turn on the target's indicator
+# lamp.
 #
-proc Stimulator_start {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_lon {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Start"
 
-	# Begin command with a battery measurement and verstion number check, 
+	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_start)]
-	
-	# Append the current.
-	set current [expr round($config(current))]
-	if {$current < $config(min_current)} {set current $config(min_current)}
-	if {$current > $config(max_current)} {set current $config(max_current)}
-	set config(current) $current
-	lappend commands $current
-	
-	# Append the two bytes of the pulse length.
-	set len [expr round($config(rck_khz) / $config(rck_divisor) * $config(pulse_ms)) - 1]
-	if {$len > $config(max_pulse_len)} {
-		set len $config(max_pulse_len)
-		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
-		Stimulator_print "WARNING: Pulses truncated to\
-			[format %.0f $len_ms]  ms."
-	} elseif {$len < $config(min_pulse_len)} {
-		set len $config(min_pulse_len)
-		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
-		Stimulator_print "WARNING: Pulses lengthened to\
-			[format %.0f $len_ms]  ms."
-	}
-	lappend commands [expr $len / 256] [expr $len % 256]
-
-	# Set the two bytes of the interval length.
-	set len [expr round($config(rck_khz) / $config(rck_divisor) * $config(period_ms))]
-	if {$len > $config(max_interval_len)} {
-		set len $config(max_interval_len)
-		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
-		Stimulator_print "WARNING: Intervals truncated to\
-			[format %.0f $len_ms] ms."
-	} elseif {$len < $config(min_interval_len)} {
-		set len $config(min_interval_len)
-		set len_ms [expr 1.0*$len/$config(rck_khz)*$config(rck_divisor)]
-		Stimulator_print "WARNING: Intervals lengthened to\
-			[format %.0f $len_ms]  ms."
-	}
-	lappend commands [expr $len / 256] [expr $len % 256]
-
-	# Set the two bytes of the stimulus length, which is the number of intervals.
-	set len $config(num_pulses)
-	if {$len > $config(max_stimulus_len)} {
-		set len $config(max_stimulus_len)
-		Stimulator_print "WARNING: Stimulus truncated to $len pulses."
-	}
-	lappend commands [expr $len / 256] [expr $len % 256]
-
-	# Randomize the pulses, or not.
-	if {$config(random)} {lappend commands 1} {lappend commands 0}
+	set commands [list $info(op_batt) $info(op_ver) $info(op_lon)]
 	
 	# Transmit the commands.
-	Stimulator_transmit [Stimulator_id $n] $commands
+	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -345,22 +283,22 @@ proc Stimulator_start {n} {
 }
 
 #
-# Stimulator_stop transmits a stop command and sets the stimulus end time
-# for selected device to the current time.
+# Telemetry_Manager_loff transmits a command to turn off the target's indicator
+# lamp.
 #
-proc Stimulator_stop {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_loff {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
 	set info(state) "Stop"
 
 	# Measure battery voltage, check version, and stop stimulus.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_stop)]
+	set commands [list $info(op_batt) $info(op_ver) $info(op_loff)]
 	
 	# Transmit the commands.
-	Stimulator_transmit [Stimulator_id $n] $commands
+	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
 	
 	# Set state variables.
 	set info(state) "Idle"
@@ -369,12 +307,12 @@ proc Stimulator_stop {n} {
 }
 
 #
-# Stimulator_xon turns on data transmission with a specific telemetry channel
+# Telemetry_Manager_xon turns on data transmission with a specific telemetry channel
 # number and sample rate. In ISTs, this will be a synchronizing signal.
 #
-proc Stimulator_xon {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_xon {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
@@ -386,7 +324,7 @@ proc Stimulator_xon {n} {
 
 	# Send the Xon command with transmit period. 	
 	if {$config(sps) > $config(max_tx_sps)} {
-		Stimulator_print "ERROR: Frequency $config(sps) SPS greater than maximum\
+		Telemetry_Manager_print "ERROR: Frequency $config(sps) SPS greater than maximum\
 			$config(max_tx_sps) SPS."
 		set info(state) "Idle"
 		return ""
@@ -400,14 +338,14 @@ proc Stimulator_xon {n} {
 		&& ($ch % 16 > 0) && ($ch % 16 < 15)} {
 		lappend commands $info(op_xon) $ch $tx_p
 	} else {
-		Stimulator_print "ERROR: Invalid channel number \"$ch\",\
+		Telemetry_Manager_print "ERROR: Invalid channel number \"$ch\",\
 			Try 0 < c < 254, c mod 16 <> 0, c mod 16 <> 15."
 		set info(state) "Idle"
 		return ""
 	}
 		
 	# Transmit the command.
-	Stimulator_transmit [Stimulator_id $n] $commands
+	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -416,11 +354,11 @@ proc Stimulator_xon {n} {
 }
 
 #
-# Stimulator_xoff turns off data transmission.
+# Telemetry_Manager_xoff turns off data transmission.
 #
-proc Stimulator_xoff {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_xoff {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
@@ -432,7 +370,7 @@ proc Stimulator_xoff {n} {
 	set commands [list $info(op_batt) $info(op_ver) $info(op_xoff)]
 	
 	# Transmit the commands.
-	Stimulator_transmit [Stimulator_id $n] $commands
+	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
 
 	# Set state variables.
 	set info(state) "Idle"
@@ -441,13 +379,13 @@ proc Stimulator_xoff {n} {
 }
 
 #
-# Stimulator_identify requests a identifying messages from all devices. It uses
+# Telemetry_Manager_identify requests a identifying messages from all devices. It uses
 # the data acquisition configuration of the first device in our list, but
 # applies the multicast identifier to reach all devices.
 #
-proc Stimulator_identify {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_identify {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	# We will use the first device's data acquisition configuration
 	# as a starting point.
@@ -461,10 +399,10 @@ proc Stimulator_identify {} {
 	set commands [list $info(op_id)]
 	
 	# Report to user.
-	Stimulator_print "Sending identification command."
+	Telemetry_Manager_print "Sending identification command."
 
 	# Transmit commands to multicast address.
-	Stimulator_transmit $config(multicast_id) $commands
+	Telemetry_Manager_transmit $config(multicast_id) $commands
 	
 	# Set state variable.
 	set info(state) "Idle"
@@ -473,18 +411,18 @@ proc Stimulator_identify {} {
 }
 
 #
-# Stimulator_all takes a parameter "action" that it uses to define a procedure
-# it will call on every stimulator in the current list, provided that its ID is
-# not "*". We introduce a delay after each action to give stimulators a chance 
+# Telemetry_Manager_all takes a parameter "action" that it uses to define a procedure
+# it will call on every Telemetry_Manager in the current list, provided that its ID is
+# not "*". We introduce a delay after each action to give Telemetry_Managers a chance 
 # to get ready for the next command.
 # 
-proc Stimulator_all {action} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_all {action} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	foreach n $info(dev_list) {
 		if {$info(dev$n\_id) != "*"} {
-			LWDAQ_post [list Stimulator_$action $n]
+			LWDAQ_post [list Telemetry_Manager_$action $n]
 		}
 	}
 
@@ -492,11 +430,12 @@ proc Stimulator_all {action} {
 }
 
 #
-# Stimulator_clear clears the status and battery values of an stimulators in the list.
+# Telemetry_Manager_clear clears the status and battery values of an
+# Telemetry_Managers in the list.
 #
-proc Stimulator_clear {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_clear {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
@@ -506,17 +445,18 @@ proc Stimulator_clear {n} {
 }
 
 #
-# Stimulator_monitor captures auxiliary messages from stimulators and keeps track
-# of when stimuli end, so it can change the state label colors. The routine looks
-# for auxiliary messages first in the Neuroplayer Tool, if one exists, and second
-# in the Receiver Instrument. While the monitor is running, it enables analysis
-# in the Receiver Instrument so that we can get auxiliary messages. Right now
-# the Stimulator Tool operates only with a graphical user interface, so we use
-# the existence of its window to determine if the monitor should shut down.
+# Telemetry_Manager_monitor captures auxiliary messages from Telemetry_Managers
+# and keeps track of when stimuli end, so it can change the state label colors.
+# The routine looks for auxiliary messages first in the Neuroplayer Tool, if one
+# exists, and second in the Receiver Instrument. While the monitor is running,
+# it enables analysis in the Receiver Instrument so that we can get auxiliary
+# messages. Right now the Telemetry_Manager Tool operates only with a graphical
+# user interface, so we use the existence of its window to determine if the
+# monitor should shut down.
 #
-proc Stimulator_monitor {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_monitor {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 	upvar #0 LWDAQ_info_Receiver rconfig
 	upvar #0 LWDAQ_info_Receiver rinfo
 	upvar #0 Neuroplayer_info ninfo
@@ -549,17 +489,17 @@ proc Stimulator_monitor {} {
 	
 	# If we have no auxiliary messages, we are done.
 	if {[llength $aux_messages] == 0} { 
-		LWDAQ_post Stimulator_monitor
+		LWDAQ_post Telemetry_Manager_monitor
 		return ""
 	}
 	
 	# Compose a list of active device numbers with their sixteen-bit identifiers,
-	# as listed in our Stimulator window.
+	# as listed in our Telemetry_Manager window.
 	set id_list ""
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_id)"}
 	
 	# Go through the auxiliary message list and find messages that could be from
-	# stimulators. As we proceed, we save the previous valid auxiliary message
+	# Telemetry_Managers. As we proceed, we save the previous valid auxiliary message
 	# so that we can avoid processing duplicates in the list.
 	set previd 0
 	set prevfa 0
@@ -571,7 +511,7 @@ proc Stimulator_monitor {} {
 		# counts 32.768 kHz clock ticks.
 		scan $am %d%d%d%d id fa db ts
 		if {$config(aux_show)} {
-			Stimulator_print "Auxiliary Message:\
+			Telemetry_Manager_print "Auxiliary Message:\
 				id=$id fa=$fa db=$db ts=$ts" $config(aux_color)
 		}
 		
@@ -651,7 +591,7 @@ proc Stimulator_monitor {} {
 				}
 				
 			if {$type != "invalid"} {
-				Stimulator_print "Acknowledge:\
+				Telemetry_Manager_print "Acknowledge:\
 					device_id=$device_id type=$type ts=$ts $now_time"
 			}
 		} elseif {$fa == $info(at_batt)} {
@@ -669,11 +609,11 @@ proc Stimulator_monitor {} {
 			
 			# Report the battery measurement.
 			set info(dev$n\_battery) $voltage
-			Stimulator_print "Battery:\
+			Telemetry_Manager_print "Battery:\
 				device_id=$device_id value=$db ts=$ts\
 				voltage=$voltage $now_time" 
 		} elseif {$fa == $info(at_id)} {
-			Stimulator_print "Identification:\
+			Telemetry_Manager_print "Identification:\
 				device_id=$device_id ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
 
@@ -681,7 +621,7 @@ proc Stimulator_monitor {} {
 			if {$n == 0} {continue}
 			
 			set info(dev$n\_version) "$db"
-			Stimulator_print "Version:\
+			Telemetry_Manager_print "Version:\
 				device_id=$device_id value=$db ts=$ts $now_time"
 		} else {
 			
@@ -698,16 +638,17 @@ proc Stimulator_monitor {} {
 	}
 	
 	# We post the monitor to the event queue and report success.
-	LWDAQ_post Stimulator_monitor
+	LWDAQ_post Telemetry_Manager_monitor
 	return ""
 }
 
 #
-# Stimulator_undraw_list removes the stimulator list from the Stimulator window.
+# Telemetry_Manager_undraw_list removes the Telemetry_Manager list from the
+# Telemetry_Manager window.
 #
-proc Stimulator_undraw_list {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_undraw_list {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	foreach n $info(dev_list) {
 		set ff $info(window).dev_list.dev$n
@@ -718,12 +659,12 @@ proc Stimulator_undraw_list {} {
 }
 
 #
-# Stimulator_draw_list draws the current list of stimulators in the 
-# Stimulator window.
+# Telemetry_Manager_draw_list draws the current list of Telemetry_Managers in
+# the Telemetry_Manager window.
 #
-proc Stimulator_draw_list {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_draw_list {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	set f $info(window).dev_list
 	if {![winfo exists $f]} {
@@ -735,7 +676,7 @@ proc Stimulator_draw_list {} {
 	
 	foreach n $info(dev_list) {
 	
-		# If this stimulator's state variable does not exist, then create it
+		# If this Telemetry_Manager's state variable does not exist, then create it
 		# now, as well as other system parameters.
 		if {![info exists info(dev$n\_id)]} {
 			set info(dev$n\_id) $config(default_id)
@@ -748,40 +689,40 @@ proc Stimulator_draw_list {} {
 		frame $ff -relief sunken -bd 2
 		pack $ff -side top -fill x
 		
-		entry $ff.id -textvariable Stimulator_info(dev$n\_id) -width 5
+		entry $ff.id -textvariable Telemetry_Manager_info(dev$n\_id) -width 5
 		pack $ff.id -side left -expand 1
 		set info(dev$n\_state) $ff.id
 		LWDAQ_set_bg $info(dev$n\_state) $config(xoff_color)
 		LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 		
-		foreach {a c} {Start green Stop black} {
+		foreach {a c} {Lon green Loff black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
-				[list LWDAQ_post "Stimulator_$b $n" front]
+				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
 			pack $ff.$b -side left -expand 1
 		}
 
 		foreach {a c} {Xon green Xoff black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
-				[list LWDAQ_post "Stimulator_$b $n" front]
+				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
 			pack $ff.$b -side left -expand 1
 		}
 
 		foreach {a c} {channel 3 version 3} {
 			label $ff.l$a -text "$a\:" -fg $config(label_color)
-			entry $ff.$a -textvariable Stimulator_info(dev$n\_$a) -width $c
+			entry $ff.$a -textvariable Telemetry_Manager_info(dev$n\_$a) -width $c
 			pack $ff.l$a $ff.$a -side left -expand 1
 		}
 
 		foreach {a c} {battery 3} {
 			label $ff.l$a -text "$a\:" -fg $config(label_color)
-			label $ff.$a -textvariable Stimulator_info(dev$n\_$a) -width $c
+			label $ff.$a -textvariable Telemetry_Manager_info(dev$n\_$a) -width $c
 			pack $ff.l$a $ff.$a -side left -expand 1
 		}
 
 		button $ff.delete -text "X" -padx $padx -command \
-			[list LWDAQ_post "Stimulator_ask_remove $n" front]
+			[list LWDAQ_post "Telemetry_Manager_ask_remove $n" front]
 		pack $ff.delete -side left -expand 1
 	}
 	
@@ -789,19 +730,19 @@ proc Stimulator_draw_list {} {
 }
 
 #
-# Stimulator_ask_remove ask if the user is certain they want to remove an 
-# stimulator from the list.
+# Telemetry_Manager_ask_remove ask if the user is certain they want to remove an 
+# Telemetry_Manager from the list.
 #
-proc Stimulator_ask_remove {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_ask_remove {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
-	# Find the stimulator in our list.
+	# Find the Telemetry_Manager in our list.
 	set index [lsearch $info(dev_list) $n]
 	
-	# Exit if the stimulator does not exist.
+	# Exit if the Telemetry_Manager does not exist.
 	if {$index < 0} {
-		Stimulator_print "ERROR: No stimulator with list index $n\."
+		Telemetry_Manager_print "ERROR: No Telemetry_Manager with list index $n\."
 		return ""
 	}
 	
@@ -815,7 +756,7 @@ proc Stimulator_ask_remove {n} {
 	label $w.q -text "Remove $info(dev$n\_id), Index $n?" \
 		-padx 10 -pady 5 -fg purple
 	button $w.yes -text "Yes" -padx 10 -pady 5 -command \
-		[list LWDAQ_post "Stimulator_remove $n" front]
+		[list LWDAQ_post "Telemetry_Manager_remove $n" front]
 	button $w.no -text "No" -padx 10 -pady 5 -command \
 		[list LWDAQ_post "destroy $w" front]
 	pack $w.q $w.yes $w.no -side left -expand 1
@@ -824,22 +765,22 @@ proc Stimulator_ask_remove {n} {
 }
 
 #
-# Stimulator_remove remove a stimulator from the list.
+# Telemetry_Manager_remove remove a Telemetry_Manager from the list.
 #
-proc Stimulator_remove {n} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_remove {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
-	# Find the stimulator in our list.
+	# Find the Telemetry_Manager in our list.
 	set index [lsearch $info(dev_list) $n]
 	
 	# If a remove window exists, destroy it
 	set w $info(window)\.remove$n
 	if {[winfo exists $w]} {destroy $w}
 
-	# Exit if the stimulator does not exist.
+	# Exit if the Telemetry_Manager does not exist.
 	if {$index < 0} {
-		Stimulator_print "ERROR: No stimulator with list index $n\."
+		Telemetry_Manager_print "ERROR: No Telemetry_Manager with list index $n\."
 		return ""
 	}
 	
@@ -856,14 +797,14 @@ proc Stimulator_remove {n} {
 }
 
 #
-# Stimulator_add_device adds a new stimulator to the list.
+# Telemetry_Manager_add_device adds a new Telemetry_Manager to the list.
 #
-proc Stimulator_add_device {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_add_device {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	# Delete the list display.
-	Stimulator_undraw_list
+	Telemetry_Manager_undraw_list
 	
 	# Find a new index for this sensor, add the new id to the list.
 	set n 1
@@ -881,17 +822,17 @@ proc Stimulator_add_device {} {
 	set info(dev$n\_battery) "?"
 	
 	# Re-draw the sensor list.
-	Stimulator_draw_list
+	Telemetry_Manager_draw_list
 	
 	return ""
 }
 
 #
-# Stimulator_save_list save a stimulator list to disk.
+# Telemetry_Manager_save_list save a Telemetry_Manager list to disk.
 #
-proc Stimulator_save_list {{fn ""}} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_save_list {{fn ""}} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 	
 	# Try to get a valid file name.
 	if {$fn == ""} {
@@ -899,31 +840,31 @@ proc Stimulator_save_list {{fn ""}} {
 		if {$fn == ""} {return ""}
 	}
 
-	# Write stimulator list to disk.
+	# Write Telemetry_Manager list to disk.
 	set f [open $fn w]
-	puts $f "set Stimulator_info(dev_list) \"$info(dev_list)\""
+	puts $f "set Telemetry_Manager_info(dev_list) \"$info(dev_list)\""
 	foreach n $info(dev_list) {
 		foreach p {id channel version} {
 			set e "dev$n\_$p"
-			puts $f "set Stimulator_info($e) \"[set info($e)]\"" 
+			puts $f "set Telemetry_Manager_info($e) \"[set info($e)]\"" 
 		}
 	}
 	close $f
 	
-	# Change the stimulator list file parameter.
+	# Change the Telemetry_Manager list file parameter.
 	set config(dev_list_file) $fn
 
 	return ""
 }
 
 #
-# Stimulator_load_list loads a stimulator list from disk. If we don't
+# Telemetry_Manager_load_list loads a Telemetry_Manager list from disk. If we don't
 # specify the list file name, the routine uses a browser to get a file
 # name.
 #
-proc Stimulator_load_list {{fn ""}} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_load_list {{fn ""}} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 	
 	# Try to get a valid file name.
 	if {$fn == ""} {
@@ -933,36 +874,36 @@ proc Stimulator_load_list {{fn ""}} {
 		if {![file exists $fn]} {return ""}
 	}
 
-	# Undraw the list, run the stimulator list file, and re-draw the list.
+	# Undraw the list, run the Telemetry_Manager list file, and re-draw the list.
 	if {[catch {
-		Stimulator_undraw_list	
+		Telemetry_Manager_undraw_list	
 		set info(dev_list) [list]
 		uplevel #0 [list source $fn]
-		Stimulator_draw_list
+		Telemetry_Manager_draw_list
 		foreach n $info(dev_list) {
 			LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
 			LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 			set info(dev$n\_battery) "?"
 		}
 	} error_message]} {
-		Stimulator_print "ERROR: $error_message\."
+		Telemetry_Manager_print "ERROR: $error_message\."
 		return
 	}
 	
-	# Change the stimulator list file name to match the newly-loaded file.
+	# Change the Telemetry_Manager list file name to match the newly-loaded file.
 	set config(dev_list_file) $fn
 	
 	return ""
 }
 
 #
-# Stimulator_rename_device changes the device name from one value to another,
-# overwriting any pre-existing device of the new name, and deleging the device
-# under the old name.
+# Telemetry_Manager_rename_device changes the device name from one value to
+# another, overwriting any pre-existing device of the new name, and deleging the
+# device under the old name.
 #
-proc Stimulator_rename_device {n m} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_rename_device {n m} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	set parameters [array name info]
 	foreach p $parameters {
@@ -976,20 +917,20 @@ proc Stimulator_rename_device {n m} {
 }
 
 #
-# Stimulator_refresh_list assigns ascending, consecutive device numbers to the
-# existing rows of the device list. It clears all state indication colors and
-# battery values.
+# Telemetry_Manager_refresh_list assigns ascending, consecutive device numbers
+# to the existing rows of the device list. It clears all state indication colors
+# and battery values.
 #
-proc Stimulator_refresh_list {{fn ""}} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_refresh_list {{fn ""}} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 	
-	Stimulator_undraw_list	
+	Telemetry_Manager_undraw_list	
 
 	set new_list [list]
 	set m 1000
 	foreach n $info(dev_list) {
-		Stimulator_rename_device $n $m
+		Telemetry_Manager_rename_device $n $m
 		lappend new_list "$m $info(dev$m\_id)"
 		incr m
 	}
@@ -999,33 +940,33 @@ proc Stimulator_refresh_list {{fn ""}} {
 	set m 1
 	foreach dev $new_list {
 		set n [lindex $dev 0]
-		Stimulator_rename_device $n $m
+		Telemetry_Manager_rename_device $n $m
 		set info(dev$m\_battery) "?"
 		lappend info(dev_list) $m
 		incr m
 	}
 	unset new_list
 	
-	Stimulator_draw_list
+	Telemetry_Manager_draw_list
 	
 	return ""
 }
 
 #
-# Stimulator_transmit_panel opens a new window that allows the user to transmit
-# specific commands to a particular device, to assemble and upload user
+# Telemetry_Manager_transmit_panel opens a new window that allows the user to
+# transmit specific commands to a particular device, to assemble and upload user
 # programs, and enable user programs. The transmit panel uses the driver address
-# and socket specified in the Stimulator window, but it uses its own device
-# identifier, which can be set to the wild card FFFF or a specific four-digit
-# hex identifier. Command bytes can be specified either as a two-digit hex value
-# using the 0x prefix, or a decimal value 0..255 with no prefix. User programs
-# are read from a file. The transmit panel loads the OSR8 assembler package and
-# uses it to generate the machine code bytes that it will upload to the
-# stimulator.
+# and socket specified in the Telemetry_Manager window, but it uses its own
+# device identifier, which can be set to the wild card FFFF or a specific
+# four-digit hex identifier. Command bytes can be specified either as a
+# two-digit hex value using the 0x prefix, or a decimal value 0..255 with no
+# prefix. User programs are read from a file. The transmit panel loads the OSR8
+# assembler package and uses it to generate the machine code bytes that it will
+# upload to the Telemetry_Manager.
 #
-proc Stimulator_transmit_panel {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_transmit_panel {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 	
 	# Open the transmit panel.
 	set w $info(window)\.xmit_panel
@@ -1034,7 +975,7 @@ proc Stimulator_transmit_panel {} {
 		return ""
 	}
 	toplevel $w
-	wm title $w "Stimulator $info(version) Transmit Panel"
+	wm title $w "Telemetry_Manager $info(version) Transmit Panel"
 	
 	# If the OSR8 Assembler tool routines are not available, run the OSR8 Assembler
 	# tool with no graphics.
@@ -1043,7 +984,7 @@ proc Stimulator_transmit_panel {} {
 		LWDAQ_run_tool OSR8_Assembler
 		destroy $ainfo(window)
 		if {[info commands OSR8_Assembler_assemble] == ""} {
-			Stimulator_print "ERROR: Failed to open OSR8 Assembler tool."
+			Telemetry_Manager_print "ERROR: Failed to open OSR8 Assembler tool."
 		} 
 	}
 
@@ -1051,29 +992,29 @@ proc Stimulator_transmit_panel {} {
 	pack $f -side top -fill x
 	
 	label $f.nl -text "Target Identifier (Hex):"
-	entry $f.ne -textvariable Stimulator_config(tp_id) -width 5
+	entry $f.ne -textvariable Telemetry_Manager_config(tp_id) -width 5
 	pack $f.nl $f.ne -side left -expand 1
 
 	foreach a {Run Halt} {
 		set b [string tolower $a]
-		button $f.$b -text "$a Program" -command "LWDAQ_post Stimulator_tp_$b"
+		button $f.$b -text "$a Program" -command "LWDAQ_post Telemetry_Manager_tp_$b"
 		pack $f.$b -side left -expand 1
 	}
 
 	label $f.bl -text "Base Address:"
-	entry $f.be -textvariable Stimulator_config(tp_base_addr) -width 8
+	entry $f.be -textvariable Telemetry_Manager_config(tp_base_addr) -width 8
 	pack $f.bl $f.be -side left -expand 1
 
 	set f [frame $w.program]
 	pack $f -side top -fill x
 	
 	label $f.lprogram -text "Program:" -fg $config(label_color)
-	entry $f.eprogram -textvariable Stimulator_config(tp_program) -width 60
+	entry $f.eprogram -textvariable Telemetry_Manager_config(tp_program) -width 60
 	pack $f.lprogram $f.eprogram -side left -expand 1
 
 	foreach a {Browse Edit} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post Stimulator_tp_$b"
+		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_tp_$b"
 		pack $f.$b -side left -expand 1
 	}
 
@@ -1081,11 +1022,11 @@ proc Stimulator_transmit_panel {} {
 	pack $f -side top -fill x
 
 	label $f.lcommands -text "Commands:" -fg $config(label_color)
-	entry $f.commands -textvariable Stimulator_config(tp_commands) -width 70
+	entry $f.commands -textvariable Telemetry_Manager_config(tp_commands) -width 70
 	pack $f.lcommands $f.commands -side left -expand 1
 
 	button $f.transmit -text "Transmit" \
-		-command "LWDAQ_post Stimulator_tp_transmit"
+		-command "LWDAQ_post Telemetry_Manager_tp_transmit"
 	pack $f.transmit -side left -expand 1
 		
 	set info(tp_text) [LWDAQ_text_widget $w 80 15]
@@ -1094,11 +1035,11 @@ proc Stimulator_transmit_panel {} {
 }
 
 #
-# Stimulator_tp_browse opens a file browser to select the program file.
+# Telemetry_Manager_tp_browse opens a file browser to select the program file.
 #
-proc Stimulator_tp_browse {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_tp_browse {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	set fn [LWDAQ_get_file_name]
 	if {$fn != ""} {set config(tp_program) $fn}
@@ -1107,11 +1048,11 @@ proc Stimulator_tp_browse {} {
 
 
 #
-# Stimulator_tp_edit opens the assembler program in an editor window.
+# Telemetry_Manager_tp_edit opens the assembler program in an editor window.
 #
-proc Stimulator_tp_edit {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_tp_edit {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	if {[winfo exists $info(tp_ew)]} {
 		raise $info(tp_ew)
@@ -1122,12 +1063,12 @@ proc Stimulator_tp_edit {} {
 }
 
 #
-# Stimulator_tp_transmit transmits the commands listed in the transmit
+# Telemetry_Manager_tp_transmit transmits the commands listed in the transmit
 # panel.
 #
-proc Stimulator_tp_transmit {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_tp_transmit {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	# Append all the commands in the transmit list, converting hex values
 	# to decimal values as we go.
@@ -1136,16 +1077,16 @@ proc Stimulator_tp_transmit {} {
 	
 	# Transmit the commands. We don't ask for an acknowledgement because
 	# we want the transmit to consist only of commands entered by the user.
-	Stimulator_transmit $config(tp_id) $commands
+	Telemetry_Manager_transmit $config(tp_id) $commands
 }
 
 #
-# Stimulator_tp_run assembles and uploads user code in chunks. After the final
+# Telemetry_Manager_tp_run assembles and uploads user code in chunks. After the final
 # chunk, it enables the program.
 #
-proc Stimulator_tp_run {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_tp_run {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 	upvar #0 OSR8_Assembler_config aconfig
 	upvar #0 OSR8_Assembler_info ainfo
 	
@@ -1176,7 +1117,7 @@ proc Stimulator_tp_run {} {
 	LWDAQ_print $info(tp_text) "Assembly successful,\
 		uploading [llength $prog] code bytes."	
 	
-	# Begin our first command with the instruction that resets the stimulator
+	# Begin our first command with the instruction that resets the Telemetry_Manager
 	# user program counter.
 	set commands [list $info(op_pgrst)]
 
@@ -1204,7 +1145,7 @@ proc Stimulator_tp_run {} {
 		}
 			
 		# Transmit the commands.
-		Stimulator_transmit $config(tp_id) $commands
+		Telemetry_Manager_transmit $config(tp_id) $commands
 		
 		# Reset the command list.
 		set commands [list]
@@ -1212,25 +1153,25 @@ proc Stimulator_tp_run {} {
 }
 
 #
-# Stimulator_tp_halt disables execution of user code on the target device.
+# Telemetry_Manager_tp_halt disables execution of user code on the target device.
 #
-proc Stimulator_tp_halt {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_tp_halt {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	# Send the program disable command.	
 	set commands [list $info(op_pgoff)]
 
 	# Transmit the commands.
-	Stimulator_transmit $config(tp_id) $commands
+	Telemetry_Manager_transmit $config(tp_id) $commands
 }
 
 #
-# Stimulator_open opens the tool window and makes all its controls.
+# Telemetry_Manager_open opens the tool window and makes all its controls.
 #
-proc Stimulator_open {} {
-	upvar #0 Stimulator_config config
-	upvar #0 Stimulator_info info
+proc Telemetry_Manager_open {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
 
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}
@@ -1239,15 +1180,15 @@ proc Stimulator_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
-	label $f.state -textvariable Stimulator_info(state) -width 12 -fg blue
+	label $f.state -textvariable Telemetry_Manager_info(state) -width 12 -fg blue
 	pack $f.state -side left -expand 1
 	
 	label $f.laddr -text "ip_addr:" -fg $config(label_color)
-	entry $f.eaddr -textvariable Stimulator_config(ip_addr) -width 16
+	entry $f.eaddr -textvariable Telemetry_Manager_config(ip_addr) -width 16
 	pack $f.laddr $f.eaddr -side left -expand 1
 
 	label $f.lsckt -text "driver_socket:" -fg $config(label_color)
-	entry $f.esckt -textvariable Stimulator_config(driver_socket) -width 4
+	entry $f.esckt -textvariable Telemetry_Manager_config(driver_socket) -width 4
 	pack $f.lsckt $f.esckt -side left -expand 1
 
 	button $f.neuroplayer -text "Neuroplayer" -command {
@@ -1262,7 +1203,7 @@ proc Stimulator_open {} {
 	pack $f.receiver -side left -expand 1
 
 	button $f.txcmd -text "Transmit Panel" -command {
-		LWDAQ_post "Stimulator_transmit_panel"
+		LWDAQ_post "Telemetry_Manager_transmit_panel"
 	}
 	pack $f.txcmd -side left -expand 1
 
@@ -1272,7 +1213,7 @@ proc Stimulator_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	checkbutton $f.log -variable Stimulator_config(log_enable) -text "Log"
+	checkbutton $f.log -variable Telemetry_Manager_config(log_enable) -text "Log"
 	pack $f.log -side left -expand 1
 
 	set f $w.list
@@ -1281,13 +1222,13 @@ proc Stimulator_open {} {
 	
 	foreach {a c} {Start green Stop black Xon green Xoff black} {
 		set b [string tolower $a]
-		button $f.$b -text "$a\_All" -fg $c -command [list LWDAQ_post "Stimulator_all $b"]
+		button $f.$b -text "$a\_All" -fg $c -command [list LWDAQ_post "Telemetry_Manager_all $b"]
 		pack $f.$b -side left -expand 1
 	}
 	
 	foreach a {Add_Device Save_List Load_List Refresh_List Identify} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post Stimulator_$b"
+		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_$b"
 		pack $f.$b -side left -expand 1
 	}
 	
@@ -1297,47 +1238,47 @@ proc Stimulator_open {} {
 	
 	foreach {a c} {pulse_ms 5 period_ms 5 num_pulses 5 current 3} {
 		label $f.l$a -text "$a\:" -fg $config(label_color)
-		entry $f.$a -textvariable Stimulator_config($a) -width $c
+		entry $f.$a -textvariable Telemetry_Manager_config($a) -width $c
 		pack $f.l$a $f.$a -side left -expand 1
 	}
 
 	checkbutton $f.random -text "Random" \
-		-variable Stimulator_config(random)
+		-variable Telemetry_Manager_config(random)
 	pack $f.random -side left -expand 1
 	
 	foreach {a c} {sps 5} {
 		label $f.l$a -text "$a\:" -fg $config(label_color)
-		entry $f.$a -textvariable Stimulator_config($a) -width $c
+		entry $f.$a -textvariable Telemetry_Manager_config($a) -width $c
 		pack $f.l$a $f.$a -side left -expand 1
 	}
 
 	if {[llength $info(dev_list)] == 0} {
-		Stimulator_add_device
+		Telemetry_Manager_add_device
 	} else {
-		Stimulator_draw_list
+		Telemetry_Manager_draw_list
 	}
 
 	set info(text) [LWDAQ_text_widget $w 80 15]
 
 	# If the device list file exist, load it.
 	if {[file exists $config(dev_list_file)]} {
-		Stimulator_load_list $config(dev_list_file)
+		Telemetry_Manager_load_list $config(dev_list_file)
 	}
 	
 	return $w
 }
 
 # Start up the tool. We call the monitor routine, which sets the monitor 
-# working in the background to maintain the stimulator status 
-Stimulator_init
-Stimulator_open
-Stimulator_monitor
+# working in the background to maintain the Telemetry_Manager status 
+Telemetry_Manager_init
+Telemetry_Manager_open
+Telemetry_Manager_monitor
 
 return ""
 
 ----------Begin Help----------
 
-http://www.opensourceinstruments.com/Electronics/A3041/Stimulator.html
+http://www.opensourceinstruments.com/Electronics/A3054/Telemetry_Manager.html
 
 ----------End Help----------
 
