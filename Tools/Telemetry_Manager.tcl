@@ -11,12 +11,12 @@
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-# 
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 # details.
-# 
+#
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -495,6 +495,7 @@ proc Telemetry_Manager_clear {n} {
 	LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 	set info(dev$n\_battery) "?"	
+	set info(dev$n\_version) "?"	
 
 	return ""
 }
@@ -757,13 +758,13 @@ proc Telemetry_Manager_draw_list {} {
 			pack $ff.$b -side left -expand 1
 		}
 
-		foreach {a c} {channel 3 version 3} {
+		foreach {a c} {channel 3} {
 			label $ff.l$a -text "$a\:" -fg $config(label_color)
 			entry $ff.$a -textvariable Telemetry_Manager_info(dev$n\_$a) -width $c
 			pack $ff.l$a $ff.$a -side left -expand 1
 		}
 
-		foreach {a c} {battery 3} {
+		foreach {a c} { version 3 battery 3} {
 			label $ff.l$a -text "$a\:" -fg $config(label_color)
 			label $ff.$a -textvariable Telemetry_Manager_info(dev$n\_$a) -width $c
 			pack $ff.l$a $ff.$a -side left -expand 1
@@ -932,6 +933,7 @@ proc Telemetry_Manager_load_list {{fn ""}} {
 			LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 			LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 			set info(dev$n\_battery) "?"
+			set info(dev$n\_version) "?"	
 		}
 	} error_message]} {
 		Telemetry_Manager_print "ERROR: $error_message\."
@@ -990,6 +992,7 @@ proc Telemetry_Manager_refresh_list {{fn ""}} {
 		set n [lindex $dev 0]
 		Telemetry_Manager_rename_device $n $m
 		set info(dev$m\_battery) "?"
+		set info(dev$n\_version) "?"	
 		lappend info(dev_list) $m
 		incr m
 	}
@@ -1129,8 +1132,8 @@ proc Telemetry_Manager_tp_transmit {} {
 }
 
 #
-# Telemetry_Manager_tp_run assembles and uploads user code in chunks. After the final
-# chunk, it enables the program.
+# Telemetry_Manager_tp_run assembles and uploads user code in chunks. After the
+# final chunk, it enables the program.
 #
 proc Telemetry_Manager_tp_run {} {
 	upvar #0 Telemetry_Manager_config config
@@ -1165,8 +1168,8 @@ proc Telemetry_Manager_tp_run {} {
 	LWDAQ_print $info(tp_text) "Assembly successful,\
 		uploading [llength $prog] code bytes."	
 	
-	# Begin our first command with the instruction that resets the Telemetry_Manager
-	# user program counter.
+	# Begin our first command with the instruction that resets the Telemetry
+	# Manager user program counter.
 	set commands [list $info(op_pgrst)]
 
 	# Divide the user program into segments of length tp_seg_len and transmit
@@ -1270,7 +1273,8 @@ proc Telemetry_Manager_open {} {
 	
 	foreach {a c} {Xon green Xoff black} {
 		set b [string tolower $a]
-		button $f.$b -text "$a\_All" -fg $c -command [list LWDAQ_post "Telemetry_Manager_all $b"]
+		button $f.$b -text "$a\_All" -fg $c -command \
+			[list LWDAQ_post "Telemetry_Manager_all $b"]
 		pack $f.$b -side left -expand 1
 	}
 	

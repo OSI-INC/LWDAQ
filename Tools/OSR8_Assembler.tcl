@@ -184,6 +184,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			set f [open $fn r]
 			set iasm [split [read $f] \n]
 			set basm [concat $basm $iasm]
+			close $f
 		} else {
 			lappend basm $line
 		}
