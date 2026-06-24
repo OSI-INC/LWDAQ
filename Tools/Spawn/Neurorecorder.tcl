@@ -1,6 +1,6 @@
 # Neurorecorder.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2007-2025 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2026 Kevan Hashemi, Open Source Instruments Inc.
 
 # The Neurorecorder records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "171"
+	LWDAQ_tool_init "Neurorecorder" "172"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -91,7 +91,7 @@ proc Neurorecorder_init {} {
 #
 # The recorder buffer variable holds data that we download from the 
 # receiver but are unable to write to disk because the recording file
-# is locked. 
+# is locked.
 #
 	set info(rbuff) ""
 	set config(max_rbuff) "20000000"
@@ -145,7 +145,7 @@ proc Neurorecorder_init {} {
 	set info(metadata_header_window) "$info(window)\.metadataheader"
 #
 # The recorder_customization string allows us to override default values for
-# data receiver parameters such as coil coordinates.
+# telemetry receiver parameters such as coil coordinates.
 #
 	set config(recorder_customization) ""
 	set info(customization_window) "$info(window)\.customization"
@@ -179,12 +179,18 @@ proc Neurorecorder_init {} {
 	set info(clocks_per_second) 128
 #
 # The Neurorecorder will record events to a log, in particular warnings and
-# errors generated during playback and recording.
+# errors generated during playback and recording. If the log file is locked, we
+# buffer messages until we are able to write again. We have a message we print
+# when we resume writing to the log file.
 #
 	set config(log_warnings) 0
 	set config(log_file) [file join \
 		[file dirname $info(settings_file_name)] Neurorecorder_log.txt]
 	set config(datetime_format) {%d-%b-%Y %H:%M:%S}
+	set info(lbuff) [list]
+	set info(max_lbuff) "100"
+	set info(log_stall_message) "WARNING: Log file locked, buffering messages."
+	set info(log_resume_message) "WARNING: Resumed writing to log file."
 # 
 # Some errors we don't want to write more than once to the text window, so
 # we keep a copy of the most recent error to compare to.
@@ -192,7 +198,7 @@ proc Neurorecorder_init {} {
 	set info(previous_line) ""
 #
 # The recorder_error_time parameter gives us the time when the Neurorecorder
-# first failed to download from the Data Receiver. A zero value means all is
+# first failed to download from the telemetry receiver. A zero value means all is
 # well. The message interval gives us the length of time between error reports
 # to the text window.
 #
@@ -279,7 +285,10 @@ proc Neurorecorder_configure {} {
 # color to the key word "norepeat". The routine always stores the previous line
 # it writes, so as to compare in the case of a norepeat requirement. Note that
 # the final print to a text window uses LWDAQ_print, which will not try to print
-# to a target with a widget-style name when graphics are disabled.
+# to a target with a widget-style name when graphics are disabled. If the log
+# file is locked, the routine buffers the log messages until it is unlocked. It
+# generates its own warning when the file is locked and another when the file
+# becomes unlocked.
 #
 proc Neurorecorder_print {line {color "black"}} {
 	upvar #0 Neurorecorder_config config
@@ -292,11 +301,47 @@ proc Neurorecorder_print {line {color "black"}} {
 	set info(previous_line) $line
 	
 	if {[regexp "^WARNING: " $line] || [regexp "^ERROR: " $line]} {
+		if {$line == $info(log_resume_message)} {
+			set resume "1"
+		} {
+			set resume "0"
+		}
 		append line " ([Neurorecorder_clock_convert [clock seconds]]\)"
+		
 		if {$config(log_warnings)} {
-			LWDAQ_print $config(log_file) "$line"
+			if {[catch {
+				# un-comment the following line and use a global lock flag to test
+				# buffering of log messages.
+				# global lockit; if {$lockit} {error}
+				set f [open $config(log_file) a]
+				if {[llength $info(lbuff)] > 0} {
+					foreach buffered_line $info(lbuff) {
+						puts $f $buffered_line
+					}
+					set info(lbuff) [list]
+				}
+				puts $f $line
+				close $f
+			} error_message]} {
+				if {[llength $info(lbuff)] == 0} {
+					set message "$info(log_stall_message)\
+						([Neurorecorder_clock_convert [clock seconds]]\)"	
+					LWDAQ_print $info(text) $message
+					set info(lbuff) [list $message $line]
+				} {
+					if {!$resume} {
+						lappend info(lbuff) $line
+						if {[llength $info(lbuff)] > $info(max_lbuff)} {
+							set info(lbuff) [lreplace $info(lbuff) 0 0]
+						}
+					} {
+						return ""
+					}
+				}
+			}
 		}
 	}
+	
 	if {$config(verbose) \
 			|| [regexp "^WARNING: " $line] \
 			|| [regexp "^ERROR: " $line] \
@@ -304,6 +349,7 @@ proc Neurorecorder_print {line {color "black"}} {
 		if {$color == "verbose"} {set color black}
 		LWDAQ_print $info(text) $line $color
 	}
+	
 	return ""
 }
 
@@ -670,7 +716,7 @@ proc Neurorecorder_record {{command ""}} {
 	# Check if we have an overriding command passed with the call to this
 	# procedure, as we might from a LWDAQ configuration script.
 	if {$command != ""} {set info(record_control) $command}
-	
+		
 	# If a global reset is going on, go to idle state.
 	if {$LWDAQ_Info(reset)} {
 		set info(record_control) "Idle"
@@ -685,6 +731,12 @@ proc Neurorecorder_record {{command ""}} {
 		array unset info
 		array unset config
 		return ""
+	}
+	
+	# We may be waiting for the log file to be free. If so, try to write the 
+	# buffered messages to disk now.
+	if {$config(log_warnings) && ([llength $info(lbuff)] > 0)} {
+		Neurorecorder_print $info(log_resume_message)
 	}
 	
 	# If Stop, we move to Idle and return.
@@ -716,7 +768,7 @@ proc Neurorecorder_record {{command ""}} {
 		set info(record_control) "Record"
 	}
 	
-	# If we are going to interact with the data receiver at all, apply the
+	# If we are going to interact with the telemetry receiver at all, apply the
 	# Neurorecorder's receiver settings.
 	if {($info(record_control) == "Start") \
 		|| ($info(record_control) == "Record")} {
@@ -736,12 +788,12 @@ proc Neurorecorder_record {{command ""}} {
 		# Turn the recording label to the start color.
 		LWDAQ_set_bg $info(record_control_label) $info(start_color)
 		
-		# Clear the buffer.
+		# Clear the data buffers.
 		set info(rbuff) ""
 
 		# If the synchronization flag is set, or if we are starting a new
 		# recording, we wait until a new second begins so as to make the file
-		# time match the time we reset the data receiver. When we are
+		# time match the time we reset the telemetry receiver. When we are
 		# automatically creating the next archive in a recording, and the
 		# synchronize flag is clear, we will not wait, nor will we be resetting
 		# the receiver.
@@ -762,14 +814,14 @@ proc Neurorecorder_record {{command ""}} {
 		
 		# Set the timestamp for the new file using the computer clock, with
 		# resolution one second. If the computer and receiver clocks are in
-		# exact agreement, we turn off the synchronization option, and there is
-		# no data loss during the recording archive A, the timestamp of the next
-		# archive, B, will be equal to the timestamp of A plus the requested
-		# duration of A. 
+		# exact agreement and we turn off the synchronization option, and there
+		# is no data loss during the recording archive A, the timestamp of the
+		# next archive, B, will be equal to the timestamp of A plus the
+		# requested duration of A. 
 		set config(record_start_clock) [clock seconds]
 		
 		# If the synchronize flag is set, or if we are starting a new recording,
-		# reset the data receiver. We will not reset if this is an autocreation
+		# reset the telemetry receiver. We will not reset if this is an autocreation
 		# and the synchronize flag is cleared.
 		if {($info(record_control) == "Start") || $config(synchronize)} {
 			set info(recorder_error_time) 0
@@ -784,6 +836,7 @@ proc Neurorecorder_record {{command ""}} {
 			}
 			Neurorecorder_set_receiver $iinfo(receiver_type)
 		}
+
 
 		# Restore the recording label to the inactive color.
 		LWDAQ_set_bg $info(record_control_label) $info(inactive_color)
@@ -838,7 +891,7 @@ proc Neurorecorder_record {{command ""}} {
 		set info(record_control) "Record"
 	}
 
-	# If Record, we attempt to download data from the data receiver and record
+	# If Record, we attempt to download data from the telemetry receiver and record
 	# it to disk. If the download attempt fails, we will still try to write any
 	# buffered data to disk. If the download succeeds, but the write failes, we
 	# buffer the downloaded data.
@@ -852,8 +905,8 @@ proc Neurorecorder_record {{command ""}} {
 			return ""
 		}
 
-		# If we are not dealing with no errors, set the record label to the
-		# active color.
+		# If we are not dealing with errors, set the record label to the active
+		# color.
 		if {($info(recorder_error_time) == 0) \
 				&& ([string length $info(rbuff)] == 0)} {
 			LWDAQ_set_bg $info(record_control_label) $info(active_color)
@@ -863,12 +916,12 @@ proc Neurorecorder_record {{command ""}} {
 		if {$iinfo(control) == "Loop"} {set iinfo(control) "Stop"}
 
 		# Set the number of clocks we want to download using the Receiver
-		# Instrument. The Receiver Instrument will giveus exactly this number of
+		# Instrument. The Receiver Instrument will gives exactly this number of
 		# clocks, unless there is an error.
 		set iconfig(daq_num_clocks) \
 			[expr round($config(record_interval) * $info(clocks_per_second))]
 
-		# We are going to make single attempts to contact the data receiver and
+		# We are going to make single attempts to contact the telemetry receiver and
 		# download a block of messages, regardless of the value of
 		# LWDAQ_Info(max_daq_attempts).
 		set saved_max_daq_attempts $LWDAQ_Info(max_daq_attempts)
@@ -882,7 +935,7 @@ proc Neurorecorder_record {{command ""}} {
 			set iconfig(analysis_enable) 0
 		}
 		
-		# Download a block of messages from the data receiver into a LWDAQ
+		# Download a block of messages from the telemetry receiver into a LWDAQ
 		# image, the name of which is $iconfig(memory_name). The Receiver
 		# Instrument returns a string that describes the data block, or reports
 		# an error.
@@ -894,7 +947,7 @@ proc Neurorecorder_record {{command ""}} {
 		# If the attempt to download encountered an error, we keep track of when
 		# we last dealt with an error, so that we do not attempt to correct the
 		# error too often. If the error is corrupted data, we are going to be
-		# resetting the data receiver.
+		# resetting the telemetry receiver.
 		if {[LWDAQ_is_error_result $daq_result]} {
 			set print_error_and_reset 0
 			if {($info(recorder_error_time) == 0)} {
@@ -1028,7 +1081,7 @@ proc Neurorecorder_record {{command ""}} {
 		LWDAQ_post Neurorecorder_record end
 		return ""
 	}
-
+	
 	# We are done and Idle.
 	set info(record_control) "Idle"
 	return ""
@@ -1087,8 +1140,8 @@ proc Neurorecorder_open {} {
 	pack $f.conf -side left -expand yes
 	button $f.help -text "Help" -command "LWDAQ_tool_help Neurorecorder"
 	pack $f.help -side left -expand yes
-	checkbutton $f.synch -variable \
-		Neurorecorder_config(synchronize) -text "Synchronize"
+	checkbutton $f.synch -variable Neurorecorder_config(synchronize) \
+		-text "Synchronize"
 	pack $f.synch -side left -expand yes
 
 	set f $w.record.b
@@ -1143,6 +1196,10 @@ proc Neurorecorder_open {} {
 	pack $f.le -side left -expand yes
 	entry $f.ee -textvariable Neurorecorder_config(autocreate) -width 6
 	pack $f.ee -side left -expand yes
+
+	checkbutton $f.log -variable Neurorecorder_config(log_warnings) \
+		-text "Log Warnings"
+	pack $f.log -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 90 7 1 1]
 	

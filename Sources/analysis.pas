@@ -1,21 +1,20 @@
 {
 	Analysis Library.
 	Copyright (C) 2007-2021, Kevan Hashemi, Brandeis University
-	Copyright (C) 2021-2024, Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2021-2026, Kevan Hashemi, Open Source Instruments Inc.
 	
-	This program is free software; you can redistribute it and/or modify it
+	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free
-	Software Foundation; either version 2 of the License, or (at your option)
+	Software Foundation, either version 3 of the License, or (at your option)
 	any later version.
 
 	This program is distributed in the hope that it will be useful, but WITHOUT
 	ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-	FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+	FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 	more details.
 
 	You should have received a copy of the GNU General Public License along with
-	this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-	Place - Suite 330, Boston, MA	02111-1307, USA.
+	this program.  If not, see <https://www.gnu.org/licenses/>.
 }
 
 library analysis;
@@ -335,7 +334,7 @@ exports
 	image_maximum name exp_prefix+'image_maximum',
 	image_minimum name exp_prefix+'image_minimum',
 	image_sum name exp_prefix+'image_sum',
-	overlay_color name exp_prefix+'overlay_color',
+	pick_plot_color name exp_prefix+'pick_plot_color',
 	spread_overlay name exp_prefix+'spread_overlay',
 	paint_overlay_bounds name exp_prefix+'paint_overlay_bounds',
 	new_image name exp_prefix+'new_image',

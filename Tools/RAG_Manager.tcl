@@ -1,22 +1,29 @@
 # Retrieval-Assisted Generation Manager, a LWDAQ Tool.
 #
-# Copyright (C) 2025 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2025-2026 Kevan Hashemi, Open Source Instruments Inc.
+#
+# The RAG Manager provides Retrieval Access Generation (RAG) for a Chatbot.
+#
 
-# RAG Check provides an interface for our Retrieval Access Generation (RAG)
-# routines, provided by our RAG package.
-
+#
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-
+#
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
+#
 
+#
+# RAG_Manager_init initializes the RAG Manager. Towards the end, it looks for an
+# attempts to execute any saved settings file. Any code that modifies the RAG
+# Manager parameters should be executed after the initialization has completed.
+#
 proc RAG_Manager_init {} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
@@ -24,22 +31,34 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "6.3"
+	LWDAQ_tool_init "RAG_Manager" "8.1"
 	if {[winfo exists $info(window)]} {return ""}
 #
-# Directory locations for key, chunks, embeds.
+# Set the default directory root for the RAG library and initialize file names.
+# If we change the root directory, we must set all these file names again,
+# either with our own configuration code after opening the RAG Manager, or by
+# calling RAG_Manager_set_root and passing in the new value for the root
+# directory.
 #
-	set config(root_dir) "~/Active/RAG"
-	set config(key_file) [file join $config(root_dir) "Key/OpenAI_API.txt"]
+	set config(root_dir) "~/Active/RAG/OSI"
+	set info(key_file) [file join $config(root_dir) "Key.txt"]
+	set info(content_dir) [file join $config(root_dir) "Content"]
+	set info(match_dir) [file join $config(root_dir) "Match"]
+	set info(embed_dir) [file join $config(root_dir) "Embed"]
+	set info(log_dir) [file join $config(root_dir) "Log"]
+	set info(signal_file) [file join $info(log_dir) "signal.txt"]
+	set info(offline_file) [file join $info(log_dir) "offline.txt"]
+	set info(dump_file) [file join $info(log_dir) "dump.txt"]
+	set info(summary_file) [file join $info(log_dir) "summaries.txt"]
 #
 # The default question.
 #
-	set config(question) "What is the operating life of an SCT\
-		with 160-Hz bandwidth and mass 2 g."
+	set config(question) "How do you set up one of OSI's telemetry systems?"
 #
 # Internal flags, lists, and control variables.
 #
 	set info(control) "Idle"
+	set info(abort) "0"
 	set info(engine_ctrl) "Idle"
 	set info(chat) ""
 	set info(ip) "127.0.0.1"
@@ -61,17 +80,19 @@ proc RAG_Manager_init {} {
 	set config(verbose) "0"
 	set config(dump) "0"
 	set config(show_match) "0"
+	set config(show_content_len) "300"
 	set config(snippet_len) "45"
 	set config(progress_frac) "0.1"
+	set config(log_summaries) "1"
 #
 # The source documents. Can be edited with a dedicated window and saved to
 # settings file.
 #
 	set config(sources) {
-
-https://www.bndhep.net/Electronics/A2071/M2071.html
-https://www.bndhep.net/Electronics/LWDAQ/LWDAQ.html
-https://www.bndhep.net/Devices/BCAM/User_Manual.html
+https://www.opensourceinstruments.com/bndhep/Electronics/A2071/M2071.html
+https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/LWDAQ.html
+https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/Cables.html
+https://www.opensourceinstruments.com/bndhep/Devices/BCAM/User_Manual.html
 https://www.opensourceinstruments.com/Electronics/A3013/Flexible_Wires.html
 https://www.opensourceinstruments.com/Electronics/A3013/Hum.html
 https://www.opensourceinstruments.com/Electronics/A3015/M3015.html
@@ -91,6 +112,8 @@ https://www.opensourceinstruments.com/Electronics/A3027/M3027.html
 https://www.opensourceinstruments.com/Electronics/A3029/M3029.html
 https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
 https://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
+https://www.opensourceinstruments.com/Electronics/A3035/M3035.html
+https://www.opensourceinstruments.com/Electronics/A3035/OSR8.html
 https://www.opensourceinstruments.com/Electronics/A3036/M3036.html
 https://www.opensourceinstruments.com/Electronics/A3038/M3038.html
 https://www.opensourceinstruments.com/Electronics/A3040/M3040.html
@@ -104,6 +127,7 @@ https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
 https://www.opensourceinstruments.com/Electronics/A3051/M3051.html
 https://www.opensourceinstruments.com/Electronics/A3052/M3052.html
 https://www.opensourceinstruments.com/Electronics/A3053/M3053.html
+https://www.opensourceinstruments.com/Electronics/A3054/M3054.html
 https://www.opensourceinstruments.com/ACC/ACC.php
 https://www.opensourceinstruments.com/ACC/Overview.html
 https://www.opensourceinstruments.com/ALT/ALT.php
@@ -128,86 +152,154 @@ https://www.opensourceinstruments.com/Resources/Surgery/electrode_sp.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Commands.html
 https://www.opensourceinstruments.com/Software/LWDAQ/Toolmaker_Library.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Acquisifier.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Startup_Manager.html
 https://www.opensourceinstruments.com/Prices.html
 https://www.opensourceinstruments.com/Chat/Manual.html
-
 	}
 #
-# Of we need to send a password to get access to our URLs, we set the password
+# If we need to send a password to get access to our URLs, we set the password
 # here, in the format "username:password".
 #
-set config(userpass) "username:password"
-
+	set config(userpass) "username:password"
 #
 # Configuration for retrieval and submission based upon relevance of the question
 # to the chunk library. We have three tiers of relevance: high, mid, and low.
 #	
 	set config(high_rel_thr) "0.55"
 	set config(mid_rel_thr) "0.30"
-	set config(high_rel_model) "gpt-4o"
-	set config(mid_rel_model) "gpt-4o"
-	set config(low_rel_model) "gpt-4o-mini"
+	set config(high_rel_model) "gpt-5.4"
+	set config(mid_rel_model) "gpt-5.4-mini"
+	set config(low_rel_model) "gpt-5.4-mini"
 	set config(high_rel_words) "5000"
-	set config(mid_rel_words) "5000"
+	set config(mid_rel_words) "40000"
 	set config(low_rel_words) "0"
 	set config(high_rel_chat_words) "3000"
 	set config(mid_rel_chat_words) "3000"
-	set config(low_rel_chat_words) "10000"
+	set config(low_rel_chat_words) "3000"
 	set config(max_question_words) "1000"
 	set config(embed_model) "text-embedding-3-small"
-	set config(temperature) "0.0"
+	set config(summarize_model) "gpt-5.4-mini"
+	set config(completion_endpoint) "https://api.openai.com/v1/chat/completions"
+	set config(embedding_endpoint) "https://api.openai.com/v1/embeddings"
 #
 # Behavior of the chat handler.
 #
-	set config(answer_timeout_s) "30" 
+	set config(answer_timeout_s) "60" 
+	set config(timeout_message) "Hello? Oh dear, I lost my train of thought.\
+		I do apologise. It happens sometimes. Please ask your question again."
 	set config(offline_min) "4"
 #
 # Completion assistant instructions for the three tiers of relevance. Can be
 # edited with a dedicated window and saved to settings file.
 #
-	set config(high_rel_assistant) {
-	
-You are a helpful technical assistant for a support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. If you do not have enough information, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
+	set config(high_rel_prompt) {
+You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-assisted generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
 
 When answering the user's question:
+  - Respond using Markdown formatting.
   - Summarize and explain technical documentation.
   - Complete mathematical calculations whenever possible.
-  - If the question asks for a figure, graph, or image, and a relevant figure is available in the provided content, include the figure in your response like this: `![Figure Caption](image_url)`  
-  - Do not say "I cannot search the web" or "I cannot find images" if a relevant figure is available in the provided content.
-  - Provide at least one hyperlink to original documentation.
-  - Respond using Markdown formatting.
-  - Use LaTeX formatting within Markdown for mathematical expressions.
+  - If the question asks for a figure, graph, or image, and a relevant figure, graph, or image is available in the provided content, include the figure, graph, or image in your response using the format `![Figure Caption](image_url)`.
+  - Provide at least one hyperlink to original documentation, and provide all hyperlinks using the format `[Descriptive Title](full_url)`.
+  - When including configuration blocks, code samples, or structured text, always enclose them in triple backtick Markdown code fences. Do not output raw structured text outside of code fences.
+  - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
-  
+  - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
     }
     
-	set config(mid_rel_assistant) {
-
-You are a helpful technical assistant for a support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the reference documentation and chat history to answer the user’s question with confidence, then answer the question. If you do not have enough information, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
+	set config(mid_rel_prompt) {
+You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-assisted generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
 
 When answering the user's question:
+  - Respond using Markdown formatting.
   - Summarize and explain technical documentation.
   - Complete mathematical calculations whenever possible.
-  - If the question asks for a figure, graph, or image, and a relevant figure is available in the provided content, include the figure in your response like this: `![Figure Caption](image_url)`  
-  - Do not say "I cannot search the web" or "I cannot find images" if a relevant figure is available in the provided content.
-  - Provide at least one hyperlink to original documentation.
-  - Respond using Markdown formatting.
-  - Use LaTeX formatting within Markdown for mathematical expressions.
+  - If the question asks for a figure, graph, or image, and a relevant figure, graph, or image is available in the provided content, include the figure, graph, or image in your response using the format `![Figure Caption](image_url)`.
+  - Provide at least one hyperlink to original documentation, and provide all hyperlinks using the format `[Descriptive Title](full_url)`.
+  - When including configuration blocks, code samples, or structured text, always enclose them in triple backtick Markdown code fences. Do not output raw structured text outside of code fences.
+  - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
-
+  - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
 	}
 	
-	set config(low_rel_assistant) {
-
-You are a helpful technical assistant for a support chatbot. The user’s question may be ambiguous or underspecified. If you have enough information from the chat history to answer the user’s question with confidence, then answer the question. If you do not have enough information, use the reference documentation and chat history to compose a request for clarification in which you ask for specific information that will resolve the ambiguity of the question. Do not make up facts or fabricate plausible-sounding answers. It is better to ask for clarification than to provide inaccurate information.
+	set config(low_rel_prompt) {
+You are a helpful assistant for a general-knowledge chatbot. When a user asks you a question, you will attempt to answer the question using your general knowledge. You will use the chat history to better understand the current question. Do not make up facts or fabricate plausible-sounding answers. If you are uncertain of your answer, tell the user that you do not know the answer.
 
 When answering the user's question:
   - Complete mathematical calculations whenever possible.
   - Respond using Markdown formatting.
-  - Use LaTeX formatting within Markdown for mathematical expressions.
+  - Use LaTeX formatting for mathematical expressions.
   - Use the minimal escaping required to represent valid LaTeX.
+  - Never use ```math blocks for LaTeX. Always use \(...\) or \[...\].
+	}	
+	
+	set config(summarize_prompt) {
+ou are generating retrieval metadata for a fantasy role-playing campaign historian chatbot.
 
-	}
+Your output will be embedded for semantic search and used to retrieve full diary chapters.
+
+The output is NOT intended for human reading as prose literature.
+The output IS intended to maximize retrieval accuracy for:
+- character names
+- locations
+- organizations and groups
+- events
+- relationships
+- conflicts
+- recurring topics
+- memorable incidents
+
+Write compactly and densely.
+Prefer factual phrasing over literary narration.
+Do not omit named entities.
+Do not explain or analyze themes.
+Do not speculate.
+Do not invent information.
+
+Output EXACTLY the following markdown structure and headings:
+
+Summary:
+<One compact paragraph of 80-250 words summarizing the chapter's major events, interactions, conflicts, discoveries, movements, and outcomes. Mention all major named characters, locations, groups, and important events naturally in the prose. Maximize semantic density.>
+
+Characters:
+ - <character>
+ - <character>
+
+Locations:
+ - <location>
+ - <location>
+
+Groups:
+ - <group or faction>
+ - <group or faction>
+
+Topics:
+ - <important topic>
+ - <important topic>
+
+Rules:
+- Preserve exact spelling of names and places from the source text.
+- Include all characters who speak, travel, fight, investigate, negotiate, perform, lead, betray, assist, or otherwise significantly participate.
+- Include inns, cities, regions, forests, buildings, landmarks, and destinations in Locations.
+- Include bands, factions, military units, tribes, guilds, tavern groups, cults, performing troupes, and other named collectives in Groups.
+- Topics should be short noun phrases, not sentences.
+- Do not include dates.
+- Do not include Page or Chapter titles.
+- Do not include explanations outside the required structure.
+- Avoid duplicate entries.
+- Keep Topics semantically broad enough to match user questions, but specific enough to distinguish this chapter from nearby chapters.
+	}	
+	set config(summarize_question) {
+Provide a summary in accordance with your instructions.	
+	}	
+#
+# When debugging the manager's formatting of the answers it gets from the end-points, 
+# we insert our own answer into the manager instead of getting one from the end 
+# point. When the diagnostic answer string is not empty, the manager will refrain from
+# contacting the completion end point and instead return the diagnostic string.
+#
+	set config(diag_answer) {}
 #
 # A list of html entities and the unicode characters we want to replace them
 # with.
@@ -285,7 +377,7 @@ When answering the user's question:
 #
 # Tags we convert only after we perform chunking.
 #	
-set info(entities_final_convert) {
+	set info(entities_final_convert) {
 		&lt;        "<"
 		&gt;        ">"
 }
@@ -324,7 +416,7 @@ set info(entities_final_convert) {
 #
 # The fragment delimiting tags.
 #
-	set info(frag_tags) {p center pre equation figure ul ol title h1 h2 h3}
+	set info(frag_tags) {p center pre equation script form figure ul ol title h1 h2 h3}
 #
 # Input-output parameters.
 #	
@@ -348,16 +440,6 @@ set info(entities_final_convert) {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 #
-# Configure the file locations based upon the root.
-#
-	set info(content_dir) [file join $config(root_dir) "Content"]
-	set info(match_dir) [file join $config(root_dir) "Match"]
-	set info(embed_dir) [file join $config(root_dir) "Embed"]
-	set info(log_dir) [file join $config(root_dir) "Log"]
-	set info(signal_file) [file join $info(log_dir) "signal.txt"]
-	set info(offline_file) [file join $info(log_dir) "offline.txt"]
-	set info(dump_file) [file join $info(log_dir) "dump.txt"]
-#
 # Empty string return means all well.
 #
 	return ""	
@@ -380,7 +462,7 @@ proc RAG_Manager_time {{ts ""}} {
 # $info(text) is a text widget, the text will be printed there with colors. If
 # it is stdout, the text will go to the console, or wherever stdout is directed.
 # If it is a valid file name in a directory in which the RAG Manager has write
-# priviledge, the output will be appended to the file.
+# privilege, the output will be appended to the file.
 #
 proc RAG_Manager_print {s {color "black"}} {
 	upvar #0 RAG_Manager_info info
@@ -408,188 +490,104 @@ proc RAG_Manager_snippet {page index} {
 }
 
 #
-# RAG_Manager_apply reads the contents of a text window and executes them as a
-# Tcl script at the global scope. We can use this routine to reconfigure long
-# string parameters such as our assistant instructions. Within the scripts we
-# can refer to the RAG Manager configuration and information arrays as "config"
-# and "info".
+# RAG_Manager_apply reads the contents of a text window, trims whitespace, and
+# assigns the resulting string to a configuration parameter.
 #
-proc RAG_Manager_apply {w} {
+proc RAG_Manager_apply {w pname} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 
-	set commands {
-		upvar #0 RAG_Manager_info info
-		upvar #0 RAG_Manager_config config	
-	}
-	append commands [string trim [$w.text get 1.0 end]]
-	if {[catch {eval $commands} error_result]} {
-		RAG_Manager_print "ERROR: $error_result"
-	}
-	
+	set config($pname) [string trim [$w.text get 1.0 end]]
 	return ""
 }
 
 #
-# RAG_Manager_assistant_prompts opens a text window and prints out the declarations of
-# the three assistant instructions. We can edit and then apply with an Apply
-# button.
+# RAG_Manager_edit_param opens a text window, prints the value of a parameter
+# in the window and creates an Apply button that, when pressed, saves the
+# edited contents of the window to the same parameter.
 #
-proc RAG_Manager_assistant_prompts {} {
+proc RAG_Manager_edit_param {pname} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	# If the assistant viewing panel exists, destroy it. We are going to make a
-	# new one.
-	set w $info(window)\.assistant
+	# If the editing panel for this parameter already exists, destroy it. We are
+	# going to make a new one.
+	set w $info(window).$pname
 	if {[winfo exists $w]} {destroy $w}
 	
 	# Create a new top-level text window that is a child of the main tool
-	# window. Bind the Command-a key to save the metadata.
+	# window. 
 	toplevel $w
-	wm title $w "Assistant Prompts, RAG_Manager $info(version)"
+	wm title $w "Editor for \"$pname\", RAG_Manager $info(version)"
 	LWDAQ_text_widget $w 100 40
 	LWDAQ_enable_text_undo $w.text
-	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
 	
-	# Create the Applpy button.
+	# Create the Apply button.
 	frame $w.f
 	pack $w.f -side top
-	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
+	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w $pname]
 	pack $w.f.apply -side left
+
+	# Bind command-a to the same apply command.
+	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w $pname]
 	
-	# Print the assistant prompts for all relevance levels.
-	foreach level {high_rel mid_rel low_rel} {
-		LWDAQ_print $w.text "set config($level\_assistant) \{\n" blue
-		LWDAQ_print $w.text "[string trim $config($level\_assistant)]"
-		LWDAQ_print $w.text "\n\}\n" blue
-	}
+	# Print the parameter value.
+	LWDAQ_print $w.text "[set config($pname)]"
 	
-	return ""
+	# Return the window name.
+	return $w
 }
 
 #
-# RAG_Manager_source_urls opens a text window and prints out the source list. We can
-# edit and then apply with an Apply button.
-#
-proc RAG_Manager_source_urls {} {
-	upvar #0 RAG_Manager_info info
-	upvar #0 RAG_Manager_config config
-	
-	# If the source viewing panel exists, destroy it. We are going to make a
-	# new one.
-	set w $info(window)\.sources
-	if {[winfo exists $w]} {destroy $w}
-	
-	# Create a new top-level text window that is a child of the main tool
-	# window. Bind the Command-a key to save the metadata.
-	toplevel $w
-	wm title $w "Source Documents, RAG_Manager $info(version)"
-	LWDAQ_text_widget $w 100 20
-	LWDAQ_enable_text_undo $w.text
-	LWDAQ_bind_command_key $w "a" [list RAG_Manager_apply $w]
-	
-	# Create the Applpy button.
-	frame $w.f
-	pack $w.f -side top
-	button $w.f.apply -text "Apply" -command [list RAG_Manager_apply $w]
-	pack $w.f.apply -side left
-	
-	# Print the sources list in the window.
-	LWDAQ_print $w.text "set config(sources) \{\n" blue
-	LWDAQ_print $w.text "[string trim $config(sources)]"
-	LWDAQ_print $w.text "\n\}\n" blue
-	
-	return ""
-}
-
-#
-# RAG_Manager_set_root takes a directory name as input. If this name is an empty
-# string or omitted, it opens a browser window to allow us to pick a directory
-# to act as the RAG Manager's root directory. If this directory contains the
-# Content, Match, Embed, and Log directories, so much the better, but if not,
-# this procedure will create them. The procedure returns the current root
-# directory, whether it has been changed or not.
+# RAG_Manager_set_root takes a directory name as input and calculates all the
+# file names for RAG management. If the root directory does not exist, the
+# routine aborts peacefully. If the root directory does exist, the routine 
+# ensures that the required subdirectories are present.
 #
 proc RAG_Manager_set_root {{rdn ""}} {
 	upvar #0 RAG_Manager_config config
 	upvar #0 RAG_Manager_info info
 
-	if {$info(control) != "Idle"} {return ""}
-	set info(control) "Root_Dir"
-	RAG_Manager_print "Choosing Root Directory [RAG_Manager_time]" purple
-
 	if {$rdn == ""} {
+		RAG_Manager_print "Selecting Root Directory" purple
 		set rdn [LWDAQ_get_dir_name $config(root_dir)]
-	}
-	
-	if {![file exists $rdn]} {
-		RAG_Manager_print "ERROR: Directory \"$rdn\" does not exist."
-		set info(control) "Idle"
-		return $config(root_dir)
-	}
-	
-	set config(root_dir) $rdn
-	RAG_Manager_print "Root Directory: $rdn"
-	if {[catch {
-		foreach sdn {Content Match Embed Log} {
-			set sdn [file join $config(root_dir) $sdn]
-			if {[file exists $sdn]} {
-				RAG_Manager_print "Found $sdn"
-			} else {
-				file mkdir $sdn
-				RAG_Manager_print "Created $sdn"
-			}
+		if {$rdn == ""} {
+			RAG_Manager_print "No new root directory \"$rdn\"."
+			return $config(root_dir)
 		}
-	} error_message]} {
-		RAG_Manager_print "ERROR: $error_message"
-		set info(control) "Idle"
-		return $rdn
+		RAG_Manager_print "Selected directory \"$rdn\"."
+	}
+	if {![file exists $rdn]} {
+		return $config(root_dir)
+	} else {
+		set config(root_dir) $rdn
 	}
 	
-	set info(content_dir) [file join $config(root_dir) "Content"]
-	set info(match_dir) [file join $config(root_dir) "Match"]
-	set info(embed_dir) [file join $config(root_dir) "Embed"]
-	set info(log_dir) [file join $config(root_dir) "Log"]
+	foreach sdn {Content Match Embed Log} {
+		set sdn [file join $config(root_dir) $sdn]
+		if {![file exists $sdn]} {
+			file mkdir $sdn
+		}
+	}
 	
-	RAG_Manager_print "New root directory established [RAG_Manager_time]" purple
-	set info(control) "Idle"
+	set info(key_file) [file join $rdn "Key.txt"]
+	set info(content_dir) [file join $rdn "Content"]
+	set info(match_dir) [file join $rdn "Match"]
+	set info(embed_dir) [file join $rdn "Embed"]
+	set info(log_dir) [file join $rdn "Log"]
+	set info(signal_file) [file join $info(log_dir) "signal.txt"]
+	set info(offline_file) [file join $info(log_dir) "offline.txt"]
+	set info(dump_file) [file join $info(log_dir) "dump.txt"]
+	set info(summary_file) [file join $info(log_dir) "summary.txt"]
+
 	return $rdn
-}
-
-#
-# RAG_Manager_set_key selects the key file we need to access endpoints.
-#
-proc RAG_Manager_set_key {{kfn ""}} {
-	upvar #0 RAG_Manager_config config
-	upvar #0 RAG_Manager_info info
-
-	if {$info(control) != "Idle"} {return ""}
-	set info(control) "Key_File"
-	RAG_Manager_print "Choosing Key File [RAG_Manager_time]" purple
-
-	if {$kfn == ""} {
-		set kfn [LWDAQ_get_file_name]
-	}
-	
-	if {![file exists $kfn]} {
-		RAG_Manager_print "ERROR: File \"$kfn\" does not exist."
-		set info(control) "Idle"
-		return $config(key_file)
-	}
-	
-	set config(key_file) $kfn
-	RAG_Manager_print "Key File: $kfn"
-
-	RAG_Manager_print "New key file chosen [RAG_Manager_time]" purple
-	set info(control) "Idle"
-	return $kfn
 }
 
 #
 # RAG_Manager_configure opens the tool configuration window, which allows us to
 # edit the configuration parameters. Additional buttons give access to multi-line
-# parameters, like the source url list and the assistant prompts.
+# parameters, like the source url list, assistant prompts, and the diagnostic 
+# answer we use to test chatbot answer rendering.
 #
 proc RAG_Manager_configure {} {
 	upvar #0 RAG_Manager_config config
@@ -597,9 +595,15 @@ proc RAG_Manager_configure {} {
 
 	set f [LWDAQ_tool_configure RAG_Manager 3]
 
-	foreach a {Set_Root Set_Key Source_URLs Assistant_Prompts} {
+	foreach a {Set_Root} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
+		pack $f.$b -side left -expand yes
+	}
+	foreach a {Sources High_Rel_Prompt Mid_Rel_Prompt Low_Rel_Prompt Diag_Answer} {
+		set b [string tolower $a]
+		button $f.$b -text "$a" -command \
+			[list LWDAQ_post "RAG_Manager_edit_param $b"]
 		pack $f.$b -side left -expand yes
 	}
 		
@@ -926,7 +930,7 @@ proc RAG_Manager_extract_date {frag} {
 }
 
 #
-# RAG_Manager_catalog_frags takes an html page and makes a list of fragments
+# RAG_Manager_catalog_frags takes an html page and makes a list of fragment
 # descriptors. Each descriptor consists of a start and end index for the content
 # of the fragment and the fragment type. The indices point to the first and last
 # characters within the fragment, not including whatever delimiters we used to find
@@ -944,7 +948,6 @@ proc RAG_Manager_catalog_frags {page} {
 	foreach {tag} $info(frag_tags) {
 		set index 0
 		while {$index < [string length $page]} {
-			LWDAQ_support
 			set indices [RAG_Manager_locate_field $page $index $tag]
 			scan $indices %d%d%d%d i_body_begin i_body_end i_field_begin i_field_end
 			if {$i_body_end > $i_body_begin} {
@@ -952,6 +955,13 @@ proc RAG_Manager_catalog_frags {page} {
 				lappend catalog $descriptor
 			}
 			set index [expr $i_field_end + 1]
+			
+			LWDAQ_support
+			if {$info(abort)} {
+				set info(abort) 0
+				set info(control) "Idle"
+				return ""
+			} 
 		}
 	}
 	
@@ -1035,6 +1045,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 	set section_chunk 0
 	set match_prompts_only 0
 	set omit_lists 0
+	set summary_match 0
 	set commands [RAG_Manager_list_bodies $page "rag"]
 	foreach cmd $commands {
 		switch -- $cmd {
@@ -1054,6 +1065,9 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"omit-lists" {
 				set omit_lists 1
 			}
+			"summary-match" {
+				set summary_match 1
+			}
 			default {
 				RAG_Manager_print "WARNING: Unrecognised directive \"$cmd\""
 			}
@@ -1062,7 +1076,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 	RAG_Manager_print "Generation rules:\
 		page_chunk=$page_chunk,\
 		chapter_chunk=$chapter_chunk,\
-		section-chunk=$section_chunk,\
+		\nsection-chunk=$section_chunk,\
 		match-prompts-only=$match_prompts_only,\
 		omit-lists=$omit_lists."
 	
@@ -1073,8 +1087,6 @@ proc RAG_Manager_construct_chunks {page frags} {
 	set section "NONE"
 	set prev_section "NONE"
 	set prev_name "NONE"
-	set empty_match 0
-	set empty_content 0
 	set contaminated 0
 	set chunks [list]
 	foreach frag_id $frags {
@@ -1127,6 +1139,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 					set match "$caption"
 					set name "video"
 				} else {
+					if {$caption == ""} {continue}
 					set content "$caption"
 					set match "$caption"
 					set name "center"
@@ -1137,6 +1150,12 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set figures [RAG_Manager_extract_figures $content]
 				set content "$caption\n\n$figures"
 				set match "$caption"
+			}
+			"form" {
+				set match $content
+			}
+			"script" {
+				set match $content
 			}
 			"equation" {
 				set match $content
@@ -1156,7 +1175,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set document [string trim $content]
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
-					[format %6s $name]\
+					[format %9s $name]\
 					\"$document\"" brown
 				continue
 			}
@@ -1168,7 +1187,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set prev_name $name
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
-					[format %6s $name]\
+					[format %9s $name]\
 					\"$chapter\"" brown	
 				continue
 			}
@@ -1178,7 +1197,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set prev_name $name
 				RAG_Manager_print "[format %7.0f $i_start]\
 					[format %7.0f $i_end]\
-					[format %6s $name]\
+					[format %9s $name]\
 					\"$section\"" brown
 				continue
 			}
@@ -1197,15 +1216,6 @@ proc RAG_Manager_construct_chunks {page frags} {
 		set content [RAG_Manager_remove_dates $content]
 		set content [string trim $content]
 		
-		if {([string length $content] == 0)} {
-			incr empty_content
-			if {$name != "center"} {
-				RAG_Manager_print "WARNING: Empty $name content\
-					\"[RAG_Manager_snippet $page $i_start]\""
-			}
-			continue
-		}
-
 		if {$match_prompts_only} {
 			set prompts [RAG_Manager_list_bodies $match "prompt"]
 			set prompts [join $prompts "\n"]
@@ -1219,7 +1229,6 @@ proc RAG_Manager_construct_chunks {page frags} {
 		}
 		if {$match == ""} {
 			if {!$page_chunk && !$chapter_chunk && !$section_chunk} {
-				incr empty_match
 				continue
 			}
 		}
@@ -1227,12 +1236,15 @@ proc RAG_Manager_construct_chunks {page frags} {
 		if {$config(verbose)} {
 			RAG_Manager_print "[format %7.0f $i_start]\
 				[format %7.0f $i_end]\
-				[format %6s $name]\
+				[format %9s $name]\
 				\"[RAG_Manager_snippet $content 0]\"" green	
 		}
 
 		set content_heading ""
 		set match_heading ""
+		if {$summary_match} {
+			append match_heading "%%%%Summarize\n"
+		}
 		append content_heading "%%%%Document: $document\n"
 		if {[regexp \
 				{Manual$|Guide$|^Guide|Tutorial$|Protocol$|Reference$|Overview$} \
@@ -1247,7 +1259,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		}
 		if {$section != "NONE"} {
 			append content_heading "%%%%Section: $section\n"
-			append match_heading ",$section section"
+			append match_heading ", $section section"
 		}
 		if {$match_heading != ""} {
 			append match_heading "."
@@ -1263,40 +1275,33 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"ul" -
 			"pre" {
 				if {$prev_name == "p"} {
-					if {$match != ""} {
-						lset chunks end 0 \
-							"[string trim [lindex $chunks end 0]\n\n$match]"
-					}
-					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
+					lset chunks end 0 \
+						"[string trim [lindex $chunks end 0]\n\n$match]"
+					lset chunks end 1 \
+						"[string trim [lindex $chunks end 1]\n\n$content]"
 				} else {
 					set append_chunk 1
 				}
 			}
 			
-			"equation" {
-				switch -- $prev_name {
-					"equation" {
-						if {$match != ""} {
-							set match \
-								"[string trim [lindex $chunks end 0]\n\n$match]"
-						}
-						set content "[lindex $chunks end 1]\n\n$content"
-						lset chunks end [list $match $content]
-					}
-					default {
-						set content_heading ""
-						set match_heading ""
-						set append_chunk 1
-					}
+			"equation" -
+			"script" {
+				if {[llength $chunks] > 0} {
+					lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
+				} else {
+					set append_chunk 1
 				} 
+			}
+			
+			"form" {
+
 			}
 			
 			default {
 				switch -- $prev_name {
 					"equation" {
-						set match "$match"
-						set content "[lindex $chunks end 1]\n\n$content"
-						set chunks [lreplace $chunks end end [list $match $content]]
+						lset chunks end 0 "$match"
+						lset chunks end 1 "[lindex $chunks end 1]\n\n$content"
 					}
 					default {
 						set append_chunk 1	
@@ -1338,15 +1343,19 @@ proc RAG_Manager_construct_chunks {page frags} {
 		}
 		
 		set prev_name $name
+		
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
 	}
 	
 	RAG_Manager_print "Final document title \"$document\"."
 	RAG_Manager_print "Generated [llength $chunks] chunks\
-		from [llength $frags] fragments,\
-		[expr $contaminated+$empty_match+$empty_content] rejects,\
-		$contaminated contaminated,\
-		$empty_match empty match,\
-		$empty_content empty content."
+		from [llength $frags] fragments\
+		with $contaminated contaminated fragments."
 	
 	return $chunks
 }
@@ -1510,6 +1519,141 @@ proc RAG_Manager_convert_entities {page entitylist} {
 }
 
 #
+# RAG_Manager_add_names takes a chunk list, in which each chunk consists of a
+# match and content string, in that order, and returns a list in which each
+# chunk consists of a match, content, and name string, in that order. To
+# generate the name string, the routine takes each match string and uses its
+# contents to obtain a unique hash name for the chunk. We will use this name to
+# form the content, match, and embed names, which will in fact all be the same
+# "hashstring.txt" in each of the three directories. 
+#
+proc RAG_Manager_add_names {chunks} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+
+	set new_chunks [list]
+	foreach chunk $chunks {
+		set match [lindex $chunk 0]
+		set content [lindex $chunk 1]
+		set name [lindex $chunk 2]
+		set cmd [list echo -n $match | openssl dgst -sha1]
+		if {[catch {
+			set result [eval exec $cmd]
+		} error_result]} {
+			RAG_Manager_print "ERROR: $error_result"
+			RAG_Manager_print $content green
+			break
+		}
+		if {[regexp {[a-f0-9]{40}} $result hash]} {
+			set hash [string range $hash 1 $info(hash_len)]
+		} else {
+			RAG_Manager_print "ERROR: No hash string found in openssl result."
+			RAG_Manager_print "RESULT: $result"
+			break
+		}
+		lappend new_chunks [list $match $content $hash]
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
+	}
+	return $new_chunks
+}
+
+#
+# RAG_Manager_summarize_matches submits each match string to a completion engine
+# to obtain a summary that replaces the match string. The name of the match
+# string does not change. The routine checks to see if the original match string
+# already exists on disk. If it does, the routine reads the summary from disk.
+# Otherwise, it creates a new summary. If summarization failes, we print an
+# error and discard the chunk. Sometimes the summarizing endpoint fails to
+# return a summary. By discarding the chunk, we make sure no match string will
+# be written to disk in place of the summary, so that when we run this routine
+# again, it will create the summary. 
+#
+proc RAG_Manager_summarize_matches {chunks} {
+	upvar #0 RAG_Manager_info info
+	upvar #0 RAG_Manager_config config
+	
+	set api_key ""
+	set new_chunks [list]
+	set existing_summaries 0
+	set new_summaries 0
+	set requested_summaries 0
+	foreach chunk $chunks {
+		set match [lindex $chunk 0]
+		set content [lindex $chunk 1]
+		set name [lindex $chunk 2]
+		if {[regexp {%%%%Summarize\n} $match]} {
+			incr requested_summaries
+			set match [regsub {%%%%Summarize\n} $match ""]
+			set match_file [file join $info(match_dir) $name.txt]
+			if {[file exists $match_file]} {
+				set f [open $match_file r]
+				set match [read $f]
+				close $f
+				if {$config(log_summaries)} {
+					LWDAQ_print $info(summary_file) $match
+					LWDAQ_print $info(summary_file) "\n-----------------------------"
+				}
+				lappend new_chunks [list $match $content $name]
+				incr existing_summaries
+			} else {
+				if {![regexp {^.*?\n\n} $match header]} {
+					set header ""
+				}
+				set len [expr round([string length $match] / $info(word_size))]
+				RAG_Manager_print "Summarizing $len words for chunk $name\
+					using $config(summarize_model)..."
+				if {$api_key == ""} {
+					set f [open $info(key_file) r]
+					set api_key [read $f]
+					close $f 
+				}
+				set json [RAG_Manager_get_answer \
+					$config(summarize_model) \
+					$config(summarize_prompt) \
+					[list $match] \
+					$config(summarize_question) \
+					$api_key]
+				if {[regexp {"content": *"((?:[^"\\]|\\.)*)"} $json -> s]} {
+					regsub -all {\\r\\n|\\r|\\n} $s "\n" s
+					regsub -all {\\"} $s {"} s
+					set match "$header"
+					append match $s
+					RAG_Manager_print "$match" green
+					if {$config(log_summaries)} {
+						LWDAQ_print $info(summary_file) $match
+						LWDAQ_print $info(summary_file) "\n-----------------------------"
+					}
+					lappend new_chunks [list $match $content $name]
+					incr new_summaries
+				} elseif {[regexp {"message": *"((?:[^"\\]|\\.)*)"} $json -> message]} {
+					RAG_Manager_print "ERROR: $message"
+				} else {
+					RAG_Manager_print "ERROR: Could not find any message in response."
+				}
+			} 
+		} else {
+			lappend new_chunks $chunk
+		}
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
+	}
+	RAG_Manager_print "Requested $requested_summaries summaries,\
+		found $existing_summaries,\
+		created $new_summaries,\
+		missing [expr $requested_summaries - $existing_summaries - $new_summaries]."
+	return $new_chunks
+}
+
+#
 # RAG_Manager_chunk_page downloads an html page from a url, splits it into
 # chunks of text, and returns a list of chunks. If the dump flag is set, the
 # routine writes all the chunk match and content strings to a chunk dump file.
@@ -1550,6 +1694,13 @@ proc RAG_Manager_chunk_page {url} {
 	
 	RAG_Manager_print "Inserting chapter urls in all chunks..." 
 	set chunks [RAG_Manager_chapter_urls $chunks $url]
+	
+	RAG_Manager_print "Generating chunk names from match strings..."
+	set chunks [RAG_Manager_add_names $chunks]
+	
+	RAG_Manager_print "Summarizing match strings wherever requested..."
+	set chunks [RAG_Manager_summarize_matches $chunks]
+	
 	RAG_Manager_print "Chunk list complete." 
 
 	return $chunks
@@ -1557,61 +1708,43 @@ proc RAG_Manager_chunk_page {url} {
 
 #
 # RAG_Manager_store_chunks stores the match and content strings of a chunk list
-# to disk. It stores the content strings in the contents_dir and the match
-# strings in the matches_dir. It takes each match string and uses its contents
-# to obtain a unique hash name for the chunk. We will use this name to form the
-# content, match, and embed names, which will in fact all be the same: hash.txt.
-# With this routine, we store the content string with as hash.txt in the
-# contents_dir, the match string as hash.txt in the match_dir. The routine takes
-# as input a chunk list, in which each chunk consists of a match string and a
-# content string.
+# to disk using their names, which are part of the chunk array. It stores the
+# content strings in the contents_dir and the match strings in the matches_dir.
+# The routine takes as input a chunk list, in which each chunk consists of a
+# match string, a content string, and a hash name for the chunk, which was
+# previously generated from its original match string, prior to any summarizing
+# of the match string that may have taken place. Once the procedure finishes
+# storing all the new chunks to disk, it purges any chunks that it did not
+# write to disk.
 #
 proc RAG_Manager_store_chunks {chunks} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	RAG_Manager_print "Storing [llength $chunks] chunks\
-		in content and match directories..." 
-	set count 0
-	set duplicates 0
+	RAG_Manager_print "Storing new chunks to disk..." 
+	set new_count 0
+	set old_count 0
 	foreach chunk $chunks {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
-
-		set cmd [list echo -n $match | openssl dgst -sha1]
-		if {[catch {
-			set result [eval exec $cmd]
-		} error_result]} {
-			RAG_Manager_print "ERROR: $error_result"
-			RAG_Manager_print $content green
-			continue
-		}
-		if {[regexp {[a-f0-9]{40}} $result hash]} {
-			set hash [string range $hash 1 $info(hash_len)]
-		} else {
-			RAG_Manager_print "ERROR: Cannot find hash string in openssl result."
-			RAG_Manager_print "RESULT: $result"
-			break
-		}
+		set name [lindex $chunk 2]
 		
 		if {[catch {
-			set mfn [file join $info(match_dir) $hash\.txt]
-			if {[file exists $mfn]} {
-				RAG_Manager_print "[format %5d $count]: [file tail $mfn]\
-					\"[RAG_Manager_snippet [regsub {^.*?\n\n} $match ""] 0]\"" brown
-				incr duplicates
+			set mfn [file join $info(match_dir) $name\.txt]
+			set cfn [file join $info(content_dir) $name\.txt]
+			if {![file exists $mfn]} {
+				set f [open $mfn w]
+				puts -nonewline $f $match
+				close $f
+				set f [open $cfn w]
+				puts -nonewline $f $content
+				close $f
+				incr new_count
+			} else {
+				incr old_count
 			}
-			set f [open $mfn w]
-			puts -nonewline $f $match
-			close $f
-
-			set cfn [file join $info(content_dir) $hash\.txt]
-			set f [open $cfn w]
-			puts -nonewline $f $content
-			close $f
 		} error_message]} {
-			RAG_Manager_print "ERROR: $error_result"
-			RAG_Manager_print "SUGGESTION: Use Set_Root in the Configuration Panel."
+			RAG_Manager_print "ERROR: $error_message"
 			break
 		}
 		
@@ -1625,9 +1758,38 @@ proc RAG_Manager_store_chunks {chunks} {
 		}
 		
 		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return 0
+		} 
 	}
-	RAG_Manager_print "Stored $count chunks, of which $duplicates duplicates,\
-		yielding [expr $count - $duplicates] chunks on disk." 
+	RAG_Manager_print "Of $count chunks generated,\
+		$new_count were new, $old_count were pre-existing."
+	
+	RAG_Manager_print "Purging obsolete chunks..."
+	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
+	set purge_count 0
+	set retain_count 0
+	if {[catch {
+		foreach cfn $cfl {
+			set root [file root [file tail $cfn]]
+			if {[lsearch -index 2 $chunks $root] < 0} {
+				file delete $cfn
+				file delete [file join $info(match_dir) $root.txt]
+				incr purge_count
+			} else {
+				incr retain_count
+			}
+		}
+	} error_message]} {
+		RAG_Manager_print "ERROR: $error_message"
+		break
+	}
+	RAG_Manager_print "Found [llength $cfl] chunks,\
+		purged $purge_count obsolete chunks,\
+		retained $retain_count chunks."
+
 	return $count
 }
 
@@ -1650,17 +1812,19 @@ proc RAG_Manager_embed_string {match api_key} {
 	set json_body " \{\n \
 		\"model\": \"$config(embed_model)\",\n \
 		\"input\": \"$match\"\n \}"
-	set cmd [list curl -sS -X POST https://api.openai.com/v1/embeddings \
+	set cmd [list curl -sS -X POST $config(embedding_endpoint) \
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $api_key" \
 		-d $json_body]
 	
 	if {[catch {
-		set result [eval exec $cmd]
+		set embed [eval exec $cmd]
 	} error_result]} {
-		return "ERROR: $error_result"
+		RAG_Manager_print "ERROR: $error_result"
+		set embed ""
 	}
-	return $result
+	
+	return [string trim $embed]
 }
 
 #
@@ -1671,11 +1835,16 @@ proc RAG_Manager_vector_from_embed {embed} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 		
-	if {[regexp {"embedding": \[([^\]]*)} $embed -> vector]} {
+	if {[regexp {"embedding"\s*:\s*\[([^\]]*)} $embed -> vector]} {
 		regsub -all {,} $vector " " vector
 		regsub -all {[\n\t ]+} $vector " " vector
 	} else {
-		RAG_Manager_print "ERROR: Could not find vector in embed."
+		RAG_Manager_print "ERROR: Could not find vector in embed, json prefix below."
+		if {[regexp {"message"\s*:\s* \[([^\]]*)} $embed -> message]} {
+			RAG_Manager_print "MESSAGE: $message"
+		} else {
+			RAG_Manager_print "PREAMBLE: [string range $embed 0 200]"
+		}
 		set vector ""
 	}
 
@@ -1708,6 +1877,7 @@ proc RAG_Manager_fetch_embeds {api_key} {
 	set new_count 0
 	set old_count 0
 	set count 0
+	set missing_count 0
 	RAG_Manager_print "Creating embeds for new match strings..."
 	foreach mfn $mfl {
 		incr count
@@ -1719,14 +1889,14 @@ proc RAG_Manager_fetch_embeds {api_key} {
 			RAG_Manager_print "[format %5d $count]:\
 				[file tail $mfn] fetching embed..." orange
 			set embed [RAG_Manager_embed_string $match $api_key]
-			if {[LWDAQ_is_error_result $embed]} {
-				RAG_Manager_print "ERROR: $embed"
-				break
+			if {$embed == ""} {
+				incr missing_count
+				continue
 			}
 			set vector [RAG_Manager_vector_from_embed $embed]
-			if {[LWDAQ_is_error_result $vector]} {
-				RAG_Manager_print "ERROR: $vector"
-				break
+			if {$vector == ""} {
+				incr missing_count
+				continue
 			}
 			set efn [file join $info(embed_dir) $root\.txt]
 			set f [open $efn w]
@@ -1743,7 +1913,12 @@ proc RAG_Manager_fetch_embeds {api_key} {
 				}
 			}
 		} 
-		LWDAQ_update
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return 0
+		} 
 	}
 
 	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
@@ -1758,7 +1933,8 @@ proc RAG_Manager_fetch_embeds {api_key} {
 	RAG_Manager_print "Checked $count chunks,\
 		found $old_count embeds,\
 		fetched $new_count embeds,\
-		$obsolete_count obsolete embeds."
+		detected $obsolete_count obsolete embeds,\
+		counted $missing_count missing embeds."
 		
 	return $new_count
 }
@@ -1817,8 +1993,8 @@ proc RAG_Manager_offline {offline} {
 
 #
 # RAG_Manager_delete deletes all chunks from the chunk directory. It does not
-# delete embeddings in the embed directory. Unused embedding vectors are culled
-# during generation.
+# delete embeddings in the embed directory. Unused embedding vectors are can be
+# culled with the purge routine.
 #
 proc RAG_Manager_delete {} {
 	upvar #0 RAG_Manager_config config
@@ -1835,6 +2011,11 @@ proc RAG_Manager_delete {} {
 		file delete $cfn
 		incr count
 		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
 	}
 	RAG_Manager_print "Deleted $count content strings."
 
@@ -1845,6 +2026,11 @@ proc RAG_Manager_delete {} {
 		file delete $mfn
 		incr count
 		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
 	}
 	RAG_Manager_print "Deleted $count match strings."
 
@@ -1866,29 +2052,46 @@ proc RAG_Manager_chunk {} {
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Chunk"
 	RAG_Manager_print "Download Sources and Chunk [RAG_Manager_time]" purple
-	
+	RAG_Manager_print "Root directory \"$config(root_dir)\"."
 	set chunks [list]
+	if {[file exists $info(summary_file)]} {file delete $info(summary_file)}	
 	foreach url [string trim $config(sources)] {
 		set new_chunks [RAG_Manager_chunk_page $url]
 		if {[llength $new_chunks] > 0} {
 			set chunks [concat $chunks $new_chunks]
 		}
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+		} 
+		if {$info(control) == "Idle"} {
+			return 0
+		}
 	}
 	
-	if {[file exists $info(dump_file)]} {file delete $info(dump_file)}
+	if {[file exists $info(dump_file)]} {file delete $info(dump_file)}	
 	if {$config(dump)} {
 		RAG_Manager_print "Writing chunks to dump file..." 
 		set count 0
 		foreach chunk $chunks {
+			set match [lindex $chunk 0]
+			set content [lindex $chunk 1]
+			set name [lindex $chunk 2]
 			incr count
-			LWDAQ_print $info(dump_file) \
-				"---------- MATCH -----------"
-			LWDAQ_print $info(dump_file) [lindex $chunk 0]
-			LWDAQ_print $info(dump_file) \
-				"--------- CONTENT ----------"
-			LWDAQ_print $info(dump_file) [lindex $chunk 1]
-			LWDAQ_print $info(dump_file) \
-				"----------- END ------------\n"
+			LWDAQ_print $info(dump_file) "---------- MATCH -----------"
+			LWDAQ_print $info(dump_file) $match
+			LWDAQ_print $info(dump_file) "--------- CONTENT ----------"
+			LWDAQ_print $info(dump_file) $content
+			LWDAQ_print $info(dump_file) "----------- NAME -----------"
+			LWDAQ_print $info(dump_file) $name
+			LWDAQ_print $info(dump_file) "----------- END ------------\n"
+			LWDAQ_support
+			if {$info(abort)} {
+				set info(abort) 0
+				set info(control) "Idle"
+				return 0
+			} 
 		}
 		RAG_Manager_print "Dump file complete." 
 	}
@@ -1902,7 +2105,7 @@ proc RAG_Manager_chunk {} {
 
 #
 # RAG_Manager_embed identifies match strings for which no embedding vector
-# exists and submits them to the embedding endpoing. This routine needs a valid
+# exists and submits them to the embedding endpoint. This routine needs a valid
 # API key from disk. It clears the libarary-loaded flag.
 #
 proc RAG_Manager_embed {} {
@@ -1914,15 +2117,15 @@ proc RAG_Manager_embed {} {
 	RAG_Manager_print "Embed Match Strings [RAG_Manager_time]" purple	
 	set info(library_loaded) 0
 
-	if {![file exists $config(key_file)]} {
-		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
+	if {![file exists $info(key_file)]} {
+		RAG_Manager_print "ERROR: Cannot find key file $info(key_file)."
 		set info(control) "Idle"
 		return ""
 	}
-	set f [open $config(key_file) r]
+	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $config(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\." 
 
 	RAG_Manager_print "Building embedding vector library..."	
 	RAG_Manager_fetch_embeds $api_key
@@ -1935,10 +2138,10 @@ proc RAG_Manager_embed {} {
 #
 # RAG_Manager_purge makes a list of all content strings in a match directory and
 # another list of all the embeds in the embed directory. It deletes any embed
-# for which there is not corresponding match string. If we set the offline flag,
+# for which there is no corresponding content string. If we set the offline flag,
 # the routine will take the chatbot and retrieval engine offline while it
 # operates. By default, however, the routine does not create or delete an
-# offline flag file.
+# offline flag file. 
 #
 proc RAG_Manager_purge {} {
 	upvar #0 RAG_Manager_info info
@@ -2007,7 +2210,11 @@ proc RAG_Manager_load {} {
 		set vector [read $f]
 		close $f
 		set name [file root [file tail $efn]]
-		lwdaq_rag add -name $name -vector $vector
+		if {[catch {
+			lwdaq_rag add -name $name -vector $vector
+		} error_result]} {
+			RAG_Manager_print "$error_result $name"
+		}
 		if {$config(verbose)} {
 			if {($count % (round([llength $efl]*$config(progress_frac))+1) == 1) \
 				|| ($count == [llength $efl])} {
@@ -2346,15 +2553,15 @@ proc RAG_Manager_retrieve {} {
 	set info(control) "Retrieve"
 	RAG_Manager_print "Retrieval for $info(ip) [RAG_Manager_time]" purple
 	RAG_Manager_print "Question: $question"
-	if {![file exists $config(key_file)]} {
-		RAG_Manager_print "ERROR: Cannot find key file $config(key_file)."
+	if {![file exists $info(key_file)]} {
+		RAG_Manager_print "ERROR: Cannot find key file $info(key_file)."
 		set info(control) "Idle"
 		return "ERROR"
 	}
-	set f [open $config(key_file) r]
+	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $config(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\."
 	
 	set chat_boundaries [regexp -all -inline -indices \
 		{\nQuestion: .*?(?=\nQuestion: |$)} \
@@ -2438,11 +2645,11 @@ proc RAG_Manager_retrieve {} {
 			close $f
 			RAG_Manager_print "[llength $contents]\:\
 				Match String with Relevance $rel:" brown
-			RAG_Manager_print $match darkgreen
+			RAG_Manager_print [string range $match 0 $config(show_content_len) darkgreen
 		} else {
 			RAG_Manager_print "[llength $contents]\:\
 				Content String with Relevance $rel:" brown
-			RAG_Manager_print $content green
+			RAG_Manager_print [string range $content 0 $config(show_content_len)] green
 		}
 	}
 
@@ -2481,21 +2688,32 @@ proc RAG_Manager_retrieve {} {
 #
 # RAG_Manager_get_answer submits a list of chunks and a question to the chat
 # completion end point and returns the answer it obtains. It takes as in put
-# five parameters: the completion model name, the assistant instructions, the
+# five parameters: the completion model name, the assistant prompt, the
 # documentation and chat history content, the question, and an api key location.
 # It returns the entire result from the end point, as a json record, and leaves
-# it to the calling procedure to extract the answer.
+# it to the calling procedure to extract the answer. In order to help us debug
+# our chatbot's presentation of answers, the get-answer procedure examines the
+# diag_answer string, and if this string is not empty, the procedure returns its
+# contents instead of fetching an answer from the completion endpoint. The
+# diagnostic answer passes through the formatting of the manager and chatbot.
+# The RAG Manager's configuration panel allows us to edit the diagnostic string.
+# The get-answer routine combines its supporting documentation into a single
+# json string, which it writes to disk using a random file name. To connect to
+# the endpoint, the routine uses the command-line "curl" utility, telling the
+# utility to read the contents of the post command from the json file. By this
+# means, we do not pass on the commmand line thousands of tokens of
+# documentation, nor do we risk some character in the documentation upsetting
+# the parsing of the curl command line.
 #
-proc RAG_Manager_get_answer {model assistant contents question api_key} {
+proc RAG_Manager_get_answer {model prompt contents question api_key} {
 	upvar #0 RAG_Manager_info info
 	upvar #0 RAG_Manager_config config
 	
-	set assistant [RAG_Manager_json_format $assistant]
+	set prompt [RAG_Manager_json_format $prompt]
  	set json_body "\{\n\
 		\"model\": \"$model\",\n\
-		\"temperature\": $config(temperature),\n\
 		\"messages\": \[\n"
-	append json_body "    \{ \"role\": \"system\", \"content\": \"$assistant\" \},\n"
+	append json_body "    \{ \"role\": \"system\", \"content\": \"$prompt\" \},\n"
 	foreach content $contents {
 		if {[regexp {^Question: (.*)} $content match chat]} {
 			set chat [RAG_Manager_json_format $chat]
@@ -2515,10 +2733,21 @@ proc RAG_Manager_get_answer {model assistant contents question api_key} {
 	append json_body "    \{ \"role\": \"user\", \"content\": \"$question\" \}\n"
 	append json_body "  \]\n\}"
 	
-	set cmd [list | curl -sS -X POST https://api.openai.com/v1/chat/completions \
+	set name [expr round(rand()*$info(rand_fn_scale))]
+	set jfn [file join $info(log_dir) "J$name\.json"] 
+	set f [open $jfn w]
+	puts $f $json_body
+	close $f
+	
+	set cmd [list | curl -sS -X POST $config(completion_endpoint) \
 	  -H "Content-Type: application/json" \
 	  -H "Authorization: Bearer $api_key" \
-	  -d $json_body] 
+	  -d "@$jfn"] 
+
+	if {[string length [string trim $config(diag_answer)]] > 0} {
+		RAG_Manager_print "WARNING: Diagnostic answer, no completion, json on disk."
+		return "\"content\": \"$config(diag_answer)\""
+	}
 
 	set ch [open $cmd]
 	fconfigure $ch -blocking 0 -buffering line
@@ -2532,14 +2761,14 @@ proc RAG_Manager_get_answer {model assistant contents question api_key} {
 			append result "$line\n"
 		}
 		if {[clock seconds] - $start_time > $config(answer_timeout_s)} {
-			set result "\"content\": \"Hello? Oh dear, I lost my train of thought.\
-				I do apologise. It happens sometimes. Please ask your question\
-				again.\""
+			set result "\"content\": \"$config(timeout_message)\""
 			close $ch
 			break
 		}
 		LWDAQ_update
 	}		  
+	
+	catch {[file delete $jfn]}
 	return $result
 }
 
@@ -2606,34 +2835,34 @@ proc RAG_Manager_submit {} {
 	set r $info(relevance)
 	if {$r >= $config(high_rel_thr)} {
 		set model $config(high_rel_model)
-		set assistant [string trim $config(high_rel_assistant)]
+		set prompt [string trim $config(high_rel_prompt)]
 		RAG_Manager_print "High-relevance question, relevance=$r,\
 			use $model and high-relevance completion prompt." brown
 	} elseif {$r >= $config(mid_rel_thr)} {
-		set assistant [string trim $config(mid_rel_assistant)]
+		set prompt [string trim $config(mid_rel_prompt)]
 		set model $config(mid_rel_model)
 		RAG_Manager_print "Mid-relevance question, relevance=$r,\
 			use $model and mid-relevance completion prompt." brown
 	} else {
 		set model $config(low_rel_model)
-		set assistant [string trim $config(low_rel_assistant)]
+		set prompt [string trim $config(low_rel_prompt)]
 		RAG_Manager_print "Low-relevance question, relevance=$r,\
 		 	use $model and low-relevance completion prompt." brown
 	}
 	RAG_Manager_print "Assistant prompt being submitted with this question:" brown
-	RAG_Manager_print "$assistant" green
+	RAG_Manager_print "$prompt" green
 
-	if {![file exists $config(key_file)]} {
-		set answer "ERROR: Cannot find key file $config(key_file)."
+	if {![file exists $info(key_file)]} {
+		set answer "ERROR: Cannot find key file $info(key_file)."
 		set info(control) "Idle"
 		return $answer
 	}
-	set f [open $config(key_file) r]
+	set f [open $info(key_file) r]
 	set api_key [read $f]
 	close $f 
-	RAG_Manager_print "Read api key from $config(key_file)\." brown
+	RAG_Manager_print "Read api key from $info(key_file)\."
 	
-	set size [string length $assistant]
+	set size [string length $prompt]
 	foreach content $info(contents) {
 		set size [expr $size + [string length $content]]
 	}
@@ -2644,7 +2873,7 @@ proc RAG_Manager_submit {} {
 	set start_ms [clock milliseconds]
 	set info(result) [RAG_Manager_get_answer \
 		 $model \
-		 $assistant \
+		 $prompt \
 		 $info(contents) \
 		 $question \
 		 $api_key]
@@ -2662,16 +2891,21 @@ proc RAG_Manager_submit {} {
 		set answer "ERROR: Could not find answer or error message in result."
 	}
 	
-	# Print the answer to the console or log file. We perform minimal formatting
-	# on the json answer: we replace escaped newline characters with newlines so
-	# that we can see the answer clearly. But we do not replace escaped
-	# backslashes nor make any attempt to clean up LaTeX. We want to know what
-	# the endpoint returned when we look in our log file. Any newline must have
-	# come from an escaped newline because the json string will never contains
-	# newlines.
-	regsub -all {\\r\\n|\\r|\\n} $answer "\n" answer_txt
-	RAG_Manager_print "$answer_txt"
-	append info(chat) "Answer: $answer_txt\n\n"
+	# Print the answer to the console or log file. We want to know what the
+	# endpoint returned when we look in our log file. We perform minimal
+	# formatting on the json answer so we can print it as text. We replace
+	# escaped newline characters with newlines. We avoid replacing
+	# double-escaped characters and we do not make any attempt to clean up
+	# LaTeX. If we see a backslash followed by a literal newline, we deem this
+	# to be an error of interpretation on the part of Tcl, and replace with a
+	# double backslash and an "n" character.
+	set s $answer
+	regsub -all {\\r\\n|\\r|\\n} $s "\n" s
+	regsub -all {(^|[^\\])\\r} $s "\\1\n" s
+	regsub -all {(^|[^\\])\\n} $s "\\1\n" s
+	regsub -all {\\\n} $s {\\\\n} s
+	RAG_Manager_print $s
+	append info(chat) "Answer: $s\n\n"
 	RAG_Manager_print "Submission Complete [RAG_Manager_time]\n" purple
 	
 	set info(control) "Idle"
@@ -2740,6 +2974,16 @@ proc RAG_Manager_open {} {
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
+
+	button $f.abort -text "Abort" -command {
+		if {$RAG_Manager_info(control) != "Idle"} {
+			RAG_Manager_print "WARNING: Abort requested, exiting current tasks."
+			set RAG_Manager_info(abort) 1
+		} else {
+			RAG_Manager_print "ERROR: Cannot abort when idle."
+		}
+	}
+	pack $f.abort -side left -expand yes
 	
 	set f [frame $w.more]
 	pack $f -side top -fill x
@@ -2788,6 +3032,7 @@ proc RAG_Manager_open {} {
 
 RAG_Manager_init
 RAG_Manager_open
+RAG_Manager_set_root $RAG_Manager_config(root_dir)
 
 return ""
 

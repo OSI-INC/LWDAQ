@@ -1,6 +1,6 @@
 # Neuroplayer.tcl, a LWDAQ Tool
 #
-# Copyright (C) 2007-2025 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2007-2026 Kevan Hashemi, Open Source Instruments Inc.
 #
 # The Neuroplayer records signals from Subcutaneous Transmitters manufactured
 # by Open Source Instruments. For detailed help, see:
@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "176"
+	LWDAQ_tool_init "Neuroplayer" "179"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -100,7 +100,7 @@ proc Neuroplayer_init {} {
 		-height $info(af_plot_height) 
 #
 # Here we specify names for the windows that open up when we click on the
-# voltage-time or amplitude-frequency plots.
+# value-time or amplitude-frequency plots.
 #
 	set info(vt_view) $info(window)\.vt_view_window
 	set info(af_view) $info(window)\.af_view_window
@@ -219,11 +219,11 @@ proc Neuroplayer_init {} {
 #
 	set info(active_channels) ""
 #
-# When we determine a channel's expected message frequency in one routine,
-# we want to save the frequency in a place that other routines can read it.
-# The default frequency is 512.
+# When we determine a channel's expected sample rate in one routine,
+# we want to save the sample rate in a place that other routines can read it.
+# The default sample rate is 512.
 #
-	set info(frequency) "512"
+	set info(sps) "512"
 #
 # The separation of the components of the fourier transform is related to
 # the playback interval. We set it to 1 Hz by default.
@@ -250,7 +250,7 @@ proc Neuroplayer_init {} {
 #
 # We set the array of selected frequencies for reconstruction to an empty
 # string. During reconstruction, we will set them to a value picked from the
-# default frequency string. We also have a f_alert parameter for each channel,
+# default sample rate string. We also have a f_alert parameter for each channel,
 # that we set to "Extra" if we have too many, "Poor" if we have too few, "None"
 # if the channel has not been active yet, "Okay" if we have the correct number,
 # and "Gone" if it was active once, but has since vanished. Once the channel
@@ -263,7 +263,7 @@ proc Neuroplayer_init {} {
 	}
 	set config(min_reception) 0.8
 	set config(max_rejection) 0.2
-	set config(glitch_threshold) 500
+	set config(glitch_threshold) 10000
 	set config(glitch_count) 0
 	set info(max_window_fraction) 0.5
 	set config(extra_fraction) 1.2
@@ -320,7 +320,7 @@ proc Neuroplayer_init {} {
 		20000 30000 40000 50000 60000 70000 80000 90000 100000"
 	set info(log_color) 11
 #
-# Here we provide a list of color codes we want to use for the voltage-
+# Here we provide a list of color codes we want to use for the value-
 # time and amplitude-frequency plots. The list specifies deviations from
 # the standard color table, giving an identifier and alternate color
 # number for any such change. There are times when you may wish
@@ -406,7 +406,7 @@ proc Neuroplayer_init {} {
 #
 	set config(slow_play) 0
 	set config(slow_play_ms) 1000
-	set config(fast_play_ms) 50
+	set config(fast_play_ms) 5
 #
 # By default, the player moves from one file to the next automatically, or
 # waits for data to be added to a file if there is no other later file. But
@@ -417,15 +417,20 @@ proc Neuroplayer_init {} {
 #
 	set config(play_stop_at_end) 0
 #
+#  We navigate event files with an index and the number of events in the list.
 #
-# When we display events, we can isolate the channels to which the event 
-# belongs. The channel select string is the third element in the event
-# description. We isolate events with the following variable set to 1.
+	set info(num_events) "0"
+	set config(event_index) "1"
 #
-	set config(isolate_events) 1
-	set info(num_events) 0
-	set config(event_index) 1
-	set info(event_id) 0
+# When we encode event jump buttons in the Neuroplayer text window, we use the
+# event identifier to make a tag name.
+#
+	set info(event_id) "0"
+#
+# When jumping to events, we can either leave the channel selector string as it
+# is, or we can isolate only the channels involved in the event.
+#
+	set config(isolate_events) "1"
 #
 # The saved play file name variable allows us to detect when the file name
 # has been changed since the last time it was used.
@@ -448,11 +453,11 @@ proc Neuroplayer_init {} {
 # which eliminates bad messages and replaces missing messages, we must specify
 # the correct message frequency and the extent of the transmission scatter
 # implemented by the tranmsitter. The phrase "5:512:8" specifies channel 5 with
-# frequency 512 and scatter 8. We have default values for frequency, which will
+# sample rate 512 and scatter 8. We have default values for frequency, which will
 # be used if we do not specify values.
 #
 	set config(channel_selector) "*"
-	set config(default_frequencies) "64 128 256 512 1024 2048 4096"
+	set config(default_sps) "32 64 128 256 512 1024 2048 4096"
 	set info(standing_values) ""
 #
 # We save the last clock message value in each message block so we can compare it 
@@ -519,10 +524,11 @@ proc Neuroplayer_init {} {
 	set config(log_frequency) 0
 	set config(log_amplitude) 0
 #
-# Colors for windows.
+# Appearances of widgets.
 #
 	set info(label_color) "darkgreen"
 	set info(variable_bg) "lightgray"
+	set info(file_tail_width) "16"
 #
 # We apply a window function to the signal before we take the fourier transform.
 # This function smooths the signal to its average value starting
@@ -546,9 +552,11 @@ proc Neuroplayer_init {} {
 	set info(classifier_match) "0.0"	
 	set config(classifier_match_limit) "0.1"
 	set config(classifier_threshold) "0.0"
+	set config(classifier_tmi) "1"
 	set config(enable_handler) "0"
 	set info(handler_script) ""
 	set config(classifier_library) ""
+	set config(classifier_escope) "0"
 #
 # Neurotracker panel configuration.
 #
@@ -1684,21 +1692,21 @@ proc Neuroplayer_command {action} {
 
 #
 # Neuroplayer_signal extracts or reconstructs the signal from one channel in the
-# data image. It updates info(num_received) and info(standing_values). It
-# info(frequency) and info(num_messages). It returns the extracted or
-# reconstructed signal. The returned signal format is a space-delimited string
-# giving a sequence of messages. Each message is a timestamp followed by a
-# sample value. The timestamp is an integer number of clock ticks from the
-# beginning of the playback interval. The timestamps and vsample alues alternate
-# in the return string, separated by single spaces. The "extracted" signal is a
-# list of messages that exist in the data image. The "reconstructed" signal is
-# the extracted signal with substitute messages inserted and bad messages
-# removed, so as to create a signal with info(frequency) messages. To perform
-# extraction and reconstruction, the routine calls lwdaq_receiver from the lwdaq
-# library. See the Receiver Manual for more information, and also the LWDAQ
-# Command Reference. The routine takes a single parameter: a channel code, which
-# is of the form "id" or "id:f" or "id:f" where "id" is the channel number and
-# "f" is its nominal message rate per second. If status_only is set, we don't
+# data image. It updates info(num_received) and info(standing_values). It sets
+# info(sps) and info(num_messages). It returns the extracted or reconstructed
+# signal. The returned signal format is a space-delimited string giving a
+# sequence of messages. Each message is a timestamp followed by a sample value.
+# The timestamp is an integer number of clock ticks from the beginning of the
+# playback interval. The timestamps and vsample alues alternate in the return
+# string, separated by single spaces. The "extracted" signal is a list of
+# messages that exist in the data image. The "reconstructed" signal is the
+# extracted signal with substitute messages inserted and bad messages removed,
+# so as to create a signal with info(sps) messages. To perform extraction and
+# reconstruction, the routine calls lwdaq_receiver from the lwdaq library. See
+# the Receiver Manual for more information, and also the LWDAQ Command
+# Reference. The routine takes a single parameter: a channel code, which is of
+# the form "id" or "id:f" or "id:f" where "id" is the channel number and "f" is
+# its nominal message rate per second. If status_only is set, we don't
 # reconstruct, but return after determining if there is loss, extra, or okay
 # reception.
 # 
@@ -1710,7 +1718,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	# to know there's no signal.
 	set info(loss) 100.0
 
-	# We split the channel code into id and frequency.
+	# We split the channel code into id and sample rate.
 	if {$channel_code == ""} {set channel_code $info(channel_code)}
 	set parameters [split $channel_code ":"] 
 	set id [lindex $parameters 0]
@@ -1725,31 +1733,31 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		set num_received $a 
 	}
 	
-	# The frequency may be set by the channel code. If not, we look at the
-	# expected frequency value that may be defined through the activity panel.
-	set frequency [lindex $parameters 1]
+	# The sample rate may be set by the channel code. If not, we look at the
+	# expected sample rate value that may be defined through the activity panel.
+	set sps [lindex $parameters 1]
 
-	# We guess the frequency if it is not already set to a integer value. The
-	# default frequency can be a single frequency or a list of frequencies, the
-	# closest of which to the number of messages received is the one that will
-	# be picked. If our search for a good frequency fails because there are too
-	# many messages, we use the highest frequency in the default list.
-	if {![string is integer -strict $frequency]} {
-		set fl [lsort -integer -decreasing [string trim $config(default_frequencies)]]
-		set frequency [lindex $fl 0]
+	# We guess the sample rate if it is not already set to a integer value. The
+	# default sample rate can be a single value or a list of values, the closest
+	# of which to the number of messages received is the one that will be
+	# picked. If our search for the correct sample rate fails because there are
+	# too many messages, we use the highest value in the default list.
+	if {![string is integer -strict $sps]} {
+		set fl [lsort -integer -decreasing [string trim $config(default_sps)]]
+		set sps [lindex $fl 0]
 		foreach f $fl {
 			if {![string is integer -strict $f]} {
-				Neuroplayer_print "ERROR: Invalid frequency \"$f\" in default list."
+				Neuroplayer_print "ERROR: Invalid sample rate \"$f\" in default list."
 				return "0 0"	
 			}
 			if {$num_received < [expr $config(extra_fraction) \
 				* $f * $info(play_interval_copy)]} {
-				set frequency $f
+				set sps $f
 			}
 		}
 	}
 	if {$num_received > [expr $config(extra_fraction) \
-			* $frequency * $info(play_interval_copy)]} {
+			* $sps * $info(play_interval_copy)]} {
 		if {$info(status_$id) != "Extra"} {
 			Neuroplayer_print \
 				"WARNING: Extra samples on channel $id\
@@ -1757,12 +1765,12 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			set info(status_$id) "Extra"
 		}
 	} elseif {$num_received < [expr $config(min_reception) \
-			* $frequency * $info(play_interval_copy)]} {
+			* $sps * $info(play_interval_copy)]} {
 		set info(status_$id) "Loss"
 	} else {
 		set info(status_$id) "Okay"
 	}
-	set info(sps_$id) $frequency
+	set info(sps_$id) $sps
 	
 	# If we are here only to determine the status and nominal sample rate of the
 	# transmitter, we return now with an empty signal string.
@@ -1772,13 +1780,13 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 	
 	# Set global parameters.
 	set info(num_received) $num_received
-	set info(frequency) $frequency
+	set info(sps) $sps
 
 	# We calculate the number of messages expected and the period
 	# of the nominal sample rate in clock ticks.
-	set num_expected [expr $frequency * $info(play_interval_copy)]
+	set num_expected [expr $sps * $info(play_interval_copy)]
 	set period [expr round(1.0 * $info(ticks_per_clock) \
-		* $info(clocks_per_second) / $frequency)]
+		* $info(clocks_per_second) / $sps)]
 	
 	# Determine the standing value of the signal from its previous interval. If
 	# the first message in the interval is missing, we will use this standing
@@ -1819,10 +1827,10 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 			return $signal
 		}
 		
-		# Reconstruction can fail if the transmit frequency is slightly too high
-		# or too low as a result of a fault in the on-board oscillator. We check
-		# for this mode of failure now, and if we find it, we reconstruct once 
-		# again, but this time with the "divergent_clocks" option set true.
+		# Reconstruction can fail if the transmit sample rate is slightly too
+		# high or too low as a result of a fault in the on-board oscillator. We
+		# check for this mode of failure now, and if we find it, we reconstruct
+		# once again, but this time with the "divergent_clocks" option set true.
 		scan [lwdaq_image_results $info(data_image)] %d%d%d%d%d%d \
 			num_clocks num_ideal num_bad num_missing standing_value num_glitches
 		if {$num_received + $num_missing > ($config(max_rejection)+1)*$num_ideal} {
@@ -1882,7 +1890,7 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 }
 
 #
-# Neuroplayer_values extracts only the voltage values from the Neuroplayer
+# Neuroplayer_values extracts only the value values from the Neuroplayer
 # signal. If there are values missing, it adds values so that we have a power
 # of two number of values to pass to the fft later. If there are too many values,
 # we remove some until the number is correct.
@@ -1897,7 +1905,7 @@ proc Neuroplayer_values {{signal ""}} {
 	foreach {t v} $info(signal) {append values "$v "}
 	
 	if {!$config(enable_reconstruct)} {
-		set missing [expr round($info(frequency) * $info(play_interval_copy) \
+		set missing [expr round($info(sps) * $info(play_interval_copy) \
 			- [llength $values])]
 		for {set m 1} {$m <= $missing} {incr m} {
 			append values "[lindex $values end] "
@@ -2105,12 +2113,15 @@ proc Neuroplayer_overview {{fn ""} } {
 		pack $f.tfn $f.lfn -side left -expand yes
 		label $f.lt_min -text "t_min"
 		entry $f.et_min -textvariable Neuroplayer_overview(t_min) -width 6
+		bind $f.et_min <Return> [list LWDAQ_post Neuroplayer_overview_plot]
 		label $f.lt_max -text "t_max"
 		entry $f.et_max -textvariable Neuroplayer_overview(t_max) -width 6
+		bind $f.et_max <Return> [list LWDAQ_post Neuroplayer_overview_plot]
 		label $f.lt_end -text "t_end"
 		label $f.et_end -textvariable Neuroplayer_overview(t_end) -width 6
 		label $f.ls -text "Select:" -anchor e
 		entry $f.es -textvariable Neuroplayer_config(channel_selector) -width 30
+		bind $f.es <Return> [list LWDAQ_post Neuroplayer_overview_plot]
 		pack $f.lt_min $f.et_min $f.lt_max $f.et_max \
 			$f.lt_end $f.et_end $f.ls $f.es -side left -expand yes
 
@@ -2564,26 +2575,27 @@ proc Neuroplayer_overview_newndf {step} {
 }
 
 #
-# Neuroclassifier allows us to view, jump to, and manipulate a list 
-# of reference events with which new events may be compared for
-# classification. The event classifier lists events like this:
+# Neuroclassifier_open opens the Event Classifier panel, which provides access
+# to all Event Classifier functions, including the Batch Classifier. All
+# routines with names beginning with "Neuroclassifier" are providing services to
+# the Event Classifier and Batch Classifier. The Event Classifier allows us to
+# view, jump to, and manipulate a library of events. The Batch Classifier allows
+# us to classify signal intervals using the library. The Event Classifier lists
+# events like this:
 #
 # archive.ndf time channel event_type baseline_power m1 m2...
 #
-# It expects the Neuroplayer's processor to produce characteristics
-# lines in the same format, except the line can contain characteristics
-# for multiple channels. The baseline power should be in units of kilo
-# square ADC counts. The remaining characteristics are "metrics", which
-# each indicated something about the shape of the interval signal, and
-# which vary between 0 to 1, with 0.5 being roughly in the middle of 
-# the expected range for recorded data. In particular, the Classifier
-# assumes that a value of 0.5 or greater in the metric1 characteristic
-# indicates an event worthy of classification has occurred. We reserve 
-# three event type words for the processor to allocate to each interval
-# before classification, "N" for "Normal", meaning no event has occurred,
-# "U" for "Unclassified", meaning the event has not yet been compared to
-# a set of reference events for classification, and "L" for "Loss", meaning
-# reception is poor.
+# The Event Classifier expects an interval processor to produce characteristics
+# lines in the same format, except the line can contain characteristics for
+# multiple channels. The baseline power should be in units of kilo-square
+# counts. The remaining characteristics are "metrics", each of which represent
+# some property of the signal in the current playback interval, and which vary
+# between 0 to 1, with 0.5 being roughly in the middle of the expected range. We
+# reserve three event type words for the processor to allocate to each interval
+# before classification, "N" for "Normal", meaning no event has occurred, "U"
+# for "Unclassified", meaning the event has not yet been compared to a set of
+# reference events for classification, and "L" for "Loss", meaning reception is
+# poor.
 #
 proc Neuroclassifier_open {} {
 	upvar #0 Neuroplayer_info info
@@ -2625,19 +2637,23 @@ proc Neuroclassifier_open {} {
 	set info(classification_label) $f.cv
 	pack $f.cv -side left -expand yes
 
-	label $f.rl -text "Match:" 
+	label $f.rl -text "Match:" -fg $info(label_color)
 	label $f.rv -textvariable Neuroplayer_info(classifier_match) -width 5 
 	pack $f.rl $f.rv -side left -expand yes
 
-	label $f.mrl -text "Limit:" 
-	entry $f.mre -textvariable Neuroplayer_config(classifier_match_limit) -width 5
+	label $f.mrl -text "Limit:" -fg $info(label_color)
+	entry $f.mre -textvariable Neuroplayer_config(classifier_match_limit) -width 4
 	pack $f.mrl $f.mre -side left -expand yes
 
-	label $f.etl -text "Threshold:" 
-	entry $f.ete -textvariable Neuroplayer_config(classifier_threshold) -width 5
+	label $f.etl -text "Threshold:" -fg $info(label_color)
+	entry $f.ete -textvariable Neuroplayer_config(classifier_threshold) -width 4
 	pack $f.etl $f.ete -side left -expand yes
 
-	foreach a {Add Continue Stop Step Back Batch_Classification} {
+	label $f.tmil -text "Index:" -fg $info(label_color)
+	entry $f.tmie -textvariable Neuroplayer_config(classifier_tmi) -width 2
+	pack $f.tmil $f.tmie -side left -expand yes
+
+	foreach a {Continue Stop Step Back Batch_Classification} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "Neuroclassifier_$b"
 		pack $f.$b -side left -expand yes
@@ -2648,7 +2664,7 @@ proc Neuroclassifier_open {} {
 	set f $w.controls2
 	
 	foreach a {x y} {
-		label $f.$a\ml -text "$a\:"
+		label $f.$a\ml -text "$a\:" -fg $info(label_color)
 		menubutton $f.$a\m -menu $f.$a\m.m -textvariable \
 			Neuroplayer_config(classifier_$a\_metric) \
 			-relief raised -indicatoron 1
@@ -2660,7 +2676,7 @@ proc Neuroclassifier_open {} {
 		-variable Neuroplayer_config(enable_handler)
 	pack $f.handler -side left -expand yes
 	
-	foreach a {Refresh Load Save Reprocess Compare} {
+	foreach a {Add Refresh Load Save Reprocess Compare} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Neuroclassifier_$b"
 		pack $f.$b -side left -expand yes
@@ -2809,7 +2825,7 @@ proc Neuroclassifier_event {event} {
 }
 
 #
-# Neuroclassifier_select hilites and event in the text window.
+# Neuroclassifier_select hilites an event in the text window.
 #
 proc Neuroclassifier_select {event} {
 	upvar #0 Neuroplayer_config config
@@ -2844,7 +2860,11 @@ proc Neuroclassifier_select {event} {
 
 #
 # Neuroclassifier_jump jumps to an event. It selects the event in the Classifier
-# window, then calls the Neuroplayer's jump routine to navigate to the event.
+# window. If the isolate events flag is set, the routine sets the event's
+# channel selector string to a list of channels generated by adding each of the
+# values in the event scope list to the telemetry channel chosen as the source
+# identifier for the event. It calls the Neuroplayer's jump routine to navigate
+# to the event.
 #
 proc Neuroclassifier_jump {event} {
 	upvar #0 Neuroplayer_config config
@@ -2853,6 +2873,14 @@ proc Neuroclassifier_jump {event} {
 	if {![winfo exists $info(classifier_window)]} {return ""}
 
 	Neuroclassifier_select $event
+	if {$config(isolate_events)} {
+		set id [lindex $event 2]
+		set clist ""
+		foreach offset $config(classifier_escope) {
+			lappend clist [expr $id + $offset]
+		}
+		lset event 2 $clist
+	}
 	Neuroplayer_jump $event 0
 	return ""
 }
@@ -2922,17 +2950,23 @@ proc Neuroclassifier_add {{index ""} {event ""}} {
 		incr info(classifier_index)
 	}
 	if {$event == ""} {
-		set id [lindex $config(channel_selector) 0]
-		if {([llength $id]>1) || ($id == "*")} {
+		if {[string trim $config(channel_selector)] == "*"} {
 			if {$info(window) == ""} {raise "."} {raise $info(window)}
-			Neuroplayer_print "ERROR: Select a single channel to add to the library."
+			Neuroplayer_print "ERROR: All event channel numbers must be\
+				specified in channel selector."
+			return ""
+		} elseif {[llength $config(channel_selector)] \
+				!= [llength $config(classifier_escope)]} {
+			if {$info(window) == ""} {raise "."} {raise $info(window)}
+			Neuroplayer_print "ERROR: Channel selector must show\
+				all event channel numbers and none others."
 			return ""
 		}
+		set id [lindex [split [lindex $config(channel_selector) 0] :] 0]
 		set event "[file tail $config(play_file)]\
 			[Neuroplayer_play_time_format \
 				[expr $config(play_time) - $config(play_interval)]]\
-			$id\
-			Added"
+			$id Added"
 		set jump 1
 	} {
 		set jump 0
@@ -3199,14 +3233,13 @@ proc Neuroclassifier_classify {metrics setup} {
 #
 # Neuroclassifier_processing accepts a characteristics line as input. If there
 # are mutliple channels recorded in this line, the routine separates the
-# characteristics of each channel and forms a list of events, one for each
-# channel. It searches the event library for each event, in case the event is a
-# repeat of one that already exists in the library. If so, it hilites the event
-# in the library and makes it visible in the text window. Otherwise, the routine
-# checks to see if the event qualifies as unusual. The first metric should be
-# greater than the classifier threshold. If the event is unusual, the routine
-# finds the closest match to the event in the library and classifies the event
-# as being of the same type. In either case, the routine plots the
+# characteristics of each channel, producing one event per channel. It searches
+# the event library for each event, and if it find the event, it hilites the
+# event in the library and makes it visible in the text window. Otherwise, the
+# routine checks to see if the event qualifies as unusual. The first metric
+# should be greater than the classifier threshold. If the event is unusual, the
+# routine finds the closest match to the event in the library and classifies the
+# event as being of the same type. In either case, the routine plots the
 # characteristics of the event upon the map. In the special case where we are
 # re-processing the event libarary to obtain new metrics, the routine replaces
 # the existing baseline power and metrics for each library event with the
@@ -3261,6 +3294,12 @@ proc Neuroclassifier_processing {characteristics} {
 		# Extract the signal idenfier and look for the event in the library.
 		set id [lindex $idc 0]
 		set index [$t search "$fn $pt $id" 1.0]
+	
+		# Obtain the threshold metric index, the sign of which tells us if our
+		# metric threshold will be an upper or lower bound, and obtain the
+		# threshold metric value from the event metrics using the ineex.
+		set tmi $config(classifier_tmi)
+		set tmv [lindex $idc [expr $info(cbo)+abs($tmi)]]
 
 		if {$index != ""} {
 			# Get the library event from the text window.
@@ -3294,10 +3333,12 @@ proc Neuroclassifier_processing {characteristics} {
 			
 			# Because we have already identified the type of this event by eye,
 			# and stored it as such in the event list, we can be certain of its
-			# type. But even if we know the type, if the power metric is below
-			# the event threshold, we will call the interval Normal, and we
-			# over-write its type in the event string we will display.
-			if {[lindex $idc [expr $info(cbo)+1]] >= $config(classifier_threshold)} {
+			# type. But even if we know the type, if the threshold metric is
+			# below a lower threshold, or above an upper threshold, we will call
+			# the interval normal, and we over-write its type in the event
+			# string we will display.
+			if {(($tmv >= $config(classifier_threshold)) && ($tmi > 0)) \
+				|| (($tmv < $config(classifier_threshold)) && ($tmi < 0))} {
 				set type [lindex $event [expr $info(sii) + $info(cto)]]
 			} {
 				set type "Normal"
@@ -3317,7 +3358,8 @@ proc Neuroclassifier_processing {characteristics} {
 			# which is the one that marks the occurance of an event, to see
 			# if the interval is normal, loss, or event. If it's an event, we
 			# classify it by finding the closest match in the event list. 
-			if {[lindex $idc [expr $info(cbo)+1]] >= $config(classifier_threshold)} {
+			if {(($tmv >= $config(classifier_threshold)) && ($tmi > 0)) \
+				|| (($tmv < $config(classifier_threshold)) && ($tmi < 0))} {
 				
 				# If the event is a loss, we set the type to loss now, and avoid
 				# performing any matching.
@@ -3350,8 +3392,9 @@ proc Neuroclassifier_processing {characteristics} {
 					}
 				}
 			} {
-				# A low-power event is Normal only if there is sufficient signal 
-				# reception to be sure that it has lower power. Otherwise it's a 
+				# An event with threshold metric that does not pass the
+				# threshold test is Normal only if there is sufficient signal
+				# reception to be sure that it has lower power. Otherwise it's a
 				# Loss.
 				set closest ""
 				if {[lindex $idc [expr $info(cbo)+1]] > 0.0} {
@@ -3381,14 +3424,8 @@ proc Neuroclassifier_processing {characteristics} {
 			}
 		}
 
-		# If we are continuing only to the next unusual event, rather than
-		# playing indefinitely, we check to see if this event was unsusual,
-		# or if it is unknown and the power metric is zero, and if so we 
-		# stop playback.
-		if {$info(classifier_continue) \
-			&& ((($type != "Normal") && ($config(classifier_threshold) > 0.0))\
-				|| (($type == "Unknown") && ($config(classifier_threshold) == 0.0))) \
-			&& ($type != "Loss")} {
+		# If we are continuing, we stop only when we come to an unknown event.
+		if {$info(classifier_continue) && ($type == "Unknown")} {
 			Neuroplayer_command "Stop"
 			set info(classifier_continue) 0
 		}
@@ -5247,7 +5284,7 @@ proc Neuroexporter_export {{cmd "Start"}} {
 					LWDAQ_post "Neuroexporter_export Abort"
 					return ""
 				}
-				if {[lsearch $config(default_frequencies) $sps] < 0} {
+				if {[lsearch $config(default_sps) $sps] < 0} {
 					LWDAQ_print $t \
 						"ERROR: Invalid sample rate \"$sps\", aborting export."
 					LWDAQ_post "Neuroexporter_export Abort"
@@ -6284,10 +6321,11 @@ proc Neuroplayer_calibration {{name ""}} {
 		}
 	}
 
-	# Determine which channels we should display, by consulting their channel 
-	# alerts. We create frames to display the channels, their frequency values
-	# and their alerts and baseline powers as we go along. We show the channel
-	# number in the color it will be plotted in the Neuroplayer and Neurotracker.
+	# Determine which channels we should display, by consulting their channel
+	# alerts. We create frames to display the channels, their sample rates and
+	# their alerts and baseline powers as we go along. We show the channel
+	# number in the color it will be plotted in the Neuroplayer and
+	# Neurotracker.
 	set count 0
 	for {set id $info(min_id)} {$id <= $info(max_id)} {incr id} {
 		if {$id % $info(set_size) == $info(set_size) - 1} {continue}
@@ -6337,6 +6375,7 @@ proc Neuroplayer_baseline_reset {} {
 		set info(bp_$i) $info(bp_reset)
 	}
 	return ""
+	Neuroplayer_print "Set baselines for all active channels to $config(bp_reset)." 
 }
 
 #
@@ -6350,6 +6389,7 @@ proc Neuroplayer_baselines_set {} {
 	for {set i $info(min_id)} {$i <= $info(max_id)} {incr i} {
 		set info(bp_$i) $config(bp_set)
 	}
+	Neuroplayer_print "Set baselines for all active channels to $config(bp_set)." 
 	return ""
 }
 
@@ -6392,14 +6432,9 @@ proc Neuroplayer_baselines_write {name} {
 			append metadata "$id $info(bp_$id)\n"
 		}
 	}
-	
 	append metadata "</baseline>\n"
-	
 	LWDAQ_ndf_string_write $config(play_file) [string trim $metadata]\n
-
-	Neuroplayer_print "Wrote baselines \"$name\" to\
-		[file tail $config(play_file)]." verbose
-
+	Neuroplayer_print "Wrote baselines \"$name\" to [file tail $config(play_file)]." 
 	return ""
 }
 
@@ -6440,14 +6475,13 @@ proc Neuroplayer_baselines_read {name} {
 			[file tail $config(play_file)]."
 		return ""
 	}
-	Neuroplayer_print "Read baselines \"$name\" from [file tail\
-		$config(play_file)]." verbose
+	Neuroplayer_print "Read baselines \"$name\" from [file tail $config(play_file)]."
 	return ""
 }
 
 # The activity displays the frequencies used for reconstruction, which may have
 # been specified by the user, or may have been picked from a list of possible
-# frequencies in the default frequency parameter. 
+# frequencies in the default sample rate parameter. 
 proc Neuroplayer_activity {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info	
@@ -6516,7 +6550,7 @@ proc Neuroplayer_activity {} {
 	}
 
 	# Determine which channels we should display, by consulting their channel 
-	# alerts. We create frames to display the channels, their frequency values
+	# alerts. We create frames to display the channels, their sample rates
 	# and their alerts and baseline powers as we go along. We show the channel
 	# number in the color it will be plotted in the Neuroplayer and Neurotracker.
 	set count 0
@@ -6591,10 +6625,10 @@ proc Neuroplayer_color_swap {id w e x y} {
 }
 
 #
-# Neuroplayer_frequency_reset sets all the frequency and frequency alerts to
+# Neuroplayer_sps_reset sets all the sample rate and sample rate alerts to
 # zero and N.
 #
-proc Neuroplayer_frequency_reset {} {
+proc Neuroplayer_sps_reset {} {
 	upvar #0 Neuroplayer_config config
 	upvar #0 Neuroplayer_info info	
 
@@ -6700,7 +6734,7 @@ proc Neuroplayer_draw_graphs {} {
 
 #
 # Neuroplayer_magnified_view opens a new window with a larger, or at lease
-# separate, plot of the voltage-time or amplitude-frequency graph. The size of
+# separate, plot of the value-time or amplitude-frequency graph. The size of
 # the window is set by the vt_view_zoom and af_view_zoom parameters.
 #
 proc Neuroplayer_magnified_view {figure} {
@@ -6714,7 +6748,7 @@ proc Neuroplayer_magnified_view {figure} {
 			return ""
 		}
 		toplevel $w
-		wm title $w "Voltage vs. Time Magnified View, Neuroplayer $info(version)"
+		wm title $w "Value vs. Time Magnified View, Neuroplayer $info(version)"
    		set info(vt_view_photo) [image create photo "_Neuroplayer_vt_view_photo_"]
    		set l $w.plot
    		label $l -image $info(vt_view_photo)
@@ -6735,8 +6769,8 @@ proc Neuroplayer_magnified_view {figure} {
 	}
 	
 	set f [frame $w.controls] 
-	label $f.b -textvariable Neuroplayer_info(play_file_tail) \
-		-width 20 -bg $info(variable_bg)
+	entry $f.b -textvariable Neuroplayer_info(play_file_tail) \
+		-width $info(file_tail_width)
 	pack $f.b -side left -expand yes
 	button $f.pick -text "Pick" -command "Neuroplayer_command Pick"
 	pack $f.pick -side left -expand yes
@@ -7084,7 +7118,7 @@ proc Neuroplayer_play {{command ""}} {
 	}
 
 	# If First or Last we find the first or last NDF file in the playback
-	# directory tree. We set the play time to zero and refresh the voltage and
+	# directory tree. We set the play time to zero and refresh the value and
 	# amplitude plots.
 	if {($info(play_control) == "First") || ($info(play_control) == "Last")} {
 		set play_list [LWDAQ_find_files $config(play_dir) *.ndf]
@@ -7857,10 +7891,11 @@ proc Neuroplayer_play {{command ""}} {
 	}
 	
 	# We check the processing result for errors, report to the screen, and write
-	# to characteristics file. We also hand control over to the Neuroclassifier
-	# if it's running. All the Neuroclassifier needs to plot and classify the
-	# most recent interval is the results of processing, which will, we assume,
-	# contain the metrics the Neuroarclassifier is expecting to receive.
+	# to characteristics file. We also hand control over to the Event
+	# Classifier, if it's running. All the Event Classifier needs to plot and
+	# classify the most recent interval is the results of processing, which
+	# will, we assume, contain the metrics the Event Classifier is expecting to
+	# receive.
 	if {$result != ""} {
 		if {![LWDAQ_is_error_result $result]} {
 			set result "[file tail $config(play_file)] $config(play_time) $result"
@@ -7951,41 +7986,41 @@ proc Neuroplayer_play {{command ""}} {
 
 #
 # Neuroplayer_jump displays an event. We can pass the event directly to the
-# routine, or we can a keyword that directs the routine to select an event from
-# an event list, or to move to the archive preceeding or following the current
-# playback archive. An event list is a file on disk. Each line in such a file
-# must itself be an event. And event is a list of values. The first two elements
-# in the list give the location of the event. The location can be specified with
-# a file name and an file time in seconds from the file start, or as an absolute
-# date-time string and an offset in seconds from that time. The third element in
-# the list is a selection string, which lists the channel numbers involved in
-# the event. If the selection string is a list of numbers, the jump routine sets
-# the Player's select string to the event selection string. If the selection
-# string is "*", the Player's channel select string will be set to "*" and all
-# channels will be selected after the jump. If the string is "?", the Player's
-# channel select string will be left unchanged. We can suppress the alteration
-# of the Player's select string by setting the Neuroplayer configuration
-# parameter "isolate_events" to 0. If, instead of an event string composed of
-# event elements, we pass one of the keywords "Back", "Go", "Step", "Hop",
-# "Play", or "Stop" the routine will read the current event list from disk and
-# select one of its events for display, just as if this event were passed to the
-# jump routine. The Back, Go, and Step keywords instruct the jump routine to
-# decrement, leave unaltered, or increment the Neuroplayer's event_index. The
-# Hop keyword instructs the jump routine to select an event at random from the
-# list, by setting the event_index to a random number between one and the event
-# list length. We use the Hop instruction to move at random in large event lists
-# to perform random sampling for confirmation of effective event classification.
-# The Play instruction causes the Neuroplayer to move through the event list,
-# displaying each event as fast as it can. The Stop instruction stops the Play
-# instruction but does nothing else. The jump routine will set the baseline
-# powers in preparation for display and processing, according to the
-# jump_strategy parameter. If this is "local" we use the current baseline
-# powers, if "read" we read them from the archive metadata using the baseline
-# power name in the Baselines Panel. If it is "event" we assume the fourth
-# element in the event list is a keyword describing the event and the fifth
-# element is the baseline power we should apply to the selected channels.
-# Another option is "verbose", which if set to zero, suppresses the event
-# description printout in the Neuroplayer text window. The "Next_NDF",
+# routine, or we can pass a keyword that directs the routine to select an event
+# from an event list, or to move to the archive preceeding or following the
+# current playback archive. An event list is a file on disk. Each line in such a
+# file must itself be an event. An event is a list of values. The first two
+# elements in the list give the location of the event. The location can be
+# specified with a file name and an file time in seconds from the file start, or
+# as an absolute date-time string and an offset in seconds from that time. The
+# third element in the list is a selection string, which lists the channel
+# numbers involved in the event. If the selection string is a list of numbers,
+# the jump routine sets the Player's select string to the event selection
+# string. If the selection string is "*", the Player's channel select string
+# will be set to "*" and all channels will be selected after the jump. If the
+# string is "?", the Player's channel select string will be left unchanged. We
+# can suppress the alteration of the Player's select string by setting the
+# Neuroplayer configuration parameter "isolate_events" to 0. If, instead of an
+# event string composed of event elements, we pass one of the keywords "Back",
+# "Go", "Step", "Hop", "Play", or "Stop" the routine will read the current event
+# list from disk and select one of its events for display, just as if this event
+# were passed to the jump routine. The Back, Go, and Step keywords instruct the
+# jump routine to decrement, leave unaltered, or increment the Neuroplayer's
+# event_index. The Hop keyword instructs the jump routine to select an event at
+# random from the list, by setting the event_index to a random number between
+# one and the event list length. We use the Hop instruction to move at random in
+# large event lists to perform random sampling for confirmation of effective
+# event classification. The Play instruction causes the Neuroplayer to move
+# through the event list, displaying each event as fast as it can. The Stop
+# instruction stops the Play instruction but does nothing else. The jump routine
+# will set the baseline powers in preparation for display and processing,
+# according to the jump_strategy parameter. If this is "local" we use the
+# current baseline powers, if "read" we read them from the archive metadata
+# using the baseline power name in the Baselines Panel. If it is "event" we
+# assume the fourth element in the event list is a keyword describing the event
+# and the fifth element is the baseline power we should apply to the selected
+# channels. Another option is "verbose", which if set to zero, suppresses the
+# event description printout in the Neuroplayer text window. The "Next_NDF",
 # "Current_NDF", "Previous_NDF" keywords jump to the start of the next, current,
 # or previous NDF files in the alphabetical list of archives in the playback
 # directory tree.
@@ -8233,8 +8268,6 @@ proc Neuroplayer_jump {{event ""} {verbose 1}} {
 	# Otherwise, make sure the file name background is gray.
 	if {$repeat} {
 		LWDAQ_post [list Neuroplayer_jump "Play"]
-	} {
-		LWDAQ_set_bg $info(event_file_label) lightgray
 	}
 	
 	# We return the event.
@@ -8757,8 +8790,8 @@ proc Neuroplayer_open {} {
 			Neuroplayer_video_close
 			exit
 		}
-	}	
-
+	}
+	
 	# Get on with creating the display in the tool's frame or window.
 	set f $w.displays
 	frame $f -border 2
@@ -8899,8 +8932,8 @@ proc Neuroplayer_open {} {
 
 	label $f.a -text "Archive:" -anchor w -fg $info(label_color)
 	pack $f.a -side left 
-	label $f.b -textvariable Neuroplayer_info(play_file_tail) \
-		-width 20 -bg $info(variable_bg)
+	entry $f.b -textvariable Neuroplayer_info(play_file_tail) \
+		-width $info(file_tail_width)
 	button $f.pick -text "Pick" -command "Neuroplayer_command Pick"
 	button $f.pickd -text "PickDir" -command "Neuroplayer_command PickDir"
 	button $f.first -text "First" -command "Neuroplayer_command First"
@@ -8928,18 +8961,22 @@ proc Neuroplayer_open {} {
 	frame $f -bd 1
 	pack $f -side top -fill x
 	
-	label $f.e -text "Processing:" -anchor w -fg $info(label_color)
-	pack $f.e -side left 
-	label $f.f -textvariable Neuroplayer_info(processor_file_tail) \
+	label $f.title -text "Processing:" -anchor w -fg $info(label_color)
+	pack $f.title -side left 
+	label $f.file -textvariable Neuroplayer_info(processor_file_tail) \
 		-width 16 -bg $info(variable_bg)
-	button $f.g -text "Pick" -command "Neuroplayer_pick processor_file 1"
+	button $f.pick -text "Pick" -command "Neuroplayer_pick processor_file 1"
+	button $f.edit -text "Edit" -command {
+		LWDAQ_edit_script Open $Neuroplayer_config(processor_file)
+	}
 	checkbutton $f.enable -variable \
 		Neuroplayer_config(enable_processing) -text "Enable"
 	checkbutton $f.save -variable \
 		Neuroplayer_config(save_processing) -text "Save"
 	checkbutton $f.quiet -variable \
 		Neuroplayer_config(quiet_processing) -text "Quiet"
-	pack $f.f $f.g $f.enable $f.save $f.quiet -side left -expand yes
+	pack $f.title $f.pick $f.edit $f.enable $f.save $f.quiet -side left -expand yes
+	
 	label $f.lchannels -text "Select:" -anchor e -fg $info(label_color)
 	switch $LWDAQ_Info(os) {
 		"MacOS" {set width 50}
@@ -8966,22 +9003,21 @@ proc Neuroplayer_open {} {
 	
 	label $f.e -text "Events:" -anchor w -fg $info(label_color)
 	pack $f.e -side left
-	label $f.f -textvariable Neuroplayer_info(event_file_tail) \
-		-width 24 -bg $info(variable_bg)
-	set info(event_file_label) $f.f
 	button $f.g -text "Pick" -command "Neuroplayer_pick event_file 1"
-	pack $f.f $f.g -side left -expand yes
+	pack $f.g -side left -expand yes
 	foreach a {Hop Play Back Go Step Stop} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command [list LWDAQ_post "Neuroplayer_jump $a"]
 		pack $f.$b -side left -expand yes
 	}
-	label $f.il -text "Index:"  -fg $info(label_color)
+	label $f.il -text "Index:" -fg $info(label_color)
 	entry $f.ie -textvariable Neuroplayer_config(event_index) -width 5
-	label $f.ll -text "Length:"  -fg $info(label_color)
+	label $f.ll -text "Length:" -fg $info(label_color)
 	label $f.le -textvariable Neuroplayer_info(num_events) -width 5
-	button $f.mark -text Mark -command [list LWDAQ_post "Neuroplayer_print_event"]
+	button $f.mark -text "Mark" -command [list LWDAQ_post "Neuroplayer_print_event"]
 	pack $f.il $f.ie $f.ll $f.le $f.mark -side left -expand yes
+	checkbutton $f.isolate -variable Neuroplayer_config(isolate_events) -text "Isolate"
+	pack $f.isolate -side left -expand yes
 
 	set f $w.play.e
 	frame $f -bd 1
@@ -9003,12 +9039,12 @@ proc Neuroplayer_open {} {
 		LWDAQ_post "LWDAQ_run_tool Stimulator"
 	}
 	pack $f.stimb -side left -expand yes
-	checkbutton $f.verbose -variable Neuroplayer_config(verbose) -text "Verbose"
-	pack $f.verbose -side left -expand yes
 	button $f.conf -text "Configure" -command "Neuroplayer_configure"
 	pack $f.conf -side left -expand yes
 	button $f.help -text "Help" -command "LWDAQ_tool_help Neuroplayer"
 	pack $f.help -side left -expand yes
+	checkbutton $f.verbose -variable Neuroplayer_config(verbose) -text "Verbose"
+	pack $f.verbose -side left -expand yes
 
 	set info(text) [LWDAQ_text_widget $w 100 10 1 1]
 	

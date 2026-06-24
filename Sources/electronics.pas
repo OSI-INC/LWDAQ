@@ -2,7 +2,7 @@
 	Routines for Analysis of Data Retrieved from Miscellaneous LWDAQ Devices
 
 	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-	Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2022-2026 Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ function lwdaq_A2057_voltmeter(ip:image_ptr_type;
 function lwdaq_A2065_inclinometer(ip:image_ptr_type;
 	v_trigger,v_min,v_max,harmonic:real):string;
 	
-function lwdaq_sct_receiver(ip:image_ptr_type;command:string):string;
+function lwdaq_telemetry_receiver(ip:image_ptr_type;command:string):string;
 
 function lwdaq_A3008_rfpm(ip:image_ptr_type;
 	v_min,v_max:real;rms:boolean):string;
@@ -335,11 +335,11 @@ begin
 
 		if ac_couple then
 			display_real_graph(ip,gauge,
-				overlay_color(channel_num),
+				pick_plot_color(channel_num),
 				t_min,t_max,y_min+gauge_ave,y_max+gauge_ave,0,0)
 		else 
 			display_real_graph(ip,gauge,
-				overlay_color(channel_num),
+				pick_plot_color(channel_num),
 				t_min,t_max,y_min,y_max,0,0);
 
 		if ave then writestr(result,result,gauge_ave:5:3,' ');
@@ -636,7 +636,7 @@ begin
 	of the first trigger.
 }
 		display_real_graph(ip,trace,
-			overlay_color(channel_num),
+			pick_plot_color(channel_num),
 			t_min,t_max,v_min,v_max,0,0);
 {
 	Apply a fourier transform to the data to obtain the fundamental frequency, should
@@ -746,7 +746,7 @@ begin
 			signal[n]:=trace[n].y;
 		end;
 		display_real_graph(ip,trace,
-			overlay_color(channel_num),
+			pick_plot_color(channel_num),
 				0,num_samples-1,v_min,v_max,0,0);
 		if (harmonic>0) then period:=num_samples/harmonic
 		else period:=0;
@@ -763,7 +763,7 @@ begin
 end;
 
 {
-	lwdaq_sct_receiver analyzes receiver messages. These messages have a
+	lwdaq_telemetry_receiver analyzes receiver messages. These messages have a
 	four-byte core, and may be accompanied by one or more bytes of payload data.
 	The routine assumes that the first byte of the second image row is the first
 	byte of a message. Each message takes the following form: an eight-bit
@@ -772,7 +772,8 @@ end;
 	sample values, or various characteristics of the data block, depending upon
 	the options passed in through the command string.
 	
-	Note: This routine was formerly called "lwdaq_sct_recorder".
+	Note: This routine was formerly called "lwdaq_sct_recorder" and
+	"lwdaq_telemetry_receiver". 
 
 	The routine does not return the payload directly, but instead uses the
 	global electronics_trace to store indices that allow another routine to
@@ -816,14 +817,14 @@ end;
 	sample values. But default x is zero and the filter is disabled.
 	
 	The "-divergent b" option enables tolerance of a sample clock that diverges
-	significantly from that of the data receiver. This option affects the
+	significantly from that of the telemetry receiver. This option affects the
 	reconstruction instruction only. We use zero and one to indicate false and
 	true.
 
 	The "-activity n" option sets the minimum number of samples a signal channel
 	must contain for either plotting or listing.
 
-	Because of limitations in their logic, some data receivers may be unable to
+	Because of limitations in their logic, some telemetry receivers may be unable to
 	eliminate duplicate messages from their data stream. The same signal message
 	received on two or more antennas may appear two or more times in the data.
 	This routine eliminates these duplicates when it copies the messages from
@@ -933,7 +934,7 @@ end;
 	line. For each message it writes the eight-bit channel number, the
 	sixteen-bit timestamp, and the sixteen-bit contents.
 }
-function lwdaq_sct_receiver(ip:image_ptr_type;command:string):string;
+function lwdaq_telemetry_receiver(ip:image_ptr_type;command:string):string;
 	
 const
 	core_message_length=4;
@@ -1106,10 +1107,10 @@ begin
 	Allocate return string and check image pointer.
 }
 	result:='ERROR: Receiver suffered an undocumented failure.';
-	lwdaq_sct_receiver:=result;
+	lwdaq_telemetry_receiver:=result;
 	if ip=nil then exit;
 	ip^.results:='';
-	mark_time('entered routine','lwdaq_sct_receiver');
+	mark_time('entered routine','lwdaq_telemetry_receiver');
 {
 	Read options out of the command string.
 }
@@ -1145,7 +1146,7 @@ begin
 	image data.
 }
 	if instruction='get' then begin
-		mark_time('get','lwdaq_sct_receiver');
+		mark_time('get','lwdaq_telemetry_receiver');
 		result:='';
 		word:=read_word(command);
 		while word<>'' do begin
@@ -1159,7 +1160,7 @@ begin
 			end;
 			word:=read_word(command);
 		end;
-		lwdaq_sct_receiver:=result;
+		lwdaq_telemetry_receiver:=result;
 		exit;
 	end;
 {
@@ -1173,7 +1174,7 @@ begin
 }
 	writestr(debug_string,'allocating ',max_num_selected*sizeof(message_type):1,
 		' bytes for mlp');
-	mark_time(debug_string,'lwdaq_sct_receiver');
+	mark_time(debug_string,'lwdaq_telemetry_receiver');
 	setlength(mlp,max_num_selected);
 {
 	We scan through the messages in the image and construct an array that is
@@ -1211,7 +1212,7 @@ begin
 	failure.
 
 	When it appears that a message is valid, we check to see if it is a
-	duplicate. Sometimes the data receiver does not eliminate duplicate messages
+	duplicate. Sometimes the telemetry receiver does not eliminate duplicate messages
 	itself, because of the large number of possible channels upon which
 	duplication can occur, and the limited logic resources in its firmware. The
 	id_previous list contains for all channels the index of the previous message
@@ -1239,7 +1240,7 @@ begin
 	data acquisition software will attempt to correct the errors and restore the
 	integrity of the data.
 }
-	mark_time('constructing message list','lwdaq_sct_receiver');
+	mark_time('constructing message list','lwdaq_telemetry_receiver');
 	for id_num:=min_id to max_id do id_qty[id_num]:=0;
 	num_errors:=0;
 	error_report:='';
@@ -1340,7 +1341,7 @@ begin
 	implemented above.
 }
 	if instruction='purge' then begin
-		mark_time('purge','lwdaq_sct_receiver');
+		mark_time('purge','lwdaq_telemetry_receiver');
 		for message_num:=0 to num_selected-1 do begin
 			write_image_message(ip,mlp[message_num],message_num);
 			copy_payload(ip,mlp[message_num].index,message_num);
@@ -1360,7 +1361,7 @@ begin
 	hexadecimal printing of the core message bytes, separated by a space.
 }
 	if instruction='print' then begin
-		mark_time('print','lwdaq_sct_receiver');
+		mark_time('print','lwdaq_telemetry_receiver');
 		writestr(result,'Total ',num_messages:1,' messages, ',
 			num_clocks:1,' clocks, ',
 			num_errors:1,' errors, ',
@@ -1379,7 +1380,7 @@ begin
 
 		writestr(message_string,
 			'Messages ',start_index:1,
-			' to ',end_index:1,' (index id value timestamp $hex):',eol);
+			' to ',end_index:1,' (index id value timestamp hex):',eol);
 		insert(message_string,result,length(result)+1);
 		message_index:=start_index;
 		while (message_index<=end_index) do begin
@@ -1407,7 +1408,7 @@ begin
 			end;
 		end;
 		writestr(message_string,
-			'Data Receiver Version ',receiver_version:1,'.');
+			'Telemetry Receiver Version ',receiver_version:1,'.');
 		insert(message_string,result,length(result)+1);
 	end;
 {
@@ -1416,10 +1417,10 @@ begin
 	the messages from the specified signal.
 }
 	if instruction='extract' then begin
-		mark_time('extracting messages','lwdaq_sct_receiver');
+		mark_time('extracting messages','lwdaq_telemetry_receiver');
 		extract_id:=read_integer(command);
 		if (extract_id<min_id) or (extract_id>max_id) then begin
-			report_error('Invalid extract_id in lwdaq_sct_receiver');
+			report_error('Invalid extract_id in lwdaq_telemetry_receiver');
 			exit;
 		end;
 		result:='';
@@ -1444,7 +1445,7 @@ begin
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
 						report_error('Too many messages for result string in '
-							+'lwdaq_sct_receiver');
+							+'lwdaq_telemetry_receiver');
 						exit;
 					end;
 					standing_value:=sample;
@@ -1501,9 +1502,10 @@ begin
 	sample than another sample in the same window, will be removed.
 }
 	if instruction='reconstruct' then begin
-		mark_time('reconstruct','lwdaq_sct_receiver');
+		mark_time('reconstruct','lwdaq_telemetry_receiver');
 		if (num_clocks<min_reconstruct_clocks) then begin
-			report_error('Too few clock messages for reconstruction in lwdaq_sct_receiver');
+			report_error('Too few clock messages for reconstruction'
+				+'in lwdaq_telemetry_receiver');
 			exit;
 		end;
 		
@@ -1512,12 +1514,12 @@ begin
 		}
 		reconstruct_id:=read_integer(command);
 		if (reconstruct_id<min_id) or (reconstruct_id>max_id) then begin
-			report_error('Invalid reconstruct_id in lwdaq_sct_receiver');
+			report_error('Invalid reconstruct_id in lwdaq_telemetry_receiver');
 			exit;
 		end;
 		period:=read_integer(command);
 		if (period<min_period) or (period>max_period) then begin
-			report_error('Invalid period in lwdaq_sct_receiver');
+			report_error('Invalid period in lwdaq_telemetry_receiver');
 			exit;
 		end;
 		
@@ -1530,7 +1532,7 @@ begin
 		if (word<>'') then begin
 			standing_value:=read_integer(word);
 			if (standing_value<min_sample) or (standing_value>max_sample) then begin
-				report_error('Invalid standing_value in lwdaq_sct_receiver');
+				report_error('Invalid standing_value in lwdaq_telemetry_receiver');
 				exit;
 			end;
 		end;
@@ -1565,7 +1567,7 @@ begin
 }
 		writestr(debug_string,'allocating ',max_num_selected*sizeof(message_type):1,
 			' bytes for msp');
-		mark_time(debug_string,'lwdaq_sct_receiver');
+		mark_time(debug_string,'lwdaq_telemetry_receiver');
 		setlength(msp,max_num_selected);
 {
 	Take messages from the reconstruct signal and put them in the
@@ -1595,7 +1597,7 @@ begin
 	into the windows. The phase that gives us the largest number of messages is
 	our best guess at the message source's nominal transmit time.
 }
-		mark_time('determine window phase','lwdaq_sct_receiver');
+		mark_time('determine window phase','lwdaq_telemetry_receiver');
 		for phase_index:=0 to period-1 do phase_histogram[phase_index]:=0;
 		for message_num:=0 to num_selected-1 do
 			inc(phase_histogram[mlp[message_num].time mod period]);
@@ -1628,7 +1630,7 @@ begin
 		reconstruct_size:=round(num_clocks*clock_period/period)+1;
 		writestr(debug_string,'allocating ',reconstruct_size*sizeof(message_type):1,
 			' bytes for msp');
-		mark_time(debug_string,'lwdaq_sct_receiver');
+		mark_time(debug_string,'lwdaq_telemetry_receiver');
 		setlength(msp,reconstruct_size);
 {
 	Run through transmission windows. In each window, make a list of available
@@ -1646,7 +1648,7 @@ begin
 		num_missing:=0;
 		num_bad:=0;
 		message_num:=0;
-		mark_time('selecting samples','lwdaq_sct_receiver');
+		mark_time('selecting samples','lwdaq_telemetry_receiver');
 		while window_time<num_clocks*clock_period-window_extent do begin
 			num_candidates:=0;
 			while (message_num<num_selected) and
@@ -1719,7 +1721,7 @@ begin
 {
 	Apply a glitch filter to the signal.
 }
-		mark_time('applying glitch filter','lwdaq_sct_receiver');
+		mark_time('applying glitch filter','lwdaq_telemetry_receiver');
 		setlength(gp,num_selected);
 		for message_num:=0 to num_selected-1 do 
 			gp[message_num]:=mlp[message_num].sample;
@@ -1744,7 +1746,7 @@ begin
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
 						report_error('Too many messages for result string '
-							+'in lwdaq_sct_receiver');
+							+'in lwdaq_telemetry_receiver');
 						exit;
 					end;
 				end;
@@ -1765,7 +1767,7 @@ begin
 	signals regardless of the state of the data.
 }
  	if instruction='plot' then begin
-		mark_time('plot','lwdaq_sct_receiver');
+		mark_time('plot','lwdaq_telemetry_receiver');
 		draw_oscilloscope_scale(ip,num_divisions);
  		display_min:=read_real(command);
  		display_max:=read_real(command);
@@ -1786,7 +1788,7 @@ begin
 			while word<>'' do begin
 				id_num:=read_integer(word);
 				if (id_num<min_id) or (id_num>max_id) then begin
-					report_error('Invalid id_num in lwdaq_sct_receiver');
+					report_error('Invalid id_num in lwdaq_telemetry_receiver');
 					exit;
 				end;
 				id_valid[id_num]:=true;	
@@ -1800,7 +1802,7 @@ begin
  		
 		num_bad_messages:=0;
 		
-		mark_time('plotting','lwdaq_sct_receiver');
+		mark_time('plotting','lwdaq_telemetry_receiver');
 		result:='';
 		for id_num:=min_id to max_id do begin
 			if id_valid[id_num] then begin
@@ -1822,17 +1824,17 @@ begin
 					max:=max_y_xy_graph(trace);
 					if display_mode='CP' then 
 						display_real_graph(ip,trace,
-							overlay_color(id_num),
+							pick_plot_color(id_num),
 							mlp[0].time,mlp[num_selected-1].time,
 							display_min+ave,display_max+ave,0,0)
 					else if display_mode='NP' then
 						display_real_graph(ip,trace,
-							overlay_color(id_num),
+							pick_plot_color(id_num),
 							mlp[0].time,mlp[num_selected-1].time,
 							0,0,0,0)
 					else 
 						display_real_graph(ip,trace,
-							overlay_color(id_num),
+							pick_plot_color(id_num),
 							mlp[0].time,mlp[num_selected-1].time,
 							display_min,display_max,0,0);
 				end else begin
@@ -1864,7 +1866,7 @@ begin
 	only the signal channels.
 }
  	if instruction='list' then begin		
-		mark_time('list','lwdaq_sct_receiver');
+		mark_time('list','lwdaq_telemetry_receiver');
 		result:='';
 		for id_num:=min_id to max_id do
 			if (id_qty[id_num]>activity_threshold) 
@@ -1878,7 +1880,7 @@ begin
 	fifteen (0xF). For each message we return the 
 }
  	if instruction='auxiliary' then begin		
-		mark_time('auxiliary','lwdaq_sct_receiver');
+		mark_time('auxiliary','lwdaq_telemetry_receiver');
 		result:='';
 		for message_num:=0 to num_selected-1 do begin
 			with mlp[message_num] do begin
@@ -1888,7 +1890,7 @@ begin
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
 						report_error('Too many messages for result string in '
-							+'lwdaq_sct_receiver');
+							+'lwdaq_telemetry_receiver');
 						exit;
 					end;
 				end;
@@ -1904,7 +1906,7 @@ begin
 	
 }
  	if instruction='system' then begin		
-		mark_time('system','lwdaq_sct_receiver');
+		mark_time('system','lwdaq_telemetry_receiver');
 		result:='';
 		for message_num:=0 to num_selected-1 do begin
 			with mlp[message_num] do begin
@@ -1914,7 +1916,7 @@ begin
 					insert(message_string,result,length(result)+1);
 					if length(result)>max_print_length then begin
 						report_error('Too many messages for result string in '
-							+'lwdaq_sct_receiver');
+							+'lwdaq_telemetry_receiver');
 						exit;
 					end;
 				end;
@@ -1924,7 +1926,7 @@ begin
 {
  	Clean up.
 }
-	lwdaq_sct_receiver:=result;
+	lwdaq_telemetry_receiver:=result;
 end;
 
 {
@@ -1985,7 +1987,7 @@ begin
 			writestr(result,result,' ',(max-min):fsr:fsd);
 		if (max<v_max) and (min>v_min) then 
 			display_real_graph(ip,trace,
-				overlay_color(channel_num),
+				pick_plot_color(channel_num),
 				0,num_samples-1,v_min,v_max,0,0);
 	end;
 {

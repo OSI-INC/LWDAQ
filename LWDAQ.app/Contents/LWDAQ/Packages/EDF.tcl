@@ -1,13 +1,13 @@
 # European Data Format Package
 #
-# (C) 2015-2024 Kevan Hashemi, Open Source Instruments Inc.
+# (C) 2015-2025 Kevan Hashemi, Open Source Instruments Inc.
 #
 # A library of routines to create and add to EDF (European Data Format) files
 # for neuroscience research, in which we assume all signals are are derived from
 # sources that produce sixteen-bit unsigned data samples that we must translate
 # into the EDF sixteen-bit little-endian signed integers, and for which all
 # signals have the same voltage range and units.
-
+#
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later

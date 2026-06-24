@@ -66,8 +66,8 @@ proc Spectrometer_init {} {
 	set info(control) "Idle"
 	set info(instrument) "RFPM"
 	set config(ip_addr) "10.0.0.37"
-	set info(graph_width) 900
-	set info(graph_height) 300
+	set info(graph_width) "900"
+	set info(graph_height) "300"
 	set info(measurement_names) "SCT Peak Average"
 	set info(cursor_y) "0"
 	set info(image_name) spectrometer
@@ -103,8 +103,8 @@ proc Spectrometer_init {} {
 	set config(f_color) "2"
 	set config(f_lines) "900 915 930"
 	set config(step) "0"
-	set config(active_width) "5"
-	set config(inactive_width) "2"
+	set config(active_width) "6"
+	set config(inactive_width) "3"
 	
 	# Calibration constants for the Sepctrometer A3008 circuit.
 	set config(f_ref) "915"

@@ -1,7 +1,7 @@
 {
 	TCL/TK Command Line Implementations of Pascal Routines 
 	Copyright (C) 2004-2021 Kevan Hashemi, Brandeis University
-	Copyright (C) 2022-2025 Kevan Hashemi, Open Source Instruments Inc.
+	Copyright (C) 2022-2026 Kevan Hashemi, Open Source Instruments Inc.
 	
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@ uses
 
 const
 	package_name = 'lwdaq';
-	version_num = '10.7';
+	version_num = '10.8';
 
 {
 	The following variables we use to implement the utils gui routines for
@@ -1399,7 +1399,7 @@ end;
 <tr><td>-replace value</td><td>If value is 1, delete the original image and replace with new image, default.</td></tr>
 <tr><td>-clear value</td><td>If value is 1, clear overlay of final image, default 0.</td></tr>
 <tr><td>-fill value</td><td>If value is 1, fill overlay of final image with white, default 0.</td></tr>
-<tr><td>-paint value</td><td>Paint the overlay within the analysis bounds with eight-bit color value, default 0.</td></tr>
+<tr><td>-paint value</td><td>Paint the overlay within the analysis bounds with eight-bit RGB color value, default 0.</td></tr>
 <tr><td>-bottom value</td><td>Set the bottom of the analysis bounds to value.</td></tr>
 <tr><td>-top value</td><td>Set the top of the analysis bounds to value.</td></tr>
 <tr><td>-left value</td><td>Set the left of the analysis bounds to value.</td></tr>
@@ -1410,7 +1410,7 @@ end;
 
 <p>With -replace 0, the manipulation creates a new image and returns its name. With -replace 1, the manipulation over-writes data in the old image and returns the old image name.</p>
 
-<p>The -paint option instructs lwdaq_image_manipulate to paint the entire area within the analysis bounds with the color given by <i>value</i>. This value should be a number between 0 and 255. The value 0 is for transparant. Other than the 0-value, the number will be treated like an eight-bit RGB code, with the top three bits for red, the middle three for green, and the bottom three for blue. Thus $E0 (hex E0) is red, $1C is green, and $03 is blue. Note that paint does not convert value into one of LWDAQ's standard graph-plotting colors, as defined in the overlay_color routine of images.pas, and used in <a href="#lwdaq_graph">lwdaq_graph</a>.</p>
+<p>The -paint option instructs lwdaq_image_manipulate to paint the entire area within the analysis bounds with the color given by <i>value</i>. This value should be a number between 0 and 255. The value 0 is for transparant. Other than the 0-value, the number will be treated like an eight-bit RGB code, with the top three bits for red, the middle three for green, and the bottom three for blue. Thus $E0 (hex E0) is red, $1C is green, and $03 is blue.</p>
 
 <p>In addition to the pixel manipulations, we also have options to change other secondary properties of the image. The table above shows the available manipulation options, each of which is followed by a value in the command line, in the format ?option value?.</p>
 
@@ -1834,7 +1834,7 @@ lwdaq_bcam $img -num_spots 2 -threshold "10 #"
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-num_spots</td><td>The number of spots the analysis should find.</td></tr>
 <tr><td>-threshold</td><td>String specifying threshold intensity and spot size.</td></tr>
-<tr><td>-color</td><td>Color for spot outlining in overlay, default red.</td></tr>
+<tr><td>-color</td><td>Color code for spot outlining in overlay, default red.</td></tr>
 <tr><td>-pixel_size_um</td><td>Tells the analysis the pixel size (assumed square)</td></tr>
 <tr><td>-show_timinig</td><td>If 1, print timing report to gui text window.</td></tr>
 <tr><td>-show_pixels</td><td>If 1, mark pixels above threshold.</td></tr>
@@ -1889,7 +1889,8 @@ spot_increasing_xy=8;</pre>
 
 <p>With show_pixels=0, which is the default value, the routine draws red boxes around the spots. These boxes are of the same size as the spots, or a little bigger if the spots are small. If num_spots=1 and the number of pixels in the spot is greater than min_pixels_for_cross, the routine draws a cross centered on the spot instead of a box around it. When show_pxels=1, the routine marks all the pixels in each spot, so you can see the pixels that are above threshold and contiguous.</p>
 
-<p>The color we use to mark the image with the results of analysis is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
+<p>We specify the color we use to mark the image using an integer code that we later translate into
+a color. The mapping between the color code and actual colors is shown in <a href="https://www.opensourceinstruments.com/Electronics/A3018/HTML/Receiver_Activity.gif">here</a>.</p>
 }
 function lwdaq_bcam(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
 
@@ -2091,12 +2092,12 @@ begin
 	end;
 	case analysis_type of 
 		spot_use_ellipse,spot_use_ellipse_shadow:
-			spot_list_display_ellipses(ip,slp,overlay_color(color));
+			spot_list_display_ellipses(ip,slp,pick_plot_color(color));
 		spot_use_vertical_stripe,
 		spot_use_vertical_shadow: begin
 			pp:=image_profile_row(ip);
 			display_profile_row(ip,pp,green_color);
-			spot_list_display_vertical_lines(ip,slp,overlay_color(color));
+			spot_list_display_vertical_lines(ip,slp,pick_plot_color(color));
 		end;
 		spot_use_vertical_edge: begin
 			if not show_pixels then begin
@@ -2115,16 +2116,16 @@ begin
 			ref_line.b.j:=round(reference_um/pixel_size_um);
 			display_ccd_line(ip,ref_line,blue_color);	
 
-			spot_list_display_vertical_lines(ip,slp,overlay_color(color));
+			spot_list_display_vertical_lines(ip,slp,pick_plot_color(color));
 		end;
 		otherwise begin
 			if num_spots>1 then 
-				spot_list_display_bounds(ip,slp,overlay_color(color));
+				spot_list_display_bounds(ip,slp,pick_plot_color(color));
 			if num_spots=1 then 
 				if slp^.spots[1].num_pixels>=min_pixels_for_cross then
-					spot_list_display_crosses(ip,slp,overlay_color(color))
+					spot_list_display_crosses(ip,slp,pick_plot_color(color))
 				else
-					spot_list_display_bounds(ip,slp,overlay_color(color));
+					spot_list_display_bounds(ip,slp,pick_plot_color(color));
 		end;
 	end;
 {
@@ -2183,7 +2184,7 @@ end;
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-num_hits</td><td>The number of hits the analysis should find, default 0.</td></tr>
 <tr><td>-threshold</td><td>String specifying threshold intensity and hit size limits.</td></tr>
-<tr><td>-color</td><td>Color for hit outlining in overlay, default green.</td></tr>
+<tr><td>-color</td><td>Integer color code for hit outlining in overlay, default 0.</td></tr>
 <tr><td>-show_timinig</td><td>If 1, print timing report to gui text window, default 0.</td></tr>
 <tr><td>-show_pixels</td><td>If 1, mark pixels above threshold, default 0.</td></tr>
 <tr><td>-subtract_gradient</td><td>If 1, subtract the image gradient before finding hits, default 0.</td></tr>
@@ -2196,7 +2197,7 @@ end;
 
 <p>With subgract_gradient=0, the dosimeter analysis operates entirely upon the original image. But with subgract_gradient=1, the analysis obtains the intensity-slope with the original image, but then subtracts the average intensity gradient from the analysis bounds and continues with bright-pixel collection in the gradient-subtracted image.</p>
 
-<p>The color we use to outline bright pixels is given in the <i>-color</i> option. You specify the color with an integer. Color codes 0 to 15 specity a set of distinct colors, shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>.</p>
+<p>We can specify the color we use to outline bright pixels with an integer code after the <i>-color</i> option. The default value for this code is zero, which selects red. The correspondance between color code and colors is shown <a href="https://www.opensourceinstruments.com/Electronics/A3018/HTML/Receiver_Activity.gif">here</a>.</p>
 
 <p>See the <a href="https://www.bndhep.net/Electronics/LWDAQ/Manual.html#Dosimeter">Dosimeter Instrument</a> Manual for more information about the option values.</p>
 }
@@ -2301,7 +2302,7 @@ begin
 	
 	mark_time('displaying positions','lwdaq_dosimeter');
 	if not show_pixels then clear_overlay(wip);
-	spot_list_display_bounds(wip,slp,overlay_color(color));
+	spot_list_display_bounds(wip,slp,pick_plot_color(color));
 
 	mark_time('calculating stdev and density','lwdaq_dosimeter');
 	stdev:=image_amplitude(wip);
@@ -3329,7 +3330,7 @@ end;
 
 <p>The lwdaq_voltmeter routine calls lwdaq_A2057_voltmeter to analyze the samples in the image. The image results string must contain some information about the samples that will allow the analysis to parse the voltages into reference samples and signal samples. The results string will contain 5 numbers. The first two are the bottom and top reference voltages available on the LWDAQ device. In the case of the A2057 these are 0 V and 5 V, but they could be some other value on another device. The third number is the gain applied to the signal. The fourth number is the data acquisition redundancy factor, which is the number of samples recorded divided by the width of the image. Because we will use a software trigger, we want to give the routine a chance to find a trigger and still have enough samples to plot one per image column. Suppose the image contains 200 columns, then we might record 600 samples so that any trigger occuring in the first 400 samples will leave us with 200 samples after the trigger to plot on the screen. In this case, our redundancy factor is 3. The fifth number is the number of channels from which we have recorded.</p>
 
-<p>The result string "0.0 5.0 10 3 2" indicates 0 V and 5 V references, a gain of 10, a redundancy factor of 3 and two channels. The channels will be plotted with the usual LWDAQ <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">colors</a>, with the first channel being color zero.</p>
+<p>The result string "0.0 5.0 10 3 2" indicates 0 V and 5 V references, a gain of 10, a redundancy factor of 3 and two channels. The channels will be plotted with the LWDAQ <a href="https://www.opensourceinstruments.com/Electronics/A3018/HTML/Receiver_Activity.gif">plot colors</a>, with the first channel being color zero, which comes out as red.</p>
 
 <p>The analysis assumes the samples are recorded as sixteen-bit numbers taking up two bytes, with the most significant byte first (big-endian short integer). The first byte of the recorded signal should be the first pixel in the second row of the image, which is pixel (0,1). If <i>n</i> is the image width and <i>r</i> is the redundancy factory, the first <i>n</i> samples (therefore 2<i>n</i> bytes) are samples of the bottom reference voltage. After that come <i>nr</i> samples from each channel recorded (therefore 2<i>nr</i> bytes from each channel). Last of all are <i>n</i> samples from the top reference.</p>
 
@@ -3542,9 +3543,9 @@ begin
 end;
 
 {
-<p>lwdaq_receiver steps through the data bytes of an image, looking for valid four-byte messages, such as those transmitted by a Subcutaneous Transmitter (<a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>) and received by an Octal Data Receiver (<a href="http://www.opensourceinstruments.com/Electronics/A3018/M3027.html">A3027</a>). The lwdaq_receiver command takes two arguments. The first is the name of the image that contains the message data. The second is a command string. The command string in turn contains an instruction and some parameters. The function of lwdaq_receiver we describe in detail, with examples, in the <a href="http://www.opensourceinstruments.com/Electronics/A3018/Receiver.html">Receiver Instrument</a> manual. The lwdaq_receiver command calls another routine <i>lwdaq_sct_receiver</i>, which is defined in <a href="https://www.bndhep.net/Software/Sources/electronics.pas">electronics.pas</a>. The paragraphs below are the comments from the head of this lwdaq_sct_receiver function, and describe how to compose the command string we pass through lwdaq_receiver to lwdaq_sct_receiver. (Note: lwdaq_sct_receiver was formerly called lwdaq_sct_recorder. The new name should be used in all code.)</p>
+<p>lwdaq_receiver steps through the data bytes of an image, looking for valid four-byte messages, such as those transmitted by a Subcutaneous Transmitter (<a href="http://www.opensourceinstruments.com/Electronics/A3028/M3028.html">A3028</a>) and received by an Octal Data Receiver (<a href="http://www.opensourceinstruments.com/Electronics/A3018/M3027.html">A3027</a>). The lwdaq_receiver command takes two arguments. The first is the name of the image that contains the message data. The second is a command string. The command string in turn contains an instruction and some parameters. The function of lwdaq_receiver we describe in detail, with examples, in the <a href="http://www.opensourceinstruments.com/Electronics/A3018/Receiver.html">Receiver Instrument</a> manual. The lwdaq_receiver command calls another routine <i>lwdaq_telemetry_receiver</i>, which is defined in <a href="https://www.bndhep.net/Software/Sources/electronics.pas">electronics.pas</a>. The paragraphs below are the comments from the head of this lwdaq_telemetry_receiver function, and describe how to compose the command string we pass through lwdaq_receiver to lwdaq_telemetry_receiver. (Note: lwdaq_telemetry_receiver was formerly called lwdaq_sct_receiver, and before that lwdaq_sct_recorder. The new name should be used in all code.)</p>
 
-<p>lwdaq_sct_receiver analyzes receiver messages. These messages have a four-byte core, and may be accompanied by one or more bytes of payload data. The routine assumes that the first byte of the second image row is the first byte of a message. Each message takes the following form: an eight-bit signal identifier, a sixteen-bit sample value, an eight-bit time stamp, and zero or more bytes of payload. The routine will return the sixteen-bit sample values, or various characteristics of the data block, depending upon the options passed in through the command string.</p>
+<p>lwdaq_telemetry_receiver analyzes receiver messages. These messages have a four-byte core, and may be accompanied by one or more bytes of payload data. The routine assumes that the first byte of the second image row is the first byte of a message. Each message takes the following form: an eight-bit signal identifier, a sixteen-bit sample value, an eight-bit time stamp, and zero or more bytes of payload. The routine will return the sixteen-bit sample values, or various characteristics of the data block, depending upon the options passed in through the command string.</p>
 
 <p>The routine does not return the payload directly, but instead uses the global electronics_trace to store indices that allow another routine to extract payload values from the image data. The electronics trace is filled with message indices when we execute the "extract" or "reconstruct" instructions.</p>
 
@@ -3620,7 +3621,7 @@ begin
 	command:=Tcl_ObjString(argv[2]);
 	
 	start_timer('starting '''+command+'''','lwdaq_receiver');
-	result:=lwdaq_sct_receiver(ip,command);
+	result:=lwdaq_telemetry_receiver(ip,command);
 	mark_time('done with '''+command+'''','lwdaq_receiver');
 	if show_timing then report_time_marks;
 		
@@ -3630,7 +3631,7 @@ begin
 end;
 
 {
-<p>lwdaq_alt extracts power measurements from data recorded by an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of telemetry devices such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), and Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="https://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver"> lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
+<p>lwdaq_alt extracts power measurements from data recorded by an Animal Location Tracker (ALT, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3038</a>) so as to measure the location of telemetry devices such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), and Blood Pressure Monitors (<a href="http://www.opensourceinstruments.com/Electronics/A3051/M3051.html">BPM</a>). The routine assumes that the global electronics_trace is a valid xy_graph created by lwdaq_receiver, giving a list of x-y values in which x is an integer time and y is an integer index. The message corresponding to time <i>x</i> is the <i>y</i>'th message in the Receiver Instrument image to which we applied the lwdaq_receiver routine. The electronics_trace will be valid provided that the most recent call to the lwdaq electronics library was the <a href="https://www.bndhep.net/Electronics/LWDAQ/Commands.html#lwdaq_receiver">lwdaq_receiver</a> with either the "extract" or "reconstruct" instructions.</p>
 
 <p>The routine takes two parameters and has several options. The first parameter is the name of the image that contains the tracker data. The indices in electronics_trace must refer to the data space of this image. An index of <i>n</i> points to the <i>n</i>'th message in the data, with the first message being number zero. Each message starts with four bytes and is followed by one or more <i>payload bytes</i>. The payload bytes contain one or more power measurements.</p>
 
@@ -3916,7 +3917,7 @@ begin
 end;
 
 {
-<p>lwdaq_tcb extracts the top antenna and top power from data recorded by a Telemetry Control Box (TCB, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</a>). The top antenna is a number specifying one of the antennas connected to the TCB. Each of these antennas is capable of receiving telemetry messages from devices such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), or Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). For each message it receives, the TCB adds a payload of two bytes to the core four-byte telemetry message. The first payload byte is the maximum power with which this message was received by any of the TCB's antennas. The second payload byte is a number identifying this antenna. We call this antenna the <i>top</i> antenna and its received power is the <i>top</i> power. The TCB-A16 antenna inputs are numbered 1-16 on the connectors on the back of the box. The top antenna number provided by the TCB-A16 gives us the antenna input to which the top antenna is connected.</p>
+<p>lwdaq_tcb extracts the top antenna and top power from data recorded by a Telemetry Control Box (TCB, <a href="http://www.opensourceinstruments.com/Electronics/A3038/M3038.html">A3042</a>). The top antenna is a number specifying one of the antennas connected to the TCB. Each of these antennas is capable of receiving telemetry messages from devices such as our Subcutaneous Transmitters (<a href="http://www.opensourceinstruments.com/SCT">SCT</a>), Implantable Inertial Sensors (<a href="http://www.opensourceinstruments.com/IIS">IIS</a>), or Implantable Stimulator-Transponders (<a href="http://www.opensourceinstruments.com/IST">IST</a>). For each message it receives, the TCB adds a payload of two bytes to the core four-byte telemetry message. The first payload byte is the maximum power with which this message was received by any of the TCB's antennas. The second payload byte is a number identifying this antenna. We call this antenna the <i>top</i> antenna and its received power is the <i>top</i> power. The The A3042A-16 and A3042B-16 antenna antenna inputs are numbered 1-16 on the connectors on the back of the box. The top antenna number provided by the TCB-A16 gives us the antenna input to which the top antenna is connected.</p>
 
 <p>If we know where our antennas are located in our recording system, the top antenna number gives us an approximate measurement of the transmitter's location. Most likely, the transmitter is nearer to the top antenna than to any other. If the transmitter is half-way between two antennas, we may see the top antenna number varying from one received message to the next. The lwdaq_tcb routine returns the median antenna number and the median power. Our assumption is that these two median values correspond to one another. We convert the antenna number into a three-dimensional position with a string of three-dimensional points, each point representing the location of an antenna in an arbitrary three-dimensional coordinate system with arbitrary units. The lwdaq_tcb routine picks the point corresponding to the top antenna and returns its three coordinates <i>x</i>, <i>y</i>, and <i>z</i>. We must choose the coordinate system for the antennas such that all <i>z</i>-coordinates are positive and non-zero. By this means, we allow our analysis of animal movement, which we apply to a history of animal position, to use coordinate "0.0 0.0 0.0" as a marker for "no measurement in this interval".</p>
 
@@ -4457,7 +4458,7 @@ lwdaq_graph $profile imagname -x_only 1 -color 4</pre>
 
 <p>By default, the graph will be drawn in the overlay, so it can use colors and be accompanied by grid lines that do not interfere with the underlying image data. The overlay can be transparent or white, depending upon whether we have cleared or filled the overlay respectively before calling <i>lwdaq_graph</i>. But if <i>in_image</i> is 1, the color will be treated as a shade of gray and the graph will be drawn in the image itself. By this means, we can create images for two-dimensional analysis out of graphs. When <i>in_image</i> is set, the <i>x_div</i> and <i>y_div</i> options are ignored.</p>
 
-<p>The color codes for a graph in the overlay give 255 unique colors. You can try them out to see which ones you like. The colors 0 to 15 specify a set of distinct colors, as shown <a href="https://www.bndhep.net/Electronics/LWDAQ/HTML/Plot_Colors.jpg">here</a>. The remaining colors are eight-bit RGB codes. If you don't specify a color, the plot will be red. The line will be one pixel wide unless we specify a larger  width with the -width option, which takes an integert value one or greater.</p>
+<p>The color codes for a graph in the overlay give 255 unique colors. You can try them out to see which ones you like. If you don't specify a color, the plot will be red. The line will be one pixel wide unless we specify a larger width with the -width option, which takes an integert value one or greater.</p>
 
 <p>Some data contains occasional error samples, which we call <i>glitches</i>. The <i>lwdaq_graph</i> "-glitch <i>g</i>" option allows you to specify a threshold for glitch filtering. The <i>lwdaq_graph</i> routine calls the <i>glitch_filter_y</i> from <a href="https://www.bndhep.net/Software/Sources/utils.pas">utils.pas</a> to eliminate glitches from the sequence of <i>y</i>-coordinates. We provide the same glitch filter at the command line with the <a href="#glitch_filter_y">glitch_filter_y</a>.</p>
 }
@@ -4580,7 +4581,7 @@ begin
 
 	if glitch>0 then glitch_filter_y(gxy,glitch);
 
-	color:=byte_shift*(width-1)+overlay_color(color);
+	color:=byte_shift*(width-1)+pick_plot_color(color);
 	shade:=byte_shift*(width-1)+color;	
 	
 	if ac_couple then begin
@@ -4947,19 +4948,29 @@ begin
 end;
 
 {
-<p>lwdaq_rag provides routines to support retrieval-assisted generation (RAG). It creates and maintains a library of embedding vectors in memory. It allows us to compare a new vector to every vector in the library and obtain a list of the most relevant library entries, a process we call <i>retrieval</i>. Each embed in the library has a name, a relevance, and an n-dimensional vector. The name is a string of characters that identify a document chunk, although lwdaq_rag at no point handles anything but embedding vectors, nor does it read embedding vectors from disk or write them to disk. The vector itself, as delivered to the library, can have integer or real-valued components, but all components will be saved as real numbers. All vectors in the library must have the same length so that the dot product of a test vector with each vector will be proportional to the cosine of the angle between each vector and the test vector.  The relevance stored with each embed is the dot product we obtained from the most recent comparison. The lwdaq_rag guarantees that all vectors have unit length by calcualting the length of each vector it receives, and dividing all its coordinates by the length.</p>
+<p>lwdaq_rag provides routines to support retrieval-assisted generation (RAG). It creates and maintains a library of embed vectors in memory. It allows us to compare a new vector to every vector in the library and obtain a list of the most relevant library entries, a process we call <i>retrieval</i>. Each embed in the library has a name, a relevance, and an n-dimensional vector. The name is a string of characters that identify a document chunk, although lwdaq_rag at no point handles anything but embed vectors, nor does it read embed vectors from disk or write them to disk. The vector itself, as delivered to the library, can have integer or real-valued components, but all components will be saved as real numbers. All vectors in the library must have the same length so that the dot product of a test vector with each vector will be proportional to the cosine of the angle between each vector and the test vector.  The relevance stored with each embed is the dot product we obtained from the most recent comparison. The lwdaq_rag guarantees that all vectors have unit length by calcualting the length of each vector it receives, and dividing all its coordinates by the length.</p>
 
-<p>The lwdaq_rag command is used by the RAG Manager tool to load a library of embedding vectors into memory, and subsequently to compare a question vector to all library entries. Embedding vectors provided by services such as OpenAI's text-embedding-3-small have real-valued components and are normalized to unit length. The RAG Manager calls lwdaq_rag to manage its embed library. To obtain 0.1% precision in relevance measurement, while at the same time reducing the size of the embeds on disk, the RAG Manager scales the vectors by &times;100k and rounds the coordinates to integers before storing to disk. These integer-coordinate vectors all have length 100k. We pass them directly into the embed directory, and the embed library automatically normalizes them to unit length.</p>
+<center><table border>
+<tr><th>Instruction</th><th>Function</th></tr>
+<tr><td>create</td><td>Create a new embed vector library, delete old library.</td></tr>
+<tr><td>add</td><td>Add an embed vector to the library.</td></tr>
+<tr><td>dump</td><td>Print out all embed vector names and components.</td></tr>
+<tr><td>config</td><td>Return the embed vector library dimensions.</td></tr>
+<tr><td>retrieve</td><td>Retrieve names of vectors closest to a query vector.</td></tr>
+</table><small><b>Table:</b> Instructions for lwdaq_rag.</small></center>
 
-<p>The lwdaq_rag command operates on a persitent embedding library. This library can be replaced, but unless replaced, it persists so long as the LWDAQ instance that created it persists. We create a new library with the <i>create</i> operation. Here is an example library creation command, one that creates a library of 925 embeds, each with 1536-dimensional vectors.</p>
+<p>The lwdaq_rag command is used by the RAG Manager tool to load a library of embed vectors into memory, and subsequently to compare a question vector to all library entries. Embed vectors provided by services such as OpenAI's text-embedding-3-small have real-valued components and are normalized to unit length. The RAG Manager calls lwdaq_rag to manage its embed library. To obtain 0.1% precision in relevance measurement, while at the same time reducing the size of the embeds on disk, the RAG Manager scales the vectors by &times;100k and rounds the coordinates to integers before storing to disk. These integer-coordinate vectors all have length 100k. We pass them directly into the embed directory, and the embed library automatically normalizes them to unit length.</p>
+
+<p>The lwdaq_rag command operates on a persitent embed library. This library can be replaced, but unless replaced, it persists so long as the LWDAQ instance that created it persists. We create a new library with the <i>create</i> operation. Here is an example library creation command, one that creates a library of 925 embeds, each with 1536-dimensional vectors.</p>
 
 <pre>lwdaq_rag create -lib_len 925 -vec_len 1536</pre>
 
-<p>Here we specify the number of entries in the library with the -lib_len option and the number of dimensions to each vector with -vec_len. These two options are both mandatory if we want to be sure the library fits our embedding vectors, but lwdaq_rag initializes both parameters from the existing library, so it will not raise an error if we fail to specify one or both.</p> 
+<p>Here we specify the number of entries in the library with the -lib_len option and the number of dimensions to each vector with -vec_len. These two options are both mandatory if we want to be sure the library fits our embed vectors, but lwdaq_rag initializes both parameters from the existing library, so it will not raise an error if we fail to specify one or both.</p> 
+
 <center><table border>
 <tr><th>Option</th><th>Function</th></tr>
 <tr><td>-lib_len</td><td>Number of embeds in the library, default 1.</td></tr>
-<tr><td>-vec_len</td><td>Number of coordinates in embedding vectors, default 1.</td></tr>
+<tr><td>-vec_len</td><td>Number of coordinates in embed vectors, default 1.</td></tr>
 <tr><td>-retrieve_len</td><td>Number of chunks returned by comparison, default 10.</td></tr>
 <tr><td>-name</td><td>A name for a new vector, default "Empty".</td></tr>
 <tr><td>-vector</td><td>A list of integers specifying a vector, devault "0".</td></tr>
@@ -5001,7 +5012,7 @@ v2 28 v1 26</pre>
 <tr><td>10000</td><td>13</td><td>5.2</td><td>51.8</td><td>49.6</td></tr>
 </table><small><b>Table:</b> Execution Time of lwdaq_rag Operations for 1536-Dimensional Vectors.</small></center>
 
-<p>The "load" time is the total time taken to load the entire library with random integer-valued vectors generated in Tcl and passed into lwdaq_rag as strings. We choose 1536-dimensional vectors because this is the size of contemporary large language model (LLM) embedding vectors. Each vector takes 1536 integer locations in memory, each of which is 8 bytes on a 64-bit machine, so each embed is 12 KByte and a ten-thousand embed library will take up 123 MByte of RAM. Once loaded into memory, however, identifying relevant is fast compared to the several seconds it takes to obtain an answer from an LLM completion endpoint.</p>
+<p>The "load" time is the total time taken to load the entire library with random integer-valued vectors generated in Tcl and passed into lwdaq_rag as strings. We choose 1536-dimensional vectors because this is the size of the large language model (LLM) embed vector we are using in the current OSI Chatbot. Each vector takes 1536 integer locations in memory, each of which is 8 bytes on a 64-bit machine, so each embed is 12 KByte and a ten-thousand embed library will take up 123 MByte of RAM. Once loaded into memory, however, identifying relevant is fast compared to the several seconds it takes to obtain an answer from an LLM completion endpoint.</p>
 
 }
 function lwdaq_rag(data,interp:pointer;argc:integer;var argv:Tcl_ArgList):integer;
@@ -5166,7 +5177,7 @@ var
 	M,N:matrix_type;
 	num_rows,num_elements,num_columns:integer;
 	num_glitches:integer=0;
-	i,extent,color,red,blue,green:integer;
+	i,extent,color:integer;
 	x_axis,y_axis,z_axis:xyz_point_type;
 	
 begin
@@ -5985,7 +5996,7 @@ C0562_1 -3.5814 88.8400 -4.9796 -12.6389 94.3849 -4.9598 -1558.772  -0.344 -566.
 	end 
 	else if option='nearest_neighbor' then begin
 {
-<p>Finds the closest point to <i>p</i> in a library of points. The point and the members of the library are all points in an <i>n</i>-dimensional space. When we call this routine, we can specify the library with the after the point by passing another string containing the library of <i>m</i> points. If we don't pass the library, the routine uses the library most recently passed. The routine stores the library in a global array so that it can use it again. We pass the point <i>p</i> as a string of <i>n</i> real numbers. The library we pass as a string of <i>m</i>&times;<i>n</i> real numbers separated by spaces. The value returned by the routine is an integer that specifies the library point that is closest to the <i>p</i>. The first library point we specify with integer 1 (one) and the last with integer <i>m</i>.</p>
+<p>The nearest neighbor calculation finds the member of a library of points that is closest to a test point. The test and library points must all reside in the same <i>n</i>-dimensional space. When we call this routine, we pass the test point as a mandatory argument and the library as an optional argument. When we pass the library, we do so as <i>m</i> points in <i>n</i>-dimensional space. If we don't pass the reference library, the routine uses the library most recently passed into this same routine. The routine stores the library in a global array so that it can use it again. We pass the point <i>p</i> as a string of <i>n</i> real numbers. The library we pass as a string of <i>m</i>&times;<i>n</i> real numbers separated by spaces. The value returned by the routine is an integer index for the reference point that is closest to the test point. The first reference point in the library has index 1 and the last has index <i>m</i>.</p>
 }
 		if (argc<>3) and (argc<>4) then begin
 			Tcl_SetReturnString(interp,error_prefix
@@ -6330,23 +6341,21 @@ lwdaq spikes_x "0 0 0 0 2 9 1 0 0 7 0 7 0 9 0 0 0 0" 2 4
 	end
 	else if option='tkcolor' then begin
 {
-<p>Returns the Tk color that matches an internal lwdaq color value. The TK color is returned as a string of the form #RRGGBB, where R, G, and B are each hexadecimal digits specifying the intensity of red, blue, and green.</p>
+<p>Maps a color code to a Tk color in the same way we do with internal lwdaq plotting and drawing functions. The color code is an index that we assume corresponds to a channel number or a plot identifier. It is not itself an eight-bit RGB color value, but rather an integer we are supposed
+to use to pick an RGB value for so that we can draw or mark an image with a color associated with the color code. We take this code and translate it into an eight-bit RGB code in such a manner as to produce distinct RGB colors for sequential color codes. We then take this RGB code and translate it into a twenty-four bit RGB code using our overlay color palett. The TK color is returned as a string of the form #RRGGBB, where R, G, and B are each hexadecimal digits specifying the intensity of red, blue, and green. Now we can draw in Tk widgets the same color as our lwdaq routines plot for the same color codes.</p>
 }
 		if (argc<>3) then begin
 			Tcl_SetReturnString(interp,error_prefix
 				+'Wrong number of arguments, should be '
-				+'"lwdaq '+option+' color_value".');
+				+'"lwdaq '+option+' color_code".');
 			exit;
 		end;
-		color:=Tcl_ObjInteger(argv[2]);
-		color:=overlay_color(color);
-		red:=round(max_byte * (color and red_mask) / red_mask);
-		green:=round(max_byte * (color and green_mask) / green_mask);
-		blue:=round(max_byte * (color and blue_mask) / blue_mask);
-		writestr(result,'#',
-			string_from_decimal(red,16,2),
-			string_from_decimal(green,16,2),
-			string_from_decimal(blue,16,2));
+		color:=pick_plot_color(Tcl_ObjInteger(argv[2]));
+		with overlay_color_palette[color] do
+			writestr(result,'#',
+				string_from_decimal(red,16,2),
+				string_from_decimal(green,16,2),
+				string_from_decimal(blue,16,2));
 		Tcl_SetReturnString(interp,result);
 	end 
 {

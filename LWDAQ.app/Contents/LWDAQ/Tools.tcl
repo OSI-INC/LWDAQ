@@ -712,18 +712,19 @@ proc LWDAQ_Toolmaker_delete_all {} {
 }
 
 #
-# LWDAQ_Toolmaker makes a new toplevel window for the Toolmaker. You enter a sequence of
-# commands in the text window, and you can execute this sequence, which we call a script,
-# with the Execute button. When you press Execute, your script will disappear from the 
-# text window, but you can make it re-appear with the Back button. The Toolmaker 
-# keeps a list of the scripts you have executed, and allows you to navigate and edit the 
-# list with the Forward, Back, and Clear buttons. You can save the list to a file with 
-# Save, and read a previously-saved list with Load. The file will contain all your scripts
-# delimited by XML-style <script> and </script> marks at the beginning and end of each
-# script respectively. For each Execute, Toolmaker creates a new toplevel text window.
-# You can print to the lower one (which is intended for results) by referring to it as $t, 
-# and using it with a text widget routine like LWDAQ_print, or calling it directly with 
-# its TK widget command, $t.
+# LWDAQ_Toolmaker makes a new toplevel window for the Toolmaker. You enter a
+# sequence of commands in the text window, and you can execute this sequence,
+# which we call a script, with the Execute button. When you press Execute, your
+# script will disappear from the text window, but you can make it re-appear with
+# the Back button. The Toolmaker keeps a list of the scripts you have executed,
+# and allows you to navigate and edit the list with the Forward, Back, and Clear
+# buttons. You can save the list to a file with Save, and read a
+# previously-saved list with Load. The file will contain all your scripts
+# delimited by XML-style "script" tags at the beginning and end of each script
+# respectively. For each Execute, Toolmaker creates a new toplevel text window.
+# You can print to the lower one (which is intended for results) by referring to
+# it as $t, and using it with a text widget routine like LWDAQ_print, or calling
+# it directly with its TK widget command, $t.
 #
 proc LWDAQ_Toolmaker {} {
 	global LWDAQ_Info
