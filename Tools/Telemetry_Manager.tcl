@@ -1141,13 +1141,14 @@ proc Telemetry_Manager_tp_run {} {
 		LWDAQ_print $info(tp_text) "Reading $config(tp_program)."
 		set f [open $config(tp_program)]
 		set program [string trim [read $f]]
+		set program [regsub {\n} $program " "]
 		close $f
 	} else {
 		LWDAQ_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
 		return ""
 	} 
-	
-	set commands $info(op_pgld) 
+
+	set commands "$info(op_pgld) [llength $program] "
 	set commands [concat $commands $program]
 	Telemetry_Manager_transmit $config(tp_id) $commands
 }
