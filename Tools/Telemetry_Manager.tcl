@@ -28,7 +28,7 @@ proc Telemetry_Manager_init {} {
 	upvar #0 Telemetry_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Telemetry_Manager" "1.1"
+	LWDAQ_tool_init "Telemetry_Manager" "1.2"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -72,8 +72,7 @@ proc Telemetry_Manager_init {} {
 	# Transmit Panel Parameters
 	set config(tp_id) "FFFF"
 	set config(tp_commands) "6 3 2 255"
-	set config(tp_program) "~/Desktop/UProg.asm"
-	set config(tp_base_addr) "0x0800"
+	set config(tp_program) "~/Desktop/Config.hex"
 	set config(tp_seg_len) "30"
 	set info(tp_ew) $info(window).tpew
 	set info(tp_text) $info(tp_ew).text
@@ -1052,10 +1051,6 @@ proc Telemetry_Manager_transmit_panel {} {
 		pack $f.$b -side left -expand 1
 	}
 
-	label $f.bl -text "Base Address:"
-	entry $f.be -textvariable Telemetry_Manager_config(tp_base_addr) -width 8
-	pack $f.bl $f.be -side left -expand 1
-
 	set f [frame $w.program]
 	pack $f -side top -fill x
 	
@@ -1143,64 +1138,18 @@ proc Telemetry_Manager_tp_run {} {
 	
 	# Read program from file.
 	if {[file exists $config(tp_program)]} {
-		LWDAQ_print $info(tp_text) "Reading and assembling $config(tp_program)."
+		LWDAQ_print $info(tp_text) "Reading $config(tp_program)."
 		set f [open $config(tp_program)]
-		set program [read $f]
+		set program [string trim [read $f]]
 		close $f
 	} else {
 		LWDAQ_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
 		return ""
 	} 
 	
-	# Assemble program, reporting errors to text window.
-	if {[catch {
-		set saved_text $ainfo(text)
-		set ainfo(text) $info(tp_text)
-		set aconfig(hex_output) 0
-		set aconfig(ofn_write) 0
-		set aconfig(base_addr) $config(tp_base_addr)
-		set prog [OSR8_Assembler_assemble $program]
-		set ainfo(text) $saved_text
-	} error_message]} {
-		LWDAQ_print $info(tp_text) "ERROR: $error_message\."
-		return ""
-	}
-	LWDAQ_print $info(tp_text) "Assembly successful,\
-		uploading [llength $prog] code bytes."	
-	
-	# Begin our first command with the instruction that resets the Telemetry
-	# Manager user program counter.
-	set commands [list $info(op_pgrst)]
-
-	# Divide the user program into segments of length tp_seg_len and transmit
-	# them separately, each as a separate command. The first command has a reset
-	# instruction followed by a program upload instruction. Subsequent commands
-	# have only the program upload instruction. The final command ends with a
-	# program-run instruction.
-	while {[llength $prog] > 0} {
-		
-		# Extract first segment from the remaining user program.
-		set segment [lrange $prog 0 [expr $config(tp_seg_len)-1]]
-		set prog [lrange $prog $config(tp_seg_len) end]
-
-		# Add upload instruction with its operand, which is the number of 
-		# program bytes that are to follow.
-		lappend commands $info(op_pgld) [llength $segment]
-	
-		# Add the program segment.
-		set commands [concat $commands $segment]
-	
-		# After the final chunk, we enable the program.
-		if {[llength $prog] == 0} {
-			lappend commands $info(op_pgon)
-		}
-			
-		# Transmit the commands.
-		Telemetry_Manager_transmit $config(tp_id) $commands
-		
-		# Reset the command list.
-		set commands [list]
-	}
+	set commands $info(op_pgld) 
+	set commands [concat $commands $program]
+	Telemetry_Manager_transmit $config(tp_id) $commands
 }
 
 #
@@ -1249,6 +1198,7 @@ proc Telemetry_Manager_open {} {
 
 	button $f.receiver -text "Receiver" -command {
 		set LWDAQ_config_Receiver(analysis_enable) 1
+		set LWDAQ_config_Receiver(daq_ip_addr) $Telemetry_Manager_config(ip_addr)
 		LWDAQ_post "LWDAQ_open Receiver"
 	}
 	pack $f.receiver -side left -expand 1
