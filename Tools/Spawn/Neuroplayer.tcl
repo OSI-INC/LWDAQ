@@ -262,7 +262,7 @@ proc Neuroplayer_init {} {
 		set info(status_$id) "None"
 	}
 	set config(min_reception) 0.8
-	set config(divergence_threshold) 100
+	set config(divergence_threshold) 200
 	set config(glitch_threshold) 10000
 	set config(glitch_count) 0
 	set info(max_window_fraction) 0.5
@@ -1831,14 +1831,21 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		# high or too low as a result of a fault in the on-board oscillator. We
 		# check for this mode of failure now, and if we find it, we reconstruct
 		# once again, but this time with the "divergent" option set true. We
-		# deem the clocks to be divergent if the number of perceived bad messages
-		# plus the number of perceived missing messages exceeds the divergence
-		# threshold. For short intervals, this threshold will be hard to attain
-		# even when the clocks are divergent, which is the behavior we desire,
-		# because divergent clocks do not cause a problem for short intervals.
+		# deem the clocks to be divergent if the number of messages received
+		# plus the number of messages missing diverges from the ideal number of
+		# messages by more than the divergence threshold. When the clocks are
+		# divergent with 100% reception, we will receive close to the ideal
+		# number of messages, but many of them will be displaced from their
+		# timing windows because the transmitter clock is too slow or too fast.
+		# Each empty window increments our count of missing messages. Divergent
+		# clocks give rise to a large number of missing messages while at the
+		# same time the number of messages received remains high. For short
+		# intervals, our divergence threshold will be hard to attain, which is
+		# the behavior we desire, because divergent clocks do not cause a
+		# problem for short intervals.
 		scan [lwdaq_image_results $info(data_image)] %d%d%d%d%d%d \
 			num_clocks num_ideal num_bad num_missing standing_value num_glitches
-		if {$num_bad + $num_missing > $config(divergence_threshold)} {
+		if {$num_received + $num_missing - $num_ideal > $config(divergence_threshold)} {
 			Neuroplayer_print "Channel [format %2d $id],\
 				sample rate out of range, adapting reconstruction." verbose
 			set signal [lwdaq_receiver $info(data_image) \
