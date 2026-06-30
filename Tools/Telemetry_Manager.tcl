@@ -1107,9 +1107,10 @@ proc Telemetry_Manager_cp_upload {} {
 	if {[file exists $config(cp_content)]} {
 		LWDAQ_print $info(cp_text) "Reading $config(cp_content)."
 		set f [open $config(cp_content)]
-		set prog [regsub -all {\n} $prog " "]
-		set prog [string trim [read $f]]
+		set prog [read $f]
 		close $f
+		set prog [regsub -all {\n} $prog " "]
+		set prog [string trim $prog]
 	} else {
 		LWDAQ_print $info(cp_text) "ERROR: Cannot find \"$config(cp_content)\"."
 		return ""
