@@ -73,7 +73,8 @@ proc Telemetry_Manager_init {} {
 	set config(tp_id) "FFFF"
 	set config(tp_commands) "6 3 2 255"
 	set config(tp_program) "~/Desktop/Config.hex"
-	set config(tp_seg_len) "30"
+	set config(tp_seg_len) "32"
+	set config(tp_addr) "0x0000"
 	set info(tp_ew) $info(window).tpew
 	set info(tp_text) $info(tp_ew).text
 	
@@ -1041,9 +1042,13 @@ proc Telemetry_Manager_transmit_panel {} {
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.nl -text "Target Identifier (Hex):"
+	label $f.nl -text "Identifier (Hex):"
 	entry $f.ne -textvariable Telemetry_Manager_config(tp_id) -width 5
 	pack $f.nl $f.ne -side left -expand 1
+
+	label $f.addrl -text "Address (Hex/Decimal):"
+	entry $f.addre -textvariable Telemetry_Manager_config(tp_addr) -width 8
+	pack $f.addrl $f.addre -side left -expand 1
 
 	foreach a {Run Halt} {
 		set b [string tolower $a]
@@ -1140,17 +1145,39 @@ proc Telemetry_Manager_tp_run {} {
 	if {[file exists $config(tp_program)]} {
 		LWDAQ_print $info(tp_text) "Reading $config(tp_program)."
 		set f [open $config(tp_program)]
-		set program [string trim [read $f]]
-		set program [regsub {\n} $program " "]
+		set prog [string trim [read $f]]
+		set prog [regsub -all {\n} $prog " "]
 		close $f
 	} else {
 		LWDAQ_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
 		return ""
 	} 
 
-	set commands "$info(op_pgld) [llength $program] "
-	set commands [concat $commands $program]
-	Telemetry_Manager_transmit $config(tp_id) $commands
+	set addr $config(tp_addr)
+	
+	while {[llength $prog] > 0} {
+
+		# Reset the command list.
+		set commands [list]
+	
+		# Extract first segment from the remaining user program.
+		set segment [lrange $prog 0 [expr $config(tp_seg_len)-1]]
+		set prog [lrange $prog $config(tp_seg_len) end]
+		set addr_h [expr $addr / 256]
+		set addr_l [expr $addr % 256]
+
+		# Add upload instruction with its operand, which is the number of 
+		# program bytes that are to follow.
+		lappend commands $info(op_pgld) [llength $segment] $addr_h $addr_l
+	
+		# Add the program segment.
+		set commands [concat $commands $segment]
+	
+		# Transmit the commands.
+		Telemetry_Manager_transmit $config(tp_id) $commands
+		
+		set addr [expr $addr + [llength $segment]]
+	}
 }
 
 #
