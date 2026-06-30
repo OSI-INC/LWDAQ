@@ -28,7 +28,7 @@ proc Telemetry_Manager_init {} {
 	upvar #0 Telemetry_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Telemetry_Manager" "1.1"
+	LWDAQ_tool_init "Telemetry_Manager" "1.3"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -70,13 +70,13 @@ proc Telemetry_Manager_init {} {
 	set config(sps) "512"
 	
 	# Transmit Panel Parameters
-	set config(tp_id) "FFFF"
-	set config(tp_commands) "6 3 2 255"
-	set config(tp_program) "~/Desktop/UProg.asm"
-	set config(tp_base_addr) "0x0800"
-	set config(tp_seg_len) "30"
-	set info(tp_ew) $info(window).tpew
-	set info(tp_text) $info(tp_ew).text
+	set config(cp_id) "FFFF"
+	set config(cp_commands) "6 3 2 255"
+	set config(cp_content) "~/Desktop/Config.txt"
+	set config(cp_seglen) "32"
+	set config(cp_addr) "0x0000"
+	set info(cp_ew) $info(window).cpew
+	set info(cp_text) $info(cp_ew).text
 	
 	# Auxiliary message types.
 	set info(at_id) "1"
@@ -606,12 +606,12 @@ proc Telemetry_Manager_monitor {} {
 			
 			# Acknowledgements encode the type of command in their data byte.
 			switch $db \
-				$info(op_stop) {
-					set type "stop"
+				$info(op_loff) {
+					set type "loff"
 					LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 				} \
-				$info(op_start) {
-					set type "start"
+				$info(op_lon) {
+					set type "lon"
 					LWDAQ_set_bg $info(dev$n\_state) $config(lon_color)
 				} \
 				$info(op_xon) {
@@ -627,15 +627,6 @@ proc Telemetry_Manager_monitor {} {
 				} \
 				$info(op_pgld) {
 					set type "pgld"
-				} \
-				$info(op_pgon) {
-					set type "pgon"
-				} \
-				$info(op_pgoff) {
-					set type "pgoff"
-				} \
-				$info(op_pgrst) {
-					set type "pgrst"
 				} \
 				$info(op_shdn) {
 					set type "shdn"
@@ -1004,18 +995,15 @@ proc Telemetry_Manager_refresh_list {{fn ""}} {
 }
 
 #
-# Telemetry_Manager_transmit_panel opens a new window that allows the user to
-# transmit specific commands to a particular device, to assemble and upload user
-# programs, and enable user programs. The transmit panel uses the driver address
-# and socket specified in the Telemetry_Manager window, but it uses its own
-# device identifier, which can be set to the wild card FFFF or a specific
-# four-digit hex identifier. Command bytes can be specified either as a
+# Telemetry_Manager_program_panel opens a new window that allows the user to
+# upload content to the device's non-volatile memory. The transmit panel uses
+# the driver address and socket specified in the Telemetry_Manager window, but
+# it uses its own device identifier, which can be set to the wild card FFFF or a
+# specific four-digit hex identifier. The bytes in the content file can be
 # two-digit hex value using the 0x prefix, or a decimal value 0..255 with no
-# prefix. User programs are read from a file. The transmit panel loads the OSR8
-# assembler package and uses it to generate the machine code bytes that it will
-# upload to the Telemetry_Manager.
+# prefix. They can be space-delimited or newline-delimited.
 #
-proc Telemetry_Manager_transmit_panel {} {
+proc Telemetry_Manager_program_panel {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 	
@@ -1026,7 +1014,7 @@ proc Telemetry_Manager_transmit_panel {} {
 		return ""
 	}
 	toplevel $w
-	wm title $w "Telemetry_Manager $info(version) Transmit Panel"
+	wm title $w "Telemetry_Manager $info(version) Programming Panel"
 	
 	# If the OSR8 Assembler tool routines are not available, run the OSR8 Assembler
 	# tool with no graphics.
@@ -1042,179 +1030,116 @@ proc Telemetry_Manager_transmit_panel {} {
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.nl -text "Target Identifier (Hex):"
-	entry $f.ne -textvariable Telemetry_Manager_config(tp_id) -width 5
+	label $f.nl -text "Identifier (Hex):"
+	entry $f.ne -textvariable Telemetry_Manager_config(cp_id) -width 5
 	pack $f.nl $f.ne -side left -expand 1
 
-	foreach a {Run Halt} {
+	label $f.addrl -text "Address (Hex/Decimal):"
+	entry $f.addre -textvariable Telemetry_Manager_config(cp_addr) -width 8
+	pack $f.addrl $f.addre -side left -expand 1
+
+	foreach a {Upload} {
 		set b [string tolower $a]
-		button $f.$b -text "$a Program" -command "LWDAQ_post Telemetry_Manager_tp_$b"
+		button $f.$b -text "$a Program" -command "LWDAQ_post Telemetry_Manager_cp_$b"
 		pack $f.$b -side left -expand 1
 	}
-
-	label $f.bl -text "Base Address:"
-	entry $f.be -textvariable Telemetry_Manager_config(tp_base_addr) -width 8
-	pack $f.bl $f.be -side left -expand 1
 
 	set f [frame $w.program]
 	pack $f -side top -fill x
 	
 	label $f.lprogram -text "Program:" -fg $config(label_color)
-	entry $f.eprogram -textvariable Telemetry_Manager_config(tp_program) -width 60
+	entry $f.eprogram -textvariable Telemetry_Manager_config(cp_content) -width 60
 	pack $f.lprogram $f.eprogram -side left -expand 1
 
 	foreach a {Browse Edit} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_tp_$b"
+		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_cp_$b"
 		pack $f.$b -side left -expand 1
 	}
 
-	set f [frame $w.commands]
-	pack $f -side top -fill x
-
-	label $f.lcommands -text "Commands:" -fg $config(label_color)
-	entry $f.commands -textvariable Telemetry_Manager_config(tp_commands) -width 70
-	pack $f.lcommands $f.commands -side left -expand 1
-
-	button $f.transmit -text "Transmit" \
-		-command "LWDAQ_post Telemetry_Manager_tp_transmit"
-	pack $f.transmit -side left -expand 1
-		
-	set info(tp_text) [LWDAQ_text_widget $w 80 15]
+	set info(cp_text) [LWDAQ_text_widget $w 80 15]
 
 	return "" 
 }
 
 #
-# Telemetry_Manager_tp_browse opens a file browser to select the program file.
+# Telemetry_Manager_cp_browse opens a file browser to select the program file.
 #
-proc Telemetry_Manager_tp_browse {} {
+proc Telemetry_Manager_cp_browse {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	set fn [LWDAQ_get_file_name]
-	if {$fn != ""} {set config(tp_program) $fn}
+	if {$fn != ""} {set config(cp_content) $fn}
 	return ""
 }
 
-
 #
-# Telemetry_Manager_tp_edit opens the assembler program in an editor window.
+# Telemetry_Manager_cp_edit opens the data file in an editor window.
 #
-proc Telemetry_Manager_tp_edit {} {
+proc Telemetry_Manager_cp_edit {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
-	if {[winfo exists $info(tp_ew)]} {
-		raise $info(tp_ew)
+	if {[winfo exists $info(cp_ew)]} {
+		raise $info(cp_ew)
 	} else {
-		set info(tp_ew) [LWDAQ_edit_script Open $config(tp_program)]
+		set info(cp_ew) [LWDAQ_edit_script Open $config(cp_content)]
 	}
-	return $info(tp_ew)
+	return $info(cp_ew)
 }
 
 #
-# Telemetry_Manager_tp_transmit transmits the commands listed in the transmit
-# panel.
+# Telemetry_Manager_cp_upload reads bytes in decimal string format from a text
+# files and uploads them to the sensor's non-volatile memory. The number of
+# bytes written should be divisible by sixteen, because the NVM page size is
+# sixteen bytes. The write begins at the sixteen-byte boundary given by the
+# transmit panel address parameter, which likewise should lie on a sixteen
+# byte boundary.
 #
-proc Telemetry_Manager_tp_transmit {} {
-	upvar #0 Telemetry_Manager_config config
-	upvar #0 Telemetry_Manager_info info
-
-	# Append all the commands in the transmit list, converting hex values
-	# to decimal values as we go.
-	set commands [list]
-	foreach cmd $config(tp_commands) {lappend commands [expr $cmd]}
-	
-	# Transmit the commands. We don't ask for an acknowledgement because
-	# we want the transmit to consist only of commands entered by the user.
-	Telemetry_Manager_transmit $config(tp_id) $commands
-}
-
-#
-# Telemetry_Manager_tp_run assembles and uploads user code in chunks. After the
-# final chunk, it enables the program.
-#
-proc Telemetry_Manager_tp_run {} {
+proc Telemetry_Manager_cp_upload {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 	upvar #0 OSR8_Assembler_config aconfig
 	upvar #0 OSR8_Assembler_info ainfo
 	
 	# Read program from file.
-	if {[file exists $config(tp_program)]} {
-		LWDAQ_print $info(tp_text) "Reading and assembling $config(tp_program)."
-		set f [open $config(tp_program)]
-		set program [read $f]
+	if {[file exists $config(cp_content)]} {
+		LWDAQ_print $info(cp_text) "Reading $config(cp_content)."
+		set f [open $config(cp_content)]
+		set prog [regsub -all {\n} $prog " "]
+		set prog [string trim [read $f]]
 		close $f
 	} else {
-		LWDAQ_print $info(tp_text) "ERROR: Cannot find \"$config(tp_program)\"."
+		LWDAQ_print $info(cp_text) "ERROR: Cannot find \"$config(cp_content)\"."
 		return ""
 	} 
-	
-	# Assemble program, reporting errors to text window.
-	if {[catch {
-		set saved_text $ainfo(text)
-		set ainfo(text) $info(tp_text)
-		set aconfig(hex_output) 0
-		set aconfig(ofn_write) 0
-		set aconfig(base_addr) $config(tp_base_addr)
-		set prog [OSR8_Assembler_assemble $program]
-		set ainfo(text) $saved_text
-	} error_message]} {
-		LWDAQ_print $info(tp_text) "ERROR: $error_message\."
-		return ""
-	}
-	LWDAQ_print $info(tp_text) "Assembly successful,\
-		uploading [llength $prog] code bytes."	
-	
-	# Begin our first command with the instruction that resets the Telemetry
-	# Manager user program counter.
-	set commands [list $info(op_pgrst)]
 
-	# Divide the user program into segments of length tp_seg_len and transmit
-	# them separately, each as a separate command. The first command has a reset
-	# instruction followed by a program upload instruction. Subsequent commands
-	# have only the program upload instruction. The final command ends with a
-	# program-run instruction.
-	while {[llength $prog] > 0} {
-		
-		# Extract first segment from the remaining user program.
-		set segment [lrange $prog 0 [expr $config(tp_seg_len)-1]]
-		set prog [lrange $prog $config(tp_seg_len) end]
+	set addr $config(cp_addr)
+	
+	while {[llength $prog] >= 16} {
+
+		# Reset the command list.
+		set commands [list]
+	
+		# Extract the first segment from the remaining user program.
+		set segment [lrange $prog 0 [expr $config(cp_seglen)-1]]
+		set prog [lrange $prog $config(cp_seglen) end]
+		set addr_h [expr $addr / 256]
+		set addr_l [expr $addr % 256]
 
 		# Add upload instruction with its operand, which is the number of 
 		# program bytes that are to follow.
-		lappend commands $info(op_pgld) [llength $segment]
+		lappend commands $info(op_pgld) [llength $segment] $addr_h $addr_l
 	
 		# Add the program segment.
 		set commands [concat $commands $segment]
 	
-		# After the final chunk, we enable the program.
-		if {[llength $prog] == 0} {
-			lappend commands $info(op_pgon)
-		}
-			
 		# Transmit the commands.
-		Telemetry_Manager_transmit $config(tp_id) $commands
+		Telemetry_Manager_transmit $config(cp_id) $commands
 		
-		# Reset the command list.
-		set commands [list]
+		set addr [expr $addr + [llength $segment]]
 	}
-}
-
-#
-# Telemetry_Manager_tp_halt disables execution of user code on the target device.
-#
-proc Telemetry_Manager_tp_halt {} {
-	upvar #0 Telemetry_Manager_config config
-	upvar #0 Telemetry_Manager_info info
-
-	# Send the program disable command.	
-	set commands [list $info(op_pgoff)]
-
-	# Transmit the commands.
-	Telemetry_Manager_transmit $config(tp_id) $commands
 }
 
 #
@@ -1249,12 +1174,13 @@ proc Telemetry_Manager_open {} {
 
 	button $f.receiver -text "Receiver" -command {
 		set LWDAQ_config_Receiver(analysis_enable) 1
+		set LWDAQ_config_Receiver(daq_ip_addr) $Telemetry_Manager_config(ip_addr)
 		LWDAQ_post "LWDAQ_open Receiver"
 	}
 	pack $f.receiver -side left -expand 1
 
-	button $f.txcmd -text "Transmit Panel" -command {
-		LWDAQ_post "Telemetry_Manager_transmit_panel"
+	button $f.txcmd -text "Programming" -command {
+		LWDAQ_post "Telemetry_Manager_program_panel"
 	}
 	pack $f.txcmd -side left -expand 1
 
