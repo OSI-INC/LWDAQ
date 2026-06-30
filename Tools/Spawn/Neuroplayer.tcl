@@ -262,7 +262,7 @@ proc Neuroplayer_init {} {
 		set info(status_$id) "None"
 	}
 	set config(min_reception) 0.8
-	set config(max_rejection) 0.2
+	set config(divergence_threshold) 100
 	set config(glitch_threshold) 10000
 	set config(glitch_count) 0
 	set info(max_window_fraction) 0.5
@@ -1830,10 +1830,15 @@ proc Neuroplayer_signal {{channel_code ""} {status_only 0}} {
 		# Reconstruction can fail if the transmit sample rate is slightly too
 		# high or too low as a result of a fault in the on-board oscillator. We
 		# check for this mode of failure now, and if we find it, we reconstruct
-		# once again, but this time with the "divergent_clocks" option set true.
+		# once again, but this time with the "divergent" option set true. We
+		# deem the clocks to be divergent if the number of perceived bad messages
+		# plus the number of perceived missing messages exceeds the divergence
+		# threshold. For short intervals, this threshold will be hard to attain
+		# even when the clocks are divergent, which is the behavior we desire,
+		# because divergent clocks do not cause a problem for short intervals.
 		scan [lwdaq_image_results $info(data_image)] %d%d%d%d%d%d \
 			num_clocks num_ideal num_bad num_missing standing_value num_glitches
-		if {$num_received + $num_missing > ($config(max_rejection)+1)*$num_ideal} {
+		if {$num_bad + $num_missing > $config(divergence_threshold)} {
 			Neuroplayer_print "Channel [format %2d $id],\
 				sample rate out of range, adapting reconstruction." verbose
 			set signal [lwdaq_receiver $info(data_image) \
