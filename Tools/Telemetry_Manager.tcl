@@ -28,7 +28,7 @@ proc Telemetry_Manager_init {} {
 	upvar #0 Telemetry_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Telemetry_Manager" "1.3"
+	LWDAQ_tool_init "Telemetry_Manager" "1.4"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -51,8 +51,8 @@ proc Telemetry_Manager_init {} {
 	set config(log_enable) "0"
 	set config(log_file) "~/Desktop/Telemetry_Manager_Log.txt"
 	
-	set config(xon_color) "red"
-	set config(xoff_color) "black"
+	set config(ton_color) "red"
+	set config(toff_color) "black"
 	set config(lon_color) "lightgreen"
 	set config(loff_color) "lightgray"	
 	set config(label_color) "brown"
@@ -87,22 +87,15 @@ proc Telemetry_Manager_init {} {
 	
 	# Operation codes, which we use to construct instructions, which
 	# we in turn combine to form commands.
-	set info(op_stop) "0"
-	set info(op_start) "1"
-	set info(op_xon) "2"
-	set info(op_xoff) "3"
-	set info(op_batt) "4"
 	set info(op_id) "5"
-	set info(op_pgld) "6"
-	set info(op_pgon) "7"
-	set info(op_pgoff) "8"
-	set info(op_pgrst) "9"
-	set info(op_shdn) "10"
 	set info(op_ver) "11"
-	set info(op_lon) "12"
-	set info(op_loff) "13"
-	set info(op_zon) "14"
-	set info(op_zoff) "15"
+	set info(op_ton) "16" 
+	set info(op_toff) "17" 
+	set info(op_zon) "18" 
+	set info(op_zoff) "19" 
+	set info(op_nvmwr) "20"
+	set info(op_lon) "30"
+	set info(op_loff) "31" 
 	
 	set info(state) "Idle"
 	set info(monitor_ms) "0"
@@ -276,7 +269,7 @@ proc Telemetry_Manager_lon {n} {
 
 	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_lon)]
+	set commands [list $info(op_lon)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -300,7 +293,7 @@ proc Telemetry_Manager_loff {n} {
 	set info(state) "Loff"
 
 	# Measure battery voltage, check version, and stop stimulus.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_loff)]
+	set commands [list $info(op_loff)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -325,7 +318,7 @@ proc Telemetry_Manager_zon {n} {
 
 	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_zon)]
+	set commands [list $info(op_zon)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -350,7 +343,7 @@ proc Telemetry_Manager_zoff {n} {
 
 	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_zoff)]
+	set commands [list $info(op_zoff)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -362,42 +355,18 @@ proc Telemetry_Manager_zoff {n} {
 }
 
 #
-# Telemetry_Manager_xon turns on data transmission with a specific telemetry channel
-# number and sample rate. In ISTs, this will be a synchronizing signal.
+# Telemetry_Manager_ton activates the telemetry protocol of the selected device.
 #
-proc Telemetry_Manager_xon {n} {
+proc Telemetry_Manager_ton {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Xon"
+	set info(state) "Ton"
 
-	# Start our command with battery measurement and version request
-	# instructions.
-	set commands [list $info(op_batt) $info(op_ver)]
-
-	# Send the Xon command with transmit period. 	
-	if {$config(sps) > $config(max_tx_sps)} {
-		Telemetry_Manager_print "ERROR: Frequency $config(sps) SPS greater than maximum\
-			$config(max_tx_sps) SPS."
-		set info(state) "Idle"
-		return ""
-	}
-	set tx_p [expr round($config(rck_khz)*1000/$config(sps))-1]
-	
-	# Add the Xon instruction.
-	set ch $info(dev$n\_channel)
-	if {[string is integer -strict $ch] \
-		&& ($ch > 0) && ($ch < 255) \
-		&& ($ch % 16 > 0) && ($ch % 16 < 15)} {
-		lappend commands $info(op_xon) $ch $tx_p
-	} else {
-		Telemetry_Manager_print "ERROR: Invalid channel number \"$ch\",\
-			Try 0 < c < 254, c mod 16 <> 0, c mod 16 <> 15."
-		set info(state) "Idle"
-		return ""
-	}
+	# Start our command with version request instruction.
+	set commands [list $info(op_ton)]
 		
 	# Transmit the command.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -409,20 +378,18 @@ proc Telemetry_Manager_xon {n} {
 }
 
 #
-# Telemetry_Manager_xoff turns off data transmission.
+# Telemetry_Manager_toff deactivates the telemetry protocol.
 #
-proc Telemetry_Manager_xoff {n} {
+proc Telemetry_Manager_toff {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Xoff"
+	set info(state) "Toff"
 
-	# Send the Xoff command, which is a transmit command with zero period.
-	# Before stopping transmission, measure battery voltage and check version
-	# number.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_xoff)]
+	# Send a Toff command.
+	set commands [list $info(op_toff)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -493,7 +460,7 @@ proc Telemetry_Manager_clear {n} {
 	upvar #0 Telemetry_Manager_info info
 
 	LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+	LWDAQ_set_fg $info(dev$n\_state) $config(toff_color)
 	set info(dev$n\_battery) "?"	
 	set info(dev$n\_version) "?"	
 
@@ -606,6 +573,20 @@ proc Telemetry_Manager_monitor {} {
 			
 			# Acknowledgements encode the type of command in their data byte.
 			switch $db \
+				$info(op_zon) {
+					set type "zon"
+				} \
+				$info(op_zoff) {
+					set type "zoff"
+				} \
+				$info(op_ton) {
+					set type "ton"
+					LWDAQ_set_fg $info(dev$n\_state) $config(ton_color)
+				} \
+				$info(op_toff) {
+					set type "toff"
+					LWDAQ_set_fg $info(dev$n\_state) $config(toff_color)
+				} \
 				$info(op_loff) {
 					set type "loff"
 					LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
@@ -613,25 +594,6 @@ proc Telemetry_Manager_monitor {} {
 				$info(op_lon) {
 					set type "lon"
 					LWDAQ_set_bg $info(dev$n\_state) $config(lon_color)
-				} \
-				$info(op_xon) {
-					set type "xon"
-					LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
-				} \
-				$info(op_xoff) {
-					set type "xoff"
-					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
-				} \
-				$info(op_batt) {
-					set type "battery"
-				} \
-				$info(op_pgld) {
-					set type "pgld"
-				} \
-				$info(op_shdn) {
-					set type "shdn"
-					LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
 				} \
 				default {
 					set type "invalid"
@@ -739,10 +701,10 @@ proc Telemetry_Manager_draw_list {} {
 		entry $ff.id -textvariable Telemetry_Manager_info(dev$n\_id) -width 5
 		pack $ff.id -side left -expand 1
 		set info(dev$n\_state) $ff.id
-		LWDAQ_set_bg $info(dev$n\_state) $config(xoff_color)
+		LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
 		LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 		
-		foreach {a c} {Lon green Loff black Xon green Xoff black Zon green Zoff black} {
+		foreach {a c} {Lon green Loff black Ton green Toff black Zon green Zoff black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
@@ -922,7 +884,7 @@ proc Telemetry_Manager_load_list {{fn ""}} {
 		Telemetry_Manager_draw_list
 		foreach n $info(dev_list) {
 			LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-			LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+			LWDAQ_set_fg $info(dev$n\_state) $config(toff_color)
 			set info(dev$n\_battery) "?"
 			set info(dev$n\_version) "?"	
 		}
@@ -1198,7 +1160,7 @@ proc Telemetry_Manager_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
-	foreach {a c} {Xon green Xoff black} {
+	foreach {a c} {Ton green Toff black} {
 		set b [string tolower $a]
 		button $f.$b -text "$a\_All" -fg $c -command \
 			[list LWDAQ_post "Telemetry_Manager_all $b"]
