@@ -70,13 +70,13 @@ proc Telemetry_Manager_init {} {
 	set config(sps) "512"
 	
 	# Transmit Panel Parameters
-	set config(cp_id) "FFFF"
-	set config(cp_commands) "6 3 2 255"
-	set config(cp_content) "~/Desktop/Config.txt"
-	set config(cp_seglen) "32"
-	set config(cp_addr) "0x0000"
-	set info(cp_ew) $info(window).cpew
-	set info(cp_text) $info(cp_ew).text
+	set config(prog_id) "FFFF"
+	set config(prog_file) "~/Desktop/Config.txt"
+	set config(prog_seglen) "32"
+	set config(prog_addr) "0x0000"
+	set info(prog_control) "Idle"
+	set info(prog_ew) $info(window).progew
+	set info(prog_text) $info(prog_ew).text
 	
 	# Auxiliary message types.
 	set info(at_id) "1"
@@ -216,7 +216,8 @@ proc Telemetry_Manager_transmit {id commands} {
 			if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
 		}
 		LWDAQ_transmit_command_hex $sock "0000"
-		LWDAQ_delay_seconds $sock [expr $config(byte_processing_time)*[llength $commands]]
+		LWDAQ_delay_seconds $sock \
+			[expr $config(byte_processing_time)*[llength $commands]]
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 	} error_result]} {
@@ -225,9 +226,9 @@ proc Telemetry_Manager_transmit {id commands} {
 		return ""
 	}
 	
-	# If we get here, we have no reason to believe the transmission failed, although
-	# we could have instructed an empty driver socket or the Telemetry_Manager could have
-	# failed to receive the command.
+	# If we get here, we have no reason to believe the transmission failed,
+	# although we could have instructed an empty driver socket or the
+	# Telemetry_Manager could have failed to receive the command.
 	set info(transmit_ms) [clock milliseconds]
 	return ""
 }
@@ -433,10 +434,10 @@ proc Telemetry_Manager_identify {} {
 }
 
 #
-# Telemetry_Manager_all takes a parameter "action" that it uses to define a procedure
-# it will call on every Telemetry_Manager in the current list, provided that its ID is
-# not "*". We introduce a delay after each action to give Telemetry_Managers a chance 
-# to get ready for the next command.
+# Telemetry_Manager_all takes a parameter "action" that it uses to define a
+# procedure it will call on every Telemetry_Manager in the current list,
+# provided that its ID is not "*". We introduce a delay after each action to
+# give Telemetry_Managers a chance to get ready for the next command.
 # 
 proc Telemetry_Manager_all {action} {
 	upvar #0 Telemetry_Manager_config config
@@ -522,8 +523,8 @@ proc Telemetry_Manager_monitor {} {
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_id)"}
 	
 	# Go through the auxiliary message list and find messages that could be from
-	# Telemetry_Managers. As we proceed, we save the previous valid auxiliary message
-	# so that we can avoid processing duplicates in the list.
+	# Telemetry_Managers. As we proceed, we save the previous valid auxiliary
+	# message so that we can avoid processing duplicates in the list.
 	set previd 0
 	set prevfa 0
 	set prevdb 0
@@ -541,7 +542,8 @@ proc Telemetry_Manager_monitor {} {
 		# If this is a confirmation message, proceed to next auxiliary message.
 		if {$fa == $info(at_conf)} {continue}
 		
-		# If this is a repeat of a previously processed auxilliary message, proceed.
+		# If this is a repeat of a previously processed auxilliary message,
+		# proceed.
 		if {($previd == $id) && ($prevfa == $fa) && ($prevdb == $db)} {continue}
 
 		# If it is some other sort of message, look for a confirmation that
@@ -571,7 +573,9 @@ proc Telemetry_Manager_monitor {} {
 			# ignore acknowledgements from devices that are not in our list.
 			if {$n == 0} {continue}
 			
-			# Acknowledgements encode the type of command in their data byte.
+			# Acknowledgements encode the type of command in their data byte. We
+			# use the rare list format of the switch command in order to resolve
+			# variables in the matching clauses.
 			switch $db \
 				$info(op_zon) {
 					set type "zon"
@@ -595,10 +599,12 @@ proc Telemetry_Manager_monitor {} {
 					set type "lon"
 					LWDAQ_set_bg $info(dev$n\_state) $config(lon_color)
 				} \
+				$info(op_nvmwr) {
+					set type "nvmwr"
+				} \
 				default {
 					set type "invalid"
 				}
-				
 			if {$type != "invalid"} {
 				Telemetry_Manager_print "Acknowledge:\
 					device_id=$device_id type=$type ts=$ts $now_time"
@@ -638,9 +644,9 @@ proc Telemetry_Manager_monitor {} {
 			continue
 		}
 		
-		# By this point, we have processed and report on the confirmed auxiliary 
-		# message, so record its identifier, field address, and data byte in order
-		# to avoid processing a subsequent duplicate.
+		# By this point, we have processed and report on the confirmed auxiliary
+		# message, so record its identifier, field address, and data byte in
+		# order to avoid processing a subsequent duplicate.
 		set previd $id
 		set prevfa $fa
 		set prevdb $db
@@ -685,8 +691,8 @@ proc Telemetry_Manager_draw_list {} {
 	
 	foreach n $info(dev_list) {
 	
-		# If this Telemetry_Manager's state variable does not exist, then create it
-		# now, as well as other system parameters.
+		# If this Telemetry_Manager's state variable does not exist, then create
+		# it now, as well as other system parameters.
 		if {![info exists info(dev$n\_id)]} {
 			set info(dev$n\_id) $config(default_id)
 			set info(dev$n\_channel) [expr 0x$config(default_id) % 256]
@@ -704,7 +710,12 @@ proc Telemetry_Manager_draw_list {} {
 		LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
 		LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 		
-		foreach {a c} {Lon green Loff black Ton green Toff black Zon green Zoff black} {
+		foreach {a c} {Lon green \
+				Loff black \
+				Ton green \
+				Toff black \
+				Zon green \
+				Zoff black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
@@ -860,8 +871,8 @@ proc Telemetry_Manager_save_list {{fn ""}} {
 }
 
 #
-# Telemetry_Manager_load_list loads a Telemetry_Manager list from disk. If we don't
-# specify the list file name, the routine uses a browser to get a file
+# Telemetry_Manager_load_list loads a Telemetry_Manager list from disk. If we
+# don't specify the list file name, the routine uses a browser to get a file
 # name.
 #
 proc Telemetry_Manager_load_list {{fn ""}} {
@@ -957,15 +968,20 @@ proc Telemetry_Manager_refresh_list {{fn ""}} {
 }
 
 #
-# Telemetry_Manager_program_panel opens a new window that allows the user to
-# upload content to the device's non-volatile memory. The transmit panel uses
-# the driver address and socket specified in the Telemetry_Manager window, but
-# it uses its own device identifier, which can be set to the wild card FFFF or a
-# specific four-digit hex identifier. The bytes in the content file can be
-# two-digit hex value using the 0x prefix, or a decimal value 0..255 with no
-# prefix. They can be space-delimited or newline-delimited.
+# Telemetry_Manager_programmer opens a new window that allows the user to upload
+# bytes to any location in a telemetry device's non-volatile memory, provided
+# that those locations are not locked for writing by the device's internal
+# write-protection logic. The programmer uses the same ip_addr and driver_socket
+# specified in the Telemetry_Manager main window, but it uses its own device
+# identifier. The identifier must be a four-digit hexadecimal value. We can
+# include or omit a "0x" prefix. We can be set to the wild card FFFF or a
+# specific four-digit identifier. The memory address to which we will write
+# bytes we specify either in decimal or in hexadecimal in the "0xFFF" format.
+# The programmer uses a text file as its source of bytes to upload to a device.
+# These bytes must be delimited by whitespace. They can be expressed as decimal
+# values or two-digit hex values in the 0xFF format.
 #
-proc Telemetry_Manager_program_panel {} {
+proc Telemetry_Manager_programmer {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 	
@@ -976,133 +992,198 @@ proc Telemetry_Manager_program_panel {} {
 		return ""
 	}
 	toplevel $w
-	wm title $w "Telemetry_Manager $info(version) Programming Panel"
+	wm title $w "Telemetry Manager $info(version) Device Programmer"
 	
-	# If the OSR8 Assembler tool routines are not available, run the OSR8 Assembler
-	# tool with no graphics.
-	if {[info commands OSR8_Assembler_*] == ""} {
-		upvar #0 OSR8_Assembler_info ainfo
-		LWDAQ_run_tool OSR8_Assembler
-		destroy $ainfo(window)
-		if {[info commands OSR8_Assembler_assemble] == ""} {
-			Telemetry_Manager_print "ERROR: Failed to open OSR8 Assembler tool."
-		} 
-	}
-
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.nl -text "Identifier (Hex):"
-	entry $f.ne -textvariable Telemetry_Manager_config(cp_id) -width 5
-	pack $f.nl $f.ne -side left -expand 1
+	label $f.state -textvariable Telemetry_Manager_info(prog_control) \
+		-width 12 -fg blue
+	pack $f.state -side left -expand 1
 
-	label $f.addrl -text "Address (Hex/Decimal):"
-	entry $f.addre -textvariable Telemetry_Manager_config(cp_addr) -width 8
+	label $f.idl -text "Device Identifier:"
+	entry $f.ide -textvariable Telemetry_Manager_config(prog_id) -width 7
+	pack $f.idl $f.ide -side left -expand 1
+
+	label $f.addrl -text "Memory Address:"
+	entry $f.addre -textvariable Telemetry_Manager_config(prog_addr) -width 8
 	pack $f.addrl $f.addre -side left -expand 1
+	
+	label $f.seglenl -text "Sgement Length:"
+	entry $f.seglene -textvariable Telemetry_Manager_config(prog_seglen) -width 4
+	pack $f.seglenl $f.seglene -side left -expand 1
 
-	foreach a {Upload} {
-		set b [string tolower $a]
-		button $f.$b -text "$a Program" -command "LWDAQ_post Telemetry_Manager_cp_$b"
-		pack $f.$b -side left -expand 1
+	button $f.upload -text "Upload" -command \
+		"LWDAQ_post Telemetry_Manager_programmer_upload"
+	pack $f.upload -side left -expand 1
+
+	button $f.stop -text "Stop" -command {
+		set Telemetry_Manager_info(prog_control) "Stop"
 	}
+	pack $f.stop -side left -expand 1
 
 	set f [frame $w.program]
 	pack $f -side top -fill x
 	
-	label $f.lprogram -text "Program:" -fg $config(label_color)
-	entry $f.eprogram -textvariable Telemetry_Manager_config(cp_content) -width 60
+	label $f.lprogram -text "Program File (hex):" -fg $config(label_color)
+	entry $f.eprogram -textvariable Telemetry_Manager_config(prog_file) -width 60
 	pack $f.lprogram $f.eprogram -side left -expand 1
 
 	foreach a {Browse Edit} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_cp_$b"
+		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_programmer_$b"
 		pack $f.$b -side left -expand 1
 	}
 
-	set info(cp_text) [LWDAQ_text_widget $w 80 15]
+	set info(prog_text) [LWDAQ_text_widget $w 80 15]
 
 	return "" 
 }
 
 #
-# Telemetry_Manager_cp_browse opens a file browser to select the program file.
+# Telemetry_Manager_programmer_browse opens a file browser to select the program
+# file.
 #
-proc Telemetry_Manager_cp_browse {} {
+proc Telemetry_Manager_programmer_browse {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	set fn [LWDAQ_get_file_name]
-	if {$fn != ""} {set config(cp_content) $fn}
+	if {$fn != ""} {set config(prog_file) $fn}
 	return ""
 }
 
 #
-# Telemetry_Manager_cp_edit opens the data file in an editor window.
+# Telemetry_Manager_programmer_edit opens the data file in an editor window.
 #
-proc Telemetry_Manager_cp_edit {} {
+proc Telemetry_Manager_programmer_edit {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
-	if {[winfo exists $info(cp_ew)]} {
-		raise $info(cp_ew)
+	if {[winfo exists $info(prog_ew)]} {
+		raise $info(prog_ew)
 	} else {
-		set info(cp_ew) [LWDAQ_edit_script Open $config(cp_content)]
+		set info(prog_ew) [LWDAQ_edit_script Open $config(prog_file)]
 	}
-	return $info(cp_ew)
+	return $info(prog_ew)
 }
 
 #
-# Telemetry_Manager_cp_upload reads bytes in decimal string format from a text
-# files and uploads them to the sensor's non-volatile memory. The number of
-# bytes written should be divisible by sixteen, because the NVM page size is
-# sixteen bytes. The write begins at the sixteen-byte boundary given by the
-# transmit panel address parameter, which likewise should lie on a sixteen
-# byte boundary.
+# Telemetry_Manager_programmer_upload reads bytes in decimal string format from
+# a text files and uploads them to the sensor's non-volatile memory. The number
+# of bytes written must be divisible by sixteen, and the destination address
+# must lie on a sixteen-byte boundary. The non-volatile memory enforces a write
+# page size of sixteen bytes and the pages lie on sixteen-byte boundaries. If we
+# pass no arguments to this routine, it picks the device identifier form the
+# programming panel, reads the contents of the file named in the programming
+# panel, and uses the address provided in the programming panel. Otherwise, it
+# uses the identifier, data, and address provided in its argument list. The data
+# must be a list of bytes delimited by white spaces with each byte in either
+# decimal or 0xFF hexadecimal format. The routine takes a segment of bytes from
+# the front of the list and uploads them to the given memory address, then posts
+# itself to the LWDAQ event queue with the remaining bytes as data and an
+# address incremented by the segment length. By posting itself to the event
+# queue, the upload process allows the Receiver Instrument and the Telemetry
+# Manager Monitor to continue operating.
 #
-proc Telemetry_Manager_cp_upload {} {
+#
+proc Telemetry_Manager_programmer_upload {{id ""} {addr ""} {data ""}} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 	upvar #0 OSR8_Assembler_config aconfig
 	upvar #0 OSR8_Assembler_info ainfo
 	
-	# Read program from file.
-	if {[file exists $config(cp_content)]} {
-		LWDAQ_print $info(cp_text) "Reading $config(cp_content)."
-		set f [open $config(cp_content)]
-		set prog [read $f]
-		close $f
-		set prog [regsub -all {\n} $prog " "]
-		set prog [string trim $prog]
-	} else {
-		LWDAQ_print $info(cp_text) "ERROR: Cannot find \"$config(cp_content)\"."
+	# If the control has been set to Stop, then do so.
+	if {$info(prog_control) == "Stop"} {
+		LWDAQ_print $info(prog_text) "Stopped program upload."
+		set info(prog_control) "Idle"
 		return ""
-	} 
-
-	set addr $config(cp_addr)
-	
-	while {[llength $prog] >= 16} {
-
-		# Reset the command list.
-		set commands [list]
-	
-		# Extract the first segment from the remaining user program.
-		set segment [lrange $prog 0 [expr $config(cp_seglen)-1]]
-		set prog [lrange $prog $config(cp_seglen) end]
-		set addr_h [expr $addr / 256]
-		set addr_l [expr $addr % 256]
-
-		# Add upload instruction with its operand, which is the number of 
-		# program bytes that are to follow.
-		lappend commands $info(op_pgld) [llength $segment] $addr_h $addr_l
-	
-		# Add the program segment.
-		set commands [concat $commands $segment]
-	
-		# Transmit the commands.
-		Telemetry_Manager_transmit $config(cp_id) $commands
-		
-		set addr [expr $addr + [llength $segment]]
 	}
+	
+	# If no identifier argument has been passed, use the value in the panel.
+	if {$id == ""} {
+		set id $config(prog_id)
+	}
+	
+	# If no address argment has been passed, use the value in the panel.
+	if {$addr == ""} {
+		set addr $config(prog_addr)
+	}
+	
+	# If no data argument has been passed, try to read data from the program
+	# file.
+	if {$data == ""} {
+		if {[file exists $config(prog_file)]} {
+			set f [open $config(prog_file)]
+			set data [read $f]
+			close $f
+			set data [regsub -all {\n} $data " "]
+			set data [string trim $data]
+			LWDAQ_print $info(prog_text) "Read [llength $data] data bytes\
+				from \"[file tail $config(prog_file)]\"."
+		} else {
+			LWDAQ_print $info(prog_text) "ERROR: Cannot find\
+				programming data file \"$config(prog_file)\"."
+			return ""
+		} 
+	}
+	
+	# Check the address and data lengths.
+	if {$addr % 16 != 0} {
+		LWDAQ_print $info(prog_text) "ERROR: Memory address must lie\
+			on a sixteen-byte boundary."
+		return ""
+	}
+	if {[llength $data] % 16 != 0} {
+		LWDAQ_print $info(prog_text) "ERROR: Number of data bytes must be\
+			divisible by sixteen."
+		return ""
+	}
+	if {[llength $data] < 16} {
+		LWDAQ_print $info(prog_text) "ERROR: Number of data bytes must be\
+			at least sixteen."
+		return ""
+	}
+	
+	# Set the control to upload.
+	set info(prog_control) "Upload"
+
+	# Extract a segment from the data, or a partial segment if we 
+	# don't have a full segment remaining.
+	if {[llength $data] >= $config(prog_seglen)} {
+		set segment [lrange $data 0 [expr $config(prog_seglen)-1]]
+		set data [lrange $data $config(prog_seglen) end]
+	} else {
+		set segment $data
+		set data ""
+	}
+	
+	# Calculate the top and bottom address bytes.
+	set addr_h [expr $addr / 256]
+	set addr_l [expr $addr % 256]
+	
+	# Print a notification.
+	LWDAQ_print $info(prog_text) "Uploading [llength $segment] bytes\
+		to 0x[format %04X $addr] on device 0x$id\..."
+
+	# Compose the upload command and transmit.
+	set commands [list $info(op_nvmwr) [llength $segment] $addr_h $addr_l]
+	set commands [concat $commands $segment]
+	Telemetry_Manager_transmit $config(prog_id) $commands
+	
+	# Increment the address.
+	set addr [expr $addr + [llength $segment]]
+	
+	# If we have more data to transmit, post another upload to the
+	# event queue.
+	if {[llength $data] >= 16} {
+		LWDAQ_post [list Telemetry_Manager_programmer_upload $id $addr $data]
+	} else {
+		set info(prog_control) "Idle"
+	}
+	
+	# We are done.
+	return ""
 }
 
 #
@@ -1142,8 +1223,8 @@ proc Telemetry_Manager_open {} {
 	}
 	pack $f.receiver -side left -expand 1
 
-	button $f.txcmd -text "Programming" -command {
-		LWDAQ_post "Telemetry_Manager_program_panel"
+	button $f.txcmd -text "Programmer" -command {
+		LWDAQ_post "Telemetry_Manager_programmer"
 	}
 	pack $f.txcmd -side left -expand 1
 

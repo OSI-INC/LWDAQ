@@ -26,7 +26,7 @@ proc OSR8_Assembler_init {} {
 	upvar #0 OSR8_Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "3.2"
+	LWDAQ_tool_init "OSR8_Assembler" "3.3"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return ""
@@ -554,6 +554,13 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	}
 	set index 0
 	foreach m $mem {
+		if {$config(hex_output)} {
+			if {[expr 0x$m] > 255} {
+				OSR8_Assembler_error "Output hex value out of range \"$m\"."
+			}
+		} elseif {($m > 255) || ($m < 0)} {
+			OSR8_Assembler_error "Output decimal value out of range \"$m\"."
+		}
 		if {$config(ofn_write)} {puts $f $m}
 		incr index
 		LWDAQ_print -nonewline $info(text) "$m "
