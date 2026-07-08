@@ -1,6 +1,6 @@
 # OSR8 Assembler, a LWDAQ Tool
 #
-# Copyright (C) 2020-2024 Kevan Hashemi, Open Source Instruments Inc.
+# Copyright (C) 2020-2026 Kevan Hashemi, Open Source Instruments Inc.
 #
 # Open-Source Reconfigurable Eight-Bit Central Porocessing Unit Assembler and
 # Dis-Assembler. The OSR8 Assembler converts text Open-Source, Reconfigurable,

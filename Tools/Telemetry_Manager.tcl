@@ -1,4 +1,4 @@
-# Telemetry Manager, a LWDAQ Tool
+# Telemetry Manager, A LWDAQ Tool
 #
 # Copyright (C) 2026 Kevan Hashemi, Open Source Instruments
 #
