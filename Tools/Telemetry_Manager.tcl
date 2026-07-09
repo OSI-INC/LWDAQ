@@ -28,7 +28,7 @@ proc Telemetry_Manager_init {} {
 	upvar #0 Telemetry_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Telemetry_Manager" "1.4"
+	LWDAQ_tool_init "Telemetry_Manager" "1.5"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -51,10 +51,8 @@ proc Telemetry_Manager_init {} {
 	set config(log_enable) "0"
 	set config(log_file) "~/Desktop/Telemetry_Manager_Log.txt"
 	
-	set config(ton_color) "red"
-	set config(toff_color) "black"
-	set config(lon_color) "lightgreen"
-	set config(loff_color) "lightgray"	
+	set config(ton_color) "lightgreen"
+	set config(toff_color) "lightgray"
 	set config(label_color) "brown"
 	
 	set config(conf_delay) "3"
@@ -85,17 +83,26 @@ proc Telemetry_Manager_init {} {
 	set info(at_conf) "4"
 	set info(at_ver) "5"
 	
-	# Operation codes, which we use to construct instructions, which
-	# we in turn combine to form commands.
+	# Telemetry Command Operation Codes. We list all defined operation codes.
+	set info(op_stop) "0" 
+	set info(op_start) "1" 
+	set info(op_xon) "2"
+	set info(op_xoff) "3"
+	set info(op_batt) "4" 
 	set info(op_id) "5"
+	set info(op_pgld) "6"
+	set info(op_pgon) "7"
+	set info(op_pgoff) "8"
+	set info(op_pgrst) "9"
+	set info(op_shdn) "10"
 	set info(op_ver) "11"
-	set info(op_ton) "16" 
-	set info(op_toff) "17" 
-	set info(op_zon) "18" 
-	set info(op_zoff) "19" 
-	set info(op_nvmwr) "20"
-	set info(op_lon) "30"
-	set info(op_loff) "31" 
+	set info(op_ton) "12"
+	set info(op_toff) "13"
+	set info(op_zon) "14"
+	set info(op_zoff) "15"
+	set info(op_nvmwr) "16"
+	set info(op_flash) "17"
+	set info(op_reset) "18"
 	
 	set info(state) "Idle"
 	set info(monitor_ms) "0"
@@ -257,20 +264,19 @@ proc Telemetry_Manager_id {n} {
 }
 
 #
-# Telemetry_Manager_lon transmits a command to turn on the target's indicator
-# lamp.
+# Telemetry_Manager_reset transmits a reset command to the target device.
 #
-proc Telemetry_Manager_lon {n} {
+proc Telemetry_Manager_reset {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Lon"
+	set info(state) "Reset"
 
 	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
-	set commands [list $info(op_lon)]
+	set commands [list $info(op_reset)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -282,23 +288,24 @@ proc Telemetry_Manager_lon {n} {
 }
 
 #
-# Telemetry_Manager_loff transmits a command to turn off the target's indicator
+# Telemetry_Manager_flash transmits a command to flash the target's indicator
 # lamp.
 #
-proc Telemetry_Manager_loff {n} {
+proc Telemetry_Manager_flash {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Loff"
+	set info(state) "Flash"
 
-	# Measure battery voltage, check version, and stop stimulus.
-	set commands [list $info(op_loff)]
+	# Combose command with a battery measurement and version number check, 
+	# then begin the start instruction.
+	set commands [list $info(op_flash)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
-	
+
 	# Set state variables.
 	set info(state) "Idle"
 	
@@ -434,6 +441,30 @@ proc Telemetry_Manager_identify {} {
 }
 
 #
+# Telemetry_Manager_query transmits version number and battery use requests
+# to the target device.
+#
+proc Telemetry_Manager_query {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
+
+	# Set the tool state variable.
+	if {$info(state) != "Idle"} {return}
+	set info(state) "Query"
+
+	# Measure battery voltage, check version, and stop stimulus.
+	set commands [list $info(op_batt) $info(op_ver)]
+	
+	# Transmit the commands.
+	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
+	
+	# Set state variables.
+	set info(state) "Idle"
+	
+	return ""
+}
+
+#
 # Telemetry_Manager_all takes a parameter "action" that it uses to define a
 # procedure it will call on every Telemetry_Manager in the current list,
 # provided that its ID is not "*". We introduce a delay after each action to
@@ -460,8 +491,7 @@ proc Telemetry_Manager_clear {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
-	LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-	LWDAQ_set_fg $info(dev$n\_state) $config(toff_color)
+	LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
 	set info(dev$n\_battery) "?"	
 	set info(dev$n\_version) "?"	
 
@@ -585,22 +615,20 @@ proc Telemetry_Manager_monitor {} {
 				} \
 				$info(op_ton) {
 					set type "ton"
-					LWDAQ_set_fg $info(dev$n\_state) $config(ton_color)
+					LWDAQ_set_bg $info(dev$n\_state) $config(ton_color)
 				} \
 				$info(op_toff) {
 					set type "toff"
-					LWDAQ_set_fg $info(dev$n\_state) $config(toff_color)
+					LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
 				} \
-				$info(op_loff) {
-					set type "loff"
-					LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-				} \
-				$info(op_lon) {
-					set type "lon"
-					LWDAQ_set_bg $info(dev$n\_state) $config(lon_color)
+				$info(op_flash) {
+					set type "flash"
 				} \
 				$info(op_nvmwr) {
 					set type "nvmwr"
+				} \
+				$info(op_reset) {
+					set type "reset"
 				} \
 				default {
 					set type "invalid"
@@ -614,19 +642,13 @@ proc Telemetry_Manager_monitor {} {
 			# Ignore battery measurements from devices that are not in our list.
 			if {$n == 0} {continue}
 			
-			# We interpret battery measurements in a manner particular to the
-			# various supported device versions.
-			set ver $info(dev$n\_version)
-			switch $ver {
-				"21" {set voltage [format %.2f [expr 255.0/$db*1.2]]}
-				default {set voltage [format %.2f [expr 255.0/$db*1.2]]}
-			}
-			
-			# Report the battery measurement.
-			set info(dev$n\_battery) $voltage
+			# The battery use is a percentage of nominal capacity, as estimated
+			# by the device. We subtract from one hundred to obtain remaining
+			# capacity estimate.
+			set info(dev$n\_battery) [expr 100-$db]
 			Telemetry_Manager_print "Battery:\
 				device_id=$device_id value=$db ts=$ts\
-				voltage=$voltage $now_time" 
+				$now_time" 
 		} elseif {$fa == $info(at_id)} {
 			Telemetry_Manager_print "Identification:\
 				device_id=$device_id ts=$ts $now_time" green
@@ -708,14 +730,14 @@ proc Telemetry_Manager_draw_list {} {
 		pack $ff.id -side left -expand 1
 		set info(dev$n\_state) $ff.id
 		LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
-		LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
 		
-		foreach {a c} {Lon green \
-				Loff black \
+		foreach {a c} {Reset red \
+				Flash orange \
 				Ton green \
 				Toff black \
 				Zon green \
-				Zoff black} {
+				Zoff black \
+				Query black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
@@ -894,8 +916,7 @@ proc Telemetry_Manager_load_list {{fn ""}} {
 		uplevel #0 [list source $fn]
 		Telemetry_Manager_draw_list
 		foreach n $info(dev_list) {
-			LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-			LWDAQ_set_fg $info(dev$n\_state) $config(toff_color)
+			LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
 			set info(dev$n\_battery) "?"
 			set info(dev$n\_version) "?"	
 		}
