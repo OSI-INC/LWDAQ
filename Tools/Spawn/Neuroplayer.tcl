@@ -1411,7 +1411,7 @@ proc Neuroplayer_end_time {fn payload {ref_time 0} {ref_index 0}} {
 #
 # Neuroplayer_filter applies a band-pass or band-stop filter to the current
 # signal. We will first explain how the band-pass filter works. The routine
-# takes the discrete Fourier transform and elminates or attenuates its
+# takes the discrete Fourier transform and eliminates or attenuates its
 # components according to four frequencies we specify in Hertz as arguments to
 # the routine. These are band_lo_end, band_lo_center, band_hi_center, and
 # band_hi_end. All components below band_lo_end and above band_hi_end are
@@ -1541,19 +1541,19 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 }
 
 #
-# Neuroplayer_band_power is for use in processor scripts as a means of detecting
-# events in a signal. The routine selects the frequency components in
-# info(spectrum) that lie between band_lo and band_hi Hertz (inclusive), adds
-# the power of all components in this band, and returns the total. If show is
-# set, the routine plots the filtered signal on the screen by taking the inverse
-# transform of the selected frequency components. If replace is set, the routine
-# calculates the inverse transform of the filtered signal, making it available
-# to the calling routine in the info(values) variable. Note that the routine
-# does not change info(signal), which contains the reconstructed signal values
-# and their timestamps, nor the spectrum of the signal. By default, the routine
-# does not plot nor does it perform the inverse transform, both of which take
-# time and slow down processing. The show parameter, if not zero, is used to
-# scale the signal for display.
+# Neuroplayer_band_power selects the frequency components in info(spectrum) that
+# lie between band_lo and band_hi Hertz (inclusive), calculates the sum of their
+# squares and divides the sum by two. The result is a measure fo the power of
+# the signal in the specified frequency band. If show is set, the routine plots
+# the filtered signal on the screen by taking the inverse transform of the
+# selected frequency components. If replace is set, the routine calculates the
+# inverse transform of the filtered signal, making it available to the calling
+# routine in the info(values) variable. Note that the routine does not change
+# info(signal), which contains the reconstructed signal values and their
+# timestamps, nor the spectrum of the signal. By default, the routine does not
+# plot nor does it perform the inverse transform, both of which take time and
+# slow down processing. The show parameter, if not zero, is used to scale the
+# signal for display.
 #
 proc Neuroplayer_band_power {band_lo band_hi {show 0} {replace 0}} {
 	upvar #0 Neuroplayer_info info

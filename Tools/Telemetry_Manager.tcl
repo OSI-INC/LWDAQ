@@ -71,7 +71,7 @@ proc Telemetry_Manager_init {} {
 	set config(prog_id) "FFFF"
 	set config(prog_file) "~/Desktop/Config.txt"
 	set config(prog_seglen) "32"
-	set config(prog_addr) "0x0000"
+	set config(prog_addr) "0x0100"
 	set info(prog_control) "Idle"
 	set info(prog_ew) $info(window).progew
 	set info(prog_text) $info(prog_ew).text
@@ -1030,7 +1030,7 @@ proc Telemetry_Manager_programmer {} {
 	entry $f.addre -textvariable Telemetry_Manager_config(prog_addr) -width 8
 	pack $f.addrl $f.addre -side left -expand 1
 	
-	label $f.seglenl -text "Sgement Length:"
+	label $f.seglenl -text "Segment Length:"
 	entry $f.seglene -textvariable Telemetry_Manager_config(prog_seglen) -width 4
 	pack $f.seglenl $f.seglene -side left -expand 1
 
