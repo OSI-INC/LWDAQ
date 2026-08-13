@@ -3,9 +3,7 @@
 # Copyright (C) 2026 Kevan Hashemi, Open Source Instruments
 #
 # The Telemetry Manager controls and configures telemetry sensors equipped with
-# crystal radio receivers. These include the existing A3054 Intraperitoneal
-# Transmitter (IPT) and other planned second-generation Subcutaneous
-# Transmitters (SCTs).
+# crystal radio receivers, such as the A3054 Intraperitoneal Transmitter (IPT).
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -453,7 +451,7 @@ proc Telemetry_Manager_query {n} {
 	set info(state) "Query"
 
 	# Measure battery voltage, check version, and stop stimulus.
-	set commands [list $info(op_batt) $info(op_ver)]
+	set commands [list $info(op_ver) $info(op_batt)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -717,7 +715,6 @@ proc Telemetry_Manager_draw_list {} {
 		# it now, as well as other system parameters.
 		if {![info exists info(dev$n\_id)]} {
 			set info(dev$n\_id) $config(default_id)
-			set info(dev$n\_channel) [expr 0x$config(default_id) % 256]
 			set info(dev$n\_version) "?"
 			set info(dev$n\_battery) "?"
 		}
@@ -742,12 +739,6 @@ proc Telemetry_Manager_draw_list {} {
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
 			pack $ff.$b -side left -expand 1
-		}
-
-		foreach {a c} {channel 3} {
-			label $ff.l$a -text "$a\:" -fg $config(label_color)
-			entry $ff.$a -textvariable Telemetry_Manager_info(dev$n\_$a) -width $c
-			pack $ff.l$a $ff.$a -side left -expand 1
 		}
 
 		foreach {a c} { version 3 battery 3} {
@@ -826,7 +817,6 @@ proc Telemetry_Manager_remove {n} {
 	unset info(dev$n\_id)
 	unset info(dev$n\_version)
 	unset info(dev$n\_battery)
-	unset info(dev$n\_channel) 
 	
 	return ""
 }
@@ -852,7 +842,6 @@ proc Telemetry_Manager_add_device {} {
 	
 	# Configure the new sensor to default values.
 	set info(dev$n\_id) $config(default_id)
-	set info(dev$n\_channel) [expr 0x$config(default_id) % 256]
 	set info(dev$n\_version) "?"
 	set info(dev$n\_battery) "?"
 	
@@ -879,7 +868,7 @@ proc Telemetry_Manager_save_list {{fn ""}} {
 	set f [open $fn w]
 	puts $f "set Telemetry_Manager_info(dev_list) \"$info(dev_list)\""
 	foreach n $info(dev_list) {
-		foreach p {id channel version} {
+		foreach p {id version} {
 			set e "dev$n\_$p"
 			puts $f "set Telemetry_Manager_info($e) \"[set info($e)]\"" 
 		}
@@ -1262,6 +1251,12 @@ proc Telemetry_Manager_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
+	foreach a {Identify} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_$b"
+		pack $f.$b -side left -expand 1
+	}
+	
 	foreach {a c} {Ton green Toff black} {
 		set b [string tolower $a]
 		button $f.$b -text "$a\_All" -fg $c -command \
@@ -1269,7 +1264,7 @@ proc Telemetry_Manager_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	foreach a {Add_Device Save_List Load_List Refresh_List Identify} {
+	foreach a {Add_Device Save_List Load_List Refresh_List} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_$b"
 		pack $f.$b -side left -expand 1
