@@ -21,7 +21,7 @@ proc DM_Check_init {} {
 #
 # Set up the tool within LWDAQ.
 #
-	LWDAQ_tool_init "DM_Check" "1.7"
+	LWDAQ_tool_init "DM_Check" "1.8"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Process control variabls.
@@ -553,6 +553,10 @@ proc DM_Check_measure {{freq ""}} {
 		set iconfig(daq_device_element) "1 2"
 		set iconfig(daq_hi_gain) "0"
 		set result [LWDAQ_acquire Voltmeter]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $info(text) $result
+			return "0.0"
+		}
 		append line "[format %.3f [lindex $result 1]] "
 		append line "[format %.3f [lindex $result 5]] "
 	}
