@@ -396,6 +396,7 @@ proc LWDAQ_reset_Receiver {} {
 		lwdaq_data_manipulate $img write 0 $data
 		set info(receiver_firmware) "?"
 		set info(receiver_type) "?"
+		set fv "0"
 		foreach payload $info(payload_options) {
 			set bb [lwdaq_receiver $img "-payload $payload print 0 1"]
 			if {[regexp {Error:} $bb]} {continue}
