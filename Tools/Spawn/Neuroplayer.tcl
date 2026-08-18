@@ -7788,35 +7788,42 @@ proc Neuroplayer_play {{command ""}} {
 		}
 	}
 	
-	# We clear the auxiliary message list. Our assumption is that tools like the
-	# Stimulator and Telemetry Manager will be waiting for the Neuroplayer to
-	# complete a play interval and then do all the work they need to on the list
-	# before the next play interval.
-	set info(aux_messages) ""
-
 	# We look for new messages in the auxiliary channels.
 	set new_aux_messages [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) -size $info(data_size) auxiliary"]
 
-	# We are going to calculate a timestamp, with resolution one clock tick, for
-	# each auxiliary message. The timestamps can be used as a form of addressing
-	# for slow data transmissions. To get the absolute timestamp, we get the
-	# time of the first clock message in the data. This time is a sixteen-bit
-	# value that has counted the number of 256-tick periods since the data receiver
-	# clock was last reset, wrapping around to zero every time it overflows.
+	# We are going to calculate a timestamp for each auxiliary message. The
+	# timestamps allow us to detect pairs of auxiliary messages transmitted one
+	# immediately following the other, as when an implant transmits a metadata
+	# and confirmation message. The timestamps also allow us to use timing as a
+	# form of addressing for slow data transmissions, although we have not yet
+	# implemented this scheme in any existing device. To obtain an absolute
+	# timestamp for each auxiliary message, we start by extracting the time of
+	# the first clock message in the current data image. This time is a
+	# sixteen-bit value that has counted the number of 256-tick periods since
+	# the data receiver clock was last reset, wrapping around to zero every time
+	# it overflows.
 	scan [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) get $first_index"] %d%d%d cid bts fvn
 		
-	# We take each new auxiliary message and break it up into three parts. The
-	# first part is a four-bit ID, which is the primary channel number of the
-	# device producing the auxiliary message. The second part is a four-bit
-	# field address. The third is eight bits of data. These sixteen bits are the
-	# contents of the auxiliary message. We add a fourth number, which is the
-	# timestamp of message reception. We give the timestamp modulo 65536, which
-	# gives us sufficient precision to detect any time-based address encoding of
+	# We create a new list of auxiliary messages. We clear the old list. We
+	# assume that any tool that uses the Neuroplayer's auxiliary message list
+	# will have had the opportunity to do so between executions of this playback
+	# procedure. These tools should use the auxiliary list each in the following
+	# way: they store the list in a previous list string and compare the latest
+	# list with the stored list. They act on the list only if the stored list is
+	# not equal to the new list. To construct the new list, we take each new
+	# auxiliary message and break it up into three parts. The first part is a
+	# four-bit ID, which is the primary channel number of the device producing
+	# the auxiliary message. The second part is a four-bit field address. The
+	# third is eight bits of data. These sixteen bits are the contents of the
+	# auxiliary message. We add a fourth number, which is the timestamp of
+	# message reception. We give the timestamp modulo 65536, which gives us
+	# sufficient precision to detect any time-based address encoding of
 	# auxiliary data. These four numbers make one entry in the auxiliary message
 	# list, so we append them to the existing list. If the four-bit ID is zero
-	# or fifteen, this is a bad message, so we don't store it.
+	# or fifteen, this is a bad message, so we don't store it. 
+	set info(aux_messages) ""
 	foreach {cn mt md} $new_aux_messages {
 		set id [expr ($md / 4096)]
 		if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
@@ -7824,11 +7831,13 @@ proc Neuroplayer_play {{command ""}} {
 		set fa [expr ($md / 256) % 16]
 		set d [expr $md % 256]
 		set ts  [expr ($mt + $bts * 256) % (65536)]
-		set am "$id $fa $d $ts"
-		lappend info(aux_messages) $am
-		Neuroplayer_print "Auxiliary: $am" verbose
+		lappend info(aux_messages) "$id $fa $d $ts"
+		Neuroplayer_print "Aux: id=$id=0x[format %02X $id]\
+			addr=$fa=0x[format %02X $fa]\
+			data=$d=0x[format %02X $d]\
+			time=$ts" verbose
 	}
-		
+	
 	# We read the processor script from disk. We replace "Neuroarchiver" with
 	# "Neuroplayer" for backward compatibility with old processors, prior to the
 	# partition of the Neuroarchiver into two parts, player and recorder.

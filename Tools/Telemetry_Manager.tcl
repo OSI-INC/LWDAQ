@@ -671,7 +671,7 @@ proc Telemetry_Manager_monitor {} {
 				}
 
 			Telemetry_Manager_print "Acknowledge:\
-				device_id=$device_id type=$type ts=$ts $now_time"
+				id=$device_id type=$type value=$db ts=$ts $now_time"
 		} elseif {$fa == $info(at_batt)} {
 			
 			# For devices in our list, convert the battery measurement into hours
@@ -682,12 +682,12 @@ proc Telemetry_Manager_monitor {} {
 			
 			# Print battery message.
 			Telemetry_Manager_print "Battery:\
-				device_id=$device_id value=$db ts=$ts $now_time" 
+				id=$device_id value=$db ts=$ts $now_time" 
 		} elseif {$fa == $info(at_id)} {
 			
 			# Print identification message.
 			Telemetry_Manager_print "Identification:\
-				device_id=$device_id ts=$ts $now_time" green
+				id=$device_id value=$db ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
 
 			# Set version number of a device in our list.
@@ -697,12 +697,12 @@ proc Telemetry_Manager_monitor {} {
 			
 			# Print version message.
 			Telemetry_Manager_print "Version:\
-				device_id=$device_id value=$db ts=$ts $now_time"
+				id=$device_id value=$db ts=$ts $now_time"
 		} else {
 			
 			# Report unknown auxiliary message.
 			Telemetry_Manager_print "Unknown:\
-				device_id=$device_id value=$db ts=$ts $now_time"
+				id=$device_id value=$db ts=$ts $now_time"
 		}
 		
 		# By this point, we have processed and reported on all confirmed and

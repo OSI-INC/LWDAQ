@@ -699,7 +699,7 @@ proc Stimulator_monitor {} {
 				}
 				
 			Stimulator_print "Acknowledge:\
-					device_id=$device_id type=$type ts=$ts $now_time"
+					id=$device_id type=$type value=$db ts=$ts $now_time"
 		} elseif {$fa == $info(at_batt)} {
 			
 			# Report battery measurements for known devices.
@@ -713,12 +713,12 @@ proc Stimulator_monitor {} {
 			
 			# Report the battery measurement.
 			Stimulator_print "Battery:\
-				device_id=$device_id value=$db ts=$ts $now_time" 
+				id=$device_id value=$db ts=$ts $now_time" 
 		} elseif {$fa == $info(at_id)} {
 			
 			# Print identification message. 
 			Stimulator_print "Identification:\
-				device_id=$device_id ts=$ts $now_time" green
+				id=$device_id value=$db ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
 
 			# Set version of known devices.
@@ -728,12 +728,12 @@ proc Stimulator_monitor {} {
 			
 			# Print version message.
 			Stimulator_print "Version:\
-				device_id=$device_id value=$db ts=$ts $now_time"
+				id=$device_id value=$db ts=$ts $now_time"
 		} else {
 			
 			# Report unknown auxiliary message.
 			Stimulator_print "Unknown:\
-				device_id=$device_id value=$db ts=$ts $now_time"
+				id=$device_id value=$db ts=$ts $now_time"
 		}
 		
 		# By this point, we have processed and reported on all confirmed and
