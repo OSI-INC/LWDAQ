@@ -97,6 +97,9 @@ proc Stimulator_init {} {
 	set info(at_conf) "4"
 	set info(at_ver) "5"
 	
+	# Saved auxiliary message list.
+	set info(saved_aux) ""
+	
 	# Stimulator operation codes, which we use to construct instructions, which
 	# we in turn combine to form commands.
 	set info(op_stop) "0"
@@ -524,21 +527,18 @@ proc Stimulator_clear {n} {
 # therefore provides both the information and the identifier, as well as making
 # it unlikely that we will receive auxiliary information from random
 # interference messages. The Stimulator is not the only tool that examines
-# auxiliary messages. The Telemetry Manager also examines them. But we assume
-# that these tools do not manage the same devices. Both tools first look for a
-# Neuroplayer list of auxiliary messages. If they find such a list, they remove
-# from it the messages they use and leave the rest in the list. If they do not
-# find a Neuroplayer list, they look for a Receiver list and use that in the
-# same way. The system of use and remove works find for all auxiliary messages
-# except identifier message, which are generated in response to an identify
-# command. Both the Telemetry Manager and the Stimulator should print these, but
-# only one will do so under the system of use and remove. The Neuroplayer and
-# Receiver clear old messages from their list whenever they analyze a new
-# interval. The system of ignoring non-confirmed messages in the list works fine
-# except when the first member of the pair is separated from its confirmation by
-# an interval boundary. Right now the Stimulator Tool operates only with a
-# graphical user interface, so we use the existence of its window to determine
-# if the monitor should shut down.
+# auxiliary messages. The Telemetry Manager also examines them. All tools that
+# use the list save the auxiliary list and acts upon only new lists. Both tools
+# first look for a Neuroplayer list of auxiliary messages. If they find such a
+# list, they compare it to the previous list they used, and if they are
+# different, they act upon the list. If they do not find a Neuroplayer list,
+# they look for a Receiver list and handle it in the same way. The Neuroplayer
+# and Receiver clear old messages from their list whenever they analyze a new
+# interval, and so generate a new or empty list. The system of ignoring
+# non-confirmed messages in the list works fine except when the first member of
+# the pair is separated from its confirmation by an interval boundary. Right now
+# the Stimulator Tool operates only with a graphical user interface, so we use
+# the existence of its window to determine if the monitor should shut down.
 #
 proc Stimulator_monitor {} {
 	upvar #0 Stimulator_config config
@@ -559,7 +559,7 @@ proc Stimulator_monitor {} {
 	set rconfig(analysis_enable) "1"
 
 	# Look for auxiliary message lists. If we find one, copy it and set the time
-	# of the messages accordingly. Receiver message arrive now, Neuroplayer
+	# of the messages accordingly. Receiver messages arrive now, Neuroplayer
 	# messages arrived at the play time.
 	set aux_messages ""
 	if {[info exists ninfo(aux_messages)]} {
@@ -568,6 +568,15 @@ proc Stimulator_monitor {} {
 	} elseif {[info exists rinfo(aux_messages)]} {
 		set aux_messages $rinfo(aux_messages)
 		set now_time \([clock format [clock seconds] -format $info(time_format)]\)
+	}
+	
+	# If the auxiliary message list is the same as the previous list, we
+	# are done. Otherwise we set the previous list to the new list.
+	if {[string match $info(saved_aux) $aux_messages]} {
+		LWDAQ_post Stimulator_monitor
+		return ""
+	} else {
+		set info(saved_aux) $aux_messages
 	}
 	
 	# If we have no auxiliary messages, we are done.
@@ -586,12 +595,10 @@ proc Stimulator_monitor {} {
 	# message so that we can avoid processing duplicates in the list. Duplicates
 	# arise sometimes in the telemetry data stream because multiple detector
 	# modules receive it. Duplicate elimination by the receiver logic is only
-	# partially effective. We also compose a new list of remaining auxiliary
-	# messages that contains messages we have not used.
+	# partially effective.
 	set previd 0
 	set prevfa 0
 	set prevdb 0
-	set remaining [list]
 	foreach am $aux_messages {
 	
 		# Scan the auxiliary message for identifier, field address, data byte
@@ -637,33 +644,33 @@ proc Stimulator_monitor {} {
 		# Check the auxiliary message type, now that it has been confirmed.
 		if {$fa == $info(at_ack)} {
 			
-			# Acknowledgements confirm that a device has received a command. We 
-			# ignore acknowledgements from devices that are not in our list, but
-			# we add them and their confirmation to the remaining list.
-			if {$n == 0} {
-				lappend remaining $am $cam
-				continue
-			}
-			
 			# Acknowledgements encode the type of command in their data byte. We
 			# use the rare list format of the switch command in order to resolve
 			# variables in the matching clauses.
 			switch $db \
 				$info(op_stop) {
 					set type "stop"
-					LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+					if {$n != 0} {
+						LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+					}
 				} \
 				$info(op_start) {
 					set type "start"
-					LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
+					if {$n != 0} {
+						LWDAQ_set_bg $info(dev$n\_state) $config(son_color)
+					}
 				} \
 				$info(op_xon) {
 					set type "xon"
-					LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
+					if {$n != 0} {
+						LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
+					}
 				} \
 				$info(op_xoff) {
 					set type "xoff"
-					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+					if {$n != 0} {
+						LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+					}
 				} \
 				$info(op_batt) {
 					set type "battery"
@@ -682,65 +689,51 @@ proc Stimulator_monitor {} {
 				} \
 				$info(op_shdn) {
 					set type "shdn"
-					LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
-					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+					if {$n != 0} {
+						LWDAQ_set_bg $info(dev$n\_state) $config(soff_color)
+						LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+					}
 				} \
 				default {
-					set type "invalid"
+					set type "unknown"
 				}
 				
-			if {$type != "invalid"} {
-				Stimulator_print "Acknowledge:\
+			Stimulator_print "Acknowledge:\
 					device_id=$device_id type=$type ts=$ts $now_time"
-			}
 		} elseif {$fa == $info(at_batt)} {
 			
-			# Ignore battery measurements from devices that are not in our list, but
-			# add them and their confirmations to the remaining list.
-			if {$n == 0} {
-				lappend remaining $am $cam
-				continue
-			}
-			
-			# We interpret battery measurements in a manner particular to the
-			# various supported device versions.
-			set ver $info(dev$n\_version)
-			switch $ver {
-				default {set voltage [format %.2f [expr 255.0/$db*1.2]]}
+			# Report battery measurements for known devices.
+			if {$n != 0} {
+				set ver $info(dev$n\_version)
+				switch $ver {
+					default {set voltage [format %.2f [expr 255.0/$db*1.2]]}
+				}
+				set info(dev$n\_battery) $voltage
 			}
 			
 			# Report the battery measurement.
-			set info(dev$n\_battery) $voltage
 			Stimulator_print "Battery:\
-				device_id=$device_id value=$db ts=$ts\
-				voltage=$voltage $now_time" 
+				device_id=$device_id value=$db ts=$ts $now_time" 
 		} elseif {$fa == $info(at_id)} {
 			
-			# Print identification message. Do not add the message or its confirmation
-			# to the remaining list. If the Telemetry Manager and the Stimulator Tools
-			# are both open, only one of them will get his message and print it.
+			# Print identification message. 
 			Stimulator_print "Identification:\
 				device_id=$device_id ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
 
-			# Ignore version number reports from devices that are not in our list,
-			# but add it and its confirmation to the remaining list.
-			if {$n == 0} {
-				lappend remaining $am $cam
-				continue
+			# Set version of known devices.
+			if {$n != 0} {
+				set info(dev$n\_version) "$db"
 			}
 			
-			set info(dev$n\_version) "$db"
+			# Print version message.
 			Stimulator_print "Version:\
 				device_id=$device_id value=$db ts=$ts $now_time"
 		} else {
 			
-			# We don't recognise this type of auxiliary message, so add it and its
-			# confirmation to the remaining list.
-			if {$n == 0} {
-				lappend remaining $am $cam
-				continue
-			}
+			# Report unknown auxiliary message.
+			Stimulator_print "Unknown:\
+				device_id=$device_id value=$db ts=$ts $now_time"
 		}
 		
 		# By this point, we have processed and reported on all confirmed and
@@ -751,13 +744,6 @@ proc Stimulator_monitor {} {
 		set previd $id
 		set prevfa $fa
 		set prevdb $db
-	}
-	
-	# Replace the list we used with our list of remaining messages.
-	if {[info exists ninfo(aux_messages)]} {
-		set ninfo(aux_messages) $remaining
-	} elseif {[info exists rinfo(aux_messages)]} {
-		set rinfo(aux_messages) $remaining
 	}
 	
 	# We post the monitor to the event queue and report success.

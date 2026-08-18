@@ -81,6 +81,9 @@ proc Telemetry_Manager_init {} {
 	set info(at_conf) "4"
 	set info(at_ver) "5"
 	
+	# Saved auxiliary message list.
+	set info(saved_aux) ""
+
 	# Telemetry Command Operation Codes. We list all defined operation codes.
 	set info(op_stop) "0" 
 	set info(op_start) "1" 
@@ -497,39 +500,37 @@ proc Telemetry_Manager_clear {n} {
 }
 
 #
-# Telemetry_Manager_monitor captures and interprets auxiliary messages from
-# implantable telemetry sensors. Each such sensor has a two-byte identifier in
-# which the lowest nibble is neither 0x0 nor 0xF. The auxiliary messages arrive
-# in pairs and specify together the two-byte identifier. While the monitor is
-# running, it enables analysis in the Receiver Instrument so that we can get
-# auxiliary messages. The routine looks for auxiliary messages first in the
-# Neuroplayer Tool, if one exists, and second in the Receiver Instrument.
-# Auxiliary messages from implants must arrive in pairs, with the pair being
-# separated in time by no more than conf_delay ticks of the receiver's 32.768
-# kHz clock. The sensors themselves transmit the two messages within one tick,
-# but the receivers do no necessarily record the two messages within one tick.
-# Both messages use the auxiliary channel that goes with the telemetry channel
-# given by the lower byte of the transmitter's two-byte identifier. The first
-# message contains some kind of information about the device, or an
-# acknowledgement, and the second message contains the upper byte of the
-# two-byte identifier. The pair of messages therefore provides both the
-# information and the identifier, as well as making it unlikely that we will
-# receive auxiliary information from random interference messages. The Telemetry
-# Manager is not the only tool that examines auxiliary messages. The Stimulator
-# Tool also examines them. But we assume that these tools do not manage the same
-# devices. Both tools first look for a Neuroplayer list of auxiliary messages.
-# If they find such a list, they remove from it the messages they use and leave
-# the rest in the list. If they do not find a Neuroplayer list, they look for a
-# Receiver list and use that in the same way. The system of use and remove works
-# find for all auxiliary messages except identifier message, which are generated
-# in response to an identify command. Both the Telemetry Manager and the
-# Stimulator should print these, but only one will do so under the system of use
-# and remove. The Neuroplayer and Receiver clear old messages from their list
-# whenever they analyze a new interval. The system of ignoring non-confirmed
-# messages in the list works fine except when the first member of the pair is
-# separated from its confirmation by an interval boundary. Right now the
-# Telemetry Manager Tool operates only with a graphical user interface, so we
-# use the existence of its window to determine if the monitor should shut down.
+# Telemetry_Monitor_monitor captures and interprets auxiliary messages from
+# telemetry sensors. Each such sensor has a two-byte identifier in which the
+# lowest nibble is neither 0x0 nor 0xF. The auxiliary messages arrive in pairs
+# and specify together the two-byte identifier. While the monitor is running, it
+# enables analysis in the Receiver Instrument so that we can get auxiliary
+# messages. The routine looks for auxiliary messages first in the Neuroplayer
+# Tool, if one exists, and second in the Receiver Instrument. Auxiliary messages
+# from implants must arrive in pairs, with the pair being separated in time by
+# no more than conf_delay ticks of the receiver's 32.768 kHz clock. The sensors
+# themselves transmit the two messages within one tick, but the receivers do no
+# necessarily record the two messages within one tick. Both messages use the
+# auxiliary channel that goes with the telemetry channel given by the lower byte
+# of the sensor's two-byte identifier. The first message contains some kind of
+# information about the device, or an acknowledgement, and the second message
+# contains the upper byte of the two-byte identifier. The pair of messages
+# therefore provides both the information and the identifier, as well as making
+# it unlikely that we will receive auxiliary information from random
+# interference messages. The Telemetry Manager is not the only tool that
+# examines auxiliary messages. The Stimulator Tool also examines them. All tools
+# that use the list save the auxiliary list and acts upon only new lists. Both
+# tools first look for a Neuroplayer list of auxiliary messages. If they find
+# such a list, they compare it to the previous list they used, and if they are
+# different, they act upon the list. If they do not find a Neuroplayer list,
+# they look for a Receiver list and handle it in the same way. The Neuroplayer
+# and Receiver clear old messages from their list whenever they analyze a new
+# interval, and so generate a new or empty list. The system of ignoring
+# non-confirmed messages in the list works fine except when the first member of
+# the pair is separated from its confirmation by an interval boundary. Right now
+# the Telemetry Manager Tool operates only with a graphical user interface, so
+# we use the existence of its window to determine if the monitor should shut
+# down.
 #
 proc Telemetry_Manager_monitor {} {
 	upvar #0 Telemetry_Manager_config config
@@ -550,7 +551,7 @@ proc Telemetry_Manager_monitor {} {
 	set rconfig(analysis_enable) "1"
 
 	# Look for auxiliary message lists. If we find one, copy it and set the time
-	# of the messages accordingly. Receiver message arrive now, Neuroplayer
+	# of the messages accordingly. Receiver messages arrive now, Neuroplayer
 	# messages arrived at the play time.
 	set aux_messages ""
 	if {[info exists ninfo(aux_messages)]} {
@@ -559,6 +560,15 @@ proc Telemetry_Manager_monitor {} {
 	} elseif {[info exists rinfo(aux_messages)]} {
 		set aux_messages $rinfo(aux_messages)
 		set now_time \([clock format [clock seconds] -format $info(time_format)]\)
+	}
+	
+	# If the auxiliary message list is the same as the previous list, we
+	# are done. Otherwise we set the previous list to the new list.
+	if {[string match $info(saved_aux) $aux_messages]} {
+		LWDAQ_post Telemetry_Manager_monitor
+		return ""
+	} else {
+		set info(saved_aux) $aux_messages
 	}
 	
 	# If we have no auxiliary messages, we are done.
@@ -577,12 +587,10 @@ proc Telemetry_Manager_monitor {} {
 	# message so that we can avoid processing duplicates in the list. Duplicates
 	# arise sometimes in the telemetry data stream because multiple detector
 	# modules receive it. Duplicate elimination by the receiver logic is only
-	# partially effective. We also compose a new list of remaining auxiliary
-	# messages that contains messages we have not used.
+	# partially effective.
 	set previd 0
 	set prevfa 0
 	set prevdb 0
-	set remaining [list]
 	foreach am $aux_messages {
 	
 		# Scan the auxiliary message for identifier, field address, data byte
@@ -627,15 +635,6 @@ proc Telemetry_Manager_monitor {} {
 
 		# Check the auxiliary message type, now that it has been confirmed.
 		if {$fa == $info(at_ack)} {
-			
-			# Acknowledgements confirm that a device has received a command. We 
-			# ignore acknowledgements from devices that are not in our list, but
-			# we add them and their confirmation to the remaining list.
-			if {$n == 0} {
-				lappend remaining $am $cam
-				continue
-			}
-			
 			# Acknowledgements encode the type of command in their data byte. We
 			# use the rare list format of the switch command in order to resolve
 			# variables in the matching clauses.
@@ -648,11 +647,15 @@ proc Telemetry_Manager_monitor {} {
 				} \
 				$info(op_ton) {
 					set type "ton"
-					LWDAQ_set_bg $info(dev$n\_state) $config(ton_color)
+					if {$n != 0} {
+						LWDAQ_set_bg $info(dev$n\_state) $config(ton_color)
+					}
 				} \
 				$info(op_toff) {
 					set type "toff"
-					LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
+					if {$n != 0} {
+						LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
+					}
 				} \
 				$info(op_flash) {
 					set type "flash"
@@ -664,54 +667,42 @@ proc Telemetry_Manager_monitor {} {
 					set type "reset"
 				} \
 				default {
-					set type "invalid"
+					set type "unknown"
 				}
-			if {$type != "invalid"} {
-				Telemetry_Manager_print "Acknowledge:\
-					device_id=$device_id type=$type ts=$ts $now_time"
-			}
+
+			Telemetry_Manager_print "Acknowledge:\
+				device_id=$device_id type=$type ts=$ts $now_time"
 		} elseif {$fa == $info(at_batt)} {
 			
-			# Ignore battery measurements from devices that are not in our list, but
-			# add them and their confirmations to the remaining list.
-			if {$n == 0} {
-				lappend remaining $am $cam
-				continue
+			# For devices in our list, convert the battery measurement into hours
+			# of use. 
+			if {$n != 0} {
+				set info(dev$n\_hours) [expr $db*$db]
 			}
 			
-			# The battery measurement is the square root of the number of hours for
-			# which the sensor has been awake.
-			set info(dev$n\_hours) [expr $db*$db]
-			Telemetry_Manager_print "Use:\
-				device_id=$device_id value=$db ts=$ts\
-				$now_time" 
+			# Print battery message.
+			Telemetry_Manager_print "Battery:\
+				device_id=$device_id value=$db ts=$ts $now_time" 
 		} elseif {$fa == $info(at_id)} {
 			
-			# Print identification message. Do not add the message or its confirmation
-			# to the remaining list. If the Telemetry Manager and the Stimulator Tools
-			# are both open, only one of them will get his message and print it.
+			# Print identification message.
 			Telemetry_Manager_print "Identification:\
 				device_id=$device_id ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
 
-			# Ignore version number reports from devices that are not in our list,
-			# but add it and its confirmation to the remaining list.
-			if {$n == 0} {
-				lappend remaining $am $cam
-				continue
+			# Set version number of a device in our list.
+			if {$n != 0} {
+				set info(dev$n\_version) "$db"
 			}
 			
-			set info(dev$n\_version) "$db"
+			# Print version message.
 			Telemetry_Manager_print "Version:\
 				device_id=$device_id value=$db ts=$ts $now_time"
 		} else {
 			
-			# We don't recognise this type of auxiliary message, so add it and its
-			# confirmation to the remaining list.
-			if {$n == 0} {
-				lappend remaining $am $cam
-				continue
-			}
+			# Report unknown auxiliary message.
+			Telemetry_Manager_print "Unknown:\
+				device_id=$device_id value=$db ts=$ts $now_time"
 		}
 		
 		# By this point, we have processed and reported on all confirmed and
@@ -722,13 +713,6 @@ proc Telemetry_Manager_monitor {} {
 		set previd $id
 		set prevfa $fa
 		set prevdb $db
-	}
-	
-	# Replace the list we used with our list of remaining messages.
-	if {[info exists ninfo(aux_messages)]} {
-		set ninfo(aux_messages) $remaining
-	} elseif {[info exists rinfo(aux_messages)]} {
-		set rinfo(aux_messages) $remaining
 	}
 	
 	# We post the monitor to the event queue and report success.
