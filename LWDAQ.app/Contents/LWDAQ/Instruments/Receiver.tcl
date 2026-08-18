@@ -103,7 +103,6 @@ proc LWDAQ_init_Receiver {} {
 	set info(max_id) "255"
 	set info(activity_rows) "32"
 	set info(aux_messages) ""
-	set info(aux_max_size) "100"
 	set info(set_size) "16"
 	set info(loop_on_error) "0"
 
@@ -237,8 +236,11 @@ proc LWDAQ_analysis_Receiver {{image_name ""}} {
 			LWDAQ_print $info(text) $channels
 		}
 				
-		# Make sure our list of auxiliary messages is not too long.
-		set info(aux_messages) [lrange $info(aux_messages) 0 $info(aux_max_size)]
+		# We clear the auxiliary message list. Our assumption is that tools like
+		# the Stimulator and Telemetry manager will be waiting for the Receiver
+		# to analyze an interval and then do all the work they need to on the
+		# list before the next interval.
+		set info(aux_messages) ""
 
 		# Look for messages in the auxiliary channels. 
 		set new_aux_messages [lwdaq_receiver $image_name \

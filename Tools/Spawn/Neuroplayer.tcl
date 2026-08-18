@@ -7788,13 +7788,13 @@ proc Neuroplayer_play {{command ""}} {
 		}
 	}
 	
-	# We clear the auxiliary message list. Our assumption is that tools like
-	# the Stimulator will be waiting for the Neuroplayer to complete a play
-	# interval and then do all the work they need to on the list before the
-	# next play interval.
+	# We clear the auxiliary message list. Our assumption is that tools like the
+	# Stimulator and Telemetry Manager will be waiting for the Neuroplayer to
+	# complete a play interval and then do all the work they need to on the list
+	# before the next play interval.
 	set info(aux_messages) ""
 
-	# We look for messages in the auxiliary channels.
+	# We look for new messages in the auxiliary channels.
 	set new_aux_messages [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) -size $info(data_size) auxiliary"]
 
@@ -7824,7 +7824,9 @@ proc Neuroplayer_play {{command ""}} {
 		set fa [expr ($md / 256) % 16]
 		set d [expr $md % 256]
 		set ts  [expr ($mt + $bts * 256) % (65536)]
-		lappend info(aux_messages) "$id $fa $d $ts"
+		set am "$id $fa $d $ts"
+		lappend info(aux_messages) $am
+		Neuroplayer_print "Auxiliary: $am" verbose
 	}
 		
 	# We read the processor script from disk. We replace "Neuroarchiver" with
@@ -9051,6 +9053,10 @@ proc Neuroplayer_open {} {
 		LWDAQ_post "LWDAQ_run_tool Stimulator"
 	}
 	pack $f.stimb -side left -expand yes
+	button $f.tmb -text "Manager" -command {
+		LWDAQ_post "LWDAQ_run_tool Telemetry_Manager"
+	}
+	pack $f.tmb -side left -expand yes
 	button $f.conf -text "Configure" -command "Neuroplayer_configure"
 	pack $f.conf -side left -expand yes
 	button $f.help -text "Help" -command "LWDAQ_tool_help Neuroplayer"
