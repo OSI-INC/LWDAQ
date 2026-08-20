@@ -64,7 +64,7 @@ proc LWDAQ_interface_init {} {
 			LWDAQ_preferences
 		}
 		proc ::tk::mac::ShowHelp {} {
-			LWDAQ_url_open "https://www.bndhep.net/Electronics/LWDAQ/Manual.html"
+			LWDAQ_url_open "https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html"
 		}
 		proc ::tk::mac::Quit {} {LWDAQ_quit}
 		proc tkAboutDialog {} {LWDAQ_about}

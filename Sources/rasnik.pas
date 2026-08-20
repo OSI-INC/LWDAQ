@@ -9,7 +9,7 @@
 	
 	For a web page describing this code, see:
 	
-	https://www.bndhep.net/Devices/RASNIK/
+	https://www.opensourceinstruments.com/bndhep/Devices/RASNIK/
 	
 	This program is free software: you can redistribute it and/or modify it
 	under the terms of the GNU General Public License as published by the Free

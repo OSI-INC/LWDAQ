@@ -424,12 +424,12 @@ proc LWDAQ_reset_Receiver {} {
 					set info(max_block_reads) "50"
 				}
 				2 {
-					set info(receiver_type) "A3032"
-					set config(payload_length) 16
-					set info(daq_avail_cntr) 0
+					set info(receiver_type) "A3042"
+					set config(payload_length) 2
+					set info(daq_avail_cntr) 1
 					set channel_select_available 0
 					set send_all_sets_cmd 0
-					set info(purge_duplicates) 0
+					set info(purge_duplicates) 1
 					set info(max_block_reads) "50"
 				}
 				3 {
@@ -732,10 +732,10 @@ proc LWDAQ_daq_Receiver {} {
 	
 			# Set the device type, select a driver and multiplexer socket.
 			# Select the internal device element that corresponds to the data
-			# receiver. In Octal Data Receivers (A3027), Animal Location
-			# Trackers (A3038), and the original Data Receiver (A3018), this
-			# element number is ignored. But in the Telemetry Control Box (TCB,
-			# A3042), the element number is used to direct commands to the
+			# receiver. In A3027 Octal Data Receivers (ODRs), A3038 Animal
+			# Location Trackers (ALTs), and the original A3018 Data Receiver,
+			# this element number is ignored. But in the A3042 Telemetry Control
+			# Box (TCB), the element number is used to direct commands to the
 			# receiver, stimulator, and interface controllers. We make sure that
 			# the element number selects the telemetry receiver on the TCB.
 			LWDAQ_set_device_type $sock $info(daq_device_type)

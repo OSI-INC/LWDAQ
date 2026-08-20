@@ -519,13 +519,13 @@ of SCTs during and after assembly and encapsulation. We use the tool to produce
 rapid frequency sweeps that allow us to see the approximate frequency response
 of a transmitter prior to encapsulation or during accelerated aging. We use the
 Measure button to produce plots of gain versus frequency for permanent and
-detailed records of the frequency response. The signal generator is either a
-Function Generator (A3050) or an Analog Signal Generator (A3052). The receiver
-must be one of our LWDAQ telemetry receivers, such as the A3027E Octal Data
-Receiver, A3038C Animal Location Tracker (ALT), or A3042-A16 Telemetry Control
-Box (TCB). The tool uses the ASG (Analog Signal Generator) package to configure
-the analog signal generator. The tool uses the Receiver Instrument to download
-telemetry signals from the receiver.
+detailed records of the frequency response. The signal generator is either an
+A3050 or A3052 Analog Signal Generator. The receiver must be one of our LWDAQ
+telemetry receivers, such as the A3027E Octal Data Receiver, A3038C Animal
+Location Tracker (ALT), or A3042 Telemetry Control Box (TCB). The tool uses the
+ASG (Analog Signal Generator) package to configure the analog signal generator.
+The tool uses the Receiver Instrument to download telemetry signals from the
+receiver.
 
 NOTE: The SCT Check tool assumes that we have terminated the coaxial cables
 carrying the analog signals with fifty-Ohm resistors.

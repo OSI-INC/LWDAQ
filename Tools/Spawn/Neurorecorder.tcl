@@ -603,34 +603,27 @@ proc Neurorecorder_set_receiver {version} {
 			set iconfig(payload_length) 0
 			set config(tracker_coordinates) ""
 			set config(tracker_background) ""
-			Neurorecorder_print "Detected: Data Receiver (A3018),\
+			Neurorecorder_print "Detected: A3018 Data Receiver,\
 				applying driver socket, ignoring channel selection."
 		}
 		"A3027" {
 			set iconfig(payload_length) 0
 			set config(tracker_coordinates) ""
-			Neurorecorder_print "Detected: Octal Data Receiver (A3027),\
+			Neurorecorder_print "Detected: A3027 Octal Data Receiver,\
 				applying driver socket, ignoring channel selection."
 			set config(tracker_background) ""
-		}
-		"A3032" {
-			set iconfig(payload_length) $info(A3032_payload)
-			set config(tracker_coordinates) $info(A3032_coordinates)
-			Neurorecorder_print "Detected: Animal Location Tracker (A3032),\
-				applying driver socket, ignoring channel selection."
-			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
 		"A3038" {
 			set iconfig(payload_length) $info(A3038_payload)
 			set config(tracker_coordinates) $info(A3038_coordinates)
-			Neurorecorder_print "Detected: Animal Location Tracker (A3038),\
+			Neurorecorder_print "Detected: A3038 Animal Location Tracker,\
 				applying channel selection, ignoring driver socket."
 			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
 		"A3042" {
 			set iconfig(payload_length) $info(A3042_payload)
 			set config(tracker_coordinates) $info(A3042_coordinates)
-			Neurorecorder_print "Detected: Telemetry Control Box (A3042),\
+			Neurorecorder_print "Detected: A3042 Telemetry Control Box,\
 				ignoring driver socket, ignoring channel selection."
 		}
 		default {

@@ -777,7 +777,8 @@ proc Telemetry_Manager_draw_list {} {
 				Toff black \
 				Zon green \
 				Zoff black \
-				Query black} {
+				Query black \
+				Program black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
@@ -1021,27 +1022,29 @@ proc Telemetry_Manager_refresh_list {{fn ""}} {
 }
 
 #
-# Telemetry_Manager_programmer opens a new window that allows the user to upload
-# bytes to any location in a telemetry device's non-volatile memory, provided
-# that those locations are not locked for writing by the device's internal
-# write-protection logic. The programmer uses the same ip_addr and driver_socket
-# specified in the Telemetry_Manager main window, but it uses its own device
-# identifier. The identifier must be a four-digit hexadecimal value. We can
-# include or omit a "0x" prefix. We can be set to the wild card FFFF or a
-# specific four-digit identifier. The memory address to which we will write
-# bytes we specify either in decimal or in hexadecimal in the "0xFFF" format.
-# The programmer uses a text file as its source of bytes to upload to a device.
-# These bytes must be delimited by whitespace. They can be expressed as decimal
-# values or two-digit hex values in the 0xFF format.
+# Telemetry_Manager_program opens a new window that allows the user to upload
+# bytes to the non-volatile memory of a telemetry device. We pass as an argument
+# the index of a device in our device list. The routine will look up the
+# identifier of this device. If the identifier is 0xFFFF, all devices will be
+# programmed. The memory address to which we will write bytes we specify either
+# in decimal or in hexadecimal in the format "0x0FFF". The programmer uses a
+# text file as its source of bytes to upload to a device. These bytes must be
+# delimited by whitespace. They can be expressed as decimal values or two-digit
+# hex values in the 0xFF format.
 #
-proc Telemetry_Manager_programmer {} {
+proc Telemetry_Manager_program {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
+	
+	# Set the device id in the programmer panel equal to the identifier of
+	# device "n" in our device list.
+	set config(prog_id) [set info(dev$n\_id)]
 	
 	# Open the transmit panel.
 	set w $info(window)\.xmit_panel
 	if {[winfo exists $w]} {
 		raise $w
+		LWDAQ_print $info(prog_text) "Target device set to [set info(dev$n\_id)]."
 		return ""
 	}
 	toplevel $w
@@ -1054,20 +1057,24 @@ proc Telemetry_Manager_programmer {} {
 		-width 12 -fg blue
 	pack $f.state -side left -expand 1
 
-	label $f.idl -text "Device Identifier:"
+	label $f.idl -text "Device:"
 	entry $f.ide -textvariable Telemetry_Manager_config(prog_id) -width 7
 	pack $f.idl $f.ide -side left -expand 1
 
-	label $f.addrl -text "Memory Address:"
+	label $f.addrl -text "Address:"
 	entry $f.addre -textvariable Telemetry_Manager_config(prog_addr) -width 8
 	pack $f.addrl $f.addre -side left -expand 1
 	
-	label $f.seglenl -text "Segment Length:"
+	label $f.seglenl -text "Segment:"
 	entry $f.seglene -textvariable Telemetry_Manager_config(prog_seglen) -width 4
 	pack $f.seglenl $f.seglene -side left -expand 1
 
+	button $f.compile -text "Compile" -command \
+		"LWDAQ_post Telemetry_Manager_compile"
+	pack $f.compile -side left -expand 1
+
 	button $f.upload -text "Upload" -command \
-		"LWDAQ_post Telemetry_Manager_programmer_upload"
+		"LWDAQ_post Telemetry_Manager_upload"
 	pack $f.upload -side left -expand 1
 
 	button $f.stop -text "Stop" -command {
@@ -1078,7 +1085,7 @@ proc Telemetry_Manager_programmer {} {
 	set f [frame $w.program]
 	pack $f -side top -fill x
 	
-	label $f.lprogram -text "Program File (hex):" -fg $config(label_color)
+	label $f.lprogram -text "File:" -fg $config(label_color)
 	entry $f.eprogram -textvariable Telemetry_Manager_config(prog_file) -width 60
 	pack $f.lprogram $f.eprogram -side left -expand 1
 
@@ -1087,8 +1094,9 @@ proc Telemetry_Manager_programmer {} {
 		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_programmer_$b"
 		pack $f.$b -side left -expand 1
 	}
-
+	
 	set info(prog_text) [LWDAQ_text_widget $w 80 15]
+	LWDAQ_print $info(prog_text) "Target device set to [set info(dev$n\_id)]."
 
 	return "" 
 }
@@ -1122,33 +1130,46 @@ proc Telemetry_Manager_programmer_edit {} {
 }
 
 #
-# Telemetry_Manager_programmer_upload reads bytes in decimal string format from
-# a text files and uploads them to the sensor's non-volatile memory. The number
-# of bytes written must be divisible by sixteen, and the destination address
-# must lie on a sixteen-byte boundary. The non-volatile memory enforces a write
-# page size of sixteen bytes and the pages lie on sixteen-byte boundaries. If we
-# pass no arguments to this routine, it picks the device identifier form the
+# Telemetry_Manager_compile takes the values in the drop-down menus and
+# writes a configuration file to disk.
+#
+proc Telemetry_Manager_compile {} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
+
+	# Set the control to upload.
+	set info(prog_control) "Upload"
+	LWDAQ_update
+	
+	# Restore control variable and return.
+	set info(prog_control) "Idle"
+}
+
+#
+# Telemetry_Manager_upload reads bytes in decimal string format from a text
+# file and uploads them to the sensor's non-volatile memory. The number of
+# bytes written must be divisible by sixteen, and the destination address must
+# lie on a sixteen-byte boundary. The non-volatile memory enforces a write page
+# size of sixteen bytes and the pages lie on sixteen-byte boundaries. If we pass
+# no arguments to this routine, it picks the device identifier form the
 # programming panel, reads the contents of the file named in the programming
 # panel, and uses the address provided in the programming panel. Otherwise, it
 # uses the identifier, data, and address provided in its argument list. The data
 # must be a list of bytes delimited by white spaces with each byte in either
 # decimal or 0xFF hexadecimal format. The routine takes a segment of bytes from
-# the front of the list and uploads them to the given memory address, then posts
-# itself to the LWDAQ event queue with the remaining bytes as data and an
-# address incremented by the segment length. By posting itself to the event
-# queue, the upload process allows the Receiver Instrument and the Telemetry
-# Manager Monitor to continue operating.
+# the front of the list and uploads them to the given address, then posts itself
+# to the LWDAQ event queue with the remaining bytes as data and an address
+# incremented by the segment length. By posting itself to the event queue, the
+# upload process allows the Receiver Instrument and the Telemetry Manager
+# Monitor to continue operating.
 #
-#
-proc Telemetry_Manager_programmer_upload {{id ""} {addr ""} {data ""}} {
+proc Telemetry_Manager_upload {{id ""} {addr ""} {data ""}} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
-	upvar #0 OSR8_Assembler_config aconfig
-	upvar #0 OSR8_Assembler_info ainfo
 	
 	# If the control has been set to Stop, then do so.
 	if {$info(prog_control) == "Stop"} {
-		LWDAQ_print $info(prog_text) "Stopped program upload."
+		LWDAQ_print $info(prog_text) "Stopped upload."
 		set info(prog_control) "Idle"
 		return ""
 	}
@@ -1222,7 +1243,7 @@ proc Telemetry_Manager_programmer_upload {{id ""} {addr ""} {data ""}} {
 	# Compose the upload command and transmit.
 	set commands [list $info(op_nvmwr) [llength $segment] $addr_h $addr_l]
 	set commands [concat $commands $segment]
-	Telemetry_Manager_transmit $config(prog_id) $commands
+	Telemetry_Manager_transmit $id $commands
 	
 	# Increment the address.
 	set addr [expr $addr + [llength $segment]]
@@ -1230,7 +1251,7 @@ proc Telemetry_Manager_programmer_upload {{id ""} {addr ""} {data ""}} {
 	# If we have more data to transmit, post another upload to the
 	# event queue.
 	if {[llength $data] >= 16} {
-		LWDAQ_post [list Telemetry_Manager_programmer_upload $id $addr $data]
+		LWDAQ_post [list Telemetry_Manager_upload $id $addr $data]
 	} else {
 		set info(prog_control) "Idle"
 	}
@@ -1275,11 +1296,6 @@ proc Telemetry_Manager_open {} {
 		LWDAQ_post "LWDAQ_open Receiver"
 	}
 	pack $f.receiver -side left -expand 1
-
-	button $f.txcmd -text "Programmer" -command {
-		LWDAQ_post "Telemetry_Manager_programmer"
-	}
-	pack $f.txcmd -side left -expand 1
 
 	foreach a {Configure Help} {
 		set b [string tolower $a]
