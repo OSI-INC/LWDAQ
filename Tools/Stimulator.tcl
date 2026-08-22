@@ -591,7 +591,7 @@ proc Stimulator_monitor {} {
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_id)"}
 	
 	# Go through the auxiliary message list and find messages that could be from
-	# implantable sensors. As we proceed, we save the previous valid auxiliary
+	# implantable stimulators. As we proceed, we save the previous valid auxiliary
 	# message so that we can avoid processing duplicates in the list. Duplicates
 	# arise sometimes in the telemetry data stream because multiple detector
 	# modules receive it. Duplicate elimination by the receiver logic is only
