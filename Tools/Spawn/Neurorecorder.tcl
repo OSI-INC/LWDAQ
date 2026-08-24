@@ -49,7 +49,7 @@ proc Neurorecorder_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neurorecorder" "172"
+	LWDAQ_tool_init "Neurorecorder" "173"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -64,16 +64,8 @@ proc Neurorecorder_init {} {
 #
 # Recording data acquisition parameters.
 #
-	set info(alt_options) "A3032 A3038 A3042"
-	set info(A3032_payload) "16"
+	set info(alt_options) "A3038 A3042A4 A3042A16"
 	set info(A3038_payload) "16"
-	set info(A3042_payload) "2"
-	set info(A3032_coordinates) "\
-		0 0 2  0 8 2  0 16 2 \
-		8  0 2  8 8 2  8 16 2 \
-		16 0 2 16 8 2 16 16 2 \
-		24 0 2 24 8 2 24 16 2 \
-		32 0 2 32 8 2 32 16 2"
 	set info(A3038_coordinates) "\
 		0  0 2 0  12 2  0 24 2 \
 		12 0 2 12 12 2 12 24 2 \
@@ -81,7 +73,11 @@ proc Neurorecorder_init {} {
 		36 0 2 36 12 2 36 24 2 \
 		48 0 2 48 12 2 48 24 2 \
 		-1 -1 -1"
-	set info(A3042_coordinates) "\
+	set info(A3042A4_payload) "2"
+	set info(A3042A4_coordinates) "\
+		0 0  2 16  0 2 32  0 2 48  0 2"
+	set info(A3042A16_payload) "2"
+	set info(A3042A16_coordinates) "\
 		0 0  2 16  0 2 32  0 2 48  0 2 \
 		0 8  2 16  8 2 32  8 2 48  8 2 \
 		0 16 2 16 16 2 32 16 2 48 16 2 \
@@ -620,10 +616,16 @@ proc Neurorecorder_set_receiver {version} {
 				applying channel selection, ignoring driver socket."
 			set config(tracker_background) "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
 		}
-		"A3042" {
-			set iconfig(payload_length) $info(A3042_payload)
-			set config(tracker_coordinates) $info(A3042_coordinates)
-			Neurorecorder_print "Detected: A3042 Telemetry Control Box,\
+		"A3042A4" {
+			set iconfig(payload_length) $info(A3042A4_payload)
+			set config(tracker_coordinates) $info(A3042A4_coordinates)
+			Neurorecorder_print "Detected: A3042 Four-Way Telemetry Control Box,\
+				ignoring driver socket, ignoring channel selection."
+		}
+		"A3042A16" {
+			set iconfig(payload_length) $info(A3042A16_payload)
+			set config(tracker_coordinates) $info(A3042A16_coordinates)
+			Neurorecorder_print "Detected: A3042 Sixteen-Way Telemetry Control Box,\
 				ignoring driver socket, ignoring channel selection."
 		}
 		default {
