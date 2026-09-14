@@ -2747,7 +2747,7 @@ proc RAG_Manager_submit {} {
 		set start_time [read $f]
 		close $f
 		set run_min [format %.1f [expr ([clock seconds]-$start_time)/60.0]]
-		set answer "The OSI Chatbot is temporarily offline.\
+		set answer "The Chatbot is temporarily offline.\
 			We are updating its documentation library.\
 			This process began $run_min minutes ago\
 			and is expected to take no more than $config(offline_min) minutes.\
