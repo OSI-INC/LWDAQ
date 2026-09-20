@@ -1715,7 +1715,7 @@ proc RAG_Manager_store_chunks {chunks} {
 	RAG_Manager_print "Of $count chunks generated,\
 		$new_count were new, $old_count were pre-existing."
 	
-	RAG_Manager_print "Purging obsolete chunks..."
+	RAG_Manager_print "Purging obsolete content and match strings..."
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	set purge_count 0
 	set retain_count 0
@@ -1941,13 +1941,11 @@ proc RAG_Manager_offline {offline} {
 
 #
 # RAG_Manager_delete deletes all content strings from the contend string
-# directory. It does not delete embeddings in the embed directory nor match
-# strings in the match directory. Unused embedding vectors and match strings can
-# be culled with the purge routine. We do not want to delete match strings
-# because some match strings are costly to obtain: those that are summaries of
-# the content strings. Each summary must be obtained with the help of the
-# summarizing model. We avoid re-summarizing the same content string by leaving
-# the match strings on disk.
+# directory and all match strings from the match string directory. This routine
+# should not be called in the normal course of maintaining a chunk library
+# because obsolete chunks and match strings are purged automatically by the
+# store-chunks routine. This routine does not delete embed vectors in the embed
+# directory.
 #
 proc RAG_Manager_delete {} {
 	upvar #0 RAG_Manager_config config
@@ -1971,6 +1969,21 @@ proc RAG_Manager_delete {} {
 		} 
 	}
 	RAG_Manager_print "Deleted $count content strings."
+
+	set mfl [glob -nocomplain [file join $info(match_dir) *.txt]]
+	RAG_Manager_print "Found [llength $cfl] match strings."
+	set count 0
+	foreach mfn $mfl {
+		file delete $mfn
+		incr count
+		LWDAQ_support
+		if {$info(abort)} {
+			set info(abort) 0
+			set info(control) "Idle"
+			return ""
+		} 
+	}
+	RAG_Manager_print "Deleted $count match strings."
 
 	RAG_Manager_print "Deletion Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
