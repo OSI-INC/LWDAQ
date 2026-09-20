@@ -2108,7 +2108,7 @@ proc RAG_Manager_purge {} {
 	RAG_Manager_print "Purged $purge_count embed vectors with no content string."
 
 	set purge_count 0
-	foreachmfn $efl {
+	foreach mfn $mfl {
 		set root [file root [file tail $mfn]]
 		if {![regexp $root $cfl]} {
 			file delete $mfn
