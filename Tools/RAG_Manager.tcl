@@ -31,7 +31,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "8.1"
+	LWDAQ_tool_init "RAG_Manager" "8.2"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Set the default directory root for the RAG library and initialize file names.
@@ -1498,11 +1498,24 @@ proc RAG_Manager_add_names {chunks} {
 }
 
 #
-# RAG_Manager_summarize_matches submits each match string to a completion engine
-# to obtain a summary that replaces the match string. The name of the match
-# string does not change. The routine checks to see if the original match string
-# already exists on disk. If it does, the routine reads the summary from disk.
-# Otherwise, it creates a new summary. If summarization failes, we print an
+# RAG_Manager_summarize_matches goes through a chunk list and summarizes any
+# match strings that are tagged for summarization. It returns a new chunk list
+# in which these match strings are replaced with their summaries. This process
+# should take place before embedding the match strings so that it is the summary
+# that is embedded, not the original match string. When a match string contains
+# the key string "%%%%Sumarize\n", this is the sign that it should be
+# summarized. The routine deletes the key string from the match string and looks
+# to see if a match string already exists on disk under the chunk name. If a
+# match string exists, the routine assumes that this match string is a
+# previously-obtained and valid summary of the original match string. It reads
+# the summary match string from disk and replaces the original match string with
+# this summary. We note that the name of the chunk is obtained from the original
+# match string, not from the summary of the match string. Once we change the
+# match string to the summary string, we can no longer deduce the chunk name
+# from the match string, but we keep using the same name. If no match string
+# exists on disk under the chunk name, the routine passes the original match
+# string to the specified summarization model to obtain a summary. This summary
+# replaces the match string in the chunk. If summarization failes, we print an
 # error and discard the chunk. Sometimes the summarizing endpoint fails to
 # return a summary. By discarding the chunk, we make sure no match string will
 # be written to disk in place of the summary, so that when we run this routine
@@ -1523,7 +1536,6 @@ proc RAG_Manager_summarize_matches {chunks} {
 		set name [lindex $chunk 2]
 		if {[regexp {%%%%Summarize\n} $match]} {
 			incr requested_summaries
-			set match [regsub {%%%%Summarize\n} $match ""]
 			set match_file [file join $info(match_dir) $name.txt]
 			if {[file exists $match_file]} {
 				set f [open $match_file r]
@@ -1536,6 +1548,7 @@ proc RAG_Manager_summarize_matches {chunks} {
 				lappend new_chunks [list $match $content $name]
 				incr existing_summaries
 			} else {
+				set match [regsub {%%%%Summarize\n} $match ""]
 				if {![regexp {^.*?\n\n} $match header]} {
 					set header ""
 				}
@@ -1927,9 +1940,14 @@ proc RAG_Manager_offline {offline} {
 }
 
 #
-# RAG_Manager_delete deletes all chunks from the chunk directory. It does not
-# delete embeddings in the embed directory. Unused embedding vectors are can be
-# culled with the purge routine.
+# RAG_Manager_delete deletes all content strings from the contend string
+# directory. It does not delete embeddings in the embed directory nor match
+# strings in the match directory. Unused embedding vectors and match strings can
+# be culled with the purge routine. We do not want to delete match strings
+# because some match strings are costly to obtain: those that are summaries of
+# the content strings. Each summary must be obtained with the help of the
+# summarizing model. We avoid re-summarizing the same content string by leaving
+# the match strings on disk.
 #
 proc RAG_Manager_delete {} {
 	upvar #0 RAG_Manager_config config
@@ -1937,7 +1955,7 @@ proc RAG_Manager_delete {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Delete"
-	RAG_Manager_print "Delete Content and Match Strings [RAG_Manager_time]" purple
+	RAG_Manager_print "Delete Content  Strings [RAG_Manager_time]" purple
 	
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings."
@@ -1953,21 +1971,6 @@ proc RAG_Manager_delete {} {
 		} 
 	}
 	RAG_Manager_print "Deleted $count content strings."
-
-	set mfl [glob -nocomplain [file join $info(match_dir) *.txt]]
-	RAG_Manager_print "Found [llength $cfl] match strings."
-	set count 0
-	foreach mfn $mfl {
-		file delete $mfn
-		incr count
-		LWDAQ_support
-		if {$info(abort)} {
-			set info(abort) 0
-			set info(control) "Idle"
-			return ""
-		} 
-	}
-	RAG_Manager_print "Deleted $count match strings."
 
 	RAG_Manager_print "Deletion Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
@@ -2072,9 +2075,10 @@ proc RAG_Manager_embed {} {
 
 #
 # RAG_Manager_purge makes a list of all content strings in a match directory and
-# another list of all the embeds in the embed directory. It deletes any embed
-# for which there is no corresponding content string. If we set the offline flag,
-# the routine will take the chatbot and retrieval engine offline while it
+# another list of all the embeds in the embed directory and all the match
+# strings in the match string directory. It deletes any embed or match string
+# for which there is no corresponding content string. If we set the offline
+# flag, the routine will take the chatbot and retrieval engine offline while it
 # operates. By default, however, the routine does not create or delete an
 # offline flag file. 
 #
@@ -2089,7 +2093,9 @@ proc RAG_Manager_purge {} {
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings on disk."
 	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
-	RAG_Manager_print "Found [llength $efl] embeds on disk."
+	RAG_Manager_print "Found [llength $efl] embed vectors on disk."
+	set mfl [glob -nocomplain [file join $info(match_dir) *.txt]]
+	RAG_Manager_print "Found [llength $efl] match strings on disk."
 
 	set purge_count 0
 	foreach efn $efl {
@@ -2099,7 +2105,17 @@ proc RAG_Manager_purge {} {
 			incr purge_count
 		}
 	}
-	RAG_Manager_print "Purged $purge_count embeds with no content string."
+	RAG_Manager_print "Purged $purge_count embed vectors with no content string."
+
+	set purge_count 0
+	foreachmfn $efl {
+		set root [file root [file tail $mfn]]
+		if {![regexp $root $cfl]} {
+			file delete $mfn
+			incr purge_count
+		}
+	}
+	RAG_Manager_print "Purged $purge_count match strings with no content string."
 
 	RAG_Manager_print "Purge Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
