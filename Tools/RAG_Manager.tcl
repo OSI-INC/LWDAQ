@@ -1011,9 +1011,10 @@ proc RAG_Manager_construct_chunks {page frags} {
 	RAG_Manager_print "Generation rules:\
 		page_chunk=$page_chunk,\
 		chapter_chunk=$chapter_chunk,\
-		\nsection-chunk=$section_chunk,\
-		match-prompts-only=$match_prompts_only,\
-		omit-lists=$omit_lists."
+		section-chunk=$section_chunk,\
+		\nmatch-prompts-only=$match_prompts_only,\
+		omit-lists=$omit_lists,\
+		summary-match=$summary_match."
 	
 	set date "NONE"
 	set document "Untitled Document"
@@ -1881,8 +1882,8 @@ proc RAG_Manager_fetch_embeds {api_key} {
 	RAG_Manager_print "Checked $count chunks,\
 		found $old_count embeds,\
 		fetched $new_count embeds,\
-		detected $obsolete_count obsolete embeds,\
-		counted $missing_count missing embeds."
+		$obsolete_count obsolete embeds,\
+		$missing_count missing embeds."
 		
 	return $new_count
 }
