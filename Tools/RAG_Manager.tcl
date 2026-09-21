@@ -31,7 +31,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "8.2"
+	LWDAQ_tool_init "RAG_Manager" "8.3"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Set the default directory root for the RAG library and initialize file names.
@@ -89,7 +89,6 @@ proc RAG_Manager_init {} {
 # settings file.
 #
 	set config(sources) {
-https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/LWDAQ.html
 https://www.opensourceinstruments.com/Chat/Manual.html
 	}
 #
@@ -103,10 +102,10 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 #	
 	set config(high_rel_thr) "0.55"
 	set config(mid_rel_thr) "0.30"
-	set config(high_rel_model) "gpt-5.4"
-	set config(mid_rel_model) "gpt-5.4-mini"
-	set config(low_rel_model) "gpt-5.4-mini"
-	set config(high_rel_words) "5000"
+	set config(high_rel_model) "gpt-5.6-luna"
+	set config(mid_rel_model) "gpt-5.6-luna"
+	set config(low_rel_model) "gpt-5.6-luna"
+	set config(high_rel_words) "80000"
 	set config(mid_rel_words) "40000"
 	set config(low_rel_words) "0"
 	set config(high_rel_chat_words) "3000"
@@ -941,7 +940,7 @@ proc RAG_Manager_remove_dates {frag} {
 #
 # RAG_Manager_construct_chunks goes through an html page and breaks it into one
 # or more chunks, returning a list of chunks. By the time the page arrives at
-# this chunking routine, all usls should been converted to Markdown. If there
+# this chunking routine, all urls should been converted to Markdown. If there
 # are any anchor or img tags left, the fragment containing them will be
 # discarded as "contaminated". The routine takes as input a list of fragments
 # each fragment represented by the start and end of its body and the start and
@@ -1513,7 +1512,10 @@ proc RAG_Manager_add_names {chunks} {
 # this summary. We note that the name of the chunk is obtained from the original
 # match string, not from the summary of the match string. Once we change the
 # match string to the summary string, we can no longer deduce the chunk name
-# from the match string, but we keep using the same name. If no match string
+# from the match string, but we keep using the same name. Note that the match
+# string used to obtain the name contains the summarization key string, so
+# the same chunk will have a different name if we generate it with summary
+# matching than if we generate it without summary matching. If no match string
 # exists on disk under the chunk name, the routine passes the original match
 # string to the specified summarization model to obtain a summary. This summary
 # replaces the match string in the chunk. If summarization failes, we print an
@@ -1604,8 +1606,19 @@ proc RAG_Manager_summarize_matches {chunks} {
 
 #
 # RAG_Manager_chunk_page downloads an html page from a url, splits it into
-# chunks of text, and returns a list of chunks. If the dump flag is set, the
-# routine writes all the chunk match and content strings to a chunk dump file.
+# chunks of text, and returns a list of chunks. Each chunk consistes of a
+# content string, a match string, and a name. The content string is obtained
+# from the source document. The match string is similar to the content string,
+# but optimized for clarity of meaning. Contents strings contain table entries,
+# but match strings do not. Match strings contain RAG prompt strings, but
+# content strings do not. The name of the chunk is derived from the match string
+# and is unique to each match string. The routine does not write to disk, but it
+# does read from disk when it calls the summarizing routine. During
+# summarization, the routine will read existing summaries from disk to complete
+# its chunk list. The original match strings, which contain a summarization
+# request key, will be replace by a summary that does not contain the
+# summarization match key. If the dump flag is set, the routine writes all the
+# chunk match and content strings to a chunk dump file.
 #
 proc RAG_Manager_chunk_page {url} {
 	upvar #0 RAG_Manager_info info
@@ -2727,13 +2740,14 @@ proc RAG_Manager_get_answer {model prompt contents question api_key} {
 		}
 		if {[clock seconds] - $start_time > $config(answer_timeout_s)} {
 			set result "\"content\": \"$config(timeout_message)\""
-			close $ch
 			break
 		}
 		LWDAQ_update
 	}		  
 	
+	catch {close $ch}
 	catch {[file delete $jfn]}
+	
 	return $result
 }
 
