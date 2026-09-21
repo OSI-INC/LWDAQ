@@ -31,7 +31,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "8.3"
+	LWDAQ_tool_init "RAG_Manager" "8.4"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Set the default directory root for the RAG library and initialize file names.
@@ -1247,8 +1247,11 @@ proc RAG_Manager_construct_chunks {page frags} {
 		
 		if {$append_chunk} {
 			if {$page_chunk \
-				|| ($chapter_chunk && ($chapter == $prev_chapter)) \
-				|| ($section_chunk && ($section == $prev_section)) } {
+				|| ($chapter_chunk && \
+						($chapter == $prev_chapter)) \
+				|| ($section_chunk && \
+						($section == $prev_section) && \
+						($chapter == $prev_chapter)) } {
 				if {[llength $chunks] > 0} {
 					if {$match != ""} {
 						lset chunks end 0 \
