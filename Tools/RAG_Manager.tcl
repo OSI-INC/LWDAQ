@@ -357,7 +357,7 @@ Provide a summary in accordance with your instructions.
 	set info(hash_len) "12"
 	set info(word_size) "5"
 	set info(embed_scale) "100000"
-	set info(retrieve_len) "500" 
+	set info(retrieve_len) "1000" 
 #
 # Check existence of dependent utilities.
 #
