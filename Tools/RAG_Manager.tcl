@@ -169,14 +169,16 @@ When answering the user's question:
 	}	
 	
 	set config(summarize_prompt) {
-ou are generating retrieval metadata for a fantasy role-playing campaign historian chatbot.
+You are generating retrieval metadata for a fantasy role-playing campaign historian chatbot.
 
 Your output will be embedded for semantic search and used to retrieve full diary chapters.
 
 The output is NOT intended for human reading as prose literature.
 The output IS intended to maximize retrieval accuracy for:
-- character names
+- characters
+- creatures
 - locations
+- named items
 - organizations and groups
 - events
 - relationships
@@ -203,6 +205,10 @@ Characters:
 Locations:
  - <location>
  - <location>
+ 
+Items:
+ - <item>
+ - <item>
 
 Groups:
  - <group or faction>
@@ -213,7 +219,7 @@ Topics:
  - <important topic>
 
 Rules:
-- Preserve exact spelling of names and places from the source text.
+- Preserve exact spelling of names, places, and items from the source text.
 - Include all characters who speak, travel, fight, investigate, negotiate, perform, lead, betray, assist, or otherwise significantly participate.
 - Include inns, cities, regions, forests, buildings, landmarks, and destinations in Locations.
 - Include bands, factions, military units, tribes, guilds, tavern groups, cults, performing troupes, and other named collectives in Groups.

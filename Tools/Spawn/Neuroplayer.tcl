@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "179"
+	LWDAQ_tool_init "Neuroplayer" "180"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -517,10 +517,12 @@ proc Neuroplayer_init {} {
 	set config(v_range) 65535
 	set config(v_offset) 0
 	set config(vt_mode) "SP"
+	set config(vt_pen_width) "1"
 	set config(a_max) 100
 	set config(a_min) 0.0
 	set config(f_min) 0.0
 	set config(f_max) 200
+	set config(af_pen_width) "1"
 	set config(log_frequency) 0
 	set config(log_amplitude) 0
 #
@@ -6868,18 +6870,18 @@ proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 		lwdaq_graph $signal $info(vt_image) \
 			-y_min [expr $config(v_offset) - ($config(v_range) / 2) ] \
 			-y_max [expr $config(v_offset) + ($config(v_range) / 2) ] \
-			-color $color \
+			-color $color -width $config(vt_pen_width) \
 			-ac_couple 1
 	} elseif {$config(vt_mode) == "NP"} {
 		lwdaq_graph $signal $info(vt_image) \
 			-y_min 0 -y_max 0 \
-			-color $color \
+			-color $color -width $config(vt_pen_width) \
 			-ac_couple 0
 	} else {
 		lwdaq_graph $signal $info(vt_image) \
 			-y_min $config(v_offset) \
 			-y_max [expr $config(v_offset) + $config(v_range)] \
-			-color $color \
+			-color $color -width $config(vt_pen_width) \
 			-ac_couple 0
 	}
 
@@ -7003,7 +7005,7 @@ proc Neuroplayer_plot_spectrum {{color ""} {spectrum ""}} {
 	lwdaq_graph $amplitudes $info(af_image) \
 		-x_min $x_min -x_max $x_max \
 		-y_min $y_min -y_max $y_max \
-		-color $color
+		-color $color -width $config(af_pen_width)
 	
 	# Detect errors.
 	if {[lwdaq_error_string] != ""} {Neuroplayer_print [lwdaq_error_string]}
