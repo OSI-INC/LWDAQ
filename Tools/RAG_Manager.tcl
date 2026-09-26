@@ -31,7 +31,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "8.4"
+	LWDAQ_tool_init "RAG_Manager" "8.5"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Set the default directory root for the RAG library and initialize file names.
@@ -540,7 +540,9 @@ proc RAG_Manager_configure {} {
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
-	foreach a {Sources High_Rel_Prompt Mid_Rel_Prompt Low_Rel_Prompt Diag_Answer} {
+	foreach a {Sources High_Rel_Prompt \
+			Mid_Rel_Prompt Low_Rel_Prompt \
+			Summarize_Prompt Diag_Answer} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command \
 			[list LWDAQ_post "RAG_Manager_edit_param $b"]
