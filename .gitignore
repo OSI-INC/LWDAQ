@@ -20,6 +20,7 @@ _CodeSignature/
 /LWDAQ.app/Contents/LWDAQ/Packages/pkgIndex.tcl
 /LWDAQ.app/Contents/LWDAQ/Configuration/*.tcl
 /LWDAQ.app/Contents/LWDAQ/Temporary/*.tcl
+/LWDAQ.app/Contents/LWDAQ/Temporary/*.txt
 
 # Icon files.
 /LWDAQ.app/Icon?
