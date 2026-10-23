@@ -50,7 +50,7 @@ proc Neuroplayer_init {} {
 # library. We can look it up in the LWDAQ Command Reference to find out more
 # about what it does.
 #
-	LWDAQ_tool_init "Neuroplayer" "179"
+	LWDAQ_tool_init "Neuroplayer" "180"
 #
 # If a graphical tool window already exists, we abort our initialization.
 #
@@ -517,10 +517,12 @@ proc Neuroplayer_init {} {
 	set config(v_range) 65535
 	set config(v_offset) 0
 	set config(vt_mode) "SP"
+	set config(vt_pen_width) "1"
 	set config(a_max) 100
 	set config(a_min) 0.0
 	set config(f_min) 0.0
 	set config(f_max) 200
+	set config(af_pen_width) "1"
 	set config(log_frequency) 0
 	set config(log_amplitude) 0
 #
@@ -1411,7 +1413,7 @@ proc Neuroplayer_end_time {fn payload {ref_time 0} {ref_index 0}} {
 #
 # Neuroplayer_filter applies a band-pass or band-stop filter to the current
 # signal. We will first explain how the band-pass filter works. The routine
-# takes the discrete Fourier transform and elminates or attenuates its
+# takes the discrete Fourier transform and eliminates or attenuates its
 # components according to four frequencies we specify in Hertz as arguments to
 # the routine. These are band_lo_end, band_lo_center, band_hi_center, and
 # band_hi_end. All components below band_lo_end and above band_hi_end are
@@ -1541,19 +1543,19 @@ proc Neuroplayer_filter {band_lo_end band_lo_center \
 }
 
 #
-# Neuroplayer_band_power is for use in processor scripts as a means of detecting
-# events in a signal. The routine selects the frequency components in
-# info(spectrum) that lie between band_lo and band_hi Hertz (inclusive), adds
-# the power of all components in this band, and returns the total. If show is
-# set, the routine plots the filtered signal on the screen by taking the inverse
-# transform of the selected frequency components. If replace is set, the routine
-# calculates the inverse transform of the filtered signal, making it available
-# to the calling routine in the info(values) variable. Note that the routine
-# does not change info(signal), which contains the reconstructed signal values
-# and their timestamps, nor the spectrum of the signal. By default, the routine
-# does not plot nor does it perform the inverse transform, both of which take
-# time and slow down processing. The show parameter, if not zero, is used to
-# scale the signal for display.
+# Neuroplayer_band_power selects the frequency components in info(spectrum) that
+# lie between band_lo and band_hi Hertz (inclusive), calculates the sum of their
+# squares and divides the sum by two. The result is a measure fo the power of
+# the signal in the specified frequency band. If show is set, the routine plots
+# the filtered signal on the screen by taking the inverse transform of the
+# selected frequency components. If replace is set, the routine calculates the
+# inverse transform of the filtered signal, making it available to the calling
+# routine in the info(values) variable. Note that the routine does not change
+# info(signal), which contains the reconstructed signal values and their
+# timestamps, nor the spectrum of the signal. By default, the routine does not
+# plot nor does it perform the inverse transform, both of which take time and
+# slow down processing. The show parameter, if not zero, is used to scale the
+# signal for display.
 #
 proc Neuroplayer_band_power {band_lo band_hi {show 0} {replace 0}} {
 	upvar #0 Neuroplayer_info info
@@ -6868,18 +6870,18 @@ proc Neuroplayer_plot_signal {{color ""} {signal ""}} {
 		lwdaq_graph $signal $info(vt_image) \
 			-y_min [expr $config(v_offset) - ($config(v_range) / 2) ] \
 			-y_max [expr $config(v_offset) + ($config(v_range) / 2) ] \
-			-color $color \
+			-color $color -width $config(vt_pen_width) \
 			-ac_couple 1
 	} elseif {$config(vt_mode) == "NP"} {
 		lwdaq_graph $signal $info(vt_image) \
 			-y_min 0 -y_max 0 \
-			-color $color \
+			-color $color -width $config(vt_pen_width) \
 			-ac_couple 0
 	} else {
 		lwdaq_graph $signal $info(vt_image) \
 			-y_min $config(v_offset) \
 			-y_max [expr $config(v_offset) + $config(v_range)] \
-			-color $color \
+			-color $color -width $config(vt_pen_width) \
 			-ac_couple 0
 	}
 
@@ -7003,7 +7005,7 @@ proc Neuroplayer_plot_spectrum {{color ""} {spectrum ""}} {
 	lwdaq_graph $amplitudes $info(af_image) \
 		-x_min $x_min -x_max $x_max \
 		-y_min $y_min -y_max $y_max \
-		-color $color
+		-color $color -width $config(af_pen_width)
 	
 	# Detect errors.
 	if {[lwdaq_error_string] != ""} {Neuroplayer_print [lwdaq_error_string]}
@@ -7788,35 +7790,42 @@ proc Neuroplayer_play {{command ""}} {
 		}
 	}
 	
-	# We clear the auxiliary message list. Our assumption is that tools like
-	# the Stimulator will be waiting for the Neuroplayer to complete a play
-	# interval and then do all the work they need to on the list before the
-	# next play interval.
-	set info(aux_messages) ""
-
-	# We look for messages in the auxiliary channels.
+	# We look for new messages in the auxiliary channels.
 	set new_aux_messages [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) -size $info(data_size) auxiliary"]
 
-	# We are going to calculate a timestamp, with resolution one clock tick, for
-	# each auxiliary message. The timestamps can be used as a form of addressing
-	# for slow data transmissions. To get the absolute timestamp, we get the
-	# time of the first clock message in the data. This time is a sixteen-bit
-	# value that has counted the number of 256-tick periods since the data receiver
-	# clock was last reset, wrapping around to zero every time it overflows.
+	# We are going to calculate a timestamp for each auxiliary message. The
+	# timestamps allow us to detect pairs of auxiliary messages transmitted one
+	# immediately following the other, as when an implant transmits a metadata
+	# and confirmation message. The timestamps also allow us to use timing as a
+	# form of addressing for slow data transmissions, although we have not yet
+	# implemented this scheme in any existing device. To obtain an absolute
+	# timestamp for each auxiliary message, we start by extracting the time of
+	# the first clock message in the current data image. This time is a
+	# sixteen-bit value that has counted the number of 256-tick periods since
+	# the data receiver clock was last reset, wrapping around to zero every time
+	# it overflows.
 	scan [lwdaq_receiver $info(data_image) \
 		"-payload $info(player_payload) get $first_index"] %d%d%d cid bts fvn
 		
-	# We take each new auxiliary message and break it up into three parts. The
-	# first part is a four-bit ID, which is the primary channel number of the
-	# device producing the auxiliary message. The second part is a four-bit
-	# field address. The third is eight bits of data. These sixteen bits are the
-	# contents of the auxiliary message. We add a fourth number, which is the
-	# timestamp of message reception. We give the timestamp modulo 65536, which
-	# gives us sufficient precision to detect any time-based address encoding of
+	# We create a new list of auxiliary messages. We clear the old list. We
+	# assume that any tool that uses the Neuroplayer's auxiliary message list
+	# will have had the opportunity to do so between executions of this playback
+	# procedure. These tools should use the auxiliary list each in the following
+	# way: they store the list in a previous list string and compare the latest
+	# list with the stored list. They act on the list only if the stored list is
+	# not equal to the new list. To construct the new list, we take each new
+	# auxiliary message and break it up into three parts. The first part is a
+	# four-bit ID, which is the primary channel number of the device producing
+	# the auxiliary message. The second part is a four-bit field address. The
+	# third is eight bits of data. These sixteen bits are the contents of the
+	# auxiliary message. We add a fourth number, which is the timestamp of
+	# message reception. We give the timestamp modulo 65536, which gives us
+	# sufficient precision to detect any time-based address encoding of
 	# auxiliary data. These four numbers make one entry in the auxiliary message
 	# list, so we append them to the existing list. If the four-bit ID is zero
-	# or fifteen, this is a bad message, so we don't store it.
+	# or fifteen, this is a bad message, so we don't store it. 
+	set info(aux_messages) ""
 	foreach {cn mt md} $new_aux_messages {
 		set id [expr ($md / 4096)]
 		if {($id == $info(set_size) - 1) || ($id == 0)} {continue}
@@ -7825,8 +7834,12 @@ proc Neuroplayer_play {{command ""}} {
 		set d [expr $md % 256]
 		set ts  [expr ($mt + $bts * 256) % (65536)]
 		lappend info(aux_messages) "$id $fa $d $ts"
+		Neuroplayer_print "Aux: id=$id=0x[format %02X $id]\
+			addr=$fa=0x[format %02X $fa]\
+			data=$d=0x[format %02X $d]\
+			time=$ts" verbose
 	}
-		
+	
 	# We read the processor script from disk. We replace "Neuroarchiver" with
 	# "Neuroplayer" for backward compatibility with old processors, prior to the
 	# partition of the Neuroarchiver into two parts, player and recorder.
@@ -9051,6 +9064,10 @@ proc Neuroplayer_open {} {
 		LWDAQ_post "LWDAQ_run_tool Stimulator"
 	}
 	pack $f.stimb -side left -expand yes
+	button $f.tmb -text "Manager" -command {
+		LWDAQ_post "LWDAQ_run_tool Telemetry_Manager"
+	}
+	pack $f.tmb -side left -expand yes
 	button $f.conf -text "Configure" -command "Neuroplayer_configure"
 	pack $f.conf -side left -expand yes
 	button $f.help -text "Help" -command "LWDAQ_tool_help Neuroplayer"

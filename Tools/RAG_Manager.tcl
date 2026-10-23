@@ -1,4 +1,4 @@
-# Retrieval-Assisted Generation Manager, a LWDAQ Tool.
+# Retrieval-Augmented Generation Manager, a LWDAQ Tool.
 #
 # Copyright (C) 2025-2026 Kevan Hashemi, Open Source Instruments Inc.
 #
@@ -31,7 +31,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "8.1"
+	LWDAQ_tool_init "RAG_Manager" "8.6"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Set the default directory root for the RAG library and initialize file names.
@@ -89,72 +89,6 @@ proc RAG_Manager_init {} {
 # settings file.
 #
 	set config(sources) {
-https://www.opensourceinstruments.com/bndhep/Electronics/A2071/M2071.html
-https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/LWDAQ.html
-https://www.opensourceinstruments.com/bndhep/Electronics/LWDAQ/Cables.html
-https://www.opensourceinstruments.com/bndhep/Devices/BCAM/User_Manual.html
-https://www.opensourceinstruments.com/Electronics/A3013/Flexible_Wires.html
-https://www.opensourceinstruments.com/Electronics/A3013/Hum.html
-https://www.opensourceinstruments.com/Electronics/A3015/M3015.html
-https://www.opensourceinstruments.com/Electronics/A3017/SCT.html
-https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer.html
-https://www.opensourceinstruments.com/Electronics/A3018/Neuroplayer_Commands.html
-https://www.opensourceinstruments.com/Electronics/A3018/Neurorecorder.html
-https://www.opensourceinstruments.com/Electronics/A3018/Event_Detection.html
-https://www.opensourceinstruments.com/Electronics/A3018/Analysis_Library.html
-https://www.opensourceinstruments.com/Electronics/A3018/Processor_Library.html
-https://www.opensourceinstruments.com/Electronics/A3018/Receiver.html
-https://www.opensourceinstruments.com/Electronics/A3018/Faraday_Enclosures.html
-https://www.opensourceinstruments.com/Electronics/A3019/Electrodes.html
-https://www.opensourceinstruments.com/Electronics/A3025/M3025.html
-https://www.opensourceinstruments.com/Electronics/A3026/M3026.html
-https://www.opensourceinstruments.com/Electronics/A3027/M3027.html
-https://www.opensourceinstruments.com/Electronics/A3029/M3029.html
-https://www.opensourceinstruments.com/Electronics/A3034/M3034.html
-https://www.opensourceinstruments.com/Electronics/A3034/Videoarchiver.html
-https://www.opensourceinstruments.com/Electronics/A3035/M3035.html
-https://www.opensourceinstruments.com/Electronics/A3035/OSR8.html
-https://www.opensourceinstruments.com/Electronics/A3036/M3036.html
-https://www.opensourceinstruments.com/Electronics/A3038/M3038.html
-https://www.opensourceinstruments.com/Electronics/A3040/M3040.html
-https://www.opensourceinstruments.com/Electronics/A3040/EIF.html
-https://www.opensourceinstruments.com/Electronics/A3041/Stimulator.html
-https://www.opensourceinstruments.com/Electronics/A3041/M3041.html
-https://www.opensourceinstruments.com/Electronics/A3042/M3042.html
-https://www.opensourceinstruments.com/Electronics/A3047/M3047.html
-https://www.opensourceinstruments.com/Electronics/A3048/M3048.html
-https://www.opensourceinstruments.com/Electronics/A3049/M3049.html
-https://www.opensourceinstruments.com/Electronics/A3051/M3051.html
-https://www.opensourceinstruments.com/Electronics/A3052/M3052.html
-https://www.opensourceinstruments.com/Electronics/A3053/M3053.html
-https://www.opensourceinstruments.com/Electronics/A3054/M3054.html
-https://www.opensourceinstruments.com/ACC/ACC.php
-https://www.opensourceinstruments.com/ACC/Overview.html
-https://www.opensourceinstruments.com/ALT/ALT.php
-https://www.opensourceinstruments.com/CPMS/index.html
-https://www.opensourceinstruments.com/DAQ/DAQ.php
-https://www.opensourceinstruments.com/DFPS/index.html
-https://www.opensourceinstruments.com/HMT/HMT.php
-https://www.opensourceinstruments.com/HMT/EIF.php
-https://www.opensourceinstruments.com/IIS/IIS.php
-https://www.opensourceinstruments.com/IST/IST.php
-https://www.opensourceinstruments.com/IST/Overview.html
-https://www.opensourceinstruments.com/SCT/SCT.php
-https://www.opensourceinstruments.com/SCT/FE.php
-https://www.opensourceinstruments.com/SCT/SCL.php
-https://www.opensourceinstruments.com/SCT/SDE.php
-https://www.opensourceinstruments.com/SCT/TCB.php
-https://www.opensourceinstruments.com/WPS/WPS.php
-https://www.opensourceinstruments.com/About/about.php
-https://www.opensourceinstruments.com/Resources/Surgery/hmt_sp.html
-https://www.opensourceinstruments.com/Resources/Surgery/sct_sp.html
-https://www.opensourceinstruments.com/Resources/Surgery/electrode_sp.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Manual.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Commands.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Toolmaker_Library.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Acquisifier.html
-https://www.opensourceinstruments.com/Software/LWDAQ/Startup_Manager.html
-https://www.opensourceinstruments.com/Prices.html
 https://www.opensourceinstruments.com/Chat/Manual.html
 	}
 #
@@ -168,10 +102,10 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 #	
 	set config(high_rel_thr) "0.55"
 	set config(mid_rel_thr) "0.30"
-	set config(high_rel_model) "gpt-5.4"
-	set config(mid_rel_model) "gpt-5.4-mini"
-	set config(low_rel_model) "gpt-5.4-mini"
-	set config(high_rel_words) "5000"
+	set config(high_rel_model) "gpt-5.6-luna"
+	set config(mid_rel_model) "gpt-5.6-luna"
+	set config(low_rel_model) "gpt-5.6-luna"
+	set config(high_rel_words) "80000"
 	set config(mid_rel_words) "40000"
 	set config(low_rel_words) "0"
 	set config(high_rel_chat_words) "3000"
@@ -194,7 +128,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 # edited with a dedicated window and saved to settings file.
 #
 	set config(high_rel_prompt) {
-You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-assisted generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
+You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-augmented generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
 
 When answering the user's question:
   - Respond using Markdown formatting.
@@ -209,7 +143,7 @@ When answering the user's question:
     }
     
 	set config(mid_rel_prompt) {
-You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-assisted generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
+You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-augmented generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
 
 When answering the user's question:
   - Respond using Markdown formatting.
@@ -235,14 +169,16 @@ When answering the user's question:
 	}	
 	
 	set config(summarize_prompt) {
-ou are generating retrieval metadata for a fantasy role-playing campaign historian chatbot.
+You are generating retrieval metadata for a fantasy role-playing campaign historian chatbot.
 
 Your output will be embedded for semantic search and used to retrieve full diary chapters.
 
 The output is NOT intended for human reading as prose literature.
 The output IS intended to maximize retrieval accuracy for:
-- character names
+- characters
+- creatures
 - locations
+- named items
 - organizations and groups
 - events
 - relationships
@@ -269,6 +205,10 @@ Characters:
 Locations:
  - <location>
  - <location>
+ 
+Items:
+ - <item>
+ - <item>
 
 Groups:
  - <group or faction>
@@ -279,7 +219,7 @@ Topics:
  - <important topic>
 
 Rules:
-- Preserve exact spelling of names and places from the source text.
+- Preserve exact spelling of names, places, and items from the source text.
 - Include all characters who speak, travel, fight, investigate, negotiate, perform, lead, betray, assist, or otherwise significantly participate.
 - Include inns, cities, regions, forests, buildings, landmarks, and destinations in Locations.
 - Include bands, factions, military units, tribes, guilds, tavern groups, cults, performing troupes, and other named collectives in Groups.
@@ -423,7 +363,7 @@ Provide a summary in accordance with your instructions.
 	set info(hash_len) "12"
 	set info(word_size) "5"
 	set info(embed_scale) "100000"
-	set info(retrieve_len) "500" 
+	set info(retrieve_len) "1000" 
 #
 # Check existence of dependent utilities.
 #
@@ -600,7 +540,9 @@ proc RAG_Manager_configure {} {
 		button $f.$b -text "$a" -command "LWDAQ_post RAG_Manager_$b"
 		pack $f.$b -side left -expand yes
 	}
-	foreach a {Sources High_Rel_Prompt Mid_Rel_Prompt Low_Rel_Prompt Diag_Answer} {
+	foreach a {Sources High_Rel_Prompt \
+			Mid_Rel_Prompt Low_Rel_Prompt \
+			Summarize_Prompt Diag_Answer} {
 		set b [string tolower $a]
 		button $f.$b -text "$a" -command \
 			[list LWDAQ_post "RAG_Manager_edit_param $b"]
@@ -1006,7 +948,7 @@ proc RAG_Manager_remove_dates {frag} {
 #
 # RAG_Manager_construct_chunks goes through an html page and breaks it into one
 # or more chunks, returning a list of chunks. By the time the page arrives at
-# this chunking routine, all usls should been converted to Markdown. If there
+# this chunking routine, all urls should been converted to Markdown. If there
 # are any anchor or img tags left, the fragment containing them will be
 # discarded as "contaminated". The routine takes as input a list of fragments
 # each fragment represented by the start and end of its body and the start and
@@ -1076,9 +1018,10 @@ proc RAG_Manager_construct_chunks {page frags} {
 	RAG_Manager_print "Generation rules:\
 		page_chunk=$page_chunk,\
 		chapter_chunk=$chapter_chunk,\
-		\nsection-chunk=$section_chunk,\
-		match-prompts-only=$match_prompts_only,\
-		omit-lists=$omit_lists."
+		section-chunk=$section_chunk,\
+		\nmatch-prompts-only=$match_prompts_only,\
+		omit-lists=$omit_lists,\
+		summary-match=$summary_match."
 	
 	set date "NONE"
 	set document "Untitled Document"
@@ -1312,8 +1255,11 @@ proc RAG_Manager_construct_chunks {page frags} {
 		
 		if {$append_chunk} {
 			if {$page_chunk \
-				|| ($chapter_chunk && ($chapter == $prev_chapter)) \
-				|| ($section_chunk && ($section == $prev_section)) } {
+				|| ($chapter_chunk && \
+						($chapter == $prev_chapter)) \
+				|| ($section_chunk && \
+						($section == $prev_section) && \
+						($chapter == $prev_chapter)) } {
 				if {[llength $chunks] > 0} {
 					if {$match != ""} {
 						lset chunks end 0 \
@@ -1563,11 +1509,27 @@ proc RAG_Manager_add_names {chunks} {
 }
 
 #
-# RAG_Manager_summarize_matches submits each match string to a completion engine
-# to obtain a summary that replaces the match string. The name of the match
-# string does not change. The routine checks to see if the original match string
-# already exists on disk. If it does, the routine reads the summary from disk.
-# Otherwise, it creates a new summary. If summarization failes, we print an
+# RAG_Manager_summarize_matches goes through a chunk list and summarizes any
+# match strings that are tagged for summarization. It returns a new chunk list
+# in which these match strings are replaced with their summaries. This process
+# should take place before embedding the match strings so that it is the summary
+# that is embedded, not the original match string. When a match string contains
+# the key string "%%%%Sumarize\n", this is the sign that it should be
+# summarized. The routine deletes the key string from the match string and looks
+# to see if a match string already exists on disk under the chunk name. If a
+# match string exists, the routine assumes that this match string is a
+# previously-obtained and valid summary of the original match string. It reads
+# the summary match string from disk and replaces the original match string with
+# this summary. We note that the name of the chunk is obtained from the original
+# match string, not from the summary of the match string. Once we change the
+# match string to the summary string, we can no longer deduce the chunk name
+# from the match string, but we keep using the same name. Note that the match
+# string used to obtain the name contains the summarization key string, so
+# the same chunk will have a different name if we generate it with summary
+# matching than if we generate it without summary matching. If no match string
+# exists on disk under the chunk name, the routine passes the original match
+# string to the specified summarization model to obtain a summary. This summary
+# replaces the match string in the chunk. If summarization failes, we print an
 # error and discard the chunk. Sometimes the summarizing endpoint fails to
 # return a summary. By discarding the chunk, we make sure no match string will
 # be written to disk in place of the summary, so that when we run this routine
@@ -1588,7 +1550,6 @@ proc RAG_Manager_summarize_matches {chunks} {
 		set name [lindex $chunk 2]
 		if {[regexp {%%%%Summarize\n} $match]} {
 			incr requested_summaries
-			set match [regsub {%%%%Summarize\n} $match ""]
 			set match_file [file join $info(match_dir) $name.txt]
 			if {[file exists $match_file]} {
 				set f [open $match_file r]
@@ -1601,6 +1562,7 @@ proc RAG_Manager_summarize_matches {chunks} {
 				lappend new_chunks [list $match $content $name]
 				incr existing_summaries
 			} else {
+				set match [regsub {%%%%Summarize\n} $match ""]
 				if {![regexp {^.*?\n\n} $match header]} {
 					set header ""
 				}
@@ -1655,8 +1617,19 @@ proc RAG_Manager_summarize_matches {chunks} {
 
 #
 # RAG_Manager_chunk_page downloads an html page from a url, splits it into
-# chunks of text, and returns a list of chunks. If the dump flag is set, the
-# routine writes all the chunk match and content strings to a chunk dump file.
+# chunks of text, and returns a list of chunks. Each chunk consistes of a
+# content string, a match string, and a name. The content string is obtained
+# from the source document. The match string is similar to the content string,
+# but optimized for clarity of meaning. Contents strings contain table entries,
+# but match strings do not. Match strings contain RAG prompt strings, but
+# content strings do not. The name of the chunk is derived from the match string
+# and is unique to each match string. The routine does not write to disk, but it
+# does read from disk when it calls the summarizing routine. During
+# summarization, the routine will read existing summaries from disk to complete
+# its chunk list. The original match strings, which contain a summarization
+# request key, will be replace by a summary that does not contain the
+# summarization match key. If the dump flag is set, the routine writes all the
+# chunk match and content strings to a chunk dump file.
 #
 proc RAG_Manager_chunk_page {url} {
 	upvar #0 RAG_Manager_info info
@@ -1724,6 +1697,7 @@ proc RAG_Manager_store_chunks {chunks} {
 	RAG_Manager_print "Storing new chunks to disk..." 
 	set new_count 0
 	set old_count 0
+	set count 0
 	foreach chunk $chunks {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
@@ -1767,7 +1741,7 @@ proc RAG_Manager_store_chunks {chunks} {
 	RAG_Manager_print "Of $count chunks generated,\
 		$new_count were new, $old_count were pre-existing."
 	
-	RAG_Manager_print "Purging obsolete chunks..."
+	RAG_Manager_print "Purging obsolete content and match strings..."
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	set purge_count 0
 	set retain_count 0
@@ -1933,8 +1907,8 @@ proc RAG_Manager_fetch_embeds {api_key} {
 	RAG_Manager_print "Checked $count chunks,\
 		found $old_count embeds,\
 		fetched $new_count embeds,\
-		detected $obsolete_count obsolete embeds,\
-		counted $missing_count missing embeds."
+		$obsolete_count obsolete embeds,\
+		$missing_count missing embeds."
 		
 	return $new_count
 }
@@ -1992,9 +1966,12 @@ proc RAG_Manager_offline {offline} {
 }
 
 #
-# RAG_Manager_delete deletes all chunks from the chunk directory. It does not
-# delete embeddings in the embed directory. Unused embedding vectors are can be
-# culled with the purge routine.
+# RAG_Manager_delete deletes all content strings from the contend string
+# directory and all match strings from the match string directory. This routine
+# should not be called in the normal course of maintaining a chunk library
+# because obsolete chunks and match strings are purged automatically by the
+# store-chunks routine. This routine does not delete embed vectors in the embed
+# directory.
 #
 proc RAG_Manager_delete {} {
 	upvar #0 RAG_Manager_config config
@@ -2002,7 +1979,7 @@ proc RAG_Manager_delete {} {
 
 	if {$info(control) != "Idle"} {return ""}
 	set info(control) "Delete"
-	RAG_Manager_print "Delete Content and Match Strings [RAG_Manager_time]" purple
+	RAG_Manager_print "Delete Content  Strings [RAG_Manager_time]" purple
 	
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings."
@@ -2137,9 +2114,10 @@ proc RAG_Manager_embed {} {
 
 #
 # RAG_Manager_purge makes a list of all content strings in a match directory and
-# another list of all the embeds in the embed directory. It deletes any embed
-# for which there is no corresponding content string. If we set the offline flag,
-# the routine will take the chatbot and retrieval engine offline while it
+# another list of all the embeds in the embed directory and all the match
+# strings in the match string directory. It deletes any embed or match string
+# for which there is no corresponding content string. If we set the offline
+# flag, the routine will take the chatbot and retrieval engine offline while it
 # operates. By default, however, the routine does not create or delete an
 # offline flag file. 
 #
@@ -2154,7 +2132,9 @@ proc RAG_Manager_purge {} {
 	set cfl [glob -nocomplain [file join $info(content_dir) *.txt]]
 	RAG_Manager_print "Found [llength $cfl] content strings on disk."
 	set efl [glob -nocomplain [file join $info(embed_dir) *.txt]]
-	RAG_Manager_print "Found [llength $efl] embeds on disk."
+	RAG_Manager_print "Found [llength $efl] embed vectors on disk."
+	set mfl [glob -nocomplain [file join $info(match_dir) *.txt]]
+	RAG_Manager_print "Found [llength $efl] match strings on disk."
 
 	set purge_count 0
 	foreach efn $efl {
@@ -2164,7 +2144,17 @@ proc RAG_Manager_purge {} {
 			incr purge_count
 		}
 	}
-	RAG_Manager_print "Purged $purge_count embeds with no content string."
+	RAG_Manager_print "Purged $purge_count embed vectors with no content string."
+
+	set purge_count 0
+	foreach mfn $mfl {
+		set root [file root [file tail $mfn]]
+		if {![regexp $root $cfl]} {
+			file delete $mfn
+			incr purge_count
+		}
+	}
+	RAG_Manager_print "Purged $purge_count match strings with no content string."
 
 	RAG_Manager_print "Purge Complete [RAG_Manager_time]" purple
 	set info(control) "Idle"
@@ -2762,13 +2752,14 @@ proc RAG_Manager_get_answer {model prompt contents question api_key} {
 		}
 		if {[clock seconds] - $start_time > $config(answer_timeout_s)} {
 			set result "\"content\": \"$config(timeout_message)\""
-			close $ch
 			break
 		}
 		LWDAQ_update
 	}		  
 	
+	catch {close $ch}
 	catch {[file delete $jfn]}
+	
 	return $result
 }
 
@@ -2812,7 +2803,7 @@ proc RAG_Manager_submit {} {
 		set start_time [read $f]
 		close $f
 		set run_min [format %.1f [expr ([clock seconds]-$start_time)/60.0]]
-		set answer "The OSI Chatbot is temporarily offline.\
+		set answer "The Chatbot is temporarily offline.\
 			We are updating its documentation library.\
 			This process began $run_min minutes ago\
 			and is expected to take no more than $config(offline_min) minutes.\

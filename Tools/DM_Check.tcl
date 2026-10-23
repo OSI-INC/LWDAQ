@@ -21,7 +21,7 @@ proc DM_Check_init {} {
 #
 # Set up the tool within LWDAQ.
 #
-	LWDAQ_tool_init "DM_Check" "1.6"
+	LWDAQ_tool_init "DM_Check" "1.8"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Process control variabls.
@@ -553,6 +553,10 @@ proc DM_Check_measure {{freq ""}} {
 		set iconfig(daq_device_element) "1 2"
 		set iconfig(daq_hi_gain) "0"
 		set result [LWDAQ_acquire Voltmeter]
+		if {[LWDAQ_is_error_result $result]} {
+			LWDAQ_print $info(text) $result
+			return "0.0"
+		}
 		append line "[format %.3f [lindex $result 1]] "
 		append line "[format %.3f [lindex $result 5]] "
 	}
@@ -614,7 +618,7 @@ proc DM_Check_open {} {
 	pack $f -side top -fill x
 	
 	foreach {a width} {gen_port 25 freq_low 8 freq_high 8\
-			freq_step 4 test_pwrs 16 attenuator 4} {
+			freq_step 4 test_pwrs 22 attenuator 4} {
 		label $f.l$a -text "$a:" -fg $config(label_color)
 		entry $f.e$a -textvariable DM_Check_config($a) -width $width
 		pack $f.l$a $f.e$a -side left -expand yes

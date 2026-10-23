@@ -1,11 +1,9 @@
-# Telemetry Manager, a LWDAQ Tool
+# Telemetry Manager, A LWDAQ Tool
 #
 # Copyright (C) 2026 Kevan Hashemi, Open Source Instruments
 #
 # The Telemetry Manager controls and configures telemetry sensors equipped with
-# crystal radio receivers. These include the existing A3054 Intraperitoneal
-# Transmitter (IPT) and other planned second-generation Subcutaneous
-# Transmitters (SCTs).
+# crystal radio receivers, such as the A3054 Intraperitoneal Transmitter (IPT).
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -28,7 +26,7 @@ proc Telemetry_Manager_init {} {
 	upvar #0 Telemetry_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Telemetry_Manager" "1.3"
+	LWDAQ_tool_init "Telemetry_Manager" "1.6"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -46,15 +44,13 @@ proc Telemetry_Manager_init {} {
 	set config(rf_off_op) "0080"
 	set config(rf_on_op) "0081"
 	set config(rf_xmit_op) "82"
-	set config(Telemetry_Manager_element) "2"
+	set config(tm_element) "2"
 	set config(checksum_preload) "1111111111111111"
 	set config(log_enable) "0"
 	set config(log_file) "~/Desktop/Telemetry_Manager_Log.txt"
 	
-	set config(xon_color) "red"
-	set config(xoff_color) "black"
-	set config(lon_color) "lightgreen"
-	set config(loff_color) "lightgray"	
+	set config(ton_color) "lightgreen"
+	set config(toff_color) "lightgray"
 	set config(label_color) "brown"
 	
 	set config(conf_delay) "3"
@@ -70,13 +66,13 @@ proc Telemetry_Manager_init {} {
 	set config(sps) "512"
 	
 	# Transmit Panel Parameters
-	set config(cp_id) "FFFF"
-	set config(cp_commands) "6 3 2 255"
-	set config(cp_content) "~/Desktop/Config.txt"
-	set config(cp_seglen) "32"
-	set config(cp_addr) "0x0000"
-	set info(cp_ew) $info(window).cpew
-	set info(cp_text) $info(cp_ew).text
+	set config(prog_id) "FFFF"
+	set config(prog_file) "~/Desktop/Config.txt"
+	set config(prog_seglen) "32"
+	set config(prog_addr) "0x0100"
+	set info(prog_control) "Idle"
+	set info(prog_ew) $info(window).progew
+	set info(prog_text) $info(prog_ew).text
 	
 	# Auxiliary message types.
 	set info(at_id) "1"
@@ -85,13 +81,15 @@ proc Telemetry_Manager_init {} {
 	set info(at_conf) "4"
 	set info(at_ver) "5"
 	
-	# Operation codes, which we use to construct instructions, which
-	# we in turn combine to form commands.
-	set info(op_stop) "0"
-	set info(op_start) "1"
+	# Saved auxiliary message list.
+	set info(saved_aux) ""
+
+	# Telemetry Command Operation Codes. We list all defined operation codes.
+	set info(op_stop) "0" 
+	set info(op_start) "1" 
 	set info(op_xon) "2"
 	set info(op_xoff) "3"
-	set info(op_batt) "4"
+	set info(op_batt) "4" 
 	set info(op_id) "5"
 	set info(op_pgld) "6"
 	set info(op_pgon) "7"
@@ -99,10 +97,13 @@ proc Telemetry_Manager_init {} {
 	set info(op_pgrst) "9"
 	set info(op_shdn) "10"
 	set info(op_ver) "11"
-	set info(op_lon) "12"
-	set info(op_loff) "13"
+	set info(op_ton) "12"
+	set info(op_toff) "13"
 	set info(op_zon) "14"
 	set info(op_zoff) "15"
+	set info(op_nvmwr) "16"
+	set info(op_flash) "17"
+	set info(op_reset) "18"
 	
 	set info(state) "Idle"
 	set info(monitor_ms) "0"
@@ -212,7 +213,7 @@ proc Telemetry_Manager_transmit {id commands} {
 			set sd $config(spacing_delay_A2071E)
 		}
 		LWDAQ_set_driver_mux $sock $config(driver_socket) $config(mux_socket)
-		LWDAQ_set_device_element $sock $config(Telemetry_Manager_element)
+		LWDAQ_set_device_element $sock $config(tm_element)
 		LWDAQ_transmit_command_hex $sock $config(rf_on_op)
 		LWDAQ_delay_seconds $sock $config(initiate_delay)
 		LWDAQ_transmit_command_hex $sock $config(rf_off_op)
@@ -223,7 +224,8 @@ proc Telemetry_Manager_transmit {id commands} {
 			if {$sd > 0} {LWDAQ_delay_seconds $sock $sd}
 		}
 		LWDAQ_transmit_command_hex $sock "0000"
-		LWDAQ_delay_seconds $sock [expr $config(byte_processing_time)*[llength $commands]]
+		LWDAQ_delay_seconds $sock \
+			[expr $config(byte_processing_time)*[llength $commands]]
 		LWDAQ_wait_for_driver $sock
 		LWDAQ_socket_close $sock
 	} error_result]} {
@@ -232,9 +234,9 @@ proc Telemetry_Manager_transmit {id commands} {
 		return ""
 	}
 	
-	# If we get here, we have no reason to believe the transmission failed, although
-	# we could have instructed an empty driver socket or the Telemetry_Manager could have
-	# failed to receive the command.
+	# If we get here, we have no reason to believe the transmission failed,
+	# although we could have instructed an empty driver socket or the
+	# Telemetry_Manager could have failed to receive the command.
 	set info(transmit_ms) [clock milliseconds]
 	return ""
 }
@@ -263,20 +265,19 @@ proc Telemetry_Manager_id {n} {
 }
 
 #
-# Telemetry_Manager_lon transmits a command to turn on the target's indicator
-# lamp.
+# Telemetry_Manager_reset transmits a reset command to the target device.
 #
-proc Telemetry_Manager_lon {n} {
+proc Telemetry_Manager_reset {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Lon"
+	set info(state) "Reset"
 
 	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_lon)]
+	set commands [list $info(op_reset)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -288,23 +289,24 @@ proc Telemetry_Manager_lon {n} {
 }
 
 #
-# Telemetry_Manager_loff transmits a command to turn off the target's indicator
+# Telemetry_Manager_flash transmits a command to flash the target's indicator
 # lamp.
 #
-proc Telemetry_Manager_loff {n} {
+proc Telemetry_Manager_flash {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Loff"
+	set info(state) "Flash"
 
-	# Measure battery voltage, check version, and stop stimulus.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_loff)]
+	# Combose command with a battery measurement and version number check, 
+	# then begin the start instruction.
+	set commands [list $info(op_flash)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
-	
+
 	# Set state variables.
 	set info(state) "Idle"
 	
@@ -325,7 +327,7 @@ proc Telemetry_Manager_zon {n} {
 
 	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_zon)]
+	set commands [list $info(op_zon)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -350,7 +352,7 @@ proc Telemetry_Manager_zoff {n} {
 
 	# Combose command with a battery measurement and version number check, 
 	# then begin the start instruction.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_zoff)]
+	set commands [list $info(op_zoff)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -362,42 +364,18 @@ proc Telemetry_Manager_zoff {n} {
 }
 
 #
-# Telemetry_Manager_xon turns on data transmission with a specific telemetry channel
-# number and sample rate. In ISTs, this will be a synchronizing signal.
+# Telemetry_Manager_ton activates the telemetry protocol of the selected device.
 #
-proc Telemetry_Manager_xon {n} {
+proc Telemetry_Manager_ton {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Xon"
+	set info(state) "Ton"
 
-	# Start our command with battery measurement and version request
-	# instructions.
-	set commands [list $info(op_batt) $info(op_ver)]
-
-	# Send the Xon command with transmit period. 	
-	if {$config(sps) > $config(max_tx_sps)} {
-		Telemetry_Manager_print "ERROR: Frequency $config(sps) SPS greater than maximum\
-			$config(max_tx_sps) SPS."
-		set info(state) "Idle"
-		return ""
-	}
-	set tx_p [expr round($config(rck_khz)*1000/$config(sps))-1]
-	
-	# Add the Xon instruction.
-	set ch $info(dev$n\_channel)
-	if {[string is integer -strict $ch] \
-		&& ($ch > 0) && ($ch < 255) \
-		&& ($ch % 16 > 0) && ($ch % 16 < 15)} {
-		lappend commands $info(op_xon) $ch $tx_p
-	} else {
-		Telemetry_Manager_print "ERROR: Invalid channel number \"$ch\",\
-			Try 0 < c < 254, c mod 16 <> 0, c mod 16 <> 15."
-		set info(state) "Idle"
-		return ""
-	}
+	# Start our command with version request instruction.
+	set commands [list $info(op_ton)]
 		
 	# Transmit the command.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -409,20 +387,18 @@ proc Telemetry_Manager_xon {n} {
 }
 
 #
-# Telemetry_Manager_xoff turns off data transmission.
+# Telemetry_Manager_toff deactivates the telemetry protocol.
 #
-proc Telemetry_Manager_xoff {n} {
+proc Telemetry_Manager_toff {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the tool state variable.
 	if {$info(state) != "Idle"} {return}
-	set info(state) "Xoff"
+	set info(state) "Toff"
 
-	# Send the Xoff command, which is a transmit command with zero period.
-	# Before stopping transmission, measure battery voltage and check version
-	# number.
-	set commands [list $info(op_batt) $info(op_ver) $info(op_xoff)]
+	# Send a Toff command.
+	set commands [list $info(op_toff)]
 	
 	# Transmit the commands.
 	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
@@ -466,10 +442,34 @@ proc Telemetry_Manager_identify {} {
 }
 
 #
-# Telemetry_Manager_all takes a parameter "action" that it uses to define a procedure
-# it will call on every Telemetry_Manager in the current list, provided that its ID is
-# not "*". We introduce a delay after each action to give Telemetry_Managers a chance 
-# to get ready for the next command.
+# Telemetry_Manager_query transmits version number and battery use requests
+# to the target device.
+#
+proc Telemetry_Manager_query {n} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
+
+	# Set the tool state variable.
+	if {$info(state) != "Idle"} {return}
+	set info(state) "Query"
+
+	# Measure battery voltage, check version, and stop stimulus.
+	set commands [list $info(op_ver) $info(op_batt)]
+	
+	# Transmit the commands.
+	Telemetry_Manager_transmit [Telemetry_Manager_id $n] $commands
+	
+	# Set state variables.
+	set info(state) "Idle"
+	
+	return ""
+}
+
+#
+# Telemetry_Manager_all takes a parameter "action" that it uses to define a
+# procedure it will call on every Telemetry_Manager in the current list,
+# provided that its ID is not "*". We introduce a delay after each action to
+# give Telemetry_Managers a chance to get ready for the next command.
 # 
 proc Telemetry_Manager_all {action} {
 	upvar #0 Telemetry_Manager_config config
@@ -485,30 +485,52 @@ proc Telemetry_Manager_all {action} {
 }
 
 #
-# Telemetry_Manager_clear clears the status and battery values of an
+# Telemetry_Manager_clear clears the status and battery use values of an
 # Telemetry_Managers in the list.
 #
 proc Telemetry_Manager_clear {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
-	LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-	LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
-	set info(dev$n\_battery) "?"	
+	LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
+	set info(dev$n\_hours) "?"	
 	set info(dev$n\_version) "?"	
 
 	return ""
 }
 
 #
-# Telemetry_Manager_monitor captures auxiliary messages from Telemetry_Managers
-# and keeps track of when stimuli end, so it can change the state label colors.
-# The routine looks for auxiliary messages first in the Neuroplayer Tool, if one
-# exists, and second in the Receiver Instrument. While the monitor is running,
-# it enables analysis in the Receiver Instrument so that we can get auxiliary
-# messages. Right now the Telemetry_Manager Tool operates only with a graphical
-# user interface, so we use the existence of its window to determine if the
-# monitor should shut down.
+# Telemetry_Monitor_monitor captures and interprets auxiliary messages from
+# telemetry sensors. Each such sensor has a two-byte identifier in which the
+# lowest nibble is neither 0x0 nor 0xF. The auxiliary messages arrive in pairs
+# and specify together the two-byte identifier. While the monitor is running, it
+# enables analysis in the Receiver Instrument so that we can get auxiliary
+# messages. The routine looks for auxiliary messages first in the Neuroplayer
+# Tool, if one exists, and second in the Receiver Instrument. Auxiliary messages
+# from implants must arrive in pairs, with the pair being separated in time by
+# no more than conf_delay ticks of the receiver's 32.768 kHz clock. The sensors
+# themselves transmit the two messages within one tick, but the receivers do no
+# necessarily record the two messages within one tick. Both messages use the
+# auxiliary channel that goes with the telemetry channel given by the lower byte
+# of the sensor's two-byte identifier. The first message contains some kind of
+# information about the device, or an acknowledgement, and the second message
+# contains the upper byte of the two-byte identifier. The pair of messages
+# therefore provides both the information and the identifier, as well as making
+# it unlikely that we will receive auxiliary information from random
+# interference messages. The Telemetry Manager is not the only tool that
+# examines auxiliary messages. The Stimulator Tool also examines them. All tools
+# that use the list save the auxiliary list and acts upon only new lists. Both
+# tools first look for a Neuroplayer list of auxiliary messages. If they find
+# such a list, they compare it to the previous list they used, and if they are
+# different, they act upon the list. If they do not find a Neuroplayer list,
+# they look for a Receiver list and handle it in the same way. The Neuroplayer
+# and Receiver clear old messages from their list whenever they analyze a new
+# interval, and so generate a new or empty list. The system of ignoring
+# non-confirmed messages in the list works fine except when the first member of
+# the pair is separated from its confirmation by an interval boundary. Right now
+# the Telemetry Manager Tool operates only with a graphical user interface, so
+# we use the existence of its window to determine if the monitor should shut
+# down.
 #
 proc Telemetry_Manager_monitor {} {
 	upvar #0 Telemetry_Manager_config config
@@ -519,28 +541,34 @@ proc Telemetry_Manager_monitor {} {
 	upvar #0 Neuroplayer_config nconfig
 	global LWDAQ_Info
 	
-	# Set or clear the analysis enable flag in the Receiver Instruments.
+	# Stop if reset or window closed. 
 	if {![winfo exists $info(window)] || $LWDAQ_Info(reset)} {
-		set rconfig(analysis_enable) "0"
 		return ""
-	} else {
-		set rconfig(analysis_enable) "1"
-	}
-	set f $info(window).state
-
-	# Note the time for stimulation tracking.
-	set now_ms [clock milliseconds]
+	} 
 	
-	# Look for auxiliary message lists. If we find one, copy and clear the list.
+	# Set the analysis enable flag in the Receiver Instrument. This flag will 
+	# remain set if we close the Telemetry Manager.
+	set rconfig(analysis_enable) "1"
+
+	# Look for auxiliary message lists. If we find one, copy it and set the time
+	# of the messages accordingly. Receiver messages arrive now, Neuroplayer
+	# messages arrived at the play time.
 	set aux_messages ""
 	if {[info exists ninfo(aux_messages)]} {
 		set aux_messages $ninfo(aux_messages)
-		set ninfo(aux_messages) ""
 		set now_time \($ninfo(play_datetime)\)
 	} elseif {[info exists rinfo(aux_messages)]} {
 		set aux_messages $rinfo(aux_messages)
-		set rinfo(aux_messages) ""
 		set now_time \([clock format [clock seconds] -format $info(time_format)]\)
+	}
+	
+	# If the auxiliary message list is the same as the previous list, we
+	# are done. Otherwise we set the previous list to the new list.
+	if {[string match $info(saved_aux) $aux_messages]} {
+		LWDAQ_post Telemetry_Manager_monitor
+		return ""
+	} else {
+		set info(saved_aux) $aux_messages
 	}
 	
 	# If we have no auxiliary messages, we are done.
@@ -550,13 +578,16 @@ proc Telemetry_Manager_monitor {} {
 	}
 	
 	# Compose a list of active device numbers with their sixteen-bit identifiers,
-	# as listed in our Telemetry_Manager window.
+	# as listed in our Telemetry Manager window.
 	set id_list ""
 	foreach n $info(dev_list) {lappend id_list "$n $info(dev$n\_id)"}
 	
 	# Go through the auxiliary message list and find messages that could be from
-	# Telemetry_Managers. As we proceed, we save the previous valid auxiliary message
-	# so that we can avoid processing duplicates in the list.
+	# implantable sensors. As we proceed, we save the previous valid auxiliary
+	# message so that we can avoid processing duplicates in the list. Duplicates
+	# arise sometimes in the telemetry data stream because multiple detector
+	# modules receive it. Duplicate elimination by the receiver logic is only
+	# partially effective.
 	set previd 0
 	set prevfa 0
 	set prevdb 0
@@ -571,26 +602,31 @@ proc Telemetry_Manager_monitor {} {
 				id=$id fa=$fa db=$db ts=$ts" $config(aux_color)
 		}
 		
+		# If this is a repeat of a previously processed auxilliary message,
+		# proceed.
+		if {($previd == $id) && ($prevfa == $fa) && ($prevdb == $db)} {continue}
+
 		# If this is a confirmation message, proceed to next auxiliary message.
 		if {$fa == $info(at_conf)} {continue}
 		
-		# If this is a repeat of a previously processed auxilliary message, proceed.
-		if {($previd == $id) && ($prevfa == $fa) && ($prevdb == $db)} {continue}
-
-		# If it is some other sort of message, look for a confirmation that
+		# If this is not a confirmation message, look for a confirmation that
 		# arrived no more than conf_delay ticks after our auxiliary message. If
 		# we don't find one, proceed to next auxiliary message. If we do find
-		# one, use it to obtain the full device identifier.
-		set device_id "0"
-		foreach cam $aux_messages {
-			scan $cam %d%d%d%d cid cfa cdb cts
-			if {$cfa != $info(at_conf)} {continue}
-			if {($cid == $id) && (($cts - $ts) % 65536 <= $config(conf_delay))} {
-				set device_id [format %04X [expr $cid + (256 * $cdb)]]
-				break
+		# one, use it to obtain the full device identifier. If we do not find
+		# a confirmation, continue. We will not add this message to the new
+		# list, nor its confirmation.
+		if {$fa != $info(at_conf)} {
+			set device_id "0"
+			foreach cam $aux_messages {
+				scan $cam %d%d%d%d cid cfa cdb cts
+				if {$cfa != $info(at_conf)} {continue}
+				if {($cid == $id) && (($cts - $ts) % 65536 <= $config(conf_delay))} {
+					set device_id [format %04X [expr $cid + (256 * $cdb)]]
+					break
+				}
 			}
+			if {$device_id == "0"} {continue}
 		}
-		if {$device_id == "0"} {continue}
 		
 		# Look for the device in our list. If we find it, set n to the device
 		# number, otherwise set n to zero.
@@ -599,86 +635,81 @@ proc Telemetry_Manager_monitor {} {
 
 		# Check the auxiliary message type, now that it has been confirmed.
 		if {$fa == $info(at_ack)} {
-			
-			# Acknowledgements confirm that a device has received a command. We 
-			# ignore acknowledgements from devices that are not in our list.
-			if {$n == 0} {continue}
-			
-			# Acknowledgements encode the type of command in their data byte.
+			# Acknowledgements encode the type of command in their data byte. We
+			# use the rare list format of the switch command in order to resolve
+			# variables in the matching clauses.
 			switch $db \
-				$info(op_loff) {
-					set type "loff"
-					LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
+				$info(op_zon) {
+					set type "zon"
 				} \
-				$info(op_lon) {
-					set type "lon"
-					LWDAQ_set_bg $info(dev$n\_state) $config(lon_color)
+				$info(op_zoff) {
+					set type "zoff"
 				} \
-				$info(op_xon) {
-					set type "xon"
-					LWDAQ_set_fg $info(dev$n\_state) $config(xon_color)
+				$info(op_ton) {
+					set type "ton"
+					if {$n != 0} {
+						LWDAQ_set_bg $info(dev$n\_state) $config(ton_color)
+					}
 				} \
-				$info(op_xoff) {
-					set type "xoff"
-					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+				$info(op_toff) {
+					set type "toff"
+					if {$n != 0} {
+						LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
+					}
 				} \
-				$info(op_batt) {
-					set type "battery"
+				$info(op_flash) {
+					set type "flash"
 				} \
-				$info(op_pgld) {
-					set type "pgld"
+				$info(op_nvmwr) {
+					set type "nvmwr"
 				} \
-				$info(op_shdn) {
-					set type "shdn"
-					LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-					LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
+				$info(op_reset) {
+					set type "reset"
 				} \
 				default {
-					set type "invalid"
+					set type "unknown"
 				}
-				
-			if {$type != "invalid"} {
-				Telemetry_Manager_print "Acknowledge:\
-					device_id=$device_id type=$type ts=$ts $now_time"
-			}
+
+			Telemetry_Manager_print "Acknowledge:\
+				id=$device_id type=$type value=$db ts=$ts $now_time"
 		} elseif {$fa == $info(at_batt)} {
 			
-			# Ignore battery measurements from devices that are not in our list.
-			if {$n == 0} {continue}
-			
-			# We interpret battery measurements in a manner particular to the
-			# various supported device versions.
-			set ver $info(dev$n\_version)
-			switch $ver {
-				"21" {set voltage [format %.2f [expr 255.0/$db*1.2]]}
-				default {set voltage [format %.2f [expr 255.0/$db*1.2]]}
+			# For devices in our list, convert the battery measurement into hours
+			# of use. 
+			if {$n != 0} {
+				set info(dev$n\_hours) [expr $db*$db]
 			}
 			
-			# Report the battery measurement.
-			set info(dev$n\_battery) $voltage
+			# Print battery message.
 			Telemetry_Manager_print "Battery:\
-				device_id=$device_id value=$db ts=$ts\
-				voltage=$voltage $now_time" 
+				id=$device_id value=$db ts=$ts $now_time" 
 		} elseif {$fa == $info(at_id)} {
+			
+			# Print identification message.
 			Telemetry_Manager_print "Identification:\
-				device_id=$device_id ts=$ts $now_time" green
+				id=$device_id value=$db ts=$ts $now_time" green
 		} elseif {$fa == $info(at_ver)} {
 
-			# Ignore version number reports from devices that are not in our list.
-			if {$n == 0} {continue}
+			# Set version number of a device in our list.
+			if {$n != 0} {
+				set info(dev$n\_version) "$db"
+			}
 			
-			set info(dev$n\_version) "$db"
+			# Print version message.
 			Telemetry_Manager_print "Version:\
-				device_id=$device_id value=$db ts=$ts $now_time"
+				id=$device_id value=$db ts=$ts $now_time"
 		} else {
 			
-			# We don't recognise this type of auxiliary message, so proceed.
-			continue
+			# Report unknown auxiliary message.
+			Telemetry_Manager_print "Unknown:\
+				id=$device_id value=$db ts=$ts $now_time"
 		}
 		
-		# By this point, we have processed and report on the confirmed auxiliary 
-		# message, so record its identifier, field address, and data byte in order
-		# to avoid processing a subsequent duplicate.
+		# By this point, we have processed and reported on all confirmed and
+		# relevant auxiliary message pairs, and we have passed any confirmed and
+		# irrelevant pairs into the remainint list. We record the first message
+		# identifier, field address, and data byte in order to avoid processing
+		# a subsequent duplicates.
 		set previd $id
 		set prevfa $fa
 		set prevdb $db
@@ -723,13 +754,12 @@ proc Telemetry_Manager_draw_list {} {
 	
 	foreach n $info(dev_list) {
 	
-		# If this Telemetry_Manager's state variable does not exist, then create it
-		# now, as well as other system parameters.
+		# If this Telemetry_Manager's state variable does not exist, then create
+		# it now, as well as other system parameters.
 		if {![info exists info(dev$n\_id)]} {
 			set info(dev$n\_id) $config(default_id)
-			set info(dev$n\_channel) [expr 0x$config(default_id) % 256]
 			set info(dev$n\_version) "?"
-			set info(dev$n\_battery) "?"
+			set info(dev$n\_hours) "?"
 		}
 
 		set ff $f.dev$n
@@ -739,23 +769,23 @@ proc Telemetry_Manager_draw_list {} {
 		entry $ff.id -textvariable Telemetry_Manager_info(dev$n\_id) -width 5
 		pack $ff.id -side left -expand 1
 		set info(dev$n\_state) $ff.id
-		LWDAQ_set_bg $info(dev$n\_state) $config(xoff_color)
-		LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
+		LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
 		
-		foreach {a c} {Lon green Loff black Xon green Xoff black Zon green Zoff black} {
+		foreach {a c} {Reset red \
+				Flash orange \
+				Ton green \
+				Toff black \
+				Zon green \
+				Zoff black \
+				Query black \
+				Program black} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
 			pack $ff.$b -side left -expand 1
 		}
 
-		foreach {a c} {channel 3} {
-			label $ff.l$a -text "$a\:" -fg $config(label_color)
-			entry $ff.$a -textvariable Telemetry_Manager_info(dev$n\_$a) -width $c
-			pack $ff.l$a $ff.$a -side left -expand 1
-		}
-
-		foreach {a c} { version 3 battery 3} {
+		foreach {a c} { version 3 hours 5} {
 			label $ff.l$a -text "$a\:" -fg $config(label_color)
 			label $ff.$a -textvariable Telemetry_Manager_info(dev$n\_$a) -width $c
 			pack $ff.l$a $ff.$a -side left -expand 1
@@ -830,8 +860,7 @@ proc Telemetry_Manager_remove {n} {
 	set info(dev_list) [lreplace $info(dev_list) $index $index]
 	unset info(dev$n\_id)
 	unset info(dev$n\_version)
-	unset info(dev$n\_battery)
-	unset info(dev$n\_channel) 
+	unset info(dev$n\_hours)
 	
 	return ""
 }
@@ -857,9 +886,8 @@ proc Telemetry_Manager_add_device {} {
 	
 	# Configure the new sensor to default values.
 	set info(dev$n\_id) $config(default_id)
-	set info(dev$n\_channel) [expr 0x$config(default_id) % 256]
 	set info(dev$n\_version) "?"
-	set info(dev$n\_battery) "?"
+	set info(dev$n\_hours) "?"
 	
 	# Re-draw the sensor list.
 	Telemetry_Manager_draw_list
@@ -884,7 +912,7 @@ proc Telemetry_Manager_save_list {{fn ""}} {
 	set f [open $fn w]
 	puts $f "set Telemetry_Manager_info(dev_list) \"$info(dev_list)\""
 	foreach n $info(dev_list) {
-		foreach p {id channel version} {
+		foreach p {id version} {
 			set e "dev$n\_$p"
 			puts $f "set Telemetry_Manager_info($e) \"[set info($e)]\"" 
 		}
@@ -898,8 +926,8 @@ proc Telemetry_Manager_save_list {{fn ""}} {
 }
 
 #
-# Telemetry_Manager_load_list loads a Telemetry_Manager list from disk. If we don't
-# specify the list file name, the routine uses a browser to get a file
+# Telemetry_Manager_load_list loads a Telemetry_Manager list from disk. If we
+# don't specify the list file name, the routine uses a browser to get a file
 # name.
 #
 proc Telemetry_Manager_load_list {{fn ""}} {
@@ -921,9 +949,8 @@ proc Telemetry_Manager_load_list {{fn ""}} {
 		uplevel #0 [list source $fn]
 		Telemetry_Manager_draw_list
 		foreach n $info(dev_list) {
-			LWDAQ_set_bg $info(dev$n\_state) $config(loff_color)
-			LWDAQ_set_fg $info(dev$n\_state) $config(xoff_color)
-			set info(dev$n\_battery) "?"
+			LWDAQ_set_bg $info(dev$n\_state) $config(toff_color)
+			set info(dev$n\_hours) "?"
 			set info(dev$n\_version) "?"	
 		}
 	} error_message]} {
@@ -982,7 +1009,7 @@ proc Telemetry_Manager_refresh_list {{fn ""}} {
 	foreach dev $new_list {
 		set n [lindex $dev 0]
 		Telemetry_Manager_rename_device $n $m
-		set info(dev$m\_battery) "?"
+		set info(dev$m\_hours) "?"
 		set info(dev$n\_version) "?"	
 		lappend info(dev_list) $m
 		incr m
@@ -995,151 +1022,242 @@ proc Telemetry_Manager_refresh_list {{fn ""}} {
 }
 
 #
-# Telemetry_Manager_program_panel opens a new window that allows the user to
-# upload content to the device's non-volatile memory. The transmit panel uses
-# the driver address and socket specified in the Telemetry_Manager window, but
-# it uses its own device identifier, which can be set to the wild card FFFF or a
-# specific four-digit hex identifier. The bytes in the content file can be
-# two-digit hex value using the 0x prefix, or a decimal value 0..255 with no
-# prefix. They can be space-delimited or newline-delimited.
+# Telemetry_Manager_program opens a new window that allows the user to upload
+# bytes to the non-volatile memory of a telemetry device. We pass as an argument
+# the index of a device in our device list. The routine will look up the
+# identifier of this device. If the identifier is 0xFFFF, all devices will be
+# programmed. The memory address to which we will write bytes we specify either
+# in decimal or in hexadecimal in the format "0x0FFF". The programmer uses a
+# text file as its source of bytes to upload to a device. These bytes must be
+# delimited by whitespace. They can be expressed as decimal values or two-digit
+# hex values in the 0xFF format.
 #
-proc Telemetry_Manager_program_panel {} {
+proc Telemetry_Manager_program {n} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
+	
+	# Set the device id in the programmer panel equal to the identifier of
+	# device "n" in our device list.
+	set config(prog_id) [set info(dev$n\_id)]
 	
 	# Open the transmit panel.
 	set w $info(window)\.xmit_panel
 	if {[winfo exists $w]} {
 		raise $w
+		LWDAQ_print $info(prog_text) "Target device set to [set info(dev$n\_id)]."
 		return ""
 	}
 	toplevel $w
-	wm title $w "Telemetry_Manager $info(version) Programming Panel"
+	wm title $w "Telemetry Manager $info(version) Device Programmer"
 	
-	# If the OSR8 Assembler tool routines are not available, run the OSR8 Assembler
-	# tool with no graphics.
-	if {[info commands OSR8_Assembler_*] == ""} {
-		upvar #0 OSR8_Assembler_info ainfo
-		LWDAQ_run_tool OSR8_Assembler
-		destroy $ainfo(window)
-		if {[info commands OSR8_Assembler_assemble] == ""} {
-			Telemetry_Manager_print "ERROR: Failed to open OSR8 Assembler tool."
-		} 
-	}
-
 	set f [frame $w.controls]
 	pack $f -side top -fill x
 	
-	label $f.nl -text "Identifier (Hex):"
-	entry $f.ne -textvariable Telemetry_Manager_config(cp_id) -width 5
-	pack $f.nl $f.ne -side left -expand 1
+	label $f.state -textvariable Telemetry_Manager_info(prog_control) \
+		-width 12 -fg blue
+	pack $f.state -side left -expand 1
 
-	label $f.addrl -text "Address (Hex/Decimal):"
-	entry $f.addre -textvariable Telemetry_Manager_config(cp_addr) -width 8
+	label $f.idl -text "Device:"
+	entry $f.ide -textvariable Telemetry_Manager_config(prog_id) -width 7
+	pack $f.idl $f.ide -side left -expand 1
+
+	label $f.addrl -text "Address:"
+	entry $f.addre -textvariable Telemetry_Manager_config(prog_addr) -width 8
 	pack $f.addrl $f.addre -side left -expand 1
+	
+	label $f.seglenl -text "Segment:"
+	entry $f.seglene -textvariable Telemetry_Manager_config(prog_seglen) -width 4
+	pack $f.seglenl $f.seglene -side left -expand 1
 
-	foreach a {Upload} {
-		set b [string tolower $a]
-		button $f.$b -text "$a Program" -command "LWDAQ_post Telemetry_Manager_cp_$b"
-		pack $f.$b -side left -expand 1
+	button $f.compile -text "Compile" -command \
+		"LWDAQ_post Telemetry_Manager_compile"
+	pack $f.compile -side left -expand 1
+
+	button $f.upload -text "Upload" -command \
+		"LWDAQ_post Telemetry_Manager_upload"
+	pack $f.upload -side left -expand 1
+
+	button $f.stop -text "Stop" -command {
+		set Telemetry_Manager_info(prog_control) "Stop"
 	}
+	pack $f.stop -side left -expand 1
 
 	set f [frame $w.program]
 	pack $f -side top -fill x
 	
-	label $f.lprogram -text "Program:" -fg $config(label_color)
-	entry $f.eprogram -textvariable Telemetry_Manager_config(cp_content) -width 60
+	label $f.lprogram -text "File:" -fg $config(label_color)
+	entry $f.eprogram -textvariable Telemetry_Manager_config(prog_file) -width 60
 	pack $f.lprogram $f.eprogram -side left -expand 1
 
 	foreach a {Browse Edit} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_cp_$b"
+		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_programmer_$b"
 		pack $f.$b -side left -expand 1
 	}
-
-	set info(cp_text) [LWDAQ_text_widget $w 80 15]
+	
+	set info(prog_text) [LWDAQ_text_widget $w 80 15]
+	LWDAQ_print $info(prog_text) "Target device set to [set info(dev$n\_id)]."
 
 	return "" 
 }
 
 #
-# Telemetry_Manager_cp_browse opens a file browser to select the program file.
+# Telemetry_Manager_programmer_browse opens a file browser to select the program
+# file.
 #
-proc Telemetry_Manager_cp_browse {} {
+proc Telemetry_Manager_programmer_browse {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
 	set fn [LWDAQ_get_file_name]
-	if {$fn != ""} {set config(cp_content) $fn}
+	if {$fn != ""} {set config(prog_file) $fn}
 	return ""
 }
 
 #
-# Telemetry_Manager_cp_edit opens the data file in an editor window.
+# Telemetry_Manager_programmer_edit opens the data file in an editor window.
 #
-proc Telemetry_Manager_cp_edit {} {
+proc Telemetry_Manager_programmer_edit {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
 
-	if {[winfo exists $info(cp_ew)]} {
-		raise $info(cp_ew)
+	if {[winfo exists $info(prog_ew)]} {
+		raise $info(prog_ew)
 	} else {
-		set info(cp_ew) [LWDAQ_edit_script Open $config(cp_content)]
+		set info(prog_ew) [LWDAQ_edit_script Open $config(prog_file)]
 	}
-	return $info(cp_ew)
+	return $info(prog_ew)
 }
 
 #
-# Telemetry_Manager_cp_upload reads bytes in decimal string format from a text
-# files and uploads them to the sensor's non-volatile memory. The number of
-# bytes written should be divisible by sixteen, because the NVM page size is
-# sixteen bytes. The write begins at the sixteen-byte boundary given by the
-# transmit panel address parameter, which likewise should lie on a sixteen
-# byte boundary.
+# Telemetry_Manager_compile takes the values in the drop-down menus and
+# writes a configuration file to disk.
 #
-proc Telemetry_Manager_cp_upload {} {
+proc Telemetry_Manager_compile {} {
 	upvar #0 Telemetry_Manager_config config
 	upvar #0 Telemetry_Manager_info info
-	upvar #0 OSR8_Assembler_config aconfig
-	upvar #0 OSR8_Assembler_info ainfo
+
+	# Set the control to upload.
+	set info(prog_control) "Upload"
+	LWDAQ_update
 	
-	# Read program from file.
-	if {[file exists $config(cp_content)]} {
-		LWDAQ_print $info(cp_text) "Reading $config(cp_content)."
-		set f [open $config(cp_content)]
-		set prog [regsub -all {\n} $prog " "]
-		set prog [string trim [read $f]]
-		close $f
-	} else {
-		LWDAQ_print $info(cp_text) "ERROR: Cannot find \"$config(cp_content)\"."
+	# Restore control variable and return.
+	set info(prog_control) "Idle"
+}
+
+#
+# Telemetry_Manager_upload reads bytes in decimal string format from a text
+# file and uploads them to the sensor's non-volatile memory. The number of
+# bytes written must be divisible by sixteen, and the destination address must
+# lie on a sixteen-byte boundary. The non-volatile memory enforces a write page
+# size of sixteen bytes and the pages lie on sixteen-byte boundaries. If we pass
+# no arguments to this routine, it picks the device identifier form the
+# programming panel, reads the contents of the file named in the programming
+# panel, and uses the address provided in the programming panel. Otherwise, it
+# uses the identifier, data, and address provided in its argument list. The data
+# must be a list of bytes delimited by white spaces with each byte in either
+# decimal or 0xFF hexadecimal format. The routine takes a segment of bytes from
+# the front of the list and uploads them to the given address, then posts itself
+# to the LWDAQ event queue with the remaining bytes as data and an address
+# incremented by the segment length. By posting itself to the event queue, the
+# upload process allows the Receiver Instrument and the Telemetry Manager
+# Monitor to continue operating.
+#
+proc Telemetry_Manager_upload {{id ""} {addr ""} {data ""}} {
+	upvar #0 Telemetry_Manager_config config
+	upvar #0 Telemetry_Manager_info info
+	
+	# If the control has been set to Stop, then do so.
+	if {$info(prog_control) == "Stop"} {
+		LWDAQ_print $info(prog_text) "Stopped upload."
+		set info(prog_control) "Idle"
 		return ""
-	} 
-
-	set addr $config(cp_addr)
-	
-	while {[llength $prog] >= 16} {
-
-		# Reset the command list.
-		set commands [list]
-	
-		# Extract the first segment from the remaining user program.
-		set segment [lrange $prog 0 [expr $config(cp_seglen)-1]]
-		set prog [lrange $prog $config(cp_seglen) end]
-		set addr_h [expr $addr / 256]
-		set addr_l [expr $addr % 256]
-
-		# Add upload instruction with its operand, which is the number of 
-		# program bytes that are to follow.
-		lappend commands $info(op_pgld) [llength $segment] $addr_h $addr_l
-	
-		# Add the program segment.
-		set commands [concat $commands $segment]
-	
-		# Transmit the commands.
-		Telemetry_Manager_transmit $config(cp_id) $commands
-		
-		set addr [expr $addr + [llength $segment]]
 	}
+	
+	# If no identifier argument has been passed, use the value in the panel.
+	if {$id == ""} {
+		set id $config(prog_id)
+	}
+	
+	# If no address argment has been passed, use the value in the panel.
+	if {$addr == ""} {
+		set addr $config(prog_addr)
+	}
+	
+	# If no data argument has been passed, try to read data from the program
+	# file.
+	if {$data == ""} {
+		if {[file exists $config(prog_file)]} {
+			set f [open $config(prog_file)]
+			set data [read $f]
+			close $f
+			set data [regsub -all {\n} $data " "]
+			set data [string trim $data]
+			LWDAQ_print $info(prog_text) "Read [llength $data] data bytes\
+				from \"[file tail $config(prog_file)]\"."
+		} else {
+			LWDAQ_print $info(prog_text) "ERROR: Cannot find\
+				programming data file \"$config(prog_file)\"."
+			return ""
+		} 
+	}
+	
+	# Check the address and data lengths.
+	if {$addr % 16 != 0} {
+		LWDAQ_print $info(prog_text) "ERROR: Memory address must lie\
+			on a sixteen-byte boundary."
+		return ""
+	}
+	if {[llength $data] % 16 != 0} {
+		LWDAQ_print $info(prog_text) "ERROR: Number of data bytes must be\
+			divisible by sixteen."
+		return ""
+	}
+	if {[llength $data] < 16} {
+		LWDAQ_print $info(prog_text) "ERROR: Number of data bytes must be\
+			at least sixteen."
+		return ""
+	}
+	
+	# Set the control to upload.
+	set info(prog_control) "Upload"
+
+	# Extract a segment from the data, or a partial segment if we 
+	# don't have a full segment remaining.
+	if {[llength $data] >= $config(prog_seglen)} {
+		set segment [lrange $data 0 [expr $config(prog_seglen)-1]]
+		set data [lrange $data $config(prog_seglen) end]
+	} else {
+		set segment $data
+		set data ""
+	}
+	
+	# Calculate the top and bottom address bytes.
+	set addr_h [expr $addr / 256]
+	set addr_l [expr $addr % 256]
+	
+	# Print a notification.
+	LWDAQ_print $info(prog_text) "Uploading [llength $segment] bytes\
+		to 0x[format %04X $addr] on device 0x$id\..."
+
+	# Compose the upload command and transmit.
+	set commands [list $info(op_nvmwr) [llength $segment] $addr_h $addr_l]
+	set commands [concat $commands $segment]
+	Telemetry_Manager_transmit $id $commands
+	
+	# Increment the address.
+	set addr [expr $addr + [llength $segment]]
+	
+	# If we have more data to transmit, post another upload to the
+	# event queue.
+	if {[llength $data] >= 16} {
+		LWDAQ_post [list Telemetry_Manager_upload $id $addr $data]
+	} else {
+		set info(prog_control) "Idle"
+	}
+	
+	# We are done.
+	return ""
 }
 
 #
@@ -1179,11 +1297,6 @@ proc Telemetry_Manager_open {} {
 	}
 	pack $f.receiver -side left -expand 1
 
-	button $f.txcmd -text "Programming" -command {
-		LWDAQ_post "Telemetry_Manager_program_panel"
-	}
-	pack $f.txcmd -side left -expand 1
-
 	foreach a {Configure Help} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_tool_$b $info(name)"
@@ -1197,25 +1310,25 @@ proc Telemetry_Manager_open {} {
 	frame $f
 	pack $f -side top -fill x
 	
-	foreach {a c} {Xon green Xoff black} {
+	foreach a {Identify} {
+		set b [string tolower $a]
+		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_$b"
+		pack $f.$b -side left -expand 1
+	}
+	
+	foreach {a c} {Ton green Toff black} {
 		set b [string tolower $a]
 		button $f.$b -text "$a\_All" -fg $c -command \
 			[list LWDAQ_post "Telemetry_Manager_all $b"]
 		pack $f.$b -side left -expand 1
 	}
 	
-	foreach a {Add_Device Save_List Load_List Refresh_List Identify} {
+	foreach a {Add_Device Save_List Load_List Refresh_List} {
 		set b [string tolower $a]
 		button $f.$b -text $a -command "LWDAQ_post Telemetry_Manager_$b"
 		pack $f.$b -side left -expand 1
 	}
 	
-	foreach {a c} {sps 5} {
-		label $f.l$a -text "$a\:" -fg $config(label_color)
-		entry $f.$a -textvariable Telemetry_Manager_config($a) -width $c
-		pack $f.l$a $f.$a -side left -expand 1
-	}
-
 	if {[llength $info(dev_list)] == 0} {
 		Telemetry_Manager_add_device
 	} else {

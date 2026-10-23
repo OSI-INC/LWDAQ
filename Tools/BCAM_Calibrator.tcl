@@ -1273,6 +1273,6 @@ return ""
 
 ----------Begin Help----------
 
-https://www.bndhep.net/Devices/BCAM/User_Manual.html#Calibration
+https://www.opensourceinstruments.com/bndhep/Devices/BCAM/User_Manual.html#Calibration
 
 ----------End Help----------

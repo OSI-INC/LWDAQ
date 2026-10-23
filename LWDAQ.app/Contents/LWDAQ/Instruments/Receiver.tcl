@@ -424,7 +424,7 @@ proc LWDAQ_reset_Receiver {} {
 					set info(max_block_reads) "50"
 				}
 				2 {
-					set info(receiver_type) "A3042"
+					set info(receiver_type) "A3042A4"
 					set config(payload_length) 2
 					set info(daq_avail_cntr) 1
 					set channel_select_available 0
@@ -442,7 +442,7 @@ proc LWDAQ_reset_Receiver {} {
 					set info(max_block_reads) "50"
 				}
 				4  {
-					set info(receiver_type) "A3042"
+					set info(receiver_type) "A3042A16"
 					set config(payload_length) 2
 					set info(daq_avail_cntr) 1
 					set channel_select_available 0
@@ -623,7 +623,7 @@ proc LWDAQ_controls_Receiver {} {
 	pack $g.reset -side left -expand 1
 
 	label $g.lrv -text "Receiver:" 
-	label $g.erv -textvariable LWDAQ_info_Receiver(receiver_type) -width 5
+	label $g.erv -textvariable LWDAQ_info_Receiver(receiver_type) -width 8
 	pack $g.lrv $g.erv -side left -expand 1
 	
 	label $g.lfv -text "Firmware:" 

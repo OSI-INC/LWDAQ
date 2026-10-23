@@ -703,6 +703,6 @@ return ""
 
 ----------Begin Help----------
 
-https://www.bndhep.net/Electronics/LWDAQ/Startup_Manager.html
+https://www.opensourceinstruments.com/Software/LWDAQ/Startup_Manager.html
 
 ----------End Help----------

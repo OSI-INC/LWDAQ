@@ -989,7 +989,8 @@ proc Acquisifier_open {} {
 
 	label $f.title -text "Script:"
 	entry $f.entry -textvariable Acquisifier_config(daq_script) -width 45
-	button $f.browse -text Browse -command [list LWDAQ_post Acquisifier_browse_daq_script]
+	button $f.browse -text Browse -command \
+		[list LWDAQ_post Acquisifier_browse_daq_script]
 	pack $f.title $f.entry $f.browse -side left -expand 1
 
 	foreach a {Load Store List} {
