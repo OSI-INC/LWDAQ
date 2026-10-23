@@ -623,7 +623,7 @@ proc LWDAQ_controls_Receiver {} {
 	pack $g.reset -side left -expand 1
 
 	label $g.lrv -text "Receiver:" 
-	label $g.erv -textvariable LWDAQ_info_Receiver(receiver_type) -width 5
+	label $g.erv -textvariable LWDAQ_info_Receiver(receiver_type) -width 8
 	pack $g.lrv $g.erv -side left -expand 1
 	
 	label $g.lfv -text "Firmware:" 

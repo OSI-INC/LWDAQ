@@ -1,4 +1,4 @@
-# Retrieval-Assisted Generation Manager, a LWDAQ Tool.
+# Retrieval-Augmented Generation Manager, a LWDAQ Tool.
 #
 # Copyright (C) 2025-2026 Kevan Hashemi, Open Source Instruments Inc.
 #
@@ -31,7 +31,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "8.5"
+	LWDAQ_tool_init "RAG_Manager" "8.6"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Set the default directory root for the RAG library and initialize file names.
@@ -128,7 +128,7 @@ https://www.opensourceinstruments.com/Chat/Manual.html
 # edited with a dedicated window and saved to settings file.
 #
 	set config(high_rel_prompt) {
-You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-assisted generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
+You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-augmented generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
 
 When answering the user's question:
   - Respond using Markdown formatting.
@@ -143,7 +143,7 @@ When answering the user's question:
     }
     
 	set config(mid_rel_prompt) {
-You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-assisted generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
+You are a helpful assistant. A user has submitted a question to a chatbot, the chatbot has retrieved documentation to support the question, and the documentation, chat history, and the question itself have been submitted to you to obtain an answer. Most users do not understand how retrieval-augmented generation works. As a result, retrieval is often unsuccessful because the question is too ambiguous and non-specific to select documentation that will contain an answer to the question. If you have enough information to answer the question with confidence, answer the question. Otherwise, advise the user on how to expand and improve their question so as to support effective retrieval. Never make up facts or fabricate plausible-sounding answers in order to satisfy the user. It is better to ask for clarification than to provide inaccurate information. Never speak of the documentation provided to you as if the documentation were inadequate, nor suggest that it was the user who supplied the documentation.
 
 When answering the user's question:
   - Respond using Markdown formatting.
@@ -1697,6 +1697,7 @@ proc RAG_Manager_store_chunks {chunks} {
 	RAG_Manager_print "Storing new chunks to disk..." 
 	set new_count 0
 	set old_count 0
+	set count 0
 	foreach chunk $chunks {
 		set match [lindex $chunk 0]
 		set content [lindex $chunk 1]
