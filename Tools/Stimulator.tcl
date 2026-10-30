@@ -25,7 +25,7 @@ proc Stimulator_init {} {
 	upvar #0 Stimulator_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Stimulator" "4.8"
+	LWDAQ_tool_init "Stimulator" "5.1"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -1068,9 +1068,8 @@ proc Stimulator_refresh_list {{fn ""}} {
 # identifier, which can be set to the wild card FFFF or a specific four-digit
 # hex identifier. Command bytes can be specified either as a two-digit hex value
 # using the 0x prefix, or a decimal value 0..255 with no prefix. User programs
-# are read from a file. The transmit panel loads the OSR8 assembler package and
-# uses it to generate the machine code bytes that it will upload to the
-# stimulator.
+# are read from a file. The transmit panel loads the Assembler tool and
+# configures it to assemble for the OSR8. 
 #
 proc Stimulator_transmit_panel {} {
 	upvar #0 Stimulator_config config
@@ -1085,14 +1084,15 @@ proc Stimulator_transmit_panel {} {
 	toplevel $w
 	wm title $w "Stimulator $info(version) Transmit Panel"
 	
-	# If the OSR8 Assembler tool routines are not available, run the OSR8 Assembler
-	# tool with no graphics.
-	if {[info commands OSR8_Assembler_*] == ""} {
-		upvar #0 OSR8_Assembler_info ainfo
-		LWDAQ_run_tool OSR8_Assembler
+	# If the Assembler tool routines are not available, run the Assembler Tool
+	# and destroy its window. The Assembler will be configured for the OSR8,
+	# which is the processor we use in all our stimulators currently.
+	if {[info commands Assembler_*] == ""} {
+		upvar #0 Assembler_info ainfo
+		LWDAQ_run_tool Assembler
 		destroy $ainfo(window)
-		if {[info commands OSR8_Assembler_assemble] == ""} {
-			Stimulator_print "ERROR: Failed to open OSR8 Assembler tool."
+		if {[info commands Assembler_assemble] == ""} {
+			Stimulator_print "ERROR: Failed to open Assembler Tool."
 		} 
 	}
 
@@ -1195,8 +1195,8 @@ proc Stimulator_tp_transmit {} {
 proc Stimulator_tp_run {} {
 	upvar #0 Stimulator_config config
 	upvar #0 Stimulator_info info
-	upvar #0 OSR8_Assembler_config aconfig
-	upvar #0 OSR8_Assembler_info ainfo
+	upvar #0 Assembler_config aconfig
+	upvar #0 Assembler_info ainfo
 	
 	# Read program from file.
 	if {[file exists $config(tp_program)]} {
@@ -1216,7 +1216,7 @@ proc Stimulator_tp_run {} {
 		set aconfig(hex_output) 0
 		set aconfig(ofn_write) 0
 		set aconfig(base_addr) $config(tp_base_addr)
-		set prog [OSR8_Assembler_assemble $program]
+		set prog [Assembler_assemble $program]
 		set ainfo(text) $saved_text
 	} error_message]} {
 		LWDAQ_print $info(tp_text) "ERROR: $error_message\."

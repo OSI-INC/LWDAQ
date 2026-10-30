@@ -1,12 +1,14 @@
-# OSR8 Assembler, a LWDAQ Tool
+# Assembler, a LWDAQ Tool
 #
 # Copyright (C) 2020-2026 Kevan Hashemi, Open Source Instruments Inc.
 #
-# Open-Source Reconfigurable Eight-Bit Central Porocessing Unit Assembler and
-# Dis-Assembler. The OSR8 Assembler converts text Open-Source, Reconfigurable,
-# Eight-Bit Central Processing Unit (OSR8 CPU) assembler source code into text
-# hexadecimal machine code for use by a firmware compiler such as the Lattice
-# Diamond VHDL compiler.
+# This tool translates Open-Source Reconfigurable Eight-Bit Microprocessor
+# (OSR8) CPU and Reduced Instruction Set Microcontroller with Five-Bit Opcodes
+# (RMC5) instruction penumonics into hexadecimal text strings, one instruction
+# memory value on each line of an output file. The tool also disassembles hex
+# output file. These hex files are designed for use with the Lattice Diamond
+# VHDL compiler. We use the OSR8 and RMC5 with Lattice Semiconductor FPGAs, in
+# particular the LCMXO2 family of devices.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -21,12 +23,12 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
-proc OSR8_Assembler_init {} {
-	upvar #0 OSR8_Assembler_info info
-	upvar #0 OSR8_Assembler_config config
+proc Assembler_init {} {
+	upvar #0 Assembler_info info
+	upvar #0 Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "OSR8_Assembler" "3.3"
+	LWDAQ_tool_init "Assembler" "4.1"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return ""
@@ -60,9 +62,9 @@ proc OSR8_Assembler_init {} {
 	return ""
 }
 
-proc OSR8_Assembler_pick {a} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_pick {a} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 
 	set fn ""
 	switch $a {
@@ -77,9 +79,9 @@ proc OSR8_Assembler_pick {a} {
 	}
 }
 
-proc OSR8_Assembler_edit {a} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_edit {a} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 
 	if {[winfo exists $info($a\_ew)]} {
 		raise $info($a\_ew)
@@ -89,9 +91,9 @@ proc OSR8_Assembler_edit {a} {
 	return $info($a\_ew)
 }
 
-proc OSR8_Assembler_instructions {} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_instructions {} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 
 	LWDAQ_print $info(text) "OSR8 Operation Codes and Instruction Syntax" purple
 	LWDAQ_print $info(text) "n = eight-bit number, nn = sixteen-bit number" purple
@@ -115,17 +117,17 @@ proc OSR8_Assembler_instructions {} {
 	return ""
 }
 
-proc OSR8_Assembler_error {message} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_error {message} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 
 	LWDAQ_print $info(text) "ERROR: $message"
 	error $message
 }
 
-proc OSR8_Assembler_find_symbol {line} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_find_symbol {line} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 
 	if {[regexp -nocase {^\s*const\s*([\w]*)\s*([\w]*)} $line dummy symbol value]} {
 		if {[regexp -nocase {^0x[0-9A-F]+$} $value]} {
@@ -133,7 +135,7 @@ proc OSR8_Assembler_find_symbol {line} {
 		} elseif {[regexp {^[0-9]+$} $value]} {
 			set value $value
 		} else {
-			OSR8_Assembler_error "Bad value \"$value\" for \"$symbol\"."
+			Assembler_error "Bad value \"$value\" for \"$symbol\"."
 		}
 		return [list $symbol $value]
 	} else {
@@ -141,9 +143,9 @@ proc OSR8_Assembler_find_symbol {line} {
 	}
 }
 
-proc OSR8_Assembler_find_include {line} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_find_include {line} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 
 	if {[regexp -nocase {^\s*include\s*"(.*?)"} $line dummy fn]} {
 		set fn [file join [file dirname $config(ifn)] $fn]
@@ -151,16 +153,16 @@ proc OSR8_Assembler_find_include {line} {
 		if {[file exists $fn]} {
 			return $fn		
 		} else {
-			OSR8_Assembler_error "Cannot find include file \"$fn\"."
+			Assembler_error "Cannot find include file \"$fn\"."
 		}
 	} else {
 		return ""
 	}
 }
 
-proc OSR8_Assembler_assemble {{asm  ""}} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_assemble {{asm  ""}} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 
 	if {$asm == ""} {
 		if {[file exists $config(ifn)]} {
@@ -168,7 +170,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			set asm [split [read $f] \n]
 			close $f
 		} else {
-			OSR8_Assembler_error "Cannot find input file \"$config(ifn)\"."
+			Assembler_error "Cannot find input file \"$config(ifn)\"."
 		}
 	} else {
 		set asm [split [string trim $asm] \n]
@@ -178,7 +180,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	# Include files, supporting recursive inclusion.
 	set basm [list]
 	foreach line $asm {
-		set fn [OSR8_Assembler_find_include $line]
+		set fn [Assembler_find_include $line]
 		if {$fn != ""} {
 			LWDAQ_print $info(text) "Including file \"$fn\"."
 			set f [open $fn r]
@@ -447,12 +449,12 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		}
 		
 		# See if this is a symbol definition line.
-		set sym_val [OSR8_Assembler_find_symbol $line] 
+		set sym_val [Assembler_find_symbol $line] 
 		if {$sym_val != ""} {
 			set sym [lindex $sym_val 0]
 			set val [lindex $sym_val 1]
 			if {[lsearch -index 0 $symbol_list $sym] >= 0} {
-				OSR8_Assembler_error "Symbol \"$sym\" already defined\
+				Assembler_error "Symbol \"$sym\" already defined\
 					at line $line_index\:\n$line\."
 			}
 			set match 1
@@ -475,7 +477,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 		
 		# Any other characters are an error.
 		if {[regexp {\w+} $line dummy]} {
-			OSR8_Assembler_error "Unrecognised pneumoic\
+			Assembler_error "Unrecognised pneumoic\
 				at line $line_index\: \"$line\"."
 		}
 	}
@@ -500,13 +502,13 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			lappend new_mem $m
 		} elseif {[regexp {^(\w+):$} $m dummy lbl]} {
 			if {[lsearch -index 0 $label_list $lbl] >= 0} {
-				OSR8_Assembler_error "Label \"$lbl\"\ defined more than once."
+				Assembler_error "Label \"$lbl\"\ defined more than once."
 			}
 			set val "[format %02X [expr $addr / 256]] [format %02X [expr $addr % 256]] "
 			lappend label_list [list $lbl $val]	
 			LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
 		} else {
-			OSR8_Assembler_error "Bad label \"$m\" in object code."
+			Assembler_error "Bad label \"$m\" in object code."
 		}
 	}
 	set mem $new_mem
@@ -530,7 +532,7 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 			}
 		}
 		if {!$found_label} {
-			OSR8_Assembler_error "Undefined label \"$m\"."
+			Assembler_error "Undefined label \"$m\"."
 		} else {
 			incr counter
 		}
@@ -556,10 +558,10 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	foreach m $mem {
 		if {$config(hex_output)} {
 			if {[expr 0x$m] > 255} {
-				OSR8_Assembler_error "Output hex value out of range \"$m\"."
+				Assembler_error "Output hex value out of range \"$m\"."
 			}
 		} elseif {($m > 255) || ($m < 0)} {
-			OSR8_Assembler_error "Output decimal value out of range \"$m\"."
+			Assembler_error "Output decimal value out of range \"$m\"."
 		}
 		if {$config(ofn_write)} {puts $f $m}
 		incr index
@@ -580,9 +582,9 @@ proc OSR8_Assembler_assemble {{asm  ""}} {
 	return $mem
 }
 
-proc OSR8_Assembler_disassemble {{mem  ""}} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_disassemble {{mem  ""}} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 
 	LWDAQ_print $info(text) "Starting OSR8 Dis-Assembler." purple
 	if {$mem == ""} {
@@ -593,7 +595,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 			close $f
 			LWDAQ_print $info(text) "Read [llength $mem] instruction bytes." purple
 		} else {
-			OSR8_Assembler_error "Cannot find file $config(ofn)."
+			Assembler_error "Cannot find file $config(ofn)."
 		}
 	} else {
 		LWDAQ_print $info(text) "Received object code from input string." purple
@@ -621,7 +623,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 				
 				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 1]]} {
 					if {$index >= [llength $mem] - 2} {
-						OSR8_Assembler_error "Missing operand bytes for\
+						Assembler_error "Missing operand bytes for\
 							final instruction $prototype\."
 					}
 					set n1 [lindex $mem [expr $index + 1]]
@@ -631,7 +633,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 					append bytes " $n1 $n2"
 				} elseif {[regexp -nocase {^n$} [lindex $prototype 1]]} {
 					if {$index >= [llength $mem] - 1} {
-						OSR8_Assembler_error "Missing operand bytes for\
+						Assembler_error "Missing operand bytes for\
 							final instruction $prototype\."
 					}
 					set n1 [lindex $mem [expr $index + 1]]
@@ -646,7 +648,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 				
 				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 2]]} {
 					if {$index >= [llength $mem] - 2} {
-						OSR8_Assembler_error "Missing operand bytes\
+						Assembler_error "Missing operand bytes\
 							for final instruction $prototype\."
 					}
 					set n1 [lindex $mem [expr $index + 1]]
@@ -656,7 +658,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 					append bytes " $n1 $n2"
 				} elseif {[regexp -nocase {^n$} [lindex $prototype 2]]} {
 					if {$index >= [llength $mem] - 1} {
-						OSR8_Assembler_error "Missing operand bytes\
+						Assembler_error "Missing operand bytes\
 							for final instruction $prototype\."
 						break
 					}
@@ -671,7 +673,7 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 		}
 
 		if {!$match} {
-			OSR8_Assembler_error "Unrecognized opcode \"$byte\"."
+			Assembler_error "Unrecognized opcode \"$byte\"."
 		} else {
 			LWDAQ_print -nonewline $info(text) "0x[format %04X $index]: "
 			LWDAQ_print -nonewline $info(text) \
@@ -686,9 +688,9 @@ proc OSR8_Assembler_disassemble {{mem  ""}} {
 	return ""
 }
 
-proc OSR8_Assembler_open {} {
-	upvar #0 OSR8_Assembler_config config
-	upvar #0 OSR8_Assembler_info info
+proc Assembler_open {} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
 	
 	set w [LWDAQ_tool_open $info(name)]
 	if {$w == ""} {return ""}
@@ -699,7 +701,7 @@ proc OSR8_Assembler_open {} {
 	
 	foreach a {Assemble Disassemble Instructions} {
 		set b [string tolower $a]
-		button $f.$b -text $a -command [list LWDAQ_post "catch OSR8_Assembler_$b"]
+		button $f.$b -text $a -command [list LWDAQ_post "catch Assembler_$b"]
 		pack $f.$b -side left -expand 1
 		
 	} 
@@ -710,9 +712,9 @@ proc OSR8_Assembler_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	checkbutton $f.hex -variable OSR8_Assembler_config(hex_output) -text "Hex Output"
+	checkbutton $f.hex -variable Assembler_config(hex_output) -text "Hex Output"
 	pack $f.hex -side left -expand 1
-	checkbutton $f.fileout -variable OSR8_Assembler_config(ofn_write) -text "Write File"
+	checkbutton $f.fileout -variable Assembler_config(ofn_write) -text "Write File"
 	pack $f.fileout -side left -expand 1
 
 	foreach {a b} {ifn Input ofn Output} {
@@ -721,9 +723,9 @@ proc OSR8_Assembler_open {} {
 		pack $f -side top -fill x
 	
 		label $f.[set a]l -text "$b File:" 
-		entry $f.[set a]e -textvariable OSR8_Assembler_config([set a]) -width 60
-		button $f.[set a]p -text "Pick" -command "OSR8_Assembler_pick $a"
-		button $f.[set a]ed -text "Edit" -command "OSR8_Assembler_edit $a"
+		entry $f.[set a]e -textvariable Assembler_config([set a]) -width 60
+		button $f.[set a]p -text "Pick" -command "Assembler_pick $a"
+		button $f.[set a]ed -text "Edit" -command "Assembler_edit $a"
 		pack $f.[set a]l $f.[set a]e $f.[set a]p $f.[set a]ed -side left -expand 1
 	}
 	
@@ -736,8 +738,8 @@ proc OSR8_Assembler_open {} {
 	return $w
 }
 
-OSR8_Assembler_init
-OSR8_Assembler_open
+Assembler_init
+Assembler_open
 	
 return ""
 
@@ -777,8 +779,6 @@ constant ld_ix_A  : opcode_type := "0011000"; -- 18 ld (IX),A
 constant ld_iy_A  : opcode_type := "0011001"; -- 19 ld (IY),A
 constant ld_HL_SP : opcode_type := "0011010"; -- 1A ld HL,SP
 constant ld_SP_HL : opcode_type := "0011011"; -- 1B ld SP,HL
-constant ld_HL_PC : opcode_type := "0011100"; -- 1C ld HL,PC
-constant ld_PC_HL : opcode_type := "0011101"; -- 1D ld PC,HL
 
 constant push_A   : opcode_type := "0100000"; -- 20 push A
 constant push_B   : opcode_type := "0100001"; -- 21 push B
