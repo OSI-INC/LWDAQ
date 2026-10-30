@@ -290,7 +290,7 @@ proc BCAM_Calculator_ct_change {ct} {
 	set available [lsort -dictionary $available]
 	$info(apparatus_version_menu) delete 0 100
 	$info(apparatus_version_menu) add command \
-			-label * -command "set BCAM_Calculator_config(apparatus_version) *"
+		-label * -command "set BCAM_Calculator_config(apparatus_version) *"
 	foreach b $available {
 		$info(apparatus_version_menu) add command \
 			-label $b -command \

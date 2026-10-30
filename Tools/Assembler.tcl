@@ -34,15 +34,37 @@ proc Assembler_init {} {
 		return ""
 	}
 	
-	set config(hex_output) "1"
+	set config(output_format) "Hex"
 	set config(ifn) "~/Desktop/Program.asm"
 	set config(ofn) "~/Desktop/Program.mem"
 	set config(ofn_write) "1"
 	set info(ifn_ew) $info(window).iew
 	set info(ofn_ew) $info(window).oew
 	
-	set config(opcode_color) "brown"
-	set config(syntax_color) "green"
+	set info(t_color) "purple"
+	set info(oc_color) "brown"
+	set info(syntax_color) "green"
+	
+	set info(supported_cpus) "OSR8 RMC5"
+	set config(cpu) "OSR8"
+	set config(opcode_width) "0"
+	set config(addr_width) "0"
+	set config(data_width) "0"
+	set config(output_format) "Hex"
+	
+	set info(OSR8_opcode_width) "8"
+	set info(OSR8_addr_width) "16"
+	set info(OSR8_default_addr_width) "16"
+	set info(OSR8_data_width) "8"
+	set info(OSR8_formats) "Hex Binary"
+	set info(OSR8_default_format) "Hex"
+	
+	set info(RMC5_opcode_width) "5"
+	set info(RMC5_addr_width) "3 4 5 6 7 8 9 10 11 12 13 14 15 16"
+	set info(RMC5_default_addr_width) "7"
+	set info(RMC5_data_width) "8"
+	set info(RMC5_formats) "Binary"
+	set info(RMC5_default_format) "Binary"
 	
 	set config(base_addr) "0x0000"
 	set config(bytes_per_line) "30"
@@ -50,16 +72,70 @@ proc Assembler_init {} {
 		uplevel #0 [list source $info(settings_file_name)]
 	} 
 
-	set data [string trim [LWDAQ_tool_data $info(name)]]
-	set data [split $data \n]
-	set info(instructions) [list]
-	foreach d $data {
-		if {[regexp { +-- +([0-9A-Fa-f]{2}) +(.*)} $d dummy opcode syntax]} {
-			lappend info(instructions) [list $syntax $opcode]
-		}
-	}	
-		
 	return ""
+}
+
+proc Assembler_set_cpu {cpu} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
+
+	set config(cpu) $cpu
+	
+	$info(addr_menu) delete 0 100
+	foreach width [set info($cpu\_addr_width)] {
+		$info(addr_menu) add command -label $width \
+			-command [list set Assembler_config(addr_width) $width]
+	}
+	set config(addr_width) $info($cpu\_default_addr_width)
+
+	$info(format_menu) delete 0 100
+	foreach f [set info($cpu\_formats)] {
+		$info(addr_menu) add command -label $f \
+			-command [list set Assembler_config(output_format) $f]
+	}
+	set config(output_format) $info($cpu\_default_format)
+}
+
+proc Assembler_load {} {
+	upvar #0 Assembler_config config
+	upvar #0 Assembler_info info
+
+	LWDAQ_print $info(text) "\nLoading instructions\
+		from built-in database..." $info(t_color)
+	LWDAQ_update
+	
+	set data [string trim [LWDAQ_tool_data $info(name)]]
+	foreach cpu $info(supported_cpus) {
+		set pattern "BEGIN_$cpu\(\.\*\?\)END_$cpu"
+		if {![regexp -indices $pattern $data match instructions]} {
+			LWDAQ_print $info(text) "ERROR: Cannot find instructions for $cpu\."
+			continue
+		}
+		set info($cpu\_instructions) [list]
+		lassign $instructions first last
+		set instructions [string range $data $first $last]
+		set instructions [split $instructions \n]
+		lassign $match first last
+		set data [string range $data [expr $last+1] end]
+
+		LWDAQ_print -nonewline $info(text) "$cpu"
+		foreach d $instructions {
+			if {[regexp { +-- +([0-9A-Fa-f]{2}) +(.*)} $d dummy opcode syntax]} {
+				lappend info($cpu\_instructions) [list $syntax $opcode]
+				LWDAQ_print -nonewline $info(text) "."
+				LWDAQ_update
+			}
+		}
+		LWDAQ_print $info(text)
+		LWDAQ_print $info(text) "Loaded [llength [set info($cpu\_instructions)]]\
+			opcodes with syntax for $cpu processor."
+		LWDAQ_update
+	}
+	
+	Assembler_set_cpu [lindex $info(supported_cpus) 0]
+	
+	LWDAQ_print $info(text) "Done. \([clock format [clock seconds]]\)" $info(t_color)
+	LWDAQ_update
 }
 
 proc Assembler_pick {a} {
@@ -95,17 +171,19 @@ proc Assembler_instructions {} {
 	upvar #0 Assembler_config config
 	upvar #0 Assembler_info info
 
-	LWDAQ_print $info(text) "OSR8 Operation Codes and Instruction Syntax" purple
-	LWDAQ_print $info(text) "n = eight-bit number, nn = sixteen-bit number" purple
-	LWDAQ_print $info(text) "(nn) = value pointed to by address nn" purple
-	LWDAQ_print $info(text) "(IX) = value pointed to by register IX" purple
+	LWDAQ_print $info(text) "Operation Codes and Instruction Syntax" $info(t_color)
+	LWDAQ_print $info(text) "n = data constant, nn = address constant" $info(t_color)
+	LWDAQ_print $info(text) "(nn) = value pointed to by address nn" $info(t_color)
+	LWDAQ_print $info(text) "SP = stack pointer, PC = program counter" $info(t_color)
+	LWDAQ_print $info(text) "(IX), (IY) values pointed to by IX and IY" $info(t_color)
 
+	set instructions [set info($config(cpu)\_instructions)]
 	set index 0
-	foreach i $info(instructions) {
+	foreach i $instructions {
 		LWDAQ_print -nonewline $info(text) \
-			"[format %-10s [lindex $i 0]] " $config(syntax_color)
+			"[format %-10s [lindex $i 0]] " $info(syntax_color)
 		LWDAQ_print -nonewline $info(text) \
-			"0x[lindex $i 1]   " $config(opcode_color)
+			"0x[lindex $i 1]   " $info(oc_color)
 		incr index
 		if {$index % 4 == 0} {LWDAQ_print $info(text)}
 		LWDAQ_support
@@ -113,16 +191,10 @@ proc Assembler_instructions {} {
 	if {$index % 4 != 0} {LWDAQ_print $info(text)}
 	
 	LWDAQ_print $info(text) "Number of Available Instructions\
-		= [llength $info(instructions)].\n" purple
+		= [llength $instructions].\n" $info(t_color)
+	LWDAQ_print $info(text) "Done. \([clock format [clock seconds]]\)\n" $info(t_color)
+
 	return ""
-}
-
-proc Assembler_error {message} {
-	upvar #0 Assembler_config config
-	upvar #0 Assembler_info info
-
-	LWDAQ_print $info(text) "ERROR: $message"
-	error $message
 }
 
 proc Assembler_find_symbol {line} {
@@ -135,7 +207,9 @@ proc Assembler_find_symbol {line} {
 		} elseif {[regexp {^[0-9]+$} $value]} {
 			set value $value
 		} else {
-			Assembler_error "Bad value \"$value\" for \"$symbol\"."
+			set message "ERROR: Bad value \"$value\" for \"$symbol\"."
+			LWDAQ_print $info(text) $message
+			error $message
 		}
 		return [list $symbol $value]
 	} else {
@@ -153,7 +227,9 @@ proc Assembler_find_include {line} {
 		if {[file exists $fn]} {
 			return $fn		
 		} else {
-			Assembler_error "Cannot find include file \"$fn\"."
+			set message "ERROR: Cannot find include file \"$fn\"."
+			LWDAQ_print $info(text) $message
+			error $message
 		}
 	} else {
 		return ""
@@ -170,12 +246,14 @@ proc Assembler_assemble {{asm  ""}} {
 			set asm [split [read $f] \n]
 			close $f
 		} else {
-			Assembler_error "Cannot find input file \"$config(ifn)\"."
+			set message "ERROR: Cannot find input file \"$config(ifn)\"."
+			LWDAQ_print $info(text) $message
+			error $message
 		}
 	} else {
 		set asm [split [string trim $asm] \n]
 	}
-	LWDAQ_print $info(text) "Assembling [llength $asm] lines of code." purple
+	LWDAQ_print $info(text) "Assembling [llength $asm] lines of code." $info(t_color)
 	
 	# Include files, supporting recursive inclusion.
 	set basm [list]
@@ -209,14 +287,15 @@ proc Assembler_assemble {{asm  ""}} {
 	}
 	
 	# Go through lines finding instructions.
-	set mem ""
+	set instructions [set info($config(cpu)\_instructions)]
+	set mem [list]
 	set symbols [list]
 	set line_index 0
 	foreach line $basm {
 		incr line_index
 		set match 0
 		set code ""
-		foreach inst $info(instructions) {
+		foreach inst $instructions {
 		
 			# Set up instruction code in code and replace comma in prototype.
 			set prototype [regsub {,} [lindex $inst 0] " "]
@@ -232,7 +311,7 @@ proc Assembler_assemble {{asm  ""}} {
 			# If there are no operands, we have found a match.
 			if {[llength $prototype] == 1} {
 				set match 1
-				append mem $code
+				lappend mem $code
 				break
 			} 
 			
@@ -333,7 +412,7 @@ proc Assembler_assemble {{asm  ""}} {
 			# If there is only one operand, we are done.
 			if {[llength $prototype] == 2} {
 				set match 1
-				append mem $code
+				lappend mem $code
 				break
 			}
 
@@ -433,7 +512,7 @@ proc Assembler_assemble {{asm  ""}} {
 			
 			# Otherwise we are done.
 			set match 1
-			append mem $code
+			lappend mem $code
 			break
 		}
 		
@@ -443,8 +522,8 @@ proc Assembler_assemble {{asm  ""}} {
 		if {$match} {
 			LWDAQ_print -nonewline $info(text) "[format %3d $line_index]: " 
 			LWDAQ_print -nonewline $info(text) \
-				"[format %-16s $prototype] " $config(syntax_color)
-			LWDAQ_print $info(text) $code $config(opcode_color)
+				"[format %-16s $prototype] " $info(syntax_color)
+			LWDAQ_print $info(text) $code $info(oc_color)
 			continue
 		}
 		
@@ -454,33 +533,37 @@ proc Assembler_assemble {{asm  ""}} {
 			set sym [lindex $sym_val 0]
 			set val [lindex $sym_val 1]
 			if {[lsearch -index 0 $symbol_list $sym] >= 0} {
-				Assembler_error "Symbol \"$sym\" already defined\
+				set message "ERROR: Symbol \"$sym\" already defined\
 					at line $line_index\:\n$line\."
+				LWDAQ_print $info(text) $message
+				error $message
 			}
 			set match 1
 			lappend symbol_list $sym_val
 			LWDAQ_print -nonewline $info(text) "[format %3d $line_index]: " 
-			LWDAQ_print -nonewline $info(text) \
-				"[format %-16s $sym] " $config(syntax_color)
+			LWDAQ_print -nonewline $info(text) "[format %-16s $sym] " $info(syntax_color)
 			LWDAQ_print $info(text) \
-				"[format %-5d $val] 0x[format %04X $val]" $config(opcode_color)
+				"[format %-5d $val] 0x[format %04X $val]" $info(oc_color)
 			continue
 		} 
 		
 		# See if this is a label line.
 		if {[regexp {^\w+:$} $line lbl]} {
 			set match 1
-			append mem "$lbl "
+			lappend mem "$lbl "
 			LWDAQ_print $info(text) $lbl 
 			continue
 		}
 		
 		# Any other characters are an error.
 		if {[regexp {\w+} $line dummy]} {
-			Assembler_error "Unrecognised pneumoic\
-				at line $line_index\: \"$line\"."
+			set message "ERROR: Unrecognised pneumoic at line $line_index\: \"$line\"."
+			LWDAQ_print $info(text) $message
+			error $message
 		}
 	}
+	
+	LWDAQ_print $info(text) $mem orange
 	
 	# Now we resolve the label values. Each element of the memory dump is now
 	# either a byte, which counts as one address, or a label with no colon,
@@ -490,7 +573,7 @@ proc Assembler_assemble {{asm  ""}} {
 	# it to the symbol list.
 	set addr [expr $config(base_addr)]
 	LWDAQ_print $info(text) "Resolving address labels,\
-		base address $config(base_addr):" purple
+		base address $config(base_addr):" $info(t_color)
 	set new_mem ""
 	foreach m $mem {
 		if {[regexp -nocase {^[0-9A-F]+$} $m]} {
@@ -502,13 +585,17 @@ proc Assembler_assemble {{asm  ""}} {
 			lappend new_mem $m
 		} elseif {[regexp {^(\w+):$} $m dummy lbl]} {
 			if {[lsearch -index 0 $label_list $lbl] >= 0} {
-				Assembler_error "Label \"$lbl\"\ defined more than once."
+				set message "ERROR: Label \"$lbl\"\ defined more than once."
+				LWDAQ_print $info(text) $message
+				error $message
 			}
 			set val "[format %02X [expr $addr / 256]] [format %02X [expr $addr % 256]] "
 			lappend label_list [list $lbl $val]	
 			LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
 		} else {
-			Assembler_error "Bad label \"$m\" in object code."
+			set message "ERROR: Bad label \"$m\" in object code."
+			LWDAQ_print $info(text) $message
+			error $message
 		}
 	}
 	set mem $new_mem
@@ -532,7 +619,9 @@ proc Assembler_assemble {{asm  ""}} {
 			}
 		}
 		if {!$found_label} {
-			Assembler_error "Undefined label \"$m\"."
+			set message "ERROR: Undefined label \"$m\"."
+			LWDAQ_print $info(text) $message
+			error $message
 		} else {
 			incr counter
 		}
@@ -543,41 +632,47 @@ proc Assembler_assemble {{asm  ""}} {
 	# and always to the text window. The format is either hex bytes or decimal
 	# bytes, as selected by user.
 	if {$config(ofn_write)} {
-		LWDAQ_print $info(text) "Opening output file $config(ofn)." purple
+		LWDAQ_print $info(text) "Opening output file $config(ofn)." $info(t_color)
 		set f [open $config(ofn) w]
 	}
-	if {$config(hex_output)} {
-		LWDAQ_print $info(text) "Code bytes in hex format:" purple
+	if {$config(output_format) == "Hex"} {
+		LWDAQ_print $info(text) "Instructions in hexadecimal format:" $info(t_color)
 	} else {
-		LWDAQ_print $info(text) "Code bytes in decimal format:" purple
-		set newmem [list]
-		foreach m $mem {lappend newmem [expr 0x$m]}
-		set mem $newmem
+		LWDAQ_print $info(text) "Instructions in binary format:" $info(t_color)
 	}
 	set index 0
-	foreach m $mem {
-		if {$config(hex_output)} {
-			if {[expr 0x$m] > 255} {
-				Assembler_error "Output hex value out of range \"$m\"."
+	foreach instruction $mem {
+		if {$config(cpu) == "OSR8"} {
+			foreach value $instruction {
+				if {[expr 0x$value] > 255} {
+					set message "ERROR: Value out of range \"0x$value\"."
+					LWDAQ_print $info(text) $message
+					error $message
+				}
+				if {$config(output_format) == "Hex"} {
+					if {$config(ofn_write)} {puts $f $value}
+					LWDAQ_print -nonewline $info(text) $value
+				} else {
+					set binvalue [format %08b [expr 0x$value]]
+					if {$config(ofn_write)} {puts $f $binvalue}
+					LWDAQ_print -nonewline $info(text) $binvalue
+				}
+				incr index
+				if {$index % $config(bytes_per_line) == 0} {LWDAQ_print $info(text)}
 			}
-		} elseif {($m > 255) || ($m < 0)} {
-			Assembler_error "Output decimal value out of range \"$m\"."
 		}
-		if {$config(ofn_write)} {puts $f $m}
-		incr index
-		LWDAQ_print -nonewline $info(text) "$m "
-		if {$index % $config(bytes_per_line) == 0} {LWDAQ_print $info(text)}
 	}
+	
 	if {$index % $config(bytes_per_line) != 0} {LWDAQ_print $info(text)}
 	if {$config(ofn_write)} {
 		close $f
 		LWDAQ_print $info(text) "Generated [llength $mem] code bytes,\
-			printed to screen, saved to \"$config(ofn)\"." purple
+			printed to screen, saved to \"$config(ofn)\"." $info(t_color)
 	} else {
 		LWDAQ_print $info(text) "Generated [llength $mem] code bytes,\
-			printed to screen, not saved to disk." purple	
+			printed to screen, not saved to disk." $info(t_color)	
 	}
-	LWDAQ_print $info(text) "Done. \([clock format [clock seconds]]\)" purple
+	LWDAQ_print $info(text) "Done. \([clock format [clock seconds]]\)\n" $info(t_color)
 	
 	return $mem
 }
@@ -586,60 +681,86 @@ proc Assembler_disassemble {{mem  ""}} {
 	upvar #0 Assembler_config config
 	upvar #0 Assembler_info info
 
-	LWDAQ_print $info(text) "Starting OSR8 Dis-Assembler." purple
+	LWDAQ_print $info(text) "Starting Dis-Assembler." $info(t_color)
 	if {$mem == ""} {
 		if {[file exists $config(ofn)]} {
-			LWDAQ_print $info(text) "Reading object code from $config(ofn)." purple
+			LWDAQ_print $info(text) "Reading object code from $config(ofn)." $info(t_color)
 			set f [open $config(ofn) r]
 			set mem [split [string trim [read $f]] \n]
 			close $f
-			LWDAQ_print $info(text) "Read [llength $mem] instruction bytes." purple
+			LWDAQ_print $info(text) "Read [llength $mem] instruction bytes." $info(t_color)
 		} else {
-			Assembler_error "Cannot find file $config(ofn)."
+			set message "ERROR: Cannot find file $config(ofn)."
+			LWDAQ_print $info(text) $message
+			error $message
 		}
 	} else {
-		LWDAQ_print $info(text) "Received object code from input string." purple
+		LWDAQ_print $info(text) "Received object code from input string." $info(t_color)
 		set mem [split [string trim $mem] \n]
-		LWDAQ_print $info(text) "Received [llength $mem] instruction bytes." purple
+		LWDAQ_print $info(text) "Received [llength $mem] instruction bytes." $info(t_color)
 	}
-	LWDAQ_print $info(text) "Output will be written to text window." purple
+	LWDAQ_print $info(text) "Output will be written to text window." $info(t_color)
 	
 	# Go through object file finding instructions and printing out prototype
 	# instructions with operands filled in by values found in object file.
+	set instructions [set info($config(cpu)\_instructions)]
 	set index 0
 	set asm ""
 	while {$index < [llength $mem]} {
-		set bytes [string trim [lindex $mem $index]]
+		set instruction_word [string trim [lindex $mem $index]]
+		set opcode ""
+		set operand ""
+		set num_words "1"
+		if {$config(cpu) == "OSR8"} {
+			if {$config(output_format) == "Hex"} {
+				set opcode [expr 0x$instruction_word]
+			} else {
+				scan $instruction_word %b opcode
+			}
+		} else {
+			if {$config(output_format) == "Hex"} {
+				set message "ERROR: Cannot disassemble hex format for RMC5."
+				LWDAQ_print $info(text) $message
+				error $message				
+			}
+			scan [string range $instruction_word 0 4] %b opcode
+			scan [string range $instruction_word 5 end] %b operand
+			set operand [format %04X $operand]
+		}
 		set match 0
-		foreach inst $info(instructions) {
+		foreach inst $instructions {
 			set prototype [regsub {,} [lindex $inst 0] " "]
-			set code "[lindex $inst 1] "
-			if {[expr 0x$code] == [expr 0x$bytes]} {
+			set prototype_operand "[lindex $inst 1] "
+			if {[expr 0x$prototype_operand] == $opcode} {
 				set match 1
 				
-				if {[llength $prototype] == 1} {
-					break
-				}
+				if {$config(cpu) == "RMC5"} {break}
+				if {[llength $prototype] == 1} {break}
 				
 				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 1]]} {
 					if {$index >= [llength $mem] - 2} {
-						Assembler_error "Missing operand bytes for\
+						set message "ERROR: Missing operand bytes for\
 							final instruction $prototype\."
+						LWDAQ_print $info(text) $message
+						error $message
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					set n2 [lindex $mem [expr $index + 2]]
 					lset prototype 1 [regsub {nn} [lindex $prototype 1] \
 						"0x[set n1][set n2]"]
-					append bytes " $n1 $n2"
+					set operand "$n1 $n2"
+					set num_words "3"
 				} elseif {[regexp -nocase {^n$} [lindex $prototype 1]]} {
 					if {$index >= [llength $mem] - 1} {
-						Assembler_error "Missing operand bytes for\
+						set message "ERROR: Missing operand bytes for\
 							final instruction $prototype\."
+						LWDAQ_print $info(text) $message
+						error $message
 					}
 					set n1 [lindex $mem [expr $index + 1]]
-					lset prototype 1 [regsub {n} [lindex $prototype 1] \
-						"0x[set n1]"]
-					append bytes " $n1"
+					lset prototype 1 [regsub {n} [lindex $prototype 1] "0x[set n1]"]
+					set operand "$n1"
+					set num_words "2"
 				}
 				
 				if {[llength $prototype] == 2} {
@@ -648,24 +769,29 @@ proc Assembler_disassemble {{mem  ""}} {
 				
 				if {[regexp -nocase {\(*nn\)*} [lindex $prototype 2]]} {
 					if {$index >= [llength $mem] - 2} {
-						Assembler_error "Missing operand bytes\
+						set message "ERROR: Missing operand bytes\
 							for final instruction $prototype\."
+						LWDAQ_print $info(text) $message
+						error $message
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					set n2 [lindex $mem [expr $index + 2]]
 					lset prototype 2 [regsub {nn} [lindex $prototype 2] \
 						"0x[set n1][set n2]"]
-					append bytes " $n1 $n2"
+					set operand "$n1 $n2"
+					set num_words "3"
 				} elseif {[regexp -nocase {^n$} [lindex $prototype 2]]} {
 					if {$index >= [llength $mem] - 1} {
-						Assembler_error "Missing operand bytes\
+						set message "ERROR: Missing operand bytes\
 							for final instruction $prototype\."
-						break
+						LWDAQ_print $info(text) $message
+						error $message
 					}
 					set n1 [lindex $mem [expr $index + 1]]
 					lset prototype 2 [regsub {n} [lindex $prototype 2] \
 						"0x[set n1]"]
-					append bytes " $n1"
+					set operand "$n1"
+					set num_words "2"
 				}
 				
 				break
@@ -673,18 +799,21 @@ proc Assembler_disassemble {{mem  ""}} {
 		}
 
 		if {!$match} {
-			Assembler_error "Unrecognized opcode \"$byte\"."
+			set message "ERROR: Unrecognized opcode \"$opcode\"."
+			LWDAQ_print $info(text) $message
+			error $message
 		} else {
 			LWDAQ_print -nonewline $info(text) "0x[format %04X $index]: "
-			LWDAQ_print -nonewline $info(text) \
-				"[format %-10s $bytes] " $config(opcode_color)
-			LWDAQ_print $info(text) $prototype $config(syntax_color)	
+			LWDAQ_print -nonewline $info(text) "[format %02X $opcode] " $info(oc_color)
+			LWDAQ_print -nonewline $info(text) "[format %-10s $operand] " $info(oc_color)
+			LWDAQ_print $info(text) "$prototype" $info(syntax_color)	
 			append asm $prototype	
 		}
 		
-		set index [expr $index + [llength $bytes]]
+		set index [expr $index + $num_words]
 	}	
 
+	LWDAQ_print $info(text) "Done. \([clock format [clock seconds]]\)\n" $info(t_color)
 	return ""
 }
 
@@ -712,11 +841,33 @@ proc Assembler_open {} {
 		pack $f.$b -side left -expand 1
 	}
 	
-	checkbutton $f.hex -variable Assembler_config(hex_output) -text "Hex Output"
-	pack $f.hex -side left -expand 1
-	checkbutton $f.fileout -variable Assembler_config(ofn_write) -text "Write File"
-	pack $f.fileout -side left -expand 1
+	set f $w.options
+	frame $f
+	pack $f -side top -fill x
 
+	label $f.lcpu -text "Processor:"
+	tk_optionMenu $f.mcpu Assembler_config(cpu) "OSR8"
+	set info(cpu_menu) $f.mcpu.menu
+	pack $f.lcpu $f.mcpu -side left -expand 1		
+	$info(cpu_menu) delete 0 100
+	foreach a $info(supported_cpus) {
+		$info(cpu_menu) add command -label $a \
+			-command [list Assembler_set_cpu $a]
+	}
+
+	label $f.laddr -text "Address Width:"
+	tk_optionMenu $f.maddr Assembler_config(addr_width) "8" 
+	set info(addr_menu) $f.maddr.menu
+	pack $f.laddr $f.maddr -side left -expand 1		
+
+	label $f.lformat -text "Output Format:"
+	tk_optionMenu $f.mformat Assembler_config(output_format) "Binary"
+	set info(format_menu) $f.mformat.menu
+	pack $f.lformat $f.mformat -side left -expand 1
+
+	checkbutton $f.fileout -variable Assembler_config(ofn_write) -text "Write"
+	pack $f.fileout -side left -expand 1	
+	
 	foreach {a b} {ifn Input ofn Output} {
 		set f $w.[set a]
 		frame $f
@@ -731,16 +882,15 @@ proc Assembler_open {} {
 	
 	set info(text) [LWDAQ_text_widget $w 100 15]
 
-	LWDAQ_print $info(text) "$info(name) Version $info(version)" purple
-	LWDAQ_print $info(text) "(c) 2020 Kevan Hashemi, Open Source\
-		Instruments Inc.\n" purple	
+	LWDAQ_print $info(text) "$info(name) Version $info(version)" $info(t_color)
 	
 	return $w
 }
 
 Assembler_init
 Assembler_open
-	
+Assembler_load
+
 return ""
 
 ----------Begin Help----------
@@ -750,6 +900,8 @@ http://www.opensourceinstruments.com/Electronics/A3035/OSR8.html#Assembler
 ----------End Help----------
 
 ----------Begin Data----------
+
+BEGIN_OSR8
 
 constant nop      : opcode_type := "0000000"; -- 00 nop
 constant jp_nn    : opcode_type := "0000001"; -- 01 jp nn
@@ -771,8 +923,8 @@ constant ld_A_n   : opcode_type := "0010000"; -- 10 ld A,n
 constant ld_IX_nn : opcode_type := "0010001"; -- 11 ld IX,nn
 constant ld_IY_nn : opcode_type := "0010010"; -- 12 ld IY,nn
 constant ld_HL_nn : opcode_type := "0010011"; -- 13 ld HL,nn
-constant ld_A_mm  : opcode_type := "0010100"; -- 14 ld A,(nn)
-constant ld_mm_A  : opcode_type := "0010101"; -- 15 ld (nn),A
+constant ld_A_m   : opcode_type := "0010100"; -- 14 ld A,(nn)
+constant ld_m_A   : opcode_type := "0010101"; -- 15 ld (nn),A
 constant ld_A_ix  : opcode_type := "0010110"; -- 16 ld A,(IX)
 constant ld_A_iy  : opcode_type := "0010111"; -- 17 ld A,(IY)
 constant ld_ix_A  : opcode_type := "0011000"; -- 18 ld (IX),A
@@ -842,5 +994,42 @@ constant sla_A    : opcode_type := "1111100"; -- 7C sla A
 constant sra_A    : opcode_type := "1111101"; -- 7D sra A
 constant srl_A    : opcode_type := "1111110"; -- 7E srl A
 
-	
+END_OSR8
+
+BEGIN_RMC5
+
+constant nop      : opcode_type := "00000"; -- 00 nop
+constant jp_nn    : opcode_type := "00001"; -- 01 jp nn
+constant jp_nz_nn : opcode_type := "00010"; -- 02 jp nz,nn
+constant jp_z_nn  : opcode_type := "00011"; -- 03 jp z,nn
+constant jp_nc_nn : opcode_type := "00100"; -- 04 jp nc,nn
+constant jp_c_nn  : opcode_type := "00101"; -- 05 jp c,nn
+constant call_nn  : opcode_type := "00110"; -- 06 call nn
+constant ret_cll  : opcode_type := "00111"; -- 07 ret
+
+constant ret_int  : opcode_type := "01000"; -- 08 rti
+constant push_A   : opcode_type := "01001"; -- 09 push A
+constant pop_A    : opcode_type := "01010"; -- 0A pop A
+constant push_F   : opcode_type := "01011"; -- 0B push F
+constant pop_F    : opcode_type := "01100"; -- 0C pop F
+constant ld_m_A   : opcode_type := "01101"; -- 0D ld (nn),A
+constant ld_A_m   : opcode_type := "01110"; -- 0E ld A,(nn)
+
+constant add_A_m  : opcode_type := "10000"; -- 10 add A,(nn)
+constant adc_A_m  : opcode_type := "10001"; -- 11 adc A,(nn)
+constant sub_A_m  : opcode_type := "10010"; -- 12 sub A,(nn)
+constant sbc_A_m  : opcode_type := "10011"; -- 13 sbc A,(nn)
+
+constant and_A_m  : opcode_type := "10100"; -- 14 and A,(nn)
+constant or_A_m   : opcode_type := "10101"; -- 15 or A,(nn)
+constant xor_A_m  : opcode_type := "10110"; -- 16 xor A,(nn)
+
+constant rl_A     : opcode_type := "11000"; -- 18 rl A
+constant rr_A     : opcode_type := "11001"; -- 19 rr A
+constant clr_aflg : opcode_type := "11010"; -- 1A clrf
+constant clr_iflg : opcode_type := "11011"; -- 1B clri
+constant set_iflg : opcode_type := "11100"; -- 1C seti
+
+END_RMC5
+
 ----------End Data----------
