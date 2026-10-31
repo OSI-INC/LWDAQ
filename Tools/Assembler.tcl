@@ -90,7 +90,7 @@ proc Assembler_set_cpu {cpu} {
 
 	$info(format_menu) delete 0 100
 	foreach f [set info($cpu\_formats)] {
-		$info(addr_menu) add command -label $f \
+		$info(format_menu) add command -label $f \
 			-command [list set Assembler_config(output_format) $f]
 	}
 	set config(output_format) $info($cpu\_default_format)
@@ -197,7 +197,7 @@ proc Assembler_instructions {} {
 	return ""
 }
 
-proc Assembler_find_symbol {line} {
+proc Assembler_define_symbol {line} {
 	upvar #0 Assembler_config config
 	upvar #0 Assembler_info info
 
@@ -285,37 +285,60 @@ proc Assembler_assemble {{asm  ""}} {
 		set line [string trim $line]
 		lappend basm $line
 	}
+	set asm $basm
 	
-	# Go through lines finding instructions.
+	# Go through lines finding instructions. Each assemby language instruction
+	# must be on a separate line. We do not allow consecutive instructions on
+	# the same line. Each instruction will represented in the assembled list by
+	# its own element, which will consists of one or more hexadecimal bytes, and
+	# perhaps a label, which we will later resolve into two hexadecimal bytes.
+	# This format for representing instructions is sufficient for any processor
+	# with opcode length one to eight bits and address length one to sixteen
+	# bits. Our list of instructions is the one corresponding to our selected
+	# processor. As we go through the code, we keep a list of symbols, which are
+	# constants defined by constant declarations in the source code, and then
+	# referenced in instructions. If a symbol is not resolved in an instruction
+	# by an existing declaration, we assume it is an address label, and we will
+	# try to resolve it later.
 	set instructions [set info($config(cpu)\_instructions)]
-	set mem [list]
+	set assembled [list]
 	set symbols [list]
 	set line_index 0
-	foreach line $basm {
+	foreach line $asm {
 		incr line_index
 		set match 0
-		set code ""
+		set opcode ""
 		foreach inst $instructions {
 		
-			# Set up instruction code in code and replace comma in prototype.
+			# We extract from the instruction the two-digit hexadecimal opcode
+			# string and the pneumonic string. We remove commas from the
+			# pneumonic string and replace them with spaces.
+			set opcode [lindex $inst 1]
 			set prototype [regsub {,} [lindex $inst 0] " "]
-			set code "[lindex $inst 1] "
 			
-			# The line and instruction must have the same number of elements,
-			# up to opcode, operand one, and operand two.
+			# The line and instruction prototype must have the same number of elements,
+			# and their first instruction pneumonic words must match.
 			if {[llength $line] != [llength $prototype]} {continue}
-			
-			# Their opcodes must match.
 			if {![regexp -nocase [lindex $line 0] [lindex $prototype 0]]} {continue}
 
-			# If there are no operands, we have found a match.
+			# The pneumonics match and there are no operands, the opcode of this 
+			# instruction is the output for this line.
 			if {[llength $prototype] == 1} {
 				set match 1
-				lappend mem $code
+				lappend assembled [string trim $opcode]
 				break
 			} 
 			
-			# Compare the first operands.
+			# Start an instruction bytes string with the opcode.
+			set code "$opcode "
+			
+			# Compare the first operands. These could be letters naming a register
+			# or pneumonics n, nn, or (nn) for a data constant, address constant,
+			# or memory access with address constant. In the case of constants, we
+			# extract the constant value from the source code line. Data constants
+			# we format as two hex digits, address constants as four hex digits. We
+			# append these bytes to the instruction code. If we encounter what might
+			# be a symbol, we look for it in our symbol list.
 			set fo_match 0
 			set po1 [lindex $prototype 1]
 			set lo1 [lindex $line 1]
@@ -412,11 +435,12 @@ proc Assembler_assemble {{asm  ""}} {
 			# If there is only one operand, we are done.
 			if {[llength $prototype] == 2} {
 				set match 1
-				lappend mem $code
+				lappend assembled [string trim $code]
 				break
 			}
 
-			# Compare the first operands.
+			# Compare the second operands. We do this in exactly the same way we
+			# did for the first operands.
 			set so_match 0
 			set po2 [lindex $prototype 2]
 			set lo2 [lindex $line 2]
@@ -512,7 +536,7 @@ proc Assembler_assemble {{asm  ""}} {
 			
 			# Otherwise we are done.
 			set match 1
-			lappend mem $code
+			lappend assembled [string trim $code]
 			break
 		}
 		
@@ -527,8 +551,10 @@ proc Assembler_assemble {{asm  ""}} {
 			continue
 		}
 		
-		# See if this is a symbol definition line.
-		set sym_val [Assembler_find_symbol $line] 
+		# We don't have an instruction match, so maybe this is a constant declaration.
+		# Use our define-symbol routine to extract the symbol string and its value.
+		# We do not allow re-definition of symbols.
+		set sym_val [Assembler_define_symbol $line] 
 		if {$sym_val != ""} {
 			set sym [lindex $sym_val 0]
 			set val [lindex $sym_val 1]
@@ -547,15 +573,18 @@ proc Assembler_assemble {{asm  ""}} {
 			continue
 		} 
 		
-		# See if this is a label line.
+		# The last possibility for this source code line is that it is a label
+		# marker: an alphanumeric string with a colon after it, which marks a
+		# location in the code for jumping to. We append labels with their colons
+		# to our assembled code list, to be resolved later.
 		if {[regexp {^\w+:$} $line lbl]} {
 			set match 1
-			lappend mem "$lbl "
+			lappend assembled "$lbl "
 			LWDAQ_print $info(text) $lbl 
 			continue
 		}
 		
-		# Any other characters are an error.
+		# We have failed to identify this line, so generate an error.
 		if {[regexp {\w+} $line dummy]} {
 			set message "ERROR: Unrecognised pneumoic at line $line_index\: \"$line\"."
 			LWDAQ_print $info(text) $message
@@ -563,74 +592,96 @@ proc Assembler_assemble {{asm  ""}} {
 		}
 	}
 	
-	LWDAQ_print $info(text) $mem orange
+	LWDAQ_print $info(text) $assembled orange
 	
-	# Now we resolve the label values. Each element of the memory dump is now
-	# either a byte, which counts as one address, or a label with no colon,
-	# which counts as two, because we are going to replace it with two bytes
-	# wherever it appears in the code, or a label with a colon, which counts as
-	# nothing because it's just a marker. But when we come to the marker, we add
-	# it to the symbol list.
+	# Resolve the label values. Each element of the memory dump is now one or
+	# more bytes, one or more bytes with a label that needs to be substituted,
+	# or a label on its own that we need to resolve. As we go through the
+	# assembled code, we keep track of the instruction memory address. The way
+	# we do this depends upon the processor. The OSR8 uses one to three bytes
+	# per instruction in its byte-wide instruction memory, and those bytes are
+	# the ones listed in our assembled instruction strings. The RMC5 has one
+	# instruction memory location per instruction.
 	set addr [expr $config(base_addr)]
 	LWDAQ_print $info(text) "Resolving address labels,\
 		base address $config(base_addr):" $info(t_color)
-	set new_mem ""
-	foreach m $mem {
-		if {[regexp -nocase {^[0-9A-F]+$} $m]} {
-			incr addr
-			lappend new_mem $m
-		} elseif {[regexp {^(\w+)$} $m dummy lbl]} {
-			incr addr
-			incr addr
-			lappend new_mem $m
-		} elseif {[regexp {^(\w+):$} $m dummy lbl]} {
-			if {[lsearch -index 0 $label_list $lbl] >= 0} {
-				set message "ERROR: Label \"$lbl\"\ defined more than once."
+	set new_assembled ""
+	foreach m $assembled {
+		set new_m ""
+		foreach element $m {
+			if {[regexp -nocase {^[0-9A-F]+$} $element]} {
+				if {$config(cpu) == "OSR8"} {incr addr}
+				append new_m "$element "
+			} elseif {[regexp {^(\w+)$} $element dummy lbl]} {
+				if {$config(cpu) == "OSR8"} {
+					incr addr
+					incr addr
+				}
+				append new_m "$element "
+			} elseif {[regexp {^(\w+):$} $element dummy lbl]} {
+				if {[lsearch -index 0 $label_list $lbl] >= 0} {
+					set message "ERROR: Label \"$lbl\"\ defined more than once."
+					LWDAQ_print $info(text) $message
+					error $message
+				}
+				set val "[format %02X [expr $addr / 256]] [format %02X [expr $addr % 256]] "
+				lappend label_list [list $lbl $val]	
+				LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
+			} else {
+				set message "ERROR: Bad label \"$m\" in object code."
 				LWDAQ_print $info(text) $message
 				error $message
 			}
-			set val "[format %02X [expr $addr / 256]] [format %02X [expr $addr % 256]] "
-			lappend label_list [list $lbl $val]	
-			LWDAQ_print $info(text) "$lbl\: 0x[format %04X $addr]"
-		} else {
-			set message "ERROR: Bad label \"$m\" in object code."
-			LWDAQ_print $info(text) $message
-			error $message
+		}
+		if {$new_m != ""} {
+			if {$config(cpu) == "RMC5"} {incr addr}
+			lappend new_assembled [string trim $new_m]
 		}
 	}
-	set mem $new_mem
+	set assembled $new_assembled
 	
-	# Replace labels with their address values.
-	set new_mem ""
+	LWDAQ_print $info(text) $assembled green
+
+	# Now that we have a list of labels and their corresponding instruction
+	# memory addresses, replace all labels with their address values, which will
+	# be two hex bytes.
+	set new_assembled ""
 	set counter 0
-	foreach m $mem {
-		if {[regexp -nocase {^[0-9A-F]+$} $m]} {
-			append new_mem "$m "
-			continue
-		}
-		set found_label 0
-		foreach lbl $label_list {
-			set label [lindex $lbl 0]
-			set value [lindex $lbl 1]
-			if {$m == $label} {
-				append new_mem "$value "
-				set found_label 1
-				break
+	foreach m $assembled {
+		set new_m ""
+		foreach element $m {
+			if {[regexp -nocase {^[0-9A-F]+$} $element]} {
+				append new_m "$element "
+				continue
+			}
+			set found_label 0
+			foreach lbl $label_list {
+				set label [lindex $lbl 0]
+				set value [lindex $lbl 1]
+				if {$element == $label} {
+					append new_m "$value "
+					set found_label 1
+					break
+				}
+			}
+			if {!$found_label} {
+				set message "ERROR: Undefined label \"$m\"."
+				LWDAQ_print $info(text) $message
+				error $message
+			} else {
+				incr counter
 			}
 		}
-		if {!$found_label} {
-			set message "ERROR: Undefined label \"$m\"."
-			LWDAQ_print $info(text) $message
-			error $message
-		} else {
-			incr counter
-		}
+		lappend new_assembled [string trim $new_m]
 	}
-	set mem $new_mem
+	set assembled $new_assembled
+
+	LWDAQ_print $info(text) $assembled blue
 	
-	# Go through the object code and write bytes to object file if enabled,
-	# and always to the text window. The format is either hex bytes or decimal
-	# bytes, as selected by user.
+	# We now have our asssembled object code, in the form of a list of instructions.
+	# Each instruction is defined by one to three bytes. We are ready to write the
+	# object code to the screen and to disk. The format is either hexadecimal 
+	# bytes or binary strings, as selected by user.
 	if {$config(ofn_write)} {
 		LWDAQ_print $info(text) "Opening output file $config(ofn)." $info(t_color)
 		set f [open $config(ofn) w]
@@ -641,7 +692,7 @@ proc Assembler_assemble {{asm  ""}} {
 		LWDAQ_print $info(text) "Instructions in binary format:" $info(t_color)
 	}
 	set index 0
-	foreach instruction $mem {
+	foreach instruction $assembled {
 		if {$config(cpu) == "OSR8"} {
 			foreach value $instruction {
 				if {[expr 0x$value] > 255} {
@@ -651,30 +702,44 @@ proc Assembler_assemble {{asm  ""}} {
 				}
 				if {$config(output_format) == "Hex"} {
 					if {$config(ofn_write)} {puts $f $value}
-					LWDAQ_print -nonewline $info(text) $value
+					LWDAQ_print -nonewline $info(text) "$value "
 				} else {
 					set binvalue [format %08b [expr 0x$value]]
 					if {$config(ofn_write)} {puts $f $binvalue}
-					LWDAQ_print -nonewline $info(text) $binvalue
+					LWDAQ_print -nonewline $info(text) "$binvalue "
 				}
 				incr index
 				if {$index % $config(bytes_per_line) == 0} {LWDAQ_print $info(text)}
 			}
-		}
+		} else {
+			set opcode [format %05b [expr 0x[lindex $instruction 0]]]
+			if {[llength $instruction] == 3} {
+				set operand [expr (0x[lindex $instruction 1] * 256) \
+					+ 0x[lindex $instruction 2]]
+			} else {
+				set operand 0
+			}
+			set operand [format %0[set config(addr_width)]b $operand]
+			if {$config(ofn_write)} {puts $f "$opcode$operand"}
+			LWDAQ_print -nonewline $info(text) "$opcode$operand "
+			incr index
+			if {$index % $config(bytes_per_line) == 0} {LWDAQ_print $info(text)}
+		} 
 	}
 	
+	# Tidy up, we are done.
 	if {$index % $config(bytes_per_line) != 0} {LWDAQ_print $info(text)}
 	if {$config(ofn_write)} {
 		close $f
-		LWDAQ_print $info(text) "Generated [llength $mem] code bytes,\
+		LWDAQ_print $info(text) "Generated [llength $assembled] code bytes,\
 			printed to screen, saved to \"$config(ofn)\"." $info(t_color)
 	} else {
-		LWDAQ_print $info(text) "Generated [llength $mem] code bytes,\
+		LWDAQ_print $info(text) "Generated [llength $assembled] code bytes,\
 			printed to screen, not saved to disk." $info(t_color)	
 	}
 	LWDAQ_print $info(text) "Done. \([clock format [clock seconds]]\)\n" $info(t_color)
 	
-	return $mem
+	return $assembled
 }
 
 proc Assembler_disassemble {{mem  ""}} {
@@ -890,6 +955,7 @@ proc Assembler_open {} {
 Assembler_init
 Assembler_open
 Assembler_load
+Assembler_set_cpu "OSR8"
 
 return ""
 
