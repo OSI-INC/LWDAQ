@@ -118,15 +118,11 @@ proc Assembler_load {} {
 		lassign $match first last
 		set data [string range $data [expr $last+1] end]
 
-		LWDAQ_print -nonewline $info(text) "$cpu"
 		foreach d $instructions {
 			if {[regexp { +-- +([0-9A-Fa-f]{2}) +(.*)} $d dummy opcode syntax]} {
 				lappend info($cpu\_instructions) [list $syntax $opcode]
-				LWDAQ_print -nonewline $info(text) "."
-				LWDAQ_update
 			}
 		}
-		LWDAQ_print $info(text)
 		LWDAQ_print $info(text) "Loaded [llength [set info($cpu\_instructions)]]\
 			opcodes with syntax for $cpu processor."
 		LWDAQ_update
@@ -592,8 +588,6 @@ proc Assembler_assemble {{asm  ""}} {
 		}
 	}
 	
-	LWDAQ_print $info(text) $assembled orange
-	
 	# Resolve the label values. Each element of the memory dump is now one or
 	# more bytes, one or more bytes with a label that needs to be substituted,
 	# or a label on its own that we need to resolve. As we go through the
@@ -640,8 +634,6 @@ proc Assembler_assemble {{asm  ""}} {
 	}
 	set assembled $new_assembled
 	
-	LWDAQ_print $info(text) $assembled green
-
 	# Now that we have a list of labels and their corresponding instruction
 	# memory addresses, replace all labels with their address values, which will
 	# be two hex bytes.
@@ -676,8 +668,6 @@ proc Assembler_assemble {{asm  ""}} {
 	}
 	set assembled $new_assembled
 
-	LWDAQ_print $info(text) $assembled blue
-	
 	# We now have our asssembled object code, in the form of a list of instructions.
 	# Each instruction is defined by one to three bytes. We are ready to write the
 	# object code to the screen and to disk. The format is either hexadecimal 
