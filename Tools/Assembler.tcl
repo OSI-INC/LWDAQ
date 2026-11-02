@@ -1054,37 +1054,44 @@ END_OSR8
 
 BEGIN_RMC5
 
-constant nop      : opcode_type := "00000"; -- 00 nop
-constant jp_nn    : opcode_type := "00001"; -- 01 jp nn
-constant jp_nz_nn : opcode_type := "00010"; -- 02 jp nz,nn
-constant jp_z_nn  : opcode_type := "00011"; -- 03 jp z,nn
-constant jp_nc_nn : opcode_type := "00100"; -- 04 jp nc,nn
-constant jp_c_nn  : opcode_type := "00101"; -- 05 jp c,nn
-constant call_nn  : opcode_type := "00110"; -- 06 call nn
-constant ret_cll  : opcode_type := "00111"; -- 07 ret
+constant nop       : opcode_type := "00000"; -- 00 nop
+constant jp_nn     : opcode_type := "00001"; -- 01 jp nn
+constant jp_nz_nn  : opcode_type := "00010"; -- 02 jp nz,nn
+constant jp_z_nn   : opcode_type := "00011"; -- 03 jp z,nn
+constant jp_nc_nn  : opcode_type := "00100"; -- 04 jp nc,nn
+constant jp_c_nn   : opcode_type := "00101"; -- 05 jp c,nn
+constant call_nn   : opcode_type := "00110"; -- 06 call nn
+constant ret_cll   : opcode_type := "00111"; -- 07 ret
 
-constant ret_int  : opcode_type := "01000"; -- 08 rti
-constant push_A   : opcode_type := "01001"; -- 09 push A
-constant pop_A    : opcode_type := "01010"; -- 0A pop A
-constant push_F   : opcode_type := "01011"; -- 0B push F
-constant pop_F    : opcode_type := "01100"; -- 0C pop F
-constant ld_m_A   : opcode_type := "01101"; -- 0D ld (nn),A
-constant ld_A_m   : opcode_type := "01110"; -- 0E ld A,(nn)
+constant ret_int   : opcode_type := "01000"; -- 08 rti
+constant push_A    : opcode_type := "01001"; -- 09 push A
+constant pop_A     : opcode_type := "01010"; -- 0A pop A
+constant push_F    : opcode_type := "01011"; -- 0B push F
+constant pop_F     : opcode_type := "01100"; -- 0C pop F
 
-constant add_A_m  : opcode_type := "10000"; -- 10 add A,(nn)
-constant adc_A_m  : opcode_type := "10001"; -- 11 adc A,(nn)
-constant sub_A_m  : opcode_type := "10010"; -- 12 sub A,(nn)
-constant sbc_A_m  : opcode_type := "10011"; -- 13 sbc A,(nn)
+constant ld_m_A    : opcode_type := "01101"; -- 0D ld (nn),A
+constant ld_A_m    : opcode_type := "01110"; -- 0E ld A,(nn)
+constant ld_IX_A   : opcode_type := "01111"; -- 0F ld (IX),A
 
-constant and_A_m  : opcode_type := "10100"; -- 14 and A,(nn)
-constant or_A_m   : opcode_type := "10101"; -- 15 or A,(nn)
-constant xor_A_m  : opcode_type := "10110"; -- 16 xor A,(nn)
+constant add_A_m   : opcode_type := "10000"; -- 10 add A,(nn)
+constant adc_A_m   : opcode_type := "10001"; -- 11 adc A,(nn)
+constant sub_A_m   : opcode_type := "10010"; -- 12 sub A,(nn)
+constant sbc_A_m   : opcode_type := "10011"; -- 13 sbc A,(nn)
 
-constant rl_A     : opcode_type := "11000"; -- 18 rl A
-constant rr_A     : opcode_type := "11001"; -- 19 rr A
-constant clr_aflg : opcode_type := "11010"; -- 1A clrf
-constant clr_iflg : opcode_type := "11011"; -- 1B clri
-constant set_iflg : opcode_type := "11100"; -- 1C seti
+constant and_A_m   : opcode_type := "10100"; -- 14 and A,(nn)
+constant or_A_m    : opcode_type := "10101"; -- 15 or A,(nn)
+constant xor_A_m   : opcode_type := "10110"; -- 16 xor A,(nn)
+
+constant ld_A_IX   : opcode_type := "10111"; -- 17 ld A,(IX)
+constant ld_IX_nn  : opcode_type := "11000"; -- 18 ld IX,nn
+constant inc_IX    : opcode_type := "11001"; -- 19 inc IX
+constant dec_IX    : opcode_type := "11010"; -- 1A dec IX
+
+constant rl_A      : opcode_type := "11011"; -- 1B rl A
+constant rr_A      : opcode_type := "11100"; -- 1C rr A
+constant clr_aflg  : opcode_type := "11101"; -- 1D clrf
+constant clr_iflg  : opcode_type := "11110"; -- 1E clri
+constant set_iflg  : opcode_type := "11111"; -- 1F seti
 
 END_RMC5
 
