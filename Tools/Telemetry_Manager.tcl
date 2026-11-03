@@ -26,7 +26,7 @@ proc Telemetry_Manager_init {} {
 	upvar #0 Telemetry_Manager_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Telemetry_Manager" "1.6"
+	LWDAQ_tool_init "Telemetry_Manager" "1.7"
 	if {[winfo exists $info(window)]} {return ""}
 	
 	set config(ip_addr) "10.0.0.37"
@@ -1030,7 +1030,8 @@ proc Telemetry_Manager_refresh_list {{fn ""}} {
 # in decimal or in hexadecimal in the format "0x0FFF". The programmer uses a
 # text file as its source of bytes to upload to a device. These bytes must be
 # delimited by whitespace. They can be expressed as decimal values or two-digit
-# hex values in the 0xFF format.
+# hex values in the 0xFF format. Comments may be added after a value by using
+# a semicolon.
 #
 proc Telemetry_Manager_program {n} {
 	upvar #0 Telemetry_Manager_config config
@@ -1138,7 +1139,7 @@ proc Telemetry_Manager_compile {} {
 	upvar #0 Telemetry_Manager_info info
 
 	# Set the control to upload.
-	set info(prog_control) "Upload"
+	set info(prog_control) "Compile"
 	LWDAQ_update
 	
 	# Restore control variable and return.
@@ -1146,22 +1147,26 @@ proc Telemetry_Manager_compile {} {
 }
 
 #
-# Telemetry_Manager_upload reads bytes in decimal string format from a text
-# file and uploads them to the sensor's non-volatile memory. The number of
-# bytes written must be divisible by sixteen, and the destination address must
-# lie on a sixteen-byte boundary. The non-volatile memory enforces a write page
-# size of sixteen bytes and the pages lie on sixteen-byte boundaries. If we pass
-# no arguments to this routine, it picks the device identifier form the
-# programming panel, reads the contents of the file named in the programming
-# panel, and uses the address provided in the programming panel. Otherwise, it
-# uses the identifier, data, and address provided in its argument list. The data
-# must be a list of bytes delimited by white spaces with each byte in either
-# decimal or 0xFF hexadecimal format. The routine takes a segment of bytes from
-# the front of the list and uploads them to the given address, then posts itself
-# to the LWDAQ event queue with the remaining bytes as data and an address
-# incremented by the segment length. By posting itself to the event queue, the
-# upload process allows the Receiver Instrument and the Telemetry Manager
-# Monitor to continue operating.
+# Telemetry_Manager_upload either receives a string of decimal and hexadecimal
+# byte values as its final argument, or reads such a string bytes from a text
+# file. When reading from a text file, the routine deletes comments that begin
+# with a semicolon and end with a newline, replacing them with a space. The
+# routine replaces all remaining newlines with a space. Now it uploads the byte
+# values to the sensor's non-volatile memory in segments that are each sixteen
+# bytes long. The number of bytes written must be divisible by sixteen, and the
+# destination address must lie on a sixteen-byte boundary. The non-volatile
+# memory enforces a write page size of sixteen bytes and the pages lie on
+# sixteen-byte boundaries. If we pass no arguments to this routine, it picks the
+# device identifier from the programming panel, reads the contents of the file
+# named in the programming panel, and uses the address provided in the
+# programming panel. Otherwise, it uses the identifier, data, and address
+# provided in its argument list. The data must be a list of bytes delimited by
+# white spaces with each byte in either decimal or 0xFF hexadecimal format. The
+# routine takes a segment of bytes from the front of the list and uploads them
+# to the given address, then posts itself to the LWDAQ event queue with the
+# remaining bytes as data and an address incremented by the segment length. By
+# posting itself to the event queue, the upload process allows the Receiver
+# Instrument and the Telemetry Manager Monitor to continue operating.
 #
 proc Telemetry_Manager_upload {{id ""} {addr ""} {data ""}} {
 	upvar #0 Telemetry_Manager_config config
@@ -1191,6 +1196,7 @@ proc Telemetry_Manager_upload {{id ""} {addr ""} {data ""}} {
 			set f [open $config(prog_file)]
 			set data [read $f]
 			close $f
+			set data [regsub -all {;[^\n]*\n} $data " "]
 			set data [regsub -all {\n} $data " "]
 			set data [string trim $data]
 			LWDAQ_print $info(prog_text) "Read [llength $data] data bytes\
