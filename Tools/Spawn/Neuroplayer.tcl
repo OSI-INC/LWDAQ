@@ -437,6 +437,11 @@ proc Neuroplayer_init {} {
 #
 	set info(play_file_saved) "None"
 #
+# The file tail variable allows us to display just the name of the play
+# file rather than its full path and name.
+#
+	set info(play_file_tail) [file tail $config(play_file)]
+#
 # The play_file_saved_mtime saves the play file modification time, which allows
 # us to recognise when the file has been modified, so we re-calculate the
 # end time, which is useful when the file is being written to by the Recorder.
