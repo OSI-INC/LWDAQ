@@ -31,7 +31,7 @@ proc RAG_Manager_init {} {
 #
 # Set up the RAG Manager in the LWDAQ tool system.
 #
-	LWDAQ_tool_init "RAG_Manager" "8.6"
+	LWDAQ_tool_init "RAG_Manager" "8.7"
 	if {[winfo exists $info(window)]} {return ""}
 #
 # Set the default directory root for the RAG library and initialize file names.
@@ -987,6 +987,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 	set section_chunk 0
 	set match_prompts_only 0
 	set omit_lists 0
+	set omit_pre 0
 	set summary_match 0
 	set commands [RAG_Manager_list_bodies $page "rag"]
 	foreach cmd $commands {
@@ -1007,6 +1008,9 @@ proc RAG_Manager_construct_chunks {page frags} {
 			"omit-lists" {
 				set omit_lists 1
 			}
+			"omit-pre" {
+				set omit_pre 1
+			}
 			"summary-match" {
 				set summary_match 1
 			}
@@ -1021,6 +1025,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 		section-chunk=$section_chunk,\
 		\nmatch-prompts-only=$match_prompts_only,\
 		omit-lists=$omit_lists,\
+		omit-pre=$omit_pre,\
 		summary-match=$summary_match."
 	
 	set date "NONE"
@@ -1104,6 +1109,7 @@ proc RAG_Manager_construct_chunks {page frags} {
 				set match $content
 			}
 			"pre" {
+				if {$omit_pre} {continue}
 				set match $content
 			}
 			"title" {
