@@ -28,7 +28,7 @@ proc Assembler_init {} {
 	upvar #0 Assembler_config config
 	global LWDAQ_Info LWDAQ_Driver
 	
-	LWDAQ_tool_init "Assembler" "4.1"
+	LWDAQ_tool_init "Assembler" "4.2"
 	if {[winfo exists $info(window)]} {
 		raise $info(window)
 		return ""
@@ -721,10 +721,10 @@ proc Assembler_assemble {{asm  ""}} {
 	if {$index % $config(bytes_per_line) != 0} {LWDAQ_print $info(text)}
 	if {$config(ofn_write)} {
 		close $f
-		LWDAQ_print $info(text) "Generated [llength $assembled] code bytes,\
+		LWDAQ_print $info(text) "Generated $index code bytes,\
 			printed to screen, saved to \"$config(ofn)\"." $info(t_color)
 	} else {
-		LWDAQ_print $info(text) "Generated [llength $assembled] code bytes,\
+		LWDAQ_print $info(text) "Generated $index code bytes,\
 			printed to screen, not saved to disk." $info(t_color)	
 	}
 	LWDAQ_print $info(text) "Done. \([clock format [clock seconds]]\)\n" $info(t_color)

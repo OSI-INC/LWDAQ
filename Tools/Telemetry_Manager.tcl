@@ -778,7 +778,8 @@ proc Telemetry_Manager_draw_list {} {
 				Zon green \
 				Zoff black \
 				Query black \
-				Program black} {
+				Program black \
+				Prognew blue} {
 			set b [string tolower $a]
 			button $ff.$b -text $a -padx $padx -fg $c -command \
 				[list LWDAQ_post "Telemetry_Manager_$b $n" front]
